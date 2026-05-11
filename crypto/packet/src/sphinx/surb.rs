@@ -234,7 +234,8 @@ mod tests {
     use hopr_types::crypto_random::Randomizable;
 
     use super::*;
-    use super::super::ec_groups::X25519Suite;
+    #[cfg(feature = "x25519")]
+    use crate::sphinx::ec_groups::X25519Suite;
     use super::super::tests::*;
 
     #[allow(type_alias_bounds)]
@@ -258,6 +259,7 @@ mod tests {
         )?)
     }
 
+    #[cfg(feature = "x25519")]
     #[test]
     fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
         let (surb_1, _) = generate_surbs::<X25519Suite>((0..3).map(|_| OffchainKeypair::random()).collect())?;

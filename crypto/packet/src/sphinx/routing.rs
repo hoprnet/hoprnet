@@ -602,7 +602,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<super::super::ec_groups::Ed25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
             reply,
         )
@@ -611,7 +611,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_x25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<super::super::ec_groups::X25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
             reply,
         )
@@ -620,7 +620,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<super::super::ec_groups::Secp256k1Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
             reply,
         )

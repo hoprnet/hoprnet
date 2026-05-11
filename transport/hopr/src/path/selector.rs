@@ -261,7 +261,7 @@ mod tests {
     };
 
     use super::*;
-    use super::{PathPlannerConfig, traits::PathSelector};
+    use crate::path::{PathPlannerConfig, traits::PathSelector};
 
     fn test_selector(
         me: OffchainPublicKey,

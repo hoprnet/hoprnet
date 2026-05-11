@@ -780,7 +780,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<super::super::ec_groups::X25519Suite>(
+        generic_test_meta_packet::<crate::sphinx::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -788,7 +788,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<super::super::ec_groups::X25519Suite>(
+        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -796,7 +796,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "x25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<super::super::ec_groups::X25519Suite>(
+        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -804,7 +804,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<super::super::ec_groups::Ed25519Suite>(
+        generic_test_meta_packet::<crate::sphinx::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -812,7 +812,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<super::super::ec_groups::Ed25519Suite>(
+        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -820,7 +820,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "ed25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<super::super::ec_groups::Ed25519Suite>(
+        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -828,7 +828,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<super::super::ec_groups::Secp256k1Suite>(
+        generic_test_meta_packet::<crate::sphinx::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
@@ -838,7 +838,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<super::super::ec_groups::Secp256k1Suite>(
+        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
@@ -848,7 +848,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "secp256k1", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<super::super::ec_groups::Secp256k1Suite>(
+        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),

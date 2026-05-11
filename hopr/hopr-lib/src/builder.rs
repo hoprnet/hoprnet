@@ -357,7 +357,7 @@ where
     #[cfg(all(feature = "telemetry", not(test)))]
     {
         use hopr_api::types::primitive::traits::AsUnixTimestamp;
-        METRIC_PROCESS_START_TIME.set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
+        METRIC_PROCESS_START_TIME.set(std::time::SystemTime::now().as_unix_timestamp().as_secs_f64());
         METRIC_HOPR_LIB_VERSION.set(
             &[const_format::formatcp!("{}", constants::APP_VERSION)],
             const_format::formatcp!(

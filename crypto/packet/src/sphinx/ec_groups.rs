@@ -223,7 +223,7 @@ mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(nodes = {4, 3, 2, 1})]
     fn test_ed25519_shared_keys(nodes: usize) {
-        generic_sphinx_suite_test::<super::Ed25519Suite>(nodes)
+        generic_sphinx_suite_test::<crate::Ed25519Suite>(nodes)
     }
 
     #[cfg(feature = "x25519")]

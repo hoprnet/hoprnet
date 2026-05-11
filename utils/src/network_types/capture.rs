@@ -56,7 +56,7 @@ impl<T> PcapIO<T> {
         let (sender, receiver) = futures::channel::mpsc::channel::<CapturedPacket>(10_000);
         let file = file.to_owned();
 
-        hopr_utils::runtime::prelude::spawn(async move {
+        crate::runtime::prelude::spawn(async move {
             match std::fs::File::create(file)
                 .and_then(|f| pcap_file::pcapng::PcapNgWriter::new(f).map_err(std::io::Error::other))
             {
@@ -72,7 +72,7 @@ impl<T> PcapIO<T> {
                     while let Some(next) = receiver.next().await {
                         let writer = writer.clone();
 
-                        if let Err(error) = hopr_utils::runtime::prelude::spawn_blocking(move || {
+                        if let Err(error) = crate::runtime::prelude::spawn_blocking(move || {
                             let data = next.as_ref();
                             writer
                                 .lock()

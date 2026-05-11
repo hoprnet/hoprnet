@@ -424,7 +424,7 @@ mod tests {
     };
 
     use super::*;
-    use super::selector::HoprGraphPathSelector;
+    use crate::path::selector::HoprGraphPathSelector;
 
     #[derive(Debug)]
     struct TestError(String);

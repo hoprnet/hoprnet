@@ -70,7 +70,7 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `tokio` resolver.
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "network-types-runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
@@ -268,12 +268,12 @@ impl std::fmt::Display for SealedHost {
 #[cfg(test)]
 mod tests {
     use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "network-types-runtime-tokio")]
     use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
 
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "network-types-runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -288,7 +288,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "runtime-tokio")]
+    #[cfg(feature = "network-types-runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;

@@ -42,6 +42,7 @@ aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6" }
 assertables = "9.9.0"
 async-broadcast = "0.7.2"
+async_channel_io = "0.3.0"
 async-lock = "3.4.2"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }

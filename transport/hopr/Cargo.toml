@@ -40,6 +40,7 @@ serde = [
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
+async_channel_io = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
@@ -68,7 +69,7 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-types = { workspace = true, features = ["crypto", "random", "internal", "primitive", "serde"] }
 
 hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon", "statistics-types", "statistics-types-weighted"] }
-hopr-crypto-packet = { workspace = true }
+hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-ticket-manager = { workspace = true }

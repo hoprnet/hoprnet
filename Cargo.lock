@@ -1148,6 +1148,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-channel"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "924ed96dd52d1b75e9c1a3e6275715fd320f5f9439fb5a4a11fa51f4221158d2"
+dependencies = [
+ "concurrent-queue",
+ "event-listener-strategy",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "async-compression"
 version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1219,6 +1231,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "async_channel_io"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2817ab4eedf77732e9b8fa765801a598df651b49264112a75c72d8f5f56319d"
+dependencies = [
+ "async-channel 2.5.0",
+ "futures",
+ "log",
 ]
 
 [[package]]
@@ -2990,7 +3013,7 @@ version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24076708e74fbd55fb36079acbba19988175140026cc67a878b91b0c3751220b"
 dependencies = [
- "async-channel",
+ "async-channel 1.9.0",
  "async-io",
  "futures-core",
  "pin-project-lite",
@@ -3844,6 +3867,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-trait",
+ "async_channel_io",
  "bimap",
  "bytes",
  "bytesize",
