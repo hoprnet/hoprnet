@@ -13,7 +13,7 @@ members = [
   "protocols/hopr",
   "protocols/session",
   "protocols/start",
-  "transport/api",
+  "transport/hopr",
   "transport/mixer",
   "transport/path",
   "transport/probe",
@@ -177,7 +177,7 @@ hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
 hopr-ticket-manager = { path = "impls/ticket-manager" }
-hopr-transport = { path = "transport/api", default-features = false }
+hopr-transport = { path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
 hopr-transport-path = { path = "transport/path", default-features = false }
 hopr-transport-probe = { path = "transport/probe", default-features = false }
