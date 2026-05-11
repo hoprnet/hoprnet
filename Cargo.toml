@@ -180,26 +180,26 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", version = "0.12.1", default-featu
   "x25519",
   "ed25519",
 ] }
-hopr-lib = { path = "hopr/hopr-lib", version = "4.0.2-rc.1", default-features = false }
-hopr-metrics = { path = "misc/metrics", version = "2.0.0", default-features = false }
-hopr-network-types = { path = "common/network-types", version = "1.2.1", default-features = false }
-hopr-parallelize = { path = "common/parallelize", version = "0.2.2", default-features = false }
-hopr-platform = { path = "misc/platform", version = "0.3.1", default-features = false }
-hopr-protocol-app = { path = "protocols/app", version = "1.0.1", default-features = false }
-hopr-protocol-hopr = { path = "protocols/hopr", version = "4.6.0", default-features = false }
-hopr-protocol-session = { path = "protocols/session", version = "1.1.1", default-features = false }
-hopr-protocol-start = { path = "protocols/start", version = "1.1.0", default-features = false }
-hopr-ticket-manager = { path = "logic/ticket-manager", version = "0.4.0" }
-hopr-transport = { path = "transport/api", version = "0.28.1", default-features = false }
-hopr-transport-mixer = { path = "transport/mixer", version = "0.4.0", default-features = false }
-hopr-transport-path = { path = "transport/path", version = "0.3.0", default-features = false }
-hopr-transport-probe = { path = "transport/probe", version = "0.6.0", default-features = false }
-hopr-transport-protocol = { path = "transport/protocol", version = "1.8.2", default-features = false }
-hopr-transport-session = { path = "transport/session", version = "0.21.0", default-features = false }
-hopr-transport-tag-allocator = { path = "transport/tag-allocator", version = "0.1.1", default-features = false }
-hopr-chain-connector = { path = "impls/connector", version = "0.20.0" }
-hopr-statistics = { path = "common/statistics", version = "0.2.0" }
-hopr-test-stubs = { path = "common/test-stubs", version = "0.1.0" }
+hopr-lib = { path = "hopr/hopr-lib", default-features = false }
+hopr-metrics = { path = "misc/metrics", default-features = false }
+hopr-network-types = { path = "common/network-types", default-features = false }
+hopr-parallelize = { path = "common/parallelize", default-features = false }
+hopr-platform = { path = "misc/platform", default-features = false }
+hopr-protocol-app = { path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
+hopr-protocol-session = { path = "protocols/session", default-features = false }
+hopr-protocol-start = { path = "protocols/start", default-features = false }
+hopr-ticket-manager = { path = "logic/ticket-manager" }
+hopr-transport = { path = "transport/api", default-features = false }
+hopr-transport-mixer = { path = "transport/mixer", default-features = false }
+hopr-transport-path = { path = "transport/path", default-features = false }
+hopr-transport-probe = { path = "transport/probe", default-features = false }
+hopr-transport-protocol = { path = "transport/protocol", default-features = false }
+hopr-transport-session = { path = "transport/session", default-features = false }
+hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
+hopr-chain-connector = { path = "impls/connector" }
+hopr-statistics = { path = "common/statistics" }
+hopr-test-stubs = { path = "common/test-stubs" }
 
 # referential implementations
 hopr-reference = { path = "hopr/reference", version = "4.1.1", default-features = false }

@@ -32,7 +32,6 @@
     - [Nix flake outputs](#nix-flake-outputs)
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
-- [Local cluster](#local-cluster)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
 - [Code Coverage](#code-coverage)
@@ -112,10 +111,6 @@ nix run .#check
 ```
 
 This will in particular run `clippy` for the entire Rust codebase.
-
-## Local cluster
-
-The best way to test with multiple HOPR nodes is by using a [local cluster of interconnected nodes](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 

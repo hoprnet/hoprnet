@@ -553,6 +553,9 @@ where
         let graph_updater = graph.clone();
         let chain_reader = chain_api.clone();
 
+        let own_chain_addr = me_onchain;
+        let own_packet_key = *transport_id.public();
+
         let ticket_price = Arc::new(parking_lot::RwLock::new(
             chain_reader.minimum_ticket_price().await.unwrap_or_default(),
         ));
@@ -572,6 +575,7 @@ where
                     let win_probability = win_probability.clone();
 
                     async move {
+                        tracing::debug!(event = %chain_event, "processing chain event");
                         match chain_event {
                             ChainEvent::Announcement(account) => {
                                 tracing::debug!(
@@ -584,13 +588,16 @@ where
                             | ChainEvent::ChannelClosed(channel)
                             | ChainEvent::ChannelBalanceIncreased(channel, _)
                             | ChainEvent::ChannelBalanceDecreased(channel, _) => {
+                                let src_addr = channel.source;
+                                let dst_addr = channel.destination;
                                 let keys = hopr_async_runtime::prelude::spawn_blocking(move || {
-                                    chain_reader
-                                        .chain_key_to_packet_key(&channel.source)
-                                        .and_then(|src| {
-                                            Ok(src.zip(chain_reader.chain_key_to_packet_key(&channel.destination)?))
-                                        })
-                                        .map_err(anyhow::Error::from)
+                                    let resolve = |addr: Address| {
+                                        if addr == own_chain_addr {
+                                            return Ok(Some(own_packet_key));
+                                        }
+                                        chain_reader.chain_key_to_packet_key(&addr).map_err(anyhow::Error::from)
+                                    };
+                                    resolve(src_addr).and_then(|src| resolve(dst_addr).map(|dst| src.zip(dst)))
                                 })
                                 .await
                                 .map_err(anyhow::Error::from)
@@ -644,7 +651,9 @@ where
                                     }
                                 }
                             }
-                            ChainEvent::ChannelClosureInitiated(_) => {}
+                            ChainEvent::ChannelClosureInitiated(channel) => {
+                                tracing::debug!(%channel, "channel closure initiated; no graph update");
+                            }
                             ChainEvent::WinningProbabilityIncreased(prob)
                             | ChainEvent::WinningProbabilityDecreased(prob) => {
                                 tracing::debug!(%prob, "recording winning probability change");

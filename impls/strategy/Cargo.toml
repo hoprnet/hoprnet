@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.18.1"
+version = "0.19.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition.workspace = true
@@ -21,6 +21,7 @@ telemetry = ["dep:hopr-metrics"]
 strategy-auto-funding = []
 strategy-auto-redeeming = []
 strategy-closure-finalizer = []
+strategy-channel-lifecycle = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -42,6 +43,7 @@ hopr-lib = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 moka = { workspace = true, features = ["sync"] }
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }
