@@ -12,6 +12,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+all-benchmarks = []
 capture = ["dep:pcap-file"]
 telemetry = [
   "serde",

@@ -301,7 +301,7 @@ mod tests {
 
         assert_eq!(actual.len(), expected.len());
 
-        actual.sort_by(|a, b| a.frame_id.cmp(&b.frame_id));
+        actual.sort_by_key(|a| a.frame_id);
         assert_eq!(actual, expected);
 
         let _ = jh.await?;

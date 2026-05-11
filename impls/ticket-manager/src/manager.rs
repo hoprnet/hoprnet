@@ -574,7 +574,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         mgr.insert_incoming_ticket(tickets[1])?;
@@ -586,7 +586,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         Ok(())
@@ -777,7 +777,7 @@ mod tests {
             unrealized_value
         );
 
-        let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
+        let neglected = mgr.neglect_tickets(channel.get_id(), None)?;
         assert_eq!(tickets.iter().map(|t| t.ticket).collect::<Vec<_>>(), neglected);
 
         let unrealized_value_after = mgr
@@ -799,7 +799,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         Ok(())
@@ -844,7 +844,7 @@ mod tests {
             unrealized_value
         );
 
-        let neglected = mgr.neglect_tickets(&channel.get_id(), Some(3))?;
+        let neglected = mgr.neglect_tickets(channel.get_id(), Some(3))?;
         assert_eq!(
             tickets
                 .iter()
@@ -873,7 +873,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         Ok(())
@@ -920,7 +920,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: HoprBalance::zero(),
             },
-            mgr.ticket_stats(Some(&tickets[0].ticket.channel_id()))?
+            mgr.ticket_stats(Some(tickets[0].ticket.channel_id()))?
         );
 
         Ok(())
@@ -1016,7 +1016,7 @@ mod tests {
                 .sum()
         );
 
-        let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0].clone())?;
+        let neglected = mgr.insert_incoming_ticket(tickets_from_epoch_2[0])?;
         assert_eq!(
             tickets_from_epoch_1.iter().map(|t| t.ticket).collect::<Vec<_>>(),
             neglected
@@ -1106,7 +1106,7 @@ mod tests {
             blokli_client,
             InMemoryBackend::default(),
             SafePayloadGenerator::new(
-                &private_key,
+                private_key,
                 contract_addresses_for_network("rotsee").unwrap().1,
                 module_addr.into(),
             ),
@@ -1277,7 +1277,7 @@ mod tests {
             unrealized_value - tickets[0].verified_ticket().amount
         );
 
-        let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
+        let neglected = mgr.neglect_tickets(channel.get_id(), None)?;
         assert_eq!(
             tickets.into_iter().skip(1).map(|t| t.ticket).collect::<Vec<_>>(),
             neglected
@@ -1345,7 +1345,7 @@ mod tests {
             .ok_or(anyhow::anyhow!("must have unrealized value"))?;
 
         // Tickets with index 1,2 and 3 get neglected
-        let neglected = mgr.neglect_tickets(&channel.get_id(), Some(tickets[3].verified_ticket().index))?;
+        let neglected = mgr.neglect_tickets(channel.get_id(), Some(tickets[3].verified_ticket().index))?;
         assert_eq!(
             tickets.iter().skip(1).take(3).map(|t| t.ticket).collect::<Vec<_>>(),
             neglected
@@ -1413,7 +1413,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // All the tickets will appear as neglected
-        let neglected = mgr.neglect_tickets(&channel.get_id(), None)?;
+        let neglected = mgr.neglect_tickets(channel.get_id(), None)?;
         assert_eq!(neglected, tickets.iter().map(|t| t.ticket).collect::<Vec<_>>());
 
         assert_eq!(
@@ -1423,7 +1423,7 @@ mod tests {
                 rejected_value: HoprBalance::zero(),
                 neglected_value: neglected.iter().map(|t| t.verified_ticket().amount).sum(),
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         // Once redemption completes we should see the tickets as redeemed
@@ -1441,7 +1441,7 @@ mod tests {
                     .sum::<HoprBalance>()
                     - tickets[0].verified_ticket().amount,
             },
-            mgr.ticket_stats(Some(&channel.get_id()))?
+            mgr.ticket_stats(Some(channel.get_id()))?
         );
 
         Ok(())

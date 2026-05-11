@@ -651,6 +651,13 @@ pub fn collect_hopr_metrics() -> errors::Result<String> {
     hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
 }
 
+/// Converts a PeerId to an OffchainPublicKey.
+///
+/// This is a standalone utility function, not part of the API traits.
+pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPublicKey> {
+    Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -761,11 +768,4 @@ mod tests {
         assert!(red.is_unavailable());
         assert!(unknown.is_unavailable());
     }
-}
-
-/// Converts a PeerId to an OffchainPublicKey.
-///
-/// This is a standalone utility function, not part of the API traits.
-pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPublicKey> {
-    Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
 }

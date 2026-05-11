@@ -459,7 +459,6 @@ mod tests {
         let mut handles = vec![];
         for _ in 0..8 {
             let cache = Arc::clone(&cache);
-            let channel_id = channel_id;
             handles.push(thread::spawn(move || cache.next(&channel_id, epoch)));
         }
 

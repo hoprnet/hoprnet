@@ -140,9 +140,9 @@ mod tests {
         pub id: OffchainPublicKey,
     }
 
-    impl Into<OffchainPublicKey> for Node {
-        fn into(self) -> OffchainPublicKey {
-            self.id
+    impl From<Node> for OffchainPublicKey {
+        fn from(n: Node) -> OffchainPublicKey {
+            n.id
         }
     }
 
@@ -156,7 +156,7 @@ mod tests {
 
     #[tokio::test]
     async fn peers_should_not_be_passed_if_none_are_present() -> anyhow::Result<()> {
-        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
+        let channel_graph = Arc::new(ChannelGraph::new(*OffchainKeypair::random().public()));
 
         let prober = ImmediateNeighborProber::new(Default::default(), channel_graph);
         let stream = ProbingTrafficGeneration::build(&prober);
@@ -169,7 +169,7 @@ mod tests {
 
     #[tokio::test]
     async fn peers_should_have_randomized_order() -> anyhow::Result<()> {
-        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
+        let channel_graph = Arc::new(ChannelGraph::new(*OffchainKeypair::random().public()));
 
         for node in RANDOM_PEERS.iter() {
             channel_graph.record_node(node.clone());
@@ -217,7 +217,7 @@ mod tests {
             recheck_threshold: std::time::Duration::from_millis(1000),
         };
 
-        let channel_graph = Arc::new(ChannelGraph::new(OffchainKeypair::random().public().clone()));
+        let channel_graph = Arc::new(ChannelGraph::new(*OffchainKeypair::random().public()));
         channel_graph.record_node(RANDOM_PEERS.iter().next().unwrap().clone());
 
         let prober = ImmediateNeighborProber::new(cfg, channel_graph);
