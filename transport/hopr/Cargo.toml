@@ -20,7 +20,6 @@ telemetry = [
   "hopr-transport-session/telemetry",
   "hopr-utils/network-types-telemetry",
   "hopr-transport-mixer/telemetry",
-  "hopr-transport-path/telemetry",
 ]
 p2p-announce-quic = []
 runtime-tokio = [
@@ -64,16 +63,16 @@ tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random", "tickets", "node", "network"] }
+hopr-api = { workspace = true, features = ["types-random", "tickets", "node", "network", "chain", "graph"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-types = { workspace = true, features = ["crypto", "random", "internal", "primitive", "serde"] }
 
-hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon"] }
+hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon", "statistics-types", "statistics-types-weighted"] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-ticket-manager = { workspace = true }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-path = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }

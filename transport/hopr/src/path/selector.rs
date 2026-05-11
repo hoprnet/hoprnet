@@ -3,7 +3,7 @@ use hopr_api::graph::{
 };
 use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
 
-use crate::{
+use super::{
     errors::{PathPlannerError, Result},
     traits::{PathSelector, PathWithCost},
 };
@@ -261,7 +261,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{PathPlannerConfig, traits::PathSelector};
+    use super::{PathPlannerConfig, traits::PathSelector};
 
     fn test_selector(
         me: OffchainPublicKey,

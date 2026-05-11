@@ -49,7 +49,7 @@ pub struct HoprProtocolConfig {
     /// Path planner configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub path_planner: hopr_transport_path::PathPlannerConfig,
+    pub path_planner: crate::path::PathPlannerConfig,
     /// Interval at which per-peer protocol conformance counters are flushed
     /// into the network graph.
     ///

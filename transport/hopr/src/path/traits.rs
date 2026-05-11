@@ -1,6 +1,6 @@
 use hopr_types::crypto::types::OffchainPublicKey;
 
-use crate::errors::Result;
+use super::errors::Result;
 
 /// A candidate path paired with its accumulated traversal cost.
 ///

@@ -3866,10 +3866,10 @@ dependencies = [
  "hopr-protocol-start",
  "hopr-ticket-manager",
  "hopr-transport-mixer",
- "hopr-transport-path",
  "hopr-transport-probe",
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
+ "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3944,31 +3944,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "hopr-transport-path"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "bimap",
- "futures",
- "futures-time",
- "hex-literal",
- "hopr-api",
- "hopr-crypto-packet",
- "hopr-metrics",
- "hopr-network-graph",
- "hopr-protocol-hopr",
- "hopr-types",
- "hopr-utils",
- "lazy_static",
- "moka",
- "smart-default",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "validator",
 ]
 
 [[package]]

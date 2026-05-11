@@ -14,7 +14,7 @@ use hopr_types::{
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
-use crate::{
+use super::{
     errors::{PathPlannerError, Result},
     traits::{BackgroundPathCacheRefreshable, PathSelector},
 };
@@ -424,7 +424,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::selector::HoprGraphPathSelector;
+    use super::selector::HoprGraphPathSelector;
 
     #[derive(Debug)]
     struct TestError(String);

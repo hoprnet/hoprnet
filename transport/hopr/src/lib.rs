@@ -14,6 +14,8 @@
 
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
 pub mod protocol;
+/// Graph-based path planning for the HOPR transport layer.
+pub mod path;
 /// Configuration of the [crate::HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
@@ -64,8 +66,8 @@ pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, Applica
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_mixer::MixerConfig;
 #[cfg(feature = "runtime-tokio")]
-use hopr_transport_path::BackgroundPathCacheRefreshable;
-use hopr_transport_path::{HoprGraphPathSelector, PathPlanner};
+use crate::path::BackgroundPathCacheRefreshable;
+use crate::path::{HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
