@@ -58,7 +58,7 @@ pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_ACTIVE_CLIENTS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_hoprd_clients",
         "Number of clients connected at this Entry node",
         &["type"]

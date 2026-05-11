@@ -52,24 +52,24 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+    static ref METRIC_ACTIVE_SESSIONS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
         "hopr_session_num_active_sessions",
         "Number of currently active HOPR sessions"
     ).unwrap();
-    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
         "hopr_session_established_sessions_count",
         "Number of sessions that were successfully established as an Exit node"
     ).unwrap();
-    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
         "hopr_session_initiated_sessions_count",
         "Number of sessions that were successfully initiated as an Entry node"
     ).unwrap();
-    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_received_error_count",
         "Number of HOPR session errors received from an Exit node",
         &["kind"]
     ).unwrap();
-    static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SENT_SESSION_ERRS: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_sent_error_count",
         "Number of HOPR session errors sent to an Entry node",
         &["kind"]

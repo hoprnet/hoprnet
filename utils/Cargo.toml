@@ -48,13 +48,13 @@ network-types-runtime-tokio = [
   "dep:tokio-util",
   "hickory-resolver/tokio",
 ]
-network-types-telemetry = ["network-types", "dep:hopr-metrics"]
+network-types-telemetry = ["network-types", "hopr-types/telemetry"]
 
 # parallelize module (from hopr-parallelize)
 parallelize = ["dep:thiserror", "dep:tracing", "dep:lazy_static", "dep:libc"]
 parallelize-rayon = ["parallelize", "dep:rayon"]
 parallelize-runtime-tokio = ["parallelize", "runtime-tokio"]
-parallelize-telemetry = ["parallelize", "dep:hopr-metrics"]
+parallelize-telemetry = ["parallelize", "hopr-types/telemetry"]
 
 # statistics module (from hopr-statistics)
 statistics-types = []
@@ -111,10 +111,7 @@ tracing = { workspace = true, optional = true }
 # shared across network-types and parallelize
 lazy_static = { workspace = true, optional = true }
 
-# telemetry optional dep (used by network-types-telemetry and parallelize-telemetry)
-hopr-metrics = { workspace = true, optional = true }
-
-# network-types-serde
+# network-types-serde + telemetry
 hopr-types = { workspace = true, optional = true }
 
 # testing

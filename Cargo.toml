@@ -4,11 +4,9 @@ resolver = "2"
 
 members = [
   "utils",
-  "crypto/keypair",
   "crypto/packet",
   "hopr/hopr-lib",
   "impls/ticket-manager",
-  "misc/metrics",
   "protocols/app",
   "protocols/hopr",
   "protocols/session",
@@ -165,12 +163,10 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
 ] }
 
 hopr-api = "1.9.0"
-hopr-types = { version = "1.6.0", features = ["use-bindings"] }
+hopr-types = { version = "1.8.0", features = ["use-bindings"] }
 hopr-utils = { path = "utils", default-features = false }
-hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
-hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-protocol-app = { path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
@@ -219,6 +215,11 @@ opt-level = 3
 debug = 2
 split-debuginfo = "off"
 strip = false
+
+# Use the unreleased hopr-types rev that adds keypair + telemetry features.
+# Replace with version = "1.8.0" once that release lands on crates.io.
+[patch.crates-io]
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", rev = "c1d5b383c43fbabacfd119d85e5591f30b200ea2" }
 
 # make insta snapshots faster
 [profile.dev.package]

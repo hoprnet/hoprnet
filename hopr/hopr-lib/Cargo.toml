@@ -17,7 +17,7 @@ capture = ["hopr-transport/capture"]
 default = []
 telemetry = [
   "hopr-transport/telemetry",
-  "dep:hopr-metrics",
+  "hopr-types/telemetry",
   "hopr-utils/network-types-telemetry",
   "hopr-utils/parallelize-telemetry",
 ]
@@ -82,8 +82,7 @@ hopr-utils = { workspace = true, features = [
   "parallelize-rayon",
   "platform",
 ] }
-hopr-crypto-keypair = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
+hopr-types = { workspace = true, features = ["keypair"] }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

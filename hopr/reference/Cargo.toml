@@ -47,7 +47,7 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
-telemetry = ["hopr-lib/telemetry", "dep:hopr-metrics", "dep:lazy_static"]
+telemetry = ["hopr-lib/telemetry", "hopr-types/telemetry", "dep:lazy_static"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -68,7 +68,7 @@ tracing = { workspace = true }
 validator = { workspace = true, optional = true }
 
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
-hopr-metrics = { workspace = true, optional = true }
+hopr-types = { workspace = true }
 # impls
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
@@ -85,7 +85,7 @@ tokio = { workspace = true }
 
 hopr-reference = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
-hopr-metrics = { workspace = true }
+hopr-types = { workspace = true, features = ["telemetry"] }
 opentelemetry_sdk = { workspace = true, features = [
   "metrics",
   "experimental_metrics_custom_reader",

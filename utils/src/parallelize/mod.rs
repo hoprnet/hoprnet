@@ -65,50 +65,50 @@ pub mod cpu {
             use lazy_static::lazy_static;
 
             lazy_static! {
-                static ref TASKS_SUBMITTED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                static ref TASKS_SUBMITTED: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
                     "hopr_rayon_tasks_submitted_total",
                     "Total number of tasks submitted to the Rayon thread pool",
                 )
                 .unwrap();
-                static ref TASKS_COMPLETED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                static ref TASKS_COMPLETED: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
                     "hopr_rayon_tasks_completed_total",
                     "Total number of Rayon tasks that completed and delivered results",
                 )
                 .unwrap();
-                static ref TASKS_CANCELLED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                static ref TASKS_CANCELLED: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
                     "hopr_rayon_tasks_cancelled_total",
                     "Total number of Rayon tasks skipped because receiver was already dropped",
                 )
                 .unwrap();
-                static ref TASKS_ORPHANED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                static ref TASKS_ORPHANED: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
                     "hopr_rayon_tasks_orphaned_total",
                     "Total number of Rayon tasks whose results were discarded after completion",
                 )
                 .unwrap();
-                static ref TASKS_REJECTED: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+                static ref TASKS_REJECTED: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
                     "hopr_rayon_tasks_rejected_total",
                     "Total number of tasks rejected due to queue being full",
                 )
                 .unwrap();
-                static ref QUEUE_WAIT: hopr_metrics::SimpleHistogram = hopr_metrics::SimpleHistogram::new(
+                static ref QUEUE_WAIT: hopr_types::telemetry::SimpleHistogram = hopr_types::telemetry::SimpleHistogram::new(
                     "hopr_rayon_queue_wait_seconds",
                     "Time tasks spend waiting in the Rayon queue before execution starts",
                     super::super::TIMING_BUCKETS.to_vec(),
                 )
                 .unwrap();
-                static ref EXECUTION_TIME: hopr_metrics::MultiHistogram = hopr_metrics::MultiHistogram::new(
+                static ref EXECUTION_TIME: hopr_types::telemetry::MultiHistogram = hopr_types::telemetry::MultiHistogram::new(
                     "hopr_rayon_execution_seconds",
                     "Time tasks spend executing in the Rayon thread pool",
                     super::super::TIMING_BUCKETS.to_vec(),
                     &["operation"],
                 )
                 .unwrap();
-                static ref OUTSTANDING_TASKS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                static ref OUTSTANDING_TASKS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
                     "hopr_rayon_outstanding_tasks",
                     "Current number of tasks queued or running in the Rayon pool",
                 )
                 .unwrap();
-                static ref QUEUE_LIMIT: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+                static ref QUEUE_LIMIT: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
                     "hopr_rayon_queue_limit",
                     "Configured maximum outstanding tasks for the Rayon thread pool",
                 )

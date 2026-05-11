@@ -16,7 +16,7 @@ all-benchmarks = []
 capture = ["dep:pcap-file"]
 telemetry = [
   "serde",
-  "dep:hopr-metrics",
+  "hopr-types/telemetry",
   "hopr-protocol-hopr/telemetry",
   "hopr-transport-session/telemetry",
   "hopr-utils/network-types-telemetry",
@@ -73,7 +73,6 @@ hopr-api = { workspace = true, features = [
   "chain",
   "graph",
 ] }
-hopr-metrics = { workspace = true, optional = true }
 hopr-types = { workspace = true, features = [
   "crypto",
   "random",

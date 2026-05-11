@@ -3509,25 +3509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-crypto-keypair"
-version = "0.5.3"
-dependencies = [
- "anyhow",
- "hex",
- "hopr-types",
- "hopr-utils",
- "insta",
- "scrypt",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tracing",
- "typenum",
- "uuid",
-]
-
-[[package]]
 name = "hopr-crypto-packet"
 version = "1.3.1"
 dependencies = [
@@ -3610,9 +3591,8 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hopr-api",
- "hopr-crypto-keypair",
- "hopr-metrics",
  "hopr-transport",
+ "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "lazy_static",
@@ -3626,16 +3606,6 @@ dependencies = [
  "tokio",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-metrics"
-version = "2.0.0"
-dependencies = [
- "anyhow",
- "opentelemetry",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
 ]
 
 [[package]]
@@ -3688,8 +3658,8 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-ticket-manager",
+ "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "lazy_static",
@@ -3726,7 +3696,6 @@ dependencies = [
  "hashbrown 0.17.0",
  "hex-literal",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-protocol-app",
  "hopr-types",
  "hopr-utils",
@@ -3781,11 +3750,11 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-lib",
- "hopr-metrics",
  "hopr-network-graph",
  "hopr-reference",
  "hopr-ticket-manager",
  "hopr-transport-p2p",
+ "hopr-types",
  "lazy_static",
  "opentelemetry-prometheus-text-exporter",
  "opentelemetry_sdk",
@@ -3818,7 +3787,7 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-lib",
- "hopr-metrics",
+ "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3886,7 +3855,6 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-network-graph",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
@@ -3931,7 +3899,6 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-metrics",
  "hopr-transport-mixer",
  "hopr-types",
  "humantime-serde",
@@ -3960,9 +3927,9 @@ dependencies = [
  "futures",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-transport",
  "hopr-transport-probe",
+ "hopr-types",
  "hopr-utils",
  "lazy_static",
  "libp2p",
@@ -4019,7 +3986,6 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-metrics",
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
@@ -4064,9 +4030,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b329053a0c75175828a44996657f7a01fc62704d6bff18b71d8502fefcea8f21"
+version = "1.8.0"
+source = "git+https://github.com/hoprnet/hopr-types?rev=c1d5b383c43fbabacfd119d85e5591f30b200ea2#c1d5b383c43fbabacfd119d85e5591f30b200ea2"
 dependencies = [
  "aes",
  "anyhow",
@@ -4091,14 +4056,19 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "num_enum",
+ "opentelemetry",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "poly1305",
  "primitive-types 0.14.0",
  "rand 0.10.1",
  "rayon",
  "regex",
+ "scrypt",
  "secp256k1 0.31.1",
  "serde",
  "serde_bytes",
+ "serde_json",
  "serde_with",
  "sha2 0.10.9",
  "sha3",
@@ -4108,6 +4078,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "typenum",
+ "uuid",
  "zeroize",
 ]
 
@@ -4127,7 +4098,6 @@ dependencies = [
  "futures-time",
  "hickory-resolver 0.26.1",
  "hopr-api",
- "hopr-metrics",
  "hopr-types",
  "indexmap 2.14.0",
  "lazy_static",
@@ -4164,8 +4134,8 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-lib",
- "hopr-metrics",
  "hopr-transport",
+ "hopr-types",
  "hopr-utils",
  "human-bandwidth",
  "lazy_static",

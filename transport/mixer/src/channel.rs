@@ -19,9 +19,9 @@ use crate::{config::MixerConfig, data::DelayedData};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    pub static ref METRIC_QUEUE_SIZE: hopr_metrics::SimpleGauge =
-        hopr_metrics::SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    pub static ref METRIC_MIXER_AVERAGE_DELAY: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+    pub static ref METRIC_QUEUE_SIZE: hopr_types::telemetry::SimpleGauge =
+        hopr_types::telemetry::SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
+    pub static ref METRIC_MIXER_AVERAGE_DELAY: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
         "hopr_mixer_average_packet_delay",
         "Average mixer packet delay averaged over a packet window"
     )

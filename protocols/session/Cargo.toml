@@ -13,7 +13,7 @@ license = "GPL-3.0-only"
 default = ["hashbrown"]
 all-benchmarks = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
-telemetry = ["dep:auto_impl", "dep:hopr-metrics", "dep:lazy_static"]
+telemetry = ["dep:auto_impl", "hopr-types/telemetry", "dep:lazy_static"]
 runtime-tokio = ["dep:tokio", "hopr-utils/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 session-types = []
@@ -51,8 +51,6 @@ tracing = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive", "random"] }
-
-hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

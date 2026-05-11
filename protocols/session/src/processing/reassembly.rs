@@ -22,8 +22,8 @@ use crate::{
 
 #[cfg(all(not(test), feature = "telemetry"))]
 lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_FRAME_FINISH: hopr_metrics::SimpleHistogram =
-        hopr_metrics::SimpleHistogram::new(
+    static ref METRIC_TIME_TO_FRAME_FINISH: hopr_types::telemetry::SimpleHistogram =
+        hopr_types::telemetry::SimpleHistogram::new(
             "hopr_session_time_to_finish_frame",
             "Measures time in milliseconds it takes a frame to be reassembled",
             vec![1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0],

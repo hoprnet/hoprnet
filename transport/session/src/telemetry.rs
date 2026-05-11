@@ -10,157 +10,157 @@ pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
 lazy_static::lazy_static! {
-    static ref METRIC_SESSION_SNAPSHOT_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_SNAPSHOT_AT_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_snapshot_at_ms",
         "Session telemetry sample time in unix milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_CREATED_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_LIFETIME_CREATED_AT_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_lifetime_created_at_ms",
         "Session creation time in unix milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_lifetime_last_activity_at_ms",
         "Last session activity time in unix milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_UPTIME_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_LIFETIME_UPTIME_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_lifetime_uptime_ms",
         "Session uptime in milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_IDLE_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_LIFETIME_IDLE_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_lifetime_idle_ms",
         "Session idle time in milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_STATE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_LIFETIME_STATE: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_lifetime_state",
         "Session lifecycle state encoded as Active=0, Closing=1, Closed=2",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_lifetime_pipeline_errors_total",
         "Session pipeline processing errors",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_MTU_BYTES: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_FRAME_MTU_BYTES: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_frame_mtu_bytes",
         "Configured frame MTU in bytes",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_TIMEOUT_MS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_FRAME_TIMEOUT_MS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_frame_timeout_ms",
         "Configured frame timeout in milliseconds",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_FRAME_CAPACITY: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_FRAME_FRAME_CAPACITY: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_frame_frame_capacity",
         "Configured frame buffer capacity",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_FRAME_BEING_ASSEMBLED: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_frame_being_assembled",
         "Number of frames currently being assembled",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_COMPLETED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_FRAME_COMPLETED_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_frame_completed_total",
         "Number of frames successfully completed",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_EMITTED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_FRAME_EMITTED_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_frame_emitted_total",
         "Number of frames emitted from the sequencer",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_FRAME_DISCARDED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_FRAME_DISCARDED_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_frame_discarded_total",
         "Number of frames discarded by the session protocol",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_MODE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_ACK_MODE: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_ack_mode",
         "Configured ack mode encoded as None=0, Partial=1, Full=2, Both=3",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_incoming_segments_total",
         "Incoming session segments",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_incoming_retransmission_requests_total",
         "Incoming session retransmission requests",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_incoming_acknowledged_frames_total",
         "Incoming session acknowledgements",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_outgoing_segments_total",
         "Outgoing session segments",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_outgoing_retransmission_requests_total",
         "Outgoing session retransmission requests",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_ack_outgoing_acknowledged_frames_total",
         "Outgoing session acknowledgements",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_PRODUCED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_SURB_PRODUCED_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_surb_produced_total",
         "Produced SURBs per session",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_CONSUMED_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_SURB_CONSUMED_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_surb_consumed_total",
         "Consumed SURBs per session",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_BUFFER_ESTIMATE: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_SURB_BUFFER_ESTIMATE: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_surb_buffer_estimate",
         "Estimated SURB buffer size",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_TARGET_BUFFER: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_SURB_TARGET_BUFFER: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_surb_target_buffer",
         "Configured SURB target buffer size",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_RATE_PER_SEC: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_SURB_RATE_PER_SEC: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_surb_rate_per_sec",
         "Estimated SURB buffer rate change per second",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_SURB_REFILL_IN_FLIGHT: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_SESSION_SURB_REFILL_IN_FLIGHT: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_surb_refill_in_flight",
         "Whether SURB refill is currently configured for a session (1 or 0)",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_transport_bytes_in_total",
         "Session ingress bytes",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_transport_bytes_out_total",
         "Session egress bytes",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_transport_packets_in_total",
         "Session ingress packets",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_transport_packets_out_total",
         "Session egress packets",
         &["session_id"]
@@ -469,7 +469,7 @@ mod tests {
         record_session_read(&id, 10);
         id.frame_completed();
 
-        let text = hopr_metrics::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_types::telemetry::gather_all_metrics().expect("must gather metrics");
         let session_id = id.to_string();
         let ingress_metric = format!("hopr_session_transport_bytes_in_total{{session_id=\"{session_id}\"}} 10");
         let frame_metric = format!("hopr_session_frame_completed_total{{session_id=\"{session_id}\"}} 1");
@@ -494,7 +494,7 @@ mod tests {
         record_session_surb_produced(&id, 8);
         record_session_surb_consumed(&id, 3);
 
-        let text = hopr_metrics::gather_all_metrics().expect("must gather metrics");
+        let text = hopr_types::telemetry::gather_all_metrics().expect("must gather metrics");
         let session_id = id.to_string();
         let produced_metric = format!("hopr_session_surb_produced_total{{session_id=\"{session_id}\"}} 8");
         let consumed_metric = format!("hopr_session_surb_consumed_total{{session_id=\"{session_id}\"}} 3");

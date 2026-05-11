@@ -17,8 +17,8 @@ use tokio_util::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PER_PEER_SEND_TIMEOUT: hopr_metrics::SimpleCounter =
-        hopr_metrics::SimpleCounter::new(
+    static ref METRIC_PER_PEER_SEND_TIMEOUT: hopr_types::telemetry::SimpleCounter =
+        hopr_types::telemetry::SimpleCounter::new(
             "hopr_egress_per_peer_send_timed_out",
             "Number of packets dropped due to per-peer egress send timeout",
         )

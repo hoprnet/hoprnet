@@ -23,7 +23,7 @@ runtime-tokio = [
 telemetry = [
   "hopr-utils/network-types-telemetry",
   "hopr-protocol-session/telemetry",
-  "dep:hopr-metrics",
+  "hopr-types/telemetry",
   "dep:lazy_static",
 ]
 allocator-mimalloc = [
@@ -65,8 +65,6 @@ hopr-utils = { workspace = true, features = [
   "network-types-serde",
 ] }
 hopr-crypto-packet = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
-
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }

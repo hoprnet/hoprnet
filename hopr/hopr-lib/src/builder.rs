@@ -60,16 +60,16 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PROCESS_START_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
+    static ref METRIC_PROCESS_START_TIME:  hopr_types::telemetry::SimpleGauge =  hopr_types::telemetry::SimpleGauge::new(
         "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
-    static ref METRIC_HOPR_LIB_VERSION:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+    static ref METRIC_HOPR_LIB_VERSION:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
         "hopr_lib_version",
         "Executed version of hopr-lib",
         &["version"]
     ).unwrap();
-    static ref METRIC_HOPR_NODE_INFO:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+    static ref METRIC_HOPR_NODE_INFO:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
         "hopr_node_addresses",
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]

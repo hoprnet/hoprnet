@@ -21,7 +21,7 @@ use super::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PATH_LENGTH: hopr_metrics::SimpleHistogram = hopr_metrics::SimpleHistogram::new(
+    static ref METRIC_PATH_LENGTH: hopr_types::telemetry::SimpleHistogram = hopr_types::telemetry::SimpleHistogram::new(
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
@@ -230,7 +230,7 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
+            hopr_types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
         trace!(%path, "validated resolved path");

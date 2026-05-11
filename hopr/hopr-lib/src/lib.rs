@@ -62,7 +62,7 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
-pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
@@ -648,7 +648,7 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 /// Only available when compiled with the `telemetry` feature.
 #[cfg(feature = "telemetry")]
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
+    hopr_types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
 }
 
 /// Converts a PeerId to an OffchainPublicKey.
