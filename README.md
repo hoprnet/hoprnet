@@ -27,268 +27,29 @@
 
 - [Table of Contents](#table-of-contents)
 - [About](#about)
-- [Install](#install)
-  - [Install via Docker](#install-via-docker)
-  - [Install via Nix package manager](#install-via-nix-package-manager)
-  - [Install via linux package manager](#install-via-linux-package-manager)
-- [Usage](#usage)
-  - [Environment variables](#environment-variables)
-  - [Example execution](#example-execution)
-  - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
-  - [REST API](#rest-api)
-- [Testnet accessibility](#testnet-accessibility)
-- [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
   - [Nix environment setup](#nix-environment-setup)
     - [Nix flake outputs](#nix-flake-outputs)
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
-    - [Generate the Python SDK](#generate-the-python-sdk)
-  - [Building a Docker image](#building-a-docker-image)
-- [Local cluster](#local-cluster)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
-  - [End-to-End Testing](#end-to-end-testing)
-    - [Running Tests Locally](#running-tests-locally)
-      - [Test execution](#test-execution)
+- [Code Coverage](#code-coverage)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
-  - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
-  - [OpenTelemetry export](#opentelemetry-export)
   - [Profiling Criterion benchmarks via `flamegraph`](#profiling-criterion-benchmarks-via-flamegraph)
     - [Prerequisites](#prerequisites)
     - [Profiling the benchmarking binaries](#profiling-the-benchmarking-binaries)
-  - [HOPR packet capture](#hopr-packet-capture)
 - [Contact](#contact)
 - [License](#license)
 
 ## About
 
-The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node.
-The most relevant components for production use cases are:
+This repository contains the core HOPR protocol library and supporting crates.
 
 1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
    - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incorporated into other projects as a transport layer.
-2. [hoprd](https://hoprnet.github.io/hoprnet/hoprd/index.html)
-   - Daemon application providing a higher level interface for creating a HOPR protocol compliant node that can use a dedicated REST API.
-3. [hoprd-api-schema](https://hoprnet.github.io/hoprnet/hoprd_api_schema/index.html)
-   - Utility to generate the OpenAPI spec for the `hoprd` served REST API.
-4. [hoprd-cfg](https://hoprnet.github.io/hoprnet/hoprd_cfg/index.html)
-   - Utility for configuration management of the `hoprd`
 
-Unless stated otherwise, the following sections only apply to `hoprd`.
-
-## Install
-
-Multiple options for installation exist, the preferred choice for any production system should be to use the container image (e.g. using `docker`).
-
-All releases and associated changelogs are located in the [official releases](https://github.com/hoprnet/hoprnet/releases) section of the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository.
-
-### Install via Docker
-
-Checkout [DockerHub](https://hub.docker.com/r/hoprnet/hoprd/tags) for specific version tag or use a custom tag:
-
-- I want the latest code from active development → `latest` or `latest-main`
-- I want the latest stable release from active development → `release-main`
-- I want the latest code from the LTS branch → `latest-lts`
-- I want the latest stable release from the LTS branch → `release-lts`
-- I want what is currently running in production → `stable`
-
-```bash
-docker pull hoprnet/hoprd:stable
-```
-
-It is recommended to setup an alias `hoprd` for the docker command invocation.
-
-### Install via [Nix package manager][1]
-
-WARNING: This setup should only be used for development or advanced usage without any further support.
-
-Clone and initialize the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository:
-
-```bash
-git clone https://github.com/hoprnet/hoprnet
-cd hoprnet
-```
-
-Build and install the `hoprd` binary, e.g. on a UNIX platform:
-
-```bash
-nix build
-sudo cp result/bin/* /usr/local/bin/
-```
-
-To build and access man pages for `hoprd`:
-
-```bash
-# Build man page for hoprd
-nix build .#hoprd-man
-man ./result/share/man/man1/hoprd.1.gz
-
-# Or install them system-wide
-sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
-```
-
-### Install via linux package manager
-
-Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
-
-## Usage
-
-`hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
-
-```bash
-$ hoprd --help
-HOPR node executable
-
-Usage: hoprd [OPTIONS]
-
-Options:
-      --identity <IDENTITY>
-          The path to the identity file [env: HOPRD_IDENTITY=]
-      --data <DATA>
-          Specifies the directory to hold all the data [env: HOPRD_DATA=]
-      --host <HOST>
-          Host to listen on for P2P connections [env: HOPRD_HOST=]
-      --announce...
-          Announce the node on chain with a public address [env: HOPRD_ANNOUNCE=]
-      --api...
-          Expose the API on localhost:3001 [env: HOPRD_API=]
-      --apiHost <HOST>
-          Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
-      --apiPort <PORT>
-          Set port to which the API server will bind [env: HOPRD_API_PORT=]
-      --apiToken <TOKEN>
-          A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
-      --password <PASSWORD>
-          A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --blokliUrl <URL>
-          URL for Blokli provider to be used for the node to connect to blockchain [env: HOPRD_BLOKLI_URL=]
-      --init...
-          initialize a database if it doesn't already exist [env: HOPRD_INIT=]
-      --forceInit...
-          initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --probeRecheckThreshold <SECONDS>
-          Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
-      --configurationFilePath <CONFIG_FILE_PATH>
-          Path to a file containing the entire HOPRd configuration [env: HOPRD_CONFIGURATION_FILE_PATH=]
-      --safeAddress <HOPRD_SAFE_ADDR>
-          Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
-      --moduleAddress <HOPRD_MODULE_ADDR>
-          Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
-  -h, --help
-          Print help
-  -V, --version
-          Print version
-```
-
-### Environment variables
-
-On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
-
-- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
-- `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
-- `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
-- `HOPRD_OTEL_SIGNALS` - comma-separated OTLP signals to export when OpenTelemetry is enabled (`traces`, `logs`, `metrics`), defaults to `traces`
-- `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
-- `HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY` - the maximum capacity of the acknowledged ticket processing queue
-- `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
-- `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
-- `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
-- `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
-- `HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY` - the maximum capacity of awaiting manual ping queue
-- `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
-- `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
-- `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
-- `HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY` - the maximum capacity of HOPR messages processed by the node
-- `HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY` - the maximum capacity of the session control channel
-- `HOPR_INTERNAL_SESSION_INCOMING_CAPACITY` - the maximum capacity of the queue storing unprocessed incoming and outgoing messages inside a session
-- `HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY` - the maximum capacity of the session balancer
-- `HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY` - the maximum capacity of the raw socket-like bidirectional API interface
-- `HOPR_INTERNAL_IN_PACKET_PIPELINE_CONCURRENCY` - the maximum number of incoming packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
-- `HOPR_INTERNAL_OUT_PACKET_PIPELINE_CONCURRENCY` - the maximum number of outgoing packets to process concurrently (default: 8 × CPU cores, 0 = no limit)
-- `HOPR_CPU_TASK_QUEUE_LIMIT` - maximum number of CPU-bound tasks (queued + running) in the Rayon thread pool. If not set, the queue is unbounded. Set this to prevent unbounded queue growth under sustained load (e.g., `1000`). When the limit is reached, new tasks are rejected and packet decode operations may fail with "local CPU queue full" errors.
-- `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in outgoing SURB balancer (default: `0.6`)
-- `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in outgoing SURB balancer (default: `0.7`)
-- `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in outgoing SURB balancer (default: `0.2`)
-- `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
-- `HOPR_CAPTURE_PATH_TRIGGER` - path used as trigger to start capturing customized HOPR packets. When there exists a file in that path, it will start capturing data.
-- `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: `30`)
-- `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: `2000 ms`)
-- `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES` - pending-write-buffer byte threshold on the libp2p frame writer, after which a flush is forced. Lower values favour latency at the cost of one syscall per frame; higher values let adjacent small frames coalesce into a single write on busy relays. The unit is **bytes**, per `tokio_util::codec::FramedWrite::set_backpressure_boundary` (default: `4096 bytes`)
-- `HOPR_PACKET_PLANNER_CONCURRENCY` - maximum number of concurrently planned outgoing packets (default: `10`)
-- `HOPR_SESSION_FRAME_SIZE` - The maximum chunk of data that can be written to the Session's input buffer (default: 1500)
-- `HOPR_SESSION_FRAME_TIMEOUT_MS` - The maximum time (in milliseconds) for an incomplete frame to stay in the Session's output buffer (default: 800 ms)
-- `HOPR_PROTOCOL_SURB_RB_SIZE` - size of the SURB ring buffer (default: 10 000)
-- `HOPR_PROTOCOL_SURB_RB_DISTRESS` - threshold since number of SURBs in the ring buffer triggers a distress packet signal (default: 1000)
-- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
-- `HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Entry node (defaults to number of CPU cores)
-- `HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Exit node (defaults to number of CPU cores)
-- `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
-- `HOPRD_NUM_CPU_THREADS` - sets the number of threads for CPU-bound tasks (default: number of CPU cores / 2)
-- `HOPRD_NUM_IO_THREADS` - sets the number of threads for IO-bound tasks (default: number of CPU cores / 2)
-- `HOPRD_THREAD_STACK_SIZE` - sets the thread stack size (default: 10 MB)
-- `HOPR_METRICS_UNACK_PER_PEER` - enable per-peer unacknowledged ticket cache metrics (disabled by default to reduce Prometheus cardinality). Set to `1` or `true` for debugging specific peer acknowledgement issues. **Warning**: Do not enable in production with many peers.
-
-### Example execution
-
-Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
-
-Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
-
-```bash
-hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --blokliUrl "http://blokli-provider.here"
-```
-
-Here is a short breakdown of each argument.
-
-```bash
-hoprd
-  # store your node identity information in the persisted database folder
-  --identity /app/hoprd-db/.hopr-identity
-  # set the encryption password for your identity
-  --password switzerland
-  # initialize the database and identity if not present
-  --init
-  # announce the node to other nodes in the network and act as relay if publicly reachable
-  --announce
-  # set IP and port of the P2P API to the container's external IP so it can be reached on your host
-  --host "0.0.0.0:9091"
-  # specify password for accessing REST API
-  --apiToken <MY_TOKEN>
-  # blokli provider supplying the HOPR updates
-  --blokliUrl "http://blokli-provider.here"
-```
-
-### Using Docker Compose with extended HOPR node monitoring
-
-Please follow the documentation for [`docker compose` based deployment](./deploy/compose/README.md).
-
-### REST API
-
-`hoprd` running a REST API exposes an endpoint at `http://<address>/api-docs/openapi.json` with full OpenApi specification of the used REST API, including the current version of the API.
-
-## Testnet accessibility
-
-To participate in a public network the node must be eligible. See [Network Registry](https://github.com/hoprnet/hoprnet/blob/master/NETWORK_REGISTRY.md) for details.
-
-Node eligibility is not required in a local development cluster (see [Develop section below](#develop)).
-
-## Migrating between releases
-
-There is **NO** backward compatibility between releases.
-
-We attempt to provide instructions on how to migrate your tokens between releases.
-
-1. Set your automatic channel strategy to `passive`.
-2. Redeem all unredeemed tickets.
-3. Close all open payment channels.
-4. Once all payment channels have closed, withdraw your funds to an external
-   wallet.
-5. Run `info` and take note of the **network name**.
-6. Once funds are confirmed to exist in a different wallet, backup `.hopr-identity` folder.
-7. Launch new `HOPRd` instance using latest release, observe the account address.
-8. Only transfer funds to new `HOPRd` instance if `HOPRd` operates on the **same network** as last release, you can compare the two networks using `info`.
+The `hoprd` daemon (HOPR node with REST API) lives in the [hoprd repository](https://github.com/hoprnet/hoprd).
 
 ## Develop
 
@@ -346,35 +107,10 @@ These formatters are also automatically run as a Git pre-commit check.
 All linters can be executed via a Nix flake helper app:
 
 ```bash
-nix run .#lint
+nix run .#check
 ```
 
 This will in particular run `clippy` for the entire Rust codebase.
-
-#### Generate the Python SDK
-
-A Python SDK is not distributed but can be generated to connect to the HOPRd API using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
-
-Prerequisites:
-
-- swagger-codegen3
-- build the repository to get the `hoprd-api-schema` generated
-
-The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
-
-For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
-
-### Building a Docker image
-
-Docker images can be built using the respective nix flake outputs. The following command builds the `hoprd` image for `x86_64-linux` platform:
-
-```bash
-nix build .#docker-hoprd-x86_64-linux
-```
-
-## Local cluster
-
-The best way to test with multiple HOPR nodes is by using a [local cluster of interconnected nodes](https://github.com/hoprnet/hoprnet/blob/master/SETUP_LOCAL_CLUSTER.md).
 
 ## Test
 
@@ -386,60 +122,11 @@ Run only unit tests: `cargo test --lib`
 
 We run a fair amount of automation using Github Actions. Too see the full list of workflows checkout [workflow docs](./.github/workflows/README.md)
 
-### End-to-End Testing
-
-When using the `nix` environment, the test environment preparation and activation is automatic.
-
-Tests are using the `pytest` infrastructure.
-
-#### Running Tests Locally
-
-##### Test execution
-
-With the environment activated, execute the tests locally:
-
-```bash
-just run-smoke-test integration
-```
-
 ## Code Coverage
 
 Coverage reports are generated using LLVM source-based instrumentation and uploaded to [Codecov](https://codecov.io/gh/hoprnet/hoprnet). See [docs/coverage.md](docs/coverage.md) for workspace-wide and single-crate usage.
 
 ## Profiling & Instrumentation
-
-Multiple layers of profiling and instrumentation can be used to debug the `hoprd`:
-
-### `tokio` executor instrumentation
-
-Requires a special build:
-
-1. Set `RUSTFLAGS="--cfg tokio_unstable"` before building
-2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
-
-Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
-
-### OpenTelemetry export
-
-`hoprd` can stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, configure these environment variables:
-
-Detailed reference: [`OTLP.md`](OTLP.md)
-
-- `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
-- `HOPRD_OTEL_SIGNALS` - comma-separated signal list from `traces`, `logs`, `metrics` (default: `traces`)
-- `HOPRD_OTLP_ENDPOINT` - base URL of an OTLP endpoint. Transport is inferred from URL scheme (`grpc://...`, `http://...`, or `https://...`)
-- `HOPRD_METRIC_EXPORT_INTERVAL` - OTLP metric export interval config in `default,prefix=interval` form (for example `15000,hopr_session=1000`). Intervals support raw milliseconds (`15000`) or suffixes (`1s`, `250ms`, `1m`).
-- `HOPRD_OTEL_EXPORT_LABELS` - comma-separated `key=value` pairs added as extra attributes to all OTEL signals (for example `HOPRD_OTEL_EXPORT_LABELS="country=UK,city=london"`).
-
-Examples:
-
-- Traces only (backward-compatible default): `HOPRD_OTEL_SIGNALS=traces`
-- Metrics only: `HOPRD_OTEL_SIGNALS=metrics`
-- Full export: `HOPRD_OTEL_SIGNALS=traces,logs,metrics`
-- OTEL traces, logs, and metrics include `node_address` and `node_peer_id` attributes automatically.
-- OTLP logs are emitted as structured objects (typed fields/attributes), and use OTLP HTTP JSON protocol when `HOPRD_OTLP_ENDPOINT` is `http(s)://...`.
-- With metrics enabled, OTEL exports keep Prometheus family naming (`<metric>`, `<metric>_count`, `<metric>_sum`, `<metric>_bucket`) and labels (`le` for histogram buckets, `quantile` for summaries).
-- Session metrics are exported to OTEL (`hopr_session_*` series with `session_id` attribute) and are excluded from the Prometheus `/metrics` endpoint.
 
 ### Profiling Criterion benchmarks via `flamegraph`
 
@@ -471,18 +158,6 @@ Examples:
    flamegraph -- ./target/release/deps/packet_benches-ce70d68371e6d19a --bench --exact packet_sending_no_precomputation/0_hop_0_surbs --profile-time 30
    ```
 4. The `flamegraph.svg` will be generated in the project root directory and can be opened in a browser.
-
-### HOPR packet capture
-
-Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Also define the environment variable `HOPR_CAPTURE_PATH_TRIGGER` with a path that will be periodically inspected, and once a file exists on that path, it will start capturing packets.
-However, for that to work the `hoprd` binary has to be built with the feature `capture`.
-For ease of use we provide different nix flake outputs that build the `hoprd`
-with the `capture` feature enabled:
-
-- `nix build .#binary-hoprd-profile-x86_64-linux`
-- `nix build .#binary-hoprd-profile-aarch64-linux`
-- `nix build .#binary-hoprd-profile-x86_64-darwin`
-- `nix build .#binary-hoprd-profile-aarch64-darwin`
 
 ## Contact
 

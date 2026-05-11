@@ -12,9 +12,6 @@ members = [
   "crypto/packet",
   "crypto/sphinx",
   "hopr/hopr-lib",
-  "hoprd/hoprd",
-  "hoprd/rest-api",
-  "hoprd/rest-api-client",
   "logic/ticket-manager",
   "misc/metrics",
   "misc/platform",
@@ -31,7 +28,6 @@ members = [
   "transport/session",
   "transport/tag-allocator",
   "utils/session",
-  "localcluster",
   # implementations
   "hopr/reference",
   "impls/connector",
@@ -56,11 +52,9 @@ arrayvec = { version = "0.7.6" }
 assertables = "9.9.0"
 async-broadcast = "0.7.2"
 async-lock = "3.4.2"
-async-signal = "0.2.14"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
 auto_impl = "1.3.0"
-axum = { version = "0.8.9", features = ["http2"] }
 backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
@@ -77,7 +71,6 @@ chrono = { version = "0.4.44", default-features = false, features = [
 ] }
 clap = { version = "4.6.1", features = ["derive", "env", "string"] }
 const_format = "0.2.36"
-console-subscriber = "0.5.0"
 criterion = { version = "0.8.2", default-features = false, features = [
   "cargo_bench_support",
   "async_tokio",
@@ -91,7 +84,6 @@ futures = { version = "0.3.32", default-features = false, features = [
   "std",
   "async-await",
 ] }
-futures-core = "0.3.32"
 futures-concurrency = "7.7.1"
 futures-timer = "3.0.3"
 futures-time = "3.0.1"
@@ -103,9 +95,7 @@ hex-literal = "1.1.0"
 hickory-resolver = { version = "0.26.1", default-features = false, features = [
   "system-config",
 ] }
-http = "1.4.0"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
-humansize = "2.1.3"
 humantime-serde = "1.1.1"
 insta = { version = "1.47.2", features = ["yaml", "redactions"] }
 indexmap = { version = "2.14.0" }
@@ -125,12 +115,9 @@ more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num-traits = "0.2.19"
 oas3 = "0.21.0"
-openapiv3 = "2.2.0"
 opentelemetry = { version = "0.31.0" }
-opentelemetry-otlp = { version = "0.31.1", default-features = false }
 opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
 opentelemetry_sdk = { version = "0.31.0" }
-tracing-opentelemetry = { version = "0.32.1" }
 temp-env = "0.3.6"
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
@@ -142,21 +129,12 @@ petgraph = { version = "0.8.3", default-features = false, features = [
 ] }
 pid = "4.0.0"
 pin-project = "1.1.11"
-percent-encoding = "2.3.2"
-prettyplease = "0.2.37"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
-progenitor = "0.13.0"
-progenitor-client = "0.13.0"
 rayon = "1.12.0"
 rand = { version = "0.10.1", features = ["thread_rng"] }
 rand_distr = "0.6.0"
 redb = "4.1.0"
-regex = "1.12.3"
-reqwest = { version = "0.13.2", default-features = false, features = [
-  "json",
-  "stream",
-] }
 ringbuffer = "0.16.0"
 rust-stream-ext-concurrent = "2.0.0"
 rstest = { version = "0.26.1" }
@@ -167,20 +145,16 @@ serde_cbor_2 = "0.13.0"
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
 serde_with = { version = "3.18.0", features = ["base64"] }
-serde_urlencoded = "0.7.1"
 serde-saphyr = "0.0.24"
 serial_test = "3.4.0"
-signal-hook = "0.4.4"
 smart-default = "0.7.1"
 socket2 = "0.6.3"
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
-syn = { version = "2.0.117", features = ["full"] }
 tempfile = "3.27.0"
 test-log = { version = "0.2.20", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
-tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"] }
 tokio = { version = "1.52.1", features = [
   "rt-multi-thread",
   "macros",
@@ -192,32 +166,10 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
 ] }
 tokio-retry = "0.3.1"
 tokio-stream = { version = "0.1.18", features = ["net"] }
-tower-http = { version = "0.6.8", features = [
-  "validate-request",
-  "compression-full",
-  "cors",
-  "trace",
-  "sensitive-headers",
-] }
-tower = { version = "0.5.3", default-features = false, features = ["util"] }
-utoipa = { version = "5.4.0" }
-utoipa-scalar = { version = "0.3.0", features = ["axum"] }
-utoipa-swagger-ui = { version = "9.0.2", features = [
-  "axum",
-  "vendored",
-  "debug-embed",
-] }
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
-tracing-subscriber = { version = "0.3.23", features = [
-  "env-filter",
-  "fmt",
-  "registry",
-  "std",
-] }
 typenum = "1.20.0"
 uuid = { version = "1.23.1" }
 validator = { version = "0.20.0", features = ["derive"] }
-vergen-gix = { version = "9.1.0", features = ["build"] }
 vsss-rs = { version = "5.4.0", default-features = false }
 mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
@@ -248,7 +200,6 @@ hopr-protocol-pix = { path = "protocols/pix", default-features = false, features
 ] }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
-hopr-strategy = { path = "impls/strategy", default-features = false }
 hopr-ticket-manager = { path = "logic/ticket-manager" }
 hopr-transport = { path = "transport/api", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
@@ -257,10 +208,6 @@ hopr-transport-probe = { path = "transport/probe", default-features = false }
 hopr-transport-protocol = { path = "transport/protocol", default-features = false }
 hopr-transport-session = { path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
-hoprd = { path = "hoprd/hoprd", default-features = false }
-hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hoprd-api-client = { path = "hoprd/rest-api-client" }
-hopr-utils-session = { path = "utils/session" }
 hopr-chain-connector = { path = "impls/connector" }
 hopr-statistics = { path = "common/statistics" }
 hopr-test-stubs = { path = "common/test-stubs" }

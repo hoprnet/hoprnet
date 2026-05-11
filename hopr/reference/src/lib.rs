@@ -229,6 +229,10 @@ where
 
 /// Builds an edge (entry/exit) [`EdgeHopr`] node using the default Blokli chain connector.
 ///
+/// This is the opinionated convenience builder for edge nodes — it creates the
+/// chain connector from `blokli_url` using well-known defaults and delegates all
+/// subsystem wiring to [`build_edge_with_chain`].
+///
 /// For a non-default connector configuration use [`build_edge_with_chain`] directly.
 #[cfg(feature = "runtime-tokio")]
 pub async fn build_edge<
@@ -262,6 +266,10 @@ pub async fn build_edge<
 
 /// Builds a full relay [`FullHopr`] node with a session server using the default
 /// Blokli chain connector.
+///
+/// This is the opinionated convenience builder for relay nodes that also serve
+/// incoming sessions. It creates the chain connector from `blokli_url` using
+/// well-known defaults and delegates all subsystem wiring to [`build_full_with_chain`].
 ///
 /// For a non-default connector configuration use [`build_full_with_chain`] directly.
 #[cfg(feature = "runtime-tokio")]
