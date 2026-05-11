@@ -69,6 +69,7 @@ lazy_static! {
         .collect::<Vec<_>>();
     pub static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestStateBuilder =
         hopr_chain_connector::testing::BlokliTestStateBuilder::default()
+            .with_hopr_network_chain_info("anvil-localhost")
             .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
                 let node_key = kp.public();
                 let chain_key = PEERS_CHAIN[i].public();
