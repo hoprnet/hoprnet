@@ -21,13 +21,33 @@ async-lock = ["dep:async-lock"]
 
 # network-types module (from hopr-network-types)
 network-types = [
-  "dep:arrayvec", "dep:flume", "dep:futures-time", "dep:hickory-resolver",
-  "dep:libp2p-identity", "dep:multiaddr", "dep:pin-project", "dep:socket2",
-  "dep:strum", "dep:thiserror", "dep:tracing", "dep:lazy_static",
+  "dep:arrayvec",
+  "dep:flume",
+  "dep:futures-time",
+  "dep:hickory-resolver",
+  "dep:libp2p-identity",
+  "dep:multiaddr",
+  "dep:pin-project",
+  "dep:socket2",
+  "dep:strum",
+  "dep:thiserror",
+  "dep:tracing",
+  "dep:lazy_static",
 ]
-network-types-serde = ["network-types", "dep:serde", "dep:serde_bytes", "libp2p-identity/serde", "hopr-types/serde"]
+network-types-serde = [
+  "network-types",
+  "dep:serde",
+  "dep:serde_bytes",
+  "libp2p-identity/serde",
+  "hopr-types/serde",
+]
 network-types-capture = ["network-types", "dep:pcap-file"]
-network-types-runtime-tokio = ["network-types", "runtime-tokio", "dep:tokio-util", "hickory-resolver/tokio"]
+network-types-runtime-tokio = [
+  "network-types",
+  "runtime-tokio",
+  "dep:tokio-util",
+  "hickory-resolver/tokio",
+]
 network-types-telemetry = ["network-types", "dep:hopr-metrics"]
 
 # parallelize module (from hopr-parallelize)

@@ -45,7 +45,12 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network", "node", "types-random"] }
 
-hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types", "parallelize", "parallelize-rayon"] }
+hopr-utils = { workspace = true, features = [
+  "runtime-tokio",
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+] }
 hopr-crypto-packet = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 
@@ -56,7 +61,11 @@ hopr-protocol-app = { workspace = true }
 [dev-dependencies]
 async-trait = { workspace = true }
 async_channel_io = { version = "0.3.0" }
-hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types", "testing"] }
+hopr-utils = { workspace = true, features = [
+  "runtime-tokio",
+  "network-types",
+  "testing",
+] }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }

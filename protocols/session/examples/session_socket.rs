@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
-use hopr_utils::network_types::udp::{ConnectedUdpStream, ForeignDataMode, UdpStreamBuilder};
 use hopr_protocol_session::{AcknowledgementState, SessionSocketExt};
+use hopr_utils::network_types::udp::{ConnectedUdpStream, ForeignDataMode, UdpStreamBuilder};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader},
     select, signal,

@@ -76,7 +76,12 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full", "types-random"] }
 
-hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon", "platform"] }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+  "platform",
+] }
 hopr-crypto-keypair = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-transport = { workspace = true }

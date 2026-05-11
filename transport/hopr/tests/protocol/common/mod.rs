@@ -24,7 +24,6 @@ use hopr_api::{
         primitive::prelude::*,
     },
 };
-use hopr_utils::runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
@@ -33,8 +32,9 @@ use hopr_protocol_hopr::{
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
-use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport::protocol::{PacketPipelineConfig, PeerProtocolCounterRegistry};
+use hopr_transport_mixer::config::MixerConfig;
+use hopr_utils::runtime::AbortableList;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;

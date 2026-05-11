@@ -1,6 +1,6 @@
 use hopr_api::node::HoprState;
-pub use hopr_utils::network_types::errors::NetworkTypeError;
 pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
+pub use hopr_utils::network_types::errors::NetworkTypeError;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.

@@ -10,13 +10,12 @@ use hopr_api::{
         primitive::traits::AsUnixTimestamp,
     },
 };
-use hopr_utils::runtime::AbortableList;
-use hopr_utils::platform::time::native::current_time;
 use hopr_protocol_app::{
     prelude::{ApplicationDataIn, ApplicationDataOut, OutgoingPacketInfo, ReservedTag},
     v1::Tag,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
+use hopr_utils::{platform::time::native::current_time, runtime::AbortableList};
 
 use crate::{
     HoprProbeProcess,

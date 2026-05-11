@@ -17,8 +17,8 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 pub mod sphinx;
-use sphinx::prelude::*;
 use hopr_types::{internal::prelude::*, primitive::prelude::*};
+use sphinx::prelude::*;
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -45,8 +45,8 @@ pub mod prelude {
     };
 }
 
-pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 use hopr_types::internal::routing;
+pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
 /// Currently used public key cipher suite for Sphinx.
 ///

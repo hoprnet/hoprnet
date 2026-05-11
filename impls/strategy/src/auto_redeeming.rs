@@ -12,7 +12,6 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
-use hopr_utils::runtime::prelude::AbortHandle;
 use hopr_lib::api::{
     chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
     node::{
@@ -25,6 +24,7 @@ use hopr_lib::api::{
         primitive::prelude::HoprBalance,
     },
 };
+use hopr_utils::runtime::prelude::AbortHandle;
 use moka::notification::RemovalCause;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};

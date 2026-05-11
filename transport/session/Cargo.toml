@@ -60,7 +60,10 @@ hopr-types = { workspace = true, features = [
   "primitive",
   "random",
 ] }
-hopr-utils = { workspace = true, features = ["network-types", "network-types-serde"] }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "network-types-serde",
+] }
 hopr-crypto-packet = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 

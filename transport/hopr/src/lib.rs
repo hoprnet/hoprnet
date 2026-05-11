@@ -12,16 +12,16 @@
 //! 4. algorithms associated with the transport layer operational management
 //! 5. interface specifications to allow modular behavioral extensions
 
-/// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
-pub mod protocol;
-/// Graph-based path planning for the HOPR transport layer.
-pub mod path;
 /// Configuration of the [crate::HoprTransport].
 pub mod config;
 /// Constants used and exposed by the crate.
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
+/// Graph-based path planning for the HOPR transport layer.
+pub mod path;
+/// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
+pub mod protocol;
 
 mod multiaddrs;
 
@@ -59,21 +59,15 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
-use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::prelude::PacketSignal;
-use hopr_utils::network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_mixer::MixerConfig;
-#[cfg(feature = "runtime-tokio")]
-use crate::path::BackgroundPathCacheRefreshable;
-use crate::path::{HoprGraphPathSelector, PathPlanner};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
     ping::{PingConfig, Pinger},
 };
-pub use crate::protocol::PeerProtocolCounterRegistry;
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -86,14 +80,21 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
+use hopr_utils::{network_types::prelude::*, runtime::AbortableList};
 pub use multiaddr::Protocol;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, trace, warn};
 
-pub use crate::config::HoprProtocolConfig;
+#[cfg(feature = "runtime-tokio")]
+use crate::path::BackgroundPathCacheRefreshable;
+pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
 use crate::{
-    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, multiaddrs::strip_p2p_protocol,
-    pipeline::HoprPipelineComponents, socket::HoprSocket,
+    constants::SESSION_INITIATION_TIMEOUT_BASE,
+    errors::HoprTransportError,
+    multiaddrs::strip_p2p_protocol,
+    path::{HoprGraphPathSelector, PathPlanner},
+    pipeline::HoprPipelineComponents,
+    socket::HoprSocket,
 };
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;

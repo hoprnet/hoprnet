@@ -64,11 +64,30 @@ tokio-util = { workspace = true, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["types-random", "tickets", "node", "network", "chain", "graph"] }
+hopr-api = { workspace = true, features = [
+  "types-random",
+  "tickets",
+  "node",
+  "network",
+  "chain",
+  "graph",
+] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-types = { workspace = true, features = ["crypto", "random", "internal", "primitive", "serde"] }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+  "serde",
+] }
 
-hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon", "statistics-types", "statistics-types-weighted"] }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+  "statistics-types",
+  "statistics-types-weighted",
+] }
 hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
@@ -93,7 +112,10 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-chain-connector = { workspace = true, features = ["testing", "runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hopr-network-graph = { workspace = true, features = ["petgraph"] }
 hopr-protocol-start = { workspace = true }
 hopr-protocol-session = { workspace = true, features = [

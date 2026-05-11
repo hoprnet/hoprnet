@@ -12,7 +12,6 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
@@ -28,6 +27,7 @@ use hopr_types::{
     },
     primitive::prelude::Address,
 };
+use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -1472,7 +1472,6 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_utils::network_types::prelude::SealedHost;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -1480,6 +1479,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 
     use super::*;

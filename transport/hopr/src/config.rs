@@ -9,12 +9,11 @@ use std::{
 use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_probe::config::ProbeConfig;
-use crate::protocol::PacketPipelineConfig;
 use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
-use crate::errors::HoprTransportError;
+use crate::{errors::HoprTransportError, protocol::PacketPipelineConfig};
 
 const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 

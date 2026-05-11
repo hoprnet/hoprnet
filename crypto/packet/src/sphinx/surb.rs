@@ -233,10 +233,9 @@ where
 mod tests {
     use hopr_types::crypto_random::Randomizable;
 
-    use super::*;
+    use super::{super::tests::*, *};
     #[cfg(feature = "x25519")]
     use crate::sphinx::ec_groups::X25519Suite;
-    use super::super::tests::*;
 
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;

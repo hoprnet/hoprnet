@@ -134,7 +134,10 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
     // -- assert: shadow state matches recorded values --------------------------
 
     assert_eq!(counter.get(), 42, "SimpleCounter shadow state");
-    assert!((gauge.get() - std::f64::consts::PI).abs() < f64::EPSILON, "SimpleGauge shadow state");
+    assert!(
+        (gauge.get() - std::f64::consts::PI).abs() < f64::EPSILON,
+        "SimpleGauge shadow state"
+    );
 
     // -- assert: OTLP data points carry correct values -------------------------
 

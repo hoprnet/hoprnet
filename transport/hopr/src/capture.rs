@@ -10,12 +10,12 @@ use hopr_api::types::{
     },
     primitive::prelude::BytesEncodable,
 };
-use hopr_utils::runtime::AbortHandle;
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_protocol_hopr::{
     IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
     OutgoingPacket, PacketDecoder, PacketEncoder,
 };
+use hopr_utils::runtime::AbortHandle;
 use pcap_file::{
     DataLink,
     pcapng::{
@@ -451,12 +451,12 @@ mod tests {
         },
     };
     use hopr_crypto_packet::prelude::PacketSignal;
-    use hopr_utils::network_types::types::SealedHost;
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
     use hopr_transport_probe::types::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
+    use hopr_utils::network_types::types::SealedHost;
 
     use super::*;
 

@@ -232,8 +232,7 @@ fn peer_id_conversion_is_repeatable() -> anyhow::Result<()> {
 
 #[test]
 fn transport_process_display_names_are_stable() {
-    use hopr_transport::HoprTransportProcess;
-    use hopr_transport::protocol::PacketPipelineProcesses;
+    use hopr_transport::{HoprTransportProcess, protocol::PacketPipelineProcesses};
 
     let names: Vec<String> = vec![
         HoprTransportProcess::Medium.to_string(),

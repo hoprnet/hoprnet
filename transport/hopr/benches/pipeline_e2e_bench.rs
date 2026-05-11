@@ -25,9 +25,9 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder,
     SurbStoreConfig,
 };
-use hopr_utils::testing::{StubChainApi, StubPathResolver};
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
+use hopr_utils::testing::{StubChainApi, StubPathResolver};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 30;

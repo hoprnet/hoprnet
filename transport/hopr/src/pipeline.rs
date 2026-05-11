@@ -7,13 +7,12 @@ use hopr_api::{
         internal::{prelude::*, routing::ResolvedTransportRouting},
     },
 };
-use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use crate::protocol::run_packet_pipeline;
+use hopr_utils::runtime::AbortableList;
 
-use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig};
+use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::run_packet_pipeline};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]

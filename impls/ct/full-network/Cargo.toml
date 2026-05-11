@@ -35,7 +35,10 @@ hopr-api = { workspace = true, features = [
   "graph",
   "types-random",
 ] }
-hopr-utils = { workspace = true, features = ["statistics-types", "statistics-types-weighted"] }
+hopr-utils = { workspace = true, features = [
+  "statistics-types",
+  "statistics-types-weighted",
+] }
 hopr-network-graph = { workspace = true, features = ["petgraph"] }
 
 [dev-dependencies]

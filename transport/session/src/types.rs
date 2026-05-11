@@ -8,10 +8,6 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_utils::network_types::{
-    prelude::SealedHost,
-    utils::{AsyncWriteSink, DuplexIO},
-};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
@@ -24,6 +20,10 @@ use hopr_types::{
         errors::GeneralError,
         prelude::{BytesRepresentable, ToHex},
     },
+};
+use hopr_utils::network_types::{
+    prelude::SealedHost,
+    utils::{AsyncWriteSink, DuplexIO},
 };
 use tracing::{debug, instrument};
 

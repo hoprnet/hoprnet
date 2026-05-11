@@ -46,9 +46,11 @@ use hopr_api::{
         primitive::prelude::{Address, UnitaryFloatOps},
     },
 };
-use hopr_utils::runtime::{AbortableList, prelude::spawn};
-use hopr_utils::network_types::addr::is_public_address;
 use hopr_transport::{HoprTransport, IncomingSession};
+use hopr_utils::{
+    network_types::addr::is_public_address,
+    runtime::{AbortableList, prelude::spawn},
+};
 use validator::Validate;
 
 use crate::{
@@ -675,10 +677,7 @@ where
                 "long-running background task finished"
             )
         });
-        processes.insert(
-            HoprLibProcess::ChannelEvents,
-            hopr_utils::spawn_as_abortable!(proc),
-        );
+        processes.insert(HoprLibProcess::ChannelEvents, hopr_utils::spawn_as_abortable!(proc));
     }
 
     Ok(PreHopr {

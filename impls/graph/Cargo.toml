@@ -31,7 +31,10 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
 
-hopr-utils = { workspace = true, features = ["statistics-types", "statistics-types-moving"] }
+hopr-utils = { workspace = true, features = [
+  "statistics-types",
+  "statistics-types-moving",
+] }
 
 [dev-dependencies]
 assertables = { workspace = true }

@@ -547,8 +547,10 @@ pub(crate) mod tests {
     };
     use parameterized::parameterized;
 
-    use super::*;
-    use super::super::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes};
+    use super::{
+        super::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes},
+        *,
+    };
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

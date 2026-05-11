@@ -13,9 +13,9 @@ use futures::{
     channel::mpsc::{Receiver, Sender},
 };
 use hopr_api::types::crypto::{keypairs::Keypair, prelude::OffchainKeypair};
-use hopr_utils::platform::time::native::current_time;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
+use hopr_utils::platform::time::native::current_time;
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {

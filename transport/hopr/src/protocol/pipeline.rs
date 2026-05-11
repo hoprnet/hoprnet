@@ -2,19 +2,20 @@ use bytes::Bytes;
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
+    PeerId,
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
-use hopr_utils::network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_utils::{
+    network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
+    runtime::AbortableList,
+};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 use validator::{Validate, ValidationError, ValidationErrors};
-
-use hopr_api::PeerId;
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].

@@ -490,10 +490,12 @@ pub(crate) mod tests {
     };
     use parameterized::parameterized;
 
-    use super::*;
-    use super::super::{
-        shared_keys::{Alpha, GroupElement, SphinxSuite},
-        tests::*,
+    use super::{
+        super::{
+            shared_keys::{Alpha, GroupElement, SphinxSuite},
+            tests::*,
+        },
+        *,
     };
 
     #[test]

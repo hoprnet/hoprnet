@@ -25,7 +25,6 @@ use hopr_api::{
     },
     network::NetworkStreamControl,
 };
-use hopr_utils::runtime::Abortable;
 use hopr_lib::{
     HopRouting, Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
@@ -35,9 +34,12 @@ use hopr_lib::{
         transfer_session,
     },
 };
-use hopr_utils::network_types::{
-    prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
-    udp::ForeignDataMode,
+use hopr_utils::{
+    network_types::{
+        prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
+        udp::ForeignDataMode,
+    },
+    runtime::Abortable,
 };
 use human_bandwidth::re::bandwidth::Bandwidth;
 use serde::{Deserialize, Serialize};

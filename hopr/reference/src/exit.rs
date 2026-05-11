@@ -75,13 +75,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
         match session.target {
             SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(
-                    move || udp_target.unseal(&kp),
-                    "udp_unseal",
-                )
-                .await
-                .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let udp_target =
+                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
+                        .await
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
                     session_id = ?session_id,
@@ -166,13 +164,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
             }
             SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(
-                    move || tcp_target.unseal(&kp),
-                    "tcp_unseal",
-                )
-                .await
-                .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let tcp_target =
+                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
+                        .await
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
 

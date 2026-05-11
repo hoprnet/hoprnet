@@ -1,7 +1,6 @@
 // use hex;
 use std::{fmt::Debug, str::FromStr};
 
-use hopr_utils::platform::file::native::{metadata, read_to_string, write};
 use hopr_types::{
     crypto::{
         crypto_traits::{Digest, KeyIvInit, StreamCipher, Update},
@@ -10,6 +9,7 @@ use hopr_types::{
     crypto_random::{Randomizable, random_bytes},
     primitive::prelude::*,
 };
+use hopr_utils::platform::file::native::{metadata, read_to_string, write};
 use scrypt::{Params as ScryptParams, scrypt};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use typenum::Unsigned;

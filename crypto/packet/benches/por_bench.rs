@@ -1,6 +1,5 @@
 mod sphinx {
-    pub use hopr_crypto_packet::sphinx::errors;
-    pub use hopr_crypto_packet::sphinx::prelude;
+    pub use hopr_crypto_packet::sphinx::{errors, prelude};
 }
 
 #[allow(unused)]
@@ -12,8 +11,10 @@ mod errors;
 mod por;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_crypto_packet::HoprSphinxSuite;
-use hopr_crypto_packet::sphinx::prelude::{SharedSecret, SphinxSuite};
+use hopr_crypto_packet::{
+    HoprSphinxSuite,
+    sphinx::prelude::{SharedSecret, SphinxSuite},
+};
 use hopr_types::{
     crypto::{keypairs::Keypair, prelude::OffchainKeypair},
     crypto_random::Randomizable,

@@ -25,7 +25,10 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "graph"] }
-hopr-utils = { workspace = true, features = ["statistics-types", "statistics-types-weighted"] }
+hopr-utils = { workspace = true, features = [
+  "statistics-types",
+  "statistics-types-weighted",
+] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-types = { workspace = true, features = [

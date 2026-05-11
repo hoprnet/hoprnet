@@ -160,8 +160,8 @@ impl IpOrHost {
 ///
 /// ### Example
 /// ```no_run
-/// use hopr_utils::network_types::prelude::{IpOrHost, SealedHost};
 /// use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
+/// use hopr_utils::network_types::prelude::{IpOrHost, SealedHost};
 /// use libp2p_identity::PeerId;
 ///
 /// # fn main() -> anyhow::Result<()> {
