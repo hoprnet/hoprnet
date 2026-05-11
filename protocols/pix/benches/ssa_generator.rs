@@ -61,7 +61,7 @@ fn bench_verify(c: &mut Criterion) {
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
         let (_commitment, verifiers) = generator.new_ssa_commitment(&pseudonym).unwrap();
-        let (_index, share) = generator.next_share(&pseudonym, x).unwrap().unwrap();
+        let (_index, share) = generator.next_share(&pseudonym, &x).unwrap().unwrap();
         let verifier = &verifiers[0];
 
         group.bench_with_input(BenchmarkId::from_parameter(format!("t{}", t)), &t, |b, _| {

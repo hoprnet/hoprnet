@@ -1,17 +1,21 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, ops::Add};
 
-use hopr_types::crypto::{
-    crypto_traits::{self, KeyIvInit, StreamCipher},
-    prelude::HalfKey,
-    primitives::Blake3,
+use hopr_types::{
+    crypto::{
+        crypto_traits::{self, KeyIvInit, StreamCipher},
+        prelude::HalfKey,
+        primitives::Blake3,
+    },
+    primitive::prelude::{BytesRepresentable, GeneralError},
 };
-use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 use vsss_rs::elliptic_curve::{
     Curve, PrimeField,
-    generic_array::{ArrayLength, GenericArray},
+    generic_array::{
+        ArrayLength, GenericArray,
+        typenum::{Sum, U4, Unsigned},
+    },
 };
-use vsss_rs::elliptic_curve::generic_array::typenum::{Sum, U4, Unsigned};
-use std::ops::Add;
+
 use crate::{PixScalar, PixSpec, errors};
 
 /// Type used to index Session Stealth Addresses (SSA).
@@ -31,7 +35,6 @@ pub type CoefficientIndex = u16;
 
 /// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
 pub type SsaPolyIndexPrefixSize = U4;
-
 
 fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialId<S>, ack: &HalfKey) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
@@ -170,8 +173,7 @@ where
 {
 }
 
-impl<S: PixSpec> Default for EncryptedPartialSsaShare<S>
-{
+impl<S: PixSpec> Default for EncryptedPartialSsaShare<S> {
     fn default() -> Self {
         Self(GenericArray::default())
     }
@@ -273,7 +275,8 @@ impl<S: PixSpec> PartialSsaShare<S> {
 
         let mut out = GenericArray::<u8, EncShareSize<S>>::default();
         out[0..size_of::<SsaIndex>()].copy_from_slice(&spi.ssa_index().to_be_bytes());
-        out[size_of::<SsaIndex>()..size_of::<SsaIndex>() + size_of::<PolynomialIndex>()].copy_from_slice(&spi.poly_index().to_be_bytes());
+        out[size_of::<SsaIndex>()..size_of::<SsaIndex>() + size_of::<PolynomialIndex>()]
+            .copy_from_slice(&spi.poly_index().to_be_bytes());
         out[size_of::<SsaIndex>() + size_of::<PolynomialIndex>()..].copy_from_slice(self.0.as_ref());
         Ok(EncryptedPartialSsaShare(out))
     }

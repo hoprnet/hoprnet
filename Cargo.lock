@@ -3818,6 +3818,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-parallelize",
  "hopr-platform",
+ "hopr-protocol-pix",
  "hopr-ticket-manager",
  "humantime-serde",
  "lazy_static",

@@ -25,6 +25,7 @@ pub struct HoprEncoder<Chain, S, T> {
     ticket_factory: T,
     chain_key: ChainKeypair,
     channels_dst: Hash,
+    ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
     cfg: HoprCodecConfig,
 }
 
@@ -36,6 +37,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
         surb_store: S,
         ticket_factory: T,
         channels_dst: Hash,
+        ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
@@ -44,6 +46,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
             ticket_factory,
             chain_key,
             channels_dst,
+            ssa_generator,
             cfg,
         }
     }
@@ -104,6 +107,7 @@ where
             next_ticket,
             self.chain_api.key_id_mapper_ref(),
             &self.channels_dst,
+            &self.ssa_generator,
             signals,
         )?;
 

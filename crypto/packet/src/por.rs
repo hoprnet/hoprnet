@@ -4,8 +4,10 @@ use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_types::{crypto::prelude::*, primitive::prelude::*};
 use tracing::instrument;
 
-use crate::errors::{PacketError, Result};
-use crate::HoprEncryptedPartialSsaShare;
+use crate::{
+    HoprEncryptedPartialSsaShare,
+    errors::{PacketError, Result},
+};
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
@@ -100,7 +102,8 @@ impl SurbReceiverInfo {
     pub fn new(pov: ProofOfRelayValues, encrypted_partial_ssa_share: HoprEncryptedPartialSsaShare) -> Self {
         let mut ret = [0u8; Self::SIZE];
         ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
-        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE].copy_from_slice(encrypted_partial_ssa_share.as_ref());
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE]
+            .copy_from_slice(encrypted_partial_ssa_share.as_ref());
         Self(ret)
     }
 
@@ -110,8 +113,10 @@ impl SurbReceiverInfo {
     }
 
     pub fn encrypted_partial_ssa_share(&self) -> HoprEncryptedPartialSsaShare {
-        HoprEncryptedPartialSsaShare::try_from(&self.0[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE])
-            .expect("SurbReceiverInfo always contains valid HoprEncryptedPartialSsaShare")
+        HoprEncryptedPartialSsaShare::try_from(
+            &self.0[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE],
+        )
+        .expect("SurbReceiverInfo always contains valid HoprEncryptedPartialSsaShare")
     }
 }
 
@@ -232,11 +237,13 @@ pub fn pre_verify(
 pub type ProofOfRelayeValuesWithSolution = (ProofOfRelayValues, Option<HalfKey>);
 
 /// Helper function which generates proof of relay for the given path.
-pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayeValuesWithSolution)> {
+pub fn generate_proof_of_relay(
+    secrets: &[SharedSecret],
+) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayeValuesWithSolution)> {
     let mut last_ack_key_share = None;
     let mut por_strings = Vec::with_capacity(secrets.len());
     let mut por_values = None;
-    
+
     for i in 0..secrets.len() {
         let hint = last_ack_key_share
             .unwrap_or_else(|| {
@@ -273,7 +280,10 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
     Ok((
         por_strings,
-        (por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?, last_ack_key_share),
+        (
+            por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?,
+            last_ack_key_share,
+        ),
     ))
 }
 

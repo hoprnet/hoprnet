@@ -10,7 +10,11 @@ use vsss_rs::{
     },
 };
 
-use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, msg_to_scalar, types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId}, PolynomialIndex};
+use crate::{
+    DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec,
+    PolynomialIndex, errors, msg_to_scalar,
+    types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
+};
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
@@ -120,7 +124,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn next_share(
         &self,
         pseudonym: &S::Pseudonym,
-        msg: impl AsRef<[u8]>,
+        msg: &impl AsRef<[u8]>,
     ) -> errors::Result<Option<GeneratedShare<S>>> {
         if let Some(entry) = self.polynomials.get(pseudonym) {
             let polys = &mut entry.lock().poly_queue;
@@ -130,13 +134,17 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                 {
                     let x = msg_to_scalar::<S>(&poly.spi, msg)?;
                     // Zero would disclose the secret, so we disallow it.
-                    // The chance is almost impossible.
+                    // The chance is practically impossible.
                     if x.is_zero().into() {
                         return Err(errors::PixError::InvalidInput);
                     }
 
                     return Ok(Some((poly.spi, poly.next_share(x))));
                 }
+                // If we replaced VecDeque with a lock-free alternative, we could remove
+                // the mutex, but the alternative would need to effectively deallocate,
+                // so the polynomials do not grow indefinitely when new commitments are
+                // being added.
                 polys.pop_front();
             }
         }
@@ -185,7 +193,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as PolynomialIndex),
+                                spi: SsaPolynomialId::new(
+                                    SsaId::new(*pseudonym, ssa_index),
+                                    poly_index as PolynomialIndex,
+                                ),
                                 poly_commitment,
                             }),
                     );
@@ -195,7 +206,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .into_iter()
                             .enumerate()
                             .map(|(poly_index, raw)| IndexedPolynomial {
-                                spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as PolynomialIndex),
+                                spi: SsaPolynomialId::new(
+                                    SsaId::new(*pseudonym, ssa_index),
+                                    poly_index as PolynomialIndex,
+                                ),
                                 raw,
                                 shares_generated: 0,
                                 t: self.cfg.threshold,
@@ -215,7 +229,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                                 .into_iter()
                                 .enumerate()
                                 .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                    spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as PolynomialIndex),
+                                    spi: SsaPolynomialId::new(
+                                        SsaId::new(*pseudonym, ssa_index),
+                                        poly_index as PolynomialIndex,
+                                    ),
                                     poly_commitment,
                                 }),
                         );
@@ -224,7 +241,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                             .poly_queue
                             .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
                                 IndexedPolynomial {
-                                    spi: SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index as PolynomialIndex),
+                                    spi: SsaPolynomialId::new(
+                                        SsaId::new(*pseudonym, ssa_index),
+                                        poly_index as PolynomialIndex,
+                                    ),
                                     raw,
                                     shares_generated: 0,
                                     t: self.cfg.threshold,
@@ -309,25 +329,25 @@ mod tests {
 
         for i in 0..12_u16 {
             let (spi, _) = generator
-                .next_share(&p1, i.to_be_bytes())?
+                .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(spi.pseudonym(), &p1);
             assert_eq!(spi.ssa_index(), 1);
             assert_eq!(spi.poly_index(), i / 4);
         }
-        assert!(generator.next_share(&p1, 20_u32.to_be_bytes())?.is_none());
+        assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
         generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u16 {
             let (spi, _) = generator
-                .next_share(&p1, i.to_be_bytes())?
+                .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(spi.pseudonym(), &p1);
             assert_eq!(spi.ssa_index(), 2);
             assert_eq!(spi.poly_index(), i / 4);
         }
-        assert!(generator.next_share(&p1, 20_u32.to_be_bytes())?.is_none());
+        assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
         Ok(())
     }
@@ -348,7 +368,7 @@ mod tests {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let (_, share) = generator
-                    .next_share(&p, x)?
+                    .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
 
                 vs[poly_index].verify(&share, x)?;
@@ -377,7 +397,7 @@ mod tests {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let (spi, share) = generator
-                    .next_share(&p, x)?
+                    .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
                     identifier: msg_to_scalar::<TestSpec>(&spi, x)?.into(),

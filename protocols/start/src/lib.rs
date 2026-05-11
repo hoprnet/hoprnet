@@ -513,7 +513,10 @@ where
                 }
                 StartProtocolDiscriminants::SsaRequest => {
                     if data.len()
-                        <= data_offset + size_of::<u64>() + size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+                        <= data_offset
+                            + size_of::<u64>()
+                            + size_of::<hopr_protocol_pix::SsaIndex>()
+                            + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
                     {
                         return Err(StartProtocolError::InvalidLength);
                     }
@@ -524,9 +527,11 @@ where
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ssa index".into()))?,
                         ),
-                        params: u64::from_be_bytes( data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()..data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<u64>()]
-                            .try_into()
-                            .map_err(|_| StartProtocolError::ParseError("params".into()))?
+                        params: u64::from_be_bytes(
+                            data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
+                                ..data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<u64>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("params".into()))?,
                         ),
                         commitment: G::try_from(
                             &data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<u64>()
@@ -582,7 +587,7 @@ where
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_protocol_app::prelude::Tag;
-
+    use hopr_protocol_pix::PolynomialIndex;
     use super::*;
 
     #[test]
@@ -689,7 +694,7 @@ mod tests {
             session_id: 0xfeedeef,
             ssa: hopr_protocol_pix::SsaIndex::MAX,
             coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
-            coefficient_commitments: (0..max_coeffs).map(|i| (i as u32, [0u8; 33])).collect(),
+            coefficient_commitments: (0..max_coeffs).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
         });
 
         let (tag, msg) = msg_1.clone().encode()?;

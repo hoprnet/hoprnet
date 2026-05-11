@@ -17,8 +17,7 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 use hopr_crypto_sphinx::prelude::*;
-use hopr_types::{internal::prelude::*, primitive::prelude::*};
-use hopr_types::crypto::prelude::SimplePseudonym;
+use hopr_types::{crypto::prelude::SimplePseudonym, internal::prelude::*, primitive::prelude::*};
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -94,10 +93,10 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; /
 pub struct HoprPixSpec;
 
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
+    type Cipher = hopr_types::crypto::primitives::ChaCha20;
     type Curve = k256::Secp256k1;
     type Digest = hopr_types::crypto::primitives::Blake3;
     type Pseudonym = SimplePseudonym;
-    type Cipher = hopr_types::crypto::primitives::ChaCha20;
 }
 
 /// HOPR-specific encrypted partial SSA share type from the PIX protocol.
@@ -139,7 +138,7 @@ mod tests {
     #[test]
     fn surb_length() {
         let surb_len = HoprSurb::SIZE;
-        assert_eq!(surb_len, 395);
+        assert_eq!(surb_len, 399);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 

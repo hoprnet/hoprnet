@@ -97,6 +97,7 @@ mod tests {
             MemorySurbStore::new(SurbStoreConfig::default()),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
+            Arc::new(hopr_protocol_pix::SsaShareGenerator::new(hopr_protocol_pix::SsaGeneratorConfig::default())),
             HoprCodecConfig::default(),
         )
     }

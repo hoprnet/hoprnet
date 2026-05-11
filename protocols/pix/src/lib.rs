@@ -1,11 +1,11 @@
+use std::ops::Add;
+
 #[cfg(feature = "rayon")]
 use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
-use std::ops::Add;
-
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
@@ -57,6 +57,8 @@ where
     type Cipher: StreamCipher + KeyIvInit;
     /// Context data used to derive the SSA encryption key.
     const KEY_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE";
+    /// Domain separator used to derive the X value of a share.
+    const HASH_SCALAR_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE_SCALAR";
 }
 
 /// Finite field used to represent the polynomial coefficients.
@@ -79,7 +81,10 @@ pub(crate) fn msg_to_scalar<S: PixSpec>(
             spi.ssa_index().to_be_bytes().as_ref(),
             spi.poly_index().to_be_bytes().as_ref(),
         ],
-        &[format!("{:?}_XMD:{:?}_SSWU_RO_", S::Curve::default(), S::Digest::default()).as_bytes()],
+        &[
+            format!("{:?}_XMD:{:?}_SSWU_RO_", S::Curve::default(), S::Digest::default()).as_bytes(),
+            S::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
+        ],
     )?)
 }
 

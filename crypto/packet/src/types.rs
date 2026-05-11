@@ -212,7 +212,11 @@ mod tests {
     };
 
     use super::*;
-    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, packet::HoprPacket, por::{SurbReceiverInfo, generate_proof_of_relay}, HoprEncryptedPartialSsaShare};
+    use crate::{
+        HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
+        packet::HoprPacket,
+        por::{SurbReceiverInfo, generate_proof_of_relay},
+    };
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 4] = [

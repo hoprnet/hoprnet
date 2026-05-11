@@ -91,7 +91,7 @@ async fn test_generator_reconstructor() -> anyhow::Result<()> {
 
     while let Some((msg, share)) = {
         let msg = hopr_types::crypto_random::random_bytes::<20>();
-        generator.next_share(&pseudonym, msg).map(|v| v.map(|u| (msg, u)))
+        generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
     }? {
         let ack = HalfKey::random();
         let enc_share = share.1.encrypt(&share.0, &ack)?;
