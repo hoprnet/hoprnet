@@ -4848,7 +4848,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-reference"
-version = "4.1.1"
+version = "4.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4892,7 +4892,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.18.1"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4912,6 +4912,7 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
+ "parking_lot",
  "serde",
  "serde_with",
  "smart-default",
