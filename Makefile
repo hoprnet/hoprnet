@@ -27,10 +27,6 @@ all: help
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
 
-.PHONY: install
-install:
-	$(cargo) install --path hoprd/hoprd
-
 .PHONY: localcluster
 localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file

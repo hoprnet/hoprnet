@@ -3,9 +3,9 @@
 //! during node runtime.
 //!
 //! - [passive strategy](crate::strategy::MultiStrategy)
-//! - [auto funding strategy](crate::auto_funding) (feature `strategy-auto-funding`)
-//! - [auto redeeming strategy](crate::auto_redeeming) (feature `strategy-auto-redeeming`)
-//! - [closure finalizer](crate::channel_finalizer) (feature `strategy-closure-finalizer`)
+//! - auto funding strategy (`auto_funding` module, feature `strategy-auto-funding`)
+//! - auto redeeming strategy (`auto_redeeming` module, feature `strategy-auto-redeeming`)
+//! - closure finalizer (`channel_finalizer` module, feature `strategy-closure-finalizer`)
 //! - channel lifecycle strategy (feature `strategy-channel-lifecycle`)
 //! - [multiple strategy chains](crate::strategy)
 //!
