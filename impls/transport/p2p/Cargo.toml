@@ -6,6 +6,7 @@ description = "rust-libp2p based p2p transport implementation"
 edition.workspace = true
 rust-version.workspace = true
 license = "GPL-3.0-only"
+publish = false
 
 [lib]
 crate-type = ["rlib"]

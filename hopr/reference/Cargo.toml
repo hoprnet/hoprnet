@@ -8,6 +8,7 @@ description = "Referentail omplementation of the hopr-lib object using canonical
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+publish = false
 
 [lib]
 crate-type = ["rlib"]
