@@ -8,7 +8,7 @@ use futures::{
     channel::mpsc::{Receiver, Sender, channel},
 };
 use hopr_api::network::NetworkStreamControl;
-use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt};
+use hopr_utils::network_types::timeout::{SinkTimeoutError, TimeoutSinkExt};
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -77,7 +77,7 @@ where
     frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
 
     // Send all outgoing data to the peer
-    hopr_async_runtime::prelude::spawn(
+    hopr_utils::runtime::prelude::spawn(
         recv.inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
             .map(Ok)
             .forward(frame_writer)
@@ -87,7 +87,7 @@ where
     );
 
     // Read all incoming data from that peer and pass it to the general ingress stream
-    hopr_async_runtime::prelude::spawn(
+    hopr_utils::runtime::prelude::spawn(
         FramedRead::new(stream_rx.compat(), codec)
             .filter_map(move |v| {
                 futures::future::ready(match v {
@@ -185,7 +185,7 @@ where
     let open_ctx_ingress = open_ctx.clone();
 
     // terminated when the incoming is dropped
-    let _ingress_process = hopr_async_runtime::prelude::spawn(
+    let _ingress_process = hopr_utils::runtime::prelude::spawn(
         incoming
             .for_each(move |(peer, stream)| {
                 let cache = cache_ingress.clone();
@@ -215,7 +215,7 @@ where
     );
 
     // terminated when the rx_in is dropped
-    let _egress_process = hopr_async_runtime::prelude::spawn(
+    let _egress_process = hopr_utils::runtime::prelude::spawn(
         rx_out
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
             .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {

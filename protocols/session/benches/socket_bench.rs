@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_network_types::utils::DuplexIO;
+use hopr_utils::network_types::utils::DuplexIO;
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};

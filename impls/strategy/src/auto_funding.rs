@@ -165,7 +165,7 @@ where
         let funding_amount = self.cfg.funding_amount;
         let in_flight = Arc::clone(&self.in_flight);
 
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             match chain.fund_channel(&channel_id, funding_amount).await {
                 Ok(confirmation) => {
                     #[cfg(all(feature = "telemetry", not(test)))]

@@ -150,7 +150,7 @@ where
             .map_err(TicketManagerError::store)?
             .collect::<Vec<_>>();
         let mut neglected = Vec::new();
-        let now = hopr_platform::time::current_time();
+        let now = hopr_utils::platform::time::current_time();
         for channel_id in stored_queues {
             // If any existing redeemable ticket queue does not match any currently existing
             // channel that's either open or its closure period did not yet elapse (i.e., the channel

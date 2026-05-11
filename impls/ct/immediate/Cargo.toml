@@ -32,7 +32,7 @@ hopr-api = { workspace = true, features = [
   "graph",
   "types-random",
 ] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

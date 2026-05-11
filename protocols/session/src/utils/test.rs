@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream};
-use hopr_network_types::utils::DuplexIO;
+use hopr_utils::network_types::utils::DuplexIO;
 use rand::{RngExt, SeedableRng, prelude::StdRng};
 use rand_distr::{Bernoulli, Distribution};
 use tracing::instrument;
@@ -156,7 +156,7 @@ impl<const C: usize> FaultyNetwork<'_, C> {
                 };
                 async move {
                     if wait > Duration::ZERO {
-                        hopr_async_runtime::prelude::sleep(wait).await;
+                        hopr_utils::runtime::prelude::sleep(wait).await;
                     }
                     e
                 }

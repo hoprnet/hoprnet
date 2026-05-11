@@ -12,7 +12,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
-use hopr_async_runtime::{prelude::AbortHandle, spawn_as_abortable};
+use hopr_utils::runtime::prelude::AbortHandle;
 use hopr_lib::api::{
     chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
     node::{
@@ -191,7 +191,7 @@ where
         let channel_id = *channel_id;
         let redemptions = self.running_redemptions.clone();
 
-        let abort_handle = spawn_as_abortable!(async move {
+        let abort_handle = hopr_utils::spawn_as_abortable!(async move {
             let redeem_result = match tmgr
                 .redeem_stream(client.clone(), channel_id, min_value.into())
                 .map_err(StrategyError::other)
@@ -224,7 +224,7 @@ where
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             let chain_api = self.node.chain_api().clone();
             let channel_id = *ack.channel_id();
-            let maybe_channel = hopr_async_runtime::prelude::spawn_blocking(move || {
+            let maybe_channel = hopr_utils::runtime::prelude::spawn_blocking(move || {
                 chain_api.channel_by_id(&channel_id).map_err(StrategyError::other)
             })
             .await
@@ -584,7 +584,7 @@ mod tests {
 
     async fn await_redemption_queue_empty(redeems: moka::sync::Cache<ChannelId, AbortHandle>) {
         loop {
-            hopr_async_runtime::prelude::sleep(Duration::from_millis(100)).await;
+            hopr_utils::runtime::prelude::sleep(Duration::from_millis(100)).await;
             redeems.run_pending_tasks();
             if redeems.entry_count() == 0 {
                 break;

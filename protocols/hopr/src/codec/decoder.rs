@@ -6,7 +6,7 @@ use hopr_api::{
     types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
 use hopr_crypto_packet::prelude::*;
-use hopr_platform::trace_timed;
+use hopr_utils::trace_timed;
 
 use crate::{
     AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,

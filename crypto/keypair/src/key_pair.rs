@@ -1,7 +1,7 @@
 // use hex;
 use std::{fmt::Debug, str::FromStr};
 
-use hopr_platform::file::native::{metadata, read_to_string, write};
+use hopr_utils::platform::file::native::{metadata, read_to_string, write};
 use hopr_types::{
     crypto::{
         crypto_traits::{Digest, KeyIvInit, StreamCipher, Update},

@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{StreamExt, pin_mut};
-use hopr_async_runtime::AbortHandle;
+use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
 use super::{
@@ -359,7 +359,7 @@ where
             "Creating session balancer level channel"
         );
         let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             async move {
                 pin_mut!(sampling_stream);
                 while sampling_stream.next().await.is_some() {

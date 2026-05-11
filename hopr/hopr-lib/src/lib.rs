@@ -35,7 +35,7 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod network {
-        pub use hopr_network_types as types;
+        pub use hopr_utils::network_types as types;
     }
 
     pub use hopr_transport as transport;
@@ -62,8 +62,8 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
-use hopr_async_runtime::prelude::spawn;
-pub use hopr_async_runtime::{Abortable, AbortableList};
+use hopr_utils::runtime::prelude::spawn;
+pub use hopr_utils::runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
@@ -189,7 +189,7 @@ pub fn prepare_tokio_runtime(
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
-    hopr_parallelize::cpu::init_thread_pool(
+    hopr_utils::parallelize::cpu::init_thread_pool(
         num_cpu_threads
             .map(|v| v.get())
             .or(avail_parallelism)

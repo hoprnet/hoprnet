@@ -15,15 +15,15 @@ crate-type = ["rlib"]
 [features]
 default = ["runtime-tokio"]
 runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
+  "hopr-utils/runtime-tokio",
   "hopr-lib/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
+  "hopr-utils/network-types-runtime-tokio",
   "hopr-transport/runtime-tokio",
 ]
 telemetry = [
   "dep:hopr-metrics",
   "hopr-transport/telemetry",
-  "hopr-network-types/telemetry",
+  "hopr-utils/network-types-telemetry",
 ]
 
 [dependencies]
@@ -46,10 +46,9 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-lib = { workspace = true, features = ["session-client"] }
-hopr-async-runtime = { workspace = true }
+hopr-utils = { workspace = true, features = ["network-types"] }
 
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

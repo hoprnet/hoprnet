@@ -1,0 +1,118 @@
+[package]
+name = "hopr-utils"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition.workspace = true
+rust-version.workspace = true
+description = "Shared utility crates for HOPR: async runtime, network types, parallelisation, statistics, platform, and testing helpers"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+# runtime module (from hopr-async-runtime) — always compiled, feature gates optional deps only
+runtime-tokio = ["dep:tokio"]
+async-lock = ["dep:async-lock"]
+
+# network-types module (from hopr-network-types)
+network-types = [
+  "dep:arrayvec", "dep:flume", "dep:futures-time", "dep:hickory-resolver",
+  "dep:libp2p-identity", "dep:multiaddr", "dep:pin-project", "dep:socket2",
+  "dep:strum", "dep:thiserror", "dep:tracing", "dep:lazy_static",
+]
+network-types-serde = ["network-types", "dep:serde", "dep:serde_bytes", "libp2p-identity/serde", "hopr-types/serde"]
+network-types-capture = ["network-types", "dep:pcap-file"]
+network-types-runtime-tokio = ["network-types", "runtime-tokio", "dep:tokio-util", "hickory-resolver/tokio"]
+network-types-telemetry = ["network-types", "dep:hopr-metrics"]
+
+# parallelize module (from hopr-parallelize)
+parallelize = ["dep:thiserror", "dep:tracing", "dep:lazy_static", "dep:libc"]
+parallelize-rayon = ["parallelize", "dep:rayon"]
+parallelize-runtime-tokio = ["parallelize", "runtime-tokio"]
+parallelize-telemetry = ["parallelize", "dep:hopr-metrics"]
+
+# statistics module (from hopr-statistics)
+statistics-types = []
+statistics-types-serde = ["statistics-types", "dep:serde"]
+statistics-types-moving = ["statistics-types"]
+statistics-types-weighted = ["statistics-types", "dep:rand"]
+
+# testing module (from hopr-test-stubs) — only for test code
+testing = ["dep:async-trait", "dep:bimap", "dep:thiserror"]
+
+# platform module (from hopr-platform)
+platform = ["dep:thiserror"]
+platform-trace-timing = ["platform", "dep:tracing"]
+
+[dependencies]
+# runtime (always-on baseline)
+auto_impl = { workspace = true }
+async-lock = { workspace = true, optional = true }
+indexmap = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true, optional = true, features = ["time", "sync"] }
+
+# network-types
+arrayvec = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
+futures-time = { workspace = true, optional = true }
+hickory-resolver = { workspace = true, optional = true }
+libp2p-identity = { workspace = true, optional = true }
+multiaddr = { workspace = true, optional = true }
+pin-project = { workspace = true, optional = true }
+pcap-file = { workspace = true, optional = true }
+socket2 = { workspace = true, features = ["all"], optional = true }
+strum = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
+
+# network-types-serde
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
+
+# parallelize
+rayon = { workspace = true, optional = true }
+
+# statistics-types-weighted
+rand = { workspace = true, optional = true }
+
+# testing
+async-trait = { workspace = true, optional = true }
+bimap = { workspace = true, optional = true }
+
+# platform + parallelize (shared)
+thiserror = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+# shared across network-types and parallelize
+lazy_static = { workspace = true, optional = true }
+
+# telemetry optional dep (used by network-types-telemetry and parallelize-telemetry)
+hopr-metrics = { workspace = true, optional = true }
+
+# network-types-serde
+hopr-types = { workspace = true, optional = true }
+
+# testing
+hopr-api = { workspace = true, optional = true, features = ["chain"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+assertables = { workspace = true }
+parameterized = { workspace = true }
+serial_test = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+test-log = { workspace = true }
+
+[package.metadata.cargo-shear]
+ignored = ["serde_bytes"]
+
+[package.metadata.cargo-machete]
+ignored = ["hickory-resolver", "serde_bytes"]

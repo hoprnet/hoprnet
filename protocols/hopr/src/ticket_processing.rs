@@ -3,7 +3,7 @@ use hopr_api::{
     types::{crypto::prelude::*, internal::prelude::*},
 };
 #[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use validator::ValidationError;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketAcknowledgementError, UnacknowledgedTicketProcessor};

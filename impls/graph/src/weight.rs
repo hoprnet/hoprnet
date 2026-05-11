@@ -5,7 +5,7 @@ use hopr_api::graph::{
         EdgeTransportMeasurement, EdgeWeightType,
     },
 };
-use hopr_statistics::ExponentialMovingAverage;
+use hopr_utils::statistics::ExponentialMovingAverage;
 
 /// A representation of a individual neighbor link measurement
 #[derive(Debug, Copy, Clone, Default, PartialEq)]

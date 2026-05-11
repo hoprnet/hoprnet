@@ -24,7 +24,7 @@ use hopr_api::{
         primitive::prelude::*,
     },
 };
-use hopr_async_runtime::AbortableList;
+use hopr_utils::runtime::AbortableList;
 use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;

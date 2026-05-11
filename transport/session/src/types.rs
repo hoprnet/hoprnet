@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_network_types::{
+use hopr_utils::network_types::{
     prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},
 };

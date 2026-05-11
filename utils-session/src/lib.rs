@@ -25,7 +25,7 @@ use hopr_api::{
     },
     network::NetworkStreamControl,
 };
-use hopr_async_runtime::Abortable;
+use hopr_utils::runtime::Abortable;
 use hopr_lib::{
     HopRouting, Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
@@ -35,7 +35,7 @@ use hopr_lib::{
         transfer_session,
     },
 };
-use hopr_network_types::{
+use hopr_utils::network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
     udp::ForeignDataMode,
 };
@@ -333,7 +333,7 @@ impl SessionPool {
             let pool_clone_2 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
-                ah: Some(hopr_async_runtime::spawn_as_abortable!(
+                ah: Some(hopr_utils::spawn_as_abortable!(
                     futures_time::stream::interval(futures_time::time::Duration::from(
                         std::time::Duration::from_secs(1).max(timeout / 2)
                     ))
@@ -433,7 +433,7 @@ pub async fn create_tcp_client_binding(
     // Create an abort handler for the listener
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
     let active_sessions_clone = active_sessions.clone();
-    hopr_async_runtime::prelude::spawn(async move {
+    hopr_utils::runtime::prelude::spawn(async move {
         let active_sessions_clone_2 = active_sessions_clone.clone();
 
         futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
@@ -496,7 +496,7 @@ pub async fn create_tcp_client_binding(
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
 
-                            hopr_async_runtime::prelude::spawn(
+                            hopr_utils::runtime::prelude::spawn(
                                 // The stream either terminates naturally (by the client closing the TCP connection)
                                 // or is terminated via the abort handle.
                                 bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
@@ -528,7 +528,7 @@ pub async fn create_tcp_client_binding(
     });
 
     open_listeners.0.insert(
-        ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
+        ListenerId(hopr_utils::network_types::types::IpProtocol::TCP, bound_host),
         StoredSessionEntry {
             destination,
             target: target_spec,
@@ -590,7 +590,7 @@ pub async fn create_udp_client_binding(
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     let open_listeners_clone = open_listeners.clone();
-    let listener_id = ListenerId(hopr_network_types::types::IpProtocol::UDP, bound_host);
+    let listener_id = ListenerId(hopr_utils::network_types::types::IpProtocol::UDP, bound_host);
 
     // Create an abort handle so that the Session can be terminated by aborting
     // the UDP stream first. Because under the hood, the bind_session_to_stream uses
@@ -616,7 +616,7 @@ pub async fn create_udp_client_binding(
             configurator,
         },
     );
-    hopr_async_runtime::prelude::spawn(async move {
+    hopr_utils::runtime::prelude::spawn(async move {
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 

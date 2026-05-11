@@ -10,7 +10,7 @@ use hopr_api::types::{
     },
     primitive::prelude::BytesEncodable,
 };
-use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
+use hopr_utils::runtime::AbortHandle;
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_protocol_hopr::{
     IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
@@ -101,11 +101,11 @@ pub fn packet_capture_channel(
 ) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
     let (sender, receiver) = futures::channel::mpsc::channel(20_000);
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
-    let ah = spawn_as_abortable!(async move {
+    let ah = hopr_utils::spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
             let writer = writer.clone();
-            match hopr_async_runtime::prelude::spawn_blocking(move || {
+            match hopr_utils::runtime::prelude::spawn_blocking(move || {
                 writer
                     .lock()
                     .map_err(|_| std::io::Error::other("lock poisoned"))
@@ -451,7 +451,7 @@ mod tests {
         },
     };
     use hopr_crypto_packet::prelude::PacketSignal;
-    use hopr_network_types::types::SealedHost;
+    use hopr_utils::network_types::types::SealedHost;
     use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};

@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::*;
 #[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use hopr_types::{
     crypto::prelude::*,
     internal::{

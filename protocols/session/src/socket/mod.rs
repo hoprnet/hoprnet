@@ -312,7 +312,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         // We have to merge the streams here and spawn a special task for it
         // Since the control messages from the State can come independent of Upstream writes.
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             (ctl_rx, segments_rx)
                 .merge()
                 .map(move |msg| {

@@ -72,7 +72,7 @@ fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
 /// paths bypass the cache), so the key stores the hop count as a plain `u32`.
 type PlannerCacheKey = (NodeId, NodeId, u32);
-type PlannerCacheValue = Arc<hopr_statistics::WeightedCollection<ValidatedPath>>;
+type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
 ///
@@ -217,7 +217,7 @@ where
                             )));
                         }
 
-                        Ok(Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)))
+                        Ok(Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)))
                     })
                     .await
                     .map_err(PathPlannerError::CacheError)?;
@@ -391,7 +391,7 @@ where
                             cache
                                 .insert(
                                     (src, dest, hops_u32),
-                                    Arc::new(hopr_statistics::WeightedCollection::new(valid_paths)),
+                                    Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
                                 )
                                 .await;
                         }

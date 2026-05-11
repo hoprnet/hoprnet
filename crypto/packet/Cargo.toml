@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 default = ["rayon"]
 all-benchmarks = []
 
-rayon = ["hopr-parallelize/rayon"]
+rayon = ["hopr-utils/parallelize-rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -41,7 +41,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-crypto-sphinx = { workspace = true }
-hopr-parallelize = { workspace = true }
+hopr-utils = { workspace = true, features = ["parallelize"] }
 hopr-types = { workspace = true, features = [
   "crypto",
   "random",

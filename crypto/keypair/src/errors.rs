@@ -1,5 +1,5 @@
 use hex::FromHexError;
-use hopr_platform::error::PlatformError;
+use hopr_utils::platform::error::PlatformError;
 use hopr_types::crypto::errors::CryptoError;
 use serde_json::Error as JsonError;
 use thiserror::Error;

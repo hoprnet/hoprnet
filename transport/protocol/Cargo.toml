@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 default = []
 all-benchmarks = []
 telemetry = ["dep:hopr-metrics", "hopr-protocol-hopr/telemetry"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-utils/runtime-tokio"]
 serde = [
   "dep:serde",
   "dep:humantime-serde",
@@ -45,20 +45,18 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["network", "node", "types-random"] }
 
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types", "parallelize", "parallelize-rayon"] }
 hopr-crypto-packet = { workspace = true }
-hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-protocol-app = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
 
 
 [dev-dependencies]
 async-trait = { workspace = true }
 async_channel_io = { version = "0.3.0" }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types", "testing"] }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
@@ -74,10 +72,8 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
-hopr-network-types = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-ticket-manager = { workspace = true }
-hopr-test-stubs = { workspace = true }
 hopr-transport-protocol = { path = ".", features = ["serde"] }
 
 [[bench]]

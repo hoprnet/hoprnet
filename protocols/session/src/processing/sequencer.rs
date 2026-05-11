@@ -282,7 +282,7 @@ mod tests {
         let input = vec![2u32, 1, 4, 5, 8, 7, 9, 11, 10];
 
         let input_clone = input.clone();
-        let jh = hopr_async_runtime::prelude::spawn(async move {
+        let jh = hopr_utils::runtime::prelude::spawn(async move {
             for v in input_clone {
                 seq_sink
                     .feed(v)
@@ -333,7 +333,7 @@ mod tests {
 
         let input = vec![2u32, 1, 3, 5, 4, 8, 11];
 
-        hopr_async_runtime::prelude::spawn(futures::stream::iter(input.clone()).map(Ok).forward(seq_sink)).await??;
+        hopr_utils::runtime::prelude::spawn(futures::stream::iter(input.clone()).map(Ok).forward(seq_sink)).await??;
 
         let seq_stream = seq_stream.sequencer(Duration::from_millis(25), 4096);
 

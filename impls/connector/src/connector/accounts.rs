@@ -38,7 +38,7 @@ where
             let backend = backend.clone();
             // This avoids the cache on purpose so it does not get spammed
             async move {
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await
+                match hopr_utils::runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await
                 {
                     Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
                     Ok(Err(error)) => {

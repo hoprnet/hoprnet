@@ -13,7 +13,7 @@ use futures::{
     channel::mpsc::{Receiver, Sender},
 };
 use hopr_api::types::crypto::{keypairs::Keypair, prelude::OffchainKeypair};
-use hopr_platform::time::native::current_time;
+use hopr_utils::platform::time::native::current_time;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
 use lazy_static::lazy_static;

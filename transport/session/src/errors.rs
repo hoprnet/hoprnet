@@ -28,7 +28,7 @@ pub enum TransportSessionError {
     Manager(#[from] SessionManagerError),
 
     #[error(transparent)]
-    Network(#[from] hopr_network_types::errors::NetworkTypeError),
+    Network(#[from] hopr_utils::network_types::errors::NetworkTypeError),
 
     #[error("session is closed")]
     Closed,

@@ -16,15 +16,15 @@ capture = ["dep:pcap-file"]
 telemetry = [
   "serde",
   "hopr-transport-session/telemetry",
-  "hopr-network-types/telemetry",
+  "hopr-utils/network-types-telemetry",
   "hopr-transport-mixer/telemetry",
   "hopr-transport-path/telemetry",
   "hopr-transport-protocol/telemetry",
 ]
 p2p-announce-quic = []
 runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
+  "hopr-utils/runtime-tokio",
+  "hopr-utils/network-types-runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
 ]
@@ -62,10 +62,8 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["types-random", "tickets", "node"] }
 
-hopr-async-runtime = { workspace = true }
+hopr-utils = { workspace = true, features = ["network-types"] }
 hopr-crypto-packet = { workspace = true }
-
-hopr-network-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-ticket-manager = { workspace = true }
@@ -82,7 +80,7 @@ async-trait = { workspace = true }
 bimap = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 rstest = { workspace = true }
 
 hopr-api = { workspace = true }

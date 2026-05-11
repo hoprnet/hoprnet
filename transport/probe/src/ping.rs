@@ -5,7 +5,7 @@ use futures::{
     channel::mpsc::{Sender, channel},
 };
 use hopr_api::{OffchainPublicKey, graph::NetworkGraphError};
-use hopr_async_runtime::prelude::timeout_fut;
+use hopr_utils::runtime::prelude::timeout_fut;
 use tracing::{debug, warn};
 
 use crate::errors::{ProbeError, Result};

@@ -66,7 +66,7 @@ mod tests {
         let mut rng = StdRng::from_seed(RNG_SEED);
         segments.shuffle(&mut rng);
 
-        hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
+        hopr_utils::runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
 
         let actual = reassm_rx
             .try_collect::<Vec<_>>()
@@ -109,7 +109,7 @@ mod tests {
         let mut rng = StdRng::from_seed(RNG_SEED);
         segments.shuffle(&mut rng);
 
-        hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
+        hopr_utils::runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
 
         let actual = reassm_rx
             .collect::<Vec<_>>()

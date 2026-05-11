@@ -55,9 +55,9 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
-use hopr_async_runtime::{AbortableList, spawn_as_abortable};
+use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::prelude::PacketSignal;
-use hopr_network_types::prelude::*;
+use hopr_utils::network_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 use hopr_transport_mixer::MixerConfig;
@@ -391,12 +391,12 @@ where
         #[cfg(feature = "runtime-tokio")]
         processes.insert(
             HoprTransportProcess::PathRefresh,
-            spawn_as_abortable!(self.path_planner.run_background_refresh()),
+            hopr_utils::spawn_as_abortable!(self.path_planner.run_background_refresh()),
         );
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer_process().inspect(|_| tracing::warn!(
+            hopr_utils::spawn_as_abortable!(transport_layer_process().inspect(|_| tracing::warn!(
                 task = %HoprTransportProcess::Medium,
                 "long-running background task finished"
             ))),
@@ -552,7 +552,7 @@ where
         let flush_interval = self.cfg.counter_flush_interval;
         processes.insert(
             HoprTransportProcess::CounterFlush,
-            spawn_as_abortable!(async move {
+            hopr_utils::spawn_as_abortable!(async move {
                 use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
 
                 futures_time::stream::interval(futures_time::time::Duration::from(flush_interval))
@@ -627,7 +627,7 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn_as_abortable!(
+            hopr_utils::spawn_as_abortable!(
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx.clone(), rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {

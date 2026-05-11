@@ -5,9 +5,9 @@ use hopr_api::{
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_async_runtime::{AbortableList, spawn_as_abortable};
+use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
-use hopr_network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
+use hopr_utils::network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -86,7 +86,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                 let encoder = encoder.clone();
                 let counters = counters.clone();
                 async move {
-                    match hopr_parallelize::cpu::spawn_fifo_blocking(
+                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                         move || {
                             encoder.encode_packet(
                                 data.data.to_bytes(),
@@ -190,7 +190,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             tracing::trace!(%peer, "protocol message in");
 
             async move {
-                match hopr_parallelize::cpu::spawn_fifo_blocking(move || decoder.decode(peer, data), "packet_decode")
+                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || decoder.decode(peer, data), "packet_decode")
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(Ok(packet))) => {
@@ -477,7 +477,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                     let c = acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE).map(|c| c.to_vec()).collect::<Vec<_>>();
                     for ack_chunk in c {
                         let encoder = encoder.clone();
-                        match hopr_parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
+                        match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
                             Ok(Ok(ack_packet)) => {
                                 wire_outgoing
                                     .feed((ack_packet.next_hop.into(), ack_packet.data))
@@ -526,7 +526,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
             async move {
                 counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
                 tracing::trace!(num = acks.len(), "received acknowledgements");
-                match hopr_parallelize::cpu::spawn_fifo_blocking(
+                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || ticket_proc.acknowledge_tickets(peer, acks),
                     "ack_decode",
                 )
@@ -758,7 +758,7 @@ where
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
-        spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable!(
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
@@ -772,7 +772,7 @@ where
 
     processes.insert(
         PacketPipelineProcesses::MsgIn,
-        spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable!(
             start_incoming_packet_pipeline(
                 (wire_out.clone(), wire_in),
                 decoder,
@@ -789,7 +789,7 @@ where
 
     processes.insert(
         PacketPipelineProcesses::AckOut,
-        spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable!(
             start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, cfg.ack_config, packet_key.clone(), wire_out,)
                 .in_current_span()
         ),
@@ -803,7 +803,7 @@ where
 
     processes.insert(
         PacketPipelineProcesses::AckIn,
-        spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable!(
             start_incoming_ack_pipeline(
                 incoming_ack_rx,
                 ticket_events,

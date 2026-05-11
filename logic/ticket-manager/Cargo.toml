@@ -37,7 +37,7 @@ hopr-api = { workspace = true, features = [
   "types-internal",
   "types-random",
 ] }
-hopr-platform = { workspace = true }
+hopr-utils = { workspace = true, features = ["platform"] }
 
 [dev-dependencies]
 criterion = { workspace = true }

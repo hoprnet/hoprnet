@@ -75,7 +75,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
         match session.target {
             SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
+                let udp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(
                     move || udp_target.unseal(&kp),
                     "udp_unseal",
                 )
@@ -166,7 +166,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
             }
             SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
+                let tcp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(
                     move || tcp_target.unseal(&kp),
                     "tcp_unseal",
                 )

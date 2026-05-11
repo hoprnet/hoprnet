@@ -38,7 +38,7 @@ where
             let selector = selector.clone();
             // This avoids the cache on purpose so it does not get spammed
             async move {
-                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
+                match hopr_utils::runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
                 {
                     Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
                     Ok(Err(error)) => {
@@ -60,7 +60,7 @@ async fn channel_by_id_async<B: Backend + Send + Sync + 'static>(
     backend: std::sync::Arc<B>,
     channel_id: ChannelId,
 ) -> Result<Option<ChannelEntry>, ConnectorError> {
-    Ok(hopr_async_runtime::prelude::spawn_blocking(move || {
+    Ok(hopr_utils::runtime::prelude::spawn_blocking(move || {
         channel_by_id.try_get_with_by_ref(&channel_id, || {
             tracing::warn!(%channel_id, "cache miss on channel_by_id");
             backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)

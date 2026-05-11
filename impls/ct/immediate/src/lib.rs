@@ -92,7 +92,7 @@ where
                 let nodes = graph.nodes();
 
                 async move {
-                    hopr_async_runtime::prelude::sleep(cfg.interval).await;
+                    hopr_utils::runtime::prelude::sleep(cfg.interval).await;
                     Some(nodes)
                 }
             })

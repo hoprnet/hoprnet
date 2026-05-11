@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-utils/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -34,8 +34,7 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "types-random", "graph"] }
 
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-platform = { workspace = true }
+hopr-utils = { workspace = true, features = ["runtime-tokio", "platform"] }
 hopr-protocol-app = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
@@ -47,7 +46,7 @@ more-asserts = { workspace = true }
 rstest = { workspace = true }
 tokio = { workspace = true }
 
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-ct-immediate = { workspace = true }
 

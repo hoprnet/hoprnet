@@ -12,7 +12,7 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_async_runtime::AbortableList;
+use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
@@ -492,7 +492,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
-        let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable!(session_close_rx.for_each_concurrent(
+        let ah_closure_notifications = hopr_utils::spawn_as_abortable!(session_close_rx.for_each_concurrent(
             None,
             move |(session_id, closure_reason)| {
                 let myself = myself.clone();
@@ -519,7 +519,7 @@ where
         // This ensures the dangling expired sessions are properly closed
         // and their closure is timely notified to the other party.
         let myself = self.clone();
-        let ah_session_expiration = hopr_async_runtime::spawn_as_abortable!(async move {
+        let ah_session_expiration = hopr_utils::spawn_as_abortable!(async move {
             let jitter = hopr_types::crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
@@ -1218,9 +1218,9 @@ where
                     );
 
                     // Start keepalive stream towards the Entry with a predefined period
-                    hopr_async_runtime::prelude::spawn(async move {
+                    hopr_utils::runtime::prelude::spawn(async move {
                         // Delay the stream execution by one period
-                        hopr_async_runtime::prelude::sleep(period).await;
+                        hopr_utils::runtime::prelude::sleep(period).await;
                         ka_controller.set_rate_per_unit(1, period);
                     });
 
@@ -1472,7 +1472,7 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_network_types::prelude::SealedHost;
+    use hopr_utils::network_types::prelude::SealedHost;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},

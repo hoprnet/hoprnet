@@ -7,7 +7,7 @@ use hopr_api::{
         internal::{prelude::*, routing::ResolvedTransportRouting},
     },
 };
-use hopr_async_runtime::AbortableList;
+use hopr_utils::runtime::AbortableList;
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;

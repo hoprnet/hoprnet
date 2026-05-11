@@ -23,7 +23,7 @@ typenum = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
 hopr-types = { workspace = true, features = ["random", "crypto", "primitive"] }
-hopr-platform = { workspace = true }
+hopr-utils = { workspace = true, features = ["platform"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

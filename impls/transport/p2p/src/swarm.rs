@@ -5,7 +5,7 @@ use std::sync::Arc;
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
-use hopr_network_types::prelude::is_public_address;
+use hopr_utils::network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
     identity::PublicKey,

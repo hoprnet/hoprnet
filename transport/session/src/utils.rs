@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use hopr_async_runtime::AbortHandle;
+use hopr_utils::runtime::AbortHandle;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
 use hopr_types::internal::routing::DestinationRouting;
@@ -45,7 +45,7 @@ where
         // This is useful for UDP-like streams on the "stream" side, which cannot be terminated
         // by a signal from outside (e.g.: for TCP sockets such signal is socket closure).
         let (_, dummy) = futures::future::AbortHandle::new_pair();
-        hopr_network_types::utils::copy_duplex_abortable(
+        hopr_utils::network_types::utils::copy_duplex_abortable(
             session,
             stream,
             (max_buffer, max_buffer),
@@ -54,7 +54,7 @@ where
         .await
         .map(|(a, b)| (a as usize, b as usize))
     } else {
-        hopr_network_types::utils::copy_duplex(session, stream, (max_buffer, max_buffer))
+        hopr_utils::network_types::utils::copy_duplex(session, stream, (max_buffer, max_buffer))
             .await
             .map(|(a, b)| (a as usize, b as usize))
     }
@@ -171,7 +171,7 @@ where
 
     // This task will automatically terminate once the returned abort handle is used.
     debug!(%session_id, "spawning keep-alive stream");
-    hopr_async_runtime::prelude::spawn(
+    hopr_utils::runtime::prelude::spawn(
         ka_stream
             .map(move |msg| {
                 ApplicationData::try_from(msg)
