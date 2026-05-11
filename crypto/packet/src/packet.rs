@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 
-use hopr_crypto_sphinx::prelude::*;
+use crate::sphinx::prelude::*;
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use hopr_types::{

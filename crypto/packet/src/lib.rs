@@ -16,7 +16,8 @@
 //!
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
-use hopr_crypto_sphinx::prelude::*;
+pub mod sphinx;
+use sphinx::prelude::*;
 use hopr_types::{internal::prelude::*, primitive::prelude::*};
 
 /// Lists all errors in this crate.
@@ -44,7 +45,7 @@ pub mod prelude {
     };
 }
 
-pub use hopr_crypto_sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
+pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 use hopr_types::internal::routing;
 
 /// Currently used public key cipher suite for Sphinx.
@@ -89,7 +90,7 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; /
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_sphinx::prelude::MetaPacket;
+    use sphinx::prelude::MetaPacket;
 
     use super::*;
     use crate::packet::HoprPacket;

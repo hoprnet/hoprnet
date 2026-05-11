@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 
-use hopr_crypto_sphinx::prelude::SharedSecret;
+use crate::sphinx::prelude::SharedSecret;
 use hopr_types::{crypto::prelude::*, primitive::prelude::*};
 use tracing::instrument;
 

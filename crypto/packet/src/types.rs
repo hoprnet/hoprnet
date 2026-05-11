@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_crypto_sphinx::{
+use crate::sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
@@ -206,7 +206,7 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_sphinx::prelude::*;
+    use crate::sphinx::prelude::*;
     use hopr_types::{
         crypto::prelude::*, crypto_random::Randomizable, internal::routing::HoprSenderId, primitive::prelude::*,
     };
