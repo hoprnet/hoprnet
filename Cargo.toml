@@ -7,7 +7,7 @@ members = [
   "crypto/keypair",
   "crypto/packet",
   "hopr/hopr-lib",
-  "logic/ticket-manager",
+  "impls/ticket-manager",
   "misc/metrics",
   "protocols/app",
   "protocols/hopr",
@@ -176,7 +176,7 @@ hopr-protocol-app = { path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
-hopr-ticket-manager = { path = "logic/ticket-manager" }
+hopr-ticket-manager = { path = "impls/ticket-manager" }
 hopr-transport = { path = "transport/api", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
 hopr-transport-path = { path = "transport/path", default-features = false }
