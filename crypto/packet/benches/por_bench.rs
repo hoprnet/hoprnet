@@ -1,3 +1,8 @@
+mod sphinx {
+    pub use hopr_crypto_packet::sphinx::errors;
+    pub use hopr_crypto_packet::sphinx::prelude;
+}
+
 #[allow(unused)]
 #[path = "../src/errors.rs"]
 mod errors;

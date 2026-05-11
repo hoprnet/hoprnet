@@ -1,4 +1,4 @@
-#[path = "../tests/common/mod.rs"]
+#[path = "../tests/protocol/common/mod.rs"]
 mod common;
 
 use std::{str::FromStr, time::Duration};

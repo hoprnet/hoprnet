@@ -87,7 +87,7 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-hopr-utils = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio", "testing"] }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }

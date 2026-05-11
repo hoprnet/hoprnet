@@ -71,7 +71,7 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
     counter.increment_by(42);
 
     let gauge = hopr_metrics::SimpleGauge::new("it_gauge", "integration test gauge").context("SimpleGauge::new")?;
-    gauge.set(3.14);
+    gauge.set(std::f64::consts::PI);
 
     let histogram =
         hopr_metrics::SimpleHistogram::new("it_histogram", "integration test histogram", vec![1.0, 5.0, 10.0])
@@ -134,7 +134,7 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
     // -- assert: shadow state matches recorded values --------------------------
 
     assert_eq!(counter.get(), 42, "SimpleCounter shadow state");
-    assert!((gauge.get() - 3.14).abs() < f64::EPSILON, "SimpleGauge shadow state");
+    assert!((gauge.get() - std::f64::consts::PI).abs() < f64::EPSILON, "SimpleGauge shadow state");
 
     // -- assert: OTLP data points carry correct values -------------------------
 

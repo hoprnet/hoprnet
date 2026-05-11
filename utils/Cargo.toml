@@ -43,7 +43,7 @@ statistics-types-moving = ["statistics-types"]
 statistics-types-weighted = ["statistics-types", "dep:rand"]
 
 # testing module (from hopr-test-stubs) — only for test code
-testing = ["dep:async-trait", "dep:bimap", "dep:thiserror"]
+testing = ["dep:async-trait", "dep:bimap", "dep:thiserror", "dep:hopr-api"]
 
 # platform module (from hopr-platform)
 platform = ["dep:thiserror"]
