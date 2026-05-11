@@ -54,18 +54,3 @@ jobs:
           zulip_topic: Releases
           gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}
-  build-dappnode:
-    name: Build dappNode
-    needs:
-      - release
-    permissions:
-      contents: write
-      pull-requests: write
-    uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      source_repo: ${{ github.repository }}
-      source_branch: ${{ github.ref_name }}
-      network: dufour
-    secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
