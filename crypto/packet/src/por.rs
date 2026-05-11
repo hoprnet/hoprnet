@@ -371,9 +371,18 @@ mod tests {
                     .to_challenge()?
                     .to_ethereum_challenge();
 
-                assert_eq!(gen_por_values.ticket_challenge(), actual_chal);
+                // `gen_por_solution` is the acknowledgement key share for the last hop, so it solves
+                // the next_ticket_challenge carried by the second-to-last ProofOfRelayString (for hops > 1),
+                // or the ticket_challenge in `gen_por_values` (for hops == 1).
+                let expected_chal = if hops == 1 {
+                    gen_por_values.ticket_challenge()
+                } else {
+                    // por_strings are produced by `generate_proof_of_relay` starting from i = 1,
+                    // so the entry at i = secrets.len() - 2 maps to por_strings index len - 3.
+                    gen_por_strings[secrets.len() - 3].next_ticket_challenge()
+                };
+                assert_eq!(expected_chal, actual_chal);
             } else {
-                //assert_eq!(por_values, gen_por_values);
                 assert!(gen_por_solution.is_none());
             }
 
