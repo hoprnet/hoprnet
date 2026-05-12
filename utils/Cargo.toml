@@ -34,13 +34,8 @@ network-types = [
   "dep:tracing",
   "dep:lazy_static",
 ]
-network-types-serde = [
-  "network-types",
-  "dep:serde",
-  "dep:serde_bytes",
-  "libp2p-identity/serde",
-  "hopr-types/serde",
-]
+serde = ["dep:serde", "dep:serde_bytes", "hopr-types/serde"]
+network-types-serde = ["network-types", "serde", "libp2p-identity/serde"]
 network-types-capture = ["network-types", "dep:pcap-file"]
 network-types-runtime-tokio = [
   "network-types",
@@ -48,13 +43,14 @@ network-types-runtime-tokio = [
   "dep:tokio-util",
   "hickory-resolver/tokio",
 ]
-network-types-telemetry = ["network-types", "hopr-types/telemetry"]
+telemetry = ["hopr-types/telemetry"]
+network-types-telemetry = ["network-types", "telemetry"]
 
 # parallelize module (from hopr-parallelize)
 parallelize = ["dep:thiserror", "dep:tracing", "dep:lazy_static", "dep:libc"]
 parallelize-rayon = ["parallelize", "dep:rayon"]
 parallelize-runtime-tokio = ["parallelize", "runtime-tokio"]
-parallelize-telemetry = ["parallelize", "hopr-types/telemetry"]
+parallelize-telemetry = ["parallelize", "telemetry"]
 
 # statistics module (from hopr-statistics)
 statistics-types = []

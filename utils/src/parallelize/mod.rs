@@ -51,16 +51,16 @@ pub mod cpu {
     pub use rayon;
 
     /// Histogram buckets for timing metrics (seconds).
-    #[cfg(all(feature = "parallelize-telemetry", not(test)))]
+    #[cfg(all(feature = "parallelize", feature = "telemetry", not(test)))]
     const TIMING_BUCKETS: &[f64] = &[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.5, 1.0];
 
     mod metrics {
-        #[cfg(any(not(feature = "parallelize-telemetry"), test))]
+        #[cfg(any(not(all(feature = "parallelize", feature = "telemetry")), test))]
         pub use noop::*;
-        #[cfg(all(feature = "parallelize-telemetry", not(test)))]
+        #[cfg(all(feature = "parallelize", feature = "telemetry", not(test)))]
         pub use real::*;
 
-        #[cfg(all(feature = "parallelize-telemetry", not(test)))]
+        #[cfg(all(feature = "parallelize", feature = "telemetry", not(test)))]
         mod real {
             use lazy_static::lazy_static;
 
@@ -166,7 +166,7 @@ pub mod cpu {
             }
         }
 
-        #[cfg(any(not(feature = "parallelize-telemetry"), test))]
+        #[cfg(any(not(all(feature = "parallelize", feature = "telemetry")), test))]
         mod noop {
             #[inline]
             pub fn submitted() {}

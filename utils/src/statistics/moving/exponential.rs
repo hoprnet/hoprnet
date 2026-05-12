@@ -13,6 +13,8 @@ pub struct ExponentialMovingAverage<const FACTOR: usize> {
 }
 
 impl<const FACTOR: usize> ExponentialMovingAverage<FACTOR> {
+    const _ASSERT_FACTOR_GT_ZERO: () = assert!(FACTOR > 0, "FACTOR must be greater than 0");
+
     /// Updates the moving average with a new value.
     pub fn update(&mut self, value: impl Into<f64>) {
         let value: f64 = value.into();

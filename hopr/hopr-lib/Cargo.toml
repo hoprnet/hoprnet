@@ -18,8 +18,7 @@ default = []
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-types/telemetry",
-  "hopr-utils/network-types-telemetry",
-  "hopr-utils/parallelize-telemetry",
+  "hopr-utils/telemetry",
 ]
 fixed-rng = ["hopr-api/types-fixed-rng"]
 runtime-tokio = [
@@ -35,7 +34,7 @@ serde = [
   "dep:serde",
   "dep:serde_with",
   "hopr-api/serde",
-  "hopr-utils/network-types-serde",
+  "hopr-utils/serde",
   "hopr-transport/serde",
 ]
 session-client = ["hopr-api/node-session-client"]

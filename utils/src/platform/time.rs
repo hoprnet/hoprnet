@@ -8,7 +8,7 @@ pub use native::current_time;
 
 /// Wraps an expression with optional TRACE-level timing instrumentation.
 ///
-/// When the `trace-timing` feature is enabled, the macro measures the elapsed
+/// When the `platform-trace-timing` feature is enabled, the macro measures the elapsed
 /// time of the body expression and emits a `tracing::trace!` log with an
 /// `elapsed_ms` field. The timing overhead is further gated behind
 /// `tracing::enabled!(tracing::Level::TRACE)` so that `Instant::now()` is
@@ -28,7 +28,7 @@ pub use native::current_time;
 #[cfg(feature = "platform-trace-timing")]
 #[macro_export]
 macro_rules! trace_timed {
-    ($label:expr, { $($body:tt)* }) => {{
+    ($label:literal, { $($body:tt)* }) => {{
         let __trace_timing = tracing::enabled!(tracing::Level::TRACE);
         let __trace_start = __trace_timing.then(std::time::Instant::now);
         let __trace_result = { $($body)* };
@@ -37,7 +37,7 @@ macro_rules! trace_timed {
         }
         __trace_result
     }};
-    ($label:expr, $($field:ident = $val:expr),+, { $($body:tt)* }) => {{
+    ($label:literal, $($field:ident = $val:expr),+, { $($body:tt)* }) => {{
         let __trace_timing = tracing::enabled!(tracing::Level::TRACE);
         let __trace_start = __trace_timing.then(std::time::Instant::now);
         let __trace_result = { $($body)* };
@@ -51,6 +51,6 @@ macro_rules! trace_timed {
 #[cfg(not(feature = "platform-trace-timing"))]
 #[macro_export]
 macro_rules! trace_timed {
-    ($label:expr, { $($body:tt)* }) => {{ $($body)* }};
-    ($label:expr, $($field:ident = $val:expr),+, { $($body:tt)* }) => {{ $($body)* }};
+    ($label:literal, { $($body:tt)* }) => {{ $($body)* }};
+    ($label:literal, $($field:ident = $val:expr),+, { $($body:tt)* }) => {{ $($body)* }};
 }

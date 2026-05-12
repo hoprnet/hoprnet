@@ -9,9 +9,9 @@ use super::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
-#[cfg_attr(feature = "network-types-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "lowercase", ascii_case_insensitive)]
-#[cfg_attr(feature = "network-types-serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum IpProtocol {
     TCP,
     UDP,
@@ -24,7 +24,7 @@ pub enum IpProtocol {
 /// This object implements [`std::net::ToSocketAddrs`] which performs automatic
 /// DNS name resolution in case this is a [`IpOrHost::Dns`] instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "network-types-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IpOrHost {
     /// DNS name and port.
     Dns(String, u16),
@@ -70,7 +70,7 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `tokio` resolver.
-    #[cfg(feature = "network-types-runtime-tokio")]
+    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
@@ -190,7 +190,7 @@ impl IpOrHost {
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumTryAs)]
-#[cfg_attr(feature = "network-types-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SealedHost {
     /// Plain (not sealed) [`IpOrHost`]
     Plain(IpOrHost),
@@ -268,12 +268,12 @@ impl std::fmt::Display for SealedHost {
 #[cfg(test)]
 mod tests {
     use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
-    #[cfg(feature = "network-types-runtime-tokio")]
+    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
 
-    #[cfg(feature = "network-types-runtime-tokio")]
+    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -288,7 +288,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "network-types-runtime-tokio")]
+    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
