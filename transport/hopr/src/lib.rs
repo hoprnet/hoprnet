@@ -158,7 +158,7 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>;
+type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -461,6 +461,7 @@ where
     /// - [`protocol::NodeType::Relay`]: full packet pipeline + SessionManager.
     /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + SessionManager.
     /// - [`protocol::NodeType::Entry`]: no ack pipeline, no SessionManager.
+    #[allow(clippy::too_many_arguments)]
     async fn run_inner<T, TFact, Ct>(
         &self,
         role: protocol::NodeType,
