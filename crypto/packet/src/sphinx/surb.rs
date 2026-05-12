@@ -231,18 +231,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "x25519")]
     use hopr_types::crypto_random::Randomizable;
-    #[cfg(feature = "x25519")]
     use super::{super::tests::*, *};
-    #[cfg(feature = "x25519")]
-    use crate::sphinx::ec_groups::X25519Suite;
 
     #[cfg(feature = "x25519")]
+    use crate::sphinx::ec_groups::X25519Suite as CurrentSuite;
+
+    #[cfg(feature = "ed25519")]
+    use crate::sphinx::ec_groups::Ed25519Suite as CurrentSuite;
+
+    #[cfg(feature = "secp256k1")]
+    use crate::sphinx::ec_groups::Secp256k1Suite as CurrentSuite;
+
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
-    #[cfg(feature = "x25519")]
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
@@ -261,14 +264,13 @@ mod tests {
         )?)
     }
 
-    #[cfg(feature = "x25519")]
     #[test]
     fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
-        let (surb_1, _) = generate_surbs::<X25519Suite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
+        let (surb_1, _) = generate_surbs::<CurrentSuite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
 
         let surb_1_enc = surb_1.into_boxed();
 
-        let surb_2 = SURB::<X25519Suite, HeaderSpec<X25519Suite>>::try_from(surb_1_enc.as_ref())?;
+        let surb_2 = SURB::<CurrentSuite, HeaderSpec<CurrentSuite>>::try_from(surb_1_enc.as_ref())?;
 
         assert_eq!(surb_1_enc, surb_2.into_boxed());
 

@@ -347,6 +347,19 @@ mod tests {
     }
 
     #[test]
+    fn reconstructor_must_not_accept_empty_encrypted_share() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+
+        let ack_key = HalfKey::random();
+        let challenge = ack_key.to_challenge()?;
+        
+        assert!(reconstructor.add_pending_share(challenge, &SimplePseudonym::random(), b"msg", EncryptedPartialSsaShare::default()).is_err());
+        
+        Ok(())
+    }
+
+
+    #[test]
     fn reconstructor_invalid_acknowledgement() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 

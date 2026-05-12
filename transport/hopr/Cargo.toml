@@ -88,7 +88,7 @@ hopr-utils = { workspace = true, features = [
   "statistics-types",
   "statistics-types-weighted",
 ] }
-hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
+hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-ticket-manager = { workspace = true }

@@ -1,11 +1,13 @@
 use std::ops::Add;
 
-#[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
+
+#[cfg(feature = "rayon")]
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
+
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{

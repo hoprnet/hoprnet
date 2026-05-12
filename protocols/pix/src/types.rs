@@ -103,7 +103,7 @@ where
         cipher.apply_keystream(share.as_mut());
         Ok(PartialSsaShare(share))
     }
-    
+
     #[inline]
     pub fn is_empty(&self) -> bool {
         self == &Self::default()
@@ -519,6 +519,11 @@ mod tests {
         let actual = size_of::<SsaIndex>() + size_of::<PolynomialIndex>();
         let expected = SsaPolyIndexPrefixSize::USIZE;
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn default_enc_share_is_empty() {
+        assert!(EncryptedPartialSsaShare::<TestSpec>::default().is_empty());
     }
 
     #[test]

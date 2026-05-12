@@ -9,7 +9,7 @@ edition.workspace = true
 
 [features]
 default = ["rayon"]
-rayon = ["hopr-parallelize/rayon"]
+rayon = ["hopr-utils/parallelize-rayon"]
 serde = ["dep:serde", "vsss-rs/serde", "hopr-types/serde"]
 
 [dependencies]
@@ -30,7 +30,7 @@ vsss-rs = { workspace = true, features = [
   "std",
 ], default-features = false }
 
-hopr-parallelize = { workspace = true }
+hopr-utils = { workspace = true }
 hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
 
 [dev-dependencies]

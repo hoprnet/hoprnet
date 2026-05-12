@@ -1,7 +1,5 @@
 use std::collections::{HashMap, VecDeque};
 
-#[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{
@@ -9,6 +7,9 @@ use vsss_rs::{
         rand_core::{CryptoRng, RngCore},
     },
 };
+
+#[cfg(feature = "rayon")]
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
 
 use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, errors, msg_to_scalar, types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId}, CoefficientIndex, PixGroupRepr};
 
@@ -47,7 +48,7 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     use std::iter::once;
 
     #[cfg(feature = "rayon")]
-    use hopr_parallelize::cpu::rayon::iter::once;
+    use hopr_utils::parallelize::cpu::rayon::iter::once;
 
     #[cfg(feature = "rayon")]
     let coeffs_iter = polynomial[1..].par_iter().map(|c| c.identifier());

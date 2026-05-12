@@ -40,7 +40,6 @@ allocator-jemalloc = [
 [dependencies]
 flagset = { workspace = true }
 hex = { workspace = true }
-k256 = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }

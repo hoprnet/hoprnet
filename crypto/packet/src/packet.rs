@@ -8,7 +8,7 @@ use hopr_types::{
     },
     primitive::prelude::*,
 };
-use hopr_protocol_pix::{SsaId, SsaPolynomialId};
+
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
 
