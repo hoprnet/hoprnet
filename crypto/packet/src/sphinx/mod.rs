@@ -10,10 +10,10 @@
 //! - type representing public and private keypair and their conversion to `Scalar` and `GroupElement` (by the means of
 //!   the corresponding `From` trait implementation)
 //!
-//! Currently, there are the following [SphinxSuite](crate::shared_keys::SphinxSuite) implementations:
+//! Currently, there are the following `SphinxSuite` implementations:
 //! - `Secp256k1Suite`: deprecated, used in previous HOPR versions
 //! - `Ed25519Suite`: simple implementation using Ed25519, used for testing
-//! - [X25519Suite](crate::ec_groups::X25519Suite) currently used, implemented using the Curve25519 Montgomery curve for
+//! - `X25519Suite` currently used, implemented using the Curve25519 Montgomery curve for
 //!   faster computation
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
