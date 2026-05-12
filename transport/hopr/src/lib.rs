@@ -454,12 +454,12 @@ where
         .await
     }
 
-    /// Internal worker driving all node-type variants of [`HoprTransport::run_*`].
+    /// Internal worker driving all node-type variants of `HoprTransport::run_*`.
     ///
     /// Branches on `role`:
     /// - [`protocol::NodeType::Relay`]: full packet pipeline + SessionManager.
-    /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + SessionManager.
-    /// - [`protocol::NodeType::Entry`]: no ack pipeline, no SessionManager.
+    /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + incoming Sessions.
+    /// - [`protocol::NodeType::Entry`]: no ack pipeline, no incoming Sessions.
     #[allow(clippy::too_many_arguments)]
     async fn run_inner<T, TFact, Ct>(
         &self,
