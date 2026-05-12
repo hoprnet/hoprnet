@@ -213,11 +213,6 @@ debug = 2
 split-debuginfo = "off"
 strip = false
 
-# Use the unreleased hopr-types rev that adds keypair + telemetry features.
-# Replace with version = "1.8.0" once that release lands on crates.io.
-[patch.crates-io]
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", rev = "c1d5b383c43fbabacfd119d85e5591f30b200ea2" }
-
 # make insta snapshots faster
 [profile.dev.package]
 insta.opt-level = 3
