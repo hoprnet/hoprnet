@@ -1,12 +1,12 @@
 use std::fmt::Formatter;
 
-use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_types::{crypto::prelude::*, primitive::prelude::*};
 use tracing::instrument;
 
 use crate::{
     HoprEncryptedPartialSsaShare,
     errors::{PacketError, Result},
+    sphinx::prelude::SharedSecret
 };
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";

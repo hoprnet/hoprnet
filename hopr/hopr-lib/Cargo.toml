@@ -17,16 +17,15 @@ capture = ["hopr-transport/capture"]
 default = []
 telemetry = [
   "hopr-transport/telemetry",
-  "dep:hopr-metrics",
-  "hopr-network-types/telemetry",
-  "hopr-parallelize/telemetry",
+  "hopr-types/telemetry",
+  "hopr-utils/telemetry",
 ]
 fixed-rng = ["hopr-api/types-fixed-rng"]
 runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
+  "hopr-utils/runtime-tokio",
+  "hopr-utils/network-types-runtime-tokio",
   "hopr-transport/runtime-tokio",
-  "hopr-parallelize/runtime-tokio",
+  "hopr-utils/parallelize-runtime-tokio",
   "dep:tokio",
 ]
 serde = [
@@ -35,7 +34,7 @@ serde = [
   "dep:serde",
   "dep:serde_with",
   "hopr-api/serde",
-  "hopr-network-types/serde",
+  "hopr-utils/serde",
   "hopr-transport/serde",
 ]
 session-client = ["hopr-api/node-session-client"]
@@ -76,16 +75,17 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["full", "types-random"] }
 
-hopr-async-runtime = { workspace = true }
-hopr-crypto-keypair = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
-hopr-platform = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+  "platform",
+] }
+hopr-types = { workspace = true, features = ["keypair"] }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 serde-saphyr = { workspace = true }
 tokio = { workspace = true }
 

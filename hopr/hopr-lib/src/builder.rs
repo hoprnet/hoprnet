@@ -46,9 +46,11 @@ use hopr_api::{
         primitive::prelude::{Address, UnitaryFloatOps},
     },
 };
-use hopr_async_runtime::{AbortableList, prelude::spawn};
-use hopr_network_types::addr::is_public_address;
 use hopr_transport::{HoprTransport, IncomingSession};
+use hopr_utils::{
+    network_types::addr::is_public_address,
+    runtime::{AbortableList, prelude::spawn},
+};
 use validator::Validate;
 
 use crate::{
@@ -58,16 +60,16 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PROCESS_START_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
+    static ref METRIC_PROCESS_START_TIME:  hopr_types::telemetry::SimpleGauge =  hopr_types::telemetry::SimpleGauge::new(
         "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
-    static ref METRIC_HOPR_LIB_VERSION:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+    static ref METRIC_HOPR_LIB_VERSION:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
         "hopr_lib_version",
         "Executed version of hopr-lib",
         &["version"]
     ).unwrap();
-    static ref METRIC_HOPR_NODE_INFO:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+    static ref METRIC_HOPR_NODE_INFO:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
         "hopr_node_addresses",
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
@@ -242,7 +244,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
-        let handle = hopr_async_runtime::spawn_as_abortable!(
+        let handle = hopr_utils::spawn_as_abortable!(
             session_rx
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
@@ -281,7 +283,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
 pub struct HoprBuilderWithSession<Chain = (), Graph = (), Net = (), Ct = ()> {
     inner: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
-    session_handle: hopr_async_runtime::AbortHandle,
+    session_handle: hopr_utils::runtime::AbortHandle,
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +359,7 @@ where
     #[cfg(all(feature = "telemetry", not(test)))]
     {
         use hopr_api::types::primitive::traits::AsUnixTimestamp;
-        METRIC_PROCESS_START_TIME.set(hopr_platform::time::current_time().as_unix_timestamp().as_secs_f64());
+        METRIC_PROCESS_START_TIME.set(std::time::SystemTime::now().as_unix_timestamp().as_secs_f64());
         METRIC_HOPR_LIB_VERSION.set(
             &[const_format::formatcp!("{}", constants::APP_VERSION)],
             const_format::formatcp!(
@@ -590,7 +592,7 @@ where
                             | ChainEvent::ChannelBalanceDecreased(channel, _) => {
                                 let src_addr = channel.source;
                                 let dst_addr = channel.destination;
-                                let keys = hopr_async_runtime::prelude::spawn_blocking(move || {
+                                let keys = hopr_utils::runtime::prelude::spawn_blocking(move || {
                                     let resolve = |addr: Address| {
                                         if addr == own_chain_addr {
                                             return Ok(Some(own_packet_key));
@@ -675,10 +677,7 @@ where
                 "long-running background task finished"
             )
         });
-        processes.insert(
-            HoprLibProcess::ChannelEvents,
-            hopr_async_runtime::spawn_as_abortable!(proc),
-        );
+        processes.insert(HoprLibProcess::ChannelEvents, hopr_utils::spawn_as_abortable!(proc));
     }
 
     Ok(PreHopr {
@@ -798,7 +797,7 @@ macro_rules! impl_build_methods {
                 let chain_for_neglect = pre.chain_api.clone();
                 let tmgr_for_neglect = ticket_manager.clone();
                 let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
-                let (neglect_handle, neglect_reg) = hopr_async_runtime::AbortHandle::new_pair();
+                let (neglect_handle, neglect_reg) = hopr_utils::runtime::AbortHandle::new_pair();
                 spawn(
                     futures::stream::Abortable::new(
                         events.filter_map(move |event| {

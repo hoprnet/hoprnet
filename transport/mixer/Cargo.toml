@@ -15,7 +15,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 all-benchmarks = []
-telemetry = ["dep:hopr-metrics", "dep:lazy_static"]
+telemetry = ["hopr-types/telemetry", "dep:lazy_static"]
 serde = ["dep:serde", "dep:humantime-serde"]
 
 [dependencies]
@@ -29,7 +29,6 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-metrics = { workspace = true, optional = true }
 hopr-types = { workspace = true, features = ["random"] }
 
 [dev-dependencies]

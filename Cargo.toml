@@ -3,31 +3,21 @@
 resolver = "2"
 
 members = [
-  "common/async-runtime",
-  "common/network-types",
-  "common/parallelize",
-  "common/statistics",
-  "common/test-stubs",
-  "crypto/keypair",
+  "utils",
   "crypto/packet",
-  "crypto/sphinx",
   "hopr/hopr-lib",
-  "logic/ticket-manager",
-  "misc/metrics",
-  "misc/platform",
+  "impls/ticket-manager",
   "protocols/app",
   "protocols/hopr",
   "protocols/pix",
   "protocols/session",
   "protocols/start",
-  "transport/api",
+  "transport/hopr",
   "transport/mixer",
-  "transport/path",
   "transport/probe",
-  "transport/protocol",
   "transport/session",
   "transport/tag-allocator",
-  "utils/session",
+  "utils-session",
   # implementations
   "hopr/reference",
   "impls/connector",
@@ -51,6 +41,7 @@ aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6" }
 assertables = "9.9.0"
 async-broadcast = "0.7.2"
+async_channel_io = "0.3.0"
 async-lock = "3.4.2"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
@@ -115,7 +106,6 @@ more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num-traits = "0.2.19"
 oas3 = "0.21.0"
-opentelemetry = { version = "0.31.0" }
 opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
 opentelemetry_sdk = { version = "0.31.0" }
 temp-env = "0.3.6"
@@ -138,7 +128,6 @@ redb = "4.1.0"
 ringbuffer = "0.16.0"
 rust-stream-ext-concurrent = "2.0.0"
 rstest = { version = "0.26.1" }
-scrypt = { version = "0.12.0", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
@@ -168,7 +157,6 @@ tokio-retry = "0.3.1"
 tokio-stream = { version = "0.1.18", features = ["net"] }
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 typenum = "1.20.0"
-uuid = { version = "1.23.1" }
 validator = { version = "0.20.0", features = ["derive"] }
 vsss-rs = { version = "5.4.0", default-features = false }
 mimalloc = { version = "0.1.50", default-features = false, features = [
@@ -176,21 +164,12 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
 ] }
 
 hopr-api = "1.9.0"
-hopr-types = { version = "1.5.4", features = ["use-bindings"] }
-hopr-async-runtime = { path = "common/async-runtime" }
-hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
+hopr-types = { version = "1.8.0", features = ["use-bindings"] }
+hopr-utils = { path = "utils", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = [
   "rayon",
 ] }
-hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
-  "x25519",
-  "ed25519",
-] }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
-hopr-metrics = { path = "misc/metrics", default-features = false }
-hopr-network-types = { path = "common/network-types", default-features = false }
-hopr-parallelize = { path = "common/parallelize", default-features = false }
-hopr-platform = { path = "misc/platform", default-features = false }
 hopr-protocol-app = { path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { path = "protocols/hopr", default-features = false, features = [
   "rayon",
@@ -200,17 +179,13 @@ hopr-protocol-pix = { path = "protocols/pix", default-features = false, features
 ] }
 hopr-protocol-session = { path = "protocols/session", default-features = false }
 hopr-protocol-start = { path = "protocols/start", default-features = false }
-hopr-ticket-manager = { path = "logic/ticket-manager" }
-hopr-transport = { path = "transport/api", default-features = false }
+hopr-ticket-manager = { path = "impls/ticket-manager" }
+hopr-transport = { path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { path = "transport/mixer", default-features = false }
-hopr-transport-path = { path = "transport/path", default-features = false }
 hopr-transport-probe = { path = "transport/probe", default-features = false }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
 hopr-transport-session = { path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { path = "impls/connector" }
-hopr-statistics = { path = "common/statistics" }
-hopr-test-stubs = { path = "common/test-stubs" }
 
 # referential implementations
 hopr-reference = { path = "hopr/reference", default-features = false }

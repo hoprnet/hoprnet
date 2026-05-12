@@ -8,7 +8,7 @@ use hopr_api::{
     chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent},
     types::{chain::prelude::*, crypto::prelude::*, internal::prelude::*, primitive::prelude::*},
 };
-use hopr_async_runtime::AbortHandle;
+use hopr_utils::runtime::AbortHandle;
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -260,7 +260,7 @@ where
 
         let ticket_values = self.ticket_values.clone();
         let health = self.health.clone();
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             let sync_started = std::time::Instant::now();
 
             let connections = client
@@ -288,7 +288,7 @@ where
                     let mapper = mapper.clone();
                     let chain_to_packet = chain_to_packet.clone();
                     let packet_to_chain = packet_to_chain.clone();
-                    hopr_async_runtime::prelude::spawn_blocking(move || {
+                    hopr_utils::runtime::prelude::spawn_blocking(move || {
                         mapper.key_to_id.insert(account.public_key, Some(account.key_id));
                         mapper.id_to_key.insert(account.key_id, Some(account.public_key));
                         graph.write().add_node(account.key_id);
@@ -316,7 +316,7 @@ where
                     let backend = backend.clone();
                     let channel_by_id = channel_by_id.clone();
                     let channel_by_parties = channel_by_parties.clone();
-                    hopr_async_runtime::prelude::spawn_blocking(move || {
+                    hopr_utils::runtime::prelude::spawn_blocking(move || {
                         graph.write().add_edge(src.key_id, dst.key_id, *channel.get_id());
                         backend
                             .insert_channel(channel)

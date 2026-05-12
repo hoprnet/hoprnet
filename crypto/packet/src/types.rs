@@ -1,12 +1,14 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_crypto_sphinx::{
-    errors::SphinxError,
-    prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
-};
 use hopr_types::primitive::prelude::GeneralError;
 
-use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
+use crate::{
+    HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT,
+    sphinx::{
+        errors::SphinxError,
+        prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
+    },
+};
 
 flagset::flags! {
    /// Individual packet signals passed up between the packet sender and destination.
@@ -206,7 +208,6 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_sphinx::prelude::*;
     use hopr_types::{
         crypto::prelude::*, crypto_random::Randomizable, internal::routing::HoprSenderId, primitive::prelude::*,
     };
@@ -216,6 +217,7 @@ mod tests {
         HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
         packet::HoprPacket,
         por::{SurbReceiverInfo, generate_proof_of_relay},
+        sphinx::prelude::*,
     };
 
     lazy_static::lazy_static! {

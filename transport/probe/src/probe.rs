@@ -10,13 +10,12 @@ use hopr_api::{
         primitive::traits::AsUnixTimestamp,
     },
 };
-use hopr_async_runtime::AbortableList;
-use hopr_platform::time::native::current_time;
 use hopr_protocol_app::{
     prelude::{ApplicationDataIn, ApplicationDataOut, OutgoingPacketInfo, ReservedTag},
     v1::Tag,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
+use hopr_utils::{platform::time::native::current_time, runtime::AbortableList};
 
 use crate::{
     HoprProbeProcess,
@@ -309,7 +308,7 @@ impl Probe {
         let classifier_path_probes = active_path_probes.clone();
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_async_runtime::spawn_as_abortable!(async move {
+            hopr_utils::spawn_as_abortable!(async move {
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_neighbor_probes = active_neighbor_probes.clone();
@@ -748,7 +747,7 @@ mod tests {
             let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
-            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+            let _jh: hopr_utils::runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
@@ -791,7 +790,7 @@ mod tests {
             let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ()>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
-            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+            let _jh: hopr_utils::runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
@@ -832,7 +831,7 @@ mod tests {
             let from_probing_to_network_tx = iface.from_probing_to_network_tx;
             let probe_classifier = iface.probe_classifier;
 
-            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+            let _jh: hopr_utils::runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
@@ -891,7 +890,7 @@ mod tests {
             let from_probing_to_network_tx = iface.from_probing_to_network_tx;
             let probe_classifier = iface.probe_classifier;
 
-            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+            let _jh: hopr_utils::runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,

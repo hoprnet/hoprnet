@@ -13,8 +13,8 @@ license = "GPL-3.0-only"
 default = ["hashbrown"]
 all-benchmarks = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
-telemetry = ["dep:auto_impl", "dep:hopr-metrics", "dep:lazy_static"]
-runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
+telemetry = ["dep:auto_impl", "hopr-types/telemetry", "dep:lazy_static"]
+runtime-tokio = ["dep:tokio", "hopr-utils/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
 session-types = []
 
@@ -48,11 +48,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive", "random"] }
-
-hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -70,11 +68,12 @@ test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
 tokio-util = { workspace = true }
 
-hopr-network-types = { workspace = true, features = [
-  "capture",
+hopr-utils = { workspace = true, features = [
   "runtime-tokio",
+  "network-types",
+  "network-types-capture",
+  "network-types-runtime-tokio",
 ] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-protocol-app = { workspace = true }
 
 [[example]]

@@ -72,14 +72,13 @@ async fn relaying_message_rejected_when_channel_out_of_funding(
     let write_succeeded_at_least_once_1 = write_succeeded_at_least_once.clone();
     let write_fut = std::pin::pin!(async move {
         loop {
-            match session
+            if let Ok(Ok(())) = session
                 .write_all(&sent_data)
                 .timeout(futures_time::time::Duration::from_millis(500))
                 .await
             {
-                Ok(Ok(())) => write_succeeded_at_least_once_1.store(true, std::sync::atomic::Ordering::Release),
-                Ok(Err(_)) | Err(_) => {} // write failed or timed out — channel may be drained
-            }
+                write_succeeded_at_least_once_1.store(true, std::sync::atomic::Ordering::Release);
+            } // else: write failed or timed out — channel may be drained
             sleep(Duration::from_millis(500)).await;
 
             // This future never completes

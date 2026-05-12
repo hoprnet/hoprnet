@@ -1,8 +1,5 @@
 use std::fmt::Formatter;
 
-use hopr_crypto_sphinx::prelude::*;
-#[cfg(feature = "rayon")]
-use hopr_parallelize::cpu::rayon::prelude::*;
 use hopr_types::{
     crypto::prelude::*,
     internal::{
@@ -12,6 +9,9 @@ use hopr_types::{
     primitive::prelude::*,
 };
 use hopr_protocol_pix::{SsaId, SsaPolynomialId};
+#[cfg(feature = "rayon")]
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
+
 use crate::{
     HoprEncryptedPartialSsaShare, HoprPixSpec, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite,
     HoprSurb, PAYLOAD_SIZE_INT,
@@ -23,6 +23,7 @@ use crate::{
         ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
         pre_verify,
     },
+    sphinx::prelude::*,
     types::{HoprPacketMessage, HoprPacketParts, PacketSignals},
 };
 
@@ -183,7 +184,7 @@ impl PartialHoprPacket {
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
-                // Extract the encrypted partial SSA share from the SURB 
+                // Extract the encrypted partial SSA share from the SURB
                 // and add it to the PIX share reconstructor if not empty.
                 let enc_partial_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
                 if !enc_partial_share.is_empty() {

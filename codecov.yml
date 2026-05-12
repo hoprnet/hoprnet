@@ -30,6 +30,7 @@ ignore:
   - ".processes/**"
   - "localcluster/**"
   - "common/test-stubs/**"
+  - "utils/src/testing/**"
   - "**/benches/**"
   - "**/build.rs"
   - "**/codegen/**"

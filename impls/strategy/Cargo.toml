@@ -8,14 +8,15 @@ rust-version.workspace = true
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+publish = false
 
 [lib]
 crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
-telemetry = ["dep:hopr-metrics"]
+runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-utils/runtime-tokio"]
+telemetry = ["hopr-types/telemetry"]
 ## Strategy features — each enables one strategy implementation.
 strategy-auto-funding = []
 strategy-auto-redeeming = []
@@ -39,8 +40,8 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-lib = { workspace = true }
-hopr-async-runtime = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
+hopr-types = { workspace = true }
+hopr-utils = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 parking_lot = { workspace = true }
 
@@ -48,7 +49,7 @@ parking_lot = { workspace = true }
 chrono = { workspace = true }
 hex-literal = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio"] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",

@@ -8,6 +8,7 @@ rust-version.workspace = true
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+publish = false
 
 [lib]
 crate-type = ["rlib"]
@@ -31,7 +32,7 @@ hopr-api = { workspace = true, features = [
   "graph",
   "types-random",
 ] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

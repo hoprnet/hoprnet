@@ -1,0 +1,8 @@
+---
+source: transport/hopr/src/protocol/heartbeat/config.rs
+assertion_line: 22
+expression: cfg
+---
+HeartbeatProtocolConfig {
+    timeout: 6s,
+}

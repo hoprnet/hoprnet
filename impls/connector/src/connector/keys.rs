@@ -267,10 +267,10 @@ mod tests {
 
         let mut connector = crate::connector::HoprBlockchainConnector::new(
             connector.chain_key.clone(),
-            connector.cfg.clone(),
+            connector.cfg,
             (*connector.client).clone(),
             MockErrorBackend,
-            connector.payload_generator.clone(),
+            connector.payload_generator,
         );
         connector.mapper = mapper;
         connector.connect().await?;

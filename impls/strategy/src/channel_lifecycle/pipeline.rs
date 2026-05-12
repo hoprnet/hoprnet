@@ -205,7 +205,7 @@ where
         let chain = self.node.chain_api().clone();
         let in_flight = Arc::clone(&self.fund_in_flight);
 
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             match chain.fund_channel(&channel_id, topup).await {
                 Ok(confirmation) => {
                     if let Err(e) = confirmation.await {
@@ -243,7 +243,7 @@ where
         let chain = self.node.chain_api().clone();
         let in_flight = Arc::clone(&self.close_in_flight);
 
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             match chain.close_channel(&channel_id).await {
                 Ok(confirmation) => {
                     if let Err(e) = confirmation.await {
@@ -282,7 +282,7 @@ where
         let chain = self.node.chain_api().clone();
         let in_flight = Arc::clone(&self.finalize_in_flight);
 
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             match chain.close_channel(&channel_id).await {
                 Ok(confirmation) => {
                     if let Err(e) = confirmation.await {
@@ -319,7 +319,7 @@ where
         let chain = self.node.chain_api().clone();
         let in_flight = Arc::clone(&self.open_in_flight);
 
-        hopr_async_runtime::prelude::spawn(async move {
+        hopr_utils::runtime::prelude::spawn(async move {
             match chain.open_channel(&dest, amount).await {
                 Ok(confirmation) => {
                     if let Err(e) = confirmation.await {

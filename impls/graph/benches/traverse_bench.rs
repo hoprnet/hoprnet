@@ -226,7 +226,7 @@ fn bench_simple_loopback(c: &mut Criterion) {
         };
 
         for &depth in depths {
-            group.bench_with_input(BenchmarkId::new(&format!("{depth}-edge"), &param), &size, |b, _| {
+            group.bench_with_input(BenchmarkId::new(format!("{depth}-edge"), &param), &size, |b, _| {
                 b.iter(|| black_box(graph.simple_loopback_to_self(depth, Some(10))));
             });
         }

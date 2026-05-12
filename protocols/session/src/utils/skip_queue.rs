@@ -555,10 +555,10 @@ mod tests {
             .collect::<Vec<_>>();
 
         let timed_items_clone = timed_items.clone();
-        let jh = hopr_async_runtime::prelude::spawn(async move {
+        let jh = hopr_utils::runtime::prelude::spawn(async move {
             for (n, time) in timed_items_clone {
                 tx.send((n, time).into()).await?;
-                hopr_async_runtime::prelude::sleep(Duration::from_millis(50)).await;
+                hopr_utils::runtime::prelude::sleep(Duration::from_millis(50)).await;
             }
             tx.close().await?;
             Ok::<_, std::io::Error>(())
