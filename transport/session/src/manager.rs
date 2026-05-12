@@ -12,7 +12,6 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_async_runtime::AbortableList;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
@@ -28,6 +27,7 @@ use hopr_types::{
     },
     primitive::prelude::Address,
 };
+use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -52,24 +52,24 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
+    static ref METRIC_ACTIVE_SESSIONS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
         "hopr_session_num_active_sessions",
         "Number of currently active HOPR sessions"
     ).unwrap();
-    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+    static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
         "hopr_session_established_sessions_count",
         "Number of sessions that were successfully established as an Exit node"
     ).unwrap();
-    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+    static ref METRIC_NUM_INITIATED_SESSIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
         "hopr_session_initiated_sessions_count",
         "Number of sessions that were successfully initiated as an Entry node"
     ).unwrap();
-    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_RECEIVED_SESSION_ERRS: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_received_error_count",
         "Number of HOPR session errors received from an Exit node",
         &["kind"]
     ).unwrap();
-    static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
+    static ref METRIC_SENT_SESSION_ERRS: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
         "hopr_session_sent_error_count",
         "Number of HOPR session errors sent to an Entry node",
         &["kind"]
@@ -492,7 +492,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
-        let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable!(session_close_rx.for_each_concurrent(
+        let ah_closure_notifications = hopr_utils::spawn_as_abortable!(session_close_rx.for_each_concurrent(
             None,
             move |(session_id, closure_reason)| {
                 let myself = myself.clone();
@@ -519,7 +519,7 @@ where
         // This ensures the dangling expired sessions are properly closed
         // and their closure is timely notified to the other party.
         let myself = self.clone();
-        let ah_session_expiration = hopr_async_runtime::spawn_as_abortable!(async move {
+        let ah_session_expiration = hopr_utils::spawn_as_abortable!(async move {
             let jitter = hopr_types::crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
@@ -1218,9 +1218,9 @@ where
                     );
 
                     // Start keepalive stream towards the Entry with a predefined period
-                    hopr_async_runtime::prelude::spawn(async move {
+                    hopr_utils::runtime::prelude::spawn(async move {
                         // Delay the stream execution by one period
-                        hopr_async_runtime::prelude::sleep(period).await;
+                        hopr_utils::runtime::prelude::sleep(period).await;
                         ka_controller.set_rate_per_unit(1, period);
                     });
 
@@ -1472,7 +1472,6 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_network_types::prelude::SealedHost;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -1480,6 +1479,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 
     use super::*;
@@ -2441,7 +2441,7 @@ mod tests {
             .times(1..)
             //.in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
-                start_msg_match(&data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) && ka.additional_data > 0))
+                start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) && ka.additional_data > 0))
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {

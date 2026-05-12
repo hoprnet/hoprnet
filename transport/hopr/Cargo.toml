@@ -1,0 +1,171 @@
+[package]
+name = "hopr-transport"
+version = "0.28.1"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Implements the main HOPR transport interface for the core library"
+edition.workspace = true
+rust-version.workspace = true
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+all-benchmarks = []
+capture = ["dep:pcap-file"]
+telemetry = [
+  "serde",
+  "hopr-types/telemetry",
+  "hopr-protocol-hopr/telemetry",
+  "hopr-transport-session/telemetry",
+  "hopr-utils/network-types-telemetry",
+  "hopr-transport-mixer/telemetry",
+]
+p2p-announce-quic = []
+runtime-tokio = [
+  "hopr-utils/runtime-tokio",
+  "hopr-utils/network-types-runtime-tokio",
+  "hopr-transport-session/runtime-tokio",
+]
+serde = [
+  "dep:serde",
+  "dep:humantime-serde",
+  "hopr-api/serde",
+  "hopr-protocol-app/serde",
+  "hopr-protocol-hopr/serde",
+  "hopr-transport-tag-allocator/serde",
+]
+
+
+[dependencies]
+ahash = { workspace = true }
+anyhow = { workspace = true }
+async_channel_io = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+cfg-if = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+futures-time = { workspace = true }
+halfbrown = { workspace = true }
+humantime-serde = { workspace = true, optional = true }
+lazy_static = { workspace = true }
+libp2p = { workspace = true, features = ["noise", "request-response"] }
+moka = { workspace = true }
+multiaddr = { workspace = true }
+proc-macro-regex = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
+pcap-file = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tokio-util = { workspace = true, features = ["codec", "compat"] }
+tracing = { workspace = true }
+validator = { workspace = true }
+
+hopr-api = { workspace = true, features = [
+  "types-random",
+  "tickets",
+  "node",
+  "network",
+  "chain",
+  "graph",
+] }
+hopr-types = { workspace = true, features = [
+  "crypto",
+  "random",
+  "internal",
+  "primitive",
+  "serde",
+] }
+
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+  "statistics-types",
+  "statistics-types-weighted",
+] }
+hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
+hopr-protocol-app = { workspace = true }
+hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
+hopr-ticket-manager = { workspace = true }
+hopr-transport-mixer = { workspace = true }
+hopr-transport-probe = { workspace = true }
+hopr-transport-session = { workspace = true }
+hopr-transport-tag-allocator = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bimap = { workspace = true }
+bytesize = { workspace = true }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+futures-concurrency = { workspace = true }
+hex-literal = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio", "testing"] }
+rstest = { workspace = true }
+serial_test = { workspace = true }
+test-log = { workspace = true }
+
+hopr-api = { workspace = true }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
+hopr-network-graph = { workspace = true, features = ["petgraph"] }
+hopr-protocol-start = { workspace = true }
+hopr-protocol-session = { workspace = true, features = [
+  "session-types",
+  "runtime-tokio",
+  "hashbrown",
+] }
+hopr-transport-mixer = { workspace = true, features = ["serde"] }
+hopr-ticket-manager = { workspace = true }
+temp-env = { workspace = true }
+tokio = { workspace = true }
+
+[[bench]]
+name = "pipeline_e2e_bench"
+harness = false
+
+[[bench]]
+name = "protocol_throughput_emulated_bench"
+harness = false
+
+[[test]]
+name = "protocol_backpressure_flow_control"
+path = "tests/protocol/backpressure_flow_control.rs"
+
+[[test]]
+name = "protocol_configuration_tunability"
+path = "tests/protocol/configuration_tunability.rs"
+
+[[test]]
+name = "protocol_counters_graph_integration"
+path = "tests/protocol/counters_graph_integration.rs"
+
+[[test]]
+name = "protocol_error_handling_adversarial"
+path = "tests/protocol/error_handling_adversarial.rs"
+
+[[test]]
+name = "protocol_msg_ack_workflows"
+path = "tests/protocol/msg_ack_workflows.rs"
+
+[[test]]
+name = "protocol_pipeline_stage_isolation"
+path = "tests/protocol/pipeline_stage_isolation.rs"
+
+[[test]]
+name = "protocol_stress_throughput"
+path = "tests/protocol/stress_throughput.rs"
+
+[package.metadata.cargo-machete]
+ignored = ["humantime-serde"]
+
+[package.metadata.cargo-shear]
+ignored = ["humantime-serde", "hopr-transport-probe"]

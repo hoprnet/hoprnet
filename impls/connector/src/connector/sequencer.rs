@@ -37,7 +37,7 @@ where
         let (sender, receiver) = futures::channel::mpsc::channel::<TxRequest<R>>(TX_QUEUE_CAPACITY);
         let current_nonce = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let current_nonce_clone = current_nonce.clone();
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             receiver
                 .then(move |(tx, notifier): (R, _)| {
                     let client = client_clone.clone();

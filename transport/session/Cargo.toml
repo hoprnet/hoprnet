@@ -16,14 +16,14 @@ crate-type = ["rlib"]
 default = []
 all-benchmarks = []
 runtime-tokio = [
-  "hopr-network-types/runtime-tokio",
+  "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
 ]
 telemetry = [
-  "hopr-network-types/telemetry",
+  "hopr-utils/network-types-telemetry",
   "hopr-protocol-session/telemetry",
-  "dep:hopr-metrics",
+  "hopr-types/telemetry",
   "dep:lazy_static",
 ]
 allocator-mimalloc = [
@@ -60,11 +60,11 @@ hopr-types = { workspace = true, features = [
   "primitive",
   "random",
 ] }
-hopr-async-runtime = { workspace = true }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "network-types-serde",
+] }
 hopr-crypto-packet = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true, features = ["serde"] }
-
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
@@ -73,14 +73,18 @@ hopr-transport-tag-allocator = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 hopr-api = { workspace = true, features = ["types-random"] }
-hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
+hopr-utils = { workspace = true, features = [
+  "runtime-tokio",
+  "network-types",
+  "network-types-runtime-tokio",
+  "network-types-serde",
+] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "serde",
   "runtime-tokio",
   "hashbrown",
 ] }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }

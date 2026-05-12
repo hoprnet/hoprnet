@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{StreamExt, pin_mut};
-use hopr_async_runtime::AbortHandle;
+use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, instrument};
 
 use super::{
@@ -18,32 +18,32 @@ use crate::SessionId;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new(
+    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_types::telemetry::MultiGauge =
+        hopr_types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_target_error_estimate",
             "Target error estimation by the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CONTROL_OUTPUT: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new(
+    static ref METRIC_CONTROL_OUTPUT: hopr_types::telemetry::MultiGauge =
+        hopr_types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_control_output",
             "Control output of the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_BUFFER: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new(
+    static ref METRIC_CURRENT_BUFFER: hopr_types::telemetry::MultiGauge =
+        hopr_types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_estimate",
             "Estimated number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_TARGET: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new(
+    static ref METRIC_CURRENT_TARGET: hopr_types::telemetry::MultiGauge =
+        hopr_types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_target",
             "Current target (setpoint) number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_SURB_RATE: hopr_metrics::MultiGauge =
-        hopr_metrics::MultiGauge::new(
+    static ref METRIC_SURB_RATE: hopr_types::telemetry::MultiGauge =
+        hopr_types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_surbs_rate",
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
@@ -359,7 +359,7 @@ where
             "Creating session balancer level channel"
         );
         let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             async move {
                 pin_mut!(sampling_stream);
                 while sampling_stream.next().await.is_some() {

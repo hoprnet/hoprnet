@@ -69,7 +69,7 @@ impl Display for MultiStrategy {
 impl Strategy for MultiStrategy {
     async fn run(&mut self) -> Result<()> {
         use futures::StreamExt as _;
-        use hopr_async_runtime::prelude::{AbortHandle, abortable, spawn};
+        use hopr_utils::runtime::prelude::{AbortHandle, abortable, spawn};
 
         let strategies = std::mem::take(&mut self.strategies);
 

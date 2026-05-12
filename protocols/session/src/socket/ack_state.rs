@@ -271,7 +271,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             let ctl_tx_clone = context.ctl_tx.clone();
             let frame_inspector_clone = context.inspector.clone();
             let cfg = self.cfg;
-            hopr_async_runtime::prelude::spawn(incoming_frame_retries_rx
+            hopr_utils::runtime::prelude::spawn(incoming_frame_retries_rx
                 .filter_map(move |rf| {
                     let frame_id = rf.frame_id;
                     let missing_segments = frame_inspector_clone.missing_segments(&frame_id).unwrap_or_default();
@@ -310,7 +310,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // Send out Frame Acknowledgements chunked as Control messages
         let ctl_tx_clone = context.ctl_tx.clone();
         let ack_delay = self.cfg.acknowledgement_delay;
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             ack_rx
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
@@ -330,7 +330,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctl_tx_clone = context.ctl_tx.clone();
         let rb_rx_clone = context.rb_rx.clone();
         let cfg = self.cfg;
-        hopr_async_runtime::prelude::spawn(
+        hopr_utils::runtime::prelude::spawn(
             outgoing_frame_retries_rx
                 .map(move |rf: RetriedFrameId| {
                     // Find out if the frame can be retried again in the future

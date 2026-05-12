@@ -39,7 +39,7 @@ pub(crate) async fn wait_for_funds<R: ChainValues>(
             Err(error) => tracing::error!(%error, "failed to fetch balance from the chain"),
         }
 
-        hopr_async_runtime::prelude::sleep(current_delay).await;
+        hopr_utils::runtime::prelude::sleep(current_delay).await;
         current_delay = current_delay.mul_f64(multiplier);
     }
 

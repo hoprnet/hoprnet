@@ -8,9 +8,10 @@ description = "Implementation of HOPR Chain APIs using Blokli client"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+publish = false
 
 [features]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-utils/runtime-tokio"]
 testing = ["dep:hex", "blokli-client/testing"]
 
 [dependencies]
@@ -43,12 +44,12 @@ hopr-api = { workspace = true, features = [
   "serde",
   "types-with-bindings",
 ] }
-hopr-async-runtime = { workspace = true }
+hopr-utils = { workspace = true }
 
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
 hex = { workspace = true }
-hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hex-literal = { workspace = true }
 insta = { workspace = true }
 lazy_static = { workspace = true }

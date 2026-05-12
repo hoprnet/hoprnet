@@ -79,23 +79,23 @@ pub use strategy::ChannelLifecycleStrategy;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_CHANNEL_OPENS: hopr_metrics::SimpleCounter =
-        hopr_metrics::SimpleCounter::new(
+    static ref METRIC_CHANNEL_OPENS: hopr_types::telemetry::SimpleCounter =
+        hopr_types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_opens",
             "Count of initiated channel opens",
         ).unwrap();
-    static ref METRIC_CHANNEL_FUNDS: hopr_metrics::SimpleCounter =
-        hopr_metrics::SimpleCounter::new(
+    static ref METRIC_CHANNEL_FUNDS: hopr_types::telemetry::SimpleCounter =
+        hopr_types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_fundings",
             "Count of initiated channel fundings",
         ).unwrap();
-    static ref METRIC_CHANNEL_CLOSES: hopr_metrics::SimpleCounter =
-        hopr_metrics::SimpleCounter::new(
+    static ref METRIC_CHANNEL_CLOSES: hopr_types::telemetry::SimpleCounter =
+        hopr_types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_closes",
             "Count of initiated channel closures",
         ).unwrap();
-    static ref METRIC_CHANNEL_FINALIZES: hopr_metrics::SimpleCounter =
-        hopr_metrics::SimpleCounter::new(
+    static ref METRIC_CHANNEL_FINALIZES: hopr_types::telemetry::SimpleCounter =
+        hopr_types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_finalizations",
             "Count of initiated channel closure finalizations",
         ).unwrap();

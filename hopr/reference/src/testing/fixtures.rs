@@ -390,6 +390,7 @@ fn alternating_configs(n: usize) -> Vec<TestNodeConfig> {
 
 pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
+        .with_hopr_network_chain_info("anvil-localhost")
         .with_balances(
             NODE_CHAIN_KEYS
                 .iter()

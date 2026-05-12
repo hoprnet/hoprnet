@@ -37,7 +37,7 @@ pub enum PacketError {
     CoreTypesError(#[from] CoreTypesError),
 
     #[error(transparent)]
-    SphinxError(#[from] hopr_crypto_sphinx::errors::SphinxError),
+    SphinxError(#[from] crate::sphinx::errors::SphinxError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),

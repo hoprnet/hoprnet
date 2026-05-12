@@ -8,6 +8,7 @@ rust-version.workspace = true
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
+publish = false
 
 [lib]
 crate-type = ["rlib"]
@@ -30,7 +31,10 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "graph", "network"] }
 
-hopr-statistics = { workspace = true, features = ["moving"] }
+hopr-utils = { workspace = true, features = [
+  "statistics-types",
+  "statistics-types-moving",
+] }
 
 [dev-dependencies]
 assertables = { workspace = true }

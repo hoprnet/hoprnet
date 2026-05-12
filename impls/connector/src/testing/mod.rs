@@ -18,8 +18,14 @@ use hopr_api::{
 };
 
 /// Allows easily building the [`BlokliTestState`] using the HOPR native types.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct BlokliTestStateBuilder(BlokliTestState);
+
+impl Default for BlokliTestStateBuilder {
+    fn default() -> Self {
+        Self(BlokliTestState::default()).with_hopr_network_chain_info("anvil-localhost")
+    }
+}
 
 const DEFAULT_ALLOWANCE: u128 = 10_000_000_000_000_u128;
 
