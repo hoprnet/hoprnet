@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use futures::{StreamExt, pin_mut};
 use futures_time::future::FutureExt;
-use hopr_protocol_pix::{
-    CoefficientIndex, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, ReconstructorEvent, SsaGeneratorConfig, SsaId,
-    SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
-};
+use hopr_protocol_pix::{transpose_commitments, CoefficientIndex, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, ReconstructorEvent, SsaGeneratorConfig, SsaId, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
     crypto_random::Randomizable,
@@ -38,18 +35,7 @@ async fn test_generator_reconstructor() -> anyhow::Result<()> {
     let (ssa_client, commitments) = generator.new_ssa_commitment(&pseudonym)?;
 
     // Transpose the commitments so they have the on-wire structure
-    let mut transposed = HashMap::<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<TestSpec>>>::new();
-    commitments
-        .into_iter()
-        .map(|c| c.into_serializable_commitments())
-        .for_each(|(spi, committed_polynomial)| {
-            for (coeff_id, coeff) in committed_polynomial.into_iter().enumerate() {
-                transposed
-                    .entry(coeff_id as CoefficientIndex)
-                    .or_default()
-                    .insert(spi.poly_index(), coeff);
-            }
-        });
+    let mut transposed = transpose_commitments(commitments);
 
     let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
         polys_per_ssa: 10,
@@ -87,26 +73,27 @@ async fn test_generator_reconstructor() -> anyhow::Result<()> {
     );
 
     let mut acks = Vec::new();
-    let relay_pk = OffchainKeypair::random();
 
     while let Some((msg, share)) = {
         let msg = hopr_types::crypto_random::random_bytes::<20>();
         generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
     }? {
         let ack = HalfKey::random();
+        let ack_challenge = ack.to_challenge()?;
         let enc_share = share.1.encrypt(&share.0, &ack)?;
 
-        reconstructor.add_pending_share(ack.to_challenge()?, share.0, msg, enc_share)?;
-        acks.push(VerifiedAcknowledgement::new(ack, &relay_pk));
+        reconstructor.add_pending_share(ack_challenge, share.0.pseudonym(), &msg, enc_share)?;
+        acks.push((ack, ack_challenge));
     }
 
     acks.shuffle(&mut rand::rng());
 
-    for ack in acks.iter().take(acks.len() - 1) {
-        assert_eq!(None, reconstructor.new_acknowledgement(*ack)?);
+    for (ack, ack_challenge) in acks.iter().take(acks.len() - 1) {
+        assert_eq!(None, reconstructor.new_acknowledgement(ack, ack_challenge)?);
     }
 
-    let recovered_1 = reconstructor.new_acknowledgement(acks.last().unwrap().clone())?;
+    let (last_ack, last_ack_challenge) = acks.last().unwrap();
+    let recovered_1 = reconstructor.new_acknowledgement(last_ack, last_ack_challenge)?;
     let recovered_2 = event_stream.next().timeout(timeout).await?;
 
     match recovered_2 {

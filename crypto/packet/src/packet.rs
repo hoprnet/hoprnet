@@ -11,7 +11,7 @@ use hopr_types::{
     },
     primitive::prelude::*,
 };
-
+use hopr_protocol_pix::{SsaId, SsaPolynomialId};
 use crate::{
     HoprEncryptedPartialSsaShare, HoprPixSpec, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite,
     HoprSurb, PAYLOAD_SIZE_INT,
@@ -113,6 +113,7 @@ impl PartialHoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
+        pix_share_rcn: &hopr_protocol_pix::SsaReconstructor<HoprPixSpec>,
         domain_separator: &Hash,
     ) -> Result<Self> {
         match routing {
@@ -174,11 +175,25 @@ impl PartialHoprPacket {
                 })
             }
             PacketRouting::Surb(id, surb) => {
+                let surb_por_values = surb.additional_data_receiver.proof_of_relay_values();
+
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .eth_challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
+                    .eth_challenge(surb_por_values.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
+
+                // Extract the encrypted partial SSA share from the SURB 
+                // and add it to the PIX share reconstructor if not empty.
+                let enc_partial_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
+                if !enc_partial_share.is_empty() {
+                    pix_share_rcn.add_pending_share(
+                        surb_por_values.acknowledgement_challenge(),
+                        &id.pseudonym(),
+                        &surb.sender_key,
+                        enc_partial_share,
+                    )?;
+                }
 
                 Ok(Self {
                     ticket,
@@ -193,7 +208,7 @@ impl PartialHoprPacket {
                         .proof_of_relay_values()
                         .acknowledgement_challenge(),
                     partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
-                        MetaPacketRouting::Surb(surb, &HoprSenderId::from_pseudonym_and_id(pseudonym, id)),
+                        MetaPacketRouting::Surb(surb, &id),
                         mapper,
                     )?,
                     surbs: vec![],
@@ -394,7 +409,7 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     /// attached SURBs can be specified.
     ForwardPath { forward_path: P, return_paths: Vec<P> },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
-    Surb(HoprSurbId, HoprSurb),
+    Surb(HoprSenderId, HoprSurb),
     /// No acknowledgement packet: a special type of 0-hop packet that is not going to be acknowledged but can carry a
     /// payload.
     NoAck(OffchainPublicKey),
@@ -498,6 +513,7 @@ impl HoprPacket {
         mapper: &M,
         domain_separator: &Hash,
         pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
+        pix_share_rcn: &hopr_protocol_pix::SsaReconstructor<HoprPixSpec>,
         signals: S,
     ) -> Result<(Self, Vec<HoprReplyOpener>)> {
         PartialHoprPacket::new(
@@ -507,6 +523,7 @@ impl HoprPacket {
             ticket,
             mapper,
             pix_share_gen,
+            pix_share_rcn,
             domain_separator,
         )?
         .into_hopr_packet(msg, signals)
@@ -615,7 +632,7 @@ mod tests {
     use anyhow::{Context, bail};
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_protocol_pix::SsaGeneratorConfig;
+    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
     use hopr_types::crypto_random::Randomizable;
     use parameterized::parameterized;
 
@@ -720,6 +737,7 @@ mod tests {
             .collect::<std::result::Result<Vec<_>, hopr_types::internal::errors::PathError>>()?;
 
         let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
+        let ssa_rcn = hopr_protocol_pix::SsaReconstructor::new(SsaReconstructorConfig::default());
 
         Ok(HoprPacket::into_outgoing(
             msg,
@@ -733,6 +751,7 @@ mod tests {
             &*MAPPER,
             &Hash::default(),
             &ssa_gen,
+            &ssa_rcn,
             FLAGS,
         )?)
     }
@@ -752,16 +771,18 @@ mod tests {
         )?;
 
         let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
+        let ssa_rcn = hopr_protocol_pix::SsaReconstructor::new(SsaReconstructorConfig::default());
 
         Ok(HoprPacket::into_outgoing(
             msg,
             hopr_pseudonym,
-            PacketRouting::<TransportPath>::Surb(surb_id, surb),
+            PacketRouting::<TransportPath>::Surb(HoprSenderId::from_pseudonym_and_id(hopr_pseudonym, surb_id), surb),
             &PEERS[sender_node].0,
             ticket,
             &*MAPPER,
             &Hash::default(),
             &ssa_gen,
+            &ssa_rcn,
             FLAGS,
         )?
         .0)

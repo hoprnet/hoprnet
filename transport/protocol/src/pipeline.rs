@@ -744,7 +744,7 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // Default maximum concurrency (if not set or zero) is 8 times the number of available cores.
+    // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
     // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()

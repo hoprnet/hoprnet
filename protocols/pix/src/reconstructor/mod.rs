@@ -2,7 +2,8 @@ mod events;
 mod utils;
 
 pub use events::ReconstructorEvent;
-use hopr_types::{crypto::prelude::HalfKeyChallenge, internal::prelude::VerifiedAcknowledgement};
+use hopr_types::{crypto::prelude::HalfKeyChallenge};
+use hopr_types::crypto::prelude::HalfKey;
 use utils::{AwaitingPartialShare, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 
 use crate::{
@@ -186,10 +187,15 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
     pub fn add_pending_share(
         &self,
         challenge: HalfKeyChallenge,
-        spi: SsaPolynomialId<S>,
-        msg: impl AsRef<[u8]>,
+        pseudonym: &S::Pseudonym,
+        msg: &impl AsRef<[u8]>,
         enc: EncryptedPartialSsaShare<S>,
     ) -> errors::Result<()> {
+        if enc.is_empty() {
+            return Err(errors::PixError::InvalidInput);
+        }
+
+        let spi = SsaPolynomialId::new(SsaId::new(*pseudonym, enc.ssa_index()), enc.poly_index());
         self.awaiting_acks.insert(
             challenge,
             AwaitingPartialShare {
@@ -207,13 +213,15 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
     /// If the acknowledgement has completed an SSA recovery, its [`SsaId`] and corresponding [`PixScalar`] are
     /// returned. This is the same data contained in the raised [`ReconstructorEvent::SsaRecovered`] event. The user
     /// can freely ignore the returned success value if they are actively processing the event stream.
+    ///
+    /// NOTE: The verification will fail if `ack` does not correspond to `ack_challenge`.
     pub fn new_acknowledgement(
         &self,
-        ack: VerifiedAcknowledgement,
+        ack: &HalfKey,
+        ack_challenge: &HalfKeyChallenge,
     ) -> errors::Result<Option<(SsaId<S>, PixScalar<S>)>> {
-        let challenge = ack.ack_key_share().to_challenge()?;
-        let Some(share) = self.awaiting_acks.remove(&challenge) else {
-            tracing::trace!(?challenge, "received ack for unknown share");
+        let Some(share) = self.awaiting_acks.remove(ack_challenge) else {
+            tracing::trace!(?ack_challenge, "received ack for unknown share");
             return Ok(None);
         };
 
@@ -222,7 +230,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             .get(&share.spi)
             .ok_or(errors::PixError::MissingVerifier)?;
 
-        let partial_share = share.enc_share.decrypt(share.spi.pseudonym(), ack.ack_key_share())?;
+        let partial_share = share.enc_share.decrypt(share.spi.pseudonym(), ack)?;
         let Some(ssa_part) = reconstructor.lock().add_share(share.spi, share.msg, partial_share)? else {
             tracing::trace!(spi = %share.spi, "ssa part not yet complete, waiting for more shares");
             return Ok(None);
@@ -261,7 +269,7 @@ mod tests {
     use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
 
     use super::*;
-    use crate::{PartialSsaShare, tests::TestSpec};
+    use crate::{PartialSsaShare, tests::TestSpec, SsaShareGenerator, SsaGeneratorConfig, transpose_commitments};
 
     #[test]
     fn reconstructor_invalid_commitment_inputs() {
@@ -320,8 +328,6 @@ mod tests {
 
         let ack_key = HalfKey::random();
         let challenge = ack_key.to_challenge()?;
-        let relay_pk = OffchainKeypair::random();
-        let ack = VerifiedAcknowledgement::new(ack_key, &relay_pk);
 
         // Add a pending share but NO commitment (so no verifier is created)
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
@@ -331,10 +337,10 @@ mod tests {
         // EncryptedPartialSsaShare is basically a wrapper around bytes.
         let enc_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
 
-        reconstructor.add_pending_share(challenge, spi, b"msg", enc_share)?;
+        reconstructor.add_pending_share(challenge, ssa_id.pseudonym(), b"msg", enc_share)?;
 
         // This should fail with MissingVerifier
-        let result = reconstructor.new_acknowledgement(ack);
+        let result = reconstructor.new_acknowledgement(&ack_key, &challenge);
         assert!(matches!(result, Err(errors::PixError::MissingVerifier)));
 
         Ok(())
@@ -345,11 +351,50 @@ mod tests {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
         let ack_key = HalfKey::random();
-        let relay_pk = OffchainKeypair::random();
-        let ack = VerifiedAcknowledgement::new(ack_key, &relay_pk);
 
         // This should return None for unknown challenge
-        assert!(reconstructor.new_acknowledgement(ack)?.is_none());
+        assert!(reconstructor.new_acknowledgement(&ack_key, &ack_key.to_challenge()?)?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn reconstructor_should_fail_on_verifying_mismatching_acks() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 10,
+            threshold: 10,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+
+        let (_, commitments) = generator.new_ssa_commitment(&pseudonym)?;
+
+        // Transpose the commitments so they have the on-wire structure
+        let transposed = transpose_commitments(commitments);
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            polys_per_ssa: 10,
+            poly_threshold: 10,
+            ..Default::default()
+        });
+
+        let ssa_id = SsaId::new(pseudonym, 1);
+
+        for (coeff_index, poly_coeff_commitments) in transposed {
+            reconstructor.add_client_commitment_data(ssa_id, coeff_index, poly_coeff_commitments)?;
+        }
+
+        let ack = HalfKey::random();
+        let challenge = ack.to_challenge()?;
+        let msg = b"some message";
+
+        let share = generator.next_share(&pseudonym, msg)?.ok_or(anyhow::anyhow!("failed to generate share"))?;
+        let share = share.1.encrypt(&share.0, &ack)?;
+
+        reconstructor.add_pending_share(challenge, &pseudonym, msg, share)?;
+
+        assert!(reconstructor.new_acknowledgement(&HalfKey::random(), &challenge).is_err());
 
         Ok(())
     }

@@ -25,7 +25,7 @@ mod generator;
 mod reconstructor;
 mod types;
 
-pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
+pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
 pub use reconstructor::{ReconstructorEvent, SsaReconstructor, SsaReconstructorConfig};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,

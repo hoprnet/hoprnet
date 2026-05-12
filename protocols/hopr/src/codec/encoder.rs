@@ -26,6 +26,7 @@ pub struct HoprEncoder<Chain, S, T> {
     chain_key: ChainKeypair,
     channels_dst: Hash,
     ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+    ssa_reconstructor: std::sync::Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
     cfg: HoprCodecConfig,
 }
 
@@ -38,6 +39,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
         ticket_factory: T,
         channels_dst: Hash,
         ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+        ssa_reconstructor: std::sync::Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
@@ -47,6 +49,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
             chain_key,
             channels_dst,
             ssa_generator,
+            ssa_reconstructor,
             cfg,
         }
     }
@@ -108,6 +111,7 @@ where
             self.chain_api.key_id_mapper_ref(),
             &self.channels_dst,
             &self.ssa_generator,
+            &self.ssa_reconstructor,
             signals,
         )?;
 
@@ -175,7 +179,7 @@ where
                     next,
                     surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
                     sender_id.pseudonym(),
-                    PacketRouting::Surb(sender_id.surb_id(), surb),
+                    PacketRouting::Surb(sender_id, surb),
                 )
             }
         };

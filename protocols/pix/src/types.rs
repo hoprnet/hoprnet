@@ -103,6 +103,11 @@ where
         cipher.apply_keystream(share.as_mut());
         Ok(PartialSsaShare(share))
     }
+    
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
 }
 
 impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S>
