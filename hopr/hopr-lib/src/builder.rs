@@ -702,7 +702,7 @@ where
 
 macro_rules! impl_build_methods {
     () => {
-        /// Builds an edge (entry/exit) [`Hopr`] node.
+        /// Builds an entry [`Hopr`] node.
         pub async fn build_edge<TFact>(
             self,
             ticket_factory: TFact,
@@ -713,15 +713,14 @@ macro_rules! impl_build_methods {
             let (configured, session_tx, processes) = self.into_parts();
             let pre = pre_build_inner(configured, session_tx, processes).await?;
 
-            tracing::info!("starting transport for edge (exit) node");
+            tracing::info!("starting transport for edge (entry) node");
             let (_, transport_processes) = pre
                 .transport_api
-                .run_exit(
+                .run_entry(
                     pre.cover_traffic,
                     pre.network,
                     pre.network_process,
                     ticket_factory,
-                    pre.session_tx,
                 )
                 .await?;
 

@@ -727,13 +727,11 @@ where
         // -- session management
         let smgr_start_res = if role != protocol::NodeType::Entry {
             // Relays and Exits can accept incoming Sessions
-            self.smgr
-                .start(
-                    unresolved_routing_msg_tx.clone(),
-                    on_incoming_session.ok_or_else(|| {
-                        HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
-                    }
-                )?,
+            self.smgr.start(
+                unresolved_routing_msg_tx.clone(),
+                on_incoming_session.ok_or_else(|| {
+                    HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
+                })?,
             )
         } else {
             // Entry nodes cannot accept incoming Sessions
@@ -755,12 +753,12 @@ where
         // caller discards the returned HoprSocket (e.g. edge-node builder).
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
-        let probe_filtered = probe_classifier.filter_stream(unresolved_routing_msg_tx.clone(), rx_from_protocol);
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             hopr_utils::spawn_as_abortable!(
-                probe_filtered
+                probe_classifier
+                    .filter_stream(unresolved_routing_msg_tx.clone(), rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
                         let smgr = smgr.clone();
                         async move {
