@@ -93,7 +93,7 @@ use crate::{
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
-    pipeline::HoprPipelineComponents,
+    pipeline::HoprPacketPipelineBuilder,
     socket::HoprSocket,
 };
 
@@ -535,20 +535,21 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        processes.extend_from(pipeline::run_hopr_packet_pipeline(
-            (self.packet_key.clone(), self.chain_key.clone()),
-            (mixing_channel_tx, wire_msg_rx),
-            (tx_from_protocol, all_resolved_external_msg_rx),
-            HoprPipelineComponents {
-                surb_store: self.path_planner.surb_store.clone(),
-                chain_api: self.chain_api.clone(),
-                counters: self.counters.clone(),
+        processes.extend_from(
+            HoprPacketPipelineBuilder::new(
+                (self.packet_key.clone(), self.chain_key.clone()),
+                (mixing_channel_tx, wire_msg_rx),
+                (tx_from_protocol, all_resolved_external_msg_rx),
+                self.path_planner.surb_store.clone(),
+                self.chain_api.clone(),
                 ticket_factory,
-                ticket_events,
-            },
-            channels_dst,
-            self.cfg.packet,
-        ));
+                self.counters.clone(),
+                channels_dst,
+            )
+            .with_config(self.cfg.packet)
+            .with_ticket_events(ticket_events)
+            .build_for_relay(),
+        );
 
         // -- periodic counter flush
         let flush_counters = self.counters.clone();
