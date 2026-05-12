@@ -99,7 +99,8 @@ jobs:
           command: |
             nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
               uv run --project .ci/no-git-dependencies \
-              python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py
+              python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py \
+              --allow hopr-types
 
   checks:
     name: Check

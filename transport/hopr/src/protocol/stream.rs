@@ -1,4 +1,4 @@
-//! Infrastructure supporting converting a collection of [`PeerId`] split `libp2p_stream` managed
+//! Infrastructure supporting converting a collection of `PeerId` split `libp2p_stream` managed
 //! individual peer-to-peer `libp2p::swarm::Stream`s.
 
 use std::sync::Arc;

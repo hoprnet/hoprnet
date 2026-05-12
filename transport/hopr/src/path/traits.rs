@@ -17,14 +17,14 @@ pub struct PathWithCost {
 /// Selects multi-hop paths through the network.
 ///
 /// Implementors are responsible for determining how paths are found.
-/// The caller (e.g. [`crate::planner::PathPlanner`]) is responsible for caching,
+/// The caller (e.g. [`crate::path::planner::PathPlanner`]) is responsible for caching,
 /// path selection strategy, and validation.
 ///
 /// # Cycle-free invariant
 ///
 /// Implementations **must** return only cycle-free (simple) paths — no node may
 /// appear more than once in any returned path.  Cycles destroy path entropy and
-/// worsen anonymity.  The built-in [`crate::selector::HoprGraphPathSelector`]
+/// worsen anonymity.  The built-in [`crate::path::selector::HoprGraphPathSelector`]
 /// guarantees this by using the `simple_paths` graph algorithm, which by
 /// definition never revisits a node.  Alternative implementations must uphold
 /// the same invariant.

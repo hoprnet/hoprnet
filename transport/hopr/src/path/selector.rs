@@ -49,7 +49,7 @@ where
 ///
 /// Returns all candidate paths for a `(src, dest, hops)` query directly from
 /// the network graph — no caching is performed here.  The caller (typically
-/// [`crate::planner::PathPlanner`]) is responsible for caching, TTL management,
+/// [`crate::path::planner::PathPlanner`]) is responsible for caching, TTL management,
 /// background refresh, and final path selection.
 ///
 /// Stores the planner's own identity (`me`) so that it can choose the
