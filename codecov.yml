@@ -8,15 +8,12 @@ coverage:
     project:
       default:
         target: auto
-        # Raised from 0.5% to accommodate one-time path-rename coverage loss
-        # from workspace consolidation (transport/api→transport/hopr etc.).
-        # Integration coverage will restore the baseline after merge.
-        threshold: 6.5%
+        threshold: 0.5%
         if_not_found: success
     patch:
       default:
         target: auto
-        threshold: 6%
+        threshold: 0%
 
 comment:
   layout: "reach, diff, flags, files"
