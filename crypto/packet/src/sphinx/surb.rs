@@ -233,6 +233,7 @@ where
 mod tests {
     #[cfg(feature = "x25519")]
     use hopr_types::crypto_random::Randomizable;
+
     #[cfg(feature = "x25519")]
     use super::{super::tests::*, *};
     #[cfg(feature = "x25519")]

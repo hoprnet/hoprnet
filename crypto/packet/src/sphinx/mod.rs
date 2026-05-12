@@ -13,8 +13,7 @@
 //! Currently, there are the following `SphinxSuite` implementations:
 //! - `Secp256k1Suite`: deprecated, used in previous HOPR versions
 //! - `Ed25519Suite`: simple implementation using Ed25519, used for testing
-//! - `X25519Suite` currently used, implemented using the Curve25519 Montgomery curve for
-//!   faster computation
+//! - `X25519Suite` currently used, implemented using the Curve25519 Montgomery curve for faster computation
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
 //! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be easy to create e.g., an

@@ -66,11 +66,12 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
 
     // -- act: create instruments and record values -----------------------------
 
-    let counter =
-        hopr_types::telemetry::SimpleCounter::new("it_counter", "integration test counter").context("SimpleCounter::new")?;
+    let counter = hopr_types::telemetry::SimpleCounter::new("it_counter", "integration test counter")
+        .context("SimpleCounter::new")?;
     counter.increment_by(42);
 
-    let gauge = hopr_types::telemetry::SimpleGauge::new("it_gauge", "integration test gauge").context("SimpleGauge::new")?;
+    let gauge =
+        hopr_types::telemetry::SimpleGauge::new("it_gauge", "integration test gauge").context("SimpleGauge::new")?;
     gauge.set(std::f64::consts::PI);
 
     let histogram =
@@ -85,8 +86,9 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
     multi_counter.increment_by(&["1.0.0"], 10);
     multi_counter.increment_by(&["2.0.0"], 5);
 
-    let multi_gauge = hopr_types::telemetry::MultiGauge::new("it_multi_gauge", "integration test multi gauge", &["kind"])
-        .context("MultiGauge::new")?;
+    let multi_gauge =
+        hopr_types::telemetry::MultiGauge::new("it_multi_gauge", "integration test multi gauge", &["kind"])
+            .context("MultiGauge::new")?;
     multi_gauge.set(&["tcp"], 100.0);
     multi_gauge.set(&["udp"], 200.0);
 
@@ -182,7 +184,8 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
 async fn prometheus_text_format_contains_expected_lines() -> anyhow::Result<()> {
     let _state = test_state();
 
-    let gauge = hopr_types::telemetry::SimpleGauge::new("it_prom_gauge", "prom format gauge").context("SimpleGauge::new")?;
+    let gauge =
+        hopr_types::telemetry::SimpleGauge::new("it_prom_gauge", "prom format gauge").context("SimpleGauge::new")?;
     gauge.set(99.0);
 
     let text = hopr_types::telemetry::gather_all_metrics()
@@ -209,8 +212,8 @@ async fn prometheus_text_format_contains_expected_lines() -> anyhow::Result<()> 
 async fn dual_export_paths_are_consistent() -> anyhow::Result<()> {
     let state = test_state();
 
-    let counter =
-        hopr_types::telemetry::SimpleCounter::new("it_dual_counter", "dual export counter").context("SimpleCounter::new")?;
+    let counter = hopr_types::telemetry::SimpleCounter::new("it_dual_counter", "dual export counter")
+        .context("SimpleCounter::new")?;
     counter.increment_by(7);
 
     // Flush so the OTLP reader picks up the data

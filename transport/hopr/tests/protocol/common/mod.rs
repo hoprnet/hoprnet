@@ -372,16 +372,16 @@ async fn peer_setup_for_with_all(
 
         let counters = PeerProtocolCounterRegistry::default();
 
-        let node_processes = hopr_transport::protocol::run_packet_pipeline(
+        let node_processes = hopr_transport::protocol::PacketPipelineBuilder::new(
             PEERS[i].clone(),
             (mixer_channel_tx, wire_msg_send_rx),
             (encoder, decoder),
-            ticket_proc,
-            received_ack_tickets_tx,
-            cfg,
             (api_recv_tx, api_send_rx),
             counters.clone(),
-        );
+        )
+        .with_config(cfg)
+        .with_ticket_processing(ticket_proc, received_ack_tickets_tx)
+        .build_for_relay();
 
         wire_channels.insert(PeerId::from(*PEERS[i].public()), (wire_msg_send_tx, mixer_channel_rx));
         logical_channels.push((api_send_tx, api_recv_rx));

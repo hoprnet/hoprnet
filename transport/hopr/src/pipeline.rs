@@ -12,7 +12,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_utils::runtime::AbortableList;
 
-use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::run_packet_pipeline};
+use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::PacketPipelineBuilder};
 
 /// Contains all components required to run the HOPR packet pipeline.
 #[derive(Clone)]
@@ -115,16 +115,10 @@ where
     };
 
     processes.flat_map_extend_from(
-        run_packet_pipeline(
-            packet_key.clone(),
-            wire_msg,
-            (encoder, decoder),
-            unack_ticket_proc,
-            ticket_events,
-            cfg.pipeline,
-            api,
-            counters,
-        ),
+        PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
+            .with_config(cfg.pipeline)
+            .with_ticket_processing(unack_ticket_proc, ticket_events)
+            .build_for_relay(),
         HoprTransportProcess::Pipeline,
     );
 

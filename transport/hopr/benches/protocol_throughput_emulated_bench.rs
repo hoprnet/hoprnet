@@ -129,16 +129,15 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             codec_config,
                         );
 
-                        let processes = hopr_transport::protocol::run_packet_pipeline(
+                        let processes = hopr_transport::protocol::PacketPipelineBuilder::new(
                             PEERS[TESTED_PEER_ID].clone(),
                             (wire_out_tx, wire_in_rx),
                             (encoder, decoder),
-                            ticket_proc,
-                            received_ack_tickets_tx,
-                            Default::default(),
                             (api_recv_tx, api_send_rx),
                             Default::default(),
-                        );
+                        )
+                        .with_ticket_processing(ticket_proc, received_ack_tickets_tx)
+                        .build_for_relay();
 
                         let path = resolve_mock_path(
                             PEERS_CHAIN[TESTED_PEER_ID].public().to_address(),

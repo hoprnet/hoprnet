@@ -507,7 +507,38 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     );
 }
 
-async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
+/// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
+///
+/// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
+/// development), but since they never receive tickets, they have nothing to acknowledge.
+async fn start_exit_incoming_ack_pipeline<AckIn>(
+    ack_incoming: AckIn,
+    counters: super::counters::PeerProtocolCounterRegistry,
+) where
+    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+{
+    ack_incoming
+        .for_each(move |(peer, acks)| {
+            let counters = counters.clone();
+            async move {
+                counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
+                tracing::trace!(num = acks.len(), "received acknowledgements (drained, not processed)");
+            }
+            .instrument(tracing::debug_span!(
+                "incoming_ack_batch_drain",
+                peer = peer.to_peerid_str()
+            ))
+        })
+        .in_current_span()
+        .await;
+
+    tracing::warn!(
+        task = "transport (protocol - ticket acknowledgement drain)",
+        "long-running background task finished"
+    );
+}
+
+async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
@@ -630,7 +661,7 @@ pub struct AcknowledgementPipelineConfig {
     /// Capacity of the `outgoing_ack` MPSC channel carrying acknowledgements to be sent back
     /// to the previous hop.
     ///
-    /// Default is 50_000. See [`ticket_ack_buffer_size`](Self::ticket_ack_buffer_size) for the
+    /// The default is 50_000. See [`ticket_ack_buffer_size`](Self::ticket_ack_buffer_size) for the
     /// rationale on why this is smaller than the original hardcoded 1_000_000.
     #[default(default_ack_out_buffer_size())]
     #[cfg_attr(feature = "serde", serde(default = "default_ack_out_buffer_size"))]
@@ -686,13 +717,244 @@ pub struct PacketPipelineConfig {
     pub ack_config: AcknowledgementPipelineConfig,
 }
 
-/// Run all processes responsible for handling the msg and acknowledgment protocols.
+/// Node type for which the packet processing pipeline is being constructed.
 ///
-/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
+/// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
+/// * [`Relay`](NodeType::Relay) — full pipeline, processes tickets and incoming acknowledgements.
+/// * [`Entry`](NodeType::Entry) — does not process tickets and does not even start the incoming acknowledgement
+///   pipeline.
+/// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
+///   only drains the stream) for future use.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+enum NodeType {
+    Relay,
+    Entry,
+    Exit,
+}
+
+/// No-op [`UnacknowledgedTicketProcessor`] used by node types that do not process tickets
+/// (Entry and Exit). All methods are unreachable because the inner pipeline never invokes
+/// them on those node types (Entry skips the ack pipeline entirely, Exit uses the drain
+/// variant, and the forwarded packet branch never fires on a terminal/source node).
+#[derive(Debug, Default, Copy, Clone)]
+#[doc(hidden)]
+pub struct NoopTicketProcessor;
+
+impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
+    type Error = std::convert::Infallible;
+
+    #[inline]
+    fn insert_unacknowledged_ticket(
+        &self,
+        _: &OffchainPublicKey,
+        _: HalfKeyChallenge,
+        _: UnacknowledgedTicket,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn acknowledge_tickets(
+        &self,
+        _: OffchainPublicKey,
+        _: Vec<Acknowledgement>,
+    ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
+        Ok(Vec::with_capacity(0))
+    }
+}
+
+/// Builder for constructing the HOPR packet pipeline for a specific node type.
+///
+/// The builder accepts the common parameters shared by all node types via [`PacketPipelineBuilder::new`]
+/// and exposes terminal methods for each node type:
+/// - [`PacketPipelineBuilder::build_for_relay`] — full pipeline, requires ticket processing via
+///   [`PacketPipelineBuilder::with_ticket_processing`].
+/// - [`PacketPipelineBuilder::build_for_entry`] — Entry nodes; the incoming acknowledgement pipeline is not started at
+///   all.
+/// - [`PacketPipelineBuilder::build_for_exit`] — Exit nodes; the incoming acknowledgement pipeline is started but only
+///   drains the stream (no ticket processing).
+///
+/// The pipeline does not handle mixing itself; it needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
-#[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+pub struct PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, AppOut, AppIn> {
+    packet_key: OffchainKeypair,
+    wire_msg: (WOut, WIn),
+    codec: (C, D),
+    cfg: PacketPipelineConfig,
+    api: (AppOut, AppIn),
+    counters: super::counters::PeerProtocolCounterRegistry,
+    ticket_proc: Option<T>,
+    ticket_events: Option<TEvt>,
+}
+
+impl<WIn, WOut, C, D, AppOut, AppIn>
+    PacketPipelineBuilder<WIn, WOut, C, D, NoopTicketProcessor, futures::sink::Drain<TicketEvent>, AppOut, AppIn>
+{
+    /// Creates a new builder with the common parameters shared by all node types.
+    ///
+    /// The pipeline configuration defaults to [`PacketPipelineConfig::default`]; use
+    /// [`PacketPipelineBuilder::with_config`] to override it.
+    ///
+    /// Use [`PacketPipelineBuilder::with_ticket_processing`] to attach ticket processing
+    /// before calling [`PacketPipelineBuilder::build_for_relay`].
+    pub fn new(
+        packet_key: OffchainKeypair,
+        wire_msg: (WOut, WIn),
+        codec: (C, D),
+        api: (AppOut, AppIn),
+        counters: super::counters::PeerProtocolCounterRegistry,
+    ) -> Self {
+        Self {
+            packet_key,
+            wire_msg,
+            codec,
+            cfg: PacketPipelineConfig::default(),
+            api,
+            counters,
+            ticket_proc: None,
+            ticket_events: None,
+        }
+    }
+
+    /// Overrides the default [`PacketPipelineConfig`].
+    #[must_use]
+    pub fn with_config(mut self, cfg: PacketPipelineConfig) -> Self {
+        self.cfg = cfg;
+        self
+    }
+
+    /// Attaches a ticket processor and a ticket-events sink to the builder.
+    ///
+    /// Required before calling [`PacketPipelineBuilder::build_for_relay`]. Has no effect on
+    /// Entry/Exit builds, which never process tickets.
+    #[must_use]
+    pub fn with_ticket_processing<T, TEvt>(
+        self,
+        ticket_proc: T,
+        ticket_events: TEvt,
+    ) -> PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>
+    where
+        T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
+        TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
+        TEvt::Error: std::error::Error,
+    {
+        PacketPipelineBuilder {
+            packet_key: self.packet_key,
+            wire_msg: self.wire_msg,
+            codec: self.codec,
+            cfg: self.cfg,
+            api: self.api,
+            counters: self.counters,
+            ticket_proc: Some(ticket_proc),
+            ticket_events: Some(ticket_events),
+        }
+    }
+}
+
+impl<WIn, WOut, C, D, T, TEvt, AppOut, AppIn> PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>
+where
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
+    WOut::Error: std::error::Error,
+    WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
+    C: PacketEncoder + Sync + Send + 'static,
+    D: PacketDecoder + Sync + Send + 'static,
+    T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
+    TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
+    TEvt::Error: std::error::Error,
+    AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
+    AppOut::Error: std::error::Error,
+    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+{
+    /// Builds and starts the full packet pipeline for a HOPR **Relay** node.
+    ///
+    /// Relay nodes run the full pipeline: outgoing/incoming messages, outgoing acknowledgements,
+    /// and incoming acknowledgements (with ticket processing).
+    ///
+    /// # Panics
+    /// Panics if [`PacketPipelineBuilder::with_ticket_processing`] was not called before this method.
+    #[must_use]
+    pub fn build_for_relay(self) -> AbortableList<PacketPipelineProcesses> {
+        let ticket_proc = self
+            .ticket_proc
+            .expect("Relay node requires ticket processing; call with_ticket_processing() first");
+        let ticket_events = self
+            .ticket_events
+            .expect("Relay node requires ticket processing; call with_ticket_processing() first");
+        run_packet_pipeline_inner(
+            NodeType::Relay,
+            self.packet_key,
+            self.wire_msg,
+            self.codec,
+            ticket_proc,
+            ticket_events,
+            self.cfg,
+            self.api,
+            self.counters,
+        )
+    }
+}
+
+impl<WIn, WOut, C, D, T, TEvt, AppOut, AppIn> PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>
+where
+    WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
+    WOut::Error: std::error::Error,
+    WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
+    C: PacketEncoder + Sync + Send + 'static,
+    D: PacketDecoder + Sync + Send + 'static,
+    AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
+    AppOut::Error: std::error::Error,
+    AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+{
+    /// Builds and starts the packet pipeline for a HOPR **Entry** node.
+    ///
+    /// Entry nodes never relay packets and therefore do not process tickets. As a consequence,
+    /// the incoming acknowledgement pipeline is **not** started.
+    /// Any ticket processor or ticket events sink previously set via
+    /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
+    #[must_use]
+    pub fn build_for_entry(self) -> AbortableList<PacketPipelineProcesses> {
+        run_packet_pipeline_inner::<_, _, _, _, NoopTicketProcessor, futures::sink::Drain<TicketEvent>, _, _>(
+            NodeType::Entry,
+            self.packet_key,
+            self.wire_msg,
+            self.codec,
+            NoopTicketProcessor,
+            futures::sink::drain(),
+            self.cfg,
+            self.api,
+            self.counters,
+        )
+    }
+
+    /// Builds and starts the packet pipeline for a HOPR **Exit** node.
+    ///
+    /// Exit nodes do not process tickets either. However, in contrast to
+    /// [`PacketPipelineBuilder::build_for_entry`], the incoming acknowledgement pipeline is kept
+    /// running (it only drains the stream) to support future development.
+    /// Any ticket processor or ticket events sink previously set via
+    /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
+    #[must_use]
+    pub fn build_for_exit(self) -> AbortableList<PacketPipelineProcesses> {
+        run_packet_pipeline_inner::<_, _, _, _, NoopTicketProcessor, futures::sink::Drain<TicketEvent>, _, _>(
+            NodeType::Exit,
+            self.packet_key,
+            self.wire_msg,
+            self.codec,
+            NoopTicketProcessor,
+            futures::sink::drain(),
+            self.cfg,
+            self.api,
+            self.counters,
+        )
+    }
+}
+
+/// Shared implementation of the packet pipeline used by [`PacketPipelineBuilder`]'s
+/// terminal `build_for_*` methods.
 #[allow(clippy::too_many_arguments)]
-pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+#[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+fn run_packet_pipeline_inner<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+    node_type: NodeType,
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
     codec: (C, D),
@@ -745,7 +1007,7 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // Default maximum concurrency (if not set or zero) is 8 times the number of available cores.
+    // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
     // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
@@ -802,19 +1064,41 @@ where
         .filter(|&n| n > 0)
         .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
 
-    processes.insert(
-        PacketPipelineProcesses::AckIn,
-        hopr_utils::spawn_as_abortable!(
-            start_incoming_ack_pipeline(
-                incoming_ack_rx,
-                ticket_events,
-                ticket_proc,
-                counters,
-                ack_input_concurrency
-            )
-            .in_current_span()
-        ),
-    );
+    match node_type {
+        NodeType::Relay => {
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(
+                    start_relay_incoming_ack_pipeline(
+                        incoming_ack_rx,
+                        ticket_events,
+                        ticket_proc,
+                        counters,
+                        ack_input_concurrency
+                    )
+                    .in_current_span()
+                ),
+            );
+        }
+        NodeType::Exit => {
+            // Exit nodes still run the incoming acknowledgement pipeline (for future use),
+            // but only drain the stream — incoming acknowledgements are NOT forwarded to the
+            // UnacknowledgedTicketProcessor because Exit nodes do not process tickets.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency);
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(
+                    start_exit_incoming_ack_pipeline(incoming_ack_rx, counters).in_current_span()
+                ),
+            );
+        }
+        NodeType::Entry => {
+            // Entry nodes do not process tickets at all and do not even start the incoming
+            // acknowledgement pipeline. The receiver is dropped here, which propagates back
+            // pressure to senders of `incoming_ack_tx`.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency, incoming_ack_rx);
+        }
+    }
 
     processes
 }
