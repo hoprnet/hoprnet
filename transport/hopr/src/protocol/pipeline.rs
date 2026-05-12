@@ -726,7 +726,7 @@ pub struct PacketPipelineConfig {
 /// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
 ///   only drains the stream) for future use.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum NodeType {
+pub enum NodeType {
     Relay,
     Entry,
     Exit,

@@ -713,14 +713,13 @@ macro_rules! impl_build_methods {
             let (configured, session_tx, processes) = self.into_parts();
             let pre = pre_build_inner(configured, session_tx, processes).await?;
 
-            tracing::info!("starting transport for edge node");
+            tracing::info!("starting transport for edge (exit) node");
             let (_, transport_processes) = pre
                 .transport_api
-                .run(
+                .run_exit(
                     pre.cover_traffic,
                     pre.network,
                     pre.network_process,
-                    futures::sink::drain(),
                     ticket_factory,
                     pre.session_tx,
                 )
@@ -846,10 +845,10 @@ macro_rules! impl_build_methods {
                 processes.insert(HoprLibProcess::ChannelClosureNeglect, neglect_handle);
             }
 
-            tracing::info!("starting transport for full node");
+            tracing::info!("starting transport for full (relay) node");
             let (_, transport_processes) = pre
                 .transport_api
-                .run(
+                .run_relay(
                     pre.cover_traffic,
                     pre.network,
                     pre.network_process,

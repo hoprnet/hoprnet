@@ -29,7 +29,7 @@ pub mod stream;
 
 pub use counters::{PeerProtocolCounterRegistry, PeerProtocolCounters};
 pub use pipeline::{
-    AcknowledgementPipelineConfig, PacketPipelineBuilder, PacketPipelineConfig, PacketPipelineProcesses,
+    AcknowledgementPipelineConfig, NodeType, PacketPipelineBuilder, PacketPipelineConfig, PacketPipelineProcesses,
 };
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
