@@ -167,8 +167,7 @@ hopr-api = "1.9.0"
 hopr-types = { version = "1.8.0", features = ["use-bindings"] }
 hopr-utils = { path = "utils", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = [
-  "rayon",
-  "ed25519"
+  "ed25519",
 ] }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { path = "protocols/app", default-features = false }
@@ -216,8 +215,15 @@ opt-level = 1
 codegen-units = 1
 lto = "fat"
 panic = "abort"
-strip = true
 opt-level = 3
+strip = true
+
+# memory profiling profile — inherits release optimizations but preserves debug symbols
+# for jeprof symbol resolution
+[profile.memprof]
+inherits = "release"
+debug = 2
+strip = false
 
 # uses extended debug symbols for profiling but does not harm benchmarking performance
 [profile.bench]

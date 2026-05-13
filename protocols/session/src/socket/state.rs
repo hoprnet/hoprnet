@@ -246,6 +246,12 @@ mod tests {
             .once()
             .in_sequence(&mut alice_seq)
             .return_once(|_| Ok::<_, SessionError>(()));
+        // PinnedDrop on SessionSocket calls state.stop() again on drop.
+        alice_state
+            .expect_stop()
+            .once()
+            .in_sequence(&mut alice_seq)
+            .return_once(|| Ok::<_, SessionError>(()));
 
         let mut bob_seq = mockall::Sequence::new();
         let mut bob_state = MockSockState::new();
@@ -289,6 +295,12 @@ mod tests {
             .once()
             .in_sequence(&mut bob_seq)
             .return_once(|_| Ok::<_, SessionError>(()));
+        // PinnedDrop on SessionSocket calls state.stop() again on drop.
+        bob_state
+            .expect_stop()
+            .once()
+            .in_sequence(&mut bob_seq)
+            .return_once(|| Ok::<_, SessionError>(()));
 
         let (alice, bob) = setup_alice_bob::<MTU>(
             FaultyNetworkConfig {

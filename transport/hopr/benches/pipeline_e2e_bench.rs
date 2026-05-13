@@ -257,16 +257,12 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                             codec_config,
                         );
 
-                        let processes = hopr_transport::protocol::run_packet_pipeline(
-                            PEERS[SENDER_IDX].clone(),
-                            (mixer_tx, wire_in_rx),
-                            (encoder, decoder),
-                            ticket_proc,
-                            ticket_events_tx,
-                            Default::default(),
-                            (api_recv_tx, api_send_rx),
-                            Default::default(),
-                        );
+                        let processes = hopr_transport::protocol::PacketPipelineBuilder::new(PEERS[SENDER_IDX].clone())
+                            .transport((mixer_tx, wire_in_rx))
+                            .codec((encoder, decoder))
+                            .api((api_recv_tx, api_send_rx))
+                            .with_ticket_processing(ticket_proc, ticket_events_tx)
+                            .build_for_relay();
 
                         let (done_tx, done_rx) = oneshot::channel::<()>();
 

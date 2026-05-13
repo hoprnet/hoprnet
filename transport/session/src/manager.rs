@@ -1,12 +1,13 @@
 use std::{
     ops::Range,
+    pin::Pin,
     sync::{Arc, OnceLock},
     time::Duration,
 };
 
 use anyhow::anyhow;
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt,
+    FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
     channel::mpsc::{Sender, UnboundedSender},
     future::AbortHandle,
     pin_mut,
@@ -261,6 +262,15 @@ pub struct SessionManagerConfig {
     pub pix_config: Option<PixConfig>,
 }
 
+// Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
+// The errors produced by the underlying sink are remapped into `SessionManagerError`.
+type IncomingSessionSink = Pin<Box<dyn Sink<IncomingSession, Error = SessionManagerError> + Send>>;
+
+type SessionNotifiers = (
+    Arc<hopr_utils::runtime::prelude::Mutex<IncomingSessionSink>>,
+    Sender<(SessionId, ClosureReason)>,
+);
+
 /// Manages lifecycles of Sessions.
 ///
 /// Once the manager is [started](SessionManager::start), the [`SessionManager::dispatch_message`]
@@ -401,10 +411,9 @@ pub struct SessionManagerConfig {
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
-pub struct SessionManager<S, T> {
+pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
-    #[allow(clippy::type_complexity)]
-    session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
+    session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
@@ -415,7 +424,7 @@ pub struct SessionManager<S, T> {
     cfg: SessionManagerConfig,
 }
 
-impl<S, T> Clone for SessionManager<S, T> {
+impl<S> Clone for SessionManager<S> {
     fn clone(&self) -> Self {
         Self {
             session_initiations: self.session_initiations.clone(),
@@ -432,12 +441,10 @@ impl<S, T> Clone for SessionManager<S, T> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-impl<S, T> SessionManager<S, T>
+impl<S> SessionManager<S>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
-    T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
-    T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
     /// for allocating session tags on the Exit (incoming) side.
@@ -497,10 +504,22 @@ where
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
-    pub fn start(&self, msg_sender: S, new_session_notifier: T) -> crate::errors::Result<Vec<AbortHandle>> {
+    pub fn start<T>(&self, msg_sender: S, new_session_notifier: T) -> crate::errors::Result<Vec<AbortHandle>>
+    where
+        T: futures::Sink<IncomingSession> + Send + 'static,
+        T::Error: std::error::Error + Send + Sync + 'static,
+    {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
+
+        // Re-map the user-provided sink errors to `SessionManagerError` and erase the concrete
+        // type, so that the `SessionManager` does not need to be generic over it. This also avoids
+        // having to spawn a separate task to forward items between channels: senders simply lock
+        // the sink and send directly.
+        let new_session_notifier: IncomingSessionSink =
+            Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
+        let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
         let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.maximum_sessions + 10);
         self.session_notifiers
@@ -973,6 +992,24 @@ where
         self.sessions.iter().map(|(k, _)| *k).collect()
     }
 
+    /// Explicitly closes the session with the given `id`.
+    ///
+    /// Removes the entry from the internal session cache, closes the data channel,
+    /// and aborts any auxiliary tasks. Returns `true` if a session was found and
+    /// closed, `false` otherwise.
+    ///
+    /// This avoids waiting for the idle timeout (`time_to_idle`) or the LRU
+    /// capacity bound to evict the entry, which is the desired behaviour when
+    /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
+    pub async fn close_session(&self, id: &SessionId) -> bool {
+        if let Some(slot) = self.sessions.remove(id).await {
+            close_session(*id, slot, ClosureReason::Eviction);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Updates the configuration of the SURB balancer on the given [`SessionId`].
     ///
     /// Returns an error if the Session with the given `id` does not exist, or
@@ -1082,7 +1119,7 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (mut new_session_notifier, mut close_session_notifier) = self
+        let (new_session_notifier, mut close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
@@ -1270,11 +1307,14 @@ where
                 target: session_req.target,
             };
 
-            // Notify that a new incoming session has been created
-            match new_session_notifier
-                .send(incoming_session)
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
+            // Notify that a new incoming session has been created. Lock the sink and send
+            // directly into it, so no extra forwarding task between channels is needed.
+            match async {
+                let mut guard = new_session_notifier.lock().await;
+                guard.send(incoming_session).await
+            }
+            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+            .await
             {
                 Err(_) => {
                     error!(%session_id, "timeout to notify about new incoming session");
@@ -1890,10 +1930,10 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::<
-            UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
-            futures::channel::mpsc::Sender<IncomingSession>,
-        >::new(Default::default(), test_tag_allocator());
+        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
+            Default::default(),
+            test_tag_allocator(),
+        );
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr

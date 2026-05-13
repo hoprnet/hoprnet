@@ -93,7 +93,7 @@ use crate::{
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
     path::{HoprGraphPathSelector, PathPlanner},
-    pipeline::HoprPipelineComponents,
+    pipeline::HoprPacketPipelineBuilder,
     socket::HoprSocket,
 };
 
@@ -140,7 +140,7 @@ pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
     #[strum(to_string = "HOPR packet pipeline ({0})")]
-    Pipeline(crate::protocol::PacketPipelineProcesses),
+    Pipeline(protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
@@ -158,7 +158,7 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>;
+type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -218,6 +218,19 @@ impl HoprSessionConfigurator {
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
             .update_surb_balancer_config(&self.id, config)
             .await?)
+    }
+
+    /// Explicitly closes the underlying Session in the [`SessionManager`].
+    ///
+    /// Returns `true` if the session was found and closed, `false` if it was
+    /// already gone (or the manager is dropped). Frees the per-session state
+    /// (frame reassembly buffers, control channels, …) immediately rather than
+    /// waiting for the manager's idle-timeout eviction.
+    pub async fn close(&self) -> bool {
+        match self.smgr.upgrade() {
+            Some(smgr) => smgr.close_session(&self.id).await,
+            None => false,
+        }
     }
 }
 
@@ -296,12 +309,12 @@ where
                 hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
             }
         }
-        let session_tag_allocator = session_tag_allocator
-            .ok_or_else(|| errors::HoprTransportError::Api("session tag allocator missing".into()))?;
+        let session_tag_allocator =
+            session_tag_allocator.ok_or_else(|| HoprTransportError::Api("session tag allocator missing".into()))?;
         let session_telemetry_tag_allocator = session_telemetry_tag_allocator
-            .ok_or_else(|| errors::HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
-        let probing_tag_allocator = probing_tag_allocator
-            .ok_or_else(|| errors::HoprTransportError::Api("probing tag allocator missing".into()))?;
+            .ok_or_else(|| HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
+        let probing_tag_allocator =
+            probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -317,7 +330,7 @@ where
                 planner_config,
             ),
             my_multiaddresses,
-            smgr: SessionManager::new(
+            smgr: Arc::new(SessionManager::new(
                 SessionManagerConfig {
                     frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                         .ok()
@@ -340,8 +353,7 @@ where
                     pix_config: Some(PixConfig::default()),
                 },
                 session_tag_allocator,
-            )
-            .into(),
+            )),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -350,13 +362,12 @@ where
         })
     }
 
-    /// Execute all processes of the [`HoprTransport`] object.
+    /// Execute all processes of the [`HoprTransport`] object as a **Relay** node.
     ///
-    /// This method will spawn the `HoprTransportProcess::Heartbeat`,
-    /// `HoprTransportProcess::BloomFilterSave`, `HoprTransportProcess::Swarm` and session-related
-    /// processes and return join handles to the calling function. These processes are not started immediately but
-    /// are waiting for a trigger from this piece of code.
-    pub async fn run<T, TFact, Ct>(
+    /// Relay nodes run the full packet pipeline including incoming ticket/acknowledgement
+    /// processing and require a [`futures::Sink`] for ticket events as well as an
+    /// `on_incoming_session` channel from the SessionManager (they can accept incoming sessions).
+    pub async fn run_relay<T, TFact, Ct>(
         &self,
         cover_traffic: Ct,
         network: Net,
@@ -364,6 +375,115 @@ where
         ticket_events: T,
         ticket_factory: TFact,
         on_incoming_session: Sender<IncomingSession>,
+    ) -> errors::Result<(
+        HoprSocket<
+            futures::stream::BoxStream<'static, ApplicationDataIn>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+        >,
+        AbortableList<HoprTransportProcess>,
+    )>
+    where
+        T: futures::Sink<hopr_api::node::TicketEvent> + Clone + Send + Unpin + 'static,
+        T::Error: std::error::Error + Clone + Send,
+        Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        self.run_inner(
+            protocol::NodeType::Relay,
+            cover_traffic,
+            network,
+            network_process,
+            ticket_events,
+            ticket_factory,
+            Some(on_incoming_session),
+        )
+        .await
+    }
+
+    /// Execute all processes of the [`HoprTransport`] object as an **Exit** (destination) node.
+    ///
+    /// Exit nodes do not process tickets but keep the incoming acknowledgement
+    /// pipeline running and can accept incoming sessions via SessionManager.
+    pub async fn run_exit<TFact, Ct>(
+        &self,
+        cover_traffic: Ct,
+        network: Net,
+        network_process: BoxedProcessFn,
+        ticket_factory: TFact,
+        on_incoming_session: Sender<IncomingSession>,
+    ) -> errors::Result<(
+        HoprSocket<
+            futures::stream::BoxStream<'static, ApplicationDataIn>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+        >,
+        AbortableList<HoprTransportProcess>,
+    )>
+    where
+        Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        self.run_inner(
+            protocol::NodeType::Exit,
+            cover_traffic,
+            network,
+            network_process,
+            futures::sink::drain(),
+            ticket_factory,
+            Some(on_incoming_session),
+        )
+        .await
+    }
+
+    /// Execute all processes of the [`HoprTransport`] object as an **Entry** (source) node.
+    ///
+    /// Entry nodes do not process tickets, do not start the incoming acknowledgement
+    /// pipeline, and do not accept incoming sessions — therefore, they require neither a
+    /// `ticket_events` sink nor an `on_incoming_session` channel.
+    pub async fn run_entry<TFact, Ct>(
+        &self,
+        cover_traffic: Ct,
+        network: Net,
+        network_process: BoxedProcessFn,
+        ticket_factory: TFact,
+    ) -> errors::Result<(
+        HoprSocket<
+            futures::stream::BoxStream<'static, ApplicationDataIn>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+        >,
+        AbortableList<HoprTransportProcess>,
+    )>
+    where
+        Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
+        TFact: TicketFactory + Clone + Send + Sync + 'static,
+    {
+        self.run_inner(
+            protocol::NodeType::Entry,
+            cover_traffic,
+            network,
+            network_process,
+            futures::sink::drain(),
+            ticket_factory,
+            None,
+        )
+        .await
+    }
+
+    /// Internal worker driving all node-type variants of `HoprTransport::run_*`.
+    ///
+    /// Branches on `role`:
+    /// - [`protocol::NodeType::Relay`]: full packet pipeline + SessionManager.
+    /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + incoming Sessions.
+    /// - [`protocol::NodeType::Entry`]: no ack pipeline, no incoming Sessions.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_inner<T, TFact, Ct>(
+        &self,
+        role: protocol::NodeType,
+        cover_traffic: Ct,
+        network: Net,
+        network_process: BoxedProcessFn,
+        ticket_events: T,
+        ticket_factory: TFact,
+        on_incoming_session: Option<Sender<IncomingSession>>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -389,7 +509,7 @@ where
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
-            crate::protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
+            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
 
         let mixing_channel_tx = hopr_transport_mixer::MixerSink::new(wire_msg_tx, build_mixer_cfg_from_env());
 
@@ -536,20 +656,23 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        processes.extend_from(pipeline::run_hopr_packet_pipeline(
-            (self.packet_key.clone(), self.chain_key.clone()),
-            (mixing_channel_tx, wire_msg_rx),
-            (tx_from_protocol, all_resolved_external_msg_rx),
-            HoprPipelineComponents {
-                surb_store: self.path_planner.surb_store.clone(),
-                chain_api: self.chain_api.clone(),
-                counters: self.counters.clone(),
-                ticket_factory,
-                ticket_events,
-            },
-            channels_dst,
-            self.cfg.packet,
-        ));
+        let pipeline_builder = HoprPacketPipelineBuilder::new()
+            .identity((&self.chain_key, &self.packet_key))
+            .transport((mixing_channel_tx, wire_msg_rx))
+            .api((tx_from_protocol, all_resolved_external_msg_rx))
+            .surb_store(self.path_planner.surb_store.clone())
+            .chain_api(self.chain_api.clone())
+            .ticket_factory(ticket_factory)
+            .channels_dst(channels_dst)
+            .with_counters(self.counters.clone())
+            .with_config(self.cfg.packet);
+
+        let pipeline_processes = match role {
+            protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
+            protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
+            protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
+        };
+        processes.extend_from(pipeline_processes);
 
         // -- periodic counter flush
         let flush_counters = self.counters.clone();
@@ -615,8 +738,21 @@ where
             .map_err(|_| HoprTransportError::Api("must set the ticket aggregation writer only once".into()))?;
 
         // -- session management
-        self.smgr
-            .start(unresolved_routing_msg_tx.clone(), on_incoming_session)
+        let smgr_start_res = if role != protocol::NodeType::Entry {
+            // Relays and Exits can accept incoming Sessions
+            self.smgr.start(
+                unresolved_routing_msg_tx.clone(),
+                on_incoming_session.ok_or_else(|| {
+                    HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
+                })?,
+            )
+        } else {
+            // Entry nodes cannot accept incoming Sessions
+            self.smgr
+                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain())
+        };
+
+        smgr_start_res
             .map_err(|_| HoprTransportError::Api("failed to start session manager".into()))?
             .into_iter()
             .enumerate()
@@ -625,8 +761,8 @@ where
                 processes.insert(k, v);
             });
 
-        // Wire incoming: cover-traffic-filtered stream → probe classify → session dispatch.
-        // This stage must run in a background task so the pipeline drains even when the
+        // Wire incoming: cover-traffic-filtered stream → probe classify → (session dispatch).
+        // This stage must run in a background task, so the pipeline drains even when the
         // caller discards the returned HoprSocket (e.g. edge-node builder).
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);

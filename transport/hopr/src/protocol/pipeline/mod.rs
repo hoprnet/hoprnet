@@ -1,4 +1,11 @@
+//! HOPR packet processing pipeline.
+
+mod builder;
+mod config;
+
+pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
+pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
@@ -15,7 +22,8 @@ use hopr_utils::{
 };
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-use validator::{Validate, ValidationError, ValidationErrors};
+
+use crate::PeerProtocolCounterRegistry;
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
@@ -277,9 +285,12 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             match packet {
                 IncomingPacket::Acknowledgement(ack) => {
                     let mut ack_incoming = ack_incoming.clone();
+                    let counters = counters.clone();
                     Either::Left(async move {
                         let IncomingAcknowledgementPacket { previous_hop, received_acks, .. } = *ack;
                         tracing::trace!(previous_hop = previous_hop.to_peerid_str(), num_acks = received_acks.len(), "incoming acknowledgements");
+                        counters.get_or_create(&previous_hop).record_acks_received(received_acks.len() as u64);
+
                         ack_incoming
                             .send((previous_hop, received_acks))
                             .await
@@ -507,11 +518,33 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     );
 }
 
-async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
+/// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
+///
+/// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
+/// development), but since they never receive tickets, they have nothing to acknowledge.
+async fn start_exit_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
+where
+    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+{
+    ack_incoming
+        .for_each(move |(peer, acks)| {
+            // TODO: PIX will make use of acknowledgements at Exits
+            tracing::trace!(%peer, num = acks.len(), "received acknowledgements (drained, not processed)");
+            futures::future::ready(())
+        })
+        .in_current_span()
+        .await;
+
+    tracing::warn!(
+        task = "transport (protocol - ticket acknowledgement drain)",
+        "long-running background task finished"
+    );
+}
+
+async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
-    counters: super::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
@@ -523,9 +556,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
-            let counters = counters.clone();
             async move {
-                counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
                 tracing::trace!(num = acks.len(), "received acknowledgements");
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || ticket_proc.acknowledge_tickets(peer, acks),
@@ -577,122 +608,57 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         "long-running background task finished"
     );
 }
-
-fn default_ack_buffer_interval() -> std::time::Duration {
-    std::time::Duration::from_millis(200)
+/// Node type for which the packet processing pipeline is being constructed.
+///
+/// The three HOPR node types differ in how they treat tickets and incoming acknowledgements:
+/// * [`Relay`](NodeType::Relay) — full pipeline, processes tickets and incoming acknowledgements.
+/// * [`Entry`](NodeType::Entry) — does not process tickets and does not even start the incoming acknowledgement
+///   pipeline.
+/// * [`Exit`](NodeType::Exit) — does not process tickets, but still runs the incoming acknowledgement pipeline (which
+///   only drains the stream) for future use.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum NodeType {
+    Relay,
+    Entry,
+    Exit,
 }
 
-fn default_ack_grouping_capacity() -> usize {
-    5
-}
+/// No-op [`UnacknowledgedTicketProcessor`] used by node types that do not process tickets
+/// (Entry and Exit). All methods are unreachable because the inner pipeline never invokes
+/// them on those node types (Entry skips the ack pipeline entirely, Exit uses the drain
+/// variant, and the forwarded packet branch never fires on a terminal/source node).
+#[derive(Debug, Default, Copy, Clone)]
+#[doc(hidden)]
+pub struct NoopTicketProcessor;
 
-fn default_ticket_ack_buffer_size() -> usize {
-    50_000
-}
+impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
+    type Error = std::convert::Infallible;
 
-fn default_ack_out_buffer_size() -> usize {
-    50_000
-}
+    #[inline]
+    fn insert_unacknowledged_ticket(
+        &self,
+        _: &OffchainPublicKey,
+        _: HalfKeyChallenge,
+        _: UnacknowledgedTicket,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
-/// Configuration for the acknowledgement processing pipeline.
-#[derive(Debug, Copy, Clone, smart_default::SmartDefault, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct AcknowledgementPipelineConfig {
-    /// Interval for which to wait to buffer acknowledgements before sending them out.
-    ///
-    /// Default is 200 ms.
-    #[default(default_ack_buffer_interval())]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default = "default_ack_buffer_interval", with = "humantime_serde")
-    )]
-    pub ack_buffer_interval: std::time::Duration,
-    /// Initial capacity when grouping outgoing acknowledgements.
-    ///
-    /// If set too low, it causes additional reallocations in the outgoing acknowledgement processing pipeline.
-    /// The value should grow if `ack_buffer_interval` grows.
-    ///
-    /// Default is 5.
-    #[default(default_ack_grouping_capacity())]
-    #[cfg_attr(feature = "serde", serde(default = "default_ack_grouping_capacity"))]
-    pub ack_grouping_capacity: usize,
-    /// Capacity of the `incoming_ack` MPSC channel carrying received acknowledgements
-    /// to the ticket-ack processing pipeline.
-    ///
-    /// The previous hardcoded value of 1_000_000 pre-allocated ~MBs of ring buffer per node even
-    /// though real-world throughput rarely saturates more than a few thousand entries. Let the
-    /// 50 ms sink timeouts (`QUEUE_SEND_TIMEOUT`) propagate backpressure instead.
-    ///
-    /// Default is 50_000.
-    #[default(default_ticket_ack_buffer_size())]
-    #[cfg_attr(feature = "serde", serde(default = "default_ticket_ack_buffer_size"))]
-    pub ticket_ack_buffer_size: usize,
-    /// Capacity of the `outgoing_ack` MPSC channel carrying acknowledgements to be sent back
-    /// to the previous hop.
-    ///
-    /// Default is 50_000. See [`ticket_ack_buffer_size`](Self::ticket_ack_buffer_size) for the
-    /// rationale on why this is smaller than the original hardcoded 1_000_000.
-    #[default(default_ack_out_buffer_size())]
-    #[cfg_attr(feature = "serde", serde(default = "default_ack_out_buffer_size"))]
-    pub ack_out_buffer_size: usize,
-    /// Maximum concurrency when processing incoming (received) acknowledgements.
-    ///
-    /// `None` or `Some(0)` both fall back to a default of 10.
-    pub ack_input_concurrency: Option<usize>,
-    /// Maximum concurrency when processing outgoing (sent-back) acknowledgements.
-    ///
-    /// `None` or `Some(0)` both fall back to a default of 10.
-    pub ack_output_concurrency: Option<usize>,
-}
-
-// Requires manual implementation due to https://github.com/Keats/validator/issues/285
-impl Validate for AcknowledgementPipelineConfig {
-    fn validate(&self) -> Result<(), ValidationErrors> {
-        let mut errors = ValidationErrors::new();
-        if self.ack_grouping_capacity == 0 {
-            errors.add("ack_grouping_capacity", ValidationError::new("must be greater than 0"));
-        }
-        if self.ack_buffer_interval < std::time::Duration::from_millis(10) {
-            errors.add("ack_buffer_interval", ValidationError::new("must be at least 10 ms"));
-        }
-        if self.ticket_ack_buffer_size == 0 {
-            errors.add("ticket_ack_buffer_size", ValidationError::new("must be greater than 0"));
-        }
-        if self.ack_out_buffer_size == 0 {
-            errors.add("ack_out_buffer_size", ValidationError::new("must be greater than 0"));
-        }
-        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    #[inline]
+    fn acknowledge_tickets(
+        &self,
+        _: OffchainPublicKey,
+        _: Vec<Acknowledgement>,
+    ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
+        Ok(Vec::with_capacity(0))
     }
 }
-
-/// Overall configuration of the input/output packet processing pipeline.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Validate)]
-#[cfg_attr(
-    feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(deny_unknown_fields)
-)]
-pub struct PacketPipelineConfig {
-    /// Maximum concurrency when processing outgoing packets.
-    ///
-    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
-    pub output_concurrency: Option<usize>,
-    /// Maximum concurrency when processing incoming packets.
-    ///
-    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
-    pub input_concurrency: Option<usize>,
-    /// Configuration of the packet acknowledgement processing
-    #[validate(nested)]
-    pub ack_config: AcknowledgementPipelineConfig,
-}
-
-/// Run all processes responsible for handling the msg and acknowledgment protocols.
-///
-/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
-/// overlay on top of the `wire_msg` Stream or Sink.
-#[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+/// Shared implementation of the packet pipeline used by [`PacketPipelineBuilder`]'s
+/// terminal `build_for_*` methods.
 #[allow(clippy::too_many_arguments)]
-pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+#[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
+pub(super) fn run_packet_pipeline_inner<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+    node_type: NodeType,
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
     codec: (C, D),
@@ -700,7 +666,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     ticket_events: TEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
-    counters: super::counters::PeerProtocolCounterRegistry,
+    counters: PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
@@ -802,19 +768,38 @@ where
         .filter(|&n| n > 0)
         .unwrap_or(DEFAULT_ACK_INPUT_CONCURRENCY);
 
-    processes.insert(
-        PacketPipelineProcesses::AckIn,
-        hopr_utils::spawn_as_abortable!(
-            start_incoming_ack_pipeline(
-                incoming_ack_rx,
-                ticket_events,
-                ticket_proc,
-                counters,
-                ack_input_concurrency
-            )
-            .in_current_span()
-        ),
-    );
+    match node_type {
+        NodeType::Relay => {
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(
+                    start_relay_incoming_ack_pipeline(
+                        incoming_ack_rx,
+                        ticket_events,
+                        ticket_proc,
+                        ack_input_concurrency
+                    )
+                    .in_current_span()
+                ),
+            );
+        }
+        NodeType::Exit => {
+            // Exit nodes still run the incoming acknowledgement pipeline (for future use),
+            // but only drain the stream — incoming acknowledgements are NOT forwarded to the
+            // UnacknowledgedTicketProcessor because Exit nodes do not process tickets.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency);
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(start_exit_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+            );
+        }
+        NodeType::Entry => {
+            // Entry nodes do not process tickets at all and do not even start the incoming
+            // acknowledgement pipeline. The receiver is dropped here, which propagates back
+            // pressure to senders of `incoming_ack_tx`.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency, incoming_ack_rx);
+        }
+    }
 
     processes
 }
