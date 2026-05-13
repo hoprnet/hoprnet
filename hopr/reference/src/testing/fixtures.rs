@@ -173,7 +173,7 @@ impl ClusterGuard {
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
                 HoprSessionClientConfig {
-                    forward_path: routing,
+                    forward_path: routing.clone(),
                     return_path: routing,
                     capabilities: Default::default(),
                     pseudonym: None,

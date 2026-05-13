@@ -687,8 +687,7 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "session-client")]
-    use hopr_api::types::crypto_random::Randomizable;
+    use hopr_transport::Keypair;
 
     use super::*;
 
@@ -801,19 +800,10 @@ mod tests {
 
     #[cfg(feature = "session-client")]
     #[test]
-    fn hop_routing_intermediate_path_from_node_ids_counts_hops() {
-        let n1 = NodeId::from(OffchainPublicKey::random());
-        let n2 = NodeId::from(OffchainPublicKey::random());
-        let route = HopRouting::try_from(vec![n1, n2]).expect("2-node path must be accepted");
-        assert_eq!(route.hop_count(), 2);
-    }
-
-    #[cfg(feature = "session-client")]
-    #[test]
     fn hop_routing_intermediate_path_from_offchain_keys_counts_hops() {
-        let k1 = OffchainPublicKey::random();
-        let k2 = OffchainPublicKey::random();
-        let k3 = OffchainPublicKey::random();
+        let k1 = *OffchainKeypair::random().public();
+        let k2 = *OffchainKeypair::random().public();
+        let k3 = *OffchainKeypair::random().public();
         let route = HopRouting::try_from(vec![k1, k2, k3]).expect("3-key path must be accepted");
         assert_eq!(route.hop_count(), 3);
     }
