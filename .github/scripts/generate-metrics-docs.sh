@@ -84,7 +84,7 @@ extract_metrics() {
       }
     }
   ' |
-    sort -t$'\t' -k1
+    LC_ALL=C sort -t$'\t' -k1,1
 }
 
 # ── --generate: print a column-aligned markdown table and exit ────────────────
