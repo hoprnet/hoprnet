@@ -310,19 +310,23 @@ where
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
-            BuiltCodec::Plain(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .with_ticket_processing(unack_ticket_proc, ticket_events)
-                    .build_for_relay()
-            }
+            BuiltCodec::Plain(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .with_ticket_processing(unack_ticket_proc, ticket_events)
+                .build_for_relay(),
             #[cfg(feature = "capture")]
-            BuiltCodec::Captured(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .with_ticket_processing(unack_ticket_proc, ticket_events)
-                    .build_for_relay()
-            }
+            BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .with_ticket_processing(unack_ticket_proc, ticket_events)
+                .build_for_relay(),
         };
 
         processes.flat_map_extend_from(inner, HoprTransportProcess::Pipeline);
@@ -359,17 +363,21 @@ where
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
-            BuiltCodec::Plain(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .build_for_entry()
-            }
+            BuiltCodec::Plain(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .build_for_entry(),
             #[cfg(feature = "capture")]
-            BuiltCodec::Captured(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .build_for_entry()
-            }
+            BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .build_for_entry(),
         };
 
         processes.flat_map_extend_from(inner, HoprTransportProcess::Pipeline);
@@ -385,17 +393,21 @@ where
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
-            BuiltCodec::Plain(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .build_for_exit()
-            }
+            BuiltCodec::Plain(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .build_for_exit(),
             #[cfg(feature = "capture")]
-            BuiltCodec::Captured(encoder, decoder) => {
-                PacketPipelineBuilder::new(packet_key.clone(), wire_msg, (encoder, decoder), api, counters)
-                    .with_config(_cfg.pipeline)
-                    .build_for_exit()
-            }
+            BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
+                .transport(wire_msg)
+                .codec((encoder, decoder))
+                .api(api)
+                .with_counters(counters)
+                .with_config(_cfg.pipeline)
+                .build_for_exit(),
         };
 
         processes.flat_map_extend_from(inner, HoprTransportProcess::Pipeline);
