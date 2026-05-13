@@ -206,8 +206,15 @@ opt-level = 1
 codegen-units = 1
 lto = "fat"
 panic = "abort"
-strip = true
 opt-level = 3
+strip = true
+
+# memory profiling profile — inherits release optimizations but preserves debug symbols
+# for jeprof symbol resolution
+[profile.memprof]
+inherits = "release"
+debug = 2
+strip = false
 
 # uses extended debug symbols for profiling but does not harm benchmarking performance
 [profile.bench]
