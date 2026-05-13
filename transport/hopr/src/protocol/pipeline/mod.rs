@@ -543,7 +543,6 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
-    counters: super::counters::PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
@@ -555,9 +554,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
         .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
-            let counters = counters.clone();
             async move {
-                counters.get_or_create(&peer).record_acks_received(acks.len() as u64);
                 tracing::trace!(num = acks.len(), "received acknowledgements");
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || ticket_proc.acknowledge_tickets(peer, acks),
@@ -778,7 +775,6 @@ where
                         incoming_ack_rx,
                         ticket_events,
                         ticket_proc,
-                        counters,
                         ack_input_concurrency
                     )
                     .in_current_span()
