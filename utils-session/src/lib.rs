@@ -783,7 +783,7 @@ mod tests {
         channel::mpsc::{UnboundedReceiver, UnboundedSender},
     };
     use futures_time::future::FutureExt as TimeFutureExt;
-    use hopr_api::types::crypto::crypto_traits::Randomizable;
+    use hopr_api::types::{crypto::crypto_traits::Randomizable, crypto_random::random_bytes};
     use hopr_lib::{
         HopRouting,
         api::types::{
@@ -962,8 +962,10 @@ mod tests {
     #[test]
     fn stored_session_entry_can_hold_explicit_intermediate_path() {
         let (abort_handle, _) = AbortHandle::new_pair();
-        let n1 = NodeId::from(OffchainPublicKey::random());
-        let n2 = NodeId::from(OffchainPublicKey::random());
+        let n1 =
+            NodeId::from(OffchainPublicKey::from_privkey(&random_bytes::<32>()).expect("valid random private key"));
+        let n2 =
+            NodeId::from(OffchainPublicKey::from_privkey(&random_bytes::<32>()).expect("valid random private key"));
         let route = HopRouting::try_from(vec![n1, n2]).expect("explicit intermediate path must be valid");
 
         let entry = StoredSessionEntry {
