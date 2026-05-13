@@ -219,6 +219,19 @@ impl HoprSessionConfigurator {
             .update_surb_balancer_config(&self.id, config)
             .await?)
     }
+
+    /// Explicitly closes the underlying Session in the [`SessionManager`].
+    ///
+    /// Returns `true` if the session was found and closed, `false` if it was
+    /// already gone (or the manager is dropped). Frees the per-session state
+    /// (frame reassembly buffers, control channels, …) immediately rather than
+    /// waiting for the manager's idle-timeout eviction.
+    pub async fn close(&self) -> bool {
+        match self.smgr.upgrade() {
+            Some(smgr) => smgr.close_session(&self.id).await,
+            None => false,
+        }
+    }
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on

@@ -957,6 +957,24 @@ where
         self.sessions.iter().map(|(k, _)| *k).collect()
     }
 
+    /// Explicitly closes the session with the given `id`.
+    ///
+    /// Removes the entry from the internal session cache, closes the data channel,
+    /// and aborts any auxiliary tasks. Returns `true` if a session was found and
+    /// closed, `false` otherwise.
+    ///
+    /// This avoids waiting for the idle timeout (`time_to_idle`) or the LRU
+    /// capacity bound to evict the entry, which is the desired behaviour when
+    /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
+    pub async fn close_session(&self, id: &SessionId) -> bool {
+        if let Some(slot) = self.sessions.remove(id).await {
+            close_session(*id, slot, ClosureReason::Eviction);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Updates the configuration of the SURB balancer on the given [`SessionId`].
     ///
     /// Returns an error if the Session with the given `id` does not exist, or

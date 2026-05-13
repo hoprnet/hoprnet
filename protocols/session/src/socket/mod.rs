@@ -88,14 +88,29 @@ enum WriteState {
 /// behavior (see [`AcknowledgementState`](ack_state::AcknowledgementState))
 ///
 /// The constant argument `C` specifies the MTU in bytes of the underlying transport.
-#[pin_project::pin_project]
-pub struct SessionSocket<const C: usize, S> {
+#[pin_project::pin_project(PinnedDrop)]
+pub struct SessionSocket<const C: usize, S: SocketState<C>> {
     state: S,
     // This is where upstream writes the to-be-segmented frame data to
     upstream_frames_in: Pin<Box<dyn futures::io::AsyncWrite + Send>>,
     // This is where upstream reads the reconstructed frame data from
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
     write_state: WriteState,
+}
+
+// Ensure `state.stop()` runs even if the socket is dropped without
+// `poll_close` (e.g. its owning task was aborted). Without this, the
+// detached tasks spawned in `SocketState::run` keep their own channel
+// senders and never terminate, pinning the FrameInspector, ring-buffer,
+// and ack buffers per leaked session.
+#[pin_project::pinned_drop]
+impl<const C: usize, S: SocketState<C>> PinnedDrop for SessionSocket<C, S> {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+        if let Err(error) = this.state.stop() {
+            tracing::debug!(%error, "state.stop on SessionSocket drop failed");
+        }
+    }
 }
 
 impl<const C: usize> SessionSocket<C, Stateless<C>> {
