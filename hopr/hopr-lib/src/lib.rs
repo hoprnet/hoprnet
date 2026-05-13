@@ -60,7 +60,10 @@ use hopr_api::{
         HoprNodeOperations, HoprState, NodeOnchainIdentity,
     },
     tickets::TicketManagement,
-    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
+    types::{
+        crypto::prelude::OffchainKeypair,
+        internal::{NodeId, routing::DestinationRouting},
+    },
 };
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
@@ -76,16 +79,14 @@ pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
-///
-/// This intentionally exposes only hop-count based routing.
 #[cfg(feature = "session-client")]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HopRouting(
-    #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
-    hopr_api::types::primitive::bounded::BoundedSize<
-        { hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
-    >,
+    #[default(hopr_api::types::internal::routing::RoutingOptions::Hops(
+        hopr_api::types::primitive::bounded::BoundedSize::MIN
+    ))]
+    hopr_api::types::internal::routing::RoutingOptions,
 );
 
 #[cfg(feature = "session-client")]
@@ -94,8 +95,13 @@ impl HopRouting {
     pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
 
     /// Returns the configured number of hops.
-    pub fn hop_count(self) -> usize {
-        self.0.into()
+    pub fn hop_count(&self) -> usize {
+        self.0.count_hops()
+    }
+
+    /// Returns the underlying transport routing options.
+    pub fn as_options(&self) -> &hopr_api::types::internal::routing::RoutingOptions {
+        &self.0
     }
 }
 
@@ -104,14 +110,36 @@ impl TryFrom<usize> for HopRouting {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(value.try_into()?))
+        Ok(Self(hopr_api::types::internal::routing::RoutingOptions::Hops(
+            value.try_into()?,
+        )))
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<Vec<NodeId>> for HopRouting {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: Vec<NodeId>) -> Result<Self, Self::Error> {
+        Ok(Self(
+            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.try_into()?),
+        ))
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<Vec<OffchainPublicKey>> for HopRouting {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: Vec<OffchainPublicKey>) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_iter().map(NodeId::from).collect::<Vec<_>>())
     }
 }
 
 #[cfg(feature = "session-client")]
 impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     fn from(value: HopRouting) -> Self {
-        Self::Hops(value.0)
+        value.0
     }
 }
 
@@ -124,8 +152,7 @@ impl std::fmt::Display for HopRouting {
 
 /// Session client configuration for `hopr-lib`.
 ///
-/// Unlike transport-level configuration, this API intentionally does not expose
-/// explicit intermediate paths.
+/// Supports both hop-count based routing and explicit intermediate paths.
 #[cfg(feature = "session-client")]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct HoprSessionClientConfig {
@@ -660,6 +687,9 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "session-client")]
+    use hopr_api::types::crypto_random::Randomizable;
+
     use super::*;
 
     #[test]
@@ -767,5 +797,24 @@ mod tests {
         let unknown = network_health_to_status(Health::Unknown, "x");
         assert!(red.is_unavailable());
         assert!(unknown.is_unavailable());
+    }
+
+    #[cfg(feature = "session-client")]
+    #[test]
+    fn hop_routing_intermediate_path_from_node_ids_counts_hops() {
+        let n1 = NodeId::from(OffchainPublicKey::random());
+        let n2 = NodeId::from(OffchainPublicKey::random());
+        let route = HopRouting::try_from(vec![n1, n2]).expect("2-node path must be accepted");
+        assert_eq!(route.hop_count(), 2);
+    }
+
+    #[cfg(feature = "session-client")]
+    #[test]
+    fn hop_routing_intermediate_path_from_offchain_keys_counts_hops() {
+        let k1 = OffchainPublicKey::random();
+        let k2 = OffchainPublicKey::random();
+        let k3 = OffchainPublicKey::random();
+        let route = HopRouting::try_from(vec![k1, k2, k3]).expect("3-key path must be accepted");
+        assert_eq!(route.hop_count(), 3);
     }
 }

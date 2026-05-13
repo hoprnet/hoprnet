@@ -788,12 +788,15 @@ mod tests {
         HopRouting,
         api::types::{
             internal::{
+                NodeId,
                 prelude::HoprPseudonym,
                 routing::{DestinationRouting, RoutingOptions},
             },
             primitive::prelude::Address,
         },
-        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, SessionId},
+        exports::transport::{
+            ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, OffchainPublicKey, SessionId,
+        },
     };
     use hopr_transport::session::HoprSessionConfig;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -954,6 +957,30 @@ mod tests {
         let entry = stub_stored_entry();
         assert!(entry.get_clients().is_empty());
         assert_eq!(entry.max_client_sessions, 5);
+    }
+
+    #[test]
+    fn stored_session_entry_can_hold_explicit_intermediate_path() {
+        let (abort_handle, _) = AbortHandle::new_pair();
+        let n1 = NodeId::from(OffchainPublicKey::random());
+        let n2 = NodeId::from(OffchainPublicKey::random());
+        let route = HopRouting::try_from(vec![n1, n2]).expect("explicit intermediate path must be valid");
+
+        let entry = StoredSessionEntry {
+            destination: Address::default(),
+            target: SessionTargetSpec::Plain("localhost:8080".into()),
+            forward_path: route.clone(),
+            return_path: route,
+            max_client_sessions: 5,
+            max_surb_upstream: None,
+            response_buffer: None,
+            session_pool: None,
+            abort_handle,
+            clients: Arc::new(DashMap::new()),
+        };
+
+        assert_eq!(entry.forward_path.hop_count(), 2);
+        assert_eq!(entry.return_path.hop_count(), 2);
     }
 
     #[test]
