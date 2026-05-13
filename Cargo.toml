@@ -162,7 +162,9 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
 hopr-api = "1.9.0"
 hopr-types = { version = "1.8.0", features = ["use-bindings"] }
 hopr-utils = { path = "utils", default-features = false }
-hopr-crypto-packet = { path = "crypto/packet", default-features = false }
+hopr-crypto-packet = { path = "crypto/packet", default-features = false, features = [
+  "ed25519",
+] }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }

@@ -62,12 +62,12 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
-pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
+pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::debug;

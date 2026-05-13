@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.21.0"
+version = "0.22.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
