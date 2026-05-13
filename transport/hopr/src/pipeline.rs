@@ -12,7 +12,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_utils::runtime::AbortableList;
 
-use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::PacketPipelineBuilder};
+use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::PacketPipelineBuilder, PeerProtocolCounterRegistry};
 
 /// Builder for the HOPR packet pipeline.
 ///
@@ -47,7 +47,7 @@ pub struct HoprPacketPipelineBuilder<
     surb_store: S,
     chain_api: Chain,
     ticket_factory: TFact,
-    counters: crate::protocol::PeerProtocolCounterRegistry,
+    counters: PeerProtocolCounterRegistry,
     channels_dst: Hash,
     cfg: HoprPacketPipelineConfig,
     ticket_events: Option<TEvt>,
@@ -77,7 +77,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn>
         surb_store: S,
         chain_api: Chain,
         ticket_factory: TFact,
-        counters: crate::protocol::PeerProtocolCounterRegistry,
+        counters: PeerProtocolCounterRegistry,
         channels_dst: Hash,
     ) -> Self {
         let (packet_key, chain_key) = keypairs;
@@ -159,7 +159,7 @@ where
         OffchainKeypair,
         (WOut, WIn),
         (AppOut, AppIn),
-        crate::protocol::PeerProtocolCounterRegistry,
+        PeerProtocolCounterRegistry,
         HoprUnacknowledgedTicketProcessor<Chain>,
         Option<TEvt>,
         HoprPacketPipelineConfig,

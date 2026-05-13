@@ -1,11 +1,12 @@
 //! HOPR packet processing pipeline.
 
-pub mod builder;
-pub mod config;
+mod builder;
+mod config;
 
 pub use builder::PacketPipelineBuilder;
-use bytes::Bytes;
 pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
+
+use bytes::Bytes;
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
