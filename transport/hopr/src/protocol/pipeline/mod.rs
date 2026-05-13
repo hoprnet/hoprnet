@@ -3,10 +3,9 @@
 mod builder;
 mod config;
 
-pub use builder::PacketPipelineBuilder;
-pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
-
+pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
+pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{

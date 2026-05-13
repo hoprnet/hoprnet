@@ -642,17 +642,16 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
-        let pipeline_builder = HoprPacketPipelineBuilder::new(
-            (self.packet_key.clone(), self.chain_key.clone()),
-            (mixing_channel_tx, wire_msg_rx),
-            (tx_from_protocol, all_resolved_external_msg_rx),
-            self.path_planner.surb_store.clone(),
-            self.chain_api.clone(),
-            ticket_factory,
-            self.counters.clone(),
-            channels_dst,
-        )
-        .with_config(self.cfg.packet);
+        let pipeline_builder = HoprPacketPipelineBuilder::new()
+            .identity((&self.chain_key, &self.packet_key))
+            .transport((mixing_channel_tx, wire_msg_rx))
+            .api((tx_from_protocol, all_resolved_external_msg_rx))
+            .surb_store(self.path_planner.surb_store.clone())
+            .chain_api(self.chain_api.clone())
+            .ticket_factory(ticket_factory)
+            .channels_dst(channels_dst)
+            .with_counters(self.counters.clone())
+            .with_config(self.cfg.packet);
 
         let pipeline_processes = match role {
             protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),

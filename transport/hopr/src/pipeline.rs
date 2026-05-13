@@ -12,7 +12,11 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_utils::runtime::AbortableList;
 
-use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::PacketPipelineBuilder, PeerProtocolCounterRegistry};
+use crate::{
+    HoprTransportProcess, PeerProtocolCounterRegistry,
+    config::HoprPacketPipelineConfig,
+    protocol::{PacketPipelineBuilder, Unset},
+};
 
 /// Builder for the HOPR packet pipeline.
 ///
@@ -28,6 +32,17 @@ use crate::{HoprTransportProcess, config::HoprPacketPipelineConfig, protocol::Pa
 /// - [`HoprPacketPipelineBuilder::build_for_exit`] — Exit nodes. Ticket events are not needed (and any value previously
 ///   set is ignored).
 ///
+/// The builder is constructed via [`HoprPacketPipelineBuilder::new`] which takes no arguments.
+/// The required components must then be supplied via the corresponding builder methods:
+/// [`identity`](HoprPacketPipelineBuilder::identity), [`transport`](HoprPacketPipelineBuilder::transport),
+/// [`api`](HoprPacketPipelineBuilder::api), [`surb_store`](HoprPacketPipelineBuilder::surb_store),
+/// [`chain_api`](HoprPacketPipelineBuilder::chain_api),
+/// [`ticket_factory`](HoprPacketPipelineBuilder::ticket_factory) and
+/// [`channels_dst`](HoprPacketPipelineBuilder::channels_dst).
+///
+/// The per-peer counter registry defaults to an empty one; override it via
+/// [`HoprPacketPipelineBuilder::with_counters`].
+///
 /// The configuration ([`HoprPacketPipelineConfig`]) is optional and defaults to
 /// `HoprPacketPipelineConfig::default()`; override it via [`HoprPacketPipelineBuilder::with_config`].
 pub struct HoprPacketPipelineBuilder<
@@ -40,57 +55,61 @@ pub struct HoprPacketPipelineBuilder<
     AppIn,
     TEvt = futures::sink::Drain<hopr_api::node::TicketEvent>,
 > {
-    packet_key: OffchainKeypair,
-    chain_key: ChainKeypair,
+    packet_key: Option<OffchainKeypair>,
+    chain_key: Option<ChainKeypair>,
     wire_msg: (WOut, WIn),
     api: (AppOut, AppIn),
     surb_store: S,
     chain_api: Chain,
     ticket_factory: TFact,
     counters: PeerProtocolCounterRegistry,
-    channels_dst: Hash,
+    channels_dst: Option<Hash>,
     cfg: HoprPacketPipelineConfig,
     ticket_events: Option<TEvt>,
 }
 
-impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn>
-    HoprPacketPipelineBuilder<
-        WIn,
-        WOut,
-        Chain,
-        S,
-        TFact,
-        AppOut,
-        AppIn,
+impl Default
+    for HoprPacketPipelineBuilder<
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
         futures::sink::Drain<hopr_api::node::TicketEvent>,
     >
 {
-    /// Creates a new builder with the mandatory components.
-    ///
-    /// The configuration defaults to [`HoprPacketPipelineConfig::default`]; use
-    /// [`HoprPacketPipelineBuilder::with_config`] to override it.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        keypairs: (OffchainKeypair, ChainKeypair),
-        wire_msg: (WOut, WIn),
-        api: (AppOut, AppIn),
-        surb_store: S,
-        chain_api: Chain,
-        ticket_factory: TFact,
-        counters: PeerProtocolCounterRegistry,
-        channels_dst: Hash,
-    ) -> Self {
-        let (packet_key, chain_key) = keypairs;
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl
+    HoprPacketPipelineBuilder<
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        Unset,
+        futures::sink::Drain<hopr_api::node::TicketEvent>,
+    >
+{
+    /// Creates a new empty builder. All required components must then be supplied via the
+    /// corresponding builder methods before calling any of the terminal `build_for_*` methods.
+    pub fn new() -> Self {
         Self {
-            packet_key,
-            chain_key,
-            wire_msg,
-            api,
-            surb_store,
-            chain_api,
-            ticket_factory,
-            counters,
-            channels_dst,
+            packet_key: None,
+            chain_key: None,
+            wire_msg: (Unset, Unset),
+            api: (Unset, Unset),
+            surb_store: Unset,
+            chain_api: Unset,
+            ticket_factory: Unset,
+            counters: PeerProtocolCounterRegistry::default(),
+            channels_dst: None,
             cfg: HoprPacketPipelineConfig::default(),
             ticket_events: None,
         }
@@ -101,13 +120,146 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
 {
     /// Overrides the default [`HoprPacketPipelineConfig`].
+    #[must_use]
     pub fn with_config(mut self, cfg: HoprPacketPipelineConfig) -> Self {
         self.cfg = cfg;
         self
     }
 
+    /// Overrides the default (empty) per-peer protocol counter registry.
+    #[must_use]
+    pub fn with_counters(mut self, counters: PeerProtocolCounterRegistry) -> Self {
+        self.counters = counters;
+        self
+    }
+
+    /// Sets the node identity (chain and offchain keypairs).
+    #[must_use]
+    pub fn identity<'a, I>(mut self, identity: I) -> Self
+    where
+        I: Into<(&'a ChainKeypair, &'a OffchainKeypair)>,
+    {
+        let (chain_key, packet_key) = identity.into();
+        self.chain_key = Some(chain_key.clone());
+        self.packet_key = Some(packet_key.clone());
+        self
+    }
+
+    /// Sets the channel-set domain separator used by the codec and ticket processor.
+    #[must_use]
+    pub fn channels_dst(mut self, channels_dst: Hash) -> Self {
+        self.channels_dst = Some(channels_dst);
+        self
+    }
+
+    /// Sets the underlying wire-message transport (outgoing sink, incoming stream).
+    #[must_use]
+    pub fn transport<WIn2, WOut2>(
+        self,
+        wire_msg: (WOut2, WIn2),
+    ) -> HoprPacketPipelineBuilder<WIn2, WOut2, Chain, S, TFact, AppOut, AppIn, TEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg,
+            api: self.api,
+            surb_store: self.surb_store,
+            chain_api: self.chain_api,
+            ticket_factory: self.ticket_factory,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+        }
+    }
+
+    /// Sets the application API (incoming sink, outgoing stream).
+    #[must_use]
+    pub fn api<AppOut2, AppIn2>(
+        self,
+        api: (AppOut2, AppIn2),
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut2, AppIn2, TEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api,
+            surb_store: self.surb_store,
+            chain_api: self.chain_api,
+            ticket_factory: self.ticket_factory,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+        }
+    }
+
+    /// Sets the SURB store used by the encoder/decoder.
+    #[must_use]
+    pub fn surb_store<S2>(
+        self,
+        surb_store: S2,
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S2, TFact, AppOut, AppIn, TEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api: self.api,
+            surb_store,
+            chain_api: self.chain_api,
+            ticket_factory: self.ticket_factory,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+        }
+    }
+
+    /// Sets the chain API used by the encoder/decoder and the unacknowledged ticket processor.
+    #[must_use]
+    pub fn chain_api<Chain2>(
+        self,
+        chain_api: Chain2,
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain2, S, TFact, AppOut, AppIn, TEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api: self.api,
+            surb_store: self.surb_store,
+            chain_api,
+            ticket_factory: self.ticket_factory,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+        }
+    }
+
+    /// Sets the ticket factory used by the encoder/decoder.
+    #[must_use]
+    pub fn ticket_factory<TFact2>(
+        self,
+        ticket_factory: TFact2,
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact2, AppOut, AppIn, TEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api: self.api,
+            surb_store: self.surb_store,
+            chain_api: self.chain_api,
+            ticket_factory,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+        }
+    }
+
     /// Attaches the ticket events sink. Required for Relay nodes (see
     /// [`HoprPacketPipelineBuilder::build_for_relay`]); ignored by Entry and Exit nodes.
+    #[must_use]
     pub fn with_ticket_events<TEvt2>(
         self,
         ticket_events: TEvt2,
@@ -180,6 +332,10 @@ where
             cfg,
             ticket_events,
         } = self;
+
+        let packet_key = packet_key.expect("identity() must be called before building the pipeline");
+        let chain_key = chain_key.expect("identity() must be called before building the pipeline");
+        let channels_dst = channels_dst.expect("channels_dst() must be called before building the pipeline");
 
         let unack_ticket_proc = HoprUnacknowledgedTicketProcessor::new(
             chain_api.clone(),
