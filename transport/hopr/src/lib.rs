@@ -140,7 +140,7 @@ pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
     #[strum(to_string = "HOPR packet pipeline ({0})")]
-    Pipeline(crate::protocol::PacketPipelineProcesses),
+    Pipeline(protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]

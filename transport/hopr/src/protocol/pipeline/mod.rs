@@ -23,6 +23,8 @@ use hopr_utils::{
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 
+use crate::PeerProtocolCounterRegistry;
+
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_input_concurrency`].
 const DEFAULT_ACK_INPUT_CONCURRENCY: usize = 10;
@@ -664,7 +666,7 @@ pub(super) fn run_packet_pipeline_inner<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>
     ticket_events: TEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
-    counters: super::counters::PeerProtocolCounterRegistry,
+    counters: PeerProtocolCounterRegistry,
 ) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
