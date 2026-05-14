@@ -98,7 +98,7 @@ pub struct StartEstablished<I> {
 ///      Note right of Exit: SessionID [Pseudonym, Tag]
 ///      Exit->>Entry: SessionEstablished (Challenge, SessionID)
 ///      Note left of Entry: SessionID [Pseudonym, Tag]
-///      Exit->>Entry: SsaRequest (SessionID, SsaIndex, ServerCommitment)
+///      Exit->>Entry: SsaRequest (SessionID, SsaIndex, ServerCommitments)
 ///      Entry->>Exit: SsaCommit (SessionID, SsaIndex, CoeffIndex, PolyCoeffs)
 ///      Entry->>Exit: KeepAlive (SessionID)
 ///      Exit->>Entry: KeepAlive (SessionID)
@@ -160,13 +160,13 @@ pub struct SsaClientCommitmentMessage<I, G> {
     pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
 }
 
-/// Sent by the Server to deliver the commitment to a single new Session Stealth Address (SSA).
+/// Sent by the Server to deliver the commitment to possibly multiple new Session Stealth Addresses (SSAs).
 ///
 /// This message is typically sent for the first time right after the [`StartEstablished`] message
 /// if PIX capabilities are indicated in the [`StartInitiation`] message, and the Server accepts it.
 ///
-/// It is then subsequently sent every time the Server needs the next SSA
-/// (with an index strictly greater than the last one) to be committed to.
+/// It is then subsequently sent every time the Server needs the next batch of SSAs
+/// (with indices strictly greater than in the last batch) to be committed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaServerCommitmentMessage<I, G> {
     /// Session ID.
@@ -175,10 +175,8 @@ pub struct SsaServerCommitmentMessage<I, G> {
     ///
     /// Upper half is the number of polynomials per SSA, lower half is the polynomial threshold (= degree + 1).
     pub params: u64,
-    /// Index of the Session Stealth Address (SSA) that is being committed by the Server.
-    pub ssa: hopr_protocol_pix::SsaIndex,
-    /// Server's serialized commitment to the SSA.
-    pub commitment: G,
+    /// Server's serialized commitments to the SSAs, ordered by the SSA index.
+    pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
 }
 
 /// Keep-alive message for a Session with the identifier `T`.
@@ -311,13 +309,28 @@ where
                 data.extend(session_id);
             }
             StartProtocol::SsaRequest(req) => {
-                let commitment_repr = req.commitment.as_ref();
-                debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
-
-                data.extend_from_slice(&req.ssa.to_be_bytes());
                 data.extend_from_slice(&req.params.to_be_bytes());
-                data.extend_from_slice(commitment_repr);
+
+                let num_commitments = req.commitments.len() as u16;
+                data.extend_from_slice(&num_commitments.to_be_bytes());
+
                 let session_id = serde_cbor_2::to_vec(&req.session_id)?;
+
+                let required_size = (size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<G>()) * req.commitments.len();
+
+                let avail_space = data.spare_capacity_mut().len() - session_id.len();
+                if req.commitments.is_empty() || required_size > avail_space {
+                    return Err(StartProtocolError::NumberOfCommitments);
+                }
+
+                for (ssa_index, commitment) in req.commitments {
+                    let commitment_repr = commitment.as_ref();
+                    debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
+
+                    data.extend_from_slice(&ssa_index.to_be_bytes());
+                    data.extend_from_slice(commitment_repr);
+                }
+
                 data.extend(session_id);
             }
         }
@@ -512,41 +525,53 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SsaRequest => {
-                    if data.len()
-                        <= data_offset
-                            + size_of::<u64>()
-                            + size_of::<hopr_protocol_pix::SsaIndex>()
-                            + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
-                    {
+                    if data.len() <= data_offset + size_of::<u64>() + size_of::<u16>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
-                    StartProtocol::SsaRequest(SsaServerCommitmentMessage {
-                        ssa: hopr_protocol_pix::SsaIndex::from_be_bytes(
-                            data[data_offset..data_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
-                                .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("ssa index".into()))?,
-                        ),
-                        params: u64::from_be_bytes(
-                            data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
-                                ..data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<u64>()]
-                                .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("params".into()))?,
-                        ),
-                        commitment: G::try_from(
-                            &data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<u64>()
-                                ..data_offset
-                                    + size_of::<hopr_protocol_pix::SsaIndex>()
-                                    + size_of::<u64>()
-                                    + Self::PIX_COEFF_COMMITMENT_REPR_SIZE],
-                        )
-                        .map_err(|_| StartProtocolError::ParseError("commitment".into()))?,
-                        session_id: serde_cbor_2::from_slice(
-                            &data[data_offset
+                    let params = u64::from_be_bytes(
+                        data[data_offset..data_offset + size_of::<u64>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("params".into()))?,
+                    );
+                    let mut next_offset = data_offset + size_of::<u64>();
+
+                    let num_commitments = u16::from_be_bytes(
+                        data[next_offset..next_offset + size_of::<u16>()]
+                            .try_into()
+                            .map_err(|_| StartProtocolError::ParseError("num_commitments".into()))?,
+                    );
+                    next_offset += size_of::<u16>();
+
+                    let mut commitments = std::collections::BTreeMap::new();
+                    while commitments.len() < num_commitments as usize {
+                        if data.len()
+                            <= next_offset
                                 + size_of::<hopr_protocol_pix::SsaIndex>()
-                                + size_of::<u64>()
-                                + Self::PIX_COEFF_COMMITMENT_REPR_SIZE..],
-                        )?,
+                                + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+                        {
+                            return Err(StartProtocolError::InvalidLength);
+                        }
+
+                        let ssa_index = hopr_protocol_pix::SsaIndex::from_be_bytes(
+                            data[next_offset..next_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
+                        );
+                        next_offset += size_of::<hopr_protocol_pix::SsaIndex>();
+
+                        let commitment =
+                            G::try_from(&data[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
+                                .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
+                        next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
+
+                        commitments.insert(ssa_index, commitment);
+                    }
+
+                    StartProtocol::SsaRequest(SsaServerCommitmentMessage {
+                        session_id: serde_cbor_2::from_slice(&data[next_offset..])?,
+                        params,
+                        commitments,
                     })
                 }
             },
@@ -587,7 +612,8 @@ where
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_protocol_app::prelude::Tag;
-    use hopr_protocol_pix::PolynomialIndex;
+    use hopr_protocol_pix::{PolynomialIndex, SsaIndex};
+
     use super::*;
 
     #[test]
@@ -663,11 +689,15 @@ mod tests {
 
     #[test]
     fn start_protocol_session_ssa_request_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let mut commitments = std::collections::BTreeMap::new();
+        for i in 0..10 {
+            commitments.insert(i as SsaIndex, [0u8; 33]);
+        }
+
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef_cafebabe,
-            ssa: hopr_protocol_pix::SsaIndex::MAX,
-            commitment: [0u8; 33],
+            commitments,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -676,6 +706,27 @@ mod tests {
 
         let msg_2 = StartProtocol::<u32, String, u8, [u8; 33]>::decode(tag, &msg)?;
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_session_ssa_request_message_should_fail_on_too_many_commitments() -> anyhow::Result<()> {
+        let mut commitments = std::collections::BTreeMap::new();
+        // A single commitment is 4 + 33 = 37 bytes.
+        // Payload size is 432 bytes.
+        // Header + params + num_commitments + session_id will take some space.
+        // Let's add many commitments to exceed the limit.
+        for i in 0..100 {
+            commitments.insert(i as SsaIndex, [0u8; 33]);
+        }
+
+        let msg = StartProtocol::<u32, (), u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0xfeedbeef_cafebabe,
+            commitments,
+        });
+
+        assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
         Ok(())
     }
 
@@ -777,11 +828,15 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
+        let mut commitments = std::collections::BTreeMap::new();
+        for i in 0..26 {
+            commitments.insert(i as SsaIndex, [0u8; 33]);
+        }
+
         let msg = StartProtocol::<String, String, u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             params: 0xfeedbeef_cafebabe,
-            ssa: hopr_protocol_pix::SsaIndex::MAX,
-            commitment: [0u8; 33],
+            commitments,
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -791,11 +846,9 @@ mod tests {
 
         let msg = StartProtocol::<String, String, u8, [u8; 33]>::SsaCommit(SsaClientCommitmentMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            ssa: hopr_protocol_pix::SsaIndex::MAX,
+            ssa: SsaIndex::MAX,
             coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
-            coefficient_commitments: (0..25)
-                .map(|i| (i as hopr_protocol_pix::PolynomialIndex, [0u8; 33]))
-                .collect(),
+            coefficient_commitments: (0..25).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
