@@ -2,8 +2,7 @@ mod events;
 mod utils;
 
 pub use events::ReconstructorEvent;
-use hopr_types::{crypto::prelude::HalfKeyChallenge};
-use hopr_types::crypto::prelude::HalfKey;
+use hopr_types::crypto::prelude::{HalfKey, HalfKeyChallenge};
 use utils::{AwaitingPartialShare, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 
 use crate::{
@@ -269,7 +268,7 @@ mod tests {
     use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
 
     use super::*;
-    use crate::{PartialSsaShare, tests::TestSpec, SsaShareGenerator, SsaGeneratorConfig, transpose_commitments};
+    use crate::{PartialSsaShare, SsaGeneratorConfig, SsaShareGenerator, tests::TestSpec, transpose_commitments};
 
     #[test]
     fn reconstructor_invalid_commitment_inputs() {
@@ -352,12 +351,20 @@ mod tests {
 
         let ack_key = HalfKey::random();
         let challenge = ack_key.to_challenge()?;
-        
-        assert!(reconstructor.add_pending_share(challenge, &SimplePseudonym::random(), b"msg", EncryptedPartialSsaShare::default()).is_err());
-        
+
+        assert!(
+            reconstructor
+                .add_pending_share(
+                    challenge,
+                    &SimplePseudonym::random(),
+                    b"msg",
+                    EncryptedPartialSsaShare::default()
+                )
+                .is_err()
+        );
+
         Ok(())
     }
-
 
     #[test]
     fn reconstructor_invalid_acknowledgement() -> anyhow::Result<()> {
@@ -366,7 +373,11 @@ mod tests {
         let ack_key = HalfKey::random();
 
         // This should return None for unknown challenge
-        assert!(reconstructor.new_acknowledgement(&ack_key, &ack_key.to_challenge()?)?.is_none());
+        assert!(
+            reconstructor
+                .new_acknowledgement(&ack_key, &ack_key.to_challenge()?)?
+                .is_none()
+        );
 
         Ok(())
     }
@@ -402,12 +413,18 @@ mod tests {
         let challenge = ack.to_challenge()?;
         let msg = b"some message";
 
-        let share = generator.next_share(&pseudonym, msg)?.ok_or(anyhow::anyhow!("failed to generate share"))?;
+        let share = generator
+            .next_share(&pseudonym, msg)?
+            .ok_or(anyhow::anyhow!("failed to generate share"))?;
         let share = share.1.encrypt(&share.0, &ack)?;
 
         reconstructor.add_pending_share(challenge, &pseudonym, msg, share)?;
 
-        assert!(reconstructor.new_acknowledgement(&HalfKey::random(), &challenge).is_err());
+        assert!(
+            reconstructor
+                .new_acknowledgement(&HalfKey::random(), &challenge)
+                .is_err()
+        );
 
         Ok(())
     }

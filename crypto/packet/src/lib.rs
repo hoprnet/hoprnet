@@ -38,7 +38,7 @@ pub mod prelude {
     pub use super::*;
     pub use crate::{
         packet::{
-            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket, AcknowledgeableEncryptedPartialSsaShare,
         },
         types::{PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
@@ -102,6 +102,17 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
 
 /// HOPR-specific encrypted partial SSA share type from the PIX protocol.
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
+
+/// HOPR-specific PIX scalar type.
+///
+/// This is the normalized form of `hopr_protocol_pix::PixScalar<HoprPixSpec>`
+/// (i.e. `<<HoprPixSpec as PixSpec>::Curve as CurveArithmetic>::Scalar`),
+/// re-exported here so downstream crates can name it without depending on
+/// `k256` directly.
+///
+/// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
+/// itself as another generic argument.
+pub type HoprPixScalar = k256::Scalar;
 
 #[cfg(test)]
 mod tests {

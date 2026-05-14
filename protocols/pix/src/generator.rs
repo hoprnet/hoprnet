@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
+#[cfg(feature = "rayon")]
+use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{
@@ -8,10 +10,11 @@ use vsss_rs::{
     },
 };
 
-#[cfg(feature = "rayon")]
-use hopr_utils::parallelize::cpu::rayon::prelude::*;
-
-use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, errors, msg_to_scalar, types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId}, CoefficientIndex, PixGroupRepr};
+use crate::{
+    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
+    PixScalar, PixSpec, PolynomialIndex, errors, msg_to_scalar,
+    types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
+};
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
@@ -259,7 +262,9 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
 
 /// Transposes the commitments returned by the [`SsaShareGenerator::new_ssa_commitment`] to a representation
 /// where verifiers are represented by coefficient index first.
-pub fn transpose_commitments<S: PixSpec>(commitments: Vec<PartialSsaShareVerifier<S>>) -> HashMap<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<S>>> {
+pub fn transpose_commitments<S: PixSpec>(
+    commitments: Vec<PartialSsaShareVerifier<S>>,
+) -> HashMap<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<S>>> {
     let mut transposed = HashMap::<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<S>>>::new();
     commitments
         .into_iter()

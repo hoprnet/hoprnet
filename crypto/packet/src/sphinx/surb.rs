@@ -232,16 +232,14 @@ where
 #[cfg(test)]
 mod tests {
     use hopr_types::crypto_random::Randomizable;
+
     use super::{super::tests::*, *};
-
-    #[cfg(feature = "x25519")]
-    use crate::sphinx::ec_groups::X25519Suite as CurrentSuite;
-
     #[cfg(feature = "ed25519")]
     use crate::sphinx::ec_groups::Ed25519Suite as CurrentSuite;
-
     #[cfg(feature = "secp256k1")]
     use crate::sphinx::ec_groups::Secp256k1Suite as CurrentSuite;
+    #[cfg(feature = "x25519")]
+    use crate::sphinx::ec_groups::X25519Suite as CurrentSuite;
 
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;

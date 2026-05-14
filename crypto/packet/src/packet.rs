@@ -8,7 +8,6 @@ use hopr_types::{
     },
     primitive::prelude::*,
 };
-
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
 
@@ -44,6 +43,7 @@ pub struct PartialHoprPacket {
     ticket: Ticket,
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
+    encrypted_pix_share: Option<AcknowledgeableEncryptedPartialSsaShare>
 }
 
 /// Shared key data for a path.
@@ -114,7 +114,6 @@ impl PartialHoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
-        pix_share_rcn: &hopr_protocol_pix::SsaReconstructor<HoprPixSpec>,
         domain_separator: &Hash,
     ) -> Result<Self> {
         match routing {
@@ -173,6 +172,7 @@ impl PartialHoprPacket {
                     ticket,
                     next_hop: forward_path[0],
                     ack_challenge: por_values.acknowledgement_challenge(),
+                    encrypted_pix_share: None,
                 })
             }
             PacketRouting::Surb(id, surb) => {
@@ -185,16 +185,7 @@ impl PartialHoprPacket {
                     .leak();
 
                 // Extract the encrypted partial SSA share from the SURB
-                // and add it to the PIX share reconstructor if not empty.
-                let enc_partial_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
-                if !enc_partial_share.is_empty() {
-                    pix_share_rcn.add_pending_share(
-                        surb_por_values.acknowledgement_challenge(),
-                        &id.pseudonym(),
-                        &surb.sender_key,
-                        enc_partial_share,
-                    )?;
-                }
+                let encrypted_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
 
                 Ok(Self {
                     ticket,
@@ -204,10 +195,13 @@ impl PartialHoprPacket {
                             surb.first_relayer.to_hex()
                         ))
                     })?,
-                    ack_challenge: surb
-                        .additional_data_receiver
-                        .proof_of_relay_values()
-                        .acknowledgement_challenge(),
+                    ack_challenge: surb_por_values.acknowledgement_challenge(),
+                    encrypted_pix_share: (!encrypted_share.is_empty())
+                        .then(|| AcknowledgeableEncryptedPartialSsaShare {
+                            pseudonym: id.pseudonym(),
+                            surb_nonce: Hash::create(&[&surb.sender_key.as_ref()]),
+                            encrypted_share,
+                        }),
                     partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         MetaPacketRouting::Surb(surb, &id),
                         mapper,
@@ -247,6 +241,7 @@ impl PartialHoprPacket {
                     ack_challenge: por_values.acknowledgement_challenge(),
                     surbs: vec![],
                     openers: vec![],
+                    encrypted_pix_share: None,
                 })
             }
         }
@@ -273,6 +268,7 @@ impl PartialHoprPacket {
                     ticket: self.ticket,
                     next_hop: self.next_hop,
                     ack_challenge: self.ack_challenge,
+                    encrypted_pix_share: self.encrypted_pix_share,
                 }
                 .into(),
             ),
@@ -317,6 +313,17 @@ impl std::fmt::Debug for HoprIncomingPacket {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct AcknowledgeableEncryptedPartialSsaShare {
+    /// Pseudonym of the sender (receiver of the return path packet)
+    pub pseudonym: HoprPseudonym,
+    /// Nonce computed from the SURB that was associated with the encrypted partial SSA share.
+    pub surb_nonce: Hash,
+    /// Encrypted partial SSA share.
+    pub encrypted_share: HoprEncryptedPartialSsaShare,
+}
+
 /// Represents a packet destined for another node.
 #[derive(Clone)]
 pub struct HoprOutgoingPacket {
@@ -328,6 +335,10 @@ pub struct HoprOutgoingPacket {
     pub next_hop: OffchainPublicKey,
     /// Acknowledgement challenge solved once the next hop sends us an acknowledgement.
     pub ack_challenge: HalfKeyChallenge,
+    /// PIX protocol encrypted partial SSA share to be decrypted once the next hop sends back an acknowledgement.
+    ///
+    /// This is populated only if this is a return path packet and the associated SURB contained an encrypted partial SSA share.
+    pub encrypted_pix_share: Option<AcknowledgeableEncryptedPartialSsaShare>,
 }
 
 impl std::fmt::Debug for HoprOutgoingPacket {
@@ -336,6 +347,7 @@ impl std::fmt::Debug for HoprOutgoingPacket {
             .field("ticket", &self.ticket)
             .field("next_hop", &self.next_hop)
             .field("ack_challenge", &self.ack_challenge)
+            .field("encrypted_pix_share", &self.encrypted_pix_share)
             .finish_non_exhaustive()
     }
 }
@@ -461,10 +473,10 @@ fn create_surb_for_path<
 
     // Existence of the first-relayer challenge solution indicates this is not a 0-hop return path.
     if let Some(first_solution) = first_relayer_solution
-        && let Some(enc_share) =
-            pix_share_gen.next_share(&recv_data.pseudonym(), &ro.sender_key)?
-                .map(|(id, share)| share.encrypt(&id, &first_solution))
-                .transpose()?
+        && let Some(enc_share) = pix_share_gen
+            .next_share(&recv_data.pseudonym(), &ro.sender_key)?
+            .map(|(id, share)| share.encrypt(&id, &first_solution))
+            .transpose()?
     {
         // Replace the empty encrypted share with the generated one, encrypted using the first relayer ticket challenge
         // solution.
@@ -514,7 +526,6 @@ impl HoprPacket {
         mapper: &M,
         domain_separator: &Hash,
         pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
-        pix_share_rcn: &hopr_protocol_pix::SsaReconstructor<HoprPixSpec>,
         signals: S,
     ) -> Result<(Self, Vec<HoprReplyOpener>)> {
         PartialHoprPacket::new(
@@ -524,7 +535,6 @@ impl HoprPacket {
             ticket,
             mapper,
             pix_share_gen,
-            pix_share_rcn,
             domain_separator,
         )?
         .into_hopr_packet(msg, signals)
@@ -583,6 +593,7 @@ impl HoprPacket {
                                 ticket,
                                 next_hop: next_node,
                                 ack_challenge: verification_output.ack_challenge,
+                                encrypted_pix_share: None,
                             },
                             packet_tag,
                             ack_key,
@@ -633,7 +644,7 @@ mod tests {
     use anyhow::{Context, bail};
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+    use hopr_protocol_pix::SsaGeneratorConfig;
     use hopr_types::crypto_random::Randomizable;
     use parameterized::parameterized;
 
@@ -738,7 +749,6 @@ mod tests {
             .collect::<std::result::Result<Vec<_>, hopr_types::internal::errors::PathError>>()?;
 
         let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
-        let ssa_rcn = hopr_protocol_pix::SsaReconstructor::new(SsaReconstructorConfig::default());
 
         Ok(HoprPacket::into_outgoing(
             msg,
@@ -752,7 +762,6 @@ mod tests {
             &*MAPPER,
             &Hash::default(),
             &ssa_gen,
-            &ssa_rcn,
             FLAGS,
         )?)
     }
@@ -772,7 +781,6 @@ mod tests {
         )?;
 
         let ssa_gen = hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default());
-        let ssa_rcn = hopr_protocol_pix::SsaReconstructor::new(SsaReconstructorConfig::default());
 
         Ok(HoprPacket::into_outgoing(
             msg,
@@ -783,7 +791,6 @@ mod tests {
             &*MAPPER,
             &Hash::default(),
             &ssa_gen,
-            &ssa_rcn,
             FLAGS,
         )?
         .0)

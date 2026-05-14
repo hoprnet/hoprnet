@@ -10,6 +10,7 @@ use hopr_api::{
 use hopr_crypto_packet::HoprSurb;
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_utils::runtime::AbortableList;
 
 use crate::{
@@ -344,12 +345,16 @@ where
             cfg.ack_processor,
         );
 
+        // TODO: needs to be passed by the caller
+        let ssa_gen = std::sync::Arc::new(SsaShareGenerator::new(SsaGeneratorConfig::default()));
+
         let encoder = HoprEncoder::new(
             chain_key.clone(),
             chain_api.clone(),
             surb_store.clone(),
             ticket_factory.clone(),
             channels_dst,
+            ssa_gen,
             cfg.codec,
         );
 

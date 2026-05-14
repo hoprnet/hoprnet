@@ -4,10 +4,8 @@ use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
-
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
-
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
@@ -26,12 +24,14 @@ pub mod errors;
 mod generator;
 mod reconstructor;
 mod types;
+mod traits;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
 pub use reconstructor::{ReconstructorEvent, SsaReconstructor, SsaReconstructorConfig};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
 };
+pub use traits::ExitAcknowledgementShareProcessor;
 
 /// Number of polynomials per SSA.
 pub const DEFAULT_POLYS_PER_SSA: usize = 1000;
@@ -41,7 +41,7 @@ pub const DEFAULT_POLY_THRESHOLD: usize = 100;
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec
 where
-    PixScalar<Self>: PrimeField + FromOkm,
+    PixScalar<Self>: PrimeField + FromOkm + Send,
     PixGroup<Self>: Group<Scalar = PixScalar<Self>> + GroupEncoding + Default + CofactorGroup,
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,

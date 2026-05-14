@@ -6,7 +6,7 @@ use tracing::instrument;
 use crate::{
     HoprEncryptedPartialSsaShare,
     errors::{PacketError, Result},
-    sphinx::prelude::SharedSecret
+    sphinx::prelude::SharedSecret,
 };
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";

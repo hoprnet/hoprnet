@@ -28,6 +28,7 @@ serde = [
   "elliptic-curve/serde",
   "curve25519-dalek/serde",
   "k256/serde",
+  "hopr-protocol-pix/serde",
   "hopr-types/serde",
 ]
 allocator-mimalloc = [

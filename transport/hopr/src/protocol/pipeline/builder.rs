@@ -11,9 +11,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_utils::runtime::AbortableList;
 
-use super::{
-    NodeType, NoopTicketProcessor, PacketPipelineProcesses, config::PacketPipelineConfig, run_packet_pipeline_inner,
-};
+use super::{NodeType, NoopTicketProcessor, PacketPipelineProcesses, config::PacketPipelineConfig, run_packet_pipeline_inner, NopExitAcknowledgementShareProcessor};
 use crate::PeerProtocolCounterRegistry;
 
 /// Placeholder type used by [`PacketPipelineBuilder`] for generic parameters that have
@@ -217,7 +215,9 @@ where
             self.wire_msg,
             self.codec,
             ticket_proc,
+            NopExitAcknowledgementShareProcessor, // TODO: must be given
             ticket_events,
+            futures::sink::drain(), // TODO: must be given
             self.cfg,
             self.api,
             self.counters,
@@ -244,12 +244,14 @@ where
     /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
     #[must_use]
     pub fn build_for_entry(self) -> AbortableList<PacketPipelineProcesses> {
-        run_packet_pipeline_inner::<_, _, _, _, NoopTicketProcessor, futures::sink::Drain<TicketEvent>, _, _>(
+        run_packet_pipeline_inner(
             NodeType::Entry,
             self.packet_key,
             self.wire_msg,
             self.codec,
             NoopTicketProcessor,
+            NopExitAcknowledgementShareProcessor,
+            futures::sink::drain(),
             futures::sink::drain(),
             self.cfg,
             self.api,
@@ -266,13 +268,15 @@ where
     /// [`PacketPipelineBuilder::with_ticket_processing`] is ignored.
     #[must_use]
     pub fn build_for_exit(self) -> AbortableList<PacketPipelineProcesses> {
-        run_packet_pipeline_inner::<_, _, _, _, NoopTicketProcessor, futures::sink::Drain<TicketEvent>, _, _>(
+        run_packet_pipeline_inner(
             NodeType::Exit,
             self.packet_key,
             self.wire_msg,
             self.codec,
             NoopTicketProcessor,
+            NopExitAcknowledgementShareProcessor, // TODO: must be given
             futures::sink::drain(),
+            futures::sink::drain(), // TODO: must be given
             self.cfg,
             self.api,
             self.counters,

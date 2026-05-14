@@ -3936,6 +3936,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
+ "hopr-protocol-pix",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-ticket-manager",

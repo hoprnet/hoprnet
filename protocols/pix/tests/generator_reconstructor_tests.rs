@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use futures::{StreamExt, pin_mut};
 use futures_time::future::FutureExt;
-use hopr_protocol_pix::{transpose_commitments, CoefficientIndex, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, ReconstructorEvent, SsaGeneratorConfig, SsaId, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+use hopr_protocol_pix::{
+    CoefficientIndex, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, ReconstructorEvent, SsaGeneratorConfig, SsaId,
+    SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, transpose_commitments,
+};
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
     crypto_random::Randomizable,
