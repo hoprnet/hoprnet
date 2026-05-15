@@ -7,7 +7,7 @@ use validator::Validate;
 
 /// Population thresholds: how many open channels to maintain.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PopulationConfig {
     /// Minimum number of open outgoing channels.  Closures are suppressed
     /// when the open count would drop below this.  Default: 5.
@@ -33,7 +33,7 @@ fn default_peer_reopen_cooldown() -> Duration {
 
 /// Peer eligibility filters for channel opening and for determining staleness.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct EligibilityConfig {
     /// Only open channels to peers that are currently connected.  Default: true.
     #[default = true]
@@ -73,7 +73,7 @@ pub struct EligibilityConfig {
 
 /// Initial and top-up balances for channel funding.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct FundingConfig {
     /// Balance when opening a new channel.  Default: 1 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
@@ -108,7 +108,7 @@ pub struct FundingConfig {
 /// during the time a funding transaction takes to confirm, and pre-funds if
 /// the projected balance after confirmation would fall below the threshold.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ProactiveFundingConfig {
     /// Enable proactive funding.  Default: true.
     #[default = true]
@@ -152,7 +152,7 @@ fn default_depletion_lookback() -> Duration {
 
 /// Thresholds that trigger channel closure.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ClosureConfig {
     /// Close a channel after the peer has been absent for this long.  Default: 24 h.
     #[serde(default = "default_close_when_peer_unseen_for", with = "humantime_serde")]
@@ -183,7 +183,7 @@ fn default_close_when_peer_unseen_for() -> Duration {
 /// Controls the finalizer phase (second `close_channel` call for `PendingToClose`
 /// channels once the notice period has elapsed).
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct FinalizerConfig {
     /// Enable the finalizer phase.  When `false`, `PendingToClose` channels
     /// are left to be finalized externally.  Default: true.
@@ -210,7 +210,7 @@ fn default_max_closure_overdue() -> Duration {
 /// Guards against mass-closing channels on restart (the graph is rebuilt from
 /// scratch and peers appear unseen until heartbeats arrive).
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct RestartGuardConfig {
     /// The close pass is suppressed entirely for this long after startup.
     /// Should exceed network bootstrap time + first heartbeat round.
@@ -227,7 +227,7 @@ fn default_startup_close_grace_period() -> Duration {
 
 /// Concurrency knobs for the per-channel evaluation loops.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ConcurrencyConfig {
     /// Maximum simultaneous in-flight chain-write operations (open + fund +
     /// close + finalize combined).  Additional operations are deferred to the
@@ -241,7 +241,7 @@ pub struct ConcurrencyConfig {
 /// All fields have sensible defaults; consumers only need to set the fields
 /// they want to override.
 #[serde_as]
-#[derive(Debug, Clone, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ChannelLifecycleConfig {
     /// Base period between full evaluation passes.  Default: 60 s.
     #[serde(default = "default_tick_interval", with = "humantime_serde")]
