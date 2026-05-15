@@ -16,13 +16,17 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprPixScalar, HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_protocol_pix::{
+    CoefficientIndex, CommitmentInsertionResult, ExitAcknowledgementShareProcessor, PixGroupRepr, PixScalar, PixSpec,
+    PolynomialIndex, TaggedEncryptedPartialSsaShare,
+};
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
 };
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-use hopr_protocol_pix::{EncryptedPartialSsaShare, ExitAcknowledgementShareProcessor, PixScalar, PixSpec};
+
 use crate::PeerProtocolCounterRegistry;
 
 /// Default concurrency for the incoming acknowledgement processing pipeline when not overridden
@@ -80,13 +84,13 @@ pub enum PacketPipelineProcesses {
 async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
-    exit_ack_proc: Option<std::sync::Arc<A>>,
+    exit_ack_proc: Option<A>,
     wire_outgoing: WOut,
     counters: PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
-    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
     E: PacketEncoder + Send + Sync + 'static,
     WOut: futures::Sink<(PeerId, Bytes), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
@@ -121,14 +125,13 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                             // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
                             // and the packet contains an encrypted partial SSA share (it is therefore an RP packet),
                             // add it to the exit acknowledgement processor.
-                            if let Some(exit_ack_proc) = exit_ack_proc.as_ref() &&
-                                let Some(encrypted_pix_share) = packet.encrypted_pix_share {
+                            if let Some(exit_ack_proc) = exit_ack_proc.as_ref()
+                                && let Some(encrypted_pix_share) = packet.encrypted_pix_share
+                            {
                                 if let Err(error) = exit_ack_proc.insert_encrypted_share(
-                                    packet.next_hop,
+                                    &packet.next_hop,
                                     packet.ack_challenge,
-                                    &encrypted_pix_share.pseudonym,
-                                    &encrypted_pix_share.surb_nonce,
-                                    encrypted_pix_share.encrypted_share
+                                    encrypted_pix_share,
                                 ) {
                                     tracing::error!(
                                         next_hop = packet.next_hop.to_peerid_str(),
@@ -545,15 +548,11 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 ///
 /// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
 /// development), but since they never receive tickets, they have nothing to acknowledge.
-async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
-    ack_incoming: AckIn,
-    exit_proc: std::sync::Arc<A>,
-    ssa_event: SEvt,
-)
+async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, ssa_event: SEvt)
 where
     S: PixSpec + Send + Sync + 'static,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
-    A: ExitAcknowledgementShareProcessor<S> + Send + Sync + 'static,
+    A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
     SEvt: futures::Sink<PixScalar<S>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     PixScalar<S>: Send,
@@ -567,10 +566,14 @@ where
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || exit_proc.acknowledge_shares(peer, acks),
                     "exit_ack_decode",
-                ).await
+                )
+                .await
                 {
                     Ok(Ok(ssa_priv_keys)) => {
-                        if let Err(error) = ssa_event.send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok))).await {
+                        if let Err(error) = ssa_event
+                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                            .await
+                        {
                             tracing::error!(%peer, %error, "failed to send pix resolution");
                         }
                     }
@@ -713,12 +716,30 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     type Error = std::convert::Infallible;
 
     #[inline]
-    fn insert_encrypted_share(&self, _: OffchainPublicKey, _: HalfKeyChallenge, _: &HoprPseudonym, _: &impl AsRef<[u8]>, _: EncryptedPartialSsaShare<HoprPixSpec>) -> Result<(), Self::Error> {
+    fn insert_coefficient_commitments(
+        &self,
+        _: CoefficientIndex,
+        _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
+    ) -> Result<hopr_protocol_pix::CommitmentInsertionResult<HoprPixSpec>, Self::Error> {
+        Ok(CommitmentInsertionResult::NoAction)
+    }
+
+    #[inline]
+    fn insert_encrypted_share<T: Into<PixScalar<HoprPixSpec>>>(
+        &self,
+        _: &OffchainPublicKey,
+        _: HalfKeyChallenge,
+        _: TaggedEncryptedPartialSsaShare<HoprPixSpec, T>,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 
     #[inline]
-    fn acknowledge_shares(&self, _: OffchainPublicKey, _: Vec<Acknowledgement>) -> Result<Vec<PixScalar<HoprPixSpec>>, Self::Error> {
+    fn acknowledge_shares(
+        &self,
+        _: OffchainPublicKey,
+        _: Vec<Acknowledgement>,
+    ) -> Result<Vec<PixScalar<HoprPixSpec>>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
 }
@@ -874,11 +895,9 @@ where
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_exit_incoming_ack_pipeline::<HoprPixSpec, _, _, _>(
-                    incoming_ack_rx,
-                    exit_ack_proc,
-                    ssa_events,
-                ).in_current_span()),
+                hopr_utils::spawn_as_abortable!(
+                    start_exit_incoming_ack_pipeline(incoming_ack_rx, exit_ack_proc, ssa_events,).in_current_span()
+                ),
             );
         }
         NodeType::Entry => {

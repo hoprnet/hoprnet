@@ -105,7 +105,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
 
     /// Adds the commitment data that the client feeds to the reconstructor.
     ///
-    /// Each "data packet" should contain an `id` of the corresponding SSA, `coeff_index` is
+    /// Each "data packet" should contain an `id` of the corresponding SSA. The `coeff_index` is
     /// the polynomial coefficient index that is common to all the polynomial coefficient commitments included in
     /// `polynomial_coeff_commitments`. In other words, the `polynomial_coeff_commitments` contains commitments to
     /// the same polynomial coefficients across multiple polynomials.

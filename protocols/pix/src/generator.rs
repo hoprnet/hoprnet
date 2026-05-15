@@ -12,7 +12,7 @@ use vsss_rs::{
 
 use crate::{
     CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, errors, msg_to_scalar,
+    PixScalar, PixSpec, PolynomialIndex, errors,
     types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
 };
 
@@ -132,7 +132,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                 if let Some(poly) = polys.front_mut()
                     && poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares
                 {
-                    let x = msg_to_scalar::<S>(&poly.spi, msg)?;
+                    let x = S::msg_to_scalar(&poly.spi, msg)?;
                     // Zero would disclose the secret, so we disallow it.
                     // The chance is practically impossible.
                     if x.is_zero().into() {
@@ -286,7 +286,7 @@ mod tests {
     use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
 
     use super::*;
-    use crate::{msg_to_scalar, tests::TestSpec};
+    use crate::tests::TestSpec;
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
@@ -420,7 +420,7 @@ mod tests {
                     .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
-                    identifier: msg_to_scalar::<TestSpec>(&spi, x)?.into(),
+                    identifier: TestSpec::msg_to_scalar(&spi, x)?.into(),
                     value: k256::Scalar::from_repr(share.0).unwrap().into(),
                 };
 

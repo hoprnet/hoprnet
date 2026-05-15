@@ -11,7 +11,10 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_utils::runtime::AbortableList;
 
-use super::{NodeType, NoopTicketProcessor, PacketPipelineProcesses, config::PacketPipelineConfig, run_packet_pipeline_inner, NopExitAcknowledgementShareProcessor};
+use super::{
+    NodeType, NoopTicketProcessor, NopExitAcknowledgementShareProcessor, PacketPipelineProcesses,
+    config::PacketPipelineConfig, run_packet_pipeline_inner,
+};
 use crate::PeerProtocolCounterRegistry;
 
 /// Placeholder type used by [`PacketPipelineBuilder`] for generic parameters that have

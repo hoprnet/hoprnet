@@ -74,11 +74,20 @@ pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
 ///
 /// This share can be [decrypted](EncryptedPartialSsaShare::decrypt) to [`PartialSsaShare`]
 /// to be verified and used for reconstruction.
-#[derive(Debug)]
 pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, EncShareSize<S>>)
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>;
+
+impl<S: PixSpec> std::fmt::Debug for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("EncryptedPartialSsaShare").field(&self.0).finish()
+    }
+}
 
 impl<S: PixSpec> EncryptedPartialSsaShare<S>
 where
@@ -114,6 +123,7 @@ impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>,
+    GenericArray<u8, EncShareSize<S>>: Clone,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -124,7 +134,7 @@ impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>,
-    <EncShareSize<S> as ArrayLength<u8>>::ArrayType: Copy,
+    GenericArray<u8, EncShareSize<S>>: Copy,
 {
 }
 
@@ -257,6 +267,234 @@ where
         }
 
         deserializer.deserialize_bytes(EncryptedPartialSsaShareVisitor::<S>(std::marker::PhantomData))
+    }
+}
+
+/// This is a wrapped [`EncryptedPartialSsaShare`] extracted from a specific SURB (presumably along with the associated
+/// `AcknowledgementChallenge`).
+pub struct TaggedEncryptedPartialSsaShare<S: PixSpec, T = PixScalar<S>> {
+    /// Pseudonym of the sender that created the encrypted partial SSA share.
+    pub pseudonym: S::Pseudonym,
+    /// Nonce used to generate the encrypted partial SSA share.
+    ///
+    /// This must typically be convertible to [`PixScalar`] of `S`.
+    pub nonce: T,
+    /// Encrypted partial SSA share.
+    pub partial_share: EncryptedPartialSsaShare<S>,
+}
+
+impl<S: PixSpec> TaggedEncryptedPartialSsaShare<S, PixScalar<S>> {
+    pub fn new(
+        pseudonym: S::Pseudonym,
+        nonce: &impl AsRef<[u8]>,
+        partial_share: EncryptedPartialSsaShare<S>,
+    ) -> errors::Result<Self> {
+        Ok(Self {
+            pseudonym,
+            nonce: S::msg_to_scalar(
+                &SsaPolynomialId::new(
+                    SsaId::new(pseudonym, partial_share.ssa_index()),
+                    partial_share.poly_index(),
+                ),
+                nonce.as_ref(),
+            )?,
+            partial_share,
+        })
+    }
+}
+
+impl<S: PixSpec, T> TaggedEncryptedPartialSsaShare<S, T> {
+    #[inline]
+    pub fn ssa_id(&self) -> SsaId<S> {
+        SsaId::new(self.pseudonym, self.partial_share.ssa_index())
+    }
+
+    #[inline]
+    pub fn ssa_polynomial_id(&self) -> SsaPolynomialId<S> {
+        SsaPolynomialId::new(self.ssa_id(), self.partial_share.poly_index())
+    }
+}
+
+impl<S: PixSpec, T: Clone> Clone for TaggedEncryptedPartialSsaShare<S, T>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pseudonym: self.pseudonym,
+            nonce: self.nonce.clone(),
+            partial_share: self.partial_share.clone(),
+        }
+    }
+}
+
+impl<S: PixSpec, T: Copy> Copy for TaggedEncryptedPartialSsaShare<S, T>
+where
+    S::Pseudonym: Copy,
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+    GenericArray<u8, EncShareSize<S>>: Copy,
+{
+}
+
+impl<S: PixSpec, T: std::fmt::Debug> std::fmt::Debug for TaggedEncryptedPartialSsaShare<S, T>
+where
+    S::Pseudonym: std::fmt::Debug,
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TaggedEncryptedPartialSsaShare")
+            .field("pseudonym", &self.pseudonym)
+            .field("nonce", &self.nonce)
+            .field("partial_share", &self.partial_share)
+            .finish()
+    }
+}
+
+impl<S: PixSpec, T: PartialEq> PartialEq for TaggedEncryptedPartialSsaShare<S, T>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.pseudonym == other.pseudonym && self.nonce == other.nonce && self.partial_share == other.partial_share
+    }
+}
+
+impl<S: PixSpec, T: Eq> Eq for TaggedEncryptedPartialSsaShare<S, T>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+}
+
+#[cfg(feature = "serde")]
+impl<S: PixSpec, T: serde::Serialize> serde::Serialize for TaggedEncryptedPartialSsaShare<S, T>
+where
+    S::Pseudonym: serde::Serialize,
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
+    where
+        Ser: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("TaggedEncryptedPartialSsaShare", 3)?;
+        state.serialize_field("pseudonym", &self.pseudonym)?;
+        state.serialize_field("nonce", &self.nonce)?;
+        state.serialize_field("partial_share", &self.partial_share)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, S: PixSpec, T: serde::Deserialize<'de>> serde::Deserialize<'de> for TaggedEncryptedPartialSsaShare<S, T>
+where
+    S::Pseudonym: serde::Deserialize<'de>,
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Pseudonym,
+            Nonce,
+            #[serde(rename = "partial_share")]
+            PartialShare,
+        }
+
+        struct TaggedEncryptedPartialSsaShareVisitor<S: PixSpec, T> {
+            _marker: std::marker::PhantomData<(S, T)>,
+        }
+
+        impl<'de, S: PixSpec, T: serde::Deserialize<'de>> serde::de::Visitor<'de>
+            for TaggedEncryptedPartialSsaShareVisitor<S, T>
+        where
+            S::Pseudonym: serde::Deserialize<'de>,
+            FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+            EncShareSize<S>: ArrayLength<u8>,
+        {
+            type Value = TaggedEncryptedPartialSsaShare<S, T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct TaggedEncryptedPartialSsaShare")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            where
+                V: serde::de::SeqAccess<'de>,
+            {
+                let pseudonym = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let nonce = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                let partial_share = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
+                Ok(TaggedEncryptedPartialSsaShare {
+                    pseudonym,
+                    nonce,
+                    partial_share,
+                })
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut pseudonym = None;
+                let mut nonce = None;
+                let mut partial_share = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Pseudonym => {
+                            if pseudonym.is_some() {
+                                return Err(serde::de::Error::duplicate_field("pseudonym"));
+                            }
+                            pseudonym = Some(map.next_value()?);
+                        }
+                        Field::Nonce => {
+                            if nonce.is_some() {
+                                return Err(serde::de::Error::duplicate_field("nonce"));
+                            }
+                            nonce = Some(map.next_value()?);
+                        }
+                        Field::PartialShare => {
+                            if partial_share.is_some() {
+                                return Err(serde::de::Error::duplicate_field("partial_share"));
+                            }
+                            partial_share = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let pseudonym = pseudonym.ok_or_else(|| serde::de::Error::missing_field("pseudonym"))?;
+                let nonce = nonce.ok_or_else(|| serde::de::Error::missing_field("nonce"))?;
+                let partial_share = partial_share.ok_or_else(|| serde::de::Error::missing_field("partial_share"))?;
+                Ok(TaggedEncryptedPartialSsaShare {
+                    pseudonym,
+                    nonce,
+                    partial_share,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["pseudonym", "nonce", "partial_share"];
+        deserializer.deserialize_struct(
+            "TaggedEncryptedPartialSsaShare",
+            FIELDS,
+            TaggedEncryptedPartialSsaShareVisitor {
+                _marker: std::marker::PhantomData,
+            },
+        )
     }
 }
 
@@ -513,6 +751,47 @@ mod tests {
 
     use super::*;
     use crate::tests::TestSpec;
+
+    #[test]
+    fn test_tagged_encrypted_partial_ssa_share_traits() {
+        let pseudonym = SimplePseudonym::random();
+        let nonce = 42u64;
+        let partial_share = EncryptedPartialSsaShare::<TestSpec>::default();
+        let tagged = TaggedEncryptedPartialSsaShare {
+            pseudonym,
+            nonce,
+            partial_share,
+        };
+
+        // Test Clone
+        let cloned = tagged.clone();
+        assert_eq!(tagged, cloned);
+
+        // Test Copy
+        let copied = tagged;
+        assert_eq!(tagged, copied);
+
+        // Test Debug
+        let debug_str = format!("{:?}", tagged);
+        assert!(debug_str.contains("TaggedEncryptedPartialSsaShare"));
+        assert!(debug_str.contains("pseudonym"));
+        assert!(debug_str.contains("nonce"));
+        assert!(debug_str.contains("partial_share"));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_tagged_encrypted_partial_ssa_share_serde() {
+        let pseudonym = SimplePseudonym::random();
+        let nonce = 42u64;
+        let partial_share = EncryptedPartialSsaShare::<TestSpec>::default();
+        let _tagged = TaggedEncryptedPartialSsaShare {
+            pseudonym,
+            nonce,
+            partial_share,
+        };
+        // Compile-time check only for now as no serde_json is available in this crate
+    }
 
     #[test]
     fn size_of_indices_must_match() {

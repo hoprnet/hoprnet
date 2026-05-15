@@ -520,7 +520,7 @@ where
     ///
     /// The incoming acknowledgement pipeline is not started; ticket events (if any) are ignored.
     pub fn build_for_entry(self) -> AbortableList<HoprTransportProcess> {
-        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, _cfg, mut processes, codec) = self.prepare();
+        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, cfg, mut processes, codec) = self.prepare();
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
@@ -529,7 +529,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_entry(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
@@ -537,7 +537,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_entry(),
         };
 
@@ -550,7 +550,7 @@ where
     /// The incoming acknowledgement pipeline is started but its acknowledgements are drained
     /// (never forwarded to a ticket processor); ticket events (if any) are ignored.
     pub fn build_for_exit(self) -> AbortableList<HoprTransportProcess> {
-        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, _cfg, mut processes, codec) = self.prepare();
+        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, cfg, mut processes, codec) = self.prepare();
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
@@ -559,7 +559,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_exit(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
@@ -567,7 +567,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_exit(),
         };
 

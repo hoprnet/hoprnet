@@ -3733,6 +3733,7 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-broadcast",
+ "auto_impl",
  "criterion",
  "futures",
  "futures-time",

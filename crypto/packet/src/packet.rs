@@ -1,5 +1,6 @@
 use std::fmt::Formatter;
 
+use hopr_protocol_pix::TaggedEncryptedPartialSsaShare;
 use hopr_types::{
     crypto::prelude::*,
     internal::{
@@ -43,7 +44,7 @@ pub struct PartialHoprPacket {
     ticket: Ticket,
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
-    encrypted_pix_share: Option<AcknowledgeableEncryptedPartialSsaShare>
+    encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
 }
 
 /// Shared key data for a path.
@@ -185,7 +186,7 @@ impl PartialHoprPacket {
                     .leak();
 
                 // Extract the encrypted partial SSA share from the SURB
-                let encrypted_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
+                let partial_share = surb.additional_data_receiver.encrypted_partial_ssa_share();
 
                 Ok(Self {
                     ticket,
@@ -196,12 +197,9 @@ impl PartialHoprPacket {
                         ))
                     })?,
                     ack_challenge: surb_por_values.acknowledgement_challenge(),
-                    encrypted_pix_share: (!encrypted_share.is_empty())
-                        .then(|| AcknowledgeableEncryptedPartialSsaShare {
-                            pseudonym: id.pseudonym(),
-                            surb_nonce: Hash::create(&[&surb.sender_key.as_ref()]),
-                            encrypted_share,
-                        }),
+                    encrypted_pix_share: (!partial_share.is_empty())
+                        .then(|| TaggedEncryptedPartialSsaShare::new(id.pseudonym(), &surb.sender_key, partial_share))
+                        .transpose()?,
                     partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         MetaPacketRouting::Surb(surb, &id),
                         mapper,
@@ -313,17 +311,6 @@ impl std::fmt::Debug for HoprIncomingPacket {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct AcknowledgeableEncryptedPartialSsaShare {
-    /// Pseudonym of the sender (receiver of the return path packet)
-    pub pseudonym: HoprPseudonym,
-    /// Nonce computed from the SURB that was associated with the encrypted partial SSA share.
-    pub surb_nonce: Hash,
-    /// Encrypted partial SSA share.
-    pub encrypted_share: HoprEncryptedPartialSsaShare,
-}
-
 /// Represents a packet destined for another node.
 #[derive(Clone)]
 pub struct HoprOutgoingPacket {
@@ -337,8 +324,9 @@ pub struct HoprOutgoingPacket {
     pub ack_challenge: HalfKeyChallenge,
     /// PIX protocol encrypted partial SSA share to be decrypted once the next hop sends back an acknowledgement.
     ///
-    /// This is populated only if this is a return path packet and the associated SURB contained an encrypted partial SSA share.
-    pub encrypted_pix_share: Option<AcknowledgeableEncryptedPartialSsaShare>,
+    /// This is populated only if this is a return path packet and the associated SURB contained an encrypted partial
+    /// SSA share.
+    pub encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
 }
 
 impl std::fmt::Debug for HoprOutgoingPacket {

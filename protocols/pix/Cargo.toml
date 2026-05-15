@@ -14,6 +14,7 @@ serde = ["dep:serde", "vsss-rs/serde", "hopr-types/serde"]
 
 [dependencies]
 ahash = { workspace = true }
+auto_impl = { workspace = true }
 async-broadcast = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
@@ -43,5 +44,5 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 [[bench]]
-name = "ssa_generator"
+name = "ssa_generator_bench"
 harness = false

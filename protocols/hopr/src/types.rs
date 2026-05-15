@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*};
 use hopr_crypto_packet::prelude::*;
+use hopr_protocol_pix::TaggedEncryptedPartialSsaShare;
 
 /// Packet that is being sent out by us.
 pub struct OutgoingPacket {
@@ -9,7 +10,7 @@ pub struct OutgoingPacket {
     /// Challenge to be solved from the acknowledgement of the next hop.
     pub ack_challenge: HalfKeyChallenge,
     /// Optional encrypted partial SSA share for PIX protocol.
-    pub encrypted_pix_share: Option<AcknowledgeableEncryptedPartialSsaShare>,
+    pub encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
     /// Encoded HOPR packet.
     pub data: Bytes,
 }

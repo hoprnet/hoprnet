@@ -23,15 +23,16 @@ use vsss_rs::{
 pub mod errors;
 mod generator;
 mod reconstructor;
-mod types;
 mod traits;
+mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
 pub use reconstructor::{ReconstructorEvent, SsaReconstructor, SsaReconstructorConfig};
+pub use traits::{CommitmentInsertionResult, ExitAcknowledgementShareProcessor};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
+    TaggedEncryptedPartialSsaShare,
 };
-pub use traits::ExitAcknowledgementShareProcessor;
 
 /// Number of polynomials per SSA.
 pub const DEFAULT_POLYS_PER_SSA: usize = 1000;
@@ -41,7 +42,7 @@ pub const DEFAULT_POLY_THRESHOLD: usize = 100;
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec
 where
-    PixScalar<Self>: PrimeField + FromOkm + Send,
+    PixScalar<Self>: PrimeField + FromOkm,
     PixGroup<Self>: Group<Scalar = PixScalar<Self>> + GroupEncoding + Default + CofactorGroup,
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
@@ -61,6 +62,32 @@ where
     const KEY_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE";
     /// Domain separator used to derive the X value of a share.
     const HASH_SCALAR_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE_SCALAR";
+
+    /// Performs conversion of the given `spi` and `msg` into [`PixScalar`] of this spec.
+    fn msg_to_scalar(spi: &SsaPolynomialId<Self>, msg: impl AsRef<[u8]>) -> errors::Result<PixScalar<Self>>
+    where
+        Self: Sized,
+    {
+        Ok(<Self::Curve as GroupDigest>::hash_to_scalar::<
+            ExpandMsgXmd<Self::Digest>,
+        >(
+            &[
+                msg.as_ref(),
+                spi.pseudonym().as_ref(),
+                spi.ssa_index().to_be_bytes().as_ref(),
+                spi.poly_index().to_be_bytes().as_ref(),
+            ],
+            &[
+                format!(
+                    "{:?}_XMD:{:?}_SSWU_RO_",
+                    Self::Curve::default(),
+                    Self::Digest::default()
+                )
+                .as_bytes(),
+                Self::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
+            ],
+        )?)
+    }
 }
 
 /// Finite field used to represent the polynomial coefficients.
@@ -72,24 +99,6 @@ pub type PixGroupRepr<S> = <PixGroup<S> as GroupEncoding>::Repr; // This interna
 /// Digest used for hashing operations.
 pub type PixDigest<S> = <S as PixSpec>::Digest;
 
-pub(crate) fn msg_to_scalar<S: PixSpec>(
-    spi: &SsaPolynomialId<S>,
-    msg: impl AsRef<[u8]>,
-) -> errors::Result<PixScalar<S>> {
-    Ok(<S::Curve as GroupDigest>::hash_to_scalar::<ExpandMsgXmd<S::Digest>>(
-        &[
-            msg.as_ref(),
-            spi.pseudonym().as_ref(),
-            spi.ssa_index().to_be_bytes().as_ref(),
-            spi.poly_index().to_be_bytes().as_ref(),
-        ],
-        &[
-            format!("{:?}_XMD:{:?}_SSWU_RO_", S::Curve::default(), S::Digest::default()).as_bytes(),
-            S::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
-        ],
-    )?)
-}
-
 pub(crate) type CompletedShare<S> =
     DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
 
@@ -100,7 +109,7 @@ pub(crate) fn into_completed_share<S: PixSpec>(
     share: &PartialSsaShare<S>,
 ) -> errors::Result<CompletedShare<S>> {
     Ok(DefaultShare {
-        identifier: msg_to_scalar::<S>(&spi, msg)?.into(),
+        identifier: S::msg_to_scalar(&spi, msg)?.into(),
         value: Option::from(PixScalar::<S>::from_repr(share.0.clone()))
             .map(|s: PixScalar<S>| s.into())
             .ok_or(vsss_rs::Error::InvalidShare)?,
@@ -295,7 +304,7 @@ pub(crate) mod tests {
 
         let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
         let x = (0..=20_u32)
-            .map(|i| msg_to_scalar::<TestSpec>(&spi, i.to_be_bytes()).unwrap())
+            .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
 
         let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
@@ -328,7 +337,7 @@ pub(crate) mod tests {
 
         let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
         let x = (0..=20_u32)
-            .map(|i| msg_to_scalar::<TestSpec>(&spi, i.to_be_bytes()).unwrap())
+            .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
 
         let (_, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;

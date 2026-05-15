@@ -38,7 +38,7 @@ pub mod prelude {
     pub use super::*;
     pub use crate::{
         packet::{
-            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket, AcknowledgeableEncryptedPartialSsaShare,
+            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
         types::{PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
