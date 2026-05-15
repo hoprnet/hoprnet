@@ -1297,7 +1297,7 @@ where
             };
 
             // Notify the sender that the session has been established.
-            // Set our peer ID in the session ID sent back to them.
+            // Return the session ID allocated for this incoming session.
             let data = HoprStartProtocol::SessionEstablished(StartEstablished {
                 orig_challenge: session_req.challenge,
                 session_id,
@@ -1512,11 +1512,11 @@ mod tests {
             Arc,
             atomic::{AtomicBool, Ordering},
         },
-        task::{Context, Poll, Waker},
+        task::{Context, Poll},
     };
 
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, Sink, future::BoxFuture};
+    use futures::{AsyncWriteExt, Sink, future::BoxFuture, task::AtomicWaker};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
@@ -1551,7 +1551,7 @@ mod tests {
     struct BlockingIncomingSessionSink {
         incoming_tx: UnboundedSender<IncomingSession>,
         released: Arc<AtomicBool>,
-        waker: Arc<parking_lot::Mutex<Option<Waker>>>,
+        waker: Arc<AtomicWaker>,
     }
 
     impl BlockingIncomingSessionSink {
@@ -1570,9 +1570,7 @@ mod tests {
 
         fn release(&self) {
             self.released.store(true, Ordering::Relaxed);
-            if let Some(waker) = self.waker.lock().take() {
-                waker.wake();
-            }
+            self.waker.wake();
         }
     }
 
@@ -1591,9 +1589,14 @@ mod tests {
 
         fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             if self.released.load(Ordering::Relaxed) {
+                return Poll::Ready(Ok(()));
+            }
+
+            self.waker.register(cx.waker());
+
+            if self.released.load(Ordering::Relaxed) {
                 Poll::Ready(Ok(()))
             } else {
-                *self.waker.lock() = Some(cx.waker().clone());
                 Poll::Pending
             }
         }
