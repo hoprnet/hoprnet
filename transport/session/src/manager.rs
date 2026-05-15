@@ -1296,31 +1296,6 @@ where
                 )?
             };
 
-            // Extract useful information about the session from the Start protocol message
-            let incoming_session = IncomingSession {
-                session,
-                target: session_req.target,
-            };
-
-            // Notify that a new incoming session has been created
-            match new_session_notifier
-                .send(incoming_session)
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-            {
-                Err(_) => {
-                    error!(%session_id, "timeout to notify about new incoming session");
-                    return Err(TransportSessionError::Timeout);
-                }
-                Ok(Err(error)) => {
-                    error!(%session_id, %error, "failed to notify about new incoming session");
-                    return Err(SessionManagerError::other(error).into());
-                }
-                _ => {}
-            };
-
-            trace!(?session_id, "session notification sent");
-
             // Notify the sender that the session has been established.
             // Set our peer ID in the session ID sent back to them.
             let data = HoprStartProtocol::SessionEstablished(StartEstablished {
@@ -1340,6 +1315,33 @@ where
                     error!(%session_id, %error, "failed to send session establishment message");
                     SessionManagerError::other(error)
                 })?;
+
+            // Extract useful information about the session from the Start protocol message
+            let incoming_session = IncomingSession {
+                session,
+                target: session_req.target,
+            };
+
+            // Notify that a new incoming session has been created only after
+            // SessionEstablished is queued. Otherwise, the exit reactor can emit
+            // session data first and consume the SURB needed for SessionEstablished.
+            match new_session_notifier
+                .send(incoming_session)
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+            {
+                Err(_) => {
+                    error!(%session_id, "timeout to notify about new incoming session");
+                    return Err(TransportSessionError::Timeout);
+                }
+                Ok(Err(error)) => {
+                    error!(%session_id, %error, "failed to notify about new incoming session");
+                    return Err(SessionManagerError::other(error).into());
+                }
+                _ => {}
+            };
+
+            trace!(?session_id, "session notification sent");
 
             info!(%session_id, "new session established");
 
@@ -1504,8 +1506,17 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        task::{Context, Poll, Waker},
+    };
+
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, future::BoxFuture};
+    use futures::{AsyncWriteExt, Sink, future::BoxFuture};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
@@ -1529,6 +1540,66 @@ mod tests {
         impl SendMsg for MsgSender {
             fn send_message<'a, 'b>(&'a self, routing: DestinationRouting, data: ApplicationDataOut)
             -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
+        }
+    }
+
+    #[derive(Debug, Clone, thiserror::Error)]
+    #[error("blocking incoming session sink failed")]
+    struct BlockingIncomingSessionSinkError;
+
+    #[derive(Clone)]
+    struct BlockingIncomingSessionSink {
+        incoming_tx: UnboundedSender<IncomingSession>,
+        released: Arc<AtomicBool>,
+        waker: Arc<parking_lot::Mutex<Option<Waker>>>,
+    }
+
+    impl BlockingIncomingSessionSink {
+        fn new() -> (Self, futures::channel::mpsc::UnboundedReceiver<IncomingSession>) {
+            let (incoming_tx, incoming_rx) = futures::channel::mpsc::unbounded();
+
+            (
+                Self {
+                    incoming_tx,
+                    released: Arc::new(AtomicBool::new(false)),
+                    waker: Default::default(),
+                },
+                incoming_rx,
+            )
+        }
+
+        fn release(&self) {
+            self.released.store(true, Ordering::Relaxed);
+            if let Some(waker) = self.waker.lock().take() {
+                waker.wake();
+            }
+        }
+    }
+
+    impl Sink<IncomingSession> for BlockingIncomingSessionSink {
+        type Error = BlockingIncomingSessionSinkError;
+
+        fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(self: Pin<&mut Self>, item: IncomingSession) -> Result<(), Self::Error> {
+            self.incoming_tx
+                .unbounded_send(item)
+                .map_err(|_| BlockingIncomingSessionSinkError)
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            if self.released.load(Ordering::Relaxed) {
+                Poll::Ready(Ok(()))
+            } else {
+                *self.waker.lock() = Some(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
         }
     }
 
@@ -1556,6 +1627,74 @@ mod tests {
         HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
             .map(msg)
             .unwrap_or(false)
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_established_should_be_sent_before_exit_reactor_can_send_session_data() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+        let bob_mgr = SessionManager::new(Default::default());
+        let (bob_msg_tx, mut bob_msg_rx) = futures::channel::mpsc::unbounded();
+        let (incoming_sink, mut incoming_rx) = BlockingIncomingSessionSink::new();
+        bob_mgr.start(bob_msg_tx, incoming_sink.clone())?;
+
+        let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
+            challenge: MIN_CHALLENGE,
+            target: SessionTarget::TcpStream(target),
+            capabilities: ByteCapabilities(Capability::NoRateControl.into()),
+            additional_data: 0,
+        });
+
+        // Use a notifier sink that delivers IncomingSession to the simulated exit
+        // reactor and then blocks on flush. If handle_incoming_session_initiation
+        // exposes the session before queuing SessionEstablished, this gives the
+        // reactor a deterministic window to send session data first.
+        let bob_mgr_clone = bob_mgr.clone();
+        let dispatch_handle = tokio::task::spawn(async move {
+            bob_mgr_clone
+                .dispatch_message(
+                    pseudonym,
+                    ApplicationDataIn {
+                        data: start_session_msg.try_into()?,
+                        packet_info: IncomingPacketInfo {
+                            num_saved_surbs: 1,
+                            ..Default::default()
+                        },
+                    },
+                )
+                .await
+        });
+
+        let mut incoming_session = timeout(Duration::from_secs(1), incoming_rx.next())
+            .await?
+            .ok_or(anyhow!("exit reactor must receive incoming session"))?;
+
+        // Model an exit reactor that writes immediately after receiving the
+        // IncomingSession. In the real transport this return-path packet consumes
+        // one SURB for the session pseudonym.
+        incoming_session.session.write_all(b"early exit data").await?;
+        incoming_session.session.flush().await?;
+
+        // If the first packet sent by the exit is session data, it can consume the
+        // first/only SURB and leave no SURB for SessionEstablished. The intended
+        // ordering is that SessionEstablished is queued before the reactor can emit
+        // any session data.
+        let first_outgoing = timeout(Duration::from_secs(1), bob_msg_rx.next())
+            .await?
+            .ok_or(anyhow!("exit must send a packet"))?;
+
+        // Let the manager finish so the test does not leave the session initiation
+        // task parked in the blocking notifier.
+        incoming_sink.release();
+        let _ = dispatch_handle.await?;
+
+        assert!(
+            msg_type(&first_outgoing.1, StartProtocolDiscriminants::SessionEstablished),
+            "exit session data was sent before SessionEstablished and can consume the first SURB"
+        );
+
+        Ok(())
     }
 
     #[test_log::test(tokio::test)]

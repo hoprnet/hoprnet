@@ -4744,7 +4744,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.0-rc.4"
+version = "4.0.0-rc.5"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -5255,7 +5255,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5327,7 +5327,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "4.0.0-rc.4"
+version = "4.0.0-rc.5"
 dependencies = [
  "anyhow",
  "async-signal",
