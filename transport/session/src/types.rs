@@ -333,7 +333,7 @@ pub struct HoprSessionConfig {
 ///
 /// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
 /// Session protocol sockets.
-#[pin_project::pin_project]
+#[pin_project::pin_project(PinnedDrop)]
 pub struct HoprSession {
     id: SessionId,
     #[pin]
@@ -492,6 +492,17 @@ impl std::fmt::Debug for HoprSession {
             .field("id", &self.id)
             .field("routing", &self.routing)
             .finish_non_exhaustive()
+    }
+}
+
+#[pin_project::pinned_drop]
+impl PinnedDrop for HoprSession {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+        if let Some(notifier) = this.on_close.take() {
+            tracing::trace!(session_id = %this.id, "notifying dropped session");
+            notifier(*this.id, ClosureReason::WriteClosed);
+        }
     }
 }
 
