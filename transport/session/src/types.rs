@@ -354,7 +354,10 @@ impl HoprSession {
     /// from the given `hopr` interface and passing it to the appropriate [`UnreliableSocket`] or [`ReliableSocket`]
     /// based on the given `capabilities`.
     ///
-    /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
+    /// The optional `on_close` closure is invoked at most once, on the first observed closure signal:
+    /// - `poll_close` completes -> [`ClosureReason::WriteClosed`]
+    /// - `poll_read` returns `0` (empty read / EOF) -> [`ClosureReason::EmptyRead`]
+    /// - the session is dropped before either of the above -> [`ClosureReason::WriteClosed`]
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new<Tx, Rx>(
         id: SessionId,
