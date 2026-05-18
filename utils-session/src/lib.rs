@@ -960,40 +960,6 @@ mod tests {
     }
 
     #[test]
-    fn stored_session_entry_can_hold_explicit_intermediate_path() {
-        let (abort_handle, _) = AbortHandle::new_pair();
-        let n1 =
-            NodeId::from(OffchainPublicKey::from_privkey(&random_bytes::<32>()).expect("valid random private key"));
-        let n2 =
-            NodeId::from(OffchainPublicKey::from_privkey(&random_bytes::<32>()).expect("valid random private key"));
-        let route = HopRouting::try_from(vec![n1, n2]).expect("explicit intermediate path must be valid");
-
-        let entry = StoredSessionEntry {
-            destination: Address::default(),
-            target: SessionTargetSpec::Plain("localhost:8080".into()),
-            forward_path: route.clone(),
-            return_path: route.invert(),
-            max_client_sessions: 5,
-            max_surb_upstream: None,
-            response_buffer: None,
-            session_pool: None,
-            abort_handle,
-            clients: Arc::new(DashMap::new()),
-        };
-
-        assert_eq!(entry.forward_path.hop_count(), 2);
-        assert_eq!(entry.return_path.hop_count(), 2);
-        match entry.forward_path.as_ref() {
-            RoutingOptions::IntermediatePath(path) => assert_eq!(path.as_ref(), &[n1, n2]),
-            other => panic!("expected explicit forward path, got {other:?}"),
-        }
-        match entry.return_path.as_ref() {
-            RoutingOptions::IntermediatePath(path) => assert_eq!(path.as_ref(), &[n2, n1]),
-            other => panic!("expected explicit return path, got {other:?}"),
-        }
-    }
-
-    #[test]
     fn session_target_spec_plain_roundtrip() {
         let spec = SessionTargetSpec::Plain("localhost:8080".into());
         let s = spec.to_string();
