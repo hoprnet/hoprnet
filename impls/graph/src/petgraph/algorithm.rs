@@ -656,11 +656,3 @@ mod test {
         assert_eq!(paths, vec![vec![0, 1, 2]]);
     }
 }
-       None,
-            0,
-            None,
-            |c, _, _| c,
-        ));
-        assert_eq!(paths, vec![vec![0, 1, 2]]);
-    }
-}

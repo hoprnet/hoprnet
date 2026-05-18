@@ -187,9 +187,12 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                     // find_paths already strips the leading `me` (source), so `a` is
                     // [intermediates…, connected_neighbor]. Append `me` to close the loopback;
                     // this is the only sanctioned position where `me` appears as a "destination".
+                    //
+                    // b is filled by find_paths BEFORE skip(1), so b[0] = me_idx and
+                    // b[1..=path_node_count] = path nodes. Closing me goes at b[path_node_count + 1].
                     let path_node_count = a.len();
-                    if path_node_count < b.len() {
-                        b[path_node_count] = me_idx.index() as u64;
+                    if path_node_count + 1 < b.len() {
+                        b[path_node_count + 1] = me_idx.index() as u64;
                     }
                     a.push(self.me);
                     (a, b)
