@@ -983,6 +983,14 @@ mod tests {
 
         assert_eq!(entry.forward_path.hop_count(), 2);
         assert_eq!(entry.return_path.hop_count(), 2);
+        match entry.forward_path.as_ref() {
+            RoutingOptions::IntermediatePath(path) => assert_eq!(path.as_ref(), &[n1, n2]),
+            other => panic!("expected explicit forward path, got {other:?}"),
+        }
+        match entry.return_path.as_ref() {
+            RoutingOptions::IntermediatePath(path) => assert_eq!(path.as_ref(), &[n2, n1]),
+            other => panic!("expected explicit return path, got {other:?}"),
+        }
     }
 
     #[test]
