@@ -76,8 +76,10 @@ pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
+///
+/// This intentionally exposes only hop-count based routing.
 #[cfg(feature = "session-client")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HopRouting(
     #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
@@ -93,7 +95,7 @@ impl HopRouting {
 
     /// Returns the configured number of hops.
     pub fn hop_count(&self) -> usize {
-        usize::from(self.0)
+        self.0.into()
     }
 }
 
@@ -122,7 +124,8 @@ impl std::fmt::Display for HopRouting {
 
 /// Session client configuration for `hopr-lib`.
 ///
-/// Supports hop-count based routing.
+/// Unlike transport-level configuration, this API intentionally does not expose
+/// explicit intermediate paths.
 #[cfg(feature = "session-client")]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct HoprSessionClientConfig {
