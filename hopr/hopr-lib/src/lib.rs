@@ -165,7 +165,7 @@ impl std::fmt::Display for HopRouting {
 
 /// Session client configuration for `hopr-lib`.
 ///
-/// Supports both hop-count based routing and explicit intermediate paths.
+/// Supports hop-count based routing.
 #[cfg(feature = "session-client")]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct HoprSessionClientConfig {
@@ -173,6 +173,28 @@ pub struct HoprSessionClientConfig {
     pub forward_path: HopRouting,
     /// Return route selection policy.
     pub return_path: HopRouting,
+    /// Capabilities offered by the session.
+    #[default(_code = "SessionCapability::Segmentation.into()")]
+    pub capabilities: SessionCapabilities,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
+    /// Enable automatic SURB management for the session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
+}
+
+/// Session client configuration for explicit intermediate-path routing.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+pub struct HoprSessionClientExplicitPathConfig {
+    /// Explicit forward intermediate path.
+    pub forward_path: Vec<NodeId>,
+    /// Explicit return intermediate path.
+    pub return_path: Vec<NodeId>,
     /// Capabilities offered by the session.
     #[default(_code = "SessionCapability::Segmentation.into()")]
     pub capabilities: SessionCapabilities,
@@ -198,6 +220,26 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
         }
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: HoprSessionClientExplicitPathConfig) -> Result<Self, Self::Error> {
+        let forward =
+            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.forward_path.try_into()?);
+        let ret = hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.return_path.try_into()?);
+
+        Ok(Self {
+            forward_path_options: forward,
+            return_path_options: ret,
+            capabilities: value.capabilities,
+            pseudonym: value.pseudonym,
+            surb_management: value.surb_management,
+            always_max_out_surbs: value.always_max_out_surbs,
+        })
     }
 }
 
@@ -338,6 +380,46 @@ where
             Err(HoprLibError::NotReady(state, error))
         }
     }
+
+    #[cfg(feature = "session-client")]
+    async fn connect_to_with_transport_config(
+        &self,
+        destination: hopr_api::types::primitive::prelude::Address,
+        target: SessionTarget,
+        cfg: hopr_transport::SessionClientConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        let backoff = backon::ConstantBuilder::default()
+            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
+            .with_delay(self.cfg.protocol.session.establish_retry_timeout)
+            .with_jitter();
+
+        use backon::Retryable;
+
+        Ok((|| {
+            let cfg = cfg.clone();
+            let target = target.clone();
+            async { self.transport_api.new_session(destination, target, cfg).await }
+        })
+        .retry(backoff)
+        .sleep(backon::FuturesTimerSleeper)
+        .await?)
+    }
+
+    /// Opens a session using explicit intermediate paths for forward and return routing.
+    #[cfg(feature = "session-client")]
+    pub async fn connect_to_with_explicit_path(
+        &self,
+        destination: hopr_api::types::primitive::prelude::Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientExplicitPathConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
+        let transport_cfg = hopr_transport::SessionClientConfig::try_from(cfg)
+            .map_err(|error| HoprLibError::GeneralError(error.to_string()))?;
+        self.connect_to_with_transport_config(destination, target, transport_cfg)
+            .await
+    }
 }
 
 #[cfg(feature = "session-client")]
@@ -364,23 +446,21 @@ where
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        if matches!(
+            cfg.forward_path.as_ref(),
+            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(_)
+        ) || matches!(
+            cfg.return_path.as_ref(),
+            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(_)
+        ) {
+            return Err(HoprLibError::GeneralError(
+                "connect_to only supports hop-count routing; use connect_to_with_explicit_path for explicit routes"
+                    .into(),
+            ));
+        }
 
-        let backoff = backon::ConstantBuilder::default()
-            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
-            .with_delay(self.cfg.protocol.session.establish_retry_timeout)
-            .with_jitter();
-
-        use backon::Retryable;
-
-        Ok((|| {
-            let cfg = hopr_transport::SessionClientConfig::from(cfg.clone());
-            let target = target.clone();
-            async { self.transport_api.new_session(destination, target, cfg).await }
-        })
-        .retry(backoff)
-        .sleep(backon::FuturesTimerSleeper)
-        .await?)
+        self.connect_to_with_transport_config(destination, target, hopr_transport::SessionClientConfig::from(cfg))
+            .await
     }
 }
 
@@ -813,11 +893,22 @@ mod tests {
 
     #[cfg(feature = "session-client")]
     #[test]
-    fn hop_routing_intermediate_path_from_offchain_keys_counts_hops() {
-        let k1 = *OffchainKeypair::random().public();
-        let k2 = *OffchainKeypair::random().public();
-        let k3 = *OffchainKeypair::random().public();
-        let route = HopRouting::try_from(vec![k1, k2, k3]).expect("3-key path must be accepted");
-        assert_eq!(route.hop_count(), 3);
+    fn explicit_path_config_converts_into_intermediate_path_routing_options() {
+        let k1 = NodeId::from(*OffchainKeypair::random().public());
+        let k2 = NodeId::from(*OffchainKeypair::random().public());
+        let k3 = NodeId::from(*OffchainKeypair::random().public());
+
+        let cfg = hopr_transport::SessionClientConfig::try_from(HoprSessionClientExplicitPathConfig {
+            forward_path: vec![k1, k2],
+            return_path: vec![k3],
+            capabilities: SessionCapability::Segmentation.into(),
+            pseudonym: None,
+            surb_management: None,
+            always_max_out_surbs: false,
+        })
+        .expect("explicit path config conversion must succeed");
+
+        assert!(matches!(cfg.forward_path_options, RoutingOptions::IntermediatePath(_)));
+        assert!(matches!(cfg.return_path_options, RoutingOptions::IntermediatePath(_)));
     }
 }
