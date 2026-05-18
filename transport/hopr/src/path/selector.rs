@@ -727,19 +727,3 @@ mod tests {
         Ok(())
     }
 }
-op")?;
-        graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
-        // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
-
-        let selector = test_selector(me, graph, MAX_PATHS);
-
-        let err = selector
-            .select_path(me, dest, 1)
-            .expect_err("zero-cost paths should be filtered out");
-        anyhow::ensure!(
-            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
-            "expected PathNotFound, got: {err}"
-        );
-        Ok(())
-    }
-}

@@ -836,11 +836,3 @@ mod tests {
         let _future = planner.run_background_refresh();
     }
 }
-nApi::new(me, me_addr(), vec![]);
-        let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
-
-        let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
-        // Just ensure it compiles and produces a future.
-        let _future = planner.run_background_refresh();
-    }
-}
