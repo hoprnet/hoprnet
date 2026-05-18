@@ -1399,6 +1399,25 @@ mod tests {
         Ok(())
     }
 
+    fn fresh_inner_with_chain<C>(
+        cfg: ChannelLifecycleConfig,
+        connector: Arc<C>,
+    ) -> ChannelLifecycleStrategyInner<ChainNode<Arc<C>>> {
+        ChannelLifecycleStrategyInner {
+            cfg,
+            node: Arc::new(ChainNode(connector)),
+            open_in_flight: Arc::new(dashmap::DashSet::new()),
+            fund_in_flight: Arc::new(dashmap::DashSet::new()),
+            close_in_flight: Arc::new(dashmap::DashSet::new()),
+            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
+            cooldown: Arc::new(DashMap::new()),
+            start_epoch: std::time::Instant::now(),
+            last_observed: Arc::new(DashMap::new()),
+            peer_ticket_activity: Arc::new(DashMap::new()),
+            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+        }
+    }
+
     /// try_open_channel: channel is already Open with stake >= lower_balance_threshold.
     /// Expected: no FundChannel tx submitted; open_in_flight empty after the call.
     #[tokio::test]
@@ -1442,19 +1461,7 @@ mod tests {
             ..Default::default()
         };
 
-        let inner = ChannelLifecycleStrategyInner {
-            cfg,
-            node: Arc::new(ChainNode(Arc::clone(&connector))),
-            open_in_flight: Arc::new(dashmap::DashSet::new()),
-            fund_in_flight: Arc::new(dashmap::DashSet::new()),
-            close_in_flight: Arc::new(dashmap::DashSet::new()),
-            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
-            cooldown: Arc::new(DashMap::new()),
-            start_epoch: std::time::Instant::now(),
-            last_observed: Arc::new(DashMap::new()),
-            peer_ticket_activity: Arc::new(DashMap::new()),
-            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
-        };
+        let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
         let result = inner.try_open_channel(*ALICE, initial_balance);
 
@@ -1524,19 +1531,7 @@ mod tests {
             ..Default::default()
         };
 
-        let inner = ChannelLifecycleStrategyInner {
-            cfg,
-            node: Arc::new(ChainNode(Arc::clone(&connector))),
-            open_in_flight: Arc::new(dashmap::DashSet::new()),
-            fund_in_flight: Arc::new(dashmap::DashSet::new()),
-            close_in_flight: Arc::new(dashmap::DashSet::new()),
-            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
-            cooldown: Arc::new(DashMap::new()),
-            start_epoch: std::time::Instant::now(),
-            last_observed: Arc::new(DashMap::new()),
-            peer_ticket_activity: Arc::new(DashMap::new()),
-            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
-        };
+        let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
         let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32));
 
@@ -1575,7 +1570,7 @@ mod tests {
                 XDaiBalance::new_base(1),
                 HoprBalance::new_base(1000),
             )
-            .with_channels([]) // No pre-existing channels
+            .with_channels([])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let mut connector =
@@ -1595,19 +1590,7 @@ mod tests {
             ..Default::default()
         };
 
-        let inner = ChannelLifecycleStrategyInner {
-            cfg,
-            node: Arc::new(ChainNode(Arc::clone(&connector))),
-            open_in_flight: Arc::new(dashmap::DashSet::new()),
-            fund_in_flight: Arc::new(dashmap::DashSet::new()),
-            close_in_flight: Arc::new(dashmap::DashSet::new()),
-            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
-            cooldown: Arc::new(DashMap::new()),
-            start_epoch: std::time::Instant::now(),
-            last_observed: Arc::new(DashMap::new()),
-            peer_ticket_activity: Arc::new(DashMap::new()),
-            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
-        };
+        let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
         let result = inner.try_open_channel(*ALICE, initial_balance);
         assert!(result, "try_open_channel should return true for a fresh channel");
