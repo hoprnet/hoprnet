@@ -25,6 +25,8 @@ use hopr_api::{
     },
     network::NetworkStreamControl,
 };
+#[cfg(feature = "explicit-path")]
+use hopr_lib::HoprSessionClientExplicitPathConfig;
 use hopr_lib::{
     HopRouting, Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
@@ -252,6 +254,14 @@ pub trait SessionFactory: Send + Sync + 'static {
         cfg: HoprSessionClientConfig,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
 
+    #[cfg(feature = "explicit-path")]
+    async fn create_session_using_explicit_path(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientExplicitPathConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
+
     fn session_idle_timeout(&self) -> Option<std::time::Duration>;
 }
 
@@ -279,6 +289,16 @@ where
         cfg: HoprSessionClientConfig,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
         Ok(HoprSessionClientOperations::connect_to(self, dest, target, cfg).await?)
+    }
+
+    #[cfg(feature = "explicit-path")]
+    async fn create_session_using_explicit_path(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientExplicitPathConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
+        Ok(self.connect_to_using_explicit_path(dest, target, cfg).await?)
     }
 
     fn session_idle_timeout(&self) -> Option<std::time::Duration> {
@@ -373,6 +393,106 @@ impl SessionPool {
     pub fn pop(&mut self) -> Option<(HoprSession, HoprSessionConfigurator)> {
         self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
     }
+}
+
+#[cfg(feature = "explicit-path")]
+pub struct ExplicitPathSessionPool {
+    pool: Option<SessionPoolInner>,
+    ah: Option<AbortHandle>,
+}
+
+#[cfg(feature = "explicit-path")]
+impl ExplicitPathSessionPool {
+    pub const MAX_SESSION_POOL_SIZE: usize = 5;
+
+    pub async fn new(
+        size: usize,
+        dst: Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientExplicitPathConfig,
+        factory: Arc<dyn SessionFactory>,
+    ) -> Result<Self, anyhow::Error> {
+        let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
+        let factory_clone = factory.clone();
+        let pool_clone = pool.clone();
+        futures::stream::iter(0..size.min(Self::MAX_SESSION_POOL_SIZE))
+            .map(Ok)
+            .try_for_each_concurrent(Self::MAX_SESSION_POOL_SIZE, move |i| {
+                let pool = pool_clone.clone();
+                let factory = factory_clone.clone();
+                let target = target.clone();
+                let cfg = cfg.clone();
+                async move {
+                    match factory
+                        .create_session_using_explicit_path(dst, target.clone(), cfg.clone())
+                        .await
+                    {
+                        Ok((session, configurator)) => {
+                            debug!(session_id = %session.id(), num_session = i, "created a new explicit-path session in pool");
+                            pool.lock().push_back((session, configurator));
+                            Ok(())
+                        }
+                        Err(error) => {
+                            error!(%error, num_session = i, "failed to establish explicit-path session for pool");
+                            Err(anyhow!("failed to establish explicit-path session #{i} in pool to {dst}: {error}"))
+                        }
+                    }
+                }
+            })
+            .await?;
+
+        if let Some(timeout) = factory.session_idle_timeout().filter(|_| !pool.lock().is_empty()) {
+            let pool_clone_1 = pool.clone();
+            let pool_clone_2 = pool.clone();
+            Ok(Self {
+                pool: Some(pool),
+                ah: Some(hopr_utils::spawn_as_abortable!(
+                    futures_time::stream::interval(futures_time::time::Duration::from(
+                        std::time::Duration::from_secs(1).max(timeout / 2)
+                    ))
+                    .take_while(move |_| futures::future::ready(!pool_clone_1.lock().is_empty()))
+                    .for_each(move |_| {
+                        let pool = pool_clone_2.clone();
+                        async move {
+                            let configurators: Vec<_> = pool.lock().iter().map(|(_, cfg)| cfg.clone()).collect();
+                            let mut dead_ids = Vec::new();
+                            for configurator in &configurators {
+                                if let Err(error) = configurator.ping().await {
+                                    let id = *configurator.id();
+                                    error!(%error, session_id = %id, "explicit-path session in pool is not alive, will remove");
+                                    dead_ids.push(id);
+                                }
+                            }
+                            if !dead_ids.is_empty() {
+                                pool.lock().retain(|(_, cfg)| !dead_ids.contains(cfg.id()));
+                            }
+                        }
+                    })
+                )),
+            })
+        } else {
+            Ok(Self { pool: None, ah: None })
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<(HoprSession, HoprSessionConfigurator)> {
+        self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+impl Drop for ExplicitPathSessionPool {
+    fn drop(&mut self) {
+        if let Some(ah) = self.ah.take() {
+            ah.abort();
+        }
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+fn explicit_path_to_hop_routing(path: Vec<hopr_api::types::internal::NodeId>) -> Result<HopRouting, BindError> {
+    HopRouting::try_from(path.len())
+        .map_err(|error| BindError::UnknownFailure(format!("invalid explicit path hop count: {error}")))
 }
 
 impl Drop for SessionPool {
@@ -638,6 +758,233 @@ pub async fn create_udp_client_binding(
             target: target_spec,
             forward_path: config.forward_path,
             return_path: config.return_path,
+            max_client_sessions: max_clients,
+            max_surb_upstream: config
+                .surb_management
+                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
+            response_buffer: config
+                .surb_management
+                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+            session_pool: None,
+            abort_handle,
+            clients,
+        },
+    );
+    Ok((bound_host, Some(session_id), max_clients))
+}
+
+#[cfg(feature = "explicit-path")]
+#[allow(clippy::too_many_arguments)]
+pub async fn create_tcp_client_binding_using_explicit_path(
+    bind_host: std::net::SocketAddr,
+    port_range: Option<String>,
+    factory: Arc<dyn SessionFactory>,
+    open_listeners: Arc<ListenerJoinHandles>,
+    destination: Address,
+    target_spec: SessionTargetSpec,
+    config: HoprSessionClientExplicitPathConfig,
+    use_session_pool: Option<usize>,
+    max_client_sessions: Option<usize>,
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
+    let forward_path = explicit_path_to_hop_routing(config.forward_path.clone())?;
+    let return_path = explicit_path_to_hop_routing(config.return_path.clone())?;
+    let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            BindError::ListenHostAlreadyUsed
+        } else {
+            BindError::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}"))
+        }
+    })?;
+    info!(%bound_host, "TCP explicit-path session listener bound");
+
+    let target = target_spec
+        .clone()
+        .into_target(IpProtocol::TCP)
+        .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+
+    let session_pool_size = use_session_pool.unwrap_or(0);
+    let mut session_pool = ExplicitPathSessionPool::new(
+        session_pool_size,
+        destination,
+        target.clone(),
+        config.clone(),
+        factory.clone(),
+    )
+    .await
+    .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+
+    let active_sessions = Arc::new(DashMap::new());
+    let mut max_clients = max_client_sessions.unwrap_or(5).max(1);
+    if max_clients < session_pool_size {
+        max_clients = session_pool_size;
+    }
+
+    let config_clone = config.clone();
+    let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    let active_sessions_clone = active_sessions.clone();
+    hopr_utils::runtime::prelude::spawn(async move {
+        let active_sessions_clone_2 = active_sessions_clone.clone();
+        futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
+            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+            .for_each(move |accepted_client| {
+                let data = config_clone.clone();
+                let target = target.clone();
+                let factory = factory.clone();
+                let active_sessions = active_sessions_clone_2.clone();
+                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                async move {
+                    match accepted_client {
+                        Ok((sock_addr, mut stream)) => {
+                            debug!(?sock_addr, "incoming TCP connection on explicit-path listener");
+                            if active_sessions.len() >= max_clients {
+                                error!(?bind_host, "no more client slots available at explicit-path listener");
+                                use tokio::io::AsyncWriteExt;
+                                if let Err(error) = stream.shutdown().await {
+                                    error!(%error, ?sock_addr, "failed to shutdown TCP connection");
+                                }
+                                return;
+                            }
+
+                            let (session, configurator) = match maybe_pooled {
+                                Some((s, c)) => {
+                                    debug!(session_id = %s.id(), "using pooled explicit-path session");
+                                    (s, c)
+                                }
+                                None => {
+                                    debug!("no pooled explicit-path sessions available, creating a new one");
+                                    match factory
+                                        .create_session_using_explicit_path(destination, target, data)
+                                        .await
+                                    {
+                                        Ok((s, c)) => (s, c),
+                                        Err(error) => {
+                                            error!(%error, "failed to establish explicit-path session");
+                                            return;
+                                        }
+                                    }
+                                }
+                            };
+
+                            let session_id = *session.id();
+                            let (abort_handle, abort_reg) = AbortHandle::new_pair();
+                            active_sessions.insert(
+                                session_id,
+                                ClientEntry {
+                                    sock_addr,
+                                    abort_handle,
+                                    configurator,
+                                },
+                            );
+
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                            hopr_utils::runtime::prelude::spawn(
+                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
+                                    move |_| async move {
+                                        active_sessions.remove(&session_id);
+                                        #[cfg(all(feature = "telemetry", not(test)))]
+                                        METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                    },
+                                ),
+                            );
+                        }
+                        Err(error) => error!(%error, "failed to accept connection"),
+                    }
+                }
+            })
+            .await;
+
+        active_sessions_clone.iter().for_each(|entry| {
+            let client = entry.value();
+            client.abort_handle.abort()
+        });
+    });
+
+    open_listeners.0.insert(
+        ListenerId(hopr_utils::network_types::types::IpProtocol::TCP, bound_host),
+        StoredSessionEntry {
+            destination,
+            target: target_spec,
+            forward_path,
+            return_path,
+            clients: active_sessions,
+            max_client_sessions: max_clients,
+            max_surb_upstream: config
+                .surb_management
+                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
+            response_buffer: config
+                .surb_management
+                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+            session_pool: Some(session_pool_size),
+            abort_handle,
+        },
+    );
+    Ok((bound_host, None, max_clients))
+}
+
+#[cfg(feature = "explicit-path")]
+pub async fn create_udp_client_binding_using_explicit_path(
+    bind_host: std::net::SocketAddr,
+    port_range: Option<String>,
+    factory: Arc<dyn SessionFactory>,
+    open_listeners: Arc<ListenerJoinHandles>,
+    destination: Address,
+    target_spec: SessionTargetSpec,
+    config: HoprSessionClientExplicitPathConfig,
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
+    let forward_path = explicit_path_to_hop_routing(config.forward_path.clone())?;
+    let return_path = explicit_path_to_hop_routing(config.return_path.clone())?;
+    let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            BindError::ListenHostAlreadyUsed
+        } else {
+            BindError::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}"))
+        }
+    })?;
+
+    info!(%bound_host, "UDP explicit-path session listener bound");
+
+    let target = target_spec
+        .clone()
+        .into_target(IpProtocol::UDP)
+        .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+
+    let (session, configurator) = factory
+        .create_session_using_explicit_path(destination, target, config.clone())
+        .await
+        .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+
+    let open_listeners_clone = open_listeners.clone();
+    let listener_id = ListenerId(hopr_utils::network_types::types::IpProtocol::UDP, bound_host);
+    let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    let clients = Arc::new(DashMap::new());
+    let max_clients: usize = 1;
+    let session_id = *session.id();
+    clients.insert(
+        session_id,
+        ClientEntry {
+            sock_addr: bound_host,
+            abort_handle: abort_handle.clone(),
+            configurator,
+        },
+    );
+    hopr_utils::runtime::prelude::spawn(async move {
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+        open_listeners_clone.0.remove(&listener_id);
+    });
+
+    open_listeners.0.insert(
+        listener_id,
+        StoredSessionEntry {
+            destination,
+            target: target_spec,
+            forward_path,
+            return_path,
             max_client_sessions: max_clients,
             max_surb_upstream: config
                 .surb_management
