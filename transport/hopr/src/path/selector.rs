@@ -124,8 +124,8 @@ where
 
                 // Strip source to get intermediate hops only.
                 // Guard: if dest already appears as an intermediate, appending it
-                // again creates a [dest, dest] loop that ValidatedPath::new would
-                // reject — skip early instead of generating noise.
+                // again creates a [dest, ..., dest] path that ValidatedPath::new
+                // would reject as a non-adjacent duplicate — skip early.
                 let candidate: Vec<_> = path.into_iter().skip(1).collect();
                 if candidate.contains(dest) {
                     return None;

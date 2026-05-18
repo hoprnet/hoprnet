@@ -196,16 +196,8 @@ where
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    // Post-resolution: catch non-adjacent chain-address duplicates
-                                    // (ValidatedPath::new only checks consecutive collisions).
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "skipping path candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
-                                }
-                                Err(e) => tracing::warn!(error = %e, "path candidate failed validation"),
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
                             }
                         }
 
@@ -376,14 +368,8 @@ where
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "background refresh: skipping candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
-                                }
-                                Err(e) => tracing::warn!(error = %e, "background refresh: path candidate failed validation"),
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => tracing::debug!(error = %e, "background refresh: path candidate failed validation"),
                             }
                         }
 
