@@ -24,11 +24,12 @@ use hopr_api::{
         traits::{EdgeObservableRead, EdgeObservableWrite},
     },
     network::NetworkStreamControl,
+    types::internal::routing::RoutingOptions,
 };
 #[cfg(feature = "explicit-path")]
 use hopr_lib::HoprSessionClientExplicitPathConfig;
 use hopr_lib::{
-    HopRouting, Hopr, HoprSessionClientConfig,
+    Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
     errors::HoprLibError,
     exports::transport::{
@@ -146,10 +147,10 @@ pub struct StoredSessionEntry {
     pub destination: Address,
     /// Target of the Session.
     pub target: SessionTargetSpec,
-    /// Forward path used for the Session.
-    pub forward_path: HopRouting,
-    /// Return path used for the Session.
-    pub return_path: HopRouting,
+    /// Forward routing options used for the Session.
+    pub forward_path: RoutingOptions,
+    /// Return routing options used for the Session.
+    pub return_path: RoutingOptions,
     /// The maximum number of client sessions that the listener can spawn.
     pub max_client_sessions: usize,
     /// The maximum number of SURB packets that can be sent upstream.
@@ -489,12 +490,6 @@ impl Drop for ExplicitPathSessionPool {
     }
 }
 
-#[cfg(feature = "explicit-path")]
-fn explicit_path_to_hop_routing(path: Vec<hopr_api::types::internal::NodeId>) -> Result<HopRouting, BindError> {
-    HopRouting::try_from(path.len())
-        .map_err(|error| BindError::UnknownFailure(format!("invalid explicit path hop count: {error}")))
-}
-
 impl Drop for SessionPool {
     fn drop(&mut self) {
         if let Some(ah) = self.ah.take() {
@@ -654,8 +649,8 @@ pub async fn create_tcp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path,
-            return_path: config.return_path,
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             clients: active_sessions,
             max_client_sessions: max_clients,
             max_surb_upstream: config
@@ -756,8 +751,8 @@ pub async fn create_udp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path,
-            return_path: config.return_path,
+            forward_path: config.forward_path.into(),
+            return_path: config.return_path.into(),
             max_client_sessions: max_clients,
             max_surb_upstream: config
                 .surb_management
@@ -786,8 +781,20 @@ pub async fn create_tcp_client_binding_using_explicit_path(
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
-    let forward_path = explicit_path_to_hop_routing(config.forward_path.clone())?;
-    let return_path = explicit_path_to_hop_routing(config.return_path.clone())?;
+    let forward_path = RoutingOptions::IntermediatePath(
+        config
+            .forward_path
+            .clone()
+            .try_into()
+            .map_err(|e| BindError::UnknownFailure(format!("invalid explicit forward path: {e}")))?,
+    );
+    let return_path = RoutingOptions::IntermediatePath(
+        config
+            .return_path
+            .clone()
+            .try_into()
+            .map_err(|e| BindError::UnknownFailure(format!("invalid explicit return path: {e}")))?,
+    );
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
             BindError::ListenHostAlreadyUsed
@@ -933,8 +940,20 @@ pub async fn create_udp_client_binding_using_explicit_path(
     target_spec: SessionTargetSpec,
     config: HoprSessionClientExplicitPathConfig,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
-    let forward_path = explicit_path_to_hop_routing(config.forward_path.clone())?;
-    let return_path = explicit_path_to_hop_routing(config.return_path.clone())?;
+    let forward_path = RoutingOptions::IntermediatePath(
+        config
+            .forward_path
+            .clone()
+            .try_into()
+            .map_err(|e| BindError::UnknownFailure(format!("invalid explicit forward path: {e}")))?,
+    );
+    let return_path = RoutingOptions::IntermediatePath(
+        config
+            .return_path
+            .clone()
+            .try_into()
+            .map_err(|e| BindError::UnknownFailure(format!("invalid explicit return path: {e}")))?,
+    );
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
             BindError::ListenHostAlreadyUsed
@@ -1268,8 +1287,8 @@ mod tests {
         StoredSessionEntry {
             destination: Address::default(),
             target: SessionTargetSpec::Plain("localhost:8080".into()),
-            forward_path: HopRouting::default(),
-            return_path: HopRouting::default(),
+            forward_path: RoutingOptions::from(HopRouting::default()),
+            return_path: RoutingOptions::from(HopRouting::default()),
             max_client_sessions: 5,
             max_surb_upstream: None,
             response_buffer: None,
