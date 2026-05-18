@@ -31,14 +31,18 @@ impl<U> FullNetworkDiscovery<U> {
     }
 }
 
-/// Strip the trailing loopback closure from a loopback path.
+/// Strip leading and/or trailing `me` markers from a loopback path.
 ///
 /// `simple_loopback_to_self` returns `[intermediates..., me]` — the leading source
-/// is already excluded by the graph crate; only the closing `me` needs to be removed
-/// so the caller can pass the remaining intermediates to `IntermediatePath`.
+/// is already excluded by the graph crate. This helper also strips a leading `me`
+/// defensively in case the graph-crate contract changes, so the result is always
+/// a plain intermediate list suitable for `IntermediatePath`.
 fn strip_loopback_trailer(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
     if path.last() == Some(me) {
         path.pop();
+    }
+    if path.first() == Some(me) {
+        path.remove(0);
     }
     path
 }
