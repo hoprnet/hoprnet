@@ -101,7 +101,7 @@ impl HopRouting {
     }
 
     /// Invert the path if it is an intermediate path, otherwise return self.
-    pub fn invert(&self) -> Self {
+    pub fn invert(self) -> Self {
         match &self.0 {
             RoutingOptions::Hops(count) => Self(RoutingOptions::Hops(*count)),
             RoutingOptions::IntermediatePath(path) => Self(RoutingOptions::IntermediatePath(
