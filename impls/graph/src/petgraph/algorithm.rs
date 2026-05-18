@@ -132,11 +132,9 @@ where
             if let Some(edge) = edges.next() {
                 let child = edge.target();
 
-                // Skip nodes already on the current path or caller-excluded.
-                // Excluded nodes are checked separately so they never appear in
-                // `visited` and never pollute the yielded path.
-                // `from` is already in `visited`, so excluding it via `excluded_nodes`
-                // is always a no-op (the source can't be re-entered).
+                // Excluded nodes checked separately — not inserted into `visited` — so they
+                // never appear in the yielded path. Excluding `from` is a no-op since it's
+                // already in `visited` at position 0.
                 if visited.contains(&child) || excluded_nodes.is_some_and(|excl| excl.contains(&child)) {
                     continue;
                 }
@@ -651,6 +649,14 @@ mod test {
             Some(&excluded),
             0,
             None,
+            0,
+            None,
+            |c, _, _| c,
+        ));
+        assert_eq!(paths, vec![vec![0, 1, 2]]);
+    }
+}
+       None,
             0,
             None,
             |c, _, _| c,

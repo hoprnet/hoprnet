@@ -292,17 +292,8 @@ mod tests {
         });
     }
 
-    /// Mark an edge as ready only as the last hop (forward or return).
-    ///
-    /// Forward last edge requires capacity; return last edge requires connectivity + score.
-    /// This helper sets all of them so it works for either direction.
     fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        graph.upsert_edge(src, dst, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(1000)));
-        });
+        mark_edge_full(graph, src, dst);
     }
 
     // Helper: build a bidirectional 2-hop graph: me ↔ hop ↔ dest.
@@ -721,6 +712,22 @@ mod tests {
         graph.add_node(hop);
         graph.add_node(dest);
         graph.add_edge(&me, &hop).context("adding edge me -> hop")?;
+        graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
+        // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
+
+        let selector = test_selector(me, graph, MAX_PATHS);
+
+        let err = selector
+            .select_path(me, dest, 1)
+            .expect_err("zero-cost paths should be filtered out");
+        anyhow::ensure!(
+            matches!(err, PathPlannerError::Path(PathError::PathNotFound(..))),
+            "expected PathNotFound, got: {err}"
+        );
+        Ok(())
+    }
+}
+op")?;
         graph.add_edge(&hop, &dest).context("adding edge hop -> dest")?;
         // No mark_edge_full/mark_edge_last → observations are empty → cost = 0
 

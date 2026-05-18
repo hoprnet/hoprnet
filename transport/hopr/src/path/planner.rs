@@ -565,12 +565,7 @@ mod tests {
     }
 
     fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        graph.upsert_edge(src, dst, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(1000)));
-        });
+        mark_edge_full(graph, src, dst);
     }
 
     fn small_config() -> PathPlannerConfig {
@@ -834,6 +829,14 @@ mod tests {
         let cfg = small_config();
         let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
+        let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
+
+        let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
+        // Just ensure it compiles and produces a future.
+        let _future = planner.run_background_refresh();
+    }
+}
+nApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
