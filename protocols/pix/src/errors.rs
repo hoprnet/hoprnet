@@ -3,6 +3,8 @@
 pub enum PixError {
     #[error("invalid input to the function")]
     InvalidInput,
+    #[error("acknowledgement from this peer is not paired to any encrypted share")]
+    UnexpectedShare,
     #[error("ssa commitment does not match ssa")]
     InvalidSsa,
     #[error("received duplicate commitment")]

@@ -13,6 +13,8 @@ use vsss_rs::{
 use crate::{
     CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
     PixScalar, PixSpec, PolynomialIndex, errors,
+    errors::PixError,
+    traits::{EntryShareGenerator, GeneratedShare, SsaCommitment},
     types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
 };
 
@@ -101,9 +103,6 @@ pub struct SsaShareGenerator<S: PixSpec> {
     cfg: SsaGeneratorConfig,
 }
 
-/// Tuple consisting of the SSA polynomial index and an SSA share from the corresponding polynomial.
-pub type GeneratedShare<S> = (SsaPolynomialId<S>, PartialSsaShare<S>);
-
 impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
         Self {
@@ -114,6 +113,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
             cfg,
         }
     }
+}
+
+impl<S: PixSpec + 'static> EntryShareGenerator<S> for SsaShareGenerator<S> {
+    type Error = PixError;
 
     /// Generate the next [`PartialSsaShare`] for the given pseudonym and message `msg`.
     ///
@@ -121,7 +124,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     ///
     /// Returns `None` if all polynomials for the given pseudonym have been used up.
     /// This signals that a new SSA must be committed.
-    pub fn next_share(
+    fn next_share(
         &self,
         pseudonym: &S::Pseudonym,
         msg: &impl AsRef<[u8]>,
@@ -139,7 +142,10 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                         return Err(errors::PixError::InvalidInput);
                     }
 
-                    return Ok(Some((poly.spi, poly.next_share(x))));
+                    return Ok(Some(GeneratedShare {
+                        id: poly.spi,
+                        share: poly.next_share(x),
+                    }));
                 }
                 // If we replaced VecDeque with a lock-free alternative, we could remove
                 // the mutex, but the alternative would need to effectively deallocate,
@@ -154,10 +160,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
     ///
     /// Returns the new random SSA-commitment and the corresponding SSA share verifier.
-    pub fn new_ssa_commitment(
-        &self,
-        pseudonym: &S::Pseudonym,
-    ) -> errors::Result<(PixGroup<S>, Vec<PartialSsaShareVerifier<S>>)> {
+    fn new_ssa_commitment(&self, pseudonym: &S::Pseudonym) -> errors::Result<SsaCommitment<S>> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
@@ -256,7 +259,11 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
                 }
             });
 
-        Ok((PixGroup::<S>::generator() * our_commitment_secret, verifiers))
+        Ok(SsaCommitment {
+            ssa_id: *verifiers.first().expect("verifiers must be populated").spi.as_ref(),
+            ssa_commitment: PixGroup::<S>::generator() * our_commitment_secret,
+            verifiers,
+        })
     }
 }
 
@@ -286,7 +293,7 @@ mod tests {
     use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
 
     use super::*;
-    use crate::tests::TestSpec;
+    use crate::{tests::TestSpec, traits::EntryShareGenerator};
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
@@ -297,14 +304,16 @@ mod tests {
         });
 
         let p1 = SimplePseudonym::random();
-        let (_, v) = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1)?;
+        let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
             assert_eq!(v[i].spi.ssa_index(), 1);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
-        let (_, v) = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1)?;
+        let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
             assert_eq!(v[i].spi.ssa_index(), 2);
@@ -312,21 +321,24 @@ mod tests {
         }
 
         let p2 = SimplePseudonym::random();
-        let (_, v) = generator.new_ssa_commitment(&p2)?;
+        let c = generator.new_ssa_commitment(&p2)?;
+        let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p2);
             assert_eq!(v[i].spi.ssa_index(), 1);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
-        let (_, v) = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1)?;
+        let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
             assert_eq!(v[i].spi.ssa_index(), 3);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
-        let (_, v) = generator.new_ssa_commitment(&p2)?;
+        let c = generator.new_ssa_commitment(&p2)?;
+        let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p2);
             assert_eq!(v[i].spi.ssa_index(), 2);
@@ -348,24 +360,24 @@ mod tests {
         generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u16 {
-            let (spi, _) = generator
+            let g = generator
                 .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
-            assert_eq!(spi.pseudonym(), &p1);
-            assert_eq!(spi.ssa_index(), 1);
-            assert_eq!(spi.poly_index(), i / 4);
+            assert_eq!(g.id.pseudonym(), &p1);
+            assert_eq!(g.id.ssa_index(), 1);
+            assert_eq!(g.id.poly_index(), i / 4);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
         generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u16 {
-            let (spi, _) = generator
+            let g = generator
                 .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
-            assert_eq!(spi.pseudonym(), &p1);
-            assert_eq!(spi.ssa_index(), 2);
-            assert_eq!(spi.poly_index(), i / 4);
+            assert_eq!(g.id.pseudonym(), &p1);
+            assert_eq!(g.id.ssa_index(), 2);
+            assert_eq!(g.id.poly_index(), i / 4);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
@@ -381,17 +393,18 @@ mod tests {
         });
 
         let p = SimplePseudonym::random();
-        let (_, vs) = generator.new_ssa_commitment(&p)?;
+        let c = generator.new_ssa_commitment(&p)?;
+        let vs = c.verifiers;
 
         for poly_index in 0..10 {
             for _ in 0..12 {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
-                let (_, share) = generator
+                let g = generator
                     .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
 
-                vs[poly_index].verify(&share, x)?;
+                vs[poly_index].verify(&g.share, x)?;
             }
         }
 
@@ -407,8 +420,9 @@ mod tests {
         });
 
         let p = SimplePseudonym::random();
-        let (orig_commitment, vs) = generator.new_ssa_commitment(&p)?;
-        let vs = vs.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
+        let c = generator.new_ssa_commitment(&p)?;
+        let orig_commitment = c.ssa_commitment;
+        let vs = c.verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
         let mut recovered_secret = k256::Scalar::default();
         for poly_index in 0..10 {
@@ -416,12 +430,12 @@ mod tests {
             for _ in 0..12 {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
-                let (spi, share) = generator
+                let g = generator
                     .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
-                    identifier: TestSpec::msg_to_scalar(&spi, x)?.into(),
-                    value: k256::Scalar::from_repr(share.0).unwrap().into(),
+                    identifier: TestSpec::msg_to_scalar(&g.id, x)?.into(),
+                    value: k256::Scalar::from_repr(g.share.0).unwrap().into(),
                 };
 
                 vs[poly_index]

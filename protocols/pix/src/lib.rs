@@ -27,8 +27,11 @@ mod traits;
 mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
-pub use reconstructor::{ReconstructorEvent, SsaReconstructor, SsaReconstructorConfig};
-pub use traits::{CommitmentInsertionResult, ExitAcknowledgementShareProcessor};
+pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
+pub use traits::{
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, GeneratedShare, RecoveredSsa, SsaCommitment,
+    SsaCommitmentState,
+};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
@@ -104,12 +107,11 @@ pub(crate) type CompletedShare<S> =
 
 #[inline]
 pub(crate) fn into_completed_share<S: PixSpec>(
-    spi: SsaPolynomialId<S>,
-    msg: impl AsRef<[u8]>,
+    identifier: PixScalar<S>,
     share: &PartialSsaShare<S>,
 ) -> errors::Result<CompletedShare<S>> {
     Ok(DefaultShare {
-        identifier: S::msg_to_scalar(&spi, msg)?.into(),
+        identifier: identifier.into(),
         value: Option::from(PixScalar::<S>::from_repr(share.0.clone()))
             .map(|s: PixScalar<S>| s.into())
             .ok_or(vsss_rs::Error::InvalidShare)?,
@@ -240,7 +242,8 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
     /// Verifies that the given `share` corresponding to `msg` belongs to the polynomial associated with this verifier.
     #[inline]
     pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<()> {
-        self.verify_completed_share(&into_completed_share(self.spi, msg, share)?)
+        let msg = S::msg_to_scalar(&self.spi, msg)?;
+        self.verify_completed_share(&into_completed_share(msg, share)?)
     }
 }
 

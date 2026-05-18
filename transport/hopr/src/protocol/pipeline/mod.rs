@@ -18,7 +18,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
     CoefficientIndex, CommitmentInsertionResult, ExitAcknowledgementShareProcessor, PixGroupRepr, PixScalar, PixSpec,
-    PolynomialIndex, TaggedEncryptedPartialSsaShare,
+    PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -718,18 +718,19 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     #[inline]
     fn insert_coefficient_commitments(
         &self,
+        ssa_id: SsaId<HoprPixSpec>,
         _: CoefficientIndex,
         _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
-    ) -> Result<hopr_protocol_pix::CommitmentInsertionResult<HoprPixSpec>, Self::Error> {
-        Ok(CommitmentInsertionResult::NoAction)
+    ) -> Result<SsaCommitmentState<HoprPixSpec>, Self::Error> {
+        Ok(SsaCommitmentState::new(ssa_id))
     }
 
     #[inline]
-    fn insert_encrypted_share<T: Into<PixScalar<HoprPixSpec>>>(
+    fn insert_encrypted_share(
         &self,
         _: &OffchainPublicKey,
         _: HalfKeyChallenge,
-        _: TaggedEncryptedPartialSsaShare<HoprPixSpec, T>,
+        _: TaggedEncryptedPartialSsaShare<HoprPixSpec>,
     ) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -739,7 +740,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         &self,
         _: OffchainPublicKey,
         _: Vec<Acknowledgement>,
-    ) -> Result<Vec<PixScalar<HoprPixSpec>>, Self::Error> {
+    ) -> Result<Vec<RecoveredSsa<HoprPixSpec>>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
 }
