@@ -575,6 +575,66 @@ mod test {
     }
 
     #[test]
+    fn complete_graph_should_yield_all_and_only_simple_paths() {
+        use petgraph::graph::NodeIndex;
+
+        // Build K5: complete directed graph on 5 nodes (every ordered pair gets an edge).
+        let edges: Vec<(u32, u32)> = (0u32..5)
+            .flat_map(|a| (0u32..5).filter(move |&b| b != a).map(move |b| (a, b)))
+            .collect();
+        let graph = DiGraph::<i32, ()>::from_edges(edges);
+
+        let src: NodeIndex = 0.into();
+        let dst: NodeIndex = 4.into();
+        let targets = HashSet::from_iter([dst]);
+
+        // ── Without exclusions ─────────────────────────────────────────────
+        let all_paths: Vec<(Vec<NodeIndex>, i32)> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+            &graph, src, &targets, None, 0, None, 0, None, |c, _, _| c,
+        )
+        .collect();
+
+        // Intermediate pool = {1, 2, 3} (3 nodes).
+        // Simple paths = P(3,0) + P(3,1) + P(3,2) + P(3,3) = 1 + 3 + 6 + 6 = 16.
+        assert_eq!(all_paths.len(), 16, "expected 16 simple paths in K5 from 0 to 4");
+
+        for (path, _) in &all_paths {
+            assert_eq!(path.first(), Some(&src), "path must start at src: {path:?}");
+            assert_eq!(path.last(), Some(&dst), "path must end at dst: {path:?}");
+            // Uniqueness: collect into a set and compare lengths.
+            let unique: HashSet<&NodeIndex, RandomState> = path.iter().collect();
+            assert_eq!(unique.len(), path.len(), "duplicate node in path: {path:?}");
+        }
+
+        // ── With excluded_nodes = {2} ──────────────────────────────────────
+        let excluded: HashSet<NodeIndex, RandomState> = HashSet::from_iter([NodeIndex::from(2u32)]);
+        let restricted: Vec<(Vec<NodeIndex>, i32)> = all_simple_paths_multi::<_, _, RandomState, _, _>(
+            &graph, src, &targets, Some(&excluded), 0, None, 0, None, |c, _, _| c,
+        )
+        .collect();
+
+        // Intermediate pool shrinks to {1, 3} (2 nodes).
+        // P(2,0) + P(2,1) + P(2,2) = 1 + 2 + 2 = 5.
+        assert_eq!(restricted.len(), 5, "expected 5 paths when node 2 is excluded");
+
+        for (path, _) in &restricted {
+            assert!(!path.contains(&NodeIndex::from(2u32)), "excluded node 2 in path: {path:?}");
+            let unique: HashSet<&NodeIndex, RandomState> = path.iter().collect();
+            assert_eq!(unique.len(), path.len(), "duplicate node in path: {path:?}");
+        }
+
+        // Restricted paths are a strict subset: every restricted path also appears in all_paths.
+        let all_set: Vec<Vec<usize>> = all_paths
+            .iter()
+            .map(|(p, _)| p.iter().map(|n| n.index()).collect())
+            .collect();
+        for (path, _) in &restricted {
+            let as_usize: Vec<usize> = path.iter().map(|n| n.index()).collect();
+            assert!(all_set.contains(&as_usize), "restricted path not in all-paths: {path:?}");
+        }
+    }
+
+    #[test]
     fn excluded_from_should_be_ignored() {
         // Excluding the source itself must not prevent paths from starting.
         let graph = DiGraph::<i32, ()>::from_edges([(0, 1), (1, 2)]);
