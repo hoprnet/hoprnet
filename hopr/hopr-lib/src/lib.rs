@@ -68,7 +68,8 @@ use hopr_api::{
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+    HoprSession, HoprSessionConfigurator, RoutingOptions, SessionCapabilities, SessionCapability, SessionTarget,
+    SurbBalancerConfig,
 };
 pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_utils::runtime::prelude::spawn;
@@ -99,8 +100,20 @@ impl HopRouting {
         self.0.count_hops()
     }
 
-    /// Returns the underlying transport routing options.
-    pub fn as_options(&self) -> &hopr_api::types::internal::routing::RoutingOptions {
+    /// Invert the path if it is an intermediate path, otherwise return self.
+    pub fn invert(&self) -> Self {
+        match &self.0 {
+            RoutingOptions::Hops(count) => Self(RoutingOptions::Hops(*count)),
+            RoutingOptions::IntermediatePath(path) => Self(RoutingOptions::IntermediatePath(
+                path.as_ref().iter().rev().cloned().collect(),
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "session-client")]
+impl AsRef<hopr_api::types::internal::routing::RoutingOptions> for HopRouting {
+    fn as_ref(&self) -> &hopr_api::types::internal::routing::RoutingOptions {
         &self.0
     }
 }

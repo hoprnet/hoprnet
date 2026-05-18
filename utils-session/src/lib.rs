@@ -972,7 +972,7 @@ mod tests {
             destination: Address::default(),
             target: SessionTargetSpec::Plain("localhost:8080".into()),
             forward_path: route.clone(),
-            return_path: route,
+            return_path: route.invert(),
             max_client_sessions: 5,
             max_surb_upstream: None,
             response_buffer: None,
