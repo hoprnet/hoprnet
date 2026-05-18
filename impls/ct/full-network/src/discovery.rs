@@ -37,7 +37,7 @@ impl<U> FullNetworkDiscovery<U> {
 /// is already excluded by the graph crate. This helper also strips a leading `me`
 /// defensively in case the graph-crate contract changes, so the result is always
 /// a plain intermediate list suitable for `IntermediatePath`.
-fn strip_loopback_trailer(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
+fn strip_loopback_endpoints(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
     if path.last() == Some(me) {
         path.pop();
     }
@@ -98,7 +98,7 @@ where
 
                 loopback_path_stream(self.cfg, self.graph.clone())
                     .filter_map(move |(path, _)| {
-                        let intermediates = strip_loopback_trailer(path, &me);
+                        let intermediates = strip_loopback_endpoints(path, &me);
                         futures::future::ready(loopback_routing(me_node, intermediates))
                     })
                     .boxed()
@@ -126,7 +126,7 @@ where
 
         let me_node: NodeId = me.into();
         let intermediates = loopback_path_stream(cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
-            let intermediates = strip_loopback_trailer(path, &me);
+            let intermediates = strip_loopback_endpoints(path, &me);
             let routing = loopback_routing(me_node, intermediates).map(|r| ProbeRouting::Looping((r, path_id)));
             futures::future::ready(routing)
         });
@@ -625,7 +625,7 @@ mod tests {
     async fn loopback_routing_should_reject_full_path_with_me() -> anyhow::Result<()> {
         // Verify that loopback_routing rejects paths that are too long for BoundedVec.
         // simple_loopback_to_self now returns [a, b, me] (no leading me); after
-        // strip_loopback_trailer this becomes [a, b], which is the correct input.
+        // strip_loopback_endpoints this becomes [a, b], which is the correct input.
         let me = random_key();
         let a = random_key();
         let b = random_key();
