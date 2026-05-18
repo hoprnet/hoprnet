@@ -38,6 +38,7 @@ use hopr_utils::runtime::AbortableList;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 
 lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: HoprBalance = HoprBalance::from_str("0.1 wxHOPR").unwrap();
@@ -352,12 +353,15 @@ async fn peer_setup_for_with_all(
 
         let ticket_factory = Arc::new(HoprTicketFactory::new(RedbStore::new_temp()?));
 
+        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+
         let encoder = HoprEncoder::new(
             PEERS_CHAIN[i].clone(),
             connector.clone(),
             surb_store.clone(),
             ticket_factory.clone(),
             channels_dst,
+            ssa_gen,
             codec_config,
         );
 
