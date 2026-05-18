@@ -601,7 +601,11 @@ mod test {
         for (path, _) in &all_paths {
             assert_eq!(path.first(), Some(&src), "path must start at src: {path:?}");
             assert_eq!(path.last(), Some(&dst), "path must end at dst: {path:?}");
-            // Uniqueness: collect into a set and compare lengths.
+            // src and dst must not appear anywhere in the interior of the path.
+            let interior = &path[1..path.len() - 1];
+            assert!(!interior.contains(&src), "src repeated inside path: {path:?}");
+            assert!(!interior.contains(&dst), "dst repeated inside path: {path:?}");
+            // No node anywhere in the path (including src and dst) appears more than once.
             let unique: HashSet<&NodeIndex, RandomState> = path.iter().collect();
             assert_eq!(unique.len(), path.len(), "duplicate node in path: {path:?}");
         }
