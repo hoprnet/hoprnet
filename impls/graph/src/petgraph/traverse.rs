@@ -41,6 +41,7 @@ where
         &inner.graph,
         source,
         destinations,
+        None,
         intermediates,
         Some(intermediates),
         initial_value,
