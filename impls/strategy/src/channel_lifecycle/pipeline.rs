@@ -302,7 +302,12 @@ where
     }
 
     /// Spawn an open transaction for a new channel to `dest`.  Returns `true`
-    /// if submitted.
+    /// if a channel action was submitted (either an open or an immediate fund).
+    ///
+    /// Before submitting, queries the current on-chain channel state so the
+    /// strategy converges to the desired state in this tick rather than
+    /// deferring to the next one.  Each candidate runs this check in its own
+    /// spawned task, so N candidates → N concurrent reads without serialisation.
     fn try_open_channel(&self, dest: Address, amount: HoprBalance) -> bool {
         if !self.open_in_flight.insert(dest) {
             return false;
@@ -310,6 +315,37 @@ where
         if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
             self.open_in_flight.remove(&dest);
             return false;
+        }
+
+        // Pre-check current on-chain state.  The snapshot `all_channels` in
+        // `pipeline_inner` can be stale (race between chain events and the
+        // snapshot pass), so we re-read here before spending a tx slot.
+        {
+            let chain = self.node.chain_api();
+            let me = *chain.me();
+            match chain.channel_by_parties(&me, &dest) {
+                Ok(Some(existing)) => match existing.status {
+                    ChannelStatus::Open => {
+                        self.open_in_flight.remove(&dest);
+                        if existing.balance > self.cfg.funding.lower_balance_threshold {
+                            info!(%dest, balance = %existing.balance, "channel-lifecycle: already open at desired stake, skipping");
+                            return false;
+                        }
+                        info!(%dest, balance = %existing.balance, "channel-lifecycle: already open below threshold, funding immediately");
+                        return self.try_fund_channel(&existing, self.cfg.funding.topup_balance);
+                    }
+                    ChannelStatus::PendingToClose(_) => {
+                        self.open_in_flight.remove(&dest);
+                        debug!(%dest, "channel-lifecycle: channel pending closure, deferring open");
+                        return false;
+                    }
+                    _ => {} // Closed — fall through to open
+                },
+                Ok(None) => {} // No channel yet — fall through to open
+                Err(_) => {
+                    warn!(%dest, "channel-lifecycle: channel_by_parties check failed, proceeding with open");
+                }
+            }
         }
 
         info!(%dest, %amount, "channel-lifecycle: opening channel");
@@ -324,9 +360,10 @@ where
                 Ok(confirmation) => {
                     if let Err(e) = confirmation.await {
                         warn!(%dest, %e, "channel-lifecycle: open tx failed");
-                        in_flight.remove(&dest);
                     }
-                    // On success: ChannelOpened event clears in_flight.
+                    // Always clear in_flight on success — ChannelOpened event also
+                    // clears it as a no-op fallback for the normal open path.
+                    in_flight.remove(&dest);
                 }
                 Err(e) => {
                     warn!(%dest, %e, "channel-lifecycle: failed to submit open tx");
@@ -1357,6 +1394,237 @@ mod tests {
         assert!(
             fresh.open_in_flight.is_empty(),
             "open_in_flight stays empty — remove was a no-op"
+        );
+
+        Ok(())
+    }
+
+    /// try_open_channel: channel is already Open with stake >= lower_balance_threshold.
+    /// Expected: no FundChannel tx submitted; open_in_flight empty after the call.
+    #[tokio::test]
+    async fn open_pass_skips_already_open_at_target_stake() -> anyhow::Result<()> {
+        let lower_threshold = HoprBalance::from(3_u32);
+        let initial_balance = HoprBalance::from(10_u32);
+
+        let existing_channel = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(5_u32) // balance 5 > threshold 3 → at desired stake
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([existing_channel])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            funding: FundingConfig {
+                lower_balance_threshold: lower_threshold,
+                initial_balance,
+                min_safe_balance_required: HoprBalance::from(1_u32),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let inner = ChannelLifecycleStrategyInner {
+            cfg,
+            node: Arc::new(ChainNode(Arc::clone(&connector))),
+            open_in_flight: Arc::new(dashmap::DashSet::new()),
+            fund_in_flight: Arc::new(dashmap::DashSet::new()),
+            close_in_flight: Arc::new(dashmap::DashSet::new()),
+            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
+            cooldown: Arc::new(DashMap::new()),
+            start_epoch: std::time::Instant::now(),
+            last_observed: Arc::new(DashMap::new()),
+            peer_ticket_activity: Arc::new(DashMap::new()),
+            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+        };
+
+        let result = inner.try_open_channel(*ALICE, initial_balance);
+
+        // No open tx should have been submitted; no fund tx either.
+        assert!(
+            !result,
+            "try_open_channel should return false for already-open-at-stake"
+        );
+        assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
+        assert!(inner.fund_in_flight.is_empty(), "fund_in_flight must be empty");
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+        assert_eq!(
+            channels.iter().find(|c| c.destination == *ALICE).map(|c| c.balance),
+            Some(HoprBalance::from(5_u32)),
+            "on-chain balance must be unchanged"
+        );
+
+        Ok(())
+    }
+
+    /// try_open_channel: channel is already Open but stake < lower_balance_threshold.
+    /// Expected: one FundChannel tx submitted immediately (no waiting for next tick);
+    /// open_in_flight empty; on-chain balance increases to initial_balance.
+    #[tokio::test]
+    async fn open_pass_tops_up_already_open_below_threshold() -> anyhow::Result<()> {
+        let lower_threshold = HoprBalance::from(3_u32);
+        let topup_balance = HoprBalance::from(8_u32);
+
+        let existing_channel = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(2_u32) // balance 2 ≤ threshold 3 → underfunded
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([existing_channel])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            funding: FundingConfig {
+                lower_balance_threshold: lower_threshold,
+                topup_balance,
+                min_safe_balance_required: HoprBalance::from(1_u32),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let inner = ChannelLifecycleStrategyInner {
+            cfg,
+            node: Arc::new(ChainNode(Arc::clone(&connector))),
+            open_in_flight: Arc::new(dashmap::DashSet::new()),
+            fund_in_flight: Arc::new(dashmap::DashSet::new()),
+            close_in_flight: Arc::new(dashmap::DashSet::new()),
+            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
+            cooldown: Arc::new(DashMap::new()),
+            start_epoch: std::time::Instant::now(),
+            last_observed: Arc::new(DashMap::new()),
+            peer_ticket_activity: Arc::new(DashMap::new()),
+            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+        };
+
+        let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32));
+
+        // Should return true (fund tx submitted) and clear open_in_flight.
+        assert!(result, "try_open_channel should return true when delegating to fund");
+        assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
+
+        // Wait for the fund tx to confirm.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+        assert!(
+            channels
+                .iter()
+                .any(|c| c.destination == *ALICE && c.balance > HoprBalance::from(2_u32)),
+            "on-chain balance must be increased after fund; got {channels:?}"
+        );
+
+        Ok(())
+    }
+
+    /// try_open_channel: no pre-existing channel for destination.
+    /// Expected: one open (FundChannel) tx submitted; on-chain channel created.
+    #[tokio::test]
+    async fn open_pass_opens_fresh_channel_when_missing() -> anyhow::Result<()> {
+        let initial_balance = HoprBalance::from(10_u32);
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([]) // No pre-existing channels
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            funding: FundingConfig {
+                initial_balance,
+                min_safe_balance_required: HoprBalance::from(1_u32),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let inner = ChannelLifecycleStrategyInner {
+            cfg,
+            node: Arc::new(ChainNode(Arc::clone(&connector))),
+            open_in_flight: Arc::new(dashmap::DashSet::new()),
+            fund_in_flight: Arc::new(dashmap::DashSet::new()),
+            close_in_flight: Arc::new(dashmap::DashSet::new()),
+            finalize_in_flight: Arc::new(dashmap::DashSet::new()),
+            cooldown: Arc::new(DashMap::new()),
+            start_epoch: std::time::Instant::now(),
+            last_observed: Arc::new(DashMap::new()),
+            peer_ticket_activity: Arc::new(DashMap::new()),
+            peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+        };
+
+        let result = inner.try_open_channel(*ALICE, initial_balance);
+        assert!(result, "try_open_channel should return true for a fresh channel");
+
+        // Wait for the open tx to confirm.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+        assert!(
+            channels
+                .iter()
+                .any(|c| c.destination == *ALICE && c.status == ChannelStatus::Open),
+            "BOB→ALICE channel must be Open after open tx; got {channels:?}"
         );
 
         Ok(())
