@@ -149,6 +149,10 @@ pub struct HoprSessionClientConfig {
 
 /// Session client configuration for explicit intermediate-path routing.
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[deprecated(
+    since = "4.0.2-rc.1",
+    note = "temporary compatibility API; remove once the explicit path is not needed anymore."
+)]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct HoprSessionClientExplicitPathConfig {
     /// Explicit forward intermediate path.
@@ -369,6 +373,10 @@ where
 
     /// Opens a session using explicit intermediate paths for forward and return routing.
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[deprecated(
+        since = "4.0.2-rc.1",
+        note = "temporary compatibility API; remove once the explicit path is not needed anymore."
+    )]
     pub async fn connect_to_using_explicit_path(
         &self,
         destination: hopr_api::types::primitive::prelude::Address,
