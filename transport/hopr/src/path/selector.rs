@@ -12,8 +12,8 @@ use super::{
 ///
 /// `length` is the number of edges to traverse (= intermediate hops + 1).
 /// `take` caps the number of candidate paths returned.
-/// The source node is stripped from every returned path; callers receive
-/// `([intermediates..., dest], cost)`.
+/// The graph crate returns only the intermediate nodes (both `src` and `dest` stripped);
+/// this function re-appends `dest` so callers receive `([intermediates..., dest], cost)`.
 fn compute_paths<G, C>(
     graph: &G,
     src: &OffchainPublicKey,
@@ -33,11 +33,11 @@ where
         .filter_map(|(path, _, cost)| {
             tracing::trace!(?path, ?cost, "evaluating candidate path");
             if cost > 0.0 {
-                // Drop the first element (src) — callers expect [intermediates..., dest].
-                Some(PathWithCost {
-                    path: path.into_iter().skip(1).collect::<Vec<_>>(),
-                    cost,
-                })
+                // The graph crate returns only intermediates (src and dest already stripped).
+                // Re-append dest so callers receive [intermediates..., dest].
+                let mut path = path;
+                path.push(*dest);
+                Some(PathWithCost { path, cost })
             } else {
                 None
             }
@@ -122,15 +122,13 @@ where
                     return None;
                 }
 
-                // Strip source to get intermediate hops only.
-                // Guard: if dest already appears as an intermediate, appending it
-                // again creates a [dest, ..., dest] path that ValidatedPath::new
-                // would reject as a non-adjacent duplicate — skip early.
-                let candidate: Vec<_> = path.into_iter().skip(1).collect();
-                if candidate.contains(dest) {
+                // The graph crate already strips `src`; `path` is [intermediates…, terminator].
+                // Guard: if dest already appears as an intermediate or terminator, appending it
+                // would produce a non-adjacent duplicate that ValidatedPath::new rejects — skip early.
+                if path.contains(dest) {
                     return None;
                 }
-                let mut candidate = candidate;
+                let mut candidate = path;
                 candidate.push(*dest);
 
                 // Skip paths already found by Phase 1 (compare path component only).

@@ -31,17 +31,14 @@ impl<U> FullNetworkDiscovery<U> {
     }
 }
 
-/// Strip the leading source and trailing destination from a loopback path.
+/// Strip the trailing loopback closure from a loopback path.
 ///
-/// `simple_loopback_to_self` returns `[me, intermediates..., me]`.  The caller
-/// adds `me` as the destination and the planner prepends `me` as source, so
-/// only the interior intermediate nodes are needed.
-fn strip_loopback_endpoints(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
+/// `simple_loopback_to_self` returns `[intermediates..., me]` — the leading source
+/// is already excluded by the graph crate; only the closing `me` needs to be removed
+/// so the caller can pass the remaining intermediates to `IntermediatePath`.
+fn strip_loopback_trailer(mut path: Vec<OffchainPublicKey>, me: &OffchainPublicKey) -> Vec<OffchainPublicKey> {
     if path.last() == Some(me) {
         path.pop();
-    }
-    if path.first() == Some(me) {
-        path.remove(0);
     }
     path
 }
@@ -97,7 +94,7 @@ where
 
                 loopback_path_stream(self.cfg, self.graph.clone())
                     .filter_map(move |(path, _)| {
-                        let intermediates = strip_loopback_endpoints(path, &me);
+                        let intermediates = strip_loopback_trailer(path, &me);
                         futures::future::ready(loopback_routing(me_node, intermediates))
                     })
                     .boxed()
@@ -125,7 +122,7 @@ where
 
         let me_node: NodeId = me.into();
         let intermediates = loopback_path_stream(cfg, self.graph.clone()).filter_map(move |(path, path_id)| {
-            let intermediates = strip_loopback_endpoints(path, &me);
+            let intermediates = strip_loopback_trailer(path, &me);
             let routing = loopback_routing(me_node, intermediates).map(|r| ProbeRouting::Looping((r, path_id)));
             futures::future::ready(routing)
         });
@@ -622,18 +619,20 @@ mod tests {
 
     #[tokio::test]
     async fn loopback_routing_should_reject_full_path_with_me() -> anyhow::Result<()> {
-        // Verify that passing the full path [me, a, b, me] to loopback_routing
-        // exceeds BoundedVec capacity and returns None.
+        // Verify that loopback_routing rejects paths that are too long for BoundedVec.
+        // simple_loopback_to_self now returns [a, b, me] (no leading me); after
+        // strip_loopback_trailer this becomes [a, b], which is the correct input.
         let me = random_key();
         let a = random_key();
         let b = random_key();
         let me_node = NodeId::Offchain(me);
 
-        // Full path as returned by simple_loopback_to_self: [me, a, b, me]
-        let full_path = vec![me, a, b, me];
+        // Path with too many elements: [a, b, c, me] — 4 elements exceeds BoundedVec<3>.
+        let c = random_key();
+        let oversized_path = vec![a, b, c, me];
         assert!(
-            loopback_routing(me_node, full_path).is_none(),
-            "full path [me, a, b, me] should exceed BoundedVec<3> and return None"
+            loopback_routing(me_node, oversized_path).is_none(),
+            "path [a, b, c, me] should exceed BoundedVec<3> and return None"
         );
 
         // Stripped path (intermediates only): [a, b]
