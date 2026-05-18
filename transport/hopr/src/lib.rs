@@ -656,6 +656,12 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        let ssa_generator = Arc::new(
+            hopr_protocol_pix::SsaShareGenerator::<hopr_crypto_packet::HoprPixSpec>::new(
+                hopr_protocol_pix::SsaGeneratorConfig::default(),
+            ),
+        );
+
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
             .transport((mixing_channel_tx, wire_msg_rx))
@@ -663,6 +669,7 @@ where
             .surb_store(self.path_planner.surb_store.clone())
             .chain_api(self.chain_api.clone())
             .ticket_factory(ticket_factory)
+            .ssa_generator(ssa_generator)
             .channels_dst(channels_dst)
             .with_counters(self.counters.clone())
             .with_config(self.cfg.packet);

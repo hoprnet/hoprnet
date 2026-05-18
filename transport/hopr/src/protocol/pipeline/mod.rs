@@ -17,8 +17,8 @@ use hopr_crypto_packet::{HoprPixScalar, HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
-    CoefficientIndex, CommitmentInsertionResult, ExitAcknowledgementShareProcessor, PixGroupRepr, PixScalar, PixSpec,
-    PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex,
+    RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -571,7 +571,7 @@ where
                 {
                     Ok(Ok(ssa_priv_keys)) => {
                         if let Err(error) = ssa_event
-                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(|r| Ok(r.ssa))))
                             .await
                         {
                             tracing::error!(%peer, %error, "failed to send pix resolution");
