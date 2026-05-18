@@ -94,7 +94,7 @@ impl HopRouting {
     pub const MAX_HOPS: usize = hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS;
 
     /// Returns the configured number of hops.
-    pub fn hop_count(&self) -> usize {
+    pub fn hop_count(self) -> usize {
         self.0.into()
     }
 }
