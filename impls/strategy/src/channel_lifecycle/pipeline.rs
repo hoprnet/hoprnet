@@ -301,20 +301,22 @@ where
         true
     }
 
-    /// Spawn an open transaction for a new channel to `dest`.  Returns `true`
-    /// if a channel action was submitted (either an open or an immediate fund).
+    /// Spawn an open transaction for a new channel to `dest`.  Returns the
+    /// committed amount if a chain action was submitted (either a fresh open or
+    /// an immediate top-up), or `None` if no action was taken.
     ///
-    /// Before submitting, queries the current on-chain channel state so the
-    /// strategy converges to the desired state in this tick rather than
-    /// deferring to the next one.  Each candidate runs this check in its own
-    /// spawned task, so N candidates → N concurrent reads without serialisation.
-    fn try_open_channel(&self, dest: Address, amount: HoprBalance) -> bool {
+    /// Before submitting, queries the current on-chain channel state from the
+    /// pipeline task so the strategy converges to the desired state in this
+    /// tick rather than deferring to the next one.  The `channel_by_parties`
+    /// call is serviced by the in-process cache (moka + RocksDB), so the
+    /// overhead is a fast in-memory lookup in the common case.
+    fn try_open_channel(&self, dest: Address, amount: HoprBalance) -> Option<HoprBalance> {
         if !self.open_in_flight.insert(dest) {
-            return false;
+            return None;
         }
         if self.total_in_flight() > self.cfg.concurrency.max_concurrent_actions {
             self.open_in_flight.remove(&dest);
-            return false;
+            return None;
         }
 
         // Pre-check current on-chain state.  The snapshot `all_channels` in
@@ -327,23 +329,24 @@ where
                 Ok(Some(existing)) => match existing.status {
                     ChannelStatus::Open => {
                         self.open_in_flight.remove(&dest);
-                        if existing.balance > self.cfg.funding.lower_balance_threshold {
+                        if existing.balance >= self.cfg.funding.lower_balance_threshold {
                             info!(%dest, balance = %existing.balance, "channel-lifecycle: already open at desired stake, skipping");
-                            return false;
+                            return None;
                         }
                         info!(%dest, balance = %existing.balance, "channel-lifecycle: already open below threshold, funding immediately");
-                        return self.try_fund_channel(&existing, self.cfg.funding.topup_balance);
+                        let topup = self.cfg.funding.topup_balance;
+                        return self.try_fund_channel(&existing, topup).then_some(topup);
                     }
                     ChannelStatus::PendingToClose(_) => {
                         self.open_in_flight.remove(&dest);
                         debug!(%dest, "channel-lifecycle: channel pending closure, deferring open");
-                        return false;
+                        return None;
                     }
                     _ => {} // Closed — fall through to open
                 },
                 Ok(None) => {} // No channel yet — fall through to open
-                Err(_) => {
-                    warn!(%dest, "channel-lifecycle: channel_by_parties check failed, proceeding with open");
+                Err(e) => {
+                    warn!(%dest, %e, "channel-lifecycle: channel_by_parties check failed, proceeding with open");
                 }
             }
         }
@@ -361,8 +364,9 @@ where
                     if let Err(e) = confirmation.await {
                         warn!(%dest, %e, "channel-lifecycle: open tx failed");
                     }
-                    // Always clear in_flight on success — ChannelOpened event also
-                    // clears it as a no-op fallback for the normal open path.
+                    // Clear in_flight once the confirmation future resolves,
+                    // success or failure — the tx is no longer pending either way.
+                    // ChannelOpened event handler also clears it as a no-op fallback.
                     in_flight.remove(&dest);
                 }
                 Err(e) => {
@@ -372,7 +376,7 @@ where
             }
         });
 
-        true
+        Some(amount)
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -596,8 +600,8 @@ where
             if safe_remaining < self.cfg.funding.initial_balance {
                 break;
             }
-            if self.try_open_channel(addr, self.cfg.funding.initial_balance) {
-                safe_remaining -= self.cfg.funding.initial_balance;
+            if let Some(committed) = self.try_open_channel(addr, self.cfg.funding.initial_balance) {
+                safe_remaining -= committed;
             }
         }
 
@@ -1467,8 +1471,8 @@ mod tests {
 
         // No open tx should have been submitted; no fund tx either.
         assert!(
-            !result,
-            "try_open_channel should return false for already-open-at-stake"
+            result.is_none(),
+            "try_open_channel should return None for already-open-at-stake"
         );
         assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
         assert!(inner.fund_in_flight.is_empty(), "fund_in_flight must be empty");
@@ -1489,7 +1493,7 @@ mod tests {
 
     /// try_open_channel: channel is already Open but stake < lower_balance_threshold.
     /// Expected: one FundChannel tx submitted immediately (no waiting for next tick);
-    /// open_in_flight empty; on-chain balance increases to initial_balance.
+    /// open_in_flight empty; on-chain balance increases by topup_balance.
     #[tokio::test]
     async fn open_pass_tops_up_already_open_below_threshold() -> anyhow::Result<()> {
         let lower_threshold = HoprBalance::from(3_u32);
@@ -1535,8 +1539,8 @@ mod tests {
 
         let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32));
 
-        // Should return true (fund tx submitted) and clear open_in_flight.
-        assert!(result, "try_open_channel should return true when delegating to fund");
+        // Should return Some(topup_balance) (fund tx submitted) and clear open_in_flight.
+        assert_eq!(result, Some(topup_balance), "try_open_channel should return Some(topup_balance) when delegating to fund");
         assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
 
         // Wait for the fund tx to confirm.
@@ -1593,7 +1597,7 @@ mod tests {
         let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
         let result = inner.try_open_channel(*ALICE, initial_balance);
-        assert!(result, "try_open_channel should return true for a fresh channel");
+        assert_eq!(result, Some(initial_balance), "try_open_channel should return Some(initial_balance) for a fresh channel");
 
         // Wait for the open tx to confirm.
         tokio::time::sleep(Duration::from_secs(1)).await;
