@@ -38,6 +38,7 @@ serde = [
   "hopr-transport/serde",
 ]
 session-client = ["hopr-api/node-session-client"]
+explicit-path = ["session-client"]
 session-server = ["hopr-api/node-session-server"]
 transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 

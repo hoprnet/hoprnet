@@ -1,6 +1,6 @@
 [package]
 name = "hopr-reference"
-version = "4.2.0"
+version = "4.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -34,6 +34,7 @@ session-server = [
   "hopr-lib/session-server",
 ]
 session-client = ["hopr-lib/session-client"]
+explicit-path = ["session-client", "hopr-lib/explicit-path"]
 testing = [
   "runtime-tokio",
   "session-client",
