@@ -34,6 +34,7 @@ session-server = [
   "hopr-lib/session-server",
 ]
 session-client = ["hopr-lib/session-client"]
+explicit-path = ["session-client", "hopr-lib/explicit-path"]
 testing = [
   "runtime-tokio",
   "session-client",

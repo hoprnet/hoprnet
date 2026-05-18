@@ -60,16 +60,12 @@ use hopr_api::{
         HoprNodeOperations, HoprState, NodeOnchainIdentity,
     },
     tickets::TicketManagement,
-    types::{
-        crypto::prelude::OffchainKeypair,
-        internal::{NodeId, routing::DestinationRouting},
-    },
+    types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, RoutingOptions, SessionCapabilities, SessionCapability, SessionTarget,
-    SurbBalancerConfig,
+    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_utils::runtime::prelude::spawn;
@@ -81,13 +77,13 @@ use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
 #[cfg(feature = "session-client")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HopRouting(
-    #[default(hopr_api::types::internal::routing::RoutingOptions::Hops(
-        hopr_api::types::primitive::bounded::BoundedSize::MIN
-    ))]
-    hopr_api::types::internal::routing::RoutingOptions,
+    #[default(hopr_api::types::primitive::bounded::BoundedSize::MIN)]
+    hopr_api::types::primitive::bounded::BoundedSize<
+        { hopr_api::types::internal::routing::RoutingOptions::MAX_INTERMEDIATE_HOPS },
+    >,
 );
 
 #[cfg(feature = "session-client")]
@@ -97,24 +93,7 @@ impl HopRouting {
 
     /// Returns the configured number of hops.
     pub fn hop_count(&self) -> usize {
-        self.0.count_hops()
-    }
-
-    /// Invert the path if it is an intermediate path, otherwise return self.
-    pub fn invert(self) -> Self {
-        match &self.0 {
-            RoutingOptions::Hops(count) => Self(RoutingOptions::Hops(*count)),
-            RoutingOptions::IntermediatePath(path) => Self(RoutingOptions::IntermediatePath(
-                path.as_ref().iter().rev().cloned().collect(),
-            )),
-        }
-    }
-}
-
-#[cfg(feature = "session-client")]
-impl AsRef<hopr_api::types::internal::routing::RoutingOptions> for HopRouting {
-    fn as_ref(&self) -> &hopr_api::types::internal::routing::RoutingOptions {
-        &self.0
+        usize::from(self.0)
     }
 }
 
@@ -123,36 +102,14 @@ impl TryFrom<usize> for HopRouting {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(hopr_api::types::internal::routing::RoutingOptions::Hops(
-            value.try_into()?,
-        )))
-    }
-}
-
-#[cfg(feature = "session-client")]
-impl TryFrom<Vec<NodeId>> for HopRouting {
-    type Error = hopr_api::types::primitive::errors::GeneralError;
-
-    fn try_from(value: Vec<NodeId>) -> Result<Self, Self::Error> {
-        Ok(Self(
-            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.try_into()?),
-        ))
-    }
-}
-
-#[cfg(feature = "session-client")]
-impl TryFrom<Vec<OffchainPublicKey>> for HopRouting {
-    type Error = hopr_api::types::primitive::errors::GeneralError;
-
-    fn try_from(value: Vec<OffchainPublicKey>) -> Result<Self, Self::Error> {
-        Self::try_from(value.into_iter().map(NodeId::from).collect::<Vec<_>>())
+        Ok(Self(value.try_into()?))
     }
 }
 
 #[cfg(feature = "session-client")]
 impl From<HopRouting> for hopr_api::types::internal::routing::RoutingOptions {
     fn from(value: HopRouting) -> Self {
-        value.0
+        Self::Hops(value.0)
     }
 }
 
@@ -188,13 +145,13 @@ pub struct HoprSessionClientConfig {
 }
 
 /// Session client configuration for explicit intermediate-path routing.
-#[cfg(feature = "session-client")]
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
 pub struct HoprSessionClientExplicitPathConfig {
     /// Explicit forward intermediate path.
-    pub forward_path: Vec<NodeId>,
+    pub forward_path: Vec<hopr_api::types::internal::NodeId>,
     /// Explicit return intermediate path.
-    pub return_path: Vec<NodeId>,
+    pub return_path: Vec<hopr_api::types::internal::NodeId>,
     /// Capabilities offered by the session.
     #[default(_code = "SessionCapability::Segmentation.into()")]
     pub capabilities: SessionCapabilities,
@@ -223,7 +180,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
     }
 }
 
-#[cfg(feature = "session-client")]
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
 impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
@@ -408,8 +365,8 @@ where
     }
 
     /// Opens a session using explicit intermediate paths for forward and return routing.
-    #[cfg(feature = "session-client")]
-    pub async fn connect_to_with_explicit_path(
+    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    pub async fn connect_to_using_explicit_path(
         &self,
         destination: hopr_api::types::primitive::prelude::Address,
         target: SessionTarget,
@@ -446,19 +403,6 @@ where
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
-        if matches!(
-            cfg.forward_path.as_ref(),
-            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(_)
-        ) || matches!(
-            cfg.return_path.as_ref(),
-            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(_)
-        ) {
-            return Err(HoprLibError::GeneralError(
-                "connect_to only supports hop-count routing; use connect_to_with_explicit_path for explicit routes"
-                    .into(),
-            ));
-        }
-
         self.connect_to_with_transport_config(destination, target, hopr_transport::SessionClientConfig::from(cfg))
             .await
     }
@@ -780,6 +724,7 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context as _;
     use hopr_transport::Keypair;
 
     use super::*;
@@ -891,12 +836,12 @@ mod tests {
         assert!(unknown.is_unavailable());
     }
 
-    #[cfg(feature = "session-client")]
+    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
     #[test]
-    fn explicit_path_config_converts_into_intermediate_path_routing_options() {
-        let k1 = NodeId::from(*OffchainKeypair::random().public());
-        let k2 = NodeId::from(*OffchainKeypair::random().public());
-        let k3 = NodeId::from(*OffchainKeypair::random().public());
+    fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
+        let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
+        let k2 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
+        let k3 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
 
         let cfg = hopr_transport::SessionClientConfig::try_from(HoprSessionClientExplicitPathConfig {
             forward_path: vec![k1, k2],
@@ -906,9 +851,16 @@ mod tests {
             surb_management: None,
             always_max_out_surbs: false,
         })
-        .expect("explicit path config conversion must succeed");
+        .context("explicit path config conversion must succeed")?;
 
-        assert!(matches!(cfg.forward_path_options, RoutingOptions::IntermediatePath(_)));
-        assert!(matches!(cfg.return_path_options, RoutingOptions::IntermediatePath(_)));
+        assert!(matches!(
+            cfg.forward_path_options,
+            hopr_transport::RoutingOptions::IntermediatePath(_)
+        ));
+        assert!(matches!(
+            cfg.return_path_options,
+            hopr_transport::RoutingOptions::IntermediatePath(_)
+        ));
+        Ok(())
     }
 }

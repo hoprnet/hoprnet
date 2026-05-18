@@ -10,6 +10,8 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
+#[cfg(feature = "explicit-path")]
+use hopr_lib::HoprSessionClientExplicitPathConfig;
 use hopr_lib::{
     HopRouting, HoprSessionClientConfig,
     api::{
@@ -173,8 +175,54 @@ impl ClusterGuard {
                 path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
                 HoprSessionClientConfig {
-                    forward_path: routing.clone(),
-                    return_path: routing.invert(),
+                    forward_path: routing,
+                    return_path: routing,
+                    capabilities: Default::default(),
+                    pseudonym: None,
+                    surb_management: None,
+                    always_max_out_surbs: false,
+                },
+            )
+            .timeout(futures_time::time::Duration::from(timeout))
+            .await;
+
+        match session_result {
+            Ok(Ok((session, _configurator))) => Ok(session),
+            Ok(Err(e)) => Err(e.into()),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after {timeout:?}")),
+        }
+    }
+
+    /// Create a session between the first and last nodes in the path using explicit intermediate nodes.
+    ///
+    /// Channels must already be open before calling this method.
+    #[cfg(feature = "explicit-path")]
+    pub async fn create_session_with_explicit_path(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
+        debug_assert!(path.len() >= 2, "path must contain at least source and destination");
+
+        let chain_info = self.chain_client.query_chain_info().await?;
+        let timeout = chain_propagation_delay(&chain_info) * 9;
+
+        let ip = IpOrHost::from_str(":0")?;
+        let forward_path = path[1..path.len() - 1]
+            .iter()
+            .map(|node| {
+                hopr_lib::peer_id_to_offchain_key(&node.peer_id())
+                    .map(hopr_lib::api::types::internal::NodeId::from)
+                    .map_err(anyhow::Error::from)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let mut return_path = forward_path.clone();
+        return_path.reverse();
+
+        let session_result = path[0]
+            .inner()
+            .connect_to_using_explicit_path(
+                path[path.len() - 1].address(),
+                SessionTarget::UdpStream(SealedHost::Plain(ip)),
+                HoprSessionClientExplicitPathConfig {
+                    forward_path,
+                    return_path,
                     capabilities: Default::default(),
                     pseudonym: None,
                     surb_management: None,
