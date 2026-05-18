@@ -11,7 +11,7 @@ use hopr_types::{
     internal::prelude::VerifiedAcknowledgement,
 };
 use rand::prelude::SliceRandom;
-use vsss_rs::elliptic_curve::ops::MulByGenerator;
+use vsss_rs::elliptic_curve::{group::GroupEncoding, ops::MulByGenerator};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct TestSpec;
@@ -39,6 +39,8 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         verifiers,
         ..
     } = generator.new_ssa_commitment(&pseudonym)?;
+
+    let ssa_commitment_repr = ssa_commitment.to_bytes();
 
     // Transpose the commitments so they have the on-wire structure
     let mut transposed = transpose_commitments(verifiers);
@@ -68,7 +70,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::from([(0, remainder)]).into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert!(res.ssa_commitment.is_some());
+    assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
     assert!(!res.is_fully_committed);
 
     // Add all the remaining coefficient commitments for all polynomials except one
@@ -78,7 +80,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
             reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_coeff_commitments.into_iter())?;
         assert_eq!(ssa_id, res.ssa_id);
         assert!(!res.is_first_encountered);
-        assert!(res.ssa_commitment.is_some());
+        assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
         assert!(!res.is_fully_committed);
     }
 
@@ -86,7 +88,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert!(res.ssa_commitment.is_some());
+    assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
     assert!(res.is_fully_committed);
 
     let mut acks = Vec::new();

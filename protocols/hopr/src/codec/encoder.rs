@@ -8,6 +8,7 @@ use hopr_api::{
     },
 };
 use hopr_crypto_packet::prelude::*;
+use hopr_protocol_pix::EntryShareGenerator;
 
 use crate::{HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, errors::HoprProtocolError};
 
@@ -19,17 +20,17 @@ pub const MAX_ACKNOWLEDGEMENTS_BATCH_SIZE: usize =
     (HoprPacket::PAYLOAD_SIZE - size_of::<u16>()) / Acknowledgement::SIZE;
 
 /// Default [encoder](PacketEncoder) implementation for HOPR packets.
-pub struct HoprEncoder<Chain, S, T> {
+pub struct HoprEncoder<Chain, G, S, T> {
     chain_api: Chain,
     surb_store: S,
     ticket_factory: T,
     chain_key: ChainKeypair,
     channels_dst: Hash,
-    ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+    ssa_generator: G,
     cfg: HoprCodecConfig,
 }
 
-impl<Chain, S, T> HoprEncoder<Chain, S, T> {
+impl<Chain, G, S, T> HoprEncoder<Chain, G, S, T> {
     /// Creates a new instance of the encoder.
     pub fn new(
         chain_key: ChainKeypair,
@@ -37,7 +38,7 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
         surb_store: S,
         ticket_factory: T,
         channels_dst: Hash,
-        ssa_generator: std::sync::Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+        ssa_generator: G,
         cfg: HoprCodecConfig,
     ) -> Self {
         Self {
@@ -52,9 +53,10 @@ impl<Chain, S, T> HoprEncoder<Chain, S, T> {
     }
 }
 
-impl<Chain, S, T> HoprEncoder<Chain, S, T>
+impl<Chain, G, S, T> HoprEncoder<Chain, G, S, T>
 where
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Sync,
+    G: EntryShareGenerator<HoprPixSpec>,
     S: SurbStore,
     T: hopr_api::tickets::TicketFactory + Sync,
 {
@@ -135,9 +137,10 @@ where
     }
 }
 
-impl<Chain, S, T> PacketEncoder for HoprEncoder<Chain, S, T>
+impl<Chain, G, S, T> PacketEncoder for HoprEncoder<Chain, G, S, T>
 where
     Chain: ChainKeyOperations + ChainReadChannelOperations + ChainReadTicketOperations + ChainValues + Send + Sync,
+    G: EntryShareGenerator<HoprPixSpec>,
     S: SurbStore + Send + Sync,
     T: hopr_api::tickets::TicketFactory + Send + Sync,
 {

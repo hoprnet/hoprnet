@@ -1,6 +1,6 @@
 use std::fmt::Formatter;
 
-use hopr_protocol_pix::TaggedEncryptedPartialSsaShare;
+use hopr_protocol_pix::{EntryShareGenerator, TaggedEncryptedPartialSsaShare};
 use hopr_types::{
     crypto::prelude::*,
     internal::{
@@ -106,6 +106,7 @@ impl PartialHoprPacket {
     /// * `pix_share_gen` generator for the pix share.
     /// * `domain_separator` channel contract domain separator.
     pub fn new<
+        G: EntryShareGenerator<HoprPixSpec>,
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
     >(
@@ -114,7 +115,7 @@ impl PartialHoprPacket {
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
-        pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
+        pix_share_gen: &G,
         domain_separator: &Hash,
     ) -> Result<Self> {
         match routing {
@@ -417,13 +418,14 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
 }
 
 fn create_surb_for_path<
+    G: EntryShareGenerator<HoprPixSpec>,
     M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
     P: NonEmptyPath<OffchainPublicKey>,
 >(
     return_path: (P, PathKeyData),
     recv_data: HoprSenderId,
     mapper: &M,
-    pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
+    pix_share_gen: &G,
 ) -> Result<(HoprSurb, HoprReplyOpener)> {
     let (
         return_path,
@@ -462,8 +464,9 @@ fn create_surb_for_path<
     // Existence of the first-relayer challenge solution indicates this is not a 0-hop return path.
     if let Some(first_solution) = first_relayer_solution
         && let Some(enc_share) = pix_share_gen
-            .next_share(&recv_data.pseudonym(), &ro.sender_key)?
-            .map(|(id, share)| share.encrypt(&id, &first_solution))
+            .next_share(&recv_data.pseudonym(), &ro.sender_key)
+            .map_err(|e| PacketConstructionError(format!("failed to generate PIX share: {e}")))?
+            .map(|gen_share| gen_share.encrypt(&first_solution))
             .transpose()?
     {
         // Replace the empty encrypted share with the generated one, encrypted using the first relayer ticket challenge
@@ -502,6 +505,7 @@ impl HoprPacket {
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
     #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
     pub fn into_outgoing<
+        G: EntryShareGenerator<HoprPixSpec>,
         M: ProtocolKeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         P: NonEmptyPath<OffchainPublicKey> + Send,
         S: Into<PacketSignals>,
@@ -513,7 +517,7 @@ impl HoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
-        pix_share_gen: &hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>,
+        pix_share_gen: &G,
         signals: S,
     ) -> Result<(Self, Vec<HoprReplyOpener>)> {
         PartialHoprPacket::new(

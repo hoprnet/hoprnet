@@ -112,6 +112,7 @@ pub struct SsaCommitment<S: PixSpec> {
     pub verifiers: Vec<PartialSsaShareVerifier<S>>,
 }
 
+#[auto_impl::auto_impl(&, Arc, Box)]
 pub trait EntryShareGenerator<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
 
