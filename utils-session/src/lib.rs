@@ -29,6 +29,8 @@ use hopr_api::{
 use hopr_lib::HopRouting;
 #[cfg(feature = "explicit-path")]
 use hopr_lib::HoprSessionClientExplicitPathConfig;
+#[cfg(feature = "explicit-path")]
+use hopr_lib::api::types::internal::routing::RoutingOptions;
 use hopr_lib::{
     Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
@@ -68,9 +70,6 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
-
-#[cfg(feature = "explicit-path")]
-use hopr_lib::HoprSessionClientExplicitPathConfig;
 
 #[cfg(feature = "explicit-path")]
 pub type Routing = RoutingOptions;
