@@ -24,8 +24,9 @@ use hopr_api::{
         traits::{EdgeObservableRead, EdgeObservableWrite},
     },
     network::NetworkStreamControl,
-    types::internal::routing::RoutingOptions,
 };
+#[cfg(not(feature = "explicit-path"))]
+use hopr_lib::HopRouting;
 #[cfg(feature = "explicit-path")]
 use hopr_lib::HoprSessionClientExplicitPathConfig;
 use hopr_lib::{
@@ -67,6 +68,15 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
+
+#[cfg(feature = "explicit-path")]
+use hopr_lib::HoprSessionClientExplicitPathConfig;
+
+#[cfg(feature = "explicit-path")]
+pub type Routing = RoutingOptions;
+
+#[cfg(not(feature = "explicit-path"))]
+pub type Routing = HopRouting;
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -148,9 +158,9 @@ pub struct StoredSessionEntry {
     /// Target of the Session.
     pub target: SessionTargetSpec,
     /// Forward routing options used for the Session.
-    pub forward_path: RoutingOptions,
+    pub forward_path: Routing,
     /// Return routing options used for the Session.
-    pub return_path: RoutingOptions,
+    pub return_path: Routing,
     /// The maximum number of client sessions that the listener can spawn.
     pub max_client_sessions: usize,
     /// The maximum number of SURB packets that can be sent upstream.
@@ -1287,8 +1297,8 @@ mod tests {
         StoredSessionEntry {
             destination: Address::default(),
             target: SessionTargetSpec::Plain("localhost:8080".into()),
-            forward_path: RoutingOptions::from(HopRouting::default()),
-            return_path: RoutingOptions::from(HopRouting::default()),
+            forward_path: Default::default(),
+            return_path: Default::default(),
             max_client_sessions: 5,
             max_surb_upstream: None,
             response_buffer: None,
