@@ -163,7 +163,7 @@ name = "protocol_stress_throughput"
 path = "tests/protocol/stress_throughput.rs"
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde"]
+ignored = ["humantime-serde", "hopr-types"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde", "hopr-transport-probe"]
+ignored = ["humantime-serde", "hopr-transport-probe", "hopr-types"]
