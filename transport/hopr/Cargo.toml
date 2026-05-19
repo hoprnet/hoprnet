@@ -67,19 +67,17 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "types-random",
+  "types-internal",
   "tickets",
   "node",
   "network",
   "chain",
   "graph",
 ] }
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "random",
-  "internal",
-  "primitive",
-  "serde",
-] }
+# Retained only to activate hopr-types/telemetry via the `telemetry` feature above.
+# Once hopr-api >= 1.10.0 is published (which adds types-telemetry), replace
+# hopr-types/telemetry in the feature above with hopr-api/types-telemetry and remove this dep.
+hopr-types = { workspace = true }
 
 hopr-utils = { workspace = true, features = [
   "network-types",

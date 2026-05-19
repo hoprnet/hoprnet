@@ -1,7 +1,7 @@
 use hopr_api::graph::{
     NetworkGraphTraverse, NetworkGraphView, ValueFn, function::EdgeValueFn, traits::EdgeObservableRead,
 };
-use hopr_types::{crypto::types::OffchainPublicKey, internal::errors::PathError};
+use hopr_api::{OffchainPublicKey, types::internal::errors::PathError};
 
 use super::{
     errors::{PathPlannerError, Result},
@@ -253,7 +253,7 @@ mod tests {
         traits::{EdgeObservableWrite, EdgeWeightType},
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::{Keypair, OffchainKeypair},
         internal::routing::RoutingOptions,
     };

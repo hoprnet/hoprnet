@@ -1,4 +1,4 @@
-use hopr_types::crypto::types::OffchainPublicKey;
+use hopr_api::OffchainPublicKey;
 
 use super::errors::Result;
 

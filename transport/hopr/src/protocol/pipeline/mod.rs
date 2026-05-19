@@ -37,12 +37,12 @@ const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_m
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PACKET_COUNT:  hopr_types::telemetry::MultiCounter =  hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_PACKET_REJECTED_COUNT: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
         "Number of incoming packets rejected due various reasons",
         &["reason"]
@@ -51,11 +51,11 @@ lazy_static::lazy_static! {
     // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
     // `hopr_rayon_tasks_cancelled_total` and hopr_rayon_queue_wait_seconds to diagnose whether
     // the bottleneck is queue depth, individual task duration, or both.
-    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
         "Number of incoming packets dropped due to decode timeout (sustained rate indicates Rayon pool saturation)"
     ).unwrap();
-    static ref METRIC_VALIDATION_ERRORS: hopr_types::telemetry::MultiCounter =  hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_VALIDATION_ERRORS: hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_ticket_validation_errors",
         "Number of different ticket validation errors encountered during packet processing",
         &["type"]

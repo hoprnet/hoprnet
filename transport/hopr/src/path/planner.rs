@@ -5,11 +5,14 @@ use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOpe
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 #[cfg(all(feature = "telemetry", not(test)))]
-use hopr_types::internal::path::Path;
-use hopr_types::{
-    crypto::{crypto_traits::Randomizable, types::OffchainPublicKey},
-    internal::{errors::PathError, prelude::*},
-    primitive::traits::ToHex,
+use hopr_api::types::internal::path::Path;
+use hopr_api::{
+    OffchainPublicKey,
+    types::{
+        crypto::crypto_traits::Randomizable,
+        internal::{errors::PathError, prelude::*},
+        primitive::traits::ToHex,
+    },
 };
 use tracing::trace;
 use validator::{Validate, ValidationError};
@@ -21,7 +24,7 @@ use super::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PATH_LENGTH: hopr_types::telemetry::SimpleHistogram = hopr_types::telemetry::SimpleHistogram::new(
+    static ref METRIC_PATH_LENGTH: hopr_api::types::telemetry::SimpleHistogram = hopr_api::types::telemetry::SimpleHistogram::new(
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
@@ -222,7 +225,7 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            hopr_types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
+            hopr_api::types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
         trace!(%path, "validated resolved path");
@@ -403,7 +406,7 @@ mod tests {
         },
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::{Keypair, OffchainKeypair},
         internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
         primitive::prelude::*,
@@ -684,7 +687,7 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_types::primitive::prelude::BoundedVec;
+        use hopr_api::types::primitive::prelude::BoundedVec;
         let intermediate_path = BoundedVec::try_from(vec![NodeId::Offchain(a)]).expect("valid");
 
         let routing = DestinationRouting::Forward {
@@ -716,7 +719,7 @@ mod tests {
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_types::internal::routing::SurbMatcher;
+        use hopr_api::types::internal::routing::SurbMatcher;
         let matcher = SurbMatcher::Pseudonym(HoprPseudonym::random());
         let routing = DestinationRouting::Return(matcher);
 
