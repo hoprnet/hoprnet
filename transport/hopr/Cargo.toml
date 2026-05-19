@@ -16,7 +16,7 @@ all-benchmarks = []
 capture = ["dep:pcap-file"]
 telemetry = [
   "serde",
-  "hopr-types/telemetry",
+  "hopr-api/types-telemetry",
   "hopr-protocol-hopr/telemetry",
   "hopr-transport-session/telemetry",
   "hopr-utils/network-types-telemetry",
@@ -74,10 +74,6 @@ hopr-api = { workspace = true, features = [
   "chain",
   "graph",
 ] }
-# Retained only to activate hopr-types/telemetry via the `telemetry` feature above.
-# Once hopr-api >= 1.10.0 is published (which adds types-telemetry), replace
-# hopr-types/telemetry in the feature above with hopr-api/types-telemetry and remove this dep.
-hopr-types = { workspace = true }
 
 hopr-utils = { workspace = true, features = [
   "network-types",
@@ -163,7 +159,7 @@ name = "protocol_stress_throughput"
 path = "tests/protocol/stress_throughput.rs"
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde", "hopr-types"]
+ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde", "hopr-transport-probe", "hopr-types"]
+ignored = ["humantime-serde", "hopr-transport-probe"]
