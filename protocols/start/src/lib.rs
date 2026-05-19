@@ -695,7 +695,7 @@ mod tests {
     fn start_protocol_session_ssa_request_message_should_encode_and_decode() -> anyhow::Result<()> {
         let mut commitments = std::collections::BTreeMap::new();
         for i in 0..10 {
-            commitments.insert(i as SsaIndex, [0u8; 33]);
+            commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
@@ -721,7 +721,7 @@ mod tests {
         // Header + params + num_commitments + session_id will take some space.
         // Let's add many commitments to exceed the limit.
         for i in 0..100 {
-            commitments.insert(i as SsaIndex, [0u8; 33]);
+            commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
         let msg = StartProtocol::<u32, (), u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
@@ -834,7 +834,7 @@ mod tests {
 
         let mut commitments = std::collections::BTreeMap::new();
         for i in 0..26 {
-            commitments.insert(i as SsaIndex, [0u8; 33]);
+            commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
         let msg = StartProtocol::<String, String, u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
