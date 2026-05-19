@@ -31,6 +31,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport::protocol::{PacketPipelineConfig, PeerProtocolCounterRegistry};
 use hopr_transport_mixer::config::MixerConfig;
@@ -38,7 +39,6 @@ use hopr_utils::runtime::AbortableList;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tracing::debug;
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 
 lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: HoprBalance = HoprBalance::from_str("0.1 wxHOPR").unwrap();

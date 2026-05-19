@@ -17,8 +17,7 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector,
     testing::{BlokliTestClient, StaticState},
 };
-use hopr_crypto_packet::HoprPixSpec;
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket};
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };

@@ -25,11 +25,11 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder,
     SurbStoreConfig,
 };
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_utils::testing::{StubChainApi, StubPathResolver};
 use libp2p::PeerId;
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 
 const SAMPLE_SIZE: usize = 30;
 const MEASUREMENT_TIME_SECS: u64 = 30;
@@ -243,7 +243,7 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
                         let ticket_mgr = std::sync::Arc::new(HoprTicketFactory::new(MemoryStore::default()));
 
                         let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
-                        
+
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[SENDER_IDX].clone(),
                             chain_api.clone(),

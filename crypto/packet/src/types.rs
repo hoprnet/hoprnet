@@ -1,9 +1,10 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_types::primitive::prelude::GeneralError;
+use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{
-    HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT,
+    HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT,
+    por::ProofOfRelayValues,
     sphinx::{
         errors::SphinxError,
         prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
@@ -203,6 +204,55 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PacketMessage<S, 
     }
 }
 
+/// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
+/// that is supposed to be passed along with the SURB.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+
+impl SurbReceiverInfo {
+    pub fn new(pov: ProofOfRelayValues, encrypted_partial_ssa_share: HoprEncryptedPartialSsaShare) -> Self {
+        let mut ret = [0u8; Self::SIZE];
+        ret[0..ProofOfRelayValues::SIZE].copy_from_slice(pov.as_ref());
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE]
+            .copy_from_slice(encrypted_partial_ssa_share.as_ref());
+        Self(ret)
+    }
+
+    pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
+        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
+            .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")
+    }
+
+    pub fn encrypted_partial_ssa_share(&self) -> HoprEncryptedPartialSsaShare {
+        HoprEncryptedPartialSsaShare::try_from(
+            &self.0[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE],
+        )
+        .expect("SurbReceiverInfo always contains valid HoprEncryptedPartialSsaShare")
+    }
+}
+
+impl AsRef<[u8]> for SurbReceiverInfo {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> std::result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("SurbReceiverInfo".into()))
+    }
+}
+
+impl BytesRepresentable for SurbReceiverInfo {
+    const SIZE: usize = ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE;
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
@@ -214,10 +264,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
-        packet::HoprPacket,
-        por::{SurbReceiverInfo, generate_proof_of_relay},
-        sphinx::prelude::*,
+        HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, packet::HoprPacket,
+        por::generate_proof_of_relay, sphinx::prelude::*, types::SurbReceiverInfo,
     };
 
     lazy_static::lazy_static! {

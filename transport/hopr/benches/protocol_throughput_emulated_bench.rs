@@ -24,9 +24,9 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use libp2p::PeerId;
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -113,7 +113,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         );
 
                         let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
-                        
+
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),
                             connectors[TESTED_PEER_ID].clone(),

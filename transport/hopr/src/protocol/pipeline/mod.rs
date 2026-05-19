@@ -13,12 +13,12 @@ use hopr_api::{
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_crypto_packet::{HoprPixScalar, HoprPixSpec, HoprSurb};
+use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex,
-    RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa,
+    SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -544,23 +544,23 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     );
 }
 
-/// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
+/// Processes incoming acknowledgements using the [`ExitAcknowledgementShareProcessor`], sending
+/// all recovered SSAs to the given `recovered_ssa` sink.
 ///
-/// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
-/// development), but since they never receive tickets, they have nothing to acknowledge.
-async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, ssa_event: SEvt)
+/// Used by Exit nodes: they do not receive any incoming tickets but still use the incoming acknowledgements
+/// to recover SSAs and forward them to the `recovered_ssa` sink.
+async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, recovered_ssa: SEvt)
 where
     S: PixSpec + Send + Sync + 'static,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
-    SEvt: futures::Sink<PixScalar<S>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<S>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
-    PixScalar<S>: Send,
 {
     ack_incoming
         .for_each(move |(peer, acks)| {
             let exit_proc = exit_proc.clone();
-            let mut ssa_event = ssa_event.clone();
+            let mut recovered_ssa = recovered_ssa.clone();
             async move {
                 tracing::trace!(%peer, num = acks.len(), "received acknowledgements");
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
@@ -570,8 +570,8 @@ where
                 .await
                 {
                     Ok(Ok(ssa_priv_keys)) => {
-                        if let Err(error) = ssa_event
-                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(|r| Ok(r.ssa))))
+                        if let Err(error) = recovered_ssa
+                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
                             .await
                         {
                             tracing::error!(%peer, %error, "failed to send pix resolution");
@@ -776,7 +776,7 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
-    SEvt: futures::Sink<HoprPixScalar> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,

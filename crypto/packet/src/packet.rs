@@ -19,12 +19,9 @@ use crate::{
         PacketError::{PacketConstructionError, PacketDecodingError},
         Result,
     },
-    por::{
-        ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
-        pre_verify,
-    },
+    por::{ProofOfRelayString, ProofOfRelayValues, derive_ack_key_share, generate_proof_of_relay, pre_verify},
     sphinx::prelude::*,
-    types::{HoprPacketMessage, HoprPacketParts, PacketSignals},
+    types::{HoprPacketMessage, HoprPacketParts, PacketSignals, SurbReceiverInfo},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.

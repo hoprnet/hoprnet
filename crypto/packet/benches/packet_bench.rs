@@ -4,13 +4,13 @@ use anyhow::anyhow;
 use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::{prelude::*, sphinx::prelude::SimpleBiMapper};
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_types::{
     crypto::prelude::*,
     crypto_random::Randomizable,
     internal::prelude::*,
     primitive::prelude::{BytesEncodable, KeyIdent},
 };
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -233,7 +233,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
     let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
-    
+
     // Sender
     let packet = HoprPacket::into_outgoing(
         &msg,
@@ -295,7 +295,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
     let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
-    
+
     // Sender
     let forward_path = TransportPath::new(path).unwrap();
     let packet = HoprPacket::into_outgoing(

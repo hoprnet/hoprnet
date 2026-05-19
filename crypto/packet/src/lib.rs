@@ -64,7 +64,7 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type PacketReceiverData = routing::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = por::SurbReceiverInfo;
+    type SurbReceiverData = types::SurbReceiverInfo;
     type UH = hopr_types::crypto::primitives::Poly1305;
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
