@@ -10,7 +10,7 @@ use crate::{
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
 pub struct SsaBuilder<S: PixSpec> {
-    pub commitment: PixGroupRepr<S>,
+    pub commitment: PixGroup<S>,
     num_polys: usize,
     builder: PixScalar<S>,
 }
@@ -18,7 +18,7 @@ pub struct SsaBuilder<S: PixSpec> {
 impl<S: PixSpec> SsaBuilder<S> {
     pub fn new(commitment: PixGroup<S>, num_polys: usize) -> Self {
         Self {
-            commitment: commitment.to_bytes(),
+            commitment,
             builder: PixScalar::<S>::default(),
             num_polys,
         }
@@ -34,7 +34,7 @@ impl<S: PixSpec> SsaBuilder<S> {
             }
         }
 
-        if self.commitment == (PixGroup::<S>::generator() * self.builder).to_bytes() {
+        if self.commitment == (PixGroup::<S>::generator() * self.builder) {
             Ok(Some(self.builder))
         } else {
             Err(errors::PixError::InvalidSsa)
@@ -77,9 +77,9 @@ pub enum CommitmentResult<S: PixSpec> {
     /// Not enough commitments have been received yet.
     NotEnoughCommitments,
     /// There are enough commitments to build at least the SSA commitment.
-    SsaCommitmentDone(PixGroupRepr<S>),
+    SsaCommitmentDone(PixGroup<S>),
     /// There are enough commitments to build at least the SSA commitment, but not all coefficients are committed yet.
-    StillIncomplete(PixGroupRepr<S>),
+    StillIncomplete(PixGroup<S>),
     /// All coefficients have been committed.
     Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>),
 }
@@ -87,16 +87,16 @@ pub enum CommitmentResult<S: PixSpec> {
 /// Builds [`CommittedSsa`] from the incoming client polynomial coefficient commitments of
 /// SSA-part polynomials for a specific Session Stealth Address (SSA).
 pub struct SsaCommitmentBuilder<S: PixSpec> {
-    id: SsaId<S>,
+    id: SsaId<S::Pseudonym>,
     poly_threshold: usize,
     num_polys: usize,
     committed_polynomials: std::collections::HashMap<PolynomialIndex, CommittedPolynomial<S>>,
     complete: bool,
-    ssa_committed: Option<PixGroupRepr<S>>,
+    ssa_committed: Option<PixGroup<S>>,
 }
 
 impl<S: PixSpec> SsaCommitmentBuilder<S> {
-    pub fn new(id: SsaId<S>, poly_threshold: usize, num_polys: usize) -> Self {
+    pub fn new(id: SsaId<S::Pseudonym>, poly_threshold: usize, num_polys: usize) -> Self {
         Self {
             id,
             poly_threshold,
@@ -191,8 +191,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                     Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(const_term))
                         .ok_or(errors::PixError::InvalidInput)
                 })
-                .sum::<errors::Result<PixGroup<S>>>()?
-                .to_bytes();
+                .sum::<errors::Result<PixGroup<S>>>()?;
 
             self.ssa_committed = Some(full_ssa_commitment);
             Ok(CommitmentResult::SsaCommitmentDone(full_ssa_commitment))

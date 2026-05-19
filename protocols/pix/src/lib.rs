@@ -29,13 +29,10 @@ mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
 pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
-pub use traits::{
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, GeneratedShare, RecoveredSsa, SsaCommitment,
-    SsaCommitmentState,
-};
+pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor};
 pub use types::{
-    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PolynomialIndex, SsaId, SsaIndex, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RecoveredSsa,
+    SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolynomialId, TaggedEncryptedPartialSsaShare,
 };
 
 /// Number of polynomials per SSA.
@@ -44,7 +41,7 @@ pub const DEFAULT_POLYS_PER_SSA: usize = 1000;
 pub const DEFAULT_POLY_THRESHOLD: usize = 100;
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
-pub trait PixSpec
+pub trait PixSpec: Send + Sync + 'static
 where
     PixScalar<Self>: PrimeField + FromOkm,
     PixGroup<Self>: Group<Scalar = PixScalar<Self>> + GroupEncoding + Default + CofactorGroup,
@@ -68,7 +65,7 @@ where
     const HASH_SCALAR_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE_SCALAR";
 
     /// Performs conversion of the given `spi` and `msg` into [`PixScalar`] of this spec.
-    fn msg_to_scalar(spi: &SsaPolynomialId<Self>, msg: impl AsRef<[u8]>) -> errors::Result<PixScalar<Self>>
+    fn msg_to_scalar(spi: &SsaPolynomialId<Self::Pseudonym>, msg: impl AsRef<[u8]>) -> errors::Result<PixScalar<Self>>
     where
         Self: Sized,
     {
@@ -78,7 +75,7 @@ where
             &[
                 msg.as_ref(),
                 spi.pseudonym().as_ref(),
-                spi.ssa_index().to_be_bytes().as_ref(),
+                spi.ssa_index().get().to_be_bytes().as_ref(),
                 spi.poly_index().to_be_bytes().as_ref(),
             ],
             &[
@@ -121,16 +118,16 @@ pub(crate) fn into_completed_share<S: PixSpec>(
 
 /// Verifier for shares of a polynomial with the given [`SsaPolynomialId`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-//#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PartialSsaShareVerifier<S: PixSpec> {
-    pub(crate) spi: SsaPolynomialId<S>,
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct PartialSsaShareVerifier<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+    pub(crate) spi: SsaPolynomialId<P>,
     pub(crate) poly_commitment: Vec<ShareVerifierGroup<PixGroup<S>>>,
 }
 
-impl<S: PixSpec> PartialSsaShareVerifier<S> {
+impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
     /// Returns the [`SsaPolynomialId`] of the polynomial corresponding to this verifier.
     #[inline]
-    pub fn spi(&self) -> &SsaPolynomialId<S> {
+    pub fn spi(&self) -> &SsaPolynomialId<S::Pseudonym> {
         &self.spi
     }
 
@@ -153,7 +150,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
 
     /// Converts this verifier into a tuple containing the [`SsaPolynomialId`] and the serialized polynomial
     /// coefficient commitments.
-    pub fn into_serializable_commitments(self) -> (SsaPolynomialId<S>, Vec<PixGroupRepr<S>>) {
+    pub fn into_serializable_commitments(self) -> (SsaPolynomialId<S::Pseudonym>, Vec<PixGroupRepr<S>>) {
         (
             self.spi,
             self.poly_commitment
@@ -168,7 +165,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S> {
     ///
     /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
     pub fn from_serializable_commitments(
-        spi: SsaPolynomialId<S>,
+        spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self> {
         if poly_commitments.is_empty() {
@@ -264,7 +261,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::types::SsaId;
 
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Hash, Ord, PartialOrd)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TestSpec;
 
     impl PixSpec for TestSpec {
@@ -306,7 +304,10 @@ pub(crate) mod tests {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
         let secret = k256::Scalar::random(&mut rng);
 
-        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
+        let spi = SsaPolynomialId::new(
+            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
+            1,
+        );
         let x = (0..=20_u32)
             .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
@@ -339,7 +340,10 @@ pub(crate) mod tests {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
         let secret = k256::Scalar::random(&mut rng);
 
-        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1), 1);
+        let spi = SsaPolynomialId::new(
+            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
+            1,
+        );
         let x = (0..=20_u32)
             .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();

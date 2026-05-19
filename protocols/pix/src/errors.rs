@@ -5,8 +5,12 @@ pub enum PixError {
     InvalidInput,
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
+    #[error("encrypted partial ssa share is empty")]
+    ShareIsEmpty,
     #[error("ssa commitment does not match ssa")]
     InvalidSsa,
+    #[error("cannot generate more ssa commitments due to ssa index overflow")]
+    SsaOverflow,
     #[error("received duplicate commitment")]
     DuplicateCommitment,
     #[error("missing commitment for building ssa")]

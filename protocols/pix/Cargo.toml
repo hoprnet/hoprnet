@@ -10,11 +10,17 @@ edition.workspace = true
 [features]
 default = ["rayon"]
 rayon = ["hopr-utils/parallelize-rayon"]
-serde = ["dep:serde", "vsss-rs/serde", "hopr-types/serde"]
+serde = [
+  "dep:elliptic-curve-tools",
+  "dep:serde",
+  "vsss-rs/serde",
+  "hopr-types/serde",
+]
 
 [dependencies]
 ahash = { workspace = true }
 auto_impl = { workspace = true }
+elliptic-curve-tools = { workspace = true, optional = true }
 hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }

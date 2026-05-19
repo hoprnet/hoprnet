@@ -14,15 +14,15 @@ use crate::{
     CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
     PixScalar, PixSpec, PolynomialIndex, errors,
     errors::PixError,
-    traits::{EntryShareGenerator, GeneratedShare, SsaCommitment},
-    types::{PartialSsaShare, SsaId, SsaIndex, SsaPolynomialId},
+    traits::EntryShareGenerator,
+    types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId},
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
 
 struct IndexedPolynomial<S: PixSpec> {
-    spi: SsaPolynomialId<S>,
+    spi: SsaPolynomialId<S::Pseudonym>,
     raw: RawPolynomial<S>,
     shares_generated: usize,
     t: usize,
@@ -103,7 +103,7 @@ pub struct SsaShareGenerator<S: PixSpec> {
     cfg: SsaGeneratorConfig,
 }
 
-impl<S: PixSpec + 'static> SsaShareGenerator<S> {
+impl<S: PixSpec> SsaShareGenerator<S> {
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
         Self {
             polynomials: moka::sync::CacheBuilder::default()
@@ -115,7 +115,7 @@ impl<S: PixSpec + 'static> SsaShareGenerator<S> {
     }
 }
 
-impl<S: PixSpec + 'static> EntryShareGenerator<S> for SsaShareGenerator<S> {
+impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     type Error = PixError;
 
     /// Generate the next [`PartialSsaShare`] for the given pseudonym and message `msg`.
@@ -190,7 +190,7 @@ impl<S: PixSpec + 'static> EntryShareGenerator<S> for SsaShareGenerator<S> {
             .entry_by_ref(pseudonym)
             .and_upsert_with(|entry| match entry {
                 None => {
-                    let ssa_index = 1;
+                    let ssa_index = SsaIndex::MIN;
                     verifiers.extend(
                         raw_verifiers
                             .into_iter()
@@ -224,7 +224,7 @@ impl<S: PixSpec + 'static> EntryShareGenerator<S> for SsaShareGenerator<S> {
                     let value = value.into_value();
                     {
                         let mut entry = value.lock();
-                        entry.ssa_index += 1;
+                        entry.ssa_index = entry.ssa_index.checked_add(1).unwrap(); // TODO: fix this unwrap
 
                         let ssa_index = entry.ssa_index;
                         verifiers.extend(
@@ -308,7 +308,7 @@ mod tests {
         let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 1);
+            assert_eq!(v[i].spi.ssa_index(), 1.try_into()?);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
@@ -316,7 +316,7 @@ mod tests {
         let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 2);
+            assert_eq!(v[i].spi.ssa_index(), 2.try_into()?);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
@@ -325,7 +325,7 @@ mod tests {
         let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p2);
-            assert_eq!(v[i].spi.ssa_index(), 1);
+            assert_eq!(v[i].spi.ssa_index(), 1.try_into()?);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
@@ -333,7 +333,7 @@ mod tests {
         let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 3);
+            assert_eq!(v[i].spi.ssa_index(), 3.try_into()?);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
@@ -341,7 +341,7 @@ mod tests {
         let v = c.verifiers;
         for i in 0..generator.cfg.polynomials_per_ssa {
             assert_eq!(v[i].spi.pseudonym(), &p2);
-            assert_eq!(v[i].spi.ssa_index(), 2);
+            assert_eq!(v[i].spi.ssa_index(), 2.try_into()?);
             assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
         }
 
@@ -364,7 +364,7 @@ mod tests {
                 .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(g.id.pseudonym(), &p1);
-            assert_eq!(g.id.ssa_index(), 1);
+            assert_eq!(g.id.ssa_index(), 1.try_into()?);
             assert_eq!(g.id.poly_index(), i / 4);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
@@ -376,7 +376,7 @@ mod tests {
                 .next_share(&p1, &i.to_be_bytes())?
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(g.id.pseudonym(), &p1);
-            assert_eq!(g.id.ssa_index(), 2);
+            assert_eq!(g.id.ssa_index(), 2.try_into()?);
             assert_eq!(g.id.poly_index(), i / 4);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());

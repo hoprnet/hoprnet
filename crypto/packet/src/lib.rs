@@ -89,7 +89,7 @@ pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
 pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; // minus padding byte
 
 /// Current specification of the PIX protocol in HOPR.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HoprPixSpec;
 

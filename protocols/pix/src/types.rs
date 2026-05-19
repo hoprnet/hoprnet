@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops::Add};
+use std::{num::NonZero, ops::Add};
 
 use hopr_types::{
     crypto::{
@@ -16,12 +16,15 @@ use vsss_rs::elliptic_curve::{
     },
 };
 
-use crate::{PixScalar, PixSpec, errors};
+use crate::{PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, errors::PixError};
+
+/// Raw zeroable SSA Index.
+pub(crate) type RawSsaIndex = u16;
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
 /// Note that SSA Index starts with 1.
-pub type SsaIndex = u16; // TODO: change this to NonZeroU16
+pub type SsaIndex = NonZero<RawSsaIndex>;
 
 /// Type used to index polynomials that reconstruct parts of a Session Stealth Addresses (SSA).
 ///
@@ -36,11 +39,141 @@ pub type CoefficientIndex = u16;
 /// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
 pub type SsaPolyIndexPrefixSize = U4;
 
-fn derive_ssa_encryption_key<S: PixSpec>(spi: &SsaPolynomialId<S>, ack: &HalfKey) -> errors::Result<S::Cipher> {
+/// Uniquely identifies a Session Stealth Address (SSA).
+///
+/// This consists of a pseudonym and [`SsaIndex`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SsaId<P> {
+    pseudonym: P,
+    ssa_index: SsaIndex,
+}
+
+impl<P> SsaId<P> {
+    /// Creates a new `SsaId` with the given pseudonym and SSA index.
+    pub fn new(pseudonym: P, ssa_index: SsaIndex) -> Self {
+        Self { pseudonym, ssa_index }
+    }
+
+    /// Pseudonym part of the `HoprSenderId`.
+    #[inline]
+    pub fn pseudonym(&self) -> &P {
+        &self.pseudonym
+    }
+
+    /// Index (i-value) of the Session Stealth Address (SSA).
+    #[inline]
+    pub fn ssa_index(&self) -> SsaIndex {
+        self.ssa_index
+    }
+}
+
+impl<P: std::fmt::Display> std::fmt::Display for SsaId<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-ssa#{}", self.pseudonym, self.ssa_index)
+    }
+}
+
+/// Uniquely identifies a polynomial that allows forming a Session Stealth Address (SSA) corresponding
+/// to a specific Session.
+///
+/// The index consists of the following parts:
+/// 1. The Pseudonym part of the `HoprSenderId` - fixed for the given Session.
+/// 2. Index (i) of the Session Stealth Address (SSA)
+/// 3. Index (j) of the polynomial used to reconstruct the portion of the SSA.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SsaPolynomialId<P> {
+    id: SsaId<P>,
+    poly_index: PolynomialIndex,
+}
+
+impl<P> SsaPolynomialId<P> {
+    /// Creates a new `SsaPolynomialId` with the given `SsaId` and polynomial index.
+    pub fn new(id: SsaId<P>, poly_index: PolynomialIndex) -> Self {
+        Self { id, poly_index }
+    }
+
+    /// Pseudonym part of the `HoprSenderId`.
+    #[inline]
+    pub fn pseudonym(&self) -> &P {
+        &self.id.pseudonym
+    }
+
+    /// Index (i-value) of the Session Stealth Address (SSA).
+    #[inline]
+    pub fn ssa_index(&self) -> SsaIndex {
+        self.id.ssa_index
+    }
+
+    /// Index (j-value) of the polynomial used to reconstruct the portion of the SSA.
+    #[inline]
+    pub fn poly_index(&self) -> PolynomialIndex {
+        self.poly_index
+    }
+}
+
+impl<P> AsRef<SsaId<P>> for SsaPolynomialId<P> {
+    fn as_ref(&self) -> &SsaId<P> {
+        &self.id
+    }
+}
+
+impl<P: std::fmt::Display> std::fmt::Display for SsaPolynomialId<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.id, self.poly_index)
+    }
+}
+
+/// Share of a polynomial used to reconstruct a portion of the Session Stealth Address (SSA).
+///
+/// This corresponds to the `P_ij(X)` of the polynomial used to reconstruct the j-th portion of i-th SSA
+/// at some value `X`.
+///
+/// The struct does not hold the `X` value, as it is usually computed from the
+/// [`nonce`](TaggedEncryptedPartialSsaShare).
+///
+/// See [`TaggedEncryptedPartialSsaShare`] and [`EncryptedPartialSsaShare`] for more details.
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
+
+impl<S: PixSpec> PartialSsaShare<S> {
+    /// Encrypts this partial SSA share using the given acknowledgement [`HalfKey`].
+    pub fn encrypt(
+        mut self,
+        spi: &SsaPolynomialId<S::Pseudonym>,
+        ack_key: &HalfKey,
+    ) -> errors::Result<EncryptedPartialSsaShare<S>>
+    where
+        FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+        EncShareSize<S>: ArrayLength<u8>,
+    {
+        let mut cipher = derive_ssa_encryption_key::<S>(spi, ack_key)?;
+        cipher.apply_keystream(self.0.as_mut());
+
+        let mut out = GenericArray::<u8, EncShareSize<S>>::default();
+        out[0..size_of::<SsaIndex>()].copy_from_slice(&spi.ssa_index().get().to_be_bytes());
+        out[size_of::<SsaIndex>()..size_of::<SsaIndex>() + size_of::<PolynomialIndex>()]
+            .copy_from_slice(&spi.poly_index().to_be_bytes());
+        out[size_of::<SsaIndex>() + size_of::<PolynomialIndex>()..].copy_from_slice(self.0.as_ref());
+        Ok(EncryptedPartialSsaShare(out))
+    }
+}
+
+impl<S: PixSpec> AsRef<<PixScalar<S> as PrimeField>::Repr> for PartialSsaShare<S> {
+    fn as_ref(&self) -> &<PixScalar<S> as PrimeField>::Repr {
+        &self.0
+    }
+}
+
+fn derive_ssa_encryption_key<S: PixSpec>(
+    spi: &SsaPolynomialId<S::Pseudonym>,
+    ack: &HalfKey,
+) -> errors::Result<S::Cipher> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
         .update_reader(ack.as_ref())
         .and_then(|h| h.update_reader(spi.id.pseudonym.as_ref()))
-        .and_then(|h| h.update_reader(spi.id.ssa_index.to_be_bytes().as_ref()))
+        .and_then(|h| h.update_reader(spi.id.ssa_index.get().to_be_bytes().as_ref()))
         .and_then(|h| h.update_reader(spi.poly_index.to_be_bytes().as_ref()))
         .map_err(|_| hopr_types::crypto::errors::CryptoError::InvalidInputValue("invalid ssa encryption key"))?
         .finalize_xof();
@@ -74,63 +207,60 @@ pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
 ///
 /// This share can be [decrypted](EncryptedPartialSsaShare::decrypt) to [`PartialSsaShare`]
 /// to be verified and used for reconstruction.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct EncryptedPartialSsaShare<S: PixSpec>(GenericArray<u8, EncShareSize<S>>)
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>;
-
-impl<S: PixSpec> std::fmt::Debug for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("EncryptedPartialSsaShare").field(&self.0).finish()
-    }
-}
 
 impl<S: PixSpec> EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>,
 {
-    /// [`SsaIndex`] embedded in this encrypted share.
-    pub fn ssa_index(&self) -> SsaIndex {
-        SsaIndex::from_be_bytes([self.0[0], self.0[1]])
+    /// [`SsaIndex`] and [`PolynomialIndex`] embedded in this encrypted share.
+    ///
+    /// Returns `None` if the share is empty.
+    pub fn indices(&self) -> Option<(SsaIndex, PolynomialIndex)> {
+        let ssa_index: Option<SsaIndex> =
+            RawSsaIndex::from_be_bytes(self.0[0..size_of::<RawSsaIndex>()].try_into().ok()?)
+                .try_into()
+                .ok();
+
+        let poly_index = PolynomialIndex::from_be_bytes(
+            self.0[size_of::<RawSsaIndex>()..size_of::<RawSsaIndex>() + size_of::<PolynomialIndex>()]
+                .try_into()
+                .ok()?,
+        );
+
+        ssa_index.map(|ssa_index| (ssa_index, poly_index))
     }
 
-    /// [`PolynomialIndex`] embedded in this encrypted share.
-    pub fn poly_index(&self) -> PolynomialIndex {
-        PolynomialIndex::from_be_bytes([self.0[2], self.0[3]])
+    /// Tries to decrypt the encrypted partial SSA share using the provided pseudonym and
+    /// acknowledgement [`HalfKey`].
+    ///
+    /// NOTE: that the share must be verified by the reconstructor.
+    pub(crate) fn decrypt(self, pseudonym: &S::Pseudonym, ack_key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+        if let Some((ssa_index, poly_index)) = self.indices() {
+            let spi = SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index);
+            let mut cipher = derive_ssa_encryption_key::<S>(&spi, ack_key)?;
+            let mut share = <PixScalar<S> as PrimeField>::Repr::default();
+            share.as_mut().copy_from_slice(&self.0[SsaPolyIndexPrefixSize::USIZE..]);
+            cipher.apply_keystream(share.as_mut());
+            Ok(PartialSsaShare(share))
+        } else {
+            Err(PixError::ShareIsEmpty)
+        }
     }
 
-    pub fn decrypt(self, pseudonym: &S::Pseudonym, key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
-        let spi = SsaPolynomialId::new(SsaId::new(*pseudonym, self.ssa_index()), self.poly_index());
-        let mut cipher = derive_ssa_encryption_key::<S>(&spi, key)?;
-        let mut share = <PixScalar<S> as PrimeField>::Repr::default();
-        share.as_mut().copy_from_slice(&self.0[SsaPolyIndexPrefixSize::USIZE..]);
-        cipher.apply_keystream(share.as_mut());
-        Ok(PartialSsaShare(share))
-    }
-
+    /// Returns true if the encrypted share is empty (all zeroes or zero SSA index).
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self == &Self::default()
+        self.0 == GenericArray::<u8, EncShareSize<S>>::default() || self.indices().is_none()
     }
 }
 
-impl<S: PixSpec> Clone for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-    GenericArray<u8, EncShareSize<S>>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<S: PixSpec> Copy for EncryptedPartialSsaShare<S>
+impl<S: PixSpec + Copy> Copy for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>,
@@ -171,110 +301,12 @@ where
     const SIZE: usize = EncShareSize::<S>::USIZE;
 }
 
-impl<S: PixSpec> PartialEq for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl<S: PixSpec> Eq for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-}
-
-impl<S: PixSpec> Default for EncryptedPartialSsaShare<S> {
-    fn default() -> Self {
-        Self(GenericArray::default())
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
-    where
-        Ser: serde::Serializer,
-    {
-        serializer.serialize_bytes(self.as_ref())
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct EncryptedPartialSsaShareVisitor<S: PixSpec>(std::marker::PhantomData<S>);
-
-        impl<'de, S: PixSpec> serde::de::Visitor<'de> for EncryptedPartialSsaShareVisitor<S>
-        where
-            FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-            EncShareSize<S>: ArrayLength<u8>,
-        {
-            type Value = EncryptedPartialSsaShare<S>;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "a byte array with the encrypted partial SSA share")
-            }
-
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                let expected = EncShareSize::<S>::USIZE;
-                if v.len() != expected {
-                    return Err(E::invalid_length(v.len(), &self));
-                }
-
-                let mut bytes = GenericArray::<u8, EncShareSize<S>>::default();
-                bytes.copy_from_slice(v);
-                Ok(EncryptedPartialSsaShare(bytes))
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let expected = EncShareSize::<S>::USIZE;
-                let mut bytes = GenericArray::<u8, EncShareSize<S>>::default();
-
-                for i in 0..expected {
-                    bytes[i] = seq
-                        .next_element()?
-                        .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
-                }
-
-                if seq.next_element::<u8>()?.is_some() {
-                    return Err(serde::de::Error::invalid_length(expected + 1, &self));
-                }
-
-                Ok(EncryptedPartialSsaShare(bytes))
-            }
-        }
-
-        deserializer.deserialize_bytes(EncryptedPartialSsaShareVisitor::<S>(std::marker::PhantomData))
-    }
-}
-
 /// This is a wrapped [`EncryptedPartialSsaShare`] extracted from a specific SURB (presumably along with the associated
 /// `AcknowledgementChallenge`).
-pub struct TaggedEncryptedPartialSsaShare<S: PixSpec, T = PixScalar<S>> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TaggedEncryptedPartialSsaShare<S: PixSpec, P = <S as PixSpec>::Pseudonym, T = PixScalar<S>> {
     /// Pseudonym of the sender that created the encrypted partial SSA share.
-    pub pseudonym: S::Pseudonym,
+    pub pseudonym: P,
     /// Nonce used to generate the encrypted partial SSA share.
     ///
     /// This must typically be convertible to [`PixScalar`] of `S`.
@@ -283,464 +315,163 @@ pub struct TaggedEncryptedPartialSsaShare<S: PixSpec, T = PixScalar<S>> {
     pub partial_share: EncryptedPartialSsaShare<S>,
 }
 
-impl<S: PixSpec> TaggedEncryptedPartialSsaShare<S, PixScalar<S>> {
+impl<S: PixSpec> TaggedEncryptedPartialSsaShare<S, S::Pseudonym, PixScalar<S>> {
+    /// Creates a new tagged encrypted partial SSA share from the
+    /// [encrypted partial SSA share](TaggedEncryptedPartialSsaShare::partial_share) that must correspond
+    /// to the given `pseudonym` and `nonce`.
     pub fn new(
         pseudonym: S::Pseudonym,
         nonce: &impl AsRef<[u8]>,
         partial_share: EncryptedPartialSsaShare<S>,
     ) -> errors::Result<Self> {
-        Ok(Self {
-            pseudonym,
-            nonce: S::msg_to_scalar(
-                &SsaPolynomialId::new(
-                    SsaId::new(pseudonym, partial_share.ssa_index()),
-                    partial_share.poly_index(),
-                ),
-                nonce.as_ref(),
-            )?,
-            partial_share,
-        })
+        if let Some((ssa_index, poly_index)) = partial_share.indices() {
+            Ok(Self {
+                pseudonym,
+                nonce: S::msg_to_scalar(
+                    &SsaPolynomialId::new(SsaId::new(pseudonym, ssa_index), poly_index),
+                    nonce.as_ref(),
+                )?,
+                partial_share,
+            })
+        } else {
+            Err(PixError::ShareIsEmpty)
+        }
     }
 }
 
-impl<S: PixSpec, T> TaggedEncryptedPartialSsaShare<S, T> {
+impl<S: PixSpec> TaggedEncryptedPartialSsaShare<S, S::Pseudonym, PixScalar<S>> {
+    /// SSA ID this share corresponds to.
+    ///
+    /// Returns `None` if the share is empty.
     #[inline]
-    pub fn ssa_id(&self) -> SsaId<S> {
-        SsaId::new(self.pseudonym, self.partial_share.ssa_index())
+    pub fn ssa_id(&self) -> Option<SsaId<S::Pseudonym>> {
+        self.partial_share
+            .indices()
+            .map(|(ssa_index, _)| SsaId::new(self.pseudonym, ssa_index))
     }
 
+    /// SSA polynomial ID this share corresponds to.
+    ///
+    /// Returns `None` if the share is empty.
     #[inline]
-    pub fn ssa_polynomial_id(&self) -> SsaPolynomialId<S> {
-        SsaPolynomialId::new(self.ssa_id(), self.partial_share.poly_index())
+    pub fn ssa_polynomial_id(&self) -> Option<SsaPolynomialId<S::Pseudonym>> {
+        self.partial_share
+            .indices()
+            .map(|(ssa_index, poly_index)| SsaPolynomialId::new(SsaId::new(self.pseudonym, ssa_index), poly_index))
     }
 }
 
-impl<S: PixSpec, T: Clone> Clone for TaggedEncryptedPartialSsaShare<S, T>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
+impl<S: PixSpec + Copy, P: Copy, T: Copy> Copy for TaggedEncryptedPartialSsaShare<S, P, T> where
+    EncryptedPartialSsaShare<S>: Copy
 {
-    fn clone(&self) -> Self {
+}
+
+/// Contains a generated share from a specific previously committed SSA.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedShare<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+    /// ID of the polynomial corresponding to the partial SSA share.
+    pub id: SsaPolynomialId<P>,
+    /// Generated partial SSA share.
+    pub share: PartialSsaShare<S>,
+}
+
+impl<S: PixSpec> GeneratedShare<S, S::Pseudonym> {
+    /// Convenience method to [encrypt](PartialSsaShare::encrypt) the share using an acknowledgement [`HalfKey`].
+    #[inline]
+    pub fn encrypt(self, ack: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>> {
+        self.share.encrypt(&self.id, ack)
+    }
+}
+
+/// Contains commitment to a specific SSA and corresponding verifier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SsaCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+    /// ID of the SSA that is being committed to.
+    pub ssa_id: SsaId<P>,
+    /// Commitment to the SSA.
+    #[cfg_attr(feature = "serde", serde(with = "elliptic_curve_tools::group"))]
+    pub ssa_commitment: PixGroup<S>,
+    /// Verifiers of the partial SSA shares.
+    pub verifiers: Vec<PartialSsaShareVerifier<S, P>>,
+}
+
+/// Represents the current state of a specific SSA commitment on an Exit node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SsaCommitmentState<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+    /// ID of the SSA that is being committed to.
+    pub ssa_id: SsaId<P>,
+    /// Commitment to the SSA, if it's already known.
+    #[cfg_attr(feature = "serde", serde(with = "option_group"))]
+    pub ssa_commitment: Option<PixGroup<S>>,
+    /// Whether the commitment is fully committed and therefore its partial shares are verifiable.
+    pub is_verifiable: bool,
+    /// Whether this SSA was encountered for the first time.
+    pub is_first_encountered: bool,
+}
+
+impl<S: PixSpec> SsaCommitmentState<S, S::Pseudonym> {
+    /// Creates a new SsaCommitmentState for the given SSA ID.
+    ///
+    /// It has no associated commitment and is not verifiable initially.
+    pub fn new(ssa_id: SsaId<S::Pseudonym>) -> Self {
         Self {
-            pseudonym: self.pseudonym,
-            nonce: self.nonce.clone(),
-            partial_share: self.partial_share.clone(),
+            ssa_id,
+            ssa_commitment: None,
+            is_verifiable: false,
+            is_first_encountered: true,
         }
     }
 }
 
-impl<S: PixSpec, T: Copy> Copy for TaggedEncryptedPartialSsaShare<S, T>
-where
-    S::Pseudonym: Copy,
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-    GenericArray<u8, EncShareSize<S>>: Copy,
-{
+/// Contains the already recovered secret scalar corresponding to a specific SSA.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RecoveredSsa<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+    /// ID of the SSA that was recovered.
+    pub ssa_id: SsaId<P>,
+    /// Recovered secret scalar (private key corresponding to the SSA).
+    pub ssa: PixScalar<S>,
 }
 
-impl<S: PixSpec, T: std::fmt::Debug> std::fmt::Debug for TaggedEncryptedPartialSsaShare<S, T>
-where
-    S::Pseudonym: std::fmt::Debug,
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TaggedEncryptedPartialSsaShare")
-            .field("pseudonym", &self.pseudonym)
-            .field("nonce", &self.nonce)
-            .field("partial_share", &self.partial_share)
-            .finish()
-    }
-}
-
-impl<S: PixSpec, T: PartialEq> PartialEq for TaggedEncryptedPartialSsaShare<S, T>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.pseudonym == other.pseudonym && self.nonce == other.nonce && self.partial_share == other.partial_share
-    }
-}
-
-impl<S: PixSpec, T: Eq> Eq for TaggedEncryptedPartialSsaShare<S, T>
-where
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-}
-
+/// Serde adapter for `Option<G>` where `G` is a curve group element, delegating
+/// to `elliptic_curve_tools::group` for the inner element.
+///
+/// Workaround for `serde_with` not supporting `Option<elliptic_curve_tools::group>`
+/// (the latter is a serde-module helper, not a `SerializeAs`/`DeserializeAs` impl).
 #[cfg(feature = "serde")]
-impl<S: PixSpec, T: serde::Serialize> serde::Serialize for TaggedEncryptedPartialSsaShare<S, T>
-where
-    S::Pseudonym: serde::Serialize,
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn serialize<Ser>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error>
+mod option_group {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
+
+    pub fn serialize<G, S>(value: &Option<G>, serializer: S) -> Result<S::Ok, S::Error>
     where
-        Ser: serde::Serializer,
+        S: Serializer,
+        G: Group + GroupEncoding,
     {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("TaggedEncryptedPartialSsaShare", 3)?;
-        state.serialize_field("pseudonym", &self.pseudonym)?;
-        state.serialize_field("nonce", &self.nonce)?;
-        state.serialize_field("partial_share", &self.partial_share)?;
-        state.end()
-    }
-}
+        struct Wrapper<'a, G: Group + GroupEncoding>(&'a G);
 
-#[cfg(feature = "serde")]
-impl<'de, S: PixSpec, T: serde::Deserialize<'de>> serde::Deserialize<'de> for TaggedEncryptedPartialSsaShare<S, T>
-where
-    S::Pseudonym: serde::Deserialize<'de>,
-    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArrayLength<u8>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field {
-            Pseudonym,
-            Nonce,
-            #[serde(rename = "partial_share")]
-            PartialShare,
-        }
-
-        struct TaggedEncryptedPartialSsaShareVisitor<S: PixSpec, T> {
-            _marker: std::marker::PhantomData<(S, T)>,
-        }
-
-        impl<'de, S: PixSpec, T: serde::Deserialize<'de>> serde::de::Visitor<'de>
-            for TaggedEncryptedPartialSsaShareVisitor<S, T>
-        where
-            S::Pseudonym: serde::Deserialize<'de>,
-            FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-            EncShareSize<S>: ArrayLength<u8>,
-        {
-            type Value = TaggedEncryptedPartialSsaShare<S, T>;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("struct TaggedEncryptedPartialSsaShare")
-            }
-
-            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
-            where
-                V: serde::de::SeqAccess<'de>,
-            {
-                let pseudonym = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-                let nonce = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
-                let partial_share = seq
-                    .next_element()?
-                    .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
-                Ok(TaggedEncryptedPartialSsaShare {
-                    pseudonym,
-                    nonce,
-                    partial_share,
-                })
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut pseudonym = None;
-                let mut nonce = None;
-                let mut partial_share = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Pseudonym => {
-                            if pseudonym.is_some() {
-                                return Err(serde::de::Error::duplicate_field("pseudonym"));
-                            }
-                            pseudonym = Some(map.next_value()?);
-                        }
-                        Field::Nonce => {
-                            if nonce.is_some() {
-                                return Err(serde::de::Error::duplicate_field("nonce"));
-                            }
-                            nonce = Some(map.next_value()?);
-                        }
-                        Field::PartialShare => {
-                            if partial_share.is_some() {
-                                return Err(serde::de::Error::duplicate_field("partial_share"));
-                            }
-                            partial_share = Some(map.next_value()?);
-                        }
-                    }
-                }
-                let pseudonym = pseudonym.ok_or_else(|| serde::de::Error::missing_field("pseudonym"))?;
-                let nonce = nonce.ok_or_else(|| serde::de::Error::missing_field("nonce"))?;
-                let partial_share = partial_share.ok_or_else(|| serde::de::Error::missing_field("partial_share"))?;
-                Ok(TaggedEncryptedPartialSsaShare {
-                    pseudonym,
-                    nonce,
-                    partial_share,
-                })
+        impl<G: Group + GroupEncoding> Serialize for Wrapper<'_, G> {
+            fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+                elliptic_curve_tools::group::serialize(self.0, s)
             }
         }
 
-        const FIELDS: &[&str] = &["pseudonym", "nonce", "partial_share"];
-        deserializer.deserialize_struct(
-            "TaggedEncryptedPartialSsaShare",
-            FIELDS,
-            TaggedEncryptedPartialSsaShareVisitor {
-                _marker: std::marker::PhantomData,
-            },
-        )
+        match value {
+            Some(g) => serializer.serialize_some(&Wrapper(g)),
+            None => serializer.serialize_none(),
+        }
     }
-}
 
-/// Share of a polynomial used to reconstruct a portion of the Session Stealth Address (SSA).
-///
-/// This corresponds to the `P_ij(X)` of the polynomial used to reconstruct the j-th portion of i-th SSA
-/// at some value `X` (of type [`PixSpec::ShareId`]).
-///
-/// The `X` value is not held by the struct, and it's the responsibility of the user to determine its correct value.
-#[derive(Default)]
-pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
-
-impl<S: PixSpec> PartialSsaShare<S> {
-    pub fn encrypt(mut self, spi: &SsaPolynomialId<S>, key: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>>
+    pub fn deserialize<'de, G, D>(deserializer: D) -> Result<Option<G>, D::Error>
     where
-        FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-        EncShareSize<S>: ArrayLength<u8>,
+        D: Deserializer<'de>,
+        G: Group + GroupEncoding,
     {
-        let mut cipher = derive_ssa_encryption_key::<S>(spi, key)?;
-        cipher.apply_keystream(self.0.as_mut());
+        #[derive(Deserialize)]
+        struct Wrapper<G: Group + GroupEncoding>(#[serde(with = "elliptic_curve_tools::group")] G);
 
-        let mut out = GenericArray::<u8, EncShareSize<S>>::default();
-        out[0..size_of::<SsaIndex>()].copy_from_slice(&spi.ssa_index().to_be_bytes());
-        out[size_of::<SsaIndex>()..size_of::<SsaIndex>() + size_of::<PolynomialIndex>()]
-            .copy_from_slice(&spi.poly_index().to_be_bytes());
-        out[size_of::<SsaIndex>() + size_of::<PolynomialIndex>()..].copy_from_slice(self.0.as_ref());
-        Ok(EncryptedPartialSsaShare(out))
-    }
-}
-
-impl<S: PixSpec> AsRef<<PixScalar<S> as PrimeField>::Repr> for PartialSsaShare<S> {
-    fn as_ref(&self) -> &<PixScalar<S> as PrimeField>::Repr {
-        &self.0
-    }
-}
-impl<S: PixSpec> Clone for PartialSsaShare<S> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl<S: PixSpec> std::fmt::Debug for PartialSsaShare<S>
-where
-    <PixScalar<S> as PrimeField>::Repr: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("PartialSsaShare").field(&self.0).finish()
-    }
-}
-
-impl<S: PixSpec> PartialEq for PartialSsaShare<S>
-where
-    <PixScalar<S> as PrimeField>::Repr: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl<S: PixSpec> Eq for PartialSsaShare<S> where <PixScalar<S> as PrimeField>::Repr: Eq {}
-
-/// Uniquely identifies a polynomial that allows forming a Session Stealth Address (SSA) corresponding
-/// to a specific Session.
-///
-/// The index consists of the following parts:
-/// 1. The Pseudonym part of the `HoprSenderId` - fixed for the given Session.
-/// 2. Index (i) of the Session Stealth Address (SSA)
-/// 3. Index (j) of the polynomial used to reconstruct the portion of the SSA.
-pub struct SsaPolynomialId<S: PixSpec> {
-    id: SsaId<S>,
-    poly_index: PolynomialIndex,
-}
-
-impl<S: PixSpec> SsaPolynomialId<S> {
-    pub fn new(id: SsaId<S>, poly_index: PolynomialIndex) -> Self {
-        Self { id, poly_index }
-    }
-
-    /// Pseudonym part of the `HoprSenderId`.
-    #[inline]
-    pub fn pseudonym(&self) -> &S::Pseudonym {
-        &self.id.pseudonym
-    }
-
-    /// Index (i-value) of the Session Stealth Address (SSA).
-    #[inline]
-    pub fn ssa_index(&self) -> SsaIndex {
-        self.id.ssa_index
-    }
-
-    /// Index (j-value) of the polynomial used to reconstruct the portion of the SSA.
-    #[inline]
-    pub fn poly_index(&self) -> PolynomialIndex {
-        self.poly_index
-    }
-}
-
-impl<S: PixSpec> AsRef<SsaId<S>> for SsaPolynomialId<S> {
-    fn as_ref(&self) -> &SsaId<S> {
-        &self.id
-    }
-}
-
-impl<S: PixSpec> std::fmt::Display for SsaPolynomialId<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.id, self.poly_index)
-    }
-}
-
-// Manual trait implementations are required because they are not dependent on the generic S
-
-impl<S: PixSpec> std::fmt::Debug for SsaPolynomialId<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SsaPolynomialIndex")
-            .field("id", &self.id)
-            .field("poly_index", &self.poly_index)
-            .finish()
-    }
-}
-
-impl<S: PixSpec> Clone for SsaPolynomialId<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<S: PixSpec> Copy for SsaPolynomialId<S> {}
-
-impl<S: PixSpec> PartialEq for SsaPolynomialId<S> {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.poly_index == other.poly_index
-    }
-}
-
-impl<S: PixSpec> Eq for SsaPolynomialId<S> {}
-
-impl<S: PixSpec> std::hash::Hash for SsaPolynomialId<S> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.poly_index.hash(state);
-    }
-}
-
-impl<S> PartialOrd for SsaPolynomialId<S>
-where
-    S: PixSpec,
-    S::Pseudonym: Ord,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<S> Ord for SsaPolynomialId<S>
-where
-    S: PixSpec,
-    S::Pseudonym: Ord,
-{
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id
-            .cmp(&other.id)
-            .then_with(|| self.poly_index.cmp(&other.poly_index))
-    }
-}
-
-/// Uniquely identifies a Session Stealth Address (SSA).
-///
-/// This consists of a pseudonym and [`SsaIndex`].
-pub struct SsaId<S: PixSpec> {
-    pseudonym: S::Pseudonym,
-    ssa_index: SsaIndex,
-}
-
-impl<S: PixSpec> SsaId<S> {
-    pub fn new(pseudonym: S::Pseudonym, ssa_index: SsaIndex) -> Self {
-        Self { pseudonym, ssa_index }
-    }
-
-    #[inline]
-    pub fn pseudonym(&self) -> &S::Pseudonym {
-        &self.pseudonym
-    }
-
-    #[inline]
-    pub fn ssa_index(&self) -> SsaIndex {
-        self.ssa_index
-    }
-}
-
-// Manual trait implementations are required because they are not dependent on the generic S
-
-impl<S: PixSpec> Clone for SsaId<S> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<S: PixSpec> Copy for SsaId<S> {}
-
-impl<S: PixSpec> PartialEq for SsaId<S> {
-    fn eq(&self, other: &Self) -> bool {
-        self.pseudonym == other.pseudonym && self.ssa_index == other.ssa_index
-    }
-}
-
-impl<S: PixSpec> Eq for SsaId<S> {}
-
-impl<S: PixSpec> std::hash::Hash for SsaId<S> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.pseudonym.hash(state);
-        self.ssa_index.hash(state);
-    }
-}
-
-impl<S: PixSpec> std::fmt::Display for SsaId<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-ssa#{}", self.pseudonym, self.ssa_index)
-    }
-}
-
-impl<S: PixSpec> std::fmt::Debug for SsaId<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SsaId")
-            .field("pseudonym", &self.pseudonym.to_string())
-            .field("ssa_index", &self.ssa_index)
-            .finish()
-    }
-}
-
-impl<S: PixSpec> PartialOrd<Self> for SsaId<S>
-where
-    S::Pseudonym: Ord,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<S: PixSpec> Ord for SsaId<S>
-where
-    S::Pseudonym: Ord,
-{
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.pseudonym
-            .cmp(&other.pseudonym)
-            .then_with(|| self.ssa_index.cmp(&other.ssa_index))
+        Ok(Option::<Wrapper<G>>::deserialize(deserializer)?.map(|w| w.0))
     }
 }
 
@@ -803,12 +534,13 @@ mod tests {
     #[test]
     fn default_enc_share_is_empty() {
         assert!(EncryptedPartialSsaShare::<TestSpec>::default().is_empty());
+        assert!(EncryptedPartialSsaShare::<TestSpec>::default().indices().is_none());
     }
 
     #[test]
     fn ssa_part_shares_should_encrypt_and_decrypt() -> anyhow::Result<()> {
         let key = HalfKey::random();
-        let spi = SsaPolynomialId::<TestSpec>::new(SsaId::new(SimplePseudonym::random(), 1), 0);
+        let spi = SsaPolynomialId::<SimplePseudonym>::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
         let scalar = PixScalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
 
         let share_1 = PartialSsaShare::<TestSpec>(scalar.to_repr());

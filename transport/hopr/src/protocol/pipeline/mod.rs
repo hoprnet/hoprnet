@@ -551,7 +551,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 /// to recover SSAs and forward them to the `recovered_ssa` sink.
 async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, recovered_ssa: SEvt)
 where
-    S: PixSpec + Send + Sync + 'static,
+    S: PixSpec,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
     SEvt: futures::Sink<RecoveredSsa<S>> + Clone + Unpin + Send + 'static,

@@ -5,12 +5,10 @@
 //! need to perform the very same steps when an incoming batch of [`Acknowledgement`]s
 //! arrives from a peer:
 //!
-//! 1. Check that *some* state is awaited from the given peer (i.e. that the local
-//!    awaiting-acks cache contains the peer entry) without bumping its popularity
-//!    estimator so that the entry can be evicted normally on inactivity.
-//! 2. Verify all acknowledgements (using either per-acknowledgement verification
-//!    or the more efficient batch verification algorithm) and translate the
-//!    resulting half-keys to their challenges.
+//! 1. Check that *some* state is awaited from the given peer (i.e. that the local awaiting-acks cache contains the peer
+//!    entry) without bumping its popularity estimator so that the entry can be evicted normally on inactivity.
+//! 2. Verify all acknowledgements (using either per-acknowledgement verification or the more efficient batch
+//!    verification algorithm) and translate the resulting half-keys to their challenges.
 //!
 //! The post-processing of the verified acknowledgements is specific to each caller
 //! and is therefore left out of this helper.

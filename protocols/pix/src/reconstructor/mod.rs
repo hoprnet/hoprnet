@@ -9,7 +9,7 @@ use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use crate::{
     CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, ExitAcknowledgementShareProcessor, PixGroupRepr,
     PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare, errors, errors::PixError, types::SsaId,
+    TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -62,6 +62,9 @@ pub struct SsaReconstructorConfig {
     pub use_batch_verification: bool,
 }
 
+type EncryptedShareCache<S> =
+    moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, <S as PixSpec>::Pseudonym, PixScalar<S>>>;
+
 /// Allows server-side reconstruction of SSAs.
 ///
 /// There are 3 inputs that reconstructor is dependent on (in order):
@@ -74,17 +77,16 @@ pub struct SsaReconstructorConfig {
 ///
 /// It is able to track SSA for multiple different pseudonyms (Sessions).
 pub struct SsaReconstructor<S: PixSpec> {
-    commitment_builder: moka::sync::Cache<SsaId<S>, std::sync::Arc<parking_lot::Mutex<SsaCommitmentBuilder<S>>>>,
-    ssa_builders: moka::sync::Cache<SsaId<S>, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
-    ssa_verifiers: moka::sync::Cache<SsaPolynomialId<S>, std::sync::Arc<parking_lot::Mutex<SsaPartBuilder<S>>>>,
-    awaiting_acks: moka::sync::Cache<
-        OffchainPublicKey,
-        moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, PixScalar<S>>>,
-    >,
+    commitment_builder:
+        moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaCommitmentBuilder<S>>>>,
+    ssa_builders: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaBuilder<S>>>>,
+    ssa_verifiers:
+        moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaPartBuilder<S>>>>,
+    awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
     cfg: SsaReconstructorConfig,
 }
 
-impl<S: PixSpec + 'static> SsaReconstructor<S> {
+impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         Self {
             commitment_builder: moka::sync::CacheBuilder::new(10)
@@ -114,7 +116,7 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
             return Ok(None);
         };
 
-        let spi = share.ssa_polynomial_id();
+        let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
@@ -142,12 +144,12 @@ impl<S: PixSpec + 'static> SsaReconstructor<S> {
     }
 }
 
-impl<S: PixSpec + 'static> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
+impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
     type Error = PixError;
 
     fn insert_coefficient_commitments(
         &self,
-        ssa_id: SsaId<S>,
+        ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> Result<SsaCommitmentState<S>, Self::Error> {
@@ -187,7 +189,7 @@ impl<S: PixSpec + 'static> ExitAcknowledgementShareProcessor<S> for SsaReconstru
                 }
 
                 res.ssa_commitment = Some(commitment);
-                res.is_fully_committed = true;
+                res.is_verifiable = true;
             }
         }
 
@@ -201,7 +203,7 @@ impl<S: PixSpec + 'static> ExitAcknowledgementShareProcessor<S> for SsaReconstru
         tagged_enc_share: TaggedEncryptedPartialSsaShare<S>,
     ) -> Result<(), Self::Error> {
         if tagged_enc_share.partial_share.is_empty() {
-            return Err(errors::PixError::InvalidInput);
+            return Err(PixError::ShareIsEmpty);
         }
 
         self.awaiting_acks
@@ -231,10 +233,10 @@ impl<S: PixSpec + 'static> ExitAcknowledgementShareProcessor<S> for SsaReconstru
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
                 Ok(Some(ssa)) => res.push(ssa),
-                Ok(None) => continue,
+                Ok(None) => {}
+                Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
-                    continue;
                 }
             }
         }
@@ -254,14 +256,14 @@ mod tests {
     use crate::{PartialSsaShare, tests::TestSpec};
 
     #[test]
-    fn reconstructor_invalid_commitment_inputs() {
+    fn reconstructor_invalid_commitment_inputs() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
             polys_per_ssa: 2,
             poly_threshold: 2,
             ..Default::default()
         });
 
-        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
         // 1. Invalid coefficient index (>= threshold)
         let result = reconstructor.insert_coefficient_commitments(
@@ -269,13 +271,15 @@ mod tests {
             2, // threshold is 2, so 2 is invalid
             HashMap::new().into_iter(),
         );
-        assert!(matches!(result, Err(errors::PixError::InvalidInput)));
+        assert!(matches!(result, Err(PixError::InvalidInput)));
 
         // 2. Invalid polynomial index (>= polys_per_ssa)
         let mut invalid_poly_map = HashMap::new();
         invalid_poly_map.insert(2 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, invalid_poly_map.into_iter());
-        assert!(matches!(result, Err(errors::PixError::InvalidInput)));
+        assert!(matches!(result, Err(PixError::InvalidInput)));
+
+        Ok(())
     }
 
     #[test]
@@ -286,7 +290,7 @@ mod tests {
             ..Default::default()
         });
 
-        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
         // Fill all commitments
         for coeff in 0..2 {
@@ -299,7 +303,7 @@ mod tests {
 
         // Now adding more should fail with DuplicateCommitment
         let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::new().into_iter());
-        assert!(matches!(result, Err(errors::PixError::DuplicateCommitment)));
+        assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
         Ok(())
     }
@@ -312,7 +316,7 @@ mod tests {
         let challenge = ack_key.to_challenge()?;
 
         // Add a pending share but NO commitment (so no verifier is created)
-        let ssa_id = SsaId::new(SimplePseudonym::random(), 1);
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
         let spi = SsaPolynomialId::new(ssa_id, 0);
 
         // We need a valid-looking encrypted share even if it's junk.

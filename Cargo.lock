@@ -3734,6 +3734,7 @@ dependencies = [
  "anyhow",
  "auto_impl",
  "criterion",
+ "elliptic-curve-tools",
  "hex",
  "hopr-types",
  "hopr-utils",

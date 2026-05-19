@@ -11,7 +11,7 @@ use hopr_types::{
     internal::prelude::VerifiedAcknowledgement,
 };
 use rand::prelude::SliceRandom;
-use vsss_rs::elliptic_curve::{group::GroupEncoding, ops::MulByGenerator};
+use vsss_rs::elliptic_curve::ops::MulByGenerator;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct TestSpec;
@@ -40,8 +40,6 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         ..
     } = generator.new_ssa_commitment(&pseudonym)?;
 
-    let ssa_commitment_repr = ssa_commitment.to_bytes();
-
     // Transpose the commitments so they have the on-wire structure
     let mut transposed = transpose_commitments(verifiers);
 
@@ -51,7 +49,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         ..Default::default()
     });
 
-    let ssa_id = SsaId::new(pseudonym, 1);
+    let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
     // In the transposed form, remove the first coefficient commitments of all polynomials
     let mut first_coeffs = transposed.remove(&0).unwrap();
@@ -64,14 +62,14 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     assert_eq!(ssa_id, res.ssa_id);
     assert!(res.is_first_encountered);
     assert!(res.ssa_commitment.is_none());
-    assert!(!res.is_fully_committed);
+    assert!(!res.is_verifiable);
 
     // Now add the first coefficient commitment of the first polynomial
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::from([(0, remainder)]).into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
-    assert!(!res.is_fully_committed);
+    assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+    assert!(!res.is_verifiable);
 
     // Add all the remaining coefficient commitments for all polynomials except one
     let remainder = transposed.remove(&5).unwrap();
@@ -80,16 +78,16 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
             reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_coeff_commitments.into_iter())?;
         assert_eq!(ssa_id, res.ssa_id);
         assert!(!res.is_first_encountered);
-        assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
-        assert!(!res.is_fully_committed);
+        assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+        assert!(!res.is_verifiable);
     }
 
     // Now the SSA should be fully committed
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(ssa_commitment_repr), res.ssa_commitment);
-    assert!(res.is_fully_committed);
+    assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+    assert!(res.is_verifiable);
 
     let mut acks = Vec::new();
 

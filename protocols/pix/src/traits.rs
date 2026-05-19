@@ -1,35 +1,12 @@
 use hopr_types::{
-    crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
+    crypto::prelude::{HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
 };
 
 use crate::{
-    CoefficientIndex, EncryptedPartialSsaShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, SsaId, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors,
+    CoefficientIndex, GeneratedShare, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
+    SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
-
-pub struct SsaCommitmentState<S: PixSpec> {
-    pub ssa_id: SsaId<S>,
-    pub ssa_commitment: Option<PixGroupRepr<S>>,
-    pub is_fully_committed: bool,
-    pub is_first_encountered: bool,
-}
-
-impl<S: PixSpec> SsaCommitmentState<S> {
-    pub fn new(ssa_id: SsaId<S>) -> Self {
-        Self {
-            ssa_id,
-            ssa_commitment: None,
-            is_fully_committed: false,
-            is_first_encountered: true,
-        }
-    }
-}
-
-pub struct RecoveredSsa<S: PixSpec> {
-    pub ssa_id: SsaId<S>,
-    pub ssa: PixScalar<S>,
-}
 
 /// Allows reconstruction of SSAs at the Exit node.
 ///
@@ -52,7 +29,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     /// the same polynomial coefficients across multiple polynomials (each one with its own polynomial index).
     fn insert_coefficient_commitments(
         &self,
-        ssa_id: SsaId<S>,
+        ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> Result<SsaCommitmentState<S>, Self::Error>;
@@ -92,26 +69,6 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     ) -> Result<Vec<RecoveredSsa<S>>, Self::Error>;
 }
 
-/// Contains a generated share from a specific previously committed SSA.
-pub struct GeneratedShare<S: PixSpec> {
-    pub id: SsaPolynomialId<S>,
-    pub share: PartialSsaShare<S>,
-}
-
-impl<S: PixSpec> GeneratedShare<S> {
-    #[inline]
-    pub fn encrypt(self, ack: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>> {
-        self.share.encrypt(&self.id, ack)
-    }
-}
-
-/// Contains commitment to a specific SSA and corresponding verifier.
-pub struct SsaCommitment<S: PixSpec> {
-    pub ssa_id: SsaId<S>,
-    pub ssa_commitment: PixGroup<S>,
-    pub verifiers: Vec<PartialSsaShareVerifier<S>>,
-}
-
 #[auto_impl::auto_impl(&, Arc, Box)]
 pub trait EntryShareGenerator<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
@@ -127,6 +84,7 @@ pub trait EntryShareGenerator<S: PixSpec> {
         pseudonym: &S::Pseudonym,
         msg: &impl AsRef<[u8]>,
     ) -> Result<Option<GeneratedShare<S>>, Self::Error>;
+
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
     ///
     /// Returns the new random SSA-commitment and the corresponding SSA share verifier.
