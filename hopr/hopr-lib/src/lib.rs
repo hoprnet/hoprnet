@@ -735,9 +735,6 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context as _;
-    use hopr_transport::Keypair;
-
     use super::*;
 
     #[test]

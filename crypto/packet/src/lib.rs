@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn surb_length() {
         let surb_len = HoprSurb::SIZE;
-        assert_eq!(surb_len, 399);
+        assert_eq!(surb_len, 401);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 

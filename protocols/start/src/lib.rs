@@ -694,7 +694,7 @@ mod tests {
     #[test]
     fn start_protocol_session_ssa_request_message_should_encode_and_decode() -> anyhow::Result<()> {
         let mut commitments = std::collections::BTreeMap::new();
-        for i in 0..10 {
+        for i in 1..=10 {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
@@ -720,7 +720,7 @@ mod tests {
         // Payload size is 432 bytes.
         // Header + params + num_commitments + session_id will take some space.
         // Let's add many commitments to exceed the limit.
-        for i in 0..100 {
+        for i in 1..=100 {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
@@ -833,7 +833,7 @@ mod tests {
         );
 
         let mut commitments = std::collections::BTreeMap::new();
-        for i in 0..26 {
+        for i in 1..26 {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
@@ -852,7 +852,7 @@ mod tests {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             ssa: SsaIndex::MAX,
             coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
-            coefficient_commitments: (0..25).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
+            coefficient_commitments: (0..24).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
