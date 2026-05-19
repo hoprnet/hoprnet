@@ -13,6 +13,7 @@ rayon = ["hopr-utils/parallelize-rayon"]
 serde = [
   "dep:elliptic-curve-tools",
   "dep:serde",
+  "dep:serde_bytes",
   "vsss-rs/serde",
   "hopr-types/serde",
 ]
@@ -25,6 +26,7 @@ hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

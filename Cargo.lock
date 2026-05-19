@@ -3743,6 +3743,7 @@ dependencies = [
  "parking_lot",
  "rand 0.10.1",
  "serde",
+ "serde_bytes",
  "smart-default",
  "thiserror 2.0.18",
  "tracing",

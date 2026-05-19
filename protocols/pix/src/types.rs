@@ -12,14 +12,14 @@ use vsss_rs::elliptic_curve::{
     Curve, PrimeField,
     generic_array::{
         ArrayLength, GenericArray,
-        typenum::{Sum, U6, Unsigned},
+        typenum::{Sum, U, Unsigned},
     },
 };
 
 use crate::{PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, errors::PixError};
 
 /// Raw zeroable SSA Index.
-pub(crate) type RawSsaIndex = u32;
+pub type RawSsaIndex = u32;
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
@@ -36,8 +36,18 @@ pub type PolynomialIndex = u16;
 /// The index is 0-based.
 pub type CoefficientIndex = u16;
 
+/// Byte size of the [`SsaIndex`] when serialized as a big-endian prefix.
+const SSA_INDEX_SIZE: usize = size_of::<SsaIndex>();
+
+/// Byte size of the [`PolynomialIndex`] when serialized as a big-endian prefix.
+const POLY_INDEX_SIZE: usize = size_of::<PolynomialIndex>();
+
 /// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
-pub type SsaPolyIndexPrefixSize = U6;
+///
+/// Derived at compile time from `size_of::<SsaIndex>() + size_of::<PolynomialIndex>()` via
+/// [`typenum`]'s `Const`/`ToUInt` machinery. The matching runtime invariant is asserted by
+/// the `size_of_indices_must_match` unit test below.
+pub type SsaPolyIndexPrefixSize = Sum<U<SSA_INDEX_SIZE>, U<POLY_INDEX_SIZE>>;
 
 /// Uniquely identifies a Session Stealth Address (SSA).
 ///
@@ -213,6 +223,29 @@ where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
     EncShareSize<S>: ArrayLength<u8>;
 
+#[cfg(feature = "serde")]
+impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn serialize<Ser: serde::Serializer>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error> {
+        serde_bytes::Bytes::new(self.0.as_slice()).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S>
+where
+    FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
+    EncShareSize<S>: ArrayLength<u8>,
+{
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let bytes = <&serde_bytes::Bytes as serde::Deserialize>::deserialize(deserializer)?;
+        Self::try_from(bytes.as_ref()).map_err(serde::de::Error::custom)
+    }
+}
+
 impl<S: PixSpec> EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
@@ -304,6 +337,15 @@ where
 /// This is a wrapped [`EncryptedPartialSsaShare`] extracted from a specific SURB (presumably along with the associated
 /// `AcknowledgementChallenge`).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "P: serde::Serialize, T: serde::Serialize, EncryptedPartialSsaShare<S>: serde::Serialize",
+        deserialize = "P: serde::Deserialize<'de>, T: serde::Deserialize<'de>, EncryptedPartialSsaShare<S>: \
+                       serde::Deserialize<'de>"
+    ))
+)]
 pub struct TaggedEncryptedPartialSsaShare<S: PixSpec, P = <S as PixSpec>::Pseudonym, T = PixScalar<S>> {
     /// Pseudonym of the sender that created the encrypted partial SSA share.
     pub pseudonym: P,

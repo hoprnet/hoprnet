@@ -280,7 +280,7 @@ where
                 data.extend(session_id);
             }
             StartProtocol::SsaCommit(commit) => {
-                data.extend_from_slice(&commit.ssa.to_be_bytes());
+                data.extend_from_slice(&commit.ssa.get().to_be_bytes());
                 data.extend_from_slice(&commit.coefficient_index.to_be_bytes());
 
                 let num_polys = commit.coefficient_commitments.len() as hopr_protocol_pix::PolynomialIndex;
@@ -327,7 +327,7 @@ where
                     let commitment_repr = commitment.as_ref();
                     debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
 
-                    data.extend_from_slice(&ssa_index.to_be_bytes());
+                    data.extend_from_slice(&ssa_index.get().to_be_bytes());
                     data.extend_from_slice(commitment_repr);
                 }
 
@@ -459,11 +459,13 @@ where
                         return Err(StartProtocolError::InvalidLength);
                     }
 
-                    let ssa = hopr_protocol_pix::SsaIndex::from_be_bytes(
+                    let ssa: hopr_protocol_pix::SsaIndex = hopr_protocol_pix::RawSsaIndex::from_be_bytes(
                         data[data_offset..data_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
-                    );
+                    )
+                    .try_into()
+                    .map_err(|_| StartProtocolError::ParseError("ssa_index is 0".into()))?;
                     let coefficient_index = hopr_protocol_pix::CoefficientIndex::from_be_bytes(
                         data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
                             ..data_offset
@@ -553,11 +555,13 @@ where
                             return Err(StartProtocolError::InvalidLength);
                         }
 
-                        let ssa_index = hopr_protocol_pix::SsaIndex::from_be_bytes(
+                        let ssa_index: hopr_protocol_pix::SsaIndex = hopr_protocol_pix::RawSsaIndex::from_be_bytes(
                             data[next_offset..next_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
-                        );
+                        )
+                        .try_into()
+                        .map_err(|_| StartProtocolError::ParseError("ssa_index is 0".into()))?;
                         next_offset += size_of::<hopr_protocol_pix::SsaIndex>();
 
                         let commitment =

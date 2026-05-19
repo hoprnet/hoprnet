@@ -31,8 +31,8 @@ pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments
 pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor};
 pub use types::{
-    CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RecoveredSsa,
-    SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
+    CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RawSsaIndex,
+    RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
 };
 

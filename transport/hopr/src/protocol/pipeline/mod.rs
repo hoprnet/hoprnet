@@ -123,10 +123,12 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                             counters.get_or_create(&packet.next_hop).record_message_sent();
 
                             // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
-                            // and the packet contains an encrypted partial SSA share (it is therefore an RP packet),
-                            // add it to the exit acknowledgement processor.
+                            // and the packet contains a non-empty encrypted partial SSA share (it is therefore an RP
+                            // packet), add it to the exit acknowledgement processor.
                             if let Some(exit_ack_proc) = exit_ack_proc.as_ref()
-                                && let Some(encrypted_pix_share) = packet.encrypted_pix_share
+                                && let Some(encrypted_pix_share) =
+                                    packet.encrypted_pix_share.filter(|s| !s.partial_share.is_empty())
+                            // Fail-safe to skip empty shares
                             {
                                 if let Err(error) = exit_ack_proc.insert_encrypted_share(
                                     &packet.next_hop,
@@ -137,6 +139,11 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                                         next_hop = packet.next_hop.to_peerid_str(),
                                         %error,
                                         "failed to insert encrypted share into the exit acknowledgement processor"
+                                    );
+                                } else {
+                                    tracing::trace!(
+                                        next_hop = packet.next_hop.to_peerid_str(),
+                                        "inserted new encrypted share into the exit acknowledgement processor"
                                     );
                                 }
                             }
@@ -718,7 +725,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     #[inline]
     fn insert_coefficient_commitments(
         &self,
-        ssa_id: SsaId<HoprPixSpec>,
+        ssa_id: SsaId<SimplePseudonym>,
         _: CoefficientIndex,
         _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
     ) -> Result<SsaCommitmentState<HoprPixSpec>, Self::Error> {
@@ -776,7 +783,7 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
