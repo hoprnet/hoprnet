@@ -20,6 +20,7 @@ use vsss_rs::{
     },
 };
 
+pub mod ack_verify;
 pub mod errors;
 mod generator;
 mod reconstructor;
