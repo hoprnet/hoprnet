@@ -12,14 +12,14 @@ use vsss_rs::elliptic_curve::{
     Curve, PrimeField,
     generic_array::{
         ArrayLength, GenericArray,
-        typenum::{Sum, U4, Unsigned},
+        typenum::{Sum, U6, Unsigned},
     },
 };
 
 use crate::{PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, errors::PixError};
 
 /// Raw zeroable SSA Index.
-pub(crate) type RawSsaIndex = u16;
+pub(crate) type RawSsaIndex = u32;
 
 /// Type used to index Session Stealth Addresses (SSA).
 ///
@@ -37,7 +37,7 @@ pub type PolynomialIndex = u16;
 pub type CoefficientIndex = u16;
 
 /// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
-pub type SsaPolyIndexPrefixSize = U4;
+pub type SsaPolyIndexPrefixSize = U6;
 
 /// Uniquely identifies a Session Stealth Address (SSA).
 ///
@@ -201,7 +201,7 @@ pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
 /// Contains an encrypted partial Session Stealth Address (SSA) share.
 ///
 /// The internal byte layout is:
-/// 1. [`SsaIndex`] (big-endian, 2 bytes)
+/// 1. [`SsaIndex`] (big-endian, 4 bytes)
 /// 2. [`PolynomialIndex`] (big-endian, 2 bytes)
 /// 3. The encrypted scalar share ([`FieldBytesSize`] bytes)
 ///

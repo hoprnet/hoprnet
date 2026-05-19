@@ -13,7 +13,7 @@ use vsss_rs::{
         consts::U256,
         generic_array::{
             ArrayLength,
-            typenum::{IsLess, IsLessOrEqual, U4},
+            typenum::{IsLess, IsLessOrEqual},
         },
         group::{GroupEncoding, cofactor::CofactorGroup},
         hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
@@ -32,7 +32,8 @@ pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RecoveredSsa,
-    SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolynomialId, TaggedEncryptedPartialSsaShare,
+    SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
+    TaggedEncryptedPartialSsaShare,
 };
 
 /// Number of polynomials per SSA.
@@ -48,8 +49,8 @@ where
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLessOrEqual<<PixDigest<Self> as BlockSizeUser>::BlockSize>,
-    <Self::Curve as Curve>::FieldBytesSize: Add<U4>,
-    <<Self::Curve as Curve>::FieldBytesSize as Add<U4>>::Output: ArrayLength<u8>,
+    <Self::Curve as Curve>::FieldBytesSize: Add<SsaPolyIndexPrefixSize>,
+    <<Self::Curve as Curve>::FieldBytesSize as Add<SsaPolyIndexPrefixSize>>::Output: ArrayLength<u8>,
 {
     /// Prime order elliptic curve use for commitments.
     type Curve: PrimeCurve + CurveArithmetic + GroupDigest;
