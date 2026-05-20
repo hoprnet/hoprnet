@@ -619,7 +619,7 @@ mod tests {
     use hopr_protocol_pix::{PolynomialIndex, SsaIndex};
 
     use super::*;
-    
+
     #[test]
     fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::StartSession(StartInitiation {

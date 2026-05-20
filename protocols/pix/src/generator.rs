@@ -104,6 +104,7 @@ pub struct SsaShareGenerator<S: PixSpec> {
 }
 
 impl<S: PixSpec> SsaShareGenerator<S> {
+    /// Creates a new share generator with the provided configuration.
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
         Self {
             polynomials: moka::sync::CacheBuilder::default()
@@ -112,6 +113,12 @@ impl<S: PixSpec> SsaShareGenerator<S> {
                 .build_with_hasher(ahash::RandomState::new()),
             cfg,
         }
+    }
+
+    /// Returns the configuration used to generate this [`SsaShareGenerator`].
+    #[inline]
+    pub fn config(&self) -> &SsaGeneratorConfig {
+        &self.cfg
     }
 }
 
@@ -203,30 +210,30 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                 poly_commitment,
                             }),
                     );
-                    Ok::<_, PixError>(moka::ops::compute::Op::Put(
-                    std::sync::Arc::new(parking_lot::Mutex::new(SsaPseudonymEntry {
-                        ssa_index,
-                        poly_queue: raw_polynomials
-                            .into_iter()
-                            .enumerate()
-                            .map(|(poly_index, raw)| IndexedPolynomial {
-                                spi: SsaPolynomialId::new(
-                                    SsaId::new(*pseudonym, ssa_index),
-                                    poly_index as PolynomialIndex,
-                                ),
-                                raw,
-                                shares_generated: 0,
-                                t: self.cfg.threshold,
-                            })
-                            .collect(),
-                    }))))
+                    Ok::<_, PixError>(moka::ops::compute::Op::Put(std::sync::Arc::new(
+                        parking_lot::Mutex::new(SsaPseudonymEntry {
+                            ssa_index,
+                            poly_queue: raw_polynomials
+                                .into_iter()
+                                .enumerate()
+                                .map(|(poly_index, raw)| IndexedPolynomial {
+                                    spi: SsaPolynomialId::new(
+                                        SsaId::new(*pseudonym, ssa_index),
+                                        poly_index as PolynomialIndex,
+                                    ),
+                                    raw,
+                                    shares_generated: 0,
+                                    t: self.cfg.threshold,
+                                })
+                                .collect(),
+                        }),
+                    )))
                 }
                 Some(value) => {
                     let value = value.into_value();
                     {
                         let mut entry = value.lock();
-                        entry.ssa_index = entry.ssa_index.checked_add(1)
-                            .ok_or(PixError::SsaOverflow)?;
+                        entry.ssa_index = entry.ssa_index.checked_add(1).ok_or(PixError::SsaOverflow)?;
 
                         let ssa_index = entry.ssa_index;
                         verifiers.extend(
@@ -388,18 +395,21 @@ mod tests {
 
     #[test]
     fn ssa_generator_shares_must_be_verifiable() -> anyhow::Result<()> {
-        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        let cfg = SsaGeneratorConfig {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
-        });
+        };
+        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+
+        assert_eq!(&cfg, generator.config());
 
         let p = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p)?;
         let vs = c.verifiers;
 
-        for poly_index in 0..10 {
-            for _ in 0..12 {
+        for poly_index in 0..cfg.polynomials_per_ssa {
+            for _ in 0..(cfg.threshold + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let g = generator
@@ -415,11 +425,12 @@ mod tests {
 
     #[test]
     fn ssa_generator_corresponds_to_standard_verifier_and_recoverer() -> anyhow::Result<()> {
-        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        let cfg = SsaGeneratorConfig {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
-        });
+        };
+        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 
         let p = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p)?;
@@ -427,9 +438,9 @@ mod tests {
         let vs = c.verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
         let mut recovered_secret = k256::Scalar::default();
-        for poly_index in 0..10 {
+        for poly_index in 0..cfg.polynomials_per_ssa {
             let mut shares = Vec::new();
-            for _ in 0..12 {
+            for _ in 0..(cfg.threshold + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let g = generator

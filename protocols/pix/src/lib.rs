@@ -118,6 +118,8 @@ pub(crate) fn into_completed_share<S: PixSpec>(
 }
 
 /// Verifier for shares of a polynomial with the given [`SsaPolynomialId`].
+///
+/// This contains commitments to all coefficients of the polynomial with the given [`SsaPolynomialId`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartialSsaShareVerifier<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
