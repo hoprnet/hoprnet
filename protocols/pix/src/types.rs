@@ -12,19 +12,15 @@ use hopr_types::{
     },
     primitive::prelude::{BytesRepresentable, GeneralError},
 };
-use vsss_rs::{
-    ShareVerifierGroup,
-    elliptic_curve::{
-        Curve, PrimeField,
-        generic_array::{
-            ArrayLength, GenericArray,
-            typenum::{Sum, U, Unsigned},
-        },
-        group::GroupEncoding,
+use vsss_rs::elliptic_curve::{
+    Curve, PrimeField,
+    generic_array::{
+        ArrayLength, GenericArray,
+        typenum::{Sum, U, Unsigned},
     },
 };
 
-use crate::{PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, errors, errors::PixError};
+use crate::{PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors, errors::PixError};
 
 /// Raw zeroable SSA Index.
 pub type RawSsaIndex = u32;
@@ -107,7 +103,7 @@ pub struct SsaPolynomialId<P> {
 }
 
 /// Transposed verifiers of the partial SSA shares.
-pub type TransposedVerifiers<S> = HashMap<CoefficientIndex, Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>>;
+pub type TransposedVerifiers<S> = HashMap<CoefficientIndex, Vec<(PolynomialIndex, PixGroupRepr<S>)>>;
 
 impl<P> SsaPolynomialId<P> {
     /// Creates a new `SsaPolynomialId` with the given `SsaId` and polynomial index.
@@ -446,16 +442,19 @@ pub struct SsaCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     #[cfg_attr(feature = "serde", serde(with = "elliptic_curve_tools::group"))]
     pub ssa_commitment: PixGroup<S>,
     /// Verifiers of the partial SSA shares.
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound(
+            serialize = "PixGroupRepr<S>: serde::Serialize",
+            deserialize = "PixGroupRepr<S>: serde::Deserialize<'de>"
+        ))
+    )]
     pub verifiers: TransposedVerifiers<S>,
 }
 
 impl<S: PixSpec, P> IntoIterator for SsaCommitment<S, P> {
-    type IntoIter =
-        std::collections::hash_map::IntoIter<CoefficientIndex, Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>>;
-    type Item = (
-        CoefficientIndex,
-        Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>,
-    );
+    type IntoIter = std::collections::hash_map::IntoIter<CoefficientIndex, Vec<(PolynomialIndex, PixGroupRepr<S>)>>;
+    type Item = (CoefficientIndex, Vec<(PolynomialIndex, PixGroupRepr<S>)>);
 
     fn into_iter(self) -> Self::IntoIter {
         self.verifiers.into_iter()
@@ -465,8 +464,7 @@ impl<S: PixSpec, P> IntoIterator for SsaCommitment<S, P> {
 impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
     /// Reconstructs the verifiers from the internal transposed representation.
     pub fn reconstruct_verifiers(self) -> errors::Result<Vec<PartialSsaShareVerifier<S>>> {
-        let mut poly_coeffs: BTreeMap<PolynomialIndex, BTreeMap<CoefficientIndex, ShareVerifierGroup<PixGroup<S>>>> =
-            BTreeMap::new();
+        let mut poly_coeffs: BTreeMap<PolynomialIndex, BTreeMap<CoefficientIndex, PixGroupRepr<S>>> = BTreeMap::new();
         for (coeff_idx, coeffs) in self.verifiers {
             for (poly_idx, commitment) in coeffs {
                 poly_coeffs.entry(poly_idx).or_default().insert(coeff_idx, commitment);
@@ -477,7 +475,7 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
             .into_iter()
             .map(|(poly_idx, coeffs)| {
                 let spi = SsaPolynomialId::new(self.ssa_id, poly_idx);
-                let sorted_coeffs: Vec<_> = coeffs.into_values().map(|c| c.0.to_bytes()).collect();
+                let sorted_coeffs: Vec<_> = coeffs.into_values().collect();
                 PartialSsaShareVerifier::from_serializable_commitments(spi, sorted_coeffs)
             })
             .collect()

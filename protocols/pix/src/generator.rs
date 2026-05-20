@@ -6,6 +6,7 @@ use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{
         Field, Group, PrimeField,
+        group::GroupEncoding,
         rand_core::{CryptoRng, RngCore},
     },
 };
@@ -293,7 +294,7 @@ pub(crate) fn transpose_commitments<S: PixSpec>(
                 transposed
                     .entry(coeff_id as CoefficientIndex)
                     .or_default()
-                    .push((spi.poly_index(), coeff));
+                    .push((spi.poly_index(), coeff.0.to_bytes()));
             });
     });
     transposed

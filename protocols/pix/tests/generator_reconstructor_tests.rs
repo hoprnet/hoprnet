@@ -10,7 +10,7 @@ use hopr_types::{
     internal::prelude::VerifiedAcknowledgement,
 };
 use rand::prelude::SliceRandom;
-use vsss_rs::elliptic_curve::{group::GroupEncoding, ops::MulByGenerator};
+use vsss_rs::elliptic_curve::ops::MulByGenerator;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct TestSpec;
@@ -42,14 +42,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     // Use the already transposed verifiers
     let mut transposed = verifiers
         .into_iter()
-        .map(|(k, v)| {
-            (
-                k,
-                v.into_iter()
-                    .map(|(pi, c)| (pi, c.0.to_bytes()))
-                    .collect::<HashMap<_, _>>(),
-            )
-        })
+        .map(|(k, v)| (k, v.into_iter().collect::<HashMap<_, _>>()))
         .collect::<HashMap<_, _>>();
 
     let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
