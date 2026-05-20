@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
@@ -11,11 +11,11 @@ use vsss_rs::{
 };
 
 use crate::{
-    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, errors,
+    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar,
+    PixSpec, PolynomialIndex, errors,
     errors::PixError,
     traits::EntryShareGenerator,
-    types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId},
+    types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId, TransposedVerifiers},
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
@@ -191,7 +191,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             .into_iter()
             .unzip();
 
-        let mut verifiers = Vec::with_capacity(raw_verifiers.len());
+        let mut verifiers: Vec<PartialSsaShareVerifier<S>> = Vec::with_capacity(raw_verifiers.len());
 
         self.polynomials
             .entry_by_ref(pseudonym)
@@ -268,31 +268,34 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 }
             })?;
 
+        let ssa_id = *verifiers[0].spi.as_ref();
         Ok(SsaCommitment {
-            ssa_id: *verifiers[0].spi.as_ref(),
+            ssa_id,
             ssa_commitment: PixGroup::<S>::generator() * our_commitment_secret,
-            verifiers,
+            verifiers: transpose_commitments(verifiers),
         })
     }
 }
 
 /// Transposes the commitments returned by the [`SsaShareGenerator::new_ssa_commitment`] to a representation
 /// where verifiers are represented by coefficient index first.
-pub fn transpose_commitments<S: PixSpec>(
+pub(crate) fn transpose_commitments<S: PixSpec>(
     commitments: Vec<PartialSsaShareVerifier<S>>,
-) -> HashMap<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<S>>> {
-    let mut transposed = HashMap::<CoefficientIndex, HashMap<PolynomialIndex, PixGroupRepr<S>>>::new();
-    commitments
-        .into_iter()
-        .map(|c| c.into_serializable_commitments())
-        .for_each(|(spi, committed_polynomial)| {
-            for (coeff_id, coeff) in committed_polynomial.into_iter().enumerate() {
+) -> TransposedVerifiers<S> {
+    let mut transposed = TransposedVerifiers::<S>::new();
+    commitments.into_iter().for_each(|c| {
+        let spi = c.spi;
+        c.poly_commitment
+            .into_iter()
+            .skip(1) // Skip generator
+            .enumerate()
+            .for_each(|(coeff_id, coeff)| {
                 transposed
                     .entry(coeff_id as CoefficientIndex)
                     .or_default()
-                    .insert(spi.poly_index(), coeff);
-            }
-        });
+                    .push((spi.poly_index(), coeff));
+            });
+    });
     transposed
 }
 
@@ -314,45 +317,25 @@ mod tests {
 
         let p1 = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p1)?;
-        let v = c.verifiers;
-        for i in 0..generator.cfg.polynomials_per_ssa {
-            assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 1.try_into()?);
-            assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
-        }
+        assert_eq!(c.ssa_id.pseudonym(), &p1);
+        assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
         let c = generator.new_ssa_commitment(&p1)?;
-        let v = c.verifiers;
-        for i in 0..generator.cfg.polynomials_per_ssa {
-            assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 2.try_into()?);
-            assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
-        }
+        assert_eq!(c.ssa_id.pseudonym(), &p1);
+        assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
 
         let p2 = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p2)?;
-        let v = c.verifiers;
-        for i in 0..generator.cfg.polynomials_per_ssa {
-            assert_eq!(v[i].spi.pseudonym(), &p2);
-            assert_eq!(v[i].spi.ssa_index(), 1.try_into()?);
-            assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
-        }
+        assert_eq!(c.ssa_id.pseudonym(), &p2);
+        assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
         let c = generator.new_ssa_commitment(&p1)?;
-        let v = c.verifiers;
-        for i in 0..generator.cfg.polynomials_per_ssa {
-            assert_eq!(v[i].spi.pseudonym(), &p1);
-            assert_eq!(v[i].spi.ssa_index(), 3.try_into()?);
-            assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
-        }
+        assert_eq!(c.ssa_id.pseudonym(), &p1);
+        assert_eq!(c.ssa_id.ssa_index(), 3.try_into()?);
 
         let c = generator.new_ssa_commitment(&p2)?;
-        let v = c.verifiers;
-        for i in 0..generator.cfg.polynomials_per_ssa {
-            assert_eq!(v[i].spi.pseudonym(), &p2);
-            assert_eq!(v[i].spi.ssa_index(), 2.try_into()?);
-            assert_eq!(v[i].spi.poly_index(), i as PolynomialIndex);
-        }
+        assert_eq!(c.ssa_id.pseudonym(), &p2);
+        assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
 
         Ok(())
     }
@@ -406,9 +389,9 @@ mod tests {
 
         let p = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p)?;
-        let vs = c.verifiers;
+        let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
 
-        for poly_index in 0..cfg.polynomials_per_ssa {
+        for verifier in verifiers.iter().take(cfg.polynomials_per_ssa) {
             for _ in 0..(cfg.threshold + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
@@ -416,7 +399,7 @@ mod tests {
                     .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
 
-                vs[poly_index].verify(&g.share, x)?;
+                verifier.verify(&g.share, x)?;
             }
         }
 
@@ -435,10 +418,11 @@ mod tests {
         let p = SimplePseudonym::random();
         let c = generator.new_ssa_commitment(&p)?;
         let orig_commitment = c.ssa_commitment;
-        let vs = c.verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
+        let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
+        let vs = verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
         let mut recovered_secret = k256::Scalar::default();
-        for poly_index in 0..cfg.polynomials_per_ssa {
+        for v in vs.iter().take(cfg.polynomials_per_ssa) {
             let mut shares = Vec::new();
             for _ in 0..(cfg.threshold + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
@@ -451,8 +435,7 @@ mod tests {
                     value: k256::Scalar::from_repr(g.share.0).unwrap().into(),
                 };
 
-                vs[poly_index]
-                    .verify_share(&complete_share)
+                v.verify_share(&complete_share)
                     .map_err(|_| anyhow::anyhow!("invalid share"))?;
                 shares.push(complete_share);
             }

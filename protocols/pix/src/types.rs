@@ -1,4 +1,8 @@
-use std::{num::NonZero, ops::Add};
+use std::{
+    collections::{BTreeMap, HashMap},
+    num::NonZero,
+    ops::Add,
+};
 
 use hopr_types::{
     crypto::{
@@ -8,11 +12,15 @@ use hopr_types::{
     },
     primitive::prelude::{BytesRepresentable, GeneralError},
 };
-use vsss_rs::elliptic_curve::{
-    Curve, PrimeField,
-    generic_array::{
-        ArrayLength, GenericArray,
-        typenum::{Sum, U, Unsigned},
+use vsss_rs::{
+    ShareVerifierGroup,
+    elliptic_curve::{
+        Curve, PrimeField,
+        generic_array::{
+            ArrayLength, GenericArray,
+            typenum::{Sum, U, Unsigned},
+        },
+        group::GroupEncoding,
     },
 };
 
@@ -97,6 +105,9 @@ pub struct SsaPolynomialId<P> {
     id: SsaId<P>,
     poly_index: PolynomialIndex,
 }
+
+/// Transposed verifiers of the partial SSA shares.
+pub type TransposedVerifiers<S> = HashMap<CoefficientIndex, Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>>;
 
 impl<P> SsaPolynomialId<P> {
     /// Creates a new `SsaPolynomialId` with the given `SsaId` and polynomial index.
@@ -435,7 +446,42 @@ pub struct SsaCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     #[cfg_attr(feature = "serde", serde(with = "elliptic_curve_tools::group"))]
     pub ssa_commitment: PixGroup<S>,
     /// Verifiers of the partial SSA shares.
-    pub verifiers: Vec<PartialSsaShareVerifier<S, P>>,
+    pub verifiers: TransposedVerifiers<S>,
+}
+
+impl<S: PixSpec, P> IntoIterator for SsaCommitment<S, P> {
+    type IntoIter =
+        std::collections::hash_map::IntoIter<CoefficientIndex, Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>>;
+    type Item = (
+        CoefficientIndex,
+        Vec<(PolynomialIndex, ShareVerifierGroup<PixGroup<S>>)>,
+    );
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.verifiers.into_iter()
+    }
+}
+
+impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
+    /// Reconstructs the verifiers from the internal transposed representation.
+    pub fn reconstruct_verifiers(self) -> errors::Result<Vec<PartialSsaShareVerifier<S>>> {
+        let mut poly_coeffs: BTreeMap<PolynomialIndex, BTreeMap<CoefficientIndex, ShareVerifierGroup<PixGroup<S>>>> =
+            BTreeMap::new();
+        for (coeff_idx, coeffs) in self.verifiers {
+            for (poly_idx, commitment) in coeffs {
+                poly_coeffs.entry(poly_idx).or_default().insert(coeff_idx, commitment);
+            }
+        }
+
+        poly_coeffs
+            .into_iter()
+            .map(|(poly_idx, coeffs)| {
+                let spi = SsaPolynomialId::new(self.ssa_id, poly_idx);
+                let sorted_coeffs: Vec<_> = coeffs.into_values().map(|c| c.0.to_bytes()).collect();
+                PartialSsaShareVerifier::from_serializable_commitments(spi, sorted_coeffs)
+            })
+            .collect()
+    }
 }
 
 /// Represents the current state of a specific SSA commitment on an Exit node.
@@ -537,6 +583,7 @@ mod tests {
         };
 
         // Test Clone
+        #[allow(clippy::clone_on_copy)]
         let cloned = tagged.clone();
         assert_eq!(tagged, cloned);
 

@@ -27,7 +27,7 @@ mod reconstructor;
 mod traits;
 mod types;
 
-pub use generator::{SsaGeneratorConfig, SsaShareGenerator, transpose_commitments};
+pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor};
 pub use types::{
@@ -276,13 +276,14 @@ pub(crate) mod tests {
     }
 
     type Share<S> = DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
+    type StandardShamirResult<S> = (Vec<Share<S>>, Vec<ShareVerifierGroup<PixGroup<S>>>);
 
     fn standard_shamir_generate<S: PixSpec>(
         secret: PixScalar<S>,
         t: usize,
         x: &[PixScalar<S>],
         mut rng: impl RngCore + CryptoRng,
-    ) -> anyhow::Result<(Vec<Share<S>>, Vec<ShareVerifierGroup<PixGroup<S>>>)> {
+    ) -> anyhow::Result<StandardShamirResult<S>> {
         anyhow::ensure!(t > 0, "t must be greater than 0");
         anyhow::ensure!(x.len() >= t, "x must have at least t elements");
 

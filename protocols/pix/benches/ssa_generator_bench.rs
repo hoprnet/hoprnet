@@ -1,7 +1,5 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_protocol_pix::{
-    EntryShareGenerator, GeneratedShare, PixSpec, SsaCommitment, SsaGeneratorConfig, SsaShareGenerator,
-};
+use hopr_protocol_pix::{EntryShareGenerator, GeneratedShare, PixSpec, SsaGeneratorConfig, SsaShareGenerator};
 use hopr_types::{
     crypto::{
         prelude::SimplePseudonym,
@@ -62,8 +60,10 @@ fn bench_verify(c: &mut Criterion) {
             ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-        let SsaCommitment { verifiers, .. } = generator.new_ssa_commitment(&pseudonym).unwrap();
+        let c = generator.new_ssa_commitment(&pseudonym).unwrap();
         let GeneratedShare { share, .. } = generator.next_share(&pseudonym, &x).unwrap().unwrap();
+
+        let verifiers = c.reconstruct_verifiers().unwrap();
         let verifier = &verifiers[0];
 
         group.bench_with_input(BenchmarkId::from_parameter(format!("t{}", t)), &t, |b, _| {

@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixSpec, SsaCommitment, SsaGeneratorConfig,
     SsaId, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
-    transpose_commitments,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -11,7 +10,7 @@ use hopr_types::{
     internal::prelude::VerifiedAcknowledgement,
 };
 use rand::prelude::SliceRandom;
-use vsss_rs::elliptic_curve::ops::MulByGenerator;
+use vsss_rs::elliptic_curve::{group::GroupEncoding, ops::MulByGenerator};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct TestSpec;
@@ -40,8 +39,18 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         ..
     } = generator.new_ssa_commitment(&pseudonym)?;
 
-    // Transpose the commitments so they have the on-wire structure
-    let mut transposed = transpose_commitments(verifiers);
+    // Use the already transposed verifiers
+    let mut transposed = verifiers
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                k,
+                v.into_iter()
+                    .map(|(pi, c)| (pi, c.0.to_bytes()))
+                    .collect::<HashMap<_, _>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
 
     let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
         polys_per_ssa: 10,
