@@ -294,10 +294,78 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        task::{Context as TaskContext, Poll},
+    };
+
     use anyhow::Context;
-    use futures::SinkExt;
+    use async_trait::async_trait;
+    use futures::{SinkExt, Stream};
+    use tokio_util::{bytes::BytesMut, codec::BytesCodec};
 
     use super::*;
+
+    #[derive(Clone, Default, Debug)]
+    struct CountingControl {
+        open_calls: Arc<AtomicUsize>,
+    }
+
+    impl CountingControl {
+        fn open_calls(&self) -> usize {
+            self.open_calls.load(Ordering::Relaxed)
+        }
+    }
+
+    #[derive(Default)]
+    struct FailingIo;
+
+    impl AsyncRead for FailingIo {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut TaskContext<'_>,
+            _buf: &mut [u8],
+        ) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for FailingIo {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut TaskContext<'_>,
+            _buf: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "intentional test failure",
+            )))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for CountingControl {
+        fn accept(self) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error> {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, FailingIo)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(FailingIo)
+        }
+    }
 
     struct AsyncBinaryStreamChannel {
         read: async_channel_io::ChannelReader,
@@ -371,6 +439,38 @@ mod tests {
         assert_eq!(
             rx.next().await.context("Value must be present")??,
             tokio_util::bytes::BytesMut::from(expected.as_ref())
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
+        let control = CountingControl::default();
+        let (mut tx_out, _rx_in) = process_stream_protocol(BytesCodec::new(), control.clone()).await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"x"[..]);
+
+        // Failing writer closes each per-peer stream quickly. This triggers send errors,
+        // invalidation, and then lazy reopen for subsequent packets to the same peer.
+        for _ in 0..12 {
+            tx_out
+                .send((peer, msg.clone()))
+                .await
+                .context("egress queue should accept test packet")?;
+            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        }
+
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        while control.open_calls() < 3 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+
+        assert!(
+            control.open_calls() <= 1,
+            "pathological reopen churn detected for same peer under send failures (open_calls={})",
+            control.open_calls()
         );
 
         Ok(())
