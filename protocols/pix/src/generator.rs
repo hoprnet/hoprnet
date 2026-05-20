@@ -188,7 +188,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
 
         self.polynomials
             .entry_by_ref(pseudonym)
-            .and_upsert_with(|entry| match entry {
+            .and_try_compute_with(|entry| match entry {
                 None => {
                     let ssa_index = SsaIndex::MIN;
                     verifiers.extend(
@@ -203,6 +203,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                 poly_commitment,
                             }),
                     );
+                    Ok::<_, PixError>(moka::ops::compute::Op::Put(
                     std::sync::Arc::new(parking_lot::Mutex::new(SsaPseudonymEntry {
                         ssa_index,
                         poly_queue: raw_polynomials
@@ -218,13 +219,14 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                 t: self.cfg.threshold,
                             })
                             .collect(),
-                    }))
+                    }))))
                 }
                 Some(value) => {
                     let value = value.into_value();
                     {
                         let mut entry = value.lock();
-                        entry.ssa_index = entry.ssa_index.checked_add(1).unwrap(); // TODO: fix this unwrap
+                        entry.ssa_index = entry.ssa_index.checked_add(1)
+                            .ok_or(PixError::SsaOverflow)?;
 
                         let ssa_index = entry.ssa_index;
                         verifiers.extend(
@@ -255,12 +257,12 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                             }));
                     }
 
-                    value
+                    Ok(moka::ops::compute::Op::Nop)
                 }
-            });
+            })?;
 
         Ok(SsaCommitment {
-            ssa_id: *verifiers.first().expect("verifiers must be populated").spi.as_ref(),
+            ssa_id: *verifiers[0].spi.as_ref(),
             ssa_commitment: PixGroup::<S>::generator() * our_commitment_secret,
             verifiers,
         })
@@ -450,6 +452,32 @@ mod tests {
             orig_commitment.to_affine(),
             (k256::ProjectivePoint::GENERATOR * recovered_secret).to_affine()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_generator_should_handle_ssa_index_overflow() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let p1 = SimplePseudonym::random();
+
+        // Setup initial commitment
+        generator.new_ssa_commitment(&p1)?;
+
+        // Manually update the ssa_index to u32::MAX
+        {
+            let entry = generator.polynomials.get(&p1).unwrap();
+            entry.lock().ssa_index = SsaIndex::MAX;
+        }
+
+        // The next commitment should fail with SsaOverflow
+        let result = generator.new_ssa_commitment(&p1);
+        assert!(matches!(result, Err(PixError::SsaOverflow)));
 
         Ok(())
     }

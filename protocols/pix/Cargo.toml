@@ -48,3 +48,6 @@ rand = { workspace = true }
 [[bench]]
 name = "ssa_generator_bench"
 harness = false
+
+[lib]
+doctest = false
