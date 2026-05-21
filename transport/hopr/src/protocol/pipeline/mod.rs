@@ -783,7 +783,7 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,

@@ -397,7 +397,7 @@ where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
         A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
         SEvt::Error: std::error::Error,
     {
         self.run_inner(
@@ -437,7 +437,7 @@ where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
         A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
         SEvt::Error: std::error::Error,
     {
         self.run_inner(
@@ -475,7 +475,7 @@ where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
     {
-        self.run_inner::<_, _, _, NopExitAcknowledgementShareProcessor, futures::sink::Drain<RecoveredSsa<HoprPixSpec, SimplePseudonym>>>(
+        self.run_inner::<_, _, _, NopExitAcknowledgementShareProcessor, futures::sink::Drain<RecoveredSsa<HoprPixSpec, HoprPseudonym>>>(
             protocol::NodeType::Entry,
             cover_traffic,
             network,
@@ -518,7 +518,7 @@ where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
         A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+        SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
         SEvt::Error: std::error::Error,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();

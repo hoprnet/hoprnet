@@ -223,7 +223,7 @@ impl<WIn, WOut, C, D, T, TEvt, A, SEvt, AppOut, AppIn>
     ) -> PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, A2, SEvt2, AppOut, AppIn>
     where
         A2: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-        SEvt2: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+        SEvt2: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
         SEvt2::Error: std::error::Error,
     {
         PacketPipelineBuilder {
@@ -253,7 +253,7 @@ where
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
@@ -338,7 +338,7 @@ where
     C: PacketEncoder + Sync + Send + 'static,
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,

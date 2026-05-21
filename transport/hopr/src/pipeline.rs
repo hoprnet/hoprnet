@@ -551,7 +551,7 @@ where
     TFact: TicketFactory + Clone + Send + Sync + 'static,
     G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
@@ -611,7 +611,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, SimplePseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
