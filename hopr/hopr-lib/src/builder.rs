@@ -847,12 +847,24 @@ macro_rules! impl_build_methods {
             tracing::info!("starting transport for full (relay) node");
             let (_, transport_processes) = pre
                 .transport_api
-                .run_relay(
+                .run_relay::<
+                    _,
+                    _,
+                    _,
+                    hopr_transport::protocol::NopExitAcknowledgementShareProcessor,
+                    futures::sink::Drain<
+                        hopr_transport::RecoveredSsa<
+                            hopr_transport::HoprPixSpec,
+                            hopr_api::types::crypto::types::SimplePseudonym,
+                        >,
+                    >,
+                >(
                     pre.cover_traffic,
                     pre.network,
                     pre.network_process,
                     tickets_tx,
                     ticket_factory,
+                    None,
                     pre.session_tx,
                 )
                 .await?;
