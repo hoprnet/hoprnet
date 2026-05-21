@@ -72,6 +72,8 @@ lazy_static::lazy_static! {
 }
 
 #[cfg(feature = "explicit-path")]
+/// Temporary compatibility alias while stored listener metadata is shared between
+/// hop-count and explicit-path session APIs.
 pub type Routing = RoutingOptions;
 
 #[cfg(not(feature = "explicit-path"))]
@@ -248,7 +250,7 @@ impl Abortable for ListenerJoinHandles {
 }
 
 // ---------------------------------------------------------------------------
-// SessionFactory trait — abstracts session creation for testability
+// Session backend + generic SessionFactory adapters
 // ---------------------------------------------------------------------------
 
 /// Trait abstracting HOPR session creation.
@@ -256,7 +258,7 @@ impl Abortable for ListenerJoinHandles {
 /// Production code uses `Hopr<...>` (via the blanket impl), while the REST API
 /// tests can provide a mock implementation.
 #[async_trait::async_trait]
-pub trait SessionFactory: Send + Sync + 'static {
+pub trait SessionBackend: Send + Sync + 'static {
     async fn create_session(
         &self,
         dest: Address,
@@ -276,7 +278,7 @@ pub trait SessionFactory: Send + Sync + 'static {
 }
 
 #[async_trait::async_trait]
-impl<Chain, Graph, Net, TMgr> SessionFactory for Hopr<Chain, Graph, Net, TMgr>
+impl<Chain, Graph, Net, TMgr> SessionBackend for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
@@ -316,6 +318,81 @@ where
     }
 }
 
+#[async_trait::async_trait]
+pub trait SessionFactory: Clone + Send + Sync + 'static {
+    type Config: Clone + Send + 'static;
+
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: Self::Config,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration>;
+}
+
+#[derive(Clone)]
+pub struct HopSessionFactory {
+    backend: Arc<dyn SessionBackend>,
+}
+
+impl HopSessionFactory {
+    pub fn new(backend: Arc<dyn SessionBackend>) -> Self {
+        Self { backend }
+    }
+}
+
+#[async_trait::async_trait]
+impl SessionFactory for HopSessionFactory {
+    type Config = HoprSessionClientConfig;
+
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: Self::Config,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
+        self.backend.create_session(dest, target, cfg).await
+    }
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration> {
+        self.backend.session_idle_timeout()
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+#[derive(Clone)]
+pub struct ExplicitPathSessionFactory {
+    backend: Arc<dyn SessionBackend>,
+}
+
+#[cfg(feature = "explicit-path")]
+impl ExplicitPathSessionFactory {
+    pub fn new(backend: Arc<dyn SessionBackend>) -> Self {
+        Self { backend }
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+#[async_trait::async_trait]
+impl SessionFactory for ExplicitPathSessionFactory {
+    type Config = HoprSessionClientExplicitPathConfig;
+
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: Self::Config,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
+        self.backend.create_session_using_explicit_path(dest, target, cfg).await
+    }
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration> {
+        self.backend.session_idle_timeout()
+    }
+}
+
 type SessionPoolInner = Arc<parking_lot::Mutex<VecDeque<(HoprSession, HoprSessionConfigurator)>>>;
 
 pub struct SessionPool {
@@ -326,12 +403,12 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new(
+    pub async fn new<T: SessionFactory>(
         size: usize,
         dst: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
-        factory: Arc<dyn SessionFactory>,
+        cfg: T::Config,
+        factory: T,
     ) -> Result<Self, anyhow::Error> {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let factory_clone = factory.clone();
@@ -359,98 +436,6 @@ impl SessionPool {
             })
             .await?;
 
-        // Spawn a task that periodically sends keep alive messages to the Session in the pool.
-        if let Some(timeout) = factory.session_idle_timeout().filter(|_| !pool.lock().is_empty()) {
-            let pool_clone_1 = pool.clone();
-            let pool_clone_2 = pool.clone();
-            Ok(Self {
-                pool: Some(pool),
-                ah: Some(hopr_utils::spawn_as_abortable!(
-                    futures_time::stream::interval(futures_time::time::Duration::from(
-                        std::time::Duration::from_secs(1).max(timeout / 2)
-                    ))
-                    .take_while(move |_| {
-                        // Continue the infinite interval stream until there are sessions in the pool
-                        futures::future::ready(!pool_clone_1.lock().is_empty())
-                    })
-                    .for_each(move |_| {
-                        let pool = pool_clone_2.clone();
-                        async move {
-                            // Collect configurators to ping (release lock before awaiting)
-                            let configurators: Vec<_> = pool.lock().iter().map(|(_, cfg)| cfg.clone()).collect();
-
-                            let mut dead_ids = Vec::new();
-                            for configurator in &configurators {
-                                if let Err(error) = configurator.ping().await {
-                                    let id = *configurator.id();
-                                    error!(%error, session_id = %id, "session in pool is not alive, will remove");
-                                    dead_ids.push(id);
-                                }
-                            }
-
-                            if !dead_ids.is_empty() {
-                                pool.lock().retain(|(_, cfg)| !dead_ids.contains(cfg.id()));
-                            }
-                        }
-                    })
-                )),
-            })
-        } else {
-            Ok(Self { pool: None, ah: None })
-        }
-    }
-
-    pub fn pop(&mut self) -> Option<(HoprSession, HoprSessionConfigurator)> {
-        self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
-    }
-}
-
-#[cfg(feature = "explicit-path")]
-pub struct ExplicitPathSessionPool {
-    pool: Option<SessionPoolInner>,
-    ah: Option<AbortHandle>,
-}
-
-#[cfg(feature = "explicit-path")]
-impl ExplicitPathSessionPool {
-    pub const MAX_SESSION_POOL_SIZE: usize = 5;
-
-    pub async fn new(
-        size: usize,
-        dst: Address,
-        target: SessionTarget,
-        cfg: HoprSessionClientExplicitPathConfig,
-        factory: Arc<dyn SessionFactory>,
-    ) -> Result<Self, anyhow::Error> {
-        let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
-        let factory_clone = factory.clone();
-        let pool_clone = pool.clone();
-        futures::stream::iter(0..size.min(Self::MAX_SESSION_POOL_SIZE))
-            .map(Ok)
-            .try_for_each_concurrent(Self::MAX_SESSION_POOL_SIZE, move |i| {
-                let pool = pool_clone.clone();
-                let factory = factory_clone.clone();
-                let target = target.clone();
-                let cfg = cfg.clone();
-                async move {
-                    match factory
-                        .create_session_using_explicit_path(dst, target.clone(), cfg.clone())
-                        .await
-                    {
-                        Ok((session, configurator)) => {
-                            debug!(session_id = %session.id(), num_session = i, "created a new explicit-path session in pool");
-                            pool.lock().push_back((session, configurator));
-                            Ok(())
-                        }
-                        Err(error) => {
-                            error!(%error, num_session = i, "failed to establish explicit-path session for pool");
-                            Err(anyhow!("failed to establish explicit-path session #{i} in pool to {dst}: {error}"))
-                        }
-                    }
-                }
-            })
-            .await?;
-
         if let Some(timeout) = factory.session_idle_timeout().filter(|_| !pool.lock().is_empty()) {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
@@ -469,7 +454,7 @@ impl ExplicitPathSessionPool {
                             for configurator in &configurators {
                                 if let Err(error) = configurator.ping().await {
                                     let id = *configurator.id();
-                                    error!(%error, session_id = %id, "explicit-path session in pool is not alive, will remove");
+                                    error!(%error, session_id = %id, "session in pool is not alive, will remove");
                                     dead_ids.push(id);
                                 }
                             }
@@ -490,15 +475,6 @@ impl ExplicitPathSessionPool {
     }
 }
 
-#[cfg(feature = "explicit-path")]
-impl Drop for ExplicitPathSessionPool {
-    fn drop(&mut self) {
-        if let Some(ah) = self.ah.take() {
-            ah.abort();
-        }
-    }
-}
-
 impl Drop for SessionPool {
     fn drop(&mut self) {
         if let Some(ah) = self.ah.take() {
@@ -511,7 +487,7 @@ impl Drop for SessionPool {
 pub async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: Arc<dyn SessionBackend>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -543,7 +519,7 @@ pub async fn create_tcp_client_binding(
         destination,
         target.clone(),
         config.clone(),
-        factory.clone(),
+        HopSessionFactory::new(factory.clone()),
     )
     .await
     .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -569,9 +545,9 @@ pub async fn create_tcp_client_binding(
                 let target = target.clone();
                 let factory = factory.clone();
                 let active_sessions = active_sessions_clone_2.clone();
+                let has_capacity = accepted_client.is_ok() && active_sessions.len() < max_clients;
+                let maybe_pooled = has_capacity.then(|| session_pool.pop()).flatten();
 
-                // Try to pop from the pool only if a client was accepted
-                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
                         Ok((sock_addr, mut stream)) => {
@@ -687,7 +663,7 @@ pub enum BindError {
 pub async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: Arc<dyn SessionBackend>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -782,7 +758,7 @@ pub async fn create_udp_client_binding(
 pub async fn create_tcp_client_binding_using_explicit_path(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: Arc<dyn SessionBackend>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -819,12 +795,12 @@ pub async fn create_tcp_client_binding_using_explicit_path(
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     let session_pool_size = use_session_pool.unwrap_or(0);
-    let mut session_pool = ExplicitPathSessionPool::new(
+    let mut session_pool = SessionPool::new(
         session_pool_size,
         destination,
         target.clone(),
         config.clone(),
-        factory.clone(),
+        ExplicitPathSessionFactory::new(factory.clone()),
     )
     .await
     .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -847,7 +823,8 @@ pub async fn create_tcp_client_binding_using_explicit_path(
                 let target = target.clone();
                 let factory = factory.clone();
                 let active_sessions = active_sessions_clone_2.clone();
-                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                let has_capacity = accepted_client.is_ok() && active_sessions.len() < max_clients;
+                let maybe_pooled = has_capacity.then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
                         Ok((sock_addr, mut stream)) => {
@@ -943,7 +920,7 @@ pub async fn create_tcp_client_binding_using_explicit_path(
 pub async fn create_udp_client_binding_using_explicit_path(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: Arc<dyn SessionBackend>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
