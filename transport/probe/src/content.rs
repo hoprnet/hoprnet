@@ -97,7 +97,7 @@ impl TryFrom<ApplicationData> for Message {
 mod tests {
     use anyhow::Context;
     use hopr_api::types::primitive::traits::AsUnixTimestamp;
-    use hopr_platform::time::native::current_time;
+    use hopr_utils::platform::time::native::current_time;
     use more_asserts::assert_lt;
 
     use super::*;

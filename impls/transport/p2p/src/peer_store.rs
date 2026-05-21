@@ -15,8 +15,8 @@ pub type Result<T> = core::result::Result<T, NetworkError>;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
-         hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
+    static ref METRIC_PEER_COUNT:  hopr_types::telemetry::SimpleGauge =
+         hopr_types::telemetry::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
 }
 
 /// In-memory store for network peer multiaddresses.

@@ -75,6 +75,7 @@ lazy_static::lazy_static! {
 #[tokio::test]
 async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<()> {
     let mock_client = BlokliTestStateBuilder::default()
+        .with_hopr_network_chain_info("anvil-localhost")
         .with_accounts(
             ACCOUNTS
                 .iter()

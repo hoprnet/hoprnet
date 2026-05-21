@@ -1,0 +1,39 @@
+//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+//! layers.
+//!
+//! ## Contents
+//!
+//! Supported protocol configurations:
+//!
+//! - `mix`
+//! - `ack`
+//! - `heartbeat`
+
+/// Coder and decoder for the transport binary protocol layer
+mod codec;
+
+/// Per-peer protocol conformance counters.
+pub mod counters;
+
+/// Errors produced by the crate.
+pub mod errors;
+
+// protocols
+/// `heartbeat` p2p protocol
+pub mod heartbeat;
+
+/// Packet pipeline for the HOPR protocol.
+mod pipeline;
+/// Stream processing utilities
+pub mod stream;
+
+pub use counters::{PeerProtocolCounterRegistry, PeerProtocolCounters};
+pub use pipeline::{
+    AcknowledgementPipelineConfig, NodeType, PacketPipelineBuilder, PacketPipelineConfig, PacketPipelineProcesses,
+    Unset,
+};
+
+const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+
+pub type HoprBinaryCodec = codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.1.0";

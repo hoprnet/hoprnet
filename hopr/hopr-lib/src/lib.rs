@@ -35,7 +35,7 @@ pub use hopr_api as api;
 #[doc(hidden)]
 pub mod exports {
     pub mod network {
-        pub use hopr_network_types as types;
+        pub use hopr_utils::network_types as types;
     }
 
     pub use hopr_transport as transport;
@@ -62,14 +62,14 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
-use hopr_async_runtime::prelude::spawn;
-pub use hopr_async_runtime::{Abortable, AbortableList};
-pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
+pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use hopr_utils::runtime::prelude::spawn;
+pub use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::debug;
 
 pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
@@ -147,6 +147,32 @@ pub struct HoprSessionClientConfig {
     pub always_max_out_surbs: bool,
 }
 
+/// Session client configuration for explicit intermediate-path routing.
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[deprecated(
+    since = "4.0.2-rc.1",
+    note = "temporary compatibility API; remove once the explicit path is not needed anymore."
+)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+pub struct HoprSessionClientExplicitPathConfig {
+    /// Explicit forward intermediate path.
+    pub forward_path: Vec<hopr_api::types::internal::NodeId>,
+    /// Explicit return intermediate path.
+    pub return_path: Vec<hopr_api::types::internal::NodeId>,
+    /// Capabilities offered by the session.
+    #[default(_code = "SessionCapability::Segmentation.into()")]
+    pub capabilities: SessionCapabilities,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
+    /// Enable automatic SURB management for the session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
+}
+
 #[cfg(feature = "session-client")]
 impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
     fn from(value: HoprSessionClientConfig) -> Self {
@@ -158,6 +184,26 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
         }
+    }
+}
+
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
+    type Error = hopr_api::types::primitive::errors::GeneralError;
+
+    fn try_from(value: HoprSessionClientExplicitPathConfig) -> Result<Self, Self::Error> {
+        let forward =
+            hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.forward_path.try_into()?);
+        let ret = hopr_api::types::internal::routing::RoutingOptions::IntermediatePath(value.return_path.try_into()?);
+
+        Ok(Self {
+            forward_path_options: forward,
+            return_path_options: ret,
+            capabilities: value.capabilities,
+            pseudonym: value.pseudonym,
+            surb_management: value.surb_management,
+            always_max_out_surbs: value.always_max_out_surbs,
+        })
     }
 }
 
@@ -189,7 +235,7 @@ pub fn prepare_tokio_runtime(
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
-    hopr_parallelize::cpu::init_thread_pool(
+    hopr_utils::parallelize::cpu::init_thread_pool(
         num_cpu_threads
             .map(|v| v.get())
             .or(avail_parallelism)
@@ -298,6 +344,50 @@ where
             Err(HoprLibError::NotReady(state, error))
         }
     }
+
+    #[cfg(feature = "session-client")]
+    async fn connect_to_with_transport_config(
+        &self,
+        destination: hopr_api::types::primitive::prelude::Address,
+        target: SessionTarget,
+        cfg: hopr_transport::SessionClientConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        let backoff = backon::ConstantBuilder::default()
+            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
+            .with_delay(self.cfg.protocol.session.establish_retry_timeout)
+            .with_jitter();
+
+        use backon::Retryable;
+
+        Ok((|| {
+            let cfg = cfg.clone();
+            let target = target.clone();
+            async { self.transport_api.new_session(destination, target, cfg).await }
+        })
+        .retry(backoff)
+        .sleep(backon::FuturesTimerSleeper)
+        .await?)
+    }
+
+    /// Opens a session using explicit intermediate paths for forward and return routing.
+    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[deprecated(
+        since = "4.0.2-rc.1",
+        note = "temporary compatibility API; remove once the explicit path is not needed anymore."
+    )]
+    pub async fn connect_to_using_explicit_path(
+        &self,
+        destination: hopr_api::types::primitive::prelude::Address,
+        target: SessionTarget,
+        cfg: HoprSessionClientExplicitPathConfig,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), HoprLibError> {
+        let transport_cfg = hopr_transport::SessionClientConfig::try_from(cfg)
+            .map_err(|error| HoprLibError::GeneralError(error.to_string()))?;
+        self.connect_to_with_transport_config(destination, target, transport_cfg)
+            .await
+    }
 }
 
 #[cfg(feature = "session-client")]
@@ -324,23 +414,8 @@ where
         target: Self::Target,
         cfg: Self::Config,
     ) -> Result<(Self::Session, Self::SessionConfigurator), Self::Error> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        let backoff = backon::ConstantBuilder::default()
-            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
-            .with_delay(self.cfg.protocol.session.establish_retry_timeout)
-            .with_jitter();
-
-        use backon::Retryable;
-
-        Ok((|| {
-            let cfg = hopr_transport::SessionClientConfig::from(cfg.clone());
-            let target = target.clone();
-            async { self.transport_api.new_session(destination, target, cfg).await }
-        })
-        .retry(backoff)
-        .sleep(backon::FuturesTimerSleeper)
-        .await?)
+        self.connect_to_with_transport_config(destination, target, hopr_transport::SessionClientConfig::from(cfg))
+            .await
     }
 }
 
@@ -648,11 +723,21 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 /// Only available when compiled with the `telemetry` feature.
 #[cfg(feature = "telemetry")]
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    hopr_metrics::gather_all_metrics().map_err(HoprLibError::other)
+    hopr_types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
+}
+
+/// Converts a PeerId to an OffchainPublicKey.
+///
+/// This is a standalone utility function, not part of the API traits.
+pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPublicKey> {
+    Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context as _;
+    use hopr_transport::Keypair;
+
     use super::*;
 
     #[test]
@@ -761,11 +846,32 @@ mod tests {
         assert!(red.is_unavailable());
         assert!(unknown.is_unavailable());
     }
-}
 
-/// Converts a PeerId to an OffchainPublicKey.
-///
-/// This is a standalone utility function, not part of the API traits.
-pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPublicKey> {
-    Ok(hopr_transport::peer_id_to_public_key(peer_id)?)
+    #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[test]
+    fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
+        let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
+        let k2 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
+        let k3 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
+
+        let cfg = hopr_transport::SessionClientConfig::try_from(HoprSessionClientExplicitPathConfig {
+            forward_path: vec![k1, k2],
+            return_path: vec![k3],
+            capabilities: SessionCapability::Segmentation.into(),
+            pseudonym: None,
+            surb_management: None,
+            always_max_out_surbs: false,
+        })
+        .context("explicit path config conversion must succeed")?;
+
+        assert!(matches!(
+            cfg.forward_path_options,
+            hopr_transport::RoutingOptions::IntermediatePath(_)
+        ));
+        assert!(matches!(
+            cfg.return_path_options,
+            hopr_transport::RoutingOptions::IntermediatePath(_)
+        ));
+        Ok(())
+    }
 }

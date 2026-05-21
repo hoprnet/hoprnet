@@ -15,7 +15,7 @@ use hopr_api::{
         },
     },
 };
-use hopr_statistics::WeightedCollection;
+use hopr_utils::statistics::WeightedCollection;
 
 use crate::{ProberConfig, priority::immediate_probe_priority};
 

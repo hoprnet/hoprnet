@@ -20,6 +20,7 @@ impl TagBloomFilter {
     const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
 
     /// Returns the current number of items in this Bloom filter.
+    #[allow(dead_code)]
     pub fn count(&self) -> usize {
         self.count
     }
@@ -52,6 +53,7 @@ impl TagBloomFilter {
     ///
     /// Returns `true` if the given `tag` was already present in the filter.
     /// False positives are possible.
+    #[allow(dead_code)]
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
         // If we're at full capacity, we do only "check" and conditionally reset with the new entry
         if self.count == self.capacity {

@@ -138,7 +138,8 @@ fn hopr_encoder_bench(c: &mut Criterion) {
     }
 
     let ack_recipient = *PEERS[1].1.public();
-    for num_acks in [10] {
+    {
+        let num_acks = 10;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("ack_batch_{num_acks}")),
             &num_acks,

@@ -13,9 +13,9 @@ use futures::{
     channel::mpsc::{Receiver, Sender},
 };
 use hopr_api::types::crypto::{keypairs::Keypair, prelude::OffchainKeypair};
-use hopr_platform::time::native::current_time;
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
+use hopr_utils::platform::time::native::current_time;
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
@@ -64,15 +64,15 @@ async fn build_p2p_swarm(
         .build(
             &random_keypair,
             vec![multiaddress.clone()],
-            hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL,
+            hopr_transport::protocol::CURRENT_HOPR_MSG_PROTOCOL,
             true,
         )
         .await
         .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
 
-    let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
+    let msg_codec = hopr_transport::protocol::HoprBinaryCodec {};
     let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
+        hopr_transport::protocol::stream::process_stream_protocol(msg_codec, network.clone()).await?;
 
     let api = Interface {
         me: peer_id,

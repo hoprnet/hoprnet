@@ -46,6 +46,7 @@ pub fn mixer_throughput(
     group.finish();
 }
 
+#[allow(dead_code)]
 fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'_, ()> {
     Box::pin(async move {
         let (tx, mut rx) = channel(cfg);
@@ -61,6 +62,7 @@ fn send_continuous_channel_load(item: &str, iterations: usize, cfg: MixerConfig)
 }
 
 // Benchmark the throughput of the mixer channel when used in a pipe
+#[allow(dead_code)]
 fn send_continuous_channel_load_through_sink_pipe(
     item: &'static str,
     iterations: usize,

@@ -16,7 +16,7 @@ use crate::config::SessionIpForwardingConfig;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+    static ref METRIC_ACTIVE_TARGETS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
         "hopr_session_hoprd_target_connections",
         "Number of currently active HOPR session target connections on this Exit node",
         &["type"]
@@ -75,13 +75,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
         match session.target {
             SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
-                    move || udp_target.unseal(&kp),
-                    "udp_unseal",
-                )
-                .await
-                .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let udp_target =
+                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
+                        .await
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
                     session_id = ?session_id,
@@ -141,7 +139,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
+                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
@@ -166,13 +164,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
             }
             SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target = hopr_lib::utils::hopr_parallelize::cpu::spawn_blocking(
-                    move || tcp_target.unseal(&kp),
-                    "tcp_unseal",
-                )
-                .await
-                .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let tcp_target =
+                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
+                        .await
+                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
+                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
 
@@ -220,7 +216,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
+                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
@@ -246,7 +242,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
                 #[cfg(all(feature = "telemetry", not(test)))]
-                let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
+                let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {

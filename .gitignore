@@ -226,3 +226,4 @@ deploy/nfpm/*.1.gz
 **/*.pcap
 ~/.cargo/advisory-db
 ~/.cargo/advisory-db..lock
+jeprof-pull-*/
