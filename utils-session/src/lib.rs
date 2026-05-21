@@ -250,35 +250,43 @@ impl Abortable for ListenerJoinHandles {
 }
 
 // ---------------------------------------------------------------------------
-// Session backend + generic SessionFactory adapters
+// Generic SessionFactory adapters
 // ---------------------------------------------------------------------------
 
-/// Trait abstracting HOPR session creation.
-///
-/// Production code uses `Hopr<...>` (via the blanket impl), while the REST API
-/// tests can provide a mock implementation.
 #[async_trait::async_trait]
-pub trait SessionBackend: Send + Sync + 'static {
+pub trait SessionFactory: Clone + Send + Sync + 'static {
+    type Cfg: Clone + Send + 'static;
+
     async fn create_session(
         &self,
         dest: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
-    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
-
-    #[cfg(feature = "explicit-path")]
-    async fn create_session_using_explicit_path(
-        &self,
-        dest: Address,
-        target: SessionTarget,
-        cfg: HoprSessionClientExplicitPathConfig,
+        cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
 
     fn session_idle_timeout(&self) -> Option<std::time::Duration>;
 }
 
+pub struct HopSessionFactory<Chain, Graph, Net, TMgr> {
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
+}
+
+impl<Chain, Graph, Net, TMgr> HopSessionFactory<Chain, Graph, Net, TMgr> {
+    pub fn new(hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>) -> Self {
+        Self { hopr }
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> Clone for HopSessionFactory<Chain, Graph, Net, TMgr> {
+    fn clone(&self) -> Self {
+        Self {
+            hopr: self.hopr.clone(),
+        }
+    }
+}
+
 #[async_trait::async_trait]
-impl<Chain, Graph, Net, TMgr> SessionBackend for Hopr<Chain, Graph, Net, TMgr>
+impl<Chain, Graph, Net, TMgr> SessionFactory for HopSessionFactory<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
@@ -294,102 +302,74 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
+    type Cfg = HoprSessionClientConfig;
+
     async fn create_session(
         &self,
         dest: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
+        cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        Ok(HoprSessionClientOperations::connect_to(self, dest, target, cfg).await?)
-    }
-
-    #[cfg(feature = "explicit-path")]
-    async fn create_session_using_explicit_path(
-        &self,
-        dest: Address,
-        target: SessionTarget,
-        cfg: HoprSessionClientExplicitPathConfig,
-    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        Ok(self.connect_to_using_explicit_path(dest, target, cfg).await?)
+        Ok(HoprSessionClientOperations::connect_to(self.hopr.as_ref(), dest, target, cfg).await?)
     }
 
     fn session_idle_timeout(&self) -> Option<std::time::Duration> {
-        Some(self.config().protocol.session.idle_timeout)
-    }
-}
-
-#[async_trait::async_trait]
-pub trait SessionFactory: Clone + Send + Sync + 'static {
-    type Config: Clone + Send + 'static;
-
-    async fn create_session(
-        &self,
-        dest: Address,
-        target: SessionTarget,
-        cfg: Self::Config,
-    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
-
-    fn session_idle_timeout(&self) -> Option<std::time::Duration>;
-}
-
-#[derive(Clone)]
-pub struct HopSessionFactory {
-    backend: Arc<dyn SessionBackend>,
-}
-
-impl HopSessionFactory {
-    pub fn new(backend: Arc<dyn SessionBackend>) -> Self {
-        Self { backend }
-    }
-}
-
-#[async_trait::async_trait]
-impl SessionFactory for HopSessionFactory {
-    type Config = HoprSessionClientConfig;
-
-    async fn create_session(
-        &self,
-        dest: Address,
-        target: SessionTarget,
-        cfg: Self::Config,
-    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        self.backend.create_session(dest, target, cfg).await
-    }
-
-    fn session_idle_timeout(&self) -> Option<std::time::Duration> {
-        self.backend.session_idle_timeout()
+        Some(self.hopr.config().protocol.session.idle_timeout)
     }
 }
 
 #[cfg(feature = "explicit-path")]
-#[derive(Clone)]
-pub struct ExplicitPathSessionFactory {
-    backend: Arc<dyn SessionBackend>,
+pub struct ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
 }
 
 #[cfg(feature = "explicit-path")]
-impl ExplicitPathSessionFactory {
-    pub fn new(backend: Arc<dyn SessionBackend>) -> Self {
-        Self { backend }
+impl<Chain, Graph, Net, TMgr> ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    pub fn new(hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>) -> Self {
+        Self { hopr }
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+impl<Chain, Graph, Net, TMgr> Clone for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    fn clone(&self) -> Self {
+        Self {
+            hopr: self.hopr.clone(),
+        }
     }
 }
 
 #[cfg(feature = "explicit-path")]
 #[async_trait::async_trait]
-impl SessionFactory for ExplicitPathSessionFactory {
-    type Config = HoprSessionClientExplicitPathConfig;
+impl<Chain, Graph, Net, TMgr> SessionFactory for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    type Cfg = HoprSessionClientExplicitPathConfig;
 
     async fn create_session(
         &self,
         dest: Address,
         target: SessionTarget,
-        cfg: Self::Config,
+        cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        self.backend.create_session_using_explicit_path(dest, target, cfg).await
+        Ok(self.hopr.connect_to_using_explicit_path(dest, target, cfg).await?)
     }
 
     fn session_idle_timeout(&self) -> Option<std::time::Duration> {
-        self.backend.session_idle_timeout()
+        Some(self.hopr.config().protocol.session.idle_timeout)
     }
 }
 
@@ -407,7 +387,7 @@ impl SessionPool {
         size: usize,
         dst: Address,
         target: SessionTarget,
-        cfg: T::Config,
+        cfg: T::Cfg,
         factory: T,
     ) -> Result<Self, anyhow::Error> {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
@@ -484,10 +464,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding(
+pub async fn create_tcp_client_binding<T: SessionFactory<Cfg = HoprSessionClientConfig>>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionBackend>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -519,7 +499,7 @@ pub async fn create_tcp_client_binding(
         destination,
         target.clone(),
         config.clone(),
-        HopSessionFactory::new(factory.clone()),
+        factory.clone(),
     )
     .await
     .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -660,10 +640,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding(
+pub async fn create_udp_client_binding<T: SessionFactory<Cfg = HoprSessionClientConfig>>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionBackend>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -755,17 +735,20 @@ pub async fn create_udp_client_binding(
 
 #[cfg(feature = "explicit-path")]
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding_using_explicit_path(
+pub async fn create_tcp_client_binding_using_explicit_path<T>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionBackend>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: HoprSessionClientExplicitPathConfig,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
-) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
+where
+    T: SessionFactory<Cfg = HoprSessionClientExplicitPathConfig>,
+{
     let forward_path = RoutingOptions::IntermediatePath(
         config
             .forward_path
@@ -800,7 +783,7 @@ pub async fn create_tcp_client_binding_using_explicit_path(
         destination,
         target.clone(),
         config.clone(),
-        ExplicitPathSessionFactory::new(factory.clone()),
+        factory.clone(),
     )
     .await
     .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
@@ -845,10 +828,7 @@ pub async fn create_tcp_client_binding_using_explicit_path(
                                 }
                                 None => {
                                     debug!("no pooled explicit-path sessions available, creating a new one");
-                                    match factory
-                                        .create_session_using_explicit_path(destination, target, data)
-                                        .await
-                                    {
+                                    match factory.create_session(destination, target, data).await {
                                         Ok((s, c)) => (s, c),
                                         Err(error) => {
                                             error!(%error, "failed to establish explicit-path session");
@@ -917,15 +897,18 @@ pub async fn create_tcp_client_binding_using_explicit_path(
 }
 
 #[cfg(feature = "explicit-path")]
-pub async fn create_udp_client_binding_using_explicit_path(
+pub async fn create_udp_client_binding_using_explicit_path<T>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionBackend>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: HoprSessionClientExplicitPathConfig,
-) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
+where
+    T: SessionFactory<Cfg = HoprSessionClientExplicitPathConfig>,
+{
     let forward_path = RoutingOptions::IntermediatePath(
         config
             .forward_path
@@ -956,7 +939,7 @@ pub async fn create_udp_client_binding_using_explicit_path(
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     let (session, configurator) = factory
-        .create_session_using_explicit_path(destination, target, config.clone())
+        .create_session(destination, target, config.clone())
         .await
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
