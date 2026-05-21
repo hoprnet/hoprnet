@@ -7,7 +7,6 @@ on:
   pull_request:
     types:
       - closed
-      # - synchronize
     branches:
       - master
       - 'release/*'
@@ -44,6 +43,7 @@ jobs:
           PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
   build-library:
     name: Library ${{ matrix.architecture }}
+    if: github.event.pull_request.merged == true
     strategy:
       fail-fast: false
       matrix:
