@@ -438,6 +438,13 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
 {
+    let ack_out_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+        "packet_pipeline_ack_out_for_each_concurrent",
+        module_path!(),
+        file!(),
+        line!(),
+    );
+
     ack_outgoing
         .map(move |(destination, maybe_ack_key)| {
             let packet_key = packet_key.clone();
@@ -483,7 +490,8 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
             move |(destination, acks)| {
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
-                async move {
+                let ack_out_diag = ack_out_diag.clone();
+                ack_out_diag.wrap(async move {
                     // Make sure that the acknowledgements are sent in batches of at most MAX_ACKNOWLEDGEMENTS_BATCH_SIZE
                     // TODO: find better strategy to avoid reallocations
                     let c = acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE).map(|c| c.to_vec()).collect::<Vec<_>>();
@@ -506,7 +514,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                         tracing::error!(%error, "failed to flush acknowledgements batch to the transport layer");
                     }
                     tracing::trace!("acknowledgements out");
-                }.instrument(tracing::debug_span!("outgoing_ack_batch", peer = destination.to_peerid_str()))
+                }.instrument(tracing::debug_span!("outgoing_ack_batch", peer = destination.to_peerid_str())))
             }
         )
         .in_current_span()
@@ -552,53 +560,64 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
 {
+    let ack_in_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+        "packet_pipeline_ack_in_for_each_concurrent",
+        module_path!(),
+        file!(),
+        line!(),
+    );
+
     ack_incoming
         .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
-            async move {
-                tracing::trace!(num = acks.len(), "received acknowledgements");
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || ticket_proc.acknowledge_tickets(peer, acks),
-                    "ack_decode",
-                )
-                .await
-                {
-                    Ok(Ok(resolutions)) if !resolutions.is_empty() => {
-                        let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
-                            ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
-                                tracing::trace!("received ack for a winning ticket");
-                                Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
-                            }
-                            ResolvedAcknowledgement::RelayingLoss(_) => {
-                                // Losing tickets are not getting accounted for anywhere.
-                                tracing::trace!("received ack for a losing ticket");
-                                None
-                            }
-                        });
+            let ack_in_diag = ack_in_diag.clone();
+            ack_in_diag.wrap(
+                async move {
+                    tracing::trace!(num = acks.len(), "received acknowledgements");
+                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, acks),
+                        "ack_decode",
+                    )
+                    .await
+                    {
+                        Ok(Ok(resolutions)) if !resolutions.is_empty() => {
+                            let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
+                                ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
+                                    tracing::trace!("received ack for a winning ticket");
+                                    Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
+                                }
+                                ResolvedAcknowledgement::RelayingLoss(_) => {
+                                    // Losing tickets are not getting accounted for anywhere.
+                                    tracing::trace!("received ack for a losing ticket");
+                                    None
+                                }
+                            });
 
-                        // All acknowledgements that resulted in winning tickets go upstream
-                        if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await {
-                            tracing::error!(%error, "failed to notify ticket resolutions");
+                            // All acknowledgements that resulted in winning tickets go upstream
+                            if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await
+                            {
+                                tracing::error!(%error, "failed to notify ticket resolutions");
+                            }
+                        }
+                        Ok(Ok(_)) => {
+                            tracing::debug!("acknowledgement batch could not acknowledge any ticket");
+                        }
+                        Ok(Err(TicketAcknowledgementError::UnexpectedAcknowledgement)) => {
+                            // Unexpected acknowledgements naturally happen
+                            // as acknowledgements of 0-hop packets
+                            tracing::trace!("received unexpected acknowledgement");
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(%error, "failed to acknowledge ticket");
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
                         }
                     }
-                    Ok(Ok(_)) => {
-                        tracing::debug!("acknowledgement batch could not acknowledge any ticket");
-                    }
-                    Ok(Err(TicketAcknowledgementError::UnexpectedAcknowledgement)) => {
-                        // Unexpected acknowledgements naturally happen
-                        // as acknowledgements of 0-hop packets
-                        tracing::trace!("received unexpected acknowledgement");
-                    }
-                    Ok(Err(error)) => {
-                        tracing::error!(%error, "failed to acknowledge ticket");
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
-                    }
                 }
-            }
-            .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
+                .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str())),
+            )
         })
         .in_current_span()
         .await;
@@ -725,7 +744,8 @@ where
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
-        hopr_utils::spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable_named!(
+            "packet_pipeline_msg_out",
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
@@ -739,7 +759,8 @@ where
 
     processes.insert(
         PacketPipelineProcesses::MsgIn,
-        hopr_utils::spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable_named!(
+            "packet_pipeline_msg_in",
             start_incoming_packet_pipeline(
                 (wire_out.clone(), wire_in),
                 decoder,
@@ -756,7 +777,8 @@ where
 
     processes.insert(
         PacketPipelineProcesses::AckOut,
-        hopr_utils::spawn_as_abortable!(
+        hopr_utils::spawn_as_abortable_named!(
+            "packet_pipeline_ack_out",
             start_outgoing_ack_pipeline(outgoing_ack_rx, encoder, cfg.ack_config, packet_key.clone(), wire_out,)
                 .in_current_span()
         ),
@@ -772,7 +794,8 @@ where
         NodeType::Relay => {
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(
+                hopr_utils::spawn_as_abortable_named!(
+                    "packet_pipeline_ack_in",
                     start_relay_incoming_ack_pipeline(
                         incoming_ack_rx,
                         ticket_events,
@@ -790,7 +813,10 @@ where
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_exit_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+                hopr_utils::spawn_as_abortable_named!(
+                    "packet_pipeline_ack_in_drain",
+                    start_exit_incoming_ack_pipeline(incoming_ack_rx).in_current_span()
+                ),
             );
         }
         NodeType::Entry => {

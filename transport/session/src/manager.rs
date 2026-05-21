@@ -511,11 +511,18 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
-        let ah_closure_notifications = hopr_utils::spawn_as_abortable!(session_close_rx.for_each_concurrent(
-            None,
-            move |(session_id, closure_reason)| {
+        let closure_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_close_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let ah_closure_notifications = hopr_utils::spawn_as_abortable_named!(
+            "session_close_notifications",
+            session_close_rx.for_each_concurrent(None, move |(session_id, closure_reason)| {
                 let myself = myself.clone();
-                async move {
+                let closure_diag = closure_diag.clone();
+                closure_diag.wrap(async move {
                     // These notifications come from the Sessions themselves once
                     // an empty read is encountered, which means the closure was done by the
                     // other party.
@@ -529,9 +536,9 @@ where
                             "could not find session id to close, maybe the session is already closed"
                         );
                     }
-                }
-            },
-        ));
+                })
+            },)
+        );
 
         // This is necessary to evict expired entries from the caches if
         // no session-related operations happen at all.
