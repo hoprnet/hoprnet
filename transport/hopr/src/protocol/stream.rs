@@ -68,7 +68,8 @@ where
 {
     let (stream_rx, stream_tx) = stream.split();
     let (send, recv) = channel::<<C as Decoder>::Item>(1000);
-    let cache_internal = cache.clone();
+    let cache_for_write = cache.clone();
+    let cache_for_read = cache.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
@@ -86,6 +87,13 @@ where
             .forward(frame_writer)
             .inspect(move |res| {
                 tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
+            })
+            .then(move |_| {
+                // Make sure we invalidate the peer entry from the cache once the stream ends
+                let peer = peer;
+                async move {
+                    cache_for_write.invalidate(&peer);
+                }
             }),
     );
 
@@ -116,7 +124,7 @@ where
                 // Make sure we invalidate the peer entry from the cache once the stream ends
                 let peer = peer;
                 async move {
-                    cache_internal.invalidate(&peer);
+                    cache_for_read.invalidate(&peer);
                 }
             }),
     );
