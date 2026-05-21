@@ -717,7 +717,7 @@ impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
 
 #[derive(Debug, Default, Copy, Clone)]
 #[doc(hidden)]
-struct NopExitAcknowledgementShareProcessor;
+pub struct NopExitAcknowledgementShareProcessor;
 
 impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementShareProcessor {
     type Error = std::convert::Infallible;
