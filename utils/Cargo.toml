@@ -5,8 +5,8 @@ authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
 description = "Shared utility crates for HOPR: async runtime, network types, parallelisation, statistics, platform, and testing helpers"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
+homepage.workspace = true
+repository.workspace = true
 license = "GPL-3.0-only"
 
 [lib]
