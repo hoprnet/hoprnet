@@ -360,7 +360,7 @@ impl<Chain, Graph, Net, TMgr> Clone for ExplicitPathSessionFactory<Chain, Graph,
 
 #[cfg(feature = "explicit-path")]
 #[async_trait::async_trait]
-impl<Chain, Graph, Net, TMgr> SessionFactory for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr>
+pub impl<Chain, Graph, Net, TMgr> SessionFactory for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
