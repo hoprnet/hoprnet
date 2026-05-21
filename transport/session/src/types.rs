@@ -8,7 +8,9 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
+use hopr_crypto_packet::HoprPixSpec;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_pix::{PixGroupRepr, SsaId, SsaIndex};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -17,8 +19,9 @@ use hopr_protocol_start::StartProtocol;
 use hopr_types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::{
+        balance::HoprBalance,
         errors::GeneralError,
-        prelude::{BytesRepresentable, ToHex},
+        prelude::{Address, BytesRepresentable, ToHex},
     },
 };
 use hopr_utils::network_types::{
@@ -67,8 +70,39 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
     }
 }
 
+/// New-type wrapper for PixGroupRepr<HoprPixSpec> to provide additional functionality.
+pub struct HoprPixGroupElement(pub PixGroupRepr<HoprPixSpec>);
+
+impl AsRef<[u8]> for HoprPixGroupElement {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() != size_of::<PixGroupRepr<HoprPixSpec>>() {
+            return Err(GeneralError::ParseError("pix repr length".into()));
+        }
+        Ok(Self(PixGroupRepr::<HoprPixSpec>::clone_from_slice(value)))
+    }
+}
+
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, Box<[u8]>>; // TODO: enhance for PIX
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
+
+/// Events raised by the Session Manager in response to received PIX messages.
+#[derive(Debug, Clone)]
+pub enum HoprSessionPixEvent {
+    ReadyToDeposit(SsaId<HoprPseudonym>, Address),
+    DepositNeeded(
+        SsaId<HoprPseudonym>,
+        Address,
+        futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
+    ),
+}
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///

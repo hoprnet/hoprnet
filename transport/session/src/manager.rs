@@ -37,8 +37,8 @@ use crate::telemetry::{
     set_session_state,
 };
 use crate::{
-    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
-    SurbBalancerConfig,
+    Capability, HoprSession, HoprSessionPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId,
+    SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
@@ -264,10 +264,10 @@ pub struct SessionManagerConfig {
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
 // The errors produced by the underlying sink are remapped into `SessionManagerError`.
-type IncomingSessionSink = Pin<Box<dyn Sink<IncomingSession, Error = SessionManagerError> + Send>>;
+type BoxSink<T> = Pin<Box<dyn Sink<T, Error = SessionManagerError> + Send>>;
 
 type SessionNotifiers = (
-    Arc<hopr_utils::runtime::prelude::Mutex<IncomingSessionSink>>,
+    Arc<hopr_utils::runtime::prelude::Mutex<BoxSink<IncomingSession>>>,
     Sender<(SessionId, ClosureReason)>,
 );
 
@@ -504,20 +504,27 @@ where
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
-    pub fn start<T>(&self, msg_sender: S, new_session_notifier: T) -> crate::errors::Result<Vec<AbortHandle>>
+    pub fn start<T, Pix>(
+        &self,
+        msg_sender: S,
+        new_session_notifier: T,
+        pix_events: Pix, // TODO: make this used
+    ) -> crate::errors::Result<Vec<AbortHandle>>
     where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
+        Pix: futures::Sink<HoprSessionPixEvent> + Send + 'static,
+        Pix::Error: std::error::Error + Send + Sync + 'static,
     {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         // Re-map the user-provided sink errors to `SessionManagerError` and erase the concrete
-        // type, so that the `SessionManager` does not need to be generic over it. This also avoids
+        //  type so that the `SessionManager` does not need to be generic over it. This also avoids
         // having to spawn a separate task to forward items between channels: senders simply lock
         // the sink and send directly.
-        let new_session_notifier: IncomingSessionSink =
+        let new_session_notifier: BoxSink<IncomingSession> =
             Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
         let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
@@ -1716,11 +1723,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1865,11 +1880,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -2058,11 +2081,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        jhs.extend(alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?);
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        jhs.extend(bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?);
 
         let result = alice_mgr
             .new_session(
@@ -2170,11 +2201,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        jhs.extend(alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?);
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        jhs.extend(bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?);
 
         let result = alice_mgr
             .new_session(
@@ -2262,7 +2301,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
+        alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?;
 
         let alice_session = alice_mgr
             .new_session(
@@ -2316,11 +2359,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
+        alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?;
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?;
+        bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?;
 
         let result = alice_mgr
             .new_session(
@@ -2348,7 +2399,7 @@ mod tests {
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        mgr.start(mock_packet_planning(transport), new_session_tx, futures::sink::drain())?;
 
         let pseudonym = HoprPseudonym::random();
         let result = mgr
@@ -2558,11 +2609,19 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(
+            mock_packet_planning(alice_transport),
+            new_session_tx_alice,
+            futures::sink::drain(),
+        )?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(
+            mock_packet_planning(bob_transport),
+            new_session_tx_bob,
+            futures::sink::drain(),
+        )?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 

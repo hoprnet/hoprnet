@@ -66,6 +66,7 @@ hopr-utils = { workspace = true, features = [
 ] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
+hopr-protocol-pix = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }

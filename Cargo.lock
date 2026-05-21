@@ -3484,9 +3484,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "253cae294dced141adf9e102a09bd4bcbac36efaf13451d1fad93661b59c5a16"
+version = "1.11.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fpix#177e92473bb5450fc10dfa279580e584c852c23c"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4063,6 +4062,7 @@ dependencies = [
  "hopr-api",
  "hopr-crypto-packet",
  "hopr-protocol-app",
+ "hopr-protocol-pix",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
@@ -4106,9 +4106,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.8.0"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f06ce2e57452d2b33e65e6fe9f320422fee2b87970e6ef07803005827e28dfb"
+checksum = "75e82a6426de74cdef7bbef15f651ce546ab39fc77ef1dc4002247b6bbf034fc"
 dependencies = [
  "aes",
  "anyhow",
