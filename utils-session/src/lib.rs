@@ -257,6 +257,7 @@ impl Abortable for ListenerJoinHandles {
 pub trait SessionFactory: Clone + Send + Sync + 'static {
     type Cfg: Clone + Send + 'static;
 
+    /// Creates a new Session with the given destination, target and configuration.
     async fn create_session(
         &self,
         dest: Address,
@@ -264,9 +265,14 @@ pub trait SessionFactory: Clone + Send + Sync + 'static {
         cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
 
+    /// Derives the forward and return routing options from the given configuration.
     fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error>;
+
+    /// Derives the listener limits (max SURB upstream and response buffer) from the given configuration.
     fn listener_limits(&self, cfg: &Self::Cfg)
     -> (Option<human_bandwidth::re::bandwidth::Bandwidth>, Option<ByteSize>);
+
+    /// Returns the idle timeout duration for sessions created by this factory, if any.
     fn session_idle_timeout(&self) -> Option<std::time::Duration>;
 }
 
