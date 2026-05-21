@@ -179,7 +179,7 @@ hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-featu
 hopr-chain-connector = { path = "impls/connector" }
 
 # referential implementations
-hopr-reference = { path = "hopr/reference", version = "4.1.1", default-features = false }
+hopr-reference = { path = "hopr/reference", version = "4.2.0", default-features = false }
 hopr-transport-p2p = { path = "impls/transport/p2p", version = "0.9.0", default-features = false }
 hopr-ct-immediate = { path = "impls/ct/immediate", version = "0.2.1", default-features = false }
 hopr-ct-full-network = { path = "impls/ct/full-network", version = "0.3.0", default-features = false }
