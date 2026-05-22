@@ -79,7 +79,7 @@ where
 {
     fn build(&self) -> BoxStream<'static, ProbeRouting> {
         // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<OffchainPublicKey, ProbeRouting> = moka::future::Cache::builder()
+        let cache_peer_routing: moka::sync::Cache<OffchainPublicKey, ProbeRouting> = moka::sync::Cache::builder()
             .time_to_live(std::time::Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
@@ -102,7 +102,7 @@ where
 
                 async move {
                     cache_peer_routing
-                        .try_get_with(peer, async move {
+                        .try_get_with(peer, || {
                             Ok::<ProbeRouting, anyhow::Error>(ProbeRouting::Neighbor(DestinationRouting::Forward {
                                 destination: Box::new(peer.into()),
                                 pseudonym: Some(HoprPseudonym::random()),
@@ -110,7 +110,6 @@ where
                                 return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
                             }))
                         })
-                        .await
                         .ok()
                 }
             })

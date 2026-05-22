@@ -115,7 +115,7 @@ pub struct PathPlanner<Surb, R, S> {
     pub surb_store: Surb,
     resolver: Arc<R>,
     selector: Arc<S>,
-    cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
+    cache: moka::sync::Cache<PlannerCacheKey, PlannerCacheValue>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -128,7 +128,7 @@ where
     ///
     /// `me` is this node's [`OffchainPublicKey`]; it is used as the source in path queries.
     pub fn new(me: OffchainPublicKey, surb_store: Surb, resolver: R, selector: S, config: PathPlannerConfig) -> Self {
-        let cache = moka::future::Cache::builder()
+        let cache = moka::sync::Cache::builder()
             .max_capacity(config.max_cache_capacity)
             .time_to_live(config.cache_time_to_live)
             .time_to_idle(config.cache_time_to_idle)
@@ -206,42 +206,42 @@ where
                 let resolver = self.resolver.clone();
                 let selector = self.selector.clone();
 
-                let paths = self
-                    .cache
-                    .try_get_with(cache_key, async move {
-                        trace!(hops = hops_usize, "path cache miss, querying selector");
-                        let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
+                let paths = if let Some(cached) = self.cache.get(&cache_key) {
+                    cached
+                } else {
+                    trace!(hops = hops_usize, "path cache miss, querying selector");
+                    let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for pwc in candidates {
-                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    // Post-resolution: catch non-adjacent chain-address duplicates
-                                    // (ValidatedPath::new only checks consecutive collisions).
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "skipping path candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
+                    let chain_resolver = ChainPathResolver::from(&*resolver);
+                    let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
+                    for pwc in candidates {
+                        let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                        match ValidatedPath::new(source, node_ids, &chain_resolver).await {
+                            Ok(vp) => {
+                                // Post-resolution: catch non-adjacent chain-address duplicates
+                                // (ValidatedPath::new only checks consecutive collisions).
+                                if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
+                                    tracing::debug!(path = %vp, "skipping path candidate with repeated chain addresses");
+                                    continue;
                                 }
-                                Err(e) => tracing::warn!(error = %e, "path candidate failed validation"),
+                                valid_paths.push((vp, pwc.cost))
                             }
+                            Err(e) => tracing::warn!(error = %e, "path candidate failed validation"),
                         }
+                    }
 
-                        if valid_paths.is_empty() {
-                            return Err(PathPlannerError::Path(PathError::PathNotFound(
-                                hops_usize,
-                                src_key.to_hex(),
-                                dest_key.to_hex(),
-                            )));
-                        }
+                    if valid_paths.is_empty() {
+                        return Err(PathPlannerError::Path(PathError::PathNotFound(
+                            hops_usize,
+                            src_key.to_hex(),
+                            dest_key.to_hex(),
+                        )));
+                    }
 
-                        Ok(Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)))
-                    })
-                    .await
-                    .map_err(PathPlannerError::CacheError)?;
+                    let paths = Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths));
+                    self.cache.insert(cache_key, paths.clone());
+                    paths
+                };
 
                 paths.pick_one().ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
@@ -408,12 +408,10 @@ where
                     }
 
                     if !valid_paths.is_empty() {
-                        cache_ref
-                            .insert(
-                                (src, dest, hops_u32),
-                                Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
-                            )
-                            .await;
+                        cache_ref.insert(
+                            (src, dest, hops_u32),
+                            Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
+                        );
                     }
                 }
             }
@@ -794,7 +792,7 @@ mod tests {
         let cache_key: PlannerCacheKey = (NodeId::Offchain(me), NodeId::Offchain(dest), 1);
 
         assert!(
-            planner.cache.get(&cache_key).await.is_none(),
+            planner.cache.get(&cache_key).is_none(),
             "cache should be empty before first call"
         );
 
@@ -806,7 +804,7 @@ mod tests {
         };
         planner.resolve_routing(100, 0, routing).await.expect("should succeed");
 
-        let cached = planner.cache.get(&cache_key).await;
+        let cached = planner.cache.get(&cache_key);
         assert!(cached.is_some(), "cache should be populated after first call");
         let paths = cached.unwrap();
         assert!(!paths.is_empty(), "cached paths must be non-empty");

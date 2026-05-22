@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use blokli_client::api::{BlokliQueryClient, RedeemedStatsSelector};
-use futures::TryFutureExt;
 use hopr_api::{
     chain::{ChainInfo, DomainSeparators, RedemptionStats},
     types::{internal::prelude::WinningProbability, primitive::prelude::*},
@@ -14,29 +13,25 @@ use crate::{
     utils::{ParsedChainInfo, model_to_chain_info, model_to_redeemed_stats},
 };
 
-pub(crate) const CHAIN_INFO_CACHE_KEY: u32 = 0;
-
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
 where
     C: BlokliQueryClient + Send + Sync + 'static,
 {
     /// Queries chain info from cache, fetching from Blokli on cold start.
     ///
-    /// The cache has no TTL - it's kept fresh by the Blokli subscription handler
+    /// The cell has no TTL — it's kept fresh by the Blokli subscription handler
     /// which updates it whenever ticket parameters change. This prevents the
     /// cascading timeout issue where cache expiration during packet processing
     /// would trigger blocking Blokli queries.
     pub(crate) async fn query_cached_chain_info(&self) -> Result<ParsedChainInfo, ConnectorError> {
-        Ok(self
+        let lock = self
             .values
-            .try_get_with(
-                CHAIN_INFO_CACHE_KEY,
-                self.client
-                    .query_chain_info()
-                    .map_err(ConnectorError::from)
-                    .and_then(|model| futures::future::ready(model_to_chain_info(model))),
-            )
-            .await?)
+            .get_or_try_init(|| async {
+                let model = self.client.query_chain_info().await?;
+                model_to_chain_info(model).map(parking_lot::RwLock::new)
+            })
+            .await?;
+        Ok(lock.read().clone())
     }
 }
 

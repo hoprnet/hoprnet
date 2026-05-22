@@ -43,8 +43,8 @@ pub enum ProbeDispatch {
 /// are yielded to the caller.
 #[derive(Clone)]
 pub struct ProbeClassifierState<G> {
-    active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue>,
-    active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
+    active_neighbor_probes: moka::sync::Cache<CacheNeighborKey, CacheNeighborValue>,
+    active_path_probes: moka::sync::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)>,
     network_graph: G,
 }
 
@@ -68,7 +68,7 @@ where
     {
         let tag: Tag = in_data.data.application_tag;
 
-        if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag).await {
+        if let Some((path_telemetry, _allocated_tag)) = self.active_path_probes.remove(&tag) {
             tracing::debug!(%tag, "loopback probe successfully received");
             self.network_graph
                 .record_edge::<NeighborTelemetry, PathTelemetry>(hopr_api::graph::MeasurableEdge::Probe(Ok(
@@ -105,7 +105,6 @@ where
                         if let Some((peer, start, replier)) = self
                             .active_neighbor_probes
                             .remove(&(pseudonym, NeighborProbe::Ping(pong)))
-                            .await
                         {
                             let latency = current_time().as_unix_timestamp().saturating_sub(start);
 
@@ -209,80 +208,56 @@ impl Probe {
         let network_graph_internal_neighbor = network_graph.clone();
         let network_graph_internal_path = network_graph.clone();
         let timeout = self.cfg.timeout;
-        let active_neighbor_probes: moka::future::Cache<CacheNeighborKey, CacheNeighborValue> =
-            moka::future::Cache::builder()
+        let active_neighbor_probes: moka::sync::Cache<CacheNeighborKey, CacheNeighborValue> =
+            moka::sync::Cache::builder()
                 .time_to_live(timeout)
                 .max_capacity(100_000)
-                .async_eviction_listener(
-                    move |k: Arc<CacheNeighborKey>,
-                          v: CacheNeighborValue,
-                          cause|
-                          -> moka::notification::ListenerFuture {
-                        if matches!(cause, moka::notification::RemovalCause::Expired) {
-                            // If the eviction cause is expiration => record as a failed probe
-                            let store = network_graph_internal_neighbor.clone();
-                            let (peer, _start, notifier) = v;
+                .eviction_listener(move |k: Arc<CacheNeighborKey>, v: CacheNeighborValue, cause| {
+                    if matches!(cause, moka::notification::RemovalCause::Expired) {
+                        // If the eviction cause is expiration => record as a failed probe
+                        let store = network_graph_internal_neighbor.clone();
+                        let (peer, _start, notifier) = v;
 
-                            tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
-                            if let Some(replier) = notifier {
-                                if matches!(peer.as_ref(), NodeId::Offchain(_)) {
-                                    replier.notify(Err(()));
-                                } else {
-                                    tracing::warn!(
-                                        reason = "non-offchain peer",
-                                        "cannot notify timeout for non-offchain peer"
-                                    );
-                                }
-                            };
-
-                            if let NodeId::Offchain(opk) = peer.as_ref() {
-                                let opk: OffchainPublicKey = *opk;
-                                store
-                                    .record_edge::<NeighborTelemetry, PathTelemetry>(
-                                        hopr_api::graph::MeasurableEdge::Probe(Err(
-                                            NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
-                                        )),
-                                    );
-                                futures::FutureExt::boxed(futures::future::ready(()))
-
+                        tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "neighbor probe failed");
+                        if let Some(replier) = notifier {
+                            if matches!(peer.as_ref(), NodeId::Offchain(_)) {
+                                replier.notify(Err(()));
                             } else {
-                                futures::FutureExt::boxed(futures::future::ready(()))
+                                tracing::warn!(
+                                    reason = "non-offchain peer",
+                                    "cannot notify timeout for non-offchain peer"
+                                );
                             }
-                        } else {
-                            // If the eviction cause is not expiration, nothing needs to be done
-                            futures::FutureExt::boxed(futures::future::ready(()))
+                        };
+
+                        if let NodeId::Offchain(opk) = peer.as_ref() {
+                            let opk: OffchainPublicKey = *opk;
+                            store.record_edge::<NeighborTelemetry, PathTelemetry>(
+                                hopr_api::graph::MeasurableEdge::Probe(Err(
+                                    NetworkGraphError::ProbeNeighborTimeout(Box::new(opk)),
+                                )),
+                            );
                         }
-                    },
-                )
+                    }
+                })
                 .build();
 
-        let active_path_probes: moka::future::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)> =
-            moka::future::Cache::builder()
+        let active_path_probes: moka::sync::Cache<Tag, (PathTelemetry, Arc<AllocatedTag>)> =
+            moka::sync::Cache::builder()
                 .time_to_live(timeout)
                 .max_capacity(100_000)
-                .async_eviction_listener(
-                    move |tag: Arc<Tag>,
-                          (path, _allocated_tag): (PathTelemetry, Arc<AllocatedTag>),
-                          cause|
-                          -> moka::notification::ListenerFuture {
-                        if matches!(cause, moka::notification::RemovalCause::Expired) {
-                            // If the eviction cause is expiration => record as a failed probe
-                            let store = network_graph_internal_path.clone();
+                .eviction_listener(move |tag: Arc<Tag>, (path, _allocated_tag): (PathTelemetry, Arc<AllocatedTag>), cause| {
+                    if matches!(cause, moka::notification::RemovalCause::Expired) {
+                        // If the eviction cause is expiration => record as a failed probe
+                        let store = network_graph_internal_path.clone();
 
-                            tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
+                        tracing::debug!(%tag, reason = "timeout", "loopback probe failed");
 
-                            store.record_edge::<NeighborTelemetry, PathTelemetry>(
-                                hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(
-                                    path,
-                                ))),
-                            );
-                            futures::FutureExt::boxed(futures::future::ready(()))
-                        } else {
-                            // If the eviction cause is not expiration, nothing needs to be done
-                            futures::FutureExt::boxed(futures::future::ready(()))
-                        }
-                    },
-                )
+                        store.record_edge::<NeighborTelemetry, PathTelemetry>(
+                            hopr_api::graph::MeasurableEdge::Probe(Err(NetworkGraphError::ProbeLoopbackTimeout(path))),
+                        );
+                    }
+                })
                 .build();
 
         let push_to_network = api_out.clone();
@@ -356,16 +331,14 @@ impl Probe {
                                         if let Err(_error) = push_to_network.send((routing, data)).await {
                                             tracing::error!("failed to send out a ping");
                                         } else {
-                                            active_neighbor_probes
-                                                .insert(
-                                                    (
-                                                        pseudonym
-                                                            .expect("the pseudonym must be present in Forward routing"),
-                                                        nonce,
-                                                    ),
-                                                    (destination, current_time().as_unix_timestamp(), notifier),
-                                                )
-                                                .await;
+                                            active_neighbor_probes.insert(
+                                                (
+                                                    pseudonym
+                                                        .expect("the pseudonym must be present in Forward routing"),
+                                                    nonce,
+                                                ),
+                                                (destination, current_time().as_unix_timestamp(), notifier),
+                                            );
                                         }
                                     } else {
                                         tracing::error!("failed to convert ping message into data");
@@ -414,8 +387,7 @@ impl Probe {
                                                 // the object is constructed above, so will always match
                                                 if let Message::Telemetry(telemetry) = message {
                                                     active_path_probes
-                                                        .insert(tag_value.into(), (telemetry, Arc::new(allocated_tag)))
-                                                        .await;
+                                                    .insert(tag_value.into(), (telemetry, Arc::new(allocated_tag)));
                                                 }
                                             }
                                         } else {

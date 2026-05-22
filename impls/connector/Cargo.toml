@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.20.0"
+version = "0.20.1"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -26,7 +26,8 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
 hex = { workspace = true, optional = true }
-moka = { workspace = true, features = ["future", "sync"] }
+async-lock = { workspace = true }
+moka = { workspace = true, features = ["sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
 postcard = { workspace = true }

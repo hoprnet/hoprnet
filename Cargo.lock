@@ -3476,11 +3476,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.20.0"
+version = "0.20.1"
 dependencies = [
  "ahash",
  "anyhow",
  "async-broadcast",
+ "async-lock",
  "async-trait",
  "atomic_enum",
  "blokli-client",
@@ -3561,7 +3562,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-immediate"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "futures",
@@ -3835,7 +3836,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.29.2"
+version = "0.29.3"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3943,7 +3944,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",

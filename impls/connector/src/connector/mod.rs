@@ -13,7 +13,7 @@ use petgraph::prelude::DiGraphMap;
 
 use crate::{
     backend::Backend,
-    connector::{keys::HoprKeyMapper, sequencer::TransactionSequencer, values::CHAIN_INFO_CACHE_KEY},
+    connector::{keys::HoprKeyMapper, sequencer::TransactionSequencer},
     errors::ConnectorError,
     utils::{
         ParsedChainInfo, model_to_account_entry, model_to_graph_entry, model_to_ticket_params,
@@ -122,8 +122,8 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     channel_by_id: moka::sync::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
     // Fast retrieval of channel entries by parties
     channel_by_parties: moka::sync::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
-    // Contains chain info (no TTL - kept fresh by subscription handler)
-    values: moka::future::Cache<u32, ParsedChainInfo>,
+    // Contains chain info (no TTL - kept fresh by subscription handler; reset only on reconnect)
+    values: std::sync::Arc<async_lock::OnceCell<parking_lot::RwLock<ParsedChainInfo>>>,
     // Ticket values (winning probability, price), kept fresh by subscription handler
     // Set only when connected
     ticket_values: std::sync::Arc<parking_lot::RwLock<Option<(WinningProbability, HoprBalance)>>>,
@@ -192,7 +192,7 @@ where
                 .time_to_idle(DEFAULT_CACHE_TIMEOUT)
                 .build_with_hasher(ahash::RandomState::default()),
             // No TTL: kept fresh by the Blokli subscription handler
-            values: moka::future::CacheBuilder::new(1).build(),
+            values: std::sync::Arc::new(async_lock::OnceCell::new()),
             ticket_values: Default::default(),
         }
     }
@@ -235,7 +235,7 @@ where
         let graph = self.graph.clone();
         let event_tx = self.events.0.clone();
         let me = self.chain_key.public().to_address();
-        let values_cache = self.values.clone();
+        let values_cell = self.values.clone();
 
         let chain_to_packet = self.chain_to_packet.clone();
         let packet_to_chain = self.packet_to_chain.clone();
@@ -360,47 +360,30 @@ where
                     }
                 })
                 .and_then(|(new_ticket_price, new_win_prob)| {
-                    let values_cache = values_cache.clone();
+                    let values_cell = values_cell.clone();
                     async move {
                         let mut events = Vec::<SubscribedEventType>::new();
-                        values_cache
-                            .entry(CHAIN_INFO_CACHE_KEY)
-                            .and_compute_with(|cached_entry| {
-                                futures::future::ready(match cached_entry {
-                                    Some(chain_info) => {
-                                        let mut chain_info = chain_info.into_value();
-                                        if chain_info.ticket_price != new_ticket_price {
-                                            events.push(SubscribedEventType::TicketPrice((
-                                                new_ticket_price,
-                                                Some(chain_info.ticket_price),
-                                            )));
-                                            chain_info.ticket_price = new_ticket_price;
-                                        }
-                                        if !chain_info.ticket_win_prob.approx_eq(&new_win_prob) {
-                                            events.push(SubscribedEventType::WinningProbability((
-                                                new_win_prob,
-                                                Some(chain_info.ticket_win_prob),
-                                            )));
-                                            chain_info.ticket_win_prob = new_win_prob;
-                                        }
-
-                                        if !events.is_empty() {
-                                            moka::ops::compute::Op::Put(chain_info)
-                                        } else {
-                                            moka::ops::compute::Op::Nop
-                                        }
-                                    }
-                                    None => {
-                                        tracing::warn!(
-                                            "chain info not present in the cache before ticket params update"
-                                        );
-                                        events.push(SubscribedEventType::TicketPrice((new_ticket_price, None)));
-                                        events.push(SubscribedEventType::WinningProbability((new_win_prob, None)));
-                                        moka::ops::compute::Op::Nop
-                                    }
-                                })
-                            })
-                            .await;
+                        if let Some(lock) = values_cell.get() {
+                            let mut chain_info = lock.write();
+                            if chain_info.ticket_price != new_ticket_price {
+                                events.push(SubscribedEventType::TicketPrice((
+                                    new_ticket_price,
+                                    Some(chain_info.ticket_price),
+                                )));
+                                chain_info.ticket_price = new_ticket_price;
+                            }
+                            if !chain_info.ticket_win_prob.approx_eq(&new_win_prob) {
+                                events.push(SubscribedEventType::WinningProbability((
+                                    new_win_prob,
+                                    Some(chain_info.ticket_win_prob),
+                                )));
+                                chain_info.ticket_win_prob = new_win_prob;
+                            }
+                        } else {
+                            tracing::warn!("chain info not present before ticket params update");
+                            events.push(SubscribedEventType::TicketPrice((new_ticket_price, None)));
+                            events.push(SubscribedEventType::WinningProbability((new_win_prob, None)));
+                        }
                         Ok(futures::stream::iter(events).map(Ok::<_, ConnectorError>))
                     }
                 })
@@ -677,7 +660,7 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
         self.channel_by_id.invalidate_all();
         self.packet_to_chain.invalidate_all();
         self.chain_to_packet.invalidate_all();
-        self.values.invalidate_all();
+        // `values` is a OnceCell — no TTL, never evicted; chain info stays valid across reconnects.
     }
 }
 
