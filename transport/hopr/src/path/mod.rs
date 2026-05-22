@@ -5,9 +5,11 @@
 //!   network.
 //! - [`PathPlanner`]: Resolves `DestinationRouting` to `ResolvedTransportRouting`, delegating path discovery to any
 //!   [`PathSelector`][crate::path::traits::PathSelector] implementation and maintaining a `moka`-backed cache of
-//!   fully-validated `ValidatedPath` objects keyed by `(source, destination, options)`.
-//! - [`PathPlannerConfig`][crate::path::PathPlannerConfig]: Configuration for the planner's cache and background
-//!   refresh.
+//!   fully-validated `ValidatedPath` objects keyed by `(source, destination, options)`. Entries are evicted by
+//!   configurable TTL and TTI; an optional background refresh task can be spawned when
+//!   [`PathPlannerConfig::background_refresh_period`] is set.
+//! - [`PathPlannerConfig`][crate::path::PathPlannerConfig]: Configuration for the planner's cache (TTL, TTI, size cap)
+//!   and optional background refresh.
 
 pub mod errors;
 pub mod planner;

@@ -43,14 +43,15 @@ pub trait PathSelector {
 
 /// A selector that can run a background path-cache refresh loop.
 ///
-/// Implementors pre-warm their internal caches on a periodic schedule,
-/// so that steady-state traffic is always served without a blocking query.
-///
-/// The returned future is `'static` because it is intended to be
-/// spawned as a long-lived background task.
+/// The returned future is `'static` because it is intended to be spawned as a
+/// long-lived background task. Callers should only spawn it when the deployment
+/// opts in via [`crate::path::PathPlannerConfig::background_refresh_period`].
 pub trait BackgroundPathCacheRefreshable: Send + Sync {
-    /// Returns a future that runs the periodic cache-refresh loop.
+    /// Returns a future that runs a periodic cache-refresh loop at the given `period`.
     ///
     /// The future never completes under normal operation.
-    fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static;
+    fn run_background_refresh(
+        &self,
+        period: std::time::Duration,
+    ) -> impl std::future::Future<Output = ()> + Send + 'static;
 }

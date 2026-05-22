@@ -512,12 +512,14 @@ where
 
         let mixing_channel_tx = hopr_transport_mixer::MixerSink::new(wire_msg_tx, build_mixer_cfg_from_env());
 
-        // -- path cache background refresh (only when tokio runtime is available)
+        // -- path cache background refresh (only when tokio runtime is available and configured)
         #[cfg(feature = "runtime-tokio")]
-        processes.insert(
-            HoprTransportProcess::PathRefresh,
-            hopr_utils::spawn_as_abortable!(self.path_planner.run_background_refresh()),
-        );
+        if let Some(period) = self.cfg.path_planner.background_refresh_period {
+            processes.insert(
+                HoprTransportProcess::PathRefresh,
+                hopr_utils::spawn_as_abortable!(self.path_planner.run_background_refresh(period)),
+            );
+        }
 
         processes.insert(
             HoprTransportProcess::Medium,

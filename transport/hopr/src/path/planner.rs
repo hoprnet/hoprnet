@@ -28,19 +28,41 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+fn validate_planner_config(cfg: &PathPlannerConfig) -> std::result::Result<(), ValidationError> {
+    if let Some(period) = cfg.background_refresh_period {
+        if period >= cfg.cache_time_to_idle {
+            return Err(ValidationError::new(
+                "background_refresh_period must be strictly less than cache_time_to_idle",
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Configuration for [`PathPlanner`]'s internal path cache.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
+#[validate(schema(function = "validate_planner_config"))]
 pub struct PathPlannerConfig {
     /// Maximum number of `(source, destination, options)` entries in the path cache.
     #[default = 10_000]
     pub max_cache_capacity: u64,
-    /// Time-to-live for a cached path list.  When an entry expires the next
-    /// [`PathPlanner::resolve_routing`] call transparently recomputes it (lazy refresh).
-    #[default(Duration::from_secs(60))]
-    pub cache_ttl: Duration,
-    /// Period between proactive background cache-refresh sweeps.
-    #[default(Duration::from_secs(30))]
-    pub refresh_period: Duration,
+    /// Absolute time-to-live for a cached entry, regardless of access frequency.
+    /// On expiry, the next [`PathPlanner::resolve_routing`] call transparently recomputes
+    /// the entry via the selector.
+    #[default(Duration::from_secs(15))]
+    pub cache_time_to_live: Duration,
+    /// Time-to-idle: evict an entry that has not been read for this long.
+    /// When background refresh is disabled, this is the primary eviction mechanism
+    /// for idle-traffic keys.
+    #[default(Duration::from_secs(5))]
+    pub cache_time_to_idle: Duration,
+    /// Optional period for the background cache-refresh task (via
+    /// [`BackgroundPathCacheRefreshable`]). `None` (default) disables the task entirely —
+    /// eviction is purely TTL + TTI driven. When `Some(period)`, the period must satisfy
+    /// `period < cache_time_to_idle`; callers are expected to only spawn the task when
+    /// this is `Some`.
+    #[default(None)]
+    pub background_refresh_period: Option<Duration>,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
     #[default = 8]
@@ -85,8 +107,8 @@ type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<Validate
 /// cache. On a cache hit a candidate is picked via weighted random selection (higher
 /// cost = higher quality = higher probability).
 ///
-/// A background sweep (`background_refresh`) can be spawned to
-/// proactively re-warm the cache for all previously-seen keys.
+/// An optional background refresh task (see [`BackgroundPathCacheRefreshable`]) can be
+/// spawned when [`PathPlannerConfig::background_refresh_period`] is configured.
 #[derive(Clone)]
 pub struct PathPlanner<Surb, R, S> {
     me: OffchainPublicKey,
@@ -94,7 +116,6 @@ pub struct PathPlanner<Surb, R, S> {
     resolver: Arc<R>,
     selector: Arc<S>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
-    refresh_period: Duration,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -109,7 +130,8 @@ where
     pub fn new(me: OffchainPublicKey, surb_store: Surb, resolver: R, selector: S, config: PathPlannerConfig) -> Self {
         let cache = moka::future::Cache::builder()
             .max_capacity(config.max_cache_capacity)
-            .time_to_live(config.cache_ttl)
+            .time_to_live(config.cache_time_to_live)
+            .time_to_idle(config.cache_time_to_idle)
             .build();
 
         Self {
@@ -118,7 +140,6 @@ where
             resolver: Arc::new(resolver),
             selector: Arc::new(selector),
             cache,
-            refresh_period: config.refresh_period,
         }
     }
 
@@ -320,85 +341,83 @@ where
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + Send + Sync + 'static,
 {
-    /// Returns a future that runs the background path-cache refresh loop.
-    ///
-    /// The returned future iterates over all keys currently in the planner's cache
-    /// and recomputes their paths on a configurable schedule, so that steady-state
-    /// traffic is always served from cache.
-    fn run_background_refresh(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
-        // Clone only the fields we need — avoids requiring R: Clone + S: Clone.
+    fn run_background_refresh(&self, period: Duration) -> impl std::future::Future<Output = ()> + Send + 'static {
+        // The returned future is `'static` — clone the three Arc fields once here,
+        // move them into the async block, then borrow inside the loop.
         let cache = self.cache.clone();
         let resolver = self.resolver.clone();
         let selector = self.selector.clone();
-        let refresh_period = self.refresh_period;
 
-        // run at a non-zero interval
-        futures_time::stream::interval(futures_time::time::Duration::from_millis(
-            refresh_period.as_millis() as u64 + 1u64,
-        ))
-        .for_each(move |_| {
-            let cache = cache.clone();
-            let resolver = resolver.clone();
-            let selector = selector.clone();
+        async move {
+            let mut ticker = futures_time::stream::interval(futures_time::time::Duration::from_millis(
+                period.as_millis() as u64 + 1u64,
+            ));
 
-            async move {
-                for (key, _) in cache.iter() {
-                    let (src, dest, hops_u32) = {
-                        let k = key.as_ref();
-                        (k.0, k.1, k.2)
-                    };
+            let chain_resolver = ChainPathResolver::from(&*resolver);
+            let selector_ref = &*selector;
+            let cache_ref = &cache;
 
+            while ticker.next().await.is_some() {
+                // Snapshot keys only; iter() yields (Arc<K>, V) — deref Arc<K> into the
+                // Copy PlannerCacheKey tuple and discard V immediately.
+                let keys: Vec<PlannerCacheKey> = cache_ref.iter().map(|(k, _v)| *k.as_ref()).collect();
+
+                for (src, dest, hops_u32) in keys {
                     if hops_u32 == 0 {
                         continue;
                     }
                     let hops_usize = hops_u32 as usize;
 
-                    let resolve_key = |node: NodeId| {
-                        let resolver = resolver.clone();
-
-                        async move {
-                            match node {
-                                NodeId::Offchain(k) => Some(k),
-                                NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
-                                    .resolve_transport_address(&addr)
-                                    .await
-                                    .ok()
-                                    .flatten(),
-                            }
-                        }
+                    let src_key = match src {
+                        NodeId::Offchain(k) => k,
+                        NodeId::Chain(addr) => match chain_resolver.resolve_transport_address(&addr).await {
+                            Ok(Some(k)) => k,
+                            _ => continue,
+                        },
+                    };
+                    let dest_key = match dest {
+                        NodeId::Offchain(k) => k,
+                        NodeId::Chain(addr) => match chain_resolver.resolve_transport_address(&addr).await {
+                            Ok(Some(k)) => k,
+                            _ => continue,
+                        },
                     };
 
-                    if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await)
-                        && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
-                    {
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for pwc in candidates {
-                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "background refresh: skipping candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
-                                }
-                                Err(e) => tracing::warn!(error = %e, "background refresh: path candidate failed validation"),
-                            }
-                        }
+                    let Ok(candidates) = selector_ref.select_path(src_key, dest_key, hops_usize) else {
+                        continue;
+                    };
 
-                        if !valid_paths.is_empty() {
-                            cache
-                                .insert(
-                                    (src, dest, hops_u32),
-                                    Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
-                                )
-                                .await;
+                    let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                    for pwc in candidates {
+                        let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect();
+                        match ValidatedPath::new(src, node_ids, &chain_resolver).await {
+                            Ok(vp) => {
+                                if vp
+                                    .chain_path()
+                                    .iter()
+                                    .enumerate()
+                                    .any(|(i, a)| vp.chain_path()[..i].contains(a))
+                                {
+                                    tracing::debug!(path = %vp, "background refresh: skipping repeated chain addresses");
+                                    continue;
+                                }
+                                valid_paths.push((vp, pwc.cost));
+                            }
+                            Err(e) => tracing::warn!(error = %e, "background refresh: candidate failed validation"),
                         }
+                    }
+
+                    if !valid_paths.is_empty() {
+                        cache_ref
+                            .insert(
+                                (src, dest, hops_u32),
+                                Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
+                            )
+                            .await;
                     }
                 }
             }
-        })
+        }
     }
 }
 
@@ -590,8 +609,9 @@ mod tests {
     fn small_config() -> PathPlannerConfig {
         PathPlannerConfig {
             max_cache_capacity: 100,
-            cache_ttl: std::time::Duration::from_secs(60),
-            refresh_period: std::time::Duration::from_secs(60),
+            cache_time_to_live: std::time::Duration::from_secs(60),
+            cache_time_to_idle: std::time::Duration::from_secs(30),
+            background_refresh_period: None,
             max_cached_paths: 2,
             ..PathPlannerConfig::default()
         }
@@ -851,7 +871,38 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
-        // Just ensure it compiles and produces a future.
-        let _future = planner.run_background_refresh();
+        let _future = planner.run_background_refresh(std::time::Duration::from_secs(30));
+    }
+
+    #[test]
+    fn validate_rejects_refresh_period_geq_tti() {
+        use validator::Validate;
+
+        let bad = PathPlannerConfig {
+            background_refresh_period: Some(std::time::Duration::from_secs(5)),
+            cache_time_to_idle: std::time::Duration::from_secs(5),
+            ..PathPlannerConfig::default()
+        };
+        assert!(bad.validate().is_err(), "period == tti should fail validation");
+
+        let also_bad = PathPlannerConfig {
+            background_refresh_period: Some(std::time::Duration::from_secs(10)),
+            cache_time_to_idle: std::time::Duration::from_secs(5),
+            ..PathPlannerConfig::default()
+        };
+        assert!(also_bad.validate().is_err(), "period > tti should fail validation");
+
+        let ok = PathPlannerConfig {
+            background_refresh_period: Some(std::time::Duration::from_secs(4)),
+            cache_time_to_idle: std::time::Duration::from_secs(5),
+            ..PathPlannerConfig::default()
+        };
+        assert!(ok.validate().is_ok(), "period < tti should pass validation");
+    }
+
+    #[test]
+    fn validate_accepts_none_refresh_period() {
+        use validator::Validate;
+        assert!(PathPlannerConfig::default().validate().is_ok());
     }
 }
