@@ -4,7 +4,7 @@ use hopr_types::{
 };
 
 use crate::{
-    CoefficientIndex, GeneratedShare, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
+    CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
     SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 
@@ -20,6 +20,9 @@ use crate::{
 #[auto_impl::auto_impl(&, Arc, Box)]
 pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
+    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>) -> Result<PixGroup<S>, Self::Error>;
 
     /// Adds the client commitment data.
     ///

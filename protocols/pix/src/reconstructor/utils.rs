@@ -10,16 +10,16 @@ use crate::{
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
 pub struct SsaBuilder<S: PixSpec> {
-    pub commitment: PixGroup<S>,
+    pub full_commitment: PixGroup<S>,
     num_polys: usize,
     builder: PixScalar<S>,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
-    pub fn new(commitment: PixGroup<S>, num_polys: usize) -> Self {
+    pub fn new(full_commitment: PixGroup<S>, exit_secret_scalar: PixScalar<S>, num_polys: usize) -> Self {
         Self {
-            commitment,
-            builder: PixScalar::<S>::default(),
+            full_commitment,
+            builder: exit_secret_scalar,
             num_polys,
         }
     }
@@ -34,7 +34,7 @@ impl<S: PixSpec> SsaBuilder<S> {
             }
         }
 
-        if self.commitment == (PixGroup::<S>::generator() * self.builder) {
+        if self.full_commitment == (PixGroup::<S>::generator() * self.builder) {
             Ok(Some(self.builder))
         } else {
             Err(errors::PixError::InvalidSsa)
@@ -92,19 +92,33 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     num_polys: usize,
     committed_polynomials: std::collections::HashMap<PolynomialIndex, CommittedPolynomial<S>>,
     complete: bool,
-    ssa_committed: Option<PixGroup<S>>,
+    exit_commitment_secret: PixScalar<S>,
+    exit_commitment_public: PixGroup<S>,
+    full_ssa_commitment: Option<PixGroup<S>>,
 }
 
 impl<S: PixSpec> SsaCommitmentBuilder<S> {
-    pub fn new(id: SsaId<S::Pseudonym>, poly_threshold: usize, num_polys: usize) -> Self {
+    pub fn new(
+        id: SsaId<S::Pseudonym>,
+        poly_threshold: usize,
+        num_polys: usize,
+        exit_commitment_secret: PixScalar<S>,
+        exit_commitment_public: PixGroup<S>,
+    ) -> Self {
         Self {
             id,
             poly_threshold,
             num_polys,
+            exit_commitment_secret,
+            exit_commitment_public,
             committed_polynomials: std::collections::HashMap::new(),
             complete: false,
-            ssa_committed: None,
+            full_ssa_commitment: None,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.committed_polynomials.is_empty()
     }
 
     pub fn add_transposed(
@@ -170,20 +184,24 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .map(|v| v.map(SsaPartBuilder::new))
                 .collect::<errors::Result<Vec<_>>>()?;
 
-            // Full SSA commitment is the sum of all constant term commitments on all polynomials
-            let full_ssa_commitment: PixGroup<S> =
+            // Full client SSA commitment is the sum of all constant term commitments on all polynomials
+            let client_ssa_commitment: PixGroup<S> =
                 complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
-            tracing::debug!(id = %self.id, commitment = hex::encode(full_ssa_commitment.to_bytes()), "SSA client commitment");
+            tracing::debug!(id = %self.id, commitment = hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
 
             Ok(CommitmentResult::Completed(
-                SsaBuilder::new(full_ssa_commitment, self.num_polys),
+                SsaBuilder::new(
+                    client_ssa_commitment + self.exit_commitment_public,
+                    self.exit_commitment_secret,
+                    self.num_polys,
+                ),
                 complete_ssa_verifier,
             ))
-        } else if self.ssa_committed.is_none() && all_constant_terms_committed {
+        } else if self.full_ssa_commitment.is_none() && all_constant_terms_committed {
             // Check if we already have at least all the constant term commitments on all polynomials.
             tracing::debug!("SSA commitment is complete");
 
-            let full_ssa_commitment = self
+            let client_ssa_commitment = self
                 .committed_polynomials
                 .values()
                 .map(|p| p.get(&0).expect("constant term must be present"))
@@ -193,9 +211,10 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 })
                 .sum::<errors::Result<PixGroup<S>>>()?;
 
-            self.ssa_committed = Some(full_ssa_commitment);
+            let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
+            self.full_ssa_commitment = Some(full_ssa_commitment);
             Ok(CommitmentResult::SsaCommitmentDone(full_ssa_commitment))
-        } else if let Some(ssa_committed) = self.ssa_committed.as_ref() {
+        } else if let Some(ssa_committed) = self.full_ssa_commitment.as_ref() {
             Ok(CommitmentResult::StillIncomplete(*ssa_committed))
         } else {
             Ok(CommitmentResult::NotEnoughCommitments)

@@ -17,8 +17,8 @@ use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa,
-    SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
+    RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -721,6 +721,10 @@ pub struct NopExitAcknowledgementShareProcessor;
 
 impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementShareProcessor {
     type Error = std::convert::Infallible;
+
+    fn new_exit_commitment(&self, _: SsaId<HoprPseudonym>) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+        Ok(PixGroup::<HoprPixSpec>::default())
+    }
 
     #[inline]
     fn insert_coefficient_commitments(

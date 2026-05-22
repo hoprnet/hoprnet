@@ -34,7 +34,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let peer = OffchainKeypair::random();
 
     let SsaCommitment {
-        ssa_commitment,
+        ssa_commitment: client_commitment,
         verifiers,
         ..
     } = generator.new_ssa_commitment(&pseudonym)?;
@@ -53,24 +53,26 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
+    let server_commitment = reconstructor.new_exit_commitment(ssa_id)?;
+
     // In the transposed form, remove the first coefficient commitments of all polynomials
     let mut first_coeffs = transposed.remove(&0).unwrap();
 
     // Remove the first polynomial completely
     let remainder = first_coeffs.remove(&0).unwrap();
 
-    // Insert all first coefficient commitments, except the first coefficient commitment of the first polynomial
+    // Insert all constant term commitments, except the constant term commitments of the first polynomial
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, first_coeffs.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(res.is_first_encountered);
     assert!(res.ssa_commitment.is_none());
     assert!(!res.is_verifiable);
 
-    // Now add the first coefficient commitment of the first polynomial
+    // Now add the constant term commitments of the first polynomial
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::from([(0, remainder)]).into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+    assert_eq!(Some(client_commitment + server_commitment), res.ssa_commitment);
     assert!(!res.is_verifiable);
 
     // Add all the remaining coefficient commitments for all polynomials except one
@@ -80,7 +82,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
             reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_coeff_commitments.into_iter())?;
         assert_eq!(ssa_id, res.ssa_id);
         assert!(!res.is_first_encountered);
-        assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+        assert_eq!(Some(client_commitment + server_commitment), res.ssa_commitment);
         assert!(!res.is_verifiable);
     }
 
@@ -88,7 +90,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(ssa_commitment), res.ssa_commitment);
+    assert_eq!(Some(client_commitment + server_commitment), res.ssa_commitment);
     assert!(res.is_verifiable);
 
     let mut acks = Vec::new();
@@ -119,7 +121,10 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     assert!(!res.is_empty());
 
     assert_eq!(res[0].ssa_id, ssa_id);
-    assert_eq!(PixGroup::<TestSpec>::mul_by_generator(&res[0].ssa), ssa_commitment);
+    assert_eq!(
+        PixGroup::<TestSpec>::mul_by_generator(&res[0].ssa),
+        client_commitment + server_commitment
+    );
 
     Ok(())
 }

@@ -5,10 +5,11 @@ use hopr_types::{
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
+use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
 
 use crate::{
-    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, ExitAcknowledgementShareProcessor, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
+    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, ExitAcknowledgementShareProcessor, PixGroup,
+    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
@@ -147,6 +148,28 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
     type Error = PixError;
 
+    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>) -> Result<PixGroup<S>, Self::Error> {
+        let exit_commitment_secret = PixScalar::<S>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+        let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
+
+        self.commitment_builder
+            .entry(id)
+            .and_try_compute_with(|entry| match entry {
+                Some(_) => Err(PixError::DuplicateCommitment),
+                None => Ok(moka::ops::compute::Op::Put(std::sync::Arc::new(
+                    parking_lot::Mutex::new(SsaCommitmentBuilder::new(
+                        id,
+                        self.cfg.poly_threshold,
+                        self.cfg.polys_per_ssa,
+                        exit_commitment_secret,
+                        exit_commitment_public,
+                    )),
+                ))),
+            })?;
+
+        Ok(exit_commitment_public)
+    }
+
     fn insert_coefficient_commitments(
         &self,
         ssa_id: SsaId<S::Pseudonym>,
@@ -154,20 +177,17 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> Result<SsaCommitmentState<S>, Self::Error> {
         let mut res = SsaCommitmentState::new(ssa_id);
-        res.is_first_encountered = false;
 
-        let maybe_complete_ssa_commitment = self
-            .commitment_builder
-            .get_with(ssa_id, || {
-                res.is_first_encountered = true;
-                std::sync::Arc::new(parking_lot::Mutex::new(SsaCommitmentBuilder::new(
-                    ssa_id,
-                    self.cfg.poly_threshold,
-                    self.cfg.polys_per_ssa,
-                )))
-            })
-            .lock()
-            .add_transposed(index, commitments)?;
+        // The Server commitment must be present first
+        let Some(builder) = self.commitment_builder.get(&ssa_id) else {
+            return Err(PixError::MissingSsaCommitment);
+        };
+
+        let maybe_complete_ssa_commitment = {
+            let mut builder = builder.lock();
+            res.is_first_encountered = builder.is_empty();
+            builder.add_transposed(index, commitments)?
+        };
 
         match maybe_complete_ssa_commitment {
             CommitmentResult::NotEnoughCommitments => {
@@ -177,7 +197,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 res.ssa_commitment = Some(commitment);
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
-                let commitment = ssa_builder.commitment;
+                let commitment = ssa_builder.full_commitment;
                 self.ssa_builders
                     .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
 
@@ -265,6 +285,8 @@ mod tests {
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
+        reconstructor.new_exit_commitment(ssa_id)?;
+
         // 1. Invalid coefficient index (>= threshold)
         let result = reconstructor.insert_coefficient_commitments(
             ssa_id,
@@ -283,6 +305,28 @@ mod tests {
     }
 
     #[test]
+    fn reconstructor_should_not_accept_client_commitments_without_priod_exit_commitment() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            polys_per_ssa: 2,
+            poly_threshold: 2,
+            ..Default::default()
+        });
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+
+        let mut poly_map = HashMap::new();
+        for poly in 0..2 {
+            poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        }
+
+        let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map.into_iter());
+
+        assert!(matches!(res, Err(PixError::MissingSsaCommitment)));
+
+        Ok(())
+    }
+
+    #[test]
     fn reconstructor_duplicate_commitments() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
             polys_per_ssa: 2,
@@ -291,6 +335,8 @@ mod tests {
         });
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+
+        reconstructor.new_exit_commitment(ssa_id)?;
 
         // Fill all commitments
         for coeff in 0..2 {
@@ -325,6 +371,8 @@ mod tests {
 
         let peer = OffchainKeypair::random();
         let nonce = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
+
+        reconstructor.new_exit_commitment(ssa_id)?;
 
         reconstructor.insert_encrypted_share(
             peer.public(),
