@@ -45,6 +45,10 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    /// Global configuration for the PIX.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub pix: PixGlobalConfig,
     /// Path planner configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -59,6 +63,44 @@ pub struct HoprProtocolConfig {
         serde(default = "default_counter_flush_interval", with = "humantime_serde")
     )]
     pub counter_flush_interval: Duration,
+}
+
+/// Global configuration for the Protocol for Incentivization of eXits (PIX).
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct PixGlobalConfig {
+    /// Number of parts an SSA is split into.
+    ///
+    /// This scales will with the CPU parallelism.
+    ///
+    /// Default is 4096.
+    #[validate(range(min = 8, max = 32384))]
+    #[default(4096)]
+    pub num_ssa_parts: usize,
+
+    /// Number of shares required to reconstruct an SSA part.
+    ///
+    /// This does not scale well with CPU parallelism.
+    ///
+    /// Default is 128.
+    #[validate(range(min = 2, max = 4096))]
+    #[default(128)]
+    pub ssa_part_size: usize,
+
+    /// Number of shares sent in addition to `ssa_part_size` to reconstruct an SSA part.
+    ///
+    /// This is used to account for potential packet loss but makes it take longer for the
+    /// other side to reconstruct the entire SSA from all its parts. This is because if
+    /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
+    ///
+    /// Default is 64.
+    #[validate(range(min = 0, max = 4096))]
+    #[default(64)]
+    pub additional_shares: usize,
 }
 
 /// Configuration of the HOPR packet pipeline.

@@ -19,9 +19,7 @@ pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SA
 pub use hopr_protocol_session::AcknowledgementMode;
 use hopr_types::internal::routing::RoutingOptions;
 pub use hopr_utils::network_types::types::*;
-pub use manager::{
-    DispatchResult, MIN_SURB_BUFFER_DURATION, PixConfig, PixToolbox, SessionManager, SessionManagerConfig,
-};
+pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{

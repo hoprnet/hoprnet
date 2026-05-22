@@ -80,9 +80,7 @@ pub use hopr_transport_session::{
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-use hopr_transport_session::{
-    DispatchResult, HoprSessionPixEvent, PixConfig, PixToolbox, SessionManager, SessionManagerConfig,
-};
+use hopr_transport_session::{DispatchResult, HoprSessionPixEvent, PixToolbox, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
@@ -359,7 +357,6 @@ where
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
-                    pix_config: Some(PixConfig::default()),
                 },
                 session_tag_allocator,
             )),
@@ -686,7 +683,11 @@ where
             .channel;
 
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
-            hopr_protocol_pix::SsaGeneratorConfig::default(),
+            hopr_protocol_pix::SsaGeneratorConfig {
+                polynomials_per_ssa: self.cfg.pix.num_ssa_parts,
+                threshold: self.cfg.pix.ssa_part_size,
+                surplus_shares: self.cfg.pix.additional_shares,
+            },
         ));
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
@@ -708,7 +709,11 @@ where
             && let Some(ssa_events) = exit_ack_share
         {
             let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                hopr_protocol_pix::SsaReconstructorConfig::default(),
+                hopr_protocol_pix::SsaReconstructorConfig {
+                    polys_per_ssa: self.cfg.pix.num_ssa_parts,
+                    poly_threshold: self.cfg.pix.ssa_part_size,
+                    ..Default::default()
+                },
             ));
 
             let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());

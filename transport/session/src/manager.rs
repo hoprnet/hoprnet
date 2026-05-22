@@ -159,21 +159,6 @@ pub enum DispatchResult {
     Unrelated(ApplicationDataIn),
 }
 
-/// Configuration for the PIX protocol.
-#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
-pub struct PixConfig {
-    /// Number of polynomials per SSA.
-    ///
-    /// Default is 4096
-    #[default(4096)]
-    pub polys_per_ssa: usize,
-    /// Number of shares required to reconstruct a single polynomial.
-    ///
-    /// Default is 128.
-    #[default(128)]
-    pub poly_threshold: usize,
-}
-
 /// Configuration for the [`SessionManager`].
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
@@ -260,13 +245,7 @@ pub struct SessionManagerConfig {
     /// Default is true.
     #[default(true)]
     pub surb_target_notify: bool,
-    /// Configuration for the PIX protocol.
-    ///
-    /// If not set, the Session manager will not support the usage of PIX protocol.
-    ///
-    /// Default is set to [`PixConfig::default()`](PixConfig).
-    #[default(Some(PixConfig::default()))]
-    pub pix_config: Option<PixConfig>,
+    // TODO: add session specific PIX config? (other than the global one)
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -1569,7 +1548,11 @@ where
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }
             }
-            HoprStartProtocol::SsaCommit(_) | HoprStartProtocol::SsaRequest(_) => {
+            HoprStartProtocol::SsaCommit(_) => {
+                // TODO: implement PIX message handlers here
+                unimplemented!()
+            }
+            HoprStartProtocol::SsaRequest(_) => {
                 // TODO: implement PIX message handlers here
                 unimplemented!()
             }
