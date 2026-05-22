@@ -118,7 +118,12 @@ where
             let sleep_for = next_release.saturating_duration_since(now);
 
             if sleep_for.is_zero() {
-                continue;
+                // Reachable only because inner.poll_ready returned Pending earlier in
+                // this poll (we pushed the item back with release_at = now). The inner
+                // sink already registered its waker via that poll_ready call, and any
+                // items it had buffered were flushed by the poll_flush call above —
+                // delegate to the lower sink's wake-up signal and yield.
+                return Poll::Pending;
             }
 
             this.timer.reset(sleep_for);
