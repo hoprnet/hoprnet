@@ -32,7 +32,7 @@ const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::fro
 
 /// Timeout for sending a single message into the per-peer mpsc buffer.
 /// If the buffer stays full for longer than this, the message is dropped.
-const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
+const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(25);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
 /// Default pending-write-buffer byte threshold on the framed writer before a flush is

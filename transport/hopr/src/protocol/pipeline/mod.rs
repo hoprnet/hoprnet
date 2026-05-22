@@ -31,7 +31,7 @@ const DEFAULT_ACK_INPUT_CONCURRENCY: usize = 10;
 /// Default concurrency for the outgoing acknowledgement processing pipeline when not overridden
 /// via [`AcknowledgementPipelineConfig::ack_output_concurrency`].
 const DEFAULT_ACK_OUTPUT_CONCURRENCY: usize = 10;
-const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
+const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(25);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
