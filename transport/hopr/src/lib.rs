@@ -685,20 +685,51 @@ where
             hopr_utils::spawn_as_abortable!(async move {
                 use hopr_api::graph::traits::{EdgeObservableWrite, EdgeWeightType};
 
+                // One-shot yield: reschedules the task after every YIELD_EVERY upserts so
+                // graph readers (path selection, BFS, probe updates) can acquire the shared
+                // RwLock between writer acquisitions rather than being starved across the
+                // entire flush batch.
+                struct YieldNow(bool);
+                impl std::future::Future for YieldNow {
+                    type Output = ();
+
+                    fn poll(
+                        mut self: std::pin::Pin<&mut Self>,
+                        cx: &mut std::task::Context<'_>,
+                    ) -> std::task::Poll<()> {
+                        if self.0 {
+                            std::task::Poll::Ready(())
+                        } else {
+                            self.0 = true;
+                            cx.waker().wake_by_ref();
+                            std::task::Poll::Pending
+                        }
+                    }
+                }
+
+                const YIELD_EVERY: usize = 8;
+
                 futures_time::stream::interval(futures_time::time::Duration::from(flush_interval))
                     .for_each(|_| {
-                        for (peer, num_packets, num_acks) in flush_counters.drain() {
-                            tracing::trace!(
-                                %peer,
-                                num_packets,
-                                num_acks,
-                                "flushing protocol conformance counters"
-                            );
-                            flush_graph.upsert_edge(&flush_me, &peer, |obs| {
-                                obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
-                            });
+                        let entries = flush_counters.drain();
+                        let fg = flush_graph.clone();
+                        async move {
+                            for (i, (peer, num_packets, num_acks)) in entries.into_iter().enumerate() {
+                                tracing::trace!(
+                                    %peer,
+                                    num_packets,
+                                    num_acks,
+                                    "flushing protocol conformance counters"
+                                );
+                                fg.upsert_edge(&flush_me, &peer, |obs| {
+                                    obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
+                                });
+                                if (i + 1) % YIELD_EVERY == 0 {
+                                    YieldNow(false).await;
+                                }
+                            }
+                            YieldNow(false).await;
                         }
-                        futures::future::ready(())
                     })
                     .await;
             }),

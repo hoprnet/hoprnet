@@ -67,18 +67,21 @@ impl PeerProtocolCounterRegistry {
     }
 
     /// Swap all counters to 0, returning `(peer, msgs_sent, acks_received)` for non-zero entries.
+    ///
+    /// Entries with zero activity since the last call are evicted from the map so the map
+    /// stays bounded to peers that have been recently active.
     pub fn drain(&self) -> Vec<(OffchainPublicKey, u64, u64)> {
-        self.inner
-            .iter()
-            .filter_map(|entry| {
-                let (sent, received) = entry.value().take();
-                if sent > 0 || received > 0 {
-                    Some((*entry.key(), sent, received))
-                } else {
-                    None
-                }
-            })
-            .collect()
+        let mut result = Vec::new();
+        self.inner.retain(|key, counters| {
+            let (sent, received) = counters.take();
+            if sent > 0 || received > 0 {
+                result.push((*key, sent, received));
+                true
+            } else {
+                false
+            }
+        });
+        result
     }
 }
 
@@ -198,5 +201,30 @@ mod tests {
 
         let second_drain = registry.drain();
         assert!(second_drain.is_empty(), "counters should be zero after drain");
+    }
+
+    #[test]
+    fn drain_should_evict_zero_count_entries() {
+        let registry = PeerProtocolCounterRegistry::default();
+        let keys: Vec<_> = (0..100).map(|_| *OffchainKeypair::random().public()).collect();
+
+        // Insert 100 entries with no traffic recorded; drain must return empty and evict all.
+        for k in &keys {
+            registry.get_or_create(k);
+        }
+        let drained = registry.drain();
+        assert!(drained.is_empty());
+        assert_eq!(registry.inner.len(), 0, "zero-count entries must be evicted");
+
+        // Insert 100 entries, record traffic on half; drain must return only the active half.
+        for k in &keys {
+            registry.get_or_create(k);
+        }
+        for k in &keys[..50] {
+            registry.get_or_create(k).record_message_sent();
+        }
+        let drained = registry.drain();
+        assert_eq!(drained.len(), 50);
+        assert_eq!(registry.inner.len(), 50, "only the active subset must remain");
     }
 }
