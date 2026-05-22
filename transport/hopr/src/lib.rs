@@ -80,7 +80,9 @@ pub use hopr_transport_session::{
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-use hopr_transport_session::{DispatchResult, HoprSessionPixEvent, PixConfig, SessionManager, SessionManagerConfig};
+use hopr_transport_session::{
+    DispatchResult, HoprSessionPixEvent, PixConfig, PixToolbox, SessionManager, SessionManagerConfig,
+};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
@@ -694,23 +696,29 @@ where
             .surb_store(self.path_planner.surb_store.clone())
             .chain_api(self.chain_api.clone())
             .ticket_factory(ticket_factory)
-            .ssa_generator(ssa_generator)
+            .ssa_generator(ssa_generator.clone())
             .channels_dst(channels_dst)
             .with_counters(self.counters.clone())
             .with_config(self.cfg.packet);
 
-        let (session_ssa_events_tx, session_ssa_events_rx) = channel::<HoprSessionPixEvent>(1024);
+        let mut pix_toolbox = None;
 
-        let pipeline_processes = if let Some(ssa_events) = exit_ack_share {
+        // Relays and Exits nodes can receive Exit incentives and therefore can execute the PIX share reconstruction
+        let pipeline_processes = if role != protocol::NodeType::Entry
+            && let Some(ssa_events) = exit_ack_share
+        {
             let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                 hopr_protocol_pix::SsaReconstructorConfig::default(),
             ));
+
+            let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
+            pix_toolbox = Some(pix_tools);
 
             let (ssa_recovery_events_tx, ssa_recovery_events_rx) = channel(1024);
             processes.insert(
                 HoprTransportProcess::PixEvents,
                 hopr_utils::spawn_as_abortable!(
-                    session_ssa_events_rx
+                    session_pix_events
                         .map(|session_pix_event| Ok(match session_pix_event {
                             HoprSessionPixEvent::ReadyToDeposit(id, addr) =>
                                 PixEvent::NewDepositAddress((*id.pseudonym(), id.ssa_index()), addr),
@@ -736,12 +744,15 @@ where
                 ),
             );
 
+            // SsaReconstructor must be embedded into the packet pipeline, and the pipeline can emit
+            // SSA recovery events.
             let pipeline_builder =
                 pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_recovery_events_tx);
+
             match role {
                 protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
                 protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
-                protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
+                _ => unreachable!(),
             }
         } else {
             match role {
@@ -823,15 +834,12 @@ where
                 on_incoming_session.ok_or_else(|| {
                     HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
                 })?,
-                session_ssa_events_tx,
+                pix_toolbox,
             )
         } else {
             // Entry nodes cannot accept incoming Sessions nor PIX events
-            self.smgr.start(
-                unresolved_routing_msg_tx.clone(),
-                futures::sink::drain(),
-                futures::sink::drain(),
-            )
+            self.smgr
+                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain(), None)
         };
 
         smgr_start_res

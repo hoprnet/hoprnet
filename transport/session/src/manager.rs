@@ -13,8 +13,9 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket};
 use hopr_protocol_app::prelude::*;
+use hopr_protocol_pix::{SsaReconstructor, SsaShareGenerator};
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
@@ -161,9 +162,15 @@ pub enum DispatchResult {
 /// Configuration for the PIX protocol.
 #[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PixConfig {
-    #[default(1024)]
+    /// Number of polynomials per SSA.
+    ///
+    /// Default is 4096
+    #[default(4096)]
     pub polys_per_ssa: usize,
-    #[default(100)]
+    /// Number of shares required to reconstruct a single polynomial.
+    ///
+    /// Default is 128.
+    #[default(128)]
     pub poly_threshold: usize,
 }
 
@@ -270,6 +277,31 @@ type SessionNotifiers = (
     Arc<hopr_utils::runtime::prelude::Mutex<BoxSink<IncomingSession>>>,
     Sender<(SessionId, ClosureReason)>,
 );
+
+/// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
+#[derive(Clone)]
+pub struct PixToolbox {
+    share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+    share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
+    pix_events: Sender<HoprSessionPixEvent>,
+}
+
+impl PixToolbox {
+    pub fn new(
+        share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+        share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
+    ) -> (Self, impl futures::Stream<Item = HoprSessionPixEvent>) {
+        let (pix_events, pix_events_rx) = futures::channel::mpsc::channel(1024);
+        (
+            Self {
+                share_generator,
+                share_processor,
+                pix_events,
+            },
+            pix_events_rx,
+        )
+    }
+}
 
 /// Manages lifecycles of Sessions.
 ///
@@ -417,6 +449,7 @@ pub struct SessionManager<S> {
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
+    pix_toolbox: OnceLock<PixToolbox>,
     /// Tag value range for sessions, derived from the [`TagAllocator`].
     session_tag_range: Range<u64>,
     /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
@@ -433,6 +466,7 @@ impl<S> Clone for SessionManager<S> {
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
             tag_allocator: self.tag_allocator.clone(),
+            pix_toolbox: self.pix_toolbox.clone(),
             session_tag_range: self.session_tag_range.clone(),
             maximum_sessions: self.maximum_sessions,
         }
@@ -491,6 +525,7 @@ where
                     _ => {}
                 })
                 .build(),
+            pix_toolbox: OnceLock::new(),
             session_notifiers: Arc::new(OnceLock::new()),
             tag_allocator,
             session_tag_range,
@@ -502,23 +537,30 @@ where
     /// Starts the instance with the given `msg_sender` `Sink`
     /// and a channel `new_session_notifier` used to notify when a new incoming session is opened to us.
     ///
+    /// Optionally, the PIX processor and event sink can be provided for handling PIX protocol.
+    /// If not specified, the `SessionManager` will not handle PIX protocol.
+    ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
-    pub fn start<T, Pix>(
+    pub fn start<T>(
         &self,
         msg_sender: S,
         new_session_notifier: T,
-        pix_events: Pix, // TODO: make this used
+        pix: Option<PixToolbox>,
     ) -> crate::errors::Result<Vec<AbortHandle>>
     where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
-        Pix: futures::Sink<HoprSessionPixEvent> + Send + 'static,
-        Pix::Error: std::error::Error + Send + Sync + 'static,
     {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
+
+        if let Some(pix) = pix {
+            self.pix_toolbox
+                .set(pix)
+                .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        }
 
         // Re-map the user-provided sink errors to `SessionManagerError` and erase the concrete
         //  type so that the `SessionManager` does not need to be generic over it. This also avoids
@@ -1723,19 +1765,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1880,19 +1914,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -2081,19 +2107,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?);
+        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?);
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?);
+        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?);
 
         let result = alice_mgr
             .new_session(
@@ -2201,19 +2219,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?);
+        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?);
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        jhs.extend(bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?);
+        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?);
 
         let result = alice_mgr
             .new_session(
@@ -2301,11 +2311,7 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?;
+        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?;
 
         let alice_session = alice_mgr
             .new_session(
@@ -2359,19 +2365,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?;
+        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?;
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?;
+        bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?;
 
         let result = alice_mgr
             .new_session(
@@ -2399,7 +2397,7 @@ mod tests {
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
-        mgr.start(mock_packet_planning(transport), new_session_tx, futures::sink::drain())?;
+        mgr.start(mock_packet_planning(transport), new_session_tx, None)?;
 
         let pseudonym = HoprPseudonym::random();
         let result = mgr
@@ -2609,19 +2607,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(
-            mock_packet_planning(alice_transport),
-            new_session_tx_alice,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice, None)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(
-            mock_packet_planning(bob_transport),
-            new_session_tx_bob,
-            futures::sink::drain(),
-        )?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob, None)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
