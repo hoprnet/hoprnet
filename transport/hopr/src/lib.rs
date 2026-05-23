@@ -709,11 +709,7 @@ where
             && let Some(ssa_events) = exit_ack_share
         {
             let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                hopr_protocol_pix::SsaReconstructorConfig {
-                    polys_per_ssa: self.cfg.pix.num_ssa_parts,
-                    poly_threshold: self.cfg.pix.ssa_part_size,
-                    ..Default::default()
-                },
+                hopr_protocol_pix::SsaReconstructorConfig::default(),
             ));
 
             let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
@@ -724,7 +720,7 @@ where
                 HoprTransportProcess::PixEvents,
                 hopr_utils::spawn_as_abortable!(
                     session_pix_events
-                        .map(|session_pix_event| Ok(match session_pix_event {
+                        .map(|session_pix_event| match session_pix_event {
                             HoprSessionPixEvent::ReadyToDeposit(id, addr) =>
                                 PixEvent::NewDepositAddress((*id.pseudonym(), id.ssa_index()), addr),
                             HoprSessionPixEvent::DepositNeeded(id, addr, notifier) => PixEvent::DepositAddressReceived(
@@ -732,19 +728,22 @@ where
                                 addr,
                                 Some(notifier)
                             ),
-                        }))
+                        })
                         .merge(
-                            ssa_recovery_events_rx.map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>| Ok(
-                                PixEvent::PrivateKeyRecovered(
+                            ssa_recovery_events_rx.filter_map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>|
+                            futures::future::ready(match ChainKeypair::from_secret(&ssa_recovery_event.ssa.to_bytes()) {
+                                Ok(key) => Some(PixEvent::PrivateKeyRecovered(
                                     (
                                         *ssa_recovery_event.ssa_id.pseudonym(),
                                         ssa_recovery_event.ssa_id.ssa_index()
-                                    ),
-                                    ChainKeypair::from_secret(&ssa_recovery_event.ssa.to_bytes())
-                                        .map_err(HoprTransportError::other)?
-                                )
-                            ))
-                        )
+                                    ), key)),
+                                Err(error) => {
+                                    tracing::error!(%error, ssa_id = %ssa_recovery_event.ssa_id, "wrong ssa private key format");
+                                    None
+                                }
+                            }
+                        )))
+                        .map(Ok)
                         .forward(ssa_events.sink_map_err(HoprTransportError::other))
                 ),
             );

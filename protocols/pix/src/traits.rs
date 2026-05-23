@@ -22,7 +22,12 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
-    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>) -> Result<PixGroup<S>, Self::Error>;
+    fn new_exit_commitment(
+        &self,
+        id: SsaId<S::Pseudonym>,
+        polys_per_ssa: usize,
+        shares_per_poly: usize,
+    ) -> Result<PixGroup<S>, Self::Error>;
 
     /// Adds the client commitment data.
     ///

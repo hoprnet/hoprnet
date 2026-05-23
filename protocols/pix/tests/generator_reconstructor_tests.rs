@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixSpec, SsaCommitment, SsaGeneratorConfig,
-    SsaId, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    SsaId, SsaReconstructor, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -45,15 +45,11 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         .map(|(k, v)| (k, v.into_iter().collect::<HashMap<_, _>>()))
         .collect::<HashMap<_, _>>();
 
-    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
-        polys_per_ssa: 10,
-        poly_threshold: 10,
-        ..Default::default()
-    });
+    let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
-    let server_commitment = reconstructor.new_exit_commitment(ssa_id)?;
+    let server_commitment = reconstructor.new_exit_commitment(ssa_id, 10, 10)?;
 
     // In the transposed form, remove the first coefficient commitments of all polynomials
     let mut first_coeffs = transposed.remove(&0).unwrap();

@@ -1,5 +1,4 @@
 mod utils;
-
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
@@ -8,26 +7,14 @@ use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
 
 use crate::{
-    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, ExitAcknowledgementShareProcessor, PixGroup,
-    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr,
+    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct SsaReconstructorConfig {
-    /// Number of polynomials needed to reconstruct a single SSA.
-    ///
-    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and 65 535.
-    #[default(DEFAULT_POLYS_PER_SSA)]
-    #[validate(range(min = 2, max = 65535))]
-    pub polys_per_ssa: usize,
-    /// Number of shares needed to reconstruct a single polynomial.
-    ///
-    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and 1000.
-    #[default(DEFAULT_POLY_THRESHOLD)]
-    #[validate(range(min = 2, max = 1000))]
-    pub poly_threshold: usize,
     /// Maximum time an SSA can be incomplete before it is discarded.
     ///
     /// Default is 10 minutes.
@@ -93,10 +80,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             commitment_builder: moka::sync::CacheBuilder::new(10)
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
-            ssa_builders: moka::sync::CacheBuilder::new(3 * cfg.polys_per_ssa as u64)
+            ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
-            ssa_verifiers: moka::sync::CacheBuilder::new(3 * cfg.polys_per_ssa as u64)
+            ssa_verifiers: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
@@ -148,7 +135,16 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
     type Error = PixError;
 
-    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>) -> Result<PixGroup<S>, Self::Error> {
+    fn new_exit_commitment(
+        &self,
+        id: SsaId<S::Pseudonym>,
+        polys_per_ssa: usize,
+        shares_per_poly: usize,
+    ) -> Result<PixGroup<S>, Self::Error> {
+        if polys_per_ssa > MAX_POLYS_PER_SSA || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_poly) {
+            return Err(PixError::InvalidInput);
+        }
+
         let exit_commitment_secret = PixScalar::<S>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
         let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
 
@@ -159,8 +155,8 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 None => Ok(moka::ops::compute::Op::Put(std::sync::Arc::new(
                     parking_lot::Mutex::new(SsaCommitmentBuilder::new(
                         id,
-                        self.cfg.poly_threshold,
-                        self.cfg.polys_per_ssa,
+                        shares_per_poly,
+                        polys_per_ssa,
                         exit_commitment_secret,
                         exit_commitment_public,
                     )),
@@ -273,19 +269,15 @@ mod tests {
     use k256::elliptic_curve::Field;
 
     use super::*;
-    use crate::{PartialSsaShare, tests::TestSpec};
+    use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShare, tests::TestSpec};
 
     #[test]
     fn reconstructor_invalid_commitment_inputs() -> anyhow::Result<()> {
-        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
-            polys_per_ssa: 2,
-            poly_threshold: 2,
-            ..Default::default()
-        });
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
-        reconstructor.new_exit_commitment(ssa_id)?;
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
         // 1. Invalid coefficient index (>= threshold)
         let result = reconstructor.insert_coefficient_commitments(
@@ -306,11 +298,7 @@ mod tests {
 
     #[test]
     fn reconstructor_should_not_accept_client_commitments_without_priod_exit_commitment() -> anyhow::Result<()> {
-        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
-            polys_per_ssa: 2,
-            poly_threshold: 2,
-            ..Default::default()
-        });
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
@@ -328,15 +316,11 @@ mod tests {
 
     #[test]
     fn reconstructor_duplicate_commitments() -> anyhow::Result<()> {
-        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
-            polys_per_ssa: 2,
-            poly_threshold: 2,
-            ..Default::default()
-        });
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
-        reconstructor.new_exit_commitment(ssa_id)?;
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
         // Fill all commitments
         for coeff in 0..2 {
@@ -372,7 +356,7 @@ mod tests {
         let peer = OffchainKeypair::random();
         let nonce = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
 
-        reconstructor.new_exit_commitment(ssa_id)?;
+        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD)?;
 
         reconstructor.insert_encrypted_share(
             peer.public(),

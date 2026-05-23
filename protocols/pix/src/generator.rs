@@ -12,8 +12,8 @@ use vsss_rs::{
 };
 
 use crate::{
-    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShareVerifier, PixGroup, PixScalar,
-    PixSpec, PolynomialIndex, errors,
+    CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA,
+    PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId, TransposedVerifiers},
@@ -80,15 +80,15 @@ fn new_polynomial_with_verifier<S: PixSpec>(
 pub struct SsaGeneratorConfig {
     /// The number of polynomials to generate per SSA commitment.
     ///
-    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and 65535.
+    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and [`MAX_POLYS_PER_SSA`].
     #[default(DEFAULT_POLYS_PER_SSA)]
-    #[validate(range(min = 2, max = 65535))]
+    #[validate(range(min = 2, max = MAX_POLYS_PER_SSA))]
     pub polynomials_per_ssa: usize,
     /// Minimum number of shares required to reconstruct each SSA polynomial.
     ///
-    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and 1000.
+    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and [`MAX_POLY_THRESHOLD`].
     #[default(DEFAULT_POLY_THRESHOLD)]
-    #[validate(range(min = 2, max = 1000))]
+    #[validate(range(min = 2, max = MAX_POLY_THRESHOLD))]
     pub threshold: usize,
     /// Additional number of shares to generate beyond the threshold for redundancy.
     ///

@@ -722,7 +722,12 @@ pub struct NopExitAcknowledgementShareProcessor;
 impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementShareProcessor {
     type Error = std::convert::Infallible;
 
-    fn new_exit_commitment(&self, _: SsaId<HoprPseudonym>) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+    fn new_exit_commitment(
+        &self,
+        _: SsaId<HoprPseudonym>,
+        _: usize,
+        _: usize,
+    ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
         Ok(PixGroup::<HoprPixSpec>::default())
     }
 
