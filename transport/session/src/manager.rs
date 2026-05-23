@@ -1,7 +1,7 @@
 use std::{
-    ops::Range,
+    ops::{Range, RangeInclusive},
     pin::Pin,
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::AtomicU32},
     time::Duration,
 };
 
@@ -15,10 +15,13 @@ use futures::{
 use futures_time::future::FutureExt as TimeExt;
 use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket};
 use hopr_protocol_app::prelude::*;
-use hopr_protocol_pix::{SsaReconstructor, SsaShareGenerator};
+use hopr_protocol_pix::{
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor,
+    SsaShareGenerator,
+};
 use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
-    StartInitiation, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
+    KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
+    StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_types::{
@@ -34,13 +37,12 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self,
-    SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
+    self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
 use crate::{
-    Capability, HoprSession, HoprSessionPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId,
-    SessionTarget, SurbBalancerConfig,
+    AgreedSsaQuota, Capability, HoprSession, HoprSessionPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig,
+    SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
@@ -149,6 +151,7 @@ struct SessionSlot {
     // `None` for outgoing sessions where the tag was assigned by the remote peer.
     #[allow(dead_code, reason = "kept alive for Drop-based tag deallocation")]
     allocated_tag: Option<Arc<AllocatedTag>>,
+    ssa_index: Arc<AtomicU32>,
 }
 
 /// Indicates the result of processing a message.
@@ -158,6 +161,23 @@ pub enum DispatchResult {
     Processed,
     /// The message was not related to Start or Session protocol.
     Unrelated(ApplicationDataIn),
+}
+
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
+pub struct SessionPixConfig {
+    /// If set to true, incoming Session without the [`Capability::UsePIX`] will be rejected.
+    ///
+    /// Default `false`.
+    #[default(false)]
+    pub enforce_pix: bool,
+    /// Acceptable range of data quota per one SSA in bytes.
+    ///
+    /// If a client sends PIX parameters for SSA reconstruction that are outside this quota range,
+    /// the incoming Session will be rejected.
+    ///
+    /// Default is 128 MB to 512 MB (inclusive).
+    #[default(_code = "(134217728..=536870912)")]
+    pub quota_range: RangeInclusive<u64>,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -246,7 +266,8 @@ pub struct SessionManagerConfig {
     /// Default is true.
     #[default(true)]
     pub surb_target_notify: bool,
-    // TODO: add session specific PIX config? (other than the global one)
+    /// Configuration of the PIX protocol for the Exit nodes.
+    pub pix_config: SessionPixConfig,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -837,6 +858,7 @@ where
                             surb_mgmt: surb_mgmt.clone(),
                             surb_estimator: surb_estimator.clone(),
                             allocated_tag: None,
+                            ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
                         },
                     )
                     .await?;
@@ -915,6 +937,7 @@ where
                             surb_mgmt: Default::default(),      // Disabled SURB management
                             surb_estimator: Default::default(), // No SURB estimator needed
                             allocated_tag: None,
+                            ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
                         },
                     )
                     .await?;
@@ -1043,11 +1066,7 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
-    pub async fn update_surb_balancer_config(
-        &self,
-        id: &SessionId,
-        config: SurbBalancerConfig,
-    ) -> errors::Result<()> {
+    pub async fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
@@ -1154,6 +1173,40 @@ where
         Ok(DispatchResult::Unrelated(in_data))
     }
 
+    fn check_pix_params(
+        &self,
+        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> Option<(usize, usize)> {
+        if req.capabilities.0.contains(Capability::UsePIX) {
+            // Client offered PIX, validate parameters
+            let polys_per_ssa = (req.additional_data & 0xFFFF0000_00000000_u64) >> 48;
+            let shares_per_ssa = (req.additional_data & 0x0000FFFF_00000000_u64) >> 32;
+
+            let quota_per_ssa = polys_per_ssa * shares_per_ssa * HoprPacket::PAYLOAD_SIZE as u64;
+            debug!(
+                challenge = req.challenge,
+                offered_quota_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
+                "client offered MB SSA quota"
+            );
+
+            self.cfg
+                .pix_config
+                .quota_range
+                .contains(&quota_per_ssa)
+                .then_some((polys_per_ssa as usize, shares_per_ssa as usize))
+        } else if self.cfg.pix_config.enforce_pix {
+            // Client didn't offer PIX, but PIX is enforced
+            None
+        } else {
+            // Client didn't offer PIX, and PIX is not enforced, so return the pre-configured values,
+            // but they are not going to be used.
+            Some((
+                *self.cfg.pix_config.quota_range.start() as usize,
+                *self.cfg.pix_config.quota_range.end() as usize,
+            ))
+        }
+    }
+
     #[tracing::instrument(level = "debug", skip(self, session_req))]
     async fn handle_incoming_session_initiation(
         &self,
@@ -1177,6 +1230,37 @@ where
 
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
+        // Verify if the client offered the right parameters for PIX
+        let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
+            error!(challenge = session_req.challenge, %pseudonym, "client offered unacceptable PIX parameters");
+
+            // Notify the sender that the session could not be established
+            let reason = StartErrorReason::UnacceptablePixParams;
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                challenge: session_req.challenge,
+                reason,
+            });
+
+            msg_sender
+                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+                .map_err(|_| {
+                    error!("timeout sending session error message");
+                    TransportSessionError::Timeout
+                })?
+                .map_err(|error| {
+                    error!(%error, "failed to send session error message");
+                    SessionManagerError::other(error)
+                })?;
+
+            trace!(%pseudonym, "session establishment failure message sent");
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+            return Ok(());
+        };
+
         // Allocate a unique tag for this incoming session
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
         let allocated_tag = if self.maximum_sessions > self.sessions.entry_count() as usize {
@@ -1197,6 +1281,7 @@ where
                 surb_mgmt: Default::default(),
                 surb_estimator: Default::default(),
                 allocated_tag: Some(allocated_tag),
+                ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
             };
             self.sessions.insert(session_id, slot.clone()).await;
 
@@ -1384,7 +1469,10 @@ where
             });
 
             msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .send((
+                    reply_routing.clone(),
+                    ApplicationDataOut::with_no_packet_info(data.try_into()?),
+                ))
                 .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
                 .map_err(|_| {
@@ -1411,6 +1499,62 @@ where
             }
 
             info!(%session_id, "new session established");
+
+            // If client requested PIX, and we support it
+            // (it was previously verified that the offered parameters are acceptable for us),
+            // then create initial Server SSA commitment message and send it to the client.
+            if let Some(pix_toolbox) = self.pix_toolbox.get().cloned()
+                && session_req.capabilities.0.contains(Capability::UsePIX)
+            {
+                let initial_ssa_index = SsaIndex::MIN;
+
+                // TODO: based on the offered quota, the Exit can decide here whether to ask for more than just one SSA
+                // commitment
+                let exit_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                    move || {
+                        pix_toolbox
+                            .share_processor
+                            .new_exit_commitment(
+                                SsaId::new(*session_id.pseudonym(), initial_ssa_index),
+                                client_polys_per_ssa,
+                                client_shares_per_ssa,
+                            )
+                            .map(|commitment| HoprPixGroupElement(commitment.to_bytes()))
+                    },
+                    "server_ssa_commitment",
+                )
+                .await
+                .map_err(SessionManagerError::other)?
+                .map_err(SessionManagerError::PixError)?;
+
+                info!(
+                    %session_id,
+                    client_polys_per_ssa,
+                    client_shares_per_ssa,
+                    %exit_commitment,
+                    "generated exit commitment"
+                );
+
+                let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+                    session_id,
+                    client_polys_per_ssa as u32,
+                    client_shares_per_ssa as u32,
+                    [(initial_ssa_index, exit_commitment)],
+                ));
+
+                msg_sender
+                    .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                    .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                    .await
+                    .map_err(|_| {
+                        error!(%session_id, "timeout sending session establishment message");
+                        TransportSessionError::Timeout
+                    })?
+                    .map_err(|error| {
+                        error!(%session_id, %error, "failed to send session establishment message");
+                        SessionManagerError::other(error)
+                    })?;
+            }
 
             #[cfg(all(feature = "telemetry", not(test)))]
             {
@@ -1475,11 +1619,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(
-        &self,
-        pseudonym: HoprPseudonym,
-        error_type: StartErrorType,
-    ) -> errors::Result<()> {
+    async fn handle_session_error(&self, pseudonym: HoprPseudonym, error_type: StartErrorType) -> errors::Result<()> {
         trace!(
             challenge = error_type.challenge,
             error = ?error_type.reason,
@@ -1492,10 +1632,7 @@ where
                 error!(%error, "could not send session error message");
                 return Err(SessionManagerError::other(error).into());
             }
-            error!(
-                challenge = error_type.challenge,
-                "session establishment error received"
-            );
+            error!(challenge = error_type.challenge, "session establishment error received");
         } else {
             error!(
                 challenge = error_type.challenge,
@@ -1581,15 +1718,118 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self, msg))]
-    async fn handle_ssa_commit(&self, _pseudonym: HoprPseudonym, msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>) -> errors::Result<()> {
+    async fn handle_ssa_commit(
+        &self,
+        _pseudonym: HoprPseudonym,
+        msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>,
+    ) -> errors::Result<()> {
         // TODO: implement PIX message handlers here
         unimplemented!()
     }
 
     #[tracing::instrument(level = "debug", skip(self, msg))]
-    async fn handle_ssa_request(&self, _pseudonym: HoprPseudonym, msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>) -> errors::Result<()> {
-        // TODO: implement PIX message handlers here
-        unimplemented!()
+    async fn handle_ssa_request(
+        &self,
+        pseudonym: HoprPseudonym,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>,
+    ) -> errors::Result<()> {
+        let Some(mut pix_toolbox) = self.pix_toolbox.get().cloned() else {
+            return Err(SessionManagerError::UnsupportedMessage.into());
+        };
+
+        let Some(session_slot) = self.sessions.get(&msg.session_id).await else {
+            return Err(SessionManagerError::NonExistingSession.into());
+        };
+
+        trace!(
+            num_server_commitments = msg.commitments.len(),
+            "received Exit SSA commitments"
+        );
+
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let quota_per_ssa = (msg.polys_per_ssa() * msg.shares_per_ssa() * HoprPacket::SIZE as u32) as u64;
+
+        // The server can theoretically send multiple SSA commitments
+        // asking us to make the equal number of client commitments and deposits
+        for (ssa_index, exit_commitment) in msg.commitments {
+            trace!(ssa_index, "received Exit SSA commitment");
+
+            let pix_toolbox_clone = pix_toolbox.clone();
+            let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || {
+                    pix_toolbox_clone
+                        .share_generator
+                        .new_ssa_commitment(&pseudonym, ssa_index)
+                },
+                "client_ssa_commitment",
+            )
+            .await
+            .map_err(SessionManagerError::other)?
+            .map_err(SessionManagerError::PixError)?;
+
+            // Construct the full SSA by adding the client and exit commitments, obtaining the deposit address
+            let full_ssa = client_commitment.ssa_commitment
+                + exit_commitment
+                    .try_into_pix_group()
+                    .map_err(SessionManagerError::other)?;
+            let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
+                anyhow::anyhow!("failed to convert SSA to deposit address"),
+            ))?;
+            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
+
+            // Notify the new SSA deposit address to allow the deposit to happen
+            pix_toolbox
+                .pix_events
+                .send(HoprSessionPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                    ssa_id: SsaId::new(pseudonym, ssa_index),
+                    deposit_address,
+                    quota_per_ssa,
+                }))
+                .await
+                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
+
+            // Split the SSA client commitment into Start protocol commitment messages
+            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment);
+            debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
+
+            // Feed each commitment message into the message sender
+            for commitment_msg in commitment_msgs {
+                let data =
+                    ApplicationDataOut::with_no_packet_info(HoprStartProtocol::SsaCommit(commitment_msg).try_into()?);
+
+                msg_sender
+                    .feed((session_slot.routing_opts.clone(), data))
+                    .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                    .await
+                    .map_err(|_| {
+                        error!(ssa_index, "timeout feeding client pix commitment message");
+                        TransportSessionError::Timeout
+                    })?
+                    .map_err(|error| {
+                        error!(ssa_index, %error, "failed to feed client pix commitment message");
+                        SessionManagerError::other(error)
+                    })?;
+            }
+
+            // And flush the sender when done for each client commitment
+            msg_sender
+                .flush()
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+                .map_err(|_| {
+                    error!(ssa_index, "timeout flushing client pix commitment messages");
+                    TransportSessionError::Timeout
+                })?
+                .map_err(|error| {
+                    error!(ssa_index, %error, "failed to flush client pix commitment messages");
+                    SessionManagerError::other(error)
+                })?;
+
+            debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
+        }
+
+        trace!(quota_per_ssa, "Exit commitment message has been fully processed");
+        Ok(())
     }
 }
 
@@ -1634,11 +1874,7 @@ mod tests {
 
     #[async_trait::async_trait]
     trait SendMsg {
-        async fn send_message(
-            &self,
-            routing: DestinationRouting,
-            data: ApplicationDataOut,
-        ) -> errors::Result<()>;
+        async fn send_message(&self, routing: DestinationRouting, data: ApplicationDataOut) -> errors::Result<()>;
     }
 
     mockall::mock! {
@@ -2010,6 +2246,7 @@ mod tests {
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
+                    ssa_index: Arc::new(AtomicU32::new(1)),
                 },
             )
             .await;
@@ -2057,6 +2294,7 @@ mod tests {
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
+                    ssa_index: Arc::new(AtomicU32::new(1)),
                 },
             )
             .await;
@@ -2169,6 +2407,7 @@ mod tests {
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
+                    ssa_index: Arc::new(AtomicU32::new(1)),
                 },
             )
             .await;

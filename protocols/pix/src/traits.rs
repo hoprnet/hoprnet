@@ -5,7 +5,7 @@ use hopr_types::{
 
 use crate::{
     CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+    SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
 };
 
 /// Allows reconstruction of SSAs at the Exit node.
@@ -40,7 +40,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
-    ) -> Result<SsaCommitmentState<S>, Self::Error>;
+    ) -> Result<SsaCommitmentState<S::Pseudonym, S::DepositAddress>, Self::Error>;
 
     /// Adds an encrypted partial SSA share awaiting acknowledgement from `peer` to be decrypted.
     ///
@@ -96,5 +96,9 @@ pub trait EntryShareGenerator<S: PixSpec> {
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
     ///
     /// Returns the new random SSA-commitment and the corresponding SSA share verifier.
-    fn new_ssa_commitment(&self, pseudonym: &S::Pseudonym) -> Result<SsaCommitment<S>, Self::Error>;
+    fn new_ssa_commitment(
+        &self,
+        pseudonym: &S::Pseudonym,
+        ssa_index: SsaIndex,
+    ) -> Result<SsaCommitment<S>, Self::Error>;
 }

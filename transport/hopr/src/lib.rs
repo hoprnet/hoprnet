@@ -75,12 +75,14 @@ use hopr_transport_probe::{
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
+use hopr_transport_session::{
+    AgreedSsaQuota, DispatchResult, HoprSessionPixEvent, PixToolbox, SessionManager, SessionManagerConfig,
+};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-use hopr_transport_session::{DispatchResult, HoprSessionPixEvent, PixToolbox, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
@@ -357,6 +359,7 @@ where
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
+                    pix_config: Default::default(),
                 },
                 session_tag_allocator,
             )),
@@ -721,28 +724,36 @@ where
                 hopr_utils::spawn_as_abortable!(
                     session_pix_events
                         .map(|session_pix_event| match session_pix_event {
-                            HoprSessionPixEvent::ReadyToDeposit(id, addr) =>
-                                PixEvent::NewDepositAddress((*id.pseudonym(), id.ssa_index()), addr),
-                            HoprSessionPixEvent::DepositNeeded(id, addr, notifier) => PixEvent::DepositAddressReceived(
-                                (*id.pseudonym(), id.ssa_index()),
-                                addr,
+                            HoprSessionPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                                ssa_id,
+                                deposit_address,
+                                ..
+                            }) =>
+                                PixEvent::NewDepositAddress((*ssa_id.pseudonym(), ssa_id.ssa_index()), deposit_address),
+                            HoprSessionPixEvent::DepositNeeded(
+                                AgreedSsaQuota {
+                                    ssa_id,
+                                    deposit_address,
+                                    ..
+                                },
+                                notifier,
+                            ) => PixEvent::DepositAddressReceived(
+                                (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                deposit_address,
                                 Some(notifier)
                             ),
                         })
                         .merge(
-                            ssa_recovery_events_rx.filter_map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>|
-                            futures::future::ready(match ChainKeypair::from_secret(&ssa_recovery_event.ssa.to_bytes()) {
-                                Ok(key) => Some(PixEvent::PrivateKeyRecovered(
+                            ssa_recovery_events_rx.map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>| {
+                                PixEvent::PrivateKeyRecovered(
                                     (
                                         *ssa_recovery_event.ssa_id.pseudonym(),
-                                        ssa_recovery_event.ssa_id.ssa_index()
-                                    ), key)),
-                                Err(error) => {
-                                    tracing::error!(%error, ssa_id = %ssa_recovery_event.ssa_id, "wrong ssa private key format");
-                                    None
-                                }
-                            }
-                        )))
+                                        ssa_recovery_event.ssa_id.ssa_index(),
+                                    ),
+                                    ssa_recovery_event.ssa,
+                                )
+                            })
+                        )
                         .map(Ok)
                         .forward(ssa_events.sink_map_err(HoprTransportError::other))
                 ),

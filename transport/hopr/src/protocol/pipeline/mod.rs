@@ -20,6 +20,7 @@ use hopr_protocol_pix::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
     RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
+use hopr_types::primitive::prelude::Address;
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
@@ -737,7 +738,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         ssa_id: SsaId<SimplePseudonym>,
         _: CoefficientIndex,
         _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
-    ) -> Result<SsaCommitmentState<HoprPixSpec>, Self::Error> {
+    ) -> Result<SsaCommitmentState<HoprPseudonym, Address>, Self::Error> {
         Ok(SsaCommitmentState::new(ssa_id))
     }
 

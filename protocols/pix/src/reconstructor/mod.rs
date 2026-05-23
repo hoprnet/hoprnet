@@ -125,6 +125,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             return Ok(None);
         };
 
+        let Some(ssa) = S::scalar_to_private_key(ssa) else {
+            tracing::error!(%spi, "ssa reconstruction failed");
+            return Err(PixError::InvalidSsa);
+        };
+
         let ssa_id = *spi.as_ref();
         tracing::info!(%ssa_id, "ssa recovered");
 
@@ -171,7 +176,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
-    ) -> Result<SsaCommitmentState<S>, Self::Error> {
+    ) -> Result<SsaCommitmentState<S::Pseudonym, S::DepositAddress>, Self::Error> {
         let mut res = SsaCommitmentState::new(ssa_id);
 
         // The Server commitment must be present first
@@ -190,7 +195,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more data");
             }
             CommitmentResult::SsaCommitmentDone(commitment) | CommitmentResult::StillIncomplete(commitment) => {
-                res.ssa_commitment = Some(commitment);
+                res.ssa_commitment = Some(S::group_to_deposit_address(commitment).ok_or(PixError::InvalidSsa)?);
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
                 let commitment = ssa_builder.full_commitment;
@@ -204,7 +209,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     );
                 }
 
-                res.ssa_commitment = Some(commitment);
+                res.ssa_commitment = Some(S::group_to_deposit_address(commitment).ok_or(PixError::InvalidSsa)?);
                 res.is_verifiable = true;
             }
         }

@@ -9,8 +9,6 @@ pub enum PixError {
     ShareIsEmpty,
     #[error("ssa commitment does not match ssa")]
     InvalidSsa,
-    #[error("cannot generate more ssa commitments due to ssa index overflow")]
-    SsaOverflow,
     #[error("received duplicate commitment")]
     DuplicateCommitment,
     #[error("missing commitment for building ssa")]

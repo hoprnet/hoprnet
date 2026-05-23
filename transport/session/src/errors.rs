@@ -60,6 +60,10 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
+    #[error("received a Start protocol message that is not supported")]
+    UnsupportedMessage,
+    #[error(transparent)]
+    PixError(#[from] hopr_protocol_pix::errors::PixError),
     #[error(transparent)]
     Other(anyhow::Error),
 }

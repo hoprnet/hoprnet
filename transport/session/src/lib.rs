@@ -19,12 +19,14 @@ pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SA
 pub use hopr_protocol_session::AcknowledgementMode;
 use hopr_types::internal::routing::RoutingOptions;
 pub use hopr_utils::network_types::types::*;
-pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig};
+pub use manager::{
+    DispatchResult, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig, SessionPixConfig,
+};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
-    HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionPixEvent, IncomingSession, ServiceId,
-    SessionId, SessionTarget,
+    AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionPixEvent, IncomingSession,
+    ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

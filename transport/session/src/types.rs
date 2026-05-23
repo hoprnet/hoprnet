@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Debug, Display, Formatter},
+    fmt::Debug,
     hash::{Hash, Hasher},
     pin::Pin,
     str::FromStr,
@@ -10,7 +10,7 @@ use std::{
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_crypto_packet::HoprPixSpec;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_pix::{PixGroupRepr, SsaId, SsaIndex};
+use hopr_protocol_pix::{GroupEncoding, PixGroup, PixGroupRepr, SsaId, SsaIndex};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -71,7 +71,16 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 }
 
 /// New-type wrapper for PixGroupRepr<HoprPixSpec> to provide additional functionality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct HoprPixGroupElement(pub PixGroupRepr<HoprPixSpec>);
+
+impl HoprPixGroupElement {
+    /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
+    pub fn try_into_pix_group(self) -> Result<PixGroup<HoprPixSpec>, GeneralError> {
+        Option::<PixGroup<HoprPixSpec>>::from(PixGroup::<HoprPixSpec>::from_bytes(&self.0))
+            .ok_or(GeneralError::ParseError("pix group from bytes failed".into()))
+    }
+}
 
 impl AsRef<[u8]> for HoprPixGroupElement {
     fn as_ref(&self) -> &[u8] {
@@ -89,17 +98,32 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
         Ok(Self(PixGroupRepr::<HoprPixSpec>::clone_from_slice(value)))
     }
 }
+impl std::fmt::Display for HoprPixGroupElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
 
 /// Start protocol instantiation for HOPR.
 pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
 
+/// Representation of a data quota per SSA agreed upon during the Session establishment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgreedSsaQuota {
+    /// ID of the SSA.
+    pub ssa_id: SsaId<HoprPseudonym>,
+    /// Deposit address of the SSA.
+    pub deposit_address: Address,
+    /// Quota of the SSA in bytes.
+    pub quota_per_ssa: u64,
+}
+
 /// Events raised by the Session Manager in response to received PIX messages.
 #[derive(Debug, Clone)]
 pub enum HoprSessionPixEvent {
-    ReadyToDeposit(SsaId<HoprPseudonym>, Address),
+    ReadyToDeposit(AgreedSsaQuota),
     DepositNeeded(
-        SsaId<HoprPseudonym>,
-        Address,
+        AgreedSsaQuota,
         futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
     ),
 }
@@ -264,7 +288,7 @@ impl<'de> serde::Deserialize<'de> for SessionId {
     }
 }
 
-impl Display for SessionId {
+impl std::fmt::Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
@@ -514,7 +538,7 @@ impl HoprSession {
 }
 
 impl std::fmt::Debug for HoprSession {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
             .field("routing", &self.routing)

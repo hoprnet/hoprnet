@@ -22,6 +22,7 @@ pub mod errors;
 
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_pix::SsaCommitment;
 
 use crate::errors::StartProtocolError;
 
@@ -38,6 +39,8 @@ pub enum StartErrorReason {
     NoSlotsAvailable = 1,
     /// Recipient is busy.
     Busy = 2,
+    /// The recipient requires incentivization or the incentivization parameters are not acceptable.
+    UnacceptablePixParams = 3,
 }
 
 /// Error message in the Start protocol.
@@ -145,7 +148,7 @@ pub struct SsaClientCommitmentMessage<I, G> {
     /// Session ID.
     pub session_id: I,
     /// Index of the Session Stealth Address (SSA) that is being committed.
-    pub ssa: hopr_protocol_pix::SsaIndex,
+    pub ssa_index: hopr_protocol_pix::SsaIndex,
     /// Index of the polynomial coefficient that is being committed.
     ///
     /// Zero value indicates the polynomial constant term commitment, which when summed over
@@ -158,6 +161,15 @@ pub struct SsaClientCommitmentMessage<I, G> {
     /// This might not be the complete set yet and might require multiple messages to deliver
     /// the complete commitment to the given coefficient of all polynomials for the given SSA.
     pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
+}
+
+impl<I, G> SsaClientCommitmentMessage<I, G> {
+    pub fn new_multiple<S: hopr_protocol_pix::PixSpec>(
+        session_id: I,
+        commitment: SsaCommitment<S, S::Pseudonym>,
+    ) -> Vec<Self> {
+        todo!()
+    }
 }
 
 /// Sent by the Server to deliver the commitment to possibly multiple new Session Stealth Addresses (SSAs).
@@ -177,6 +189,30 @@ pub struct SsaServerCommitmentMessage<I, G> {
     pub params: u64,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
+}
+
+impl<I, G> SsaServerCommitmentMessage<I, G> {
+    /// Convenience constructor for creating a new `SsaServerCommitmentMessage`.
+    pub fn new(
+        session_id: I,
+        polys_per_ssa: u32,
+        shares_per_ssa: u32,
+        commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
+    ) -> Self {
+        Self {
+            session_id,
+            params: ((polys_per_ssa as u64) << 32) | shares_per_ssa as u64,
+            commitments: commitments.into_iter().collect(),
+        }
+    }
+
+    pub fn polys_per_ssa(&self) -> u32 {
+        (self.params >> 32) as u32
+    }
+
+    pub fn shares_per_ssa(&self) -> u32 {
+        self.params as u32
+    }
 }
 
 /// Keep-alive message for a Session with the identifier `T`.
@@ -280,7 +316,7 @@ where
                 data.extend(session_id);
             }
             StartProtocol::SsaCommit(commit) => {
-                data.extend_from_slice(&commit.ssa.get().to_be_bytes());
+                data.extend_from_slice(&commit.ssa_index.get().to_be_bytes());
                 data.extend_from_slice(&commit.coefficient_index.to_be_bytes());
 
                 let num_polys = commit.coefficient_commitments.len() as hopr_protocol_pix::PolynomialIndex;
@@ -521,7 +557,7 @@ where
 
                     StartProtocol::SsaCommit(SsaClientCommitmentMessage {
                         session_id: serde_cbor_2::from_slice(&data[next_offset..])?,
-                        ssa,
+                        ssa_index: ssa,
                         coefficient_index,
                         coefficient_commitments,
                     })
@@ -747,7 +783,7 @@ mod tests {
 
         let msg_1 = StartProtocol::SsaCommit(SsaClientCommitmentMessage {
             session_id: 0xfeedeef,
-            ssa: hopr_protocol_pix::SsaIndex::MAX,
+            ssa_index: hopr_protocol_pix::SsaIndex::MAX,
             coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
             coefficient_commitments: (0..max_coeffs).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
         });
@@ -850,7 +886,7 @@ mod tests {
 
         let msg = StartProtocol::<String, String, u8, [u8; 33]>::SsaCommit(SsaClientCommitmentMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            ssa: SsaIndex::MAX,
+            ssa_index: SsaIndex::MAX,
             coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
             coefficient_commitments: (0..24).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
         });

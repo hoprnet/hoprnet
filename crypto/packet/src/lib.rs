@@ -17,7 +17,11 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 pub mod sphinx;
-use hopr_types::{crypto::prelude::SimplePseudonym, internal::prelude::*, primitive::prelude::*};
+use hopr_types::{
+    crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
+    internal::prelude::*,
+    primitive::prelude::*,
+};
 use sphinx::prelude::*;
 
 /// Lists all errors in this crate.
@@ -45,6 +49,7 @@ pub mod prelude {
     };
 }
 
+use hopr_protocol_pix::{PixGroup, PixScalar};
 use hopr_types::internal::routing;
 pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
@@ -94,10 +99,20 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; /
 pub struct HoprPixSpec;
 
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
+    type AddressPrivateKey = ChainKeypair;
     type Cipher = hopr_types::crypto::primitives::ChaCha20;
     type Curve = k256::Secp256k1;
+    type DepositAddress = Address;
     type Digest = hopr_types::crypto::primitives::Blake3;
     type Pseudonym = SimplePseudonym;
+
+    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
+        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
+    }
+
+    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
+        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
+    }
 }
 
 /// HOPR-specific encrypted partial SSA share type from the PIX protocol.

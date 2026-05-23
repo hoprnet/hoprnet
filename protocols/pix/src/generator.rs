@@ -168,7 +168,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
     ///
     /// Returns the new random SSA-commitment and the corresponding SSA share verifier.
-    fn new_ssa_commitment(&self, pseudonym: &S::Pseudonym) -> errors::Result<SsaCommitment<S>> {
+    fn new_ssa_commitment(&self, pseudonym: &S::Pseudonym, ssa_index: SsaIndex) -> errors::Result<SsaCommitment<S>> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
@@ -198,7 +198,6 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             .entry_by_ref(pseudonym)
             .and_try_compute_with(|entry| match entry {
                 None => {
-                    let ssa_index = SsaIndex::MIN;
                     verifiers.extend(
                         raw_verifiers
                             .into_iter()
@@ -234,9 +233,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                     let value = value.into_value();
                     {
                         let mut entry = value.lock();
-                        entry.ssa_index = entry.ssa_index.checked_add(1).ok_or(PixError::SsaOverflow)?;
+                        if ssa_index <= entry.ssa_index {
+                            return Err(PixError::InvalidInput);
+                        }
+                        entry.ssa_index = ssa_index;
 
-                        let ssa_index = entry.ssa_index;
                         verifiers.extend(
                             raw_verifiers
                                 .into_iter()
@@ -317,26 +318,29 @@ mod tests {
         });
 
         let p1 = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1, 1.try_into()?)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1, 2.try_into()?)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
 
         let p2 = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p2)?;
+        let c = generator.new_ssa_commitment(&p2, 1.try_into()?)?;
         assert_eq!(c.ssa_id.pseudonym(), &p2);
         assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p1)?;
+        let c = generator.new_ssa_commitment(&p1, 3.try_into()?)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 3.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p2)?;
+        let c = generator.new_ssa_commitment(&p2, 2.try_into()?)?;
         assert_eq!(c.ssa_id.pseudonym(), &p2);
         assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
+
+        // Repeated SSA index
+        assert!(generator.new_ssa_commitment(&p2, 2.try_into()?).is_err());
 
         Ok(())
     }
@@ -350,7 +354,7 @@ mod tests {
         });
 
         let p1 = SimplePseudonym::random();
-        generator.new_ssa_commitment(&p1)?;
+        generator.new_ssa_commitment(&p1, 1.try_into()?)?;
 
         for i in 0..12_u16 {
             let g = generator
@@ -362,7 +366,7 @@ mod tests {
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
-        generator.new_ssa_commitment(&p1)?;
+        generator.new_ssa_commitment(&p1, 2.try_into()?)?;
 
         for i in 0..12_u16 {
             let g = generator
@@ -389,7 +393,7 @@ mod tests {
         assert_eq!(&cfg, generator.config());
 
         let p = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p)?;
+        let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
 
         for verifier in verifiers.iter().take(cfg.polynomials_per_ssa) {
@@ -417,7 +421,7 @@ mod tests {
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 
         let p = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p)?;
+        let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
         let orig_commitment = c.ssa_commitment;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
         let vs = verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
@@ -447,32 +451,6 @@ mod tests {
             orig_commitment.to_affine(),
             (k256::ProjectivePoint::GENERATOR * recovered_secret).to_affine()
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn ssa_generator_should_handle_ssa_index_overflow() -> anyhow::Result<()> {
-        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
-            polynomials_per_ssa: 2,
-            threshold: 2,
-            surplus_shares: 0,
-        });
-
-        let p1 = SimplePseudonym::random();
-
-        // Setup initial commitment
-        generator.new_ssa_commitment(&p1)?;
-
-        // Manually update the ssa_index to u32::MAX
-        {
-            let entry = generator.polynomials.get(&p1).unwrap();
-            entry.lock().ssa_index = SsaIndex::MAX;
-        }
-
-        // The next commitment should fail with SsaOverflow
-        let result = generator.new_ssa_commitment(&p1);
-        assert!(matches!(result, Err(PixError::SsaOverflow)));
 
         Ok(())
     }

@@ -9,13 +9,13 @@ use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{
-        Curve, CurveArithmetic, Group, PrimeCurve, PrimeField,
+        Curve, CurveArithmetic, PrimeCurve, PrimeField,
         consts::U256,
         generic_array::{
             ArrayLength,
             typenum::{IsLess, IsLessOrEqual},
         },
-        group::{GroupEncoding, cofactor::CofactorGroup},
+        group::cofactor::CofactorGroup,
         hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
     },
 };
@@ -35,6 +35,7 @@ pub use types::{
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
 };
+pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
 
 /// Number of polynomials per SSA.
 pub const DEFAULT_POLYS_PER_SSA: usize = 8192;
@@ -65,6 +66,11 @@ where
     type Pseudonym: Pseudonym + Copy + Send + Sync + 'static;
     /// Stream cipher used to encrypt the SSA shares.
     type Cipher: StreamCipher + KeyIvInit;
+    /// Deposit address type.
+    type DepositAddress: Copy + for<'a> From<&'a Self::AddressPrivateKey> + Send + Sync + 'static;
+    /// Private key type.
+    type AddressPrivateKey: Clone + Send + Sync + 'static;
+
     /// Context data used to derive the SSA encryption key.
     const KEY_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE";
     /// Domain separator used to derive the X value of a share.
@@ -95,6 +101,13 @@ where
             ],
         )?)
     }
+
+    /// Converts `PixGroup` to an address that can be deposited to.
+    ///
+    /// Returns `None` if the conversion is not possible.
+    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress>;
+    /// Convert `PixScalar` to a private key of a deposit address.
+    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey>;
 }
 
 /// Finite field used to represent the polynomial coefficients.
@@ -256,7 +269,10 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 #[cfg(test)]
 pub(crate) mod tests {
     use anyhow::Context;
-    use hopr_types::crypto::prelude::SimplePseudonym;
+    use hopr_types::{
+        crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
+        primitive::prelude::Address,
+    };
     use vsss_rs::{
         ParticipantIdGeneratorType,
         elliptic_curve::{
@@ -274,10 +290,20 @@ pub(crate) mod tests {
     pub struct TestSpec;
 
     impl PixSpec for TestSpec {
+        type AddressPrivateKey = ChainKeypair;
         type Cipher = hopr_types::crypto::primitives::ChaCha20;
         type Curve = k256::Secp256k1;
+        type DepositAddress = Address;
         type Digest = hopr_types::crypto::primitives::Sha3_256;
         type Pseudonym = SimplePseudonym;
+
+        fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
+            PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
+        }
+
+        fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
+            ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
+        }
     }
 
     type Share<S> = DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;

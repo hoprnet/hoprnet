@@ -1,20 +1,35 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_protocol_pix::{EntryShareGenerator, GeneratedShare, PixSpec, SsaGeneratorConfig, SsaShareGenerator};
+use hopr_protocol_pix::{
+    EntryShareGenerator, GeneratedShare, PixGroup, PixScalar, PixSpec, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
+};
 use hopr_types::{
     crypto::{
-        prelude::SimplePseudonym,
+        prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
         primitives::{Blake3, ChaCha20},
     },
     crypto_random::Randomizable,
+    primitive::prelude::Address,
 };
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TestSpec;
 
 impl PixSpec for TestSpec {
+    type AddressPrivateKey = ChainKeypair;
     type Cipher = ChaCha20;
     type Curve = k256::Secp256k1;
+    type DepositAddress = Address;
     type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
+
+    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
+        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
+    }
+
+    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
+        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
+    }
 }
 
 fn bench_new_ssa_commitment(c: &mut Criterion) {
@@ -40,8 +55,10 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
                 &(t, p),
                 |b, _| {
+                    let mut index = SsaIndex::MIN;
                     b.iter(|| {
-                        generator.new_ssa_commitment(&pseudonym).unwrap();
+                        generator.new_ssa_commitment(&pseudonym, index).unwrap();
+                        index = index.checked_add(1).unwrap();
                     });
                 },
             );
@@ -58,13 +75,16 @@ fn bench_verify(c: &mut Criterion) {
     let pseudonym = SimplePseudonym::random();
     let x = hopr_types::crypto_random::random_bytes::<10>();
 
+    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         let cfg = SsaGeneratorConfig {
             threshold: t,
             ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-        let c = generator.new_ssa_commitment(&pseudonym).unwrap();
+        let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
+        index = index.checked_add(1).unwrap();
+
         let GeneratedShare { share, .. } = generator.next_share(&pseudonym, &x).unwrap().unwrap();
 
         let verifiers = c.reconstruct_verifiers().unwrap();
@@ -87,6 +107,7 @@ fn bench_next_share(c: &mut Criterion) {
     let polynomials_per_ssa = [2048]; // Benchmark does not depend on polynomials_per_ssa
     let pseudonym = SimplePseudonym::random();
 
+    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         for &p in &polynomials_per_ssa {
             let cfg = SsaGeneratorConfig {
@@ -97,7 +118,8 @@ fn bench_next_share(c: &mut Criterion) {
             let generator = SsaShareGenerator::<TestSpec>::new(cfg);
             // Prime the generator with an initial commitment, so the first iteration
             // has a polynomial to draw from.
-            generator.new_ssa_commitment(&pseudonym).unwrap();
+            generator.new_ssa_commitment(&pseudonym, index).unwrap();
+            index = index.checked_add(1).unwrap();
 
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
@@ -124,7 +146,8 @@ fn bench_next_share(c: &mut Criterion) {
                                 // This intentionally "wastes" any remaining shares from
                                 // the previous SSA (there are none at this point) and
                                 // ensures subsequent iterations have shares available.
-                                generator.new_ssa_commitment(&pseudonym).unwrap();
+                                generator.new_ssa_commitment(&pseudonym, index).unwrap();
+                                index = index.checked_add(1).unwrap();
                             }
                         }
                         total

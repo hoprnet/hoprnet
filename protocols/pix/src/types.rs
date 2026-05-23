@@ -485,23 +485,22 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
 /// Represents the current state of a specific SSA commitment on an Exit node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SsaCommitmentState<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+pub struct SsaCommitmentState<P, A> {
     /// ID of the SSA that is being committed to.
     pub ssa_id: SsaId<P>,
     /// Commitment to the SSA, if it's already known.
-    #[cfg_attr(feature = "serde", serde(with = "option_group"))]
-    pub ssa_commitment: Option<PixGroup<S>>,
+    pub ssa_commitment: Option<A>,
     /// Whether the commitment is fully committed and therefore its partial shares are verifiable.
     pub is_verifiable: bool,
     /// Whether this SSA was encountered for the first time.
     pub is_first_encountered: bool,
 }
 
-impl<S: PixSpec> SsaCommitmentState<S, S::Pseudonym> {
+impl<P, A> SsaCommitmentState<P, A> {
     /// Creates a new SsaCommitmentState for the given SSA ID.
     ///
     /// It has no associated commitment and is not verifiable initially.
-    pub fn new(ssa_id: SsaId<S::Pseudonym>) -> Self {
+    pub fn new(ssa_id: SsaId<P>) -> Self {
         Self {
             ssa_id,
             ssa_commitment: None,
@@ -516,49 +515,8 @@ impl<S: PixSpec> SsaCommitmentState<S, S::Pseudonym> {
 pub struct RecoveredSsa<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     /// ID of the SSA that was recovered.
     pub ssa_id: SsaId<P>,
-    /// Recovered secret scalar (private key corresponding to the SSA).
-    pub ssa: PixScalar<S>,
-}
-
-/// Serde adapter for `Option<G>` where `G` is a curve group element, delegating
-/// to `elliptic_curve_tools::group` for the inner element.
-///
-/// Workaround for `serde_with` not supporting `Option<elliptic_curve_tools::group>`
-/// (the latter is a serde-module helper, not a `SerializeAs`/`DeserializeAs` impl).
-#[cfg(feature = "serde")]
-mod option_group {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
-
-    pub fn serialize<G, S>(value: &Option<G>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        G: Group + GroupEncoding,
-    {
-        struct Wrapper<'a, G: Group + GroupEncoding>(&'a G);
-
-        impl<G: Group + GroupEncoding> Serialize for Wrapper<'_, G> {
-            fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-                elliptic_curve_tools::group::serialize(self.0, s)
-            }
-        }
-
-        match value {
-            Some(g) => serializer.serialize_some(&Wrapper(g)),
-            None => serializer.serialize_none(),
-        }
-    }
-
-    pub fn deserialize<'de, G, D>(deserializer: D) -> Result<Option<G>, D::Error>
-    where
-        D: Deserializer<'de>,
-        G: Group + GroupEncoding,
-    {
-        #[derive(Deserialize)]
-        struct Wrapper<G: Group + GroupEncoding>(#[serde(with = "elliptic_curve_tools::group")] G);
-
-        Ok(Option::<Wrapper<G>>::deserialize(deserializer)?.map(|w| w.0))
-    }
+    /// Recovered secret scalar (private key corresponding to the SSA deposit address).
+    pub ssa: S::AddressPrivateKey,
 }
 
 #[cfg(test)]
