@@ -18,7 +18,7 @@ use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{SsaReconstructor, SsaShareGenerator};
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
-    StartInitiation,
+    StartInitiation, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
 };
 use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_types::{
@@ -47,7 +47,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
-    types::{ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
+    types::{ClosureReason, HoprPixGroupElement, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
@@ -1111,10 +1111,27 @@ where
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
             trace!("dispatching Start protocol message");
-            return self
-                .handle_start_protocol_message(pseudonym, in_data)
-                .await
-                .map(|_| DispatchResult::Processed);
+            match HoprStartProtocol::try_from(in_data.data)? {
+                HoprStartProtocol::StartSession(session_req) => {
+                    self.handle_incoming_session_initiation(pseudonym, session_req).await?;
+                }
+                HoprStartProtocol::SessionEstablished(est) => {
+                    self.handle_session_established(pseudonym, est).await?;
+                }
+                HoprStartProtocol::SessionError(error_type) => {
+                    self.handle_session_error(pseudonym, error_type).await?;
+                }
+                HoprStartProtocol::KeepAlive(msg) => {
+                    self.handle_keep_alive(pseudonym, msg).await?;
+                }
+                HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                    self.handle_ssa_commit(pseudonym, client_commit_msg).await?;
+                }
+                HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                    self.handle_ssa_request(pseudonym, server_commit_msg).await?;
+                }
+            }
+            return Ok(DispatchResult::Processed);
         } else if self.session_tag_range.contains(&in_data.data.application_tag.as_u64()) {
             let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
@@ -1430,135 +1447,144 @@ where
         Ok(())
     }
 
-    async fn handle_start_protocol_message(
+    async fn handle_session_established(
         &self,
-        pseudonym: HoprPseudonym,
-        data: ApplicationDataIn,
+        _pseudonym: HoprPseudonym,
+        est: StartEstablished<SessionId>,
     ) -> crate::errors::Result<()> {
-        match HoprStartProtocol::try_from(data.data)? {
-            HoprStartProtocol::StartSession(session_req) => {
-                self.handle_incoming_session_initiation(pseudonym, session_req).await?;
+        trace!(
+            session_id = ?est.session_id,
+            "received session establishment confirmation"
+        );
+        let challenge = est.orig_challenge;
+        let session_id = est.session_id;
+        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
+            if let Err(error) = tx_est.unbounded_send(Ok(est)) {
+                error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
+                return Err(SessionManagerError::other(error).into());
             }
-            HoprStartProtocol::SessionEstablished(est) => {
-                trace!(
-                    session_id = ?est.session_id,
-                    "received session establishment confirmation"
-                );
-                let challenge = est.orig_challenge;
-                let session_id = est.session_id;
-                if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
-                    if let Err(error) = tx_est.unbounded_send(Ok(est)) {
-                        error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
-                        return Err(SessionManagerError::other(error).into());
-                    }
-                    debug!(?session_id, challenge, "session establishment complete");
-                } else {
-                    error!(%session_id, challenge, "unknown session establishment attempt or expired");
-                }
-            }
-            HoprStartProtocol::SessionError(error_type) => {
-                trace!(
-                    challenge = error_type.challenge,
-                    error = ?error_type.reason,
-                    "failed to initialize a session",
-                );
-                // Currently, we do not distinguish between individual error types
-                // and just discard the initiation attempt and pass on the error.
-                if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
-                    if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
-                        error!(%error, ?error_type, "could not send session error message");
-                        return Err(SessionManagerError::other(error).into());
-                    }
-                    error!(
-                        challenge = error_type.challenge,
-                        ?error_type,
-                        "session establishment error received"
-                    );
-                } else {
-                    error!(
-                        challenge = error_type.challenge,
-                        ?error_type,
-                        "session establishment attempt expired before error could be delivered"
-                    );
-                }
-
-                #[cfg(all(feature = "telemetry", not(test)))]
-                METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()])
-            }
-            HoprStartProtocol::KeepAlive(msg) => {
-                let session_id = msg.session_id;
-                if let Some(session_slot) = self.sessions.get(&session_id).await {
-                    trace!(?session_id, "received keep-alive message");
-                    match &session_slot.routing_opts {
-                        // Session is outgoing - keep-alive was received from the Exit
-                        DestinationRouting::Forward { .. } => {
-                            if msg.flags.contains(KeepAliveFlag::BalancerState)
-                                && !session_slot.surb_mgmt.is_disabled()
-                                && session_slot.surb_mgmt.buffer_level() != msg.additional_data
-                            {
-                                // Update the buffer level as sent to us from the Exit
-                                session_slot
-                                    .surb_mgmt
-                                    .buffer_level
-                                    .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                                debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
-                            }
-
-                            // Increase the number of consumed SURBs in the estimator
-                            session_slot
-                                .surb_estimator
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
-                        }
-                        // Session is incoming - keep-alive was received from the Entry
-                        DestinationRouting::Return(_) => {
-                            // Allow updating SURB balancer target based on the received Keep-Alive message
-                            if msg.flags.contains(KeepAliveFlag::BalancerTarget)
-                                && msg.additional_data > 0
-                                && !session_slot.surb_mgmt.is_disabled()
-                                && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
-                            {
-                                // Update the target buffer size as sent to us from the Entry
-                                session_slot
-                                    .surb_mgmt
-                                    .target_surb_buffer_size
-                                    .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
-                                // Update maximum SURBs per second based on the new target
-                                session_slot.surb_mgmt.max_surbs_per_sec.store(
-                                    msg.additional_data / self.cfg.minimum_surb_buffer_duration.as_secs(),
-                                    std::sync::atomic::Ordering::Relaxed,
-                                );
-                                debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
-                            }
-
-                            // Increase the number of received SURBs in the estimator.
-                            // Typically, 2 SURBs per Keep-Alive message
-                            let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
-                            session_slot
-                                .surb_estimator
-                                .produced
-                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_produced(&session_id, produced);
-                        }
-                    }
-                } else {
-                    debug!(%session_id, "received keep-alive request for an unknown session");
-                }
-            }
-            HoprStartProtocol::SsaCommit(_) => {
-                // TODO: implement PIX message handlers here
-                unimplemented!()
-            }
-            HoprStartProtocol::SsaRequest(_) => {
-                // TODO: implement PIX message handlers here
-                unimplemented!()
-            }
+            debug!(?session_id, challenge, "session establishment complete");
+        } else {
+            error!(%session_id, challenge, "unknown session establishment attempt or expired");
         }
 
         Ok(())
+    }
+
+    async fn handle_session_error(
+        &self,
+        _pseudonym: HoprPseudonym,
+        error_type: StartErrorType,
+    ) -> crate::errors::Result<()> {
+        trace!(
+            challenge = error_type.challenge,
+            error = ?error_type.reason,
+            "failed to initialize a session",
+        );
+        // Currently, we do not distinguish between individual error types
+        // and just discard the initiation attempt and pass on the error.
+        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
+            if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
+                error!(%error, ?error_type, "could not send session error message");
+                return Err(SessionManagerError::other(error).into());
+            }
+            error!(
+                challenge = error_type.challenge,
+                ?error_type,
+                "session establishment error received"
+            );
+        } else {
+            error!(
+                challenge = error_type.challenge,
+                ?error_type,
+                "session establishment attempt expired before error could be delivered"
+            );
+        }
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()]);
+
+        Ok(())
+    }
+
+    async fn handle_keep_alive(
+        &self,
+        _pseudonym: HoprPseudonym,
+        msg: KeepAliveMessage<SessionId>,
+    ) -> crate::errors::Result<()> {
+        let session_id = msg.session_id;
+        if let Some(session_slot) = self.sessions.get(&session_id).await {
+            trace!(?session_id, "received keep-alive message");
+            match &session_slot.routing_opts {
+                // Session is outgoing - keep-alive was received from the Exit
+                DestinationRouting::Forward { .. } => {
+                    if msg.flags.contains(KeepAliveFlag::BalancerState)
+                        && !session_slot.surb_mgmt.is_disabled()
+                        && session_slot.surb_mgmt.buffer_level() != msg.additional_data
+                    {
+                        // Update the buffer level as sent to us from the Exit
+                        session_slot
+                            .surb_mgmt
+                            .buffer_level
+                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                        debug!(%session_id, surb_level = msg.additional_data, "keep-alive updated SURB buffer size from the Exit");
+                    }
+
+                    // Increase the number of consumed SURBs in the estimator
+                    session_slot
+                        .surb_estimator
+                        .consumed
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    #[cfg(feature = "telemetry")]
+                    crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                }
+                // Session is incoming - keep-alive was received from the Entry
+                DestinationRouting::Return(_) => {
+                    // Allow updating SURB balancer target based on the received Keep-Alive message
+                    if msg.flags.contains(KeepAliveFlag::BalancerTarget)
+                        && msg.additional_data > 0
+                        && !session_slot.surb_mgmt.is_disabled()
+                        && session_slot.surb_mgmt.controller_bounds().target() != msg.additional_data
+                    {
+                        // Update the target buffer size as sent to us from the Entry
+                        session_slot
+                            .surb_mgmt
+                            .target_surb_buffer_size
+                            .store(msg.additional_data, std::sync::atomic::Ordering::Relaxed);
+                        // Update maximum SURBs per second based on the new target
+                        session_slot.surb_mgmt.max_surbs_per_sec.store(
+                            msg.additional_data / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                            std::sync::atomic::Ordering::Relaxed,
+                        );
+                        debug!(%session_id, target_surb_buffer_size = msg.additional_data, "keep-alive updated SURB balancer target buffer size from the Entry");
+                    }
+
+                    // Increase the number of received SURBs in the estimator.
+                    // Typically, 2 SURBs per Keep-Alive message
+                    let produced = KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64;
+                    session_slot
+                        .surb_estimator
+                        .produced
+                        .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                    #[cfg(feature = "telemetry")]
+                    crate::telemetry::record_session_surb_produced(&session_id, produced);
+                }
+            }
+        } else {
+            debug!(%session_id, "received keep-alive request for an unknown session");
+        }
+
+        Ok(())
+    }
+
+    async fn handle_ssa_commit(&self, _pseudonym: HoprPseudonym, _msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>) -> crate::errors::Result<()> {
+        // TODO: implement PIX message handlers here
+        unimplemented!()
+    }
+
+    async fn handle_ssa_request(&self, _pseudonym: HoprPseudonym, _msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>) -> crate::errors::Result<()> {
+        // TODO: implement PIX message handlers here
+        unimplemented!()
     }
 }
 
