@@ -34,6 +34,7 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
+    self,
     SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
@@ -46,7 +47,7 @@ use crate::{
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
-    errors::{SessionManagerError, TransportSessionError},
+    errors::{self, SessionManagerError, TransportSessionError},
     types::{ClosureReason, HoprPixGroupElement, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -526,7 +527,7 @@ where
         msg_sender: S,
         new_session_notifier: T,
         pix: Option<PixToolbox>,
-    ) -> crate::errors::Result<Vec<AbortHandle>>
+    ) -> errors::Result<Vec<AbortHandle>>
     where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
@@ -611,7 +612,7 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
+    async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> errors::Result<()> {
         // We currently do not support loopback Sessions on ourselves.
         if let moka::ops::compute::CompResult::Inserted(_) = self
             .sessions
@@ -651,7 +652,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> crate::errors::Result<HoprSession> {
+    ) -> errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
         if self.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
@@ -767,7 +768,7 @@ where
                                 .produced
                                 .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_produced(&session_id, produced);
+                            telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -881,7 +882,7 @@ where
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                                telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
                         ),
                         Some(notifier),
@@ -990,7 +991,7 @@ where
     /// Sends a keep-alive packet with the given [`SessionId`].
     ///
     /// This currently "fires & forgets" and does not expect nor await any "pong" response.
-    pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+    pub async fn ping_session(&self, id: &SessionId) -> errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id).await {
             trace!(session_id = ?id, "pinging manually session");
             Ok(self
@@ -1046,7 +1047,7 @@ where
         &self,
         id: &SessionId,
         config: SurbBalancerConfig,
-    ) -> crate::errors::Result<()> {
+    ) -> errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
@@ -1066,7 +1067,7 @@ where
     /// Retrieves the configuration of SURB balancing for the given Session.
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub async fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
+    pub async fn get_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         match self.sessions.get(id).await {
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
@@ -1081,7 +1082,7 @@ where
     /// For an incoming Session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub async fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
+    pub async fn get_surb_level_estimates(&self, id: &SessionId) -> errors::Result<(u64, u64)> {
         match self.sessions.get(id).await {
             Some(session) => Ok((
                 session
@@ -1107,7 +1108,7 @@ where
         &self,
         pseudonym: HoprPseudonym,
         in_data: ApplicationDataIn,
-    ) -> crate::errors::Result<DispatchResult> {
+    ) -> errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
             trace!("dispatching Start protocol message");
@@ -1153,11 +1154,12 @@ where
         Ok(DispatchResult::Unrelated(in_data))
     }
 
+    #[tracing::instrument(level = "debug", skip(self, session_req))]
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
         session_req: StartInitiation<SessionTarget, HoprSessionCapabilities>,
-    ) -> crate::errors::Result<()> {
+    ) -> errors::Result<()> {
         trace!(challenge = session_req.challenge, "received session initiation request");
 
         debug!(%pseudonym, "got new session request, searching for a free session slot");
@@ -1245,7 +1247,7 @@ where
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                                telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             })
                             .rate_limit_with_controller(&egress_rate_control)
@@ -1258,7 +1260,7 @@ where
                                 .produced
                                 .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_produced(&session_id, produced);
+                            telemetry::record_session_surb_produced(&session_id, produced);
                         }),
                     ),
                     Some(closure_notifier),
@@ -1309,7 +1311,7 @@ where
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                                telemetry::record_session_surb_consumed(&session_id, 1);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
@@ -1447,11 +1449,12 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip(self, est))]
     async fn handle_session_established(
         &self,
-        _pseudonym: HoprPseudonym,
+        pseudonym: HoprPseudonym,
         est: StartEstablished<SessionId>,
-    ) -> crate::errors::Result<()> {
+    ) -> errors::Result<()> {
         trace!(
             session_id = ?est.session_id,
             "received session establishment confirmation"
@@ -1471,11 +1474,12 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn handle_session_error(
         &self,
-        _pseudonym: HoprPseudonym,
+        pseudonym: HoprPseudonym,
         error_type: StartErrorType,
-    ) -> crate::errors::Result<()> {
+    ) -> errors::Result<()> {
         trace!(
             challenge = error_type.challenge,
             error = ?error_type.reason,
@@ -1485,18 +1489,16 @@ where
         // and just discard the initiation attempt and pass on the error.
         if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
             if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
-                error!(%error, ?error_type, "could not send session error message");
+                error!(%error, "could not send session error message");
                 return Err(SessionManagerError::other(error).into());
             }
             error!(
                 challenge = error_type.challenge,
-                ?error_type,
                 "session establishment error received"
             );
         } else {
             error!(
                 challenge = error_type.challenge,
-                ?error_type,
                 "session establishment attempt expired before error could be delivered"
             );
         }
@@ -1507,11 +1509,12 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self, msg))]
     async fn handle_keep_alive(
         &self,
-        _pseudonym: HoprPseudonym,
+        pseudonym: HoprPseudonym,
         msg: KeepAliveMessage<SessionId>,
-    ) -> crate::errors::Result<()> {
+    ) -> errors::Result<()> {
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id).await {
             trace!(?session_id, "received keep-alive message");
@@ -1536,7 +1539,7 @@ where
                         .consumed
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     #[cfg(feature = "telemetry")]
-                    crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                    telemetry::record_session_surb_consumed(&session_id, 1);
                 }
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
@@ -1567,7 +1570,7 @@ where
                         .produced
                         .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                     #[cfg(feature = "telemetry")]
-                    crate::telemetry::record_session_surb_produced(&session_id, produced);
+                    telemetry::record_session_surb_produced(&session_id, produced);
                 }
             }
         } else {
@@ -1577,12 +1580,14 @@ where
         Ok(())
     }
 
-    async fn handle_ssa_commit(&self, _pseudonym: HoprPseudonym, _msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>) -> crate::errors::Result<()> {
+    #[tracing::instrument(level = "debug", skip(self, msg))]
+    async fn handle_ssa_commit(&self, _pseudonym: HoprPseudonym, msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>) -> errors::Result<()> {
         // TODO: implement PIX message handlers here
         unimplemented!()
     }
 
-    async fn handle_ssa_request(&self, _pseudonym: HoprPseudonym, _msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>) -> crate::errors::Result<()> {
+    #[tracing::instrument(level = "debug", skip(self, msg))]
+    async fn handle_ssa_request(&self, _pseudonym: HoprPseudonym, msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>) -> errors::Result<()> {
         // TODO: implement PIX message handlers here
         unimplemented!()
     }
@@ -1633,14 +1638,14 @@ mod tests {
             &self,
             routing: DestinationRouting,
             data: ApplicationDataOut,
-        ) -> crate::errors::Result<()>;
+        ) -> errors::Result<()>;
     }
 
     mockall::mock! {
         MsgSender {}
         impl SendMsg for MsgSender {
             fn send_message<'a, 'b>(&'a self, routing: DestinationRouting, data: ApplicationDataOut)
-            -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
+            -> BoxFuture<'b, errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
         }
     }
 
