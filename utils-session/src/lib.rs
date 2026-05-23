@@ -25,8 +25,14 @@ use hopr_api::{
     },
     network::NetworkStreamControl,
 };
+#[cfg(not(feature = "explicit-path"))]
+use hopr_lib::HopRouting;
+#[cfg(feature = "explicit-path")]
+use hopr_lib::HoprSessionClientExplicitPathConfig;
+#[cfg(feature = "explicit-path")]
+use hopr_lib::api::types::internal::routing::RoutingOptions;
 use hopr_lib::{
-    HopRouting, Hopr, HoprSessionClientConfig,
+    Hopr, HoprSessionClientConfig,
     api::{network::NetworkView, node::HoprSessionClientOperations, types::primitive::prelude::Address},
     errors::HoprLibError,
     exports::transport::{
@@ -64,6 +70,14 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
+
+#[cfg(feature = "explicit-path")]
+/// Temporary compatibility alias while stored listener metadata is shared between
+/// hop-count and explicit-path session APIs.
+pub type Routing = RoutingOptions;
+
+#[cfg(not(feature = "explicit-path"))]
+pub type Routing = HopRouting;
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -144,10 +158,10 @@ pub struct StoredSessionEntry {
     pub destination: Address,
     /// Target of the Session.
     pub target: SessionTargetSpec,
-    /// Forward path used for the Session.
-    pub forward_path: HopRouting,
-    /// Return path used for the Session.
-    pub return_path: HopRouting,
+    /// Forward routing options used for the Session.
+    pub forward_path: Routing,
+    /// Return routing options used for the Session.
+    pub return_path: Routing,
     /// The maximum number of client sessions that the listener can spawn.
     pub max_client_sessions: usize,
     /// The maximum number of SURB packets that can be sent upstream.
@@ -236,27 +250,52 @@ impl Abortable for ListenerJoinHandles {
 }
 
 // ---------------------------------------------------------------------------
-// SessionFactory trait — abstracts session creation for testability
+// Generic SessionFactory adapters
 // ---------------------------------------------------------------------------
 
-/// Trait abstracting HOPR session creation.
-///
-/// Production code uses `Hopr<...>` (via the blanket impl), while the REST API
-/// tests can provide a mock implementation.
 #[async_trait::async_trait]
-pub trait SessionFactory: Send + Sync + 'static {
+pub trait SessionFactory: Clone + Send + Sync + 'static {
+    type Cfg: Clone + Send + 'static;
+
+    /// Creates a new Session with the given destination, target and configuration.
     async fn create_session(
         &self,
         dest: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
+        cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error>;
 
+    /// Derives the forward and return routing options from the given configuration.
+    fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error>;
+
+    /// Derives the listener limits (max SURB upstream and response buffer) from the given configuration.
+    fn listener_limits(&self, cfg: &Self::Cfg)
+    -> (Option<human_bandwidth::re::bandwidth::Bandwidth>, Option<ByteSize>);
+
+    /// Returns the idle timeout duration for sessions created by this factory, if any.
     fn session_idle_timeout(&self) -> Option<std::time::Duration>;
 }
 
+pub struct HopSessionFactory<Chain, Graph, Net, TMgr> {
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
+}
+
+impl<Chain, Graph, Net, TMgr> HopSessionFactory<Chain, Graph, Net, TMgr> {
+    pub fn new(hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>) -> Self {
+        Self { hopr }
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> Clone for HopSessionFactory<Chain, Graph, Net, TMgr> {
+    fn clone(&self) -> Self {
+        Self {
+            hopr: self.hopr.clone(),
+        }
+    }
+}
+
 #[async_trait::async_trait]
-impl<Chain, Graph, Net, TMgr> SessionFactory for Hopr<Chain, Graph, Net, TMgr>
+impl<Chain, Graph, Net, TMgr> SessionFactory for HopSessionFactory<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
     Graph: NetworkGraphView<NodeId = OffchainPublicKey>
@@ -272,17 +311,118 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     TMgr: Send + Sync + 'static,
 {
+    type Cfg = HoprSessionClientConfig;
+
     async fn create_session(
         &self,
         dest: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
+        cfg: Self::Cfg,
     ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
-        Ok(HoprSessionClientOperations::connect_to(self, dest, target, cfg).await?)
+        Ok(HoprSessionClientOperations::connect_to(self.hopr.as_ref(), dest, target, cfg).await?)
+    }
+
+    fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
+        Ok((cfg.forward_path.into(), cfg.return_path.into()))
+    }
+
+    fn listener_limits(
+        &self,
+        cfg: &Self::Cfg,
+    ) -> (Option<human_bandwidth::re::bandwidth::Bandwidth>, Option<ByteSize>) {
+        (
+            cfg.surb_management
+                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
+            cfg.surb_management
+                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+        )
     }
 
     fn session_idle_timeout(&self) -> Option<std::time::Duration> {
-        Some(self.config().protocol.session.idle_timeout)
+        Some(self.hopr.config().protocol.session.idle_timeout)
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+pub struct ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>,
+}
+
+#[cfg(feature = "explicit-path")]
+impl<Chain, Graph, Net, TMgr> ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    pub fn new(hopr: Arc<Hopr<Chain, Graph, Net, TMgr>>) -> Self {
+        Self { hopr }
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+impl<Chain, Graph, Net, TMgr> Clone for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr> {
+    fn clone(&self) -> Self {
+        Self {
+            hopr: self.hopr.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "explicit-path")]
+#[async_trait::async_trait]
+impl<Chain, Graph, Net, TMgr> SessionFactory for ExplicitPathSessionFactory<Chain, Graph, Net, TMgr>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Graph: NetworkGraphView<NodeId = OffchainPublicKey>
+        + NetworkGraphUpdate
+        + NetworkGraphWrite<NodeId = OffchainPublicKey>
+        + NetworkGraphTraverse<NodeId = OffchainPublicKey>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <Graph as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
+    <Graph as NetworkGraphWrite>::Observed: EdgeObservableWrite + Send,
+    Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
+    TMgr: Send + Sync + 'static,
+{
+    type Cfg = HoprSessionClientExplicitPathConfig;
+
+    async fn create_session(
+        &self,
+        dest: Address,
+        target: SessionTarget,
+        cfg: Self::Cfg,
+    ) -> Result<(HoprSession, HoprSessionConfigurator), anyhow::Error> {
+        Ok(self.hopr.connect_to_using_explicit_path(dest, target, cfg).await?)
+    }
+
+    fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
+        let forward_path = RoutingOptions::IntermediatePath(
+            cfg.forward_path
+                .clone()
+                .try_into()
+                .map_err(|e| anyhow!("invalid explicit forward path: {e}"))?,
+        );
+        let return_path = RoutingOptions::IntermediatePath(
+            cfg.return_path
+                .clone()
+                .try_into()
+                .map_err(|e| anyhow!("invalid explicit return path: {e}"))?,
+        );
+        Ok((forward_path, return_path))
+    }
+
+    fn listener_limits(
+        &self,
+        cfg: &Self::Cfg,
+    ) -> (Option<human_bandwidth::re::bandwidth::Bandwidth>, Option<ByteSize>) {
+        (
+            cfg.surb_management
+                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
+            cfg.surb_management
+                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+        )
+    }
+
+    fn session_idle_timeout(&self) -> Option<std::time::Duration> {
+        Some(self.hopr.config().protocol.session.idle_timeout)
     }
 }
 
@@ -296,12 +436,12 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new(
+    pub async fn new<T: SessionFactory>(
         size: usize,
         dst: Address,
         target: SessionTarget,
-        cfg: HoprSessionClientConfig,
-        factory: Arc<dyn SessionFactory>,
+        cfg: T::Cfg,
+        factory: T,
     ) -> Result<Self, anyhow::Error> {
         let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let factory_clone = factory.clone();
@@ -329,7 +469,6 @@ impl SessionPool {
             })
             .await?;
 
-        // Spawn a task that periodically sends keep alive messages to the Session in the pool.
         if let Some(timeout) = factory.session_idle_timeout().filter(|_| !pool.lock().is_empty()) {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
@@ -339,16 +478,11 @@ impl SessionPool {
                     futures_time::stream::interval(futures_time::time::Duration::from(
                         std::time::Duration::from_secs(1).max(timeout / 2)
                     ))
-                    .take_while(move |_| {
-                        // Continue the infinite interval stream until there are sessions in the pool
-                        futures::future::ready(!pool_clone_1.lock().is_empty())
-                    })
+                    .take_while(move |_| futures::future::ready(!pool_clone_1.lock().is_empty()))
                     .for_each(move |_| {
                         let pool = pool_clone_2.clone();
                         async move {
-                            // Collect configurators to ping (release lock before awaiting)
                             let configurators: Vec<_> = pool.lock().iter().map(|(_, cfg)| cfg.clone()).collect();
-
                             let mut dead_ids = Vec::new();
                             for configurator in &configurators {
                                 if let Err(error) = configurator.ping().await {
@@ -357,7 +491,6 @@ impl SessionPool {
                                     dead_ids.push(id);
                                 }
                             }
-
                             if !dead_ids.is_empty() {
                                 pool.lock().retain(|(_, cfg)| !dead_ids.contains(cfg.id()));
                             }
@@ -384,14 +517,14 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding(
+pub async fn create_tcp_client_binding<T: SessionFactory>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: HoprSessionClientConfig,
+    config: T::Cfg,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
@@ -411,6 +544,10 @@ pub async fn create_tcp_client_binding(
         .clone()
         .into_target(IpProtocol::TCP)
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+    let (forward_path, return_path) = factory
+        .routing_from_cfg(&config)
+        .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+    let (max_surb_upstream, response_buffer) = factory.listener_limits(&config);
 
     // Create a session pool if requested
     let session_pool_size = use_session_pool.unwrap_or(0);
@@ -445,9 +582,9 @@ pub async fn create_tcp_client_binding(
                 let target = target.clone();
                 let factory = factory.clone();
                 let active_sessions = active_sessions_clone_2.clone();
+                let has_capacity = accepted_client.is_ok() && active_sessions.len() < max_clients;
+                let maybe_pooled = has_capacity.then(|| session_pool.pop()).flatten();
 
-                // Try to pop from the pool only if a client was accepted
-                let maybe_pooled = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
                         Ok((sock_addr, mut stream)) => {
@@ -534,16 +671,12 @@ pub async fn create_tcp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path,
-            return_path: config.return_path,
+            forward_path,
+            return_path,
             clients: active_sessions,
             max_client_sessions: max_clients,
-            max_surb_upstream: config
-                .surb_management
-                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
-            response_buffer: config
-                .surb_management
-                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+            max_surb_upstream,
+            response_buffer,
             session_pool: Some(session_pool_size),
             abort_handle,
         },
@@ -560,14 +693,14 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding(
+pub async fn create_udp_client_binding<T: SessionFactory>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    factory: Arc<dyn SessionFactory>,
+    factory: T,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
-    config: HoprSessionClientConfig,
+    config: T::Cfg,
 ) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError> {
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
@@ -584,6 +717,10 @@ pub async fn create_udp_client_binding(
         .clone()
         .into_target(IpProtocol::UDP)
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+    let (forward_path, return_path) = factory
+        .routing_from_cfg(&config)
+        .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
+    let (max_surb_upstream, response_buffer) = factory.listener_limits(&config);
 
     // Create a single session for the UDP socket
     let (session, configurator) = factory
@@ -636,15 +773,11 @@ pub async fn create_udp_client_binding(
         StoredSessionEntry {
             destination,
             target: target_spec,
-            forward_path: config.forward_path,
-            return_path: config.return_path,
+            forward_path,
+            return_path,
             max_client_sessions: max_clients,
-            max_surb_upstream: config
-                .surb_management
-                .map(|v| Bandwidth::from_bps(v.max_surbs_per_sec * SURB_SIZE as u64)),
-            response_buffer: config
-                .surb_management
-                .map(|v| ByteSize::b(v.target_surb_buffer_size * SURB_SIZE as u64)),
+            max_surb_upstream,
+            response_buffer,
             session_pool: None,
             abort_handle,
             clients,
@@ -921,8 +1054,8 @@ mod tests {
         StoredSessionEntry {
             destination: Address::default(),
             target: SessionTargetSpec::Plain("localhost:8080".into()),
-            forward_path: HopRouting::default(),
-            return_path: HopRouting::default(),
+            forward_path: Default::default(),
+            return_path: Default::default(),
             max_client_sessions: 5,
             max_surb_upstream: None,
             response_buffer: None,
