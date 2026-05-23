@@ -744,6 +744,7 @@ where
                             ),
                         })
                         .merge(
+                            // TODO: feed this back to the SessionManager to ensure new Exit commitment is made
                             ssa_recovery_events_rx.map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>| {
                                 PixEvent::PrivateKeyRecovered(
                                     (

@@ -489,11 +489,13 @@ pub struct SsaCommitmentState<P, A> {
     /// ID of the SSA that is being committed to.
     pub ssa_id: SsaId<P>,
     /// Commitment to the SSA, if it's already known.
-    pub ssa_commitment: Option<A>,
+    pub ssa_deposit_address: Option<A>,
     /// Whether the commitment is fully committed and therefore its partial shares are verifiable.
     pub is_verifiable: bool,
     /// Whether this SSA was encountered for the first time.
     pub is_first_encountered: bool,
+    /// Whether the SSA deposit address has been discovered.
+    pub is_deposit_address_fresh_known: bool,
 }
 
 impl<P, A> SsaCommitmentState<P, A> {
@@ -503,9 +505,10 @@ impl<P, A> SsaCommitmentState<P, A> {
     pub fn new(ssa_id: SsaId<P>) -> Self {
         Self {
             ssa_id,
-            ssa_commitment: None,
+            ssa_deposit_address: None,
             is_verifiable: false,
             is_first_encountered: true,
+            is_deposit_address_fresh_known: false,
         }
     }
 }

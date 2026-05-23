@@ -121,7 +121,12 @@ pub struct AgreedSsaQuota {
 /// Events raised by the Session Manager in response to received PIX messages.
 #[derive(Debug, Clone)]
 pub enum HoprSessionPixEvent {
+    /// Event raised by the [`SessionManager`] of an Entry node can deposit funds to an SSA for the agreed data quota.
     ReadyToDeposit(AgreedSsaQuota),
+    /// Event raised by the [`SessionManager`] of an Exit node, whenever it knows a new SSA and expects funds to be
+    /// deposited.
+    ///
+    /// The attached sender is used to deliver updates once the deposit is completed.
     DepositNeeded(
         AgreedSsaQuota,
         futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
@@ -334,6 +339,8 @@ pub enum ClosureReason {
     EmptyRead,
     /// Session has been evicted from the cache due to inactivity or capacity reasons.
     Eviction,
+    /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
+    UnrealizedDeposit,
 }
 
 /// Helper trait to allow Box aliasing

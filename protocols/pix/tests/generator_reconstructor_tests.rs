@@ -78,14 +78,14 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, first_coeffs.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(res.is_first_encountered);
-    assert!(res.ssa_commitment.is_none());
+    assert!(res.ssa_deposit_address.is_none());
     assert!(!res.is_verifiable);
 
     // Now add the constant term commitments of the first polynomial
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::from([(0, remainder)]).into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(full_ssa_deposit_address), res.ssa_commitment);
+    assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
     assert!(!res.is_verifiable);
 
     // Add all the remaining coefficient commitments for all polynomials except one
@@ -95,7 +95,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
             reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_coeff_commitments.into_iter())?;
         assert_eq!(ssa_id, res.ssa_id);
         assert!(!res.is_first_encountered);
-        assert_eq!(Some(full_ssa_deposit_address), res.ssa_commitment);
+        assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
         assert!(!res.is_verifiable);
     }
 
@@ -103,7 +103,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
-    assert_eq!(Some(full_ssa_deposit_address), res.ssa_commitment);
+    assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
     assert!(res.is_verifiable);
 
     let mut acks = Vec::new();

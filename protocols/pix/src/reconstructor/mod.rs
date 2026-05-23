@@ -194,11 +194,18 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             CommitmentResult::NotEnoughCommitments => {
                 tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more data");
             }
-            CommitmentResult::SsaCommitmentDone(commitment) | CommitmentResult::StillIncomplete(commitment) => {
-                res.ssa_commitment = Some(S::group_to_deposit_address(commitment).ok_or(PixError::InvalidSsa)?);
+            CommitmentResult::SsaCommitmentDone(full_ssa_commitment) => {
+                res.is_deposit_address_fresh_known = true;
+                res.ssa_deposit_address =
+                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+            }
+            CommitmentResult::StillIncomplete(full_ssa_commitment) => {
+                res.is_deposit_address_fresh_known = res.ssa_deposit_address.is_none();
+                res.ssa_deposit_address =
+                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
-                let commitment = ssa_builder.full_commitment;
+                let full_ssa_commitment = ssa_builder.full_commitment;
                 self.ssa_builders
                     .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
 
@@ -209,7 +216,9 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     );
                 }
 
-                res.ssa_commitment = Some(S::group_to_deposit_address(commitment).ok_or(PixError::InvalidSsa)?);
+                res.is_deposit_address_fresh_known = res.ssa_deposit_address.is_none();
+                res.ssa_deposit_address =
+                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
                 res.is_verifiable = true;
             }
         }

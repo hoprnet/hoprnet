@@ -131,6 +131,8 @@ type SessionInitiationCache =
 enum SessionTasks {
     KeepAlive,
     Balancer,
+    PixKillSwitch,
+    DepositAwaiter,
 }
 
 #[derive(Clone)]
@@ -178,6 +180,20 @@ pub struct SessionPixConfig {
     /// Default is 128 MB to 512 MB (inclusive).
     #[default(_code = "(134217728..=536870912)")]
     pub quota_range: RangeInclusive<u64>,
+    /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
+    ///
+    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
+    /// wait time because the Client has to be able to deliver its SSA commitment.
+    #[default(Duration::from_secs(20))]
+    pub max_ssa_delivery_time: Duration,
+    /// Maximum time to wait for the funds to be deposited in the SSA.
+    ///
+    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
+    /// wait time because the Client has to be able to deliver its SSA commitment.
+    ///
+    /// Default is 1 minute.
+    #[default(Duration::from_secs(60))]
+    pub max_deposit_wait: Duration,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1554,6 +1570,21 @@ where
                         error!(%session_id, %error, "failed to send session establishment message");
                         SessionManagerError::other(error)
                     })?;
+
+                // Set up a kill switch on the Session that has to be removed
+                // once the deposit to the SSA has been made.
+                let slot_clone = slot.clone();
+                let session_deadline = std::time::Instant::now()
+                    + self.cfg.pix_config.max_deposit_wait
+                    + self.cfg.pix_config.max_ssa_delivery_time;
+                slot.abort_handles.lock().insert(
+                    SessionTasks::PixKillSwitch,
+                    hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
+                        move |_| async move {
+                            close_session(session_id, slot_clone, ClosureReason::UnrealizedDeposit);
+                        }
+                    )),
+                );
             }
 
             #[cfg(all(feature = "telemetry", not(test)))]
@@ -1720,11 +1751,84 @@ where
     #[tracing::instrument(level = "debug", skip(self, msg))]
     async fn handle_ssa_commit(
         &self,
-        _pseudonym: HoprPseudonym,
+        pseudonym: HoprPseudonym,
         msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>,
     ) -> errors::Result<()> {
-        // TODO: implement PIX message handlers here
-        unimplemented!()
+        let Some(mut pix_toolbox) = self.pix_toolbox.get().cloned() else {
+            return Err(SessionManagerError::UnsupportedMessage.into());
+        };
+
+        let session_id = msg.session_id;
+
+        if &pseudonym != session_id.pseudonym() {
+            error!(%pseudonym, %msg.session_id, "received SSA client commitment for a different session");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
+        let Some(session_slot) = self.sessions.get(&session_id).await else {
+            return Err(SessionManagerError::NonExistingSession.into());
+        };
+
+        let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
+
+        let ssa_client_commitment_state = pix_toolbox
+            .share_processor
+            .insert_coefficient_commitments(
+                ssa_id,
+                msg.coefficient_index,
+                msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
+            )
+            .map_err(SessionManagerError::PixError)?;
+
+        let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
+
+        if ssa_client_commitment_state.is_deposit_address_fresh_known
+            && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
+        {
+            let slot_clone = session_slot.clone();
+            let max_deposit_wait = self.cfg.pix_config.max_deposit_wait;
+            // TODO: generalize the awaiter into a perpetual Session task that either awaits for Deposit or a signal
+            // that sends Exit commitment and reinstates the kill-switch.
+            session_slot.abort_handles.lock().insert(
+                SessionTasks::DepositAwaiter,
+                hopr_utils::spawn_as_abortable!(async move {
+                    if let Ok(_) = deposit_done_rx
+                        .filter(|((evt_pseudonym, evt_index), _)| {
+                            futures::future::ready(
+                                evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym(),
+                            )
+                        })
+                        .next()
+                        .delay(futures_time::time::Duration::from_millis(100))
+                        .timeout(futures_time::time::Duration::from(max_deposit_wait))
+                        .await
+                    {
+                        // Abort the kill switch once the deposit has been done
+                        // This kill-switch is reinstated once the SSA has been recovered and a new Client commitment is
+                        // needed.
+                        slot_clone.abort_handles.lock().abort_one(&SessionTasks::PixKillSwitch);
+                        info!(%session_id, "SSA deposit successful");
+                    }
+                }),
+            );
+
+            pix_toolbox
+                .pix_events
+                .send(HoprSessionPixEvent::DepositNeeded(
+                    AgreedSsaQuota {
+                        ssa_id,
+                        deposit_address,
+                        quota_per_ssa: 0, // TODO: where to get the quota from?
+                    },
+                    deposit_done_tx,
+                ))
+                .await
+                .map_err(|_| {
+                    SessionManagerError::other(anyhow::anyhow!("failed to send pix event for needed deposit"))
+                })?;
+        }
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "debug", skip(self, msg))]
@@ -1736,6 +1840,11 @@ where
         let Some(mut pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
         };
+
+        if &pseudonym != msg.session_id.pseudonym() {
+            error!(%pseudonym, %msg.session_id, "received SSA server commitment for a different session");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
 
         let Some(session_slot) = self.sessions.get(&msg.session_id).await else {
             return Err(SessionManagerError::NonExistingSession.into());
