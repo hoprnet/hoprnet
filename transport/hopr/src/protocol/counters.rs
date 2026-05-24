@@ -59,6 +59,9 @@ pub struct PeerProtocolCounterRegistry {
 impl PeerProtocolCounterRegistry {
     /// Get or create counters for the given peer.
     pub fn get_or_create(&self, peer: &OffchainPublicKey) -> Arc<PeerProtocolCounters> {
+        if let Some(entry) = self.inner.get(peer) {
+            return entry.clone();
+        }
         self.inner
             .entry(*peer)
             .or_insert_with(|| Arc::new(PeerProtocolCounters::default()))
@@ -72,15 +75,28 @@ impl PeerProtocolCounterRegistry {
     /// stays bounded to peers that have been recently active.
     pub fn drain(&self) -> Vec<(OffchainPublicKey, u64, u64)> {
         let mut result = Vec::new();
-        self.inner.retain(|key, counters| {
-            let (sent, received) = counters.take();
+        let mut to_evict: Vec<OffchainPublicKey> = Vec::new();
+
+        // Phase 1: shared read lock per shard — atomic-swap counters, collect non-zero results.
+        // `PeerProtocolCounters::take()` uses internal atomics and is safe under a read lock.
+        for entry in self.inner.iter() {
+            let (sent, received) = entry.value().take();
             if sent > 0 || received > 0 {
-                result.push((*key, sent, received));
-                true
+                result.push((*entry.key(), sent, received));
             } else {
-                false
+                to_evict.push(*entry.key());
             }
-        });
+        }
+
+        // Phase 2: exclusive write lock per shard, but only for entries that were zero.
+        // Re-check before removing: a concurrent `get_or_create` + record may have
+        // incremented the counter between our `take()` and this removal.
+        for key in to_evict {
+            self.inner.remove_if(&key, |_, c| {
+                c.messages_sent.load(Ordering::Relaxed) == 0 && c.acks_received.load(Ordering::Relaxed) == 0
+            });
+        }
+
         result
     }
 }

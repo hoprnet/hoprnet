@@ -680,6 +680,7 @@ where
         let flush_graph = self.graph.clone();
         let flush_me = *self.packet_key.public();
         let flush_interval = self.cfg.counter_flush_interval;
+        tracing::info!(interval_ms = flush_interval.as_millis(), "counter flush task starting");
         processes.insert(
             HoprTransportProcess::CounterFlush,
             hopr_utils::spawn_as_abortable!(async move {

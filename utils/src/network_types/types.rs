@@ -70,23 +70,16 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `tokio` resolver.
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                #[cfg(test)]
                 let resolver = hickory_resolver::Resolver::builder_with_config(
                     hickory_resolver::config::ResolverConfig::default(),
                     hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
                 )
                 .build()
                 .map_err(std::io::Error::other)?;
-
-                #[cfg(not(test))]
-                let resolver = hickory_resolver::Resolver::builder_tokio()
-                    .map_err(std::io::Error::other)?
-                    .build()
-                    .map_err(std::io::Error::other)?;
 
                 let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
                 Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
@@ -268,12 +261,12 @@ impl std::fmt::Display for SealedHost {
 #[cfg(test)]
 mod tests {
     use hopr_types::crypto::prelude::{Keypair, OffchainKeypair};
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
 
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -288,7 +281,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
