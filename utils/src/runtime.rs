@@ -124,7 +124,7 @@ pub mod diagnostics {
         );
 
         #[cfg(not(feature = "runtime-tokio"))]
-        eprintln!(
+        tracing::warn!(
             "high-frequency polling detected: task={name} location={location} total_polls={total_polls} elapsed_ms={} \
              polls_per_sec={polls_per_sec}",
             elapsed.as_millis()
@@ -155,7 +155,7 @@ pub mod diagnostics {
         );
 
         #[cfg(not(feature = "runtime-tokio"))]
-        eprintln!(
+        tracing::warn!(
             "high-frequency concurrent child churn detected: task={name} location={location} started={started} \
              completed={completed} dropped={dropped} in_flight={in_flight} elapsed_ms={} \
              completed_per_sec={completed_per_sec}",
