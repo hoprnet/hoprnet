@@ -231,8 +231,8 @@ pub(crate) enum HoprLibProcess {
 pub fn prepare_tokio_runtime(
     num_cpu_threads: Option<std::num::NonZeroUsize>,
     num_io_threads: Option<std::num::NonZeroUsize>,
+    thread_stack_size: Option<usize>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
-    use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
     hopr_utils::parallelize::cpu::init_thread_pool(
@@ -260,9 +260,7 @@ pub fn prepare_tokio_runtime(
         )
         .thread_name("hoprd")
         .thread_stack_size(
-            std::env::var("HOPRD_THREAD_STACK_SIZE")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
+            thread_stack_size
                 .unwrap_or(10 * 1024 * 1024)
                 .max(2 * 1024 * 1024),
         )

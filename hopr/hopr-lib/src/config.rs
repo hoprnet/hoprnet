@@ -88,6 +88,23 @@ pub struct HoprLibConfig {
         serde(default = "default_out_index_sync_period", with = "humantime_serde")
     )]
     pub out_index_sync_period: Duration,
+    /// Capacity of the incoming session channel (number of buffered sessions).
+    ///
+    /// Used only when the `session-server` feature is enabled.
+    /// Default is 256.
+    #[default(default_incoming_session_capacity())]
+    #[cfg_attr(feature = "serde", serde(default = "default_incoming_session_capacity"))]
+    pub incoming_session_capacity: usize,
+    /// Disables win-probability and ticket-price protocol safety checks.
+    ///
+    /// Should only be set in testing or local-cluster environments.
+    /// Default is false.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub disable_protocol_checks: bool,
+}
+
+fn default_incoming_session_capacity() -> usize {
+    256
 }
 
 const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);

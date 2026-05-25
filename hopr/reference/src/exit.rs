@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, num::NonZeroUsize};
+use std::net::SocketAddr;
 
 use hopr_lib::{
     api::types::crypto::prelude::OffchainKeypair,
@@ -118,9 +118,8 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
                     .with_receiver_parallelism(
-                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
-                            .ok()
-                            .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                        self.cfg
+                            .udp_rx_parallelism
                             .map(UdpStreamParallelism::Specific)
                             .unwrap_or(UdpStreamParallelism::Auto),
                     )

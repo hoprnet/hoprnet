@@ -235,11 +235,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         + Send
         + 'static,
     ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
-        let incoming_session_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(256);
+        let incoming_session_capacity = self.ctx.cfg.incoming_session_capacity.max(1);
 
         let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
 
@@ -423,7 +419,7 @@ where
         .await
         .map_err(HoprLibError::chain)?;
     let configured_win_prob = ctx.cfg.protocol.packet.codec.outgoing_win_prob;
-    if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
+    if !ctx.cfg.disable_protocol_checks
         && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
     {
         return Err(HoprLibError::GeneralError(format!(
