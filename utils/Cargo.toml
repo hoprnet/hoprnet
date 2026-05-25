@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 default = []
 
 # runtime module (from hopr-async-runtime) — always compiled, feature gates optional deps only
-runtime-tokio = ["dep:tokio"]
+runtime-tokio = ["dep:tokio", "dep:tracing"]
 async-lock = ["dep:async-lock"]
 
 # network-types module (from hopr-network-types)

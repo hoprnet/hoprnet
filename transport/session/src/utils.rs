@@ -171,7 +171,13 @@ where
 
     // This task will automatically terminate once the returned abort handle is used.
     debug!(%session_id, "spawning keep-alive stream");
-    hopr_utils::runtime::prelude::spawn(
+    let keep_alive_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+        "session_keep_alive_try_for_each_concurrent",
+        module_path!(),
+        file!(),
+        line!(),
+    );
+    hopr_utils::runtime::prelude::spawn(hopr_utils::runtime::diagnostics::instrument(
         ka_stream
             .map(move |msg| {
                 ApplicationData::try_from(msg)
@@ -180,12 +186,13 @@ where
             .map_err(TransportSessionError::from)
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
-                async move {
+                let keep_alive_diag = keep_alive_diag.clone();
+                keep_alive_diag.wrap(async move {
                     sender_clone
                         .send(msg)
                         .await
                         .map_err(TransportSessionError::packet_sending)
-                }
+                })
             })
             .then(move |res| {
                 match res {
@@ -200,7 +207,11 @@ where
                 futures::future::ready(())
             })
             .in_current_span(),
-    );
+        "session_keep_alive",
+        module_path!(),
+        file!(),
+        line!(),
+    ));
 
     (controller, abort_handle)
 }
