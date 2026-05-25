@@ -5,11 +5,14 @@ use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOpe
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
 #[cfg(all(feature = "telemetry", not(test)))]
-use hopr_types::internal::path::Path;
-use hopr_types::{
-    crypto::{crypto_traits::Randomizable, types::OffchainPublicKey},
-    internal::{errors::PathError, prelude::*},
-    primitive::traits::ToHex,
+use hopr_api::types::internal::path::Path;
+use hopr_api::{
+    OffchainPublicKey,
+    types::{
+        crypto::crypto_traits::Randomizable,
+        internal::{errors::PathError, prelude::*},
+        primitive::traits::ToHex,
+    },
 };
 use tracing::trace;
 use validator::{Validate, ValidationError};
@@ -21,7 +24,7 @@ use super::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PATH_LENGTH: hopr_types::telemetry::SimpleHistogram = hopr_types::telemetry::SimpleHistogram::new(
+    static ref METRIC_PATH_LENGTH: hopr_api::types::telemetry::SimpleHistogram = hopr_api::types::telemetry::SimpleHistogram::new(
         "hopr_path_length",
         "Distribution of number of hops of sent messages",
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
@@ -196,16 +199,8 @@ where
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    // Post-resolution: catch non-adjacent chain-address duplicates
-                                    // (ValidatedPath::new only checks consecutive collisions).
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "skipping path candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
-                                }
-                                Err(e) => tracing::warn!(error = %e, "path candidate failed validation"),
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
                             }
                         }
 
@@ -230,7 +225,7 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            hopr_types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
+            hopr_api::types::telemetry::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
         trace!(%path, "validated resolved path");
@@ -376,14 +371,8 @@ where
                         for pwc in candidates {
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    if vp.chain_path().iter().enumerate().any(|(i, a)| vp.chain_path()[..i].contains(a)) {
-                                        tracing::debug!(path = %vp, "background refresh: skipping candidate with repeated chain addresses");
-                                        continue;
-                                    }
-                                    valid_paths.push((vp, pwc.cost))
-                                }
-                                Err(e) => tracing::warn!(error = %e, "background refresh: path candidate failed validation"),
+                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Err(e) => tracing::debug!(error = %e, "background refresh: path candidate failed validation"),
                             }
                         }
 
@@ -417,7 +406,7 @@ mod tests {
         },
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::{Keypair, OffchainKeypair},
         internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
         primitive::prelude::*,
@@ -579,12 +568,7 @@ mod tests {
     }
 
     fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        graph.upsert_edge(src, dst, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(1000)));
-        });
+        mark_edge_full(graph, src, dst);
     }
 
     fn small_config() -> PathPlannerConfig {
@@ -703,7 +687,7 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_types::primitive::prelude::BoundedVec;
+        use hopr_api::types::primitive::prelude::BoundedVec;
         let intermediate_path = BoundedVec::try_from(vec![NodeId::Offchain(a)]).expect("valid");
 
         let routing = DestinationRouting::Forward {
@@ -735,7 +719,7 @@ mod tests {
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        use hopr_types::internal::routing::SurbMatcher;
+        use hopr_api::types::internal::routing::SurbMatcher;
         let matcher = SurbMatcher::Pseudonym(HoprPseudonym::random());
         let routing = DestinationRouting::Return(matcher);
 
