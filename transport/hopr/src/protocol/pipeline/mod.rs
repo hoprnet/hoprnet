@@ -557,48 +557,49 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
             async move {
-                tracing::trace!(num = acks.len(), "received acknowledgements");
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || ticket_proc.acknowledge_tickets(peer, acks),
-                    "ack_decode",
-                )
-                .await
-                {
-                    Ok(Ok(resolutions)) if !resolutions.is_empty() => {
-                        let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
-                            ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
-                                tracing::trace!("received ack for a winning ticket");
-                                Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
-                            }
-                            ResolvedAcknowledgement::RelayingLoss(_) => {
-                                // Losing tickets are not getting accounted for anywhere.
-                                tracing::trace!("received ack for a losing ticket");
-                                None
-                            }
-                        });
+                    tracing::trace!(num = acks.len(), "received acknowledgements");
+                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, acks),
+                        "ack_decode",
+                    )
+                    .await
+                    {
+                        Ok(Ok(resolutions)) if !resolutions.is_empty() => {
+                            let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
+                                ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
+                                    tracing::trace!("received ack for a winning ticket");
+                                    Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
+                                }
+                                ResolvedAcknowledgement::RelayingLoss(_) => {
+                                    // Losing tickets are not getting accounted for anywhere.
+                                    tracing::trace!("received ack for a losing ticket");
+                                    None
+                                }
+                            });
 
-                        // All acknowledgements that resulted in winning tickets go upstream
-                        if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await {
-                            tracing::error!(%error, "failed to notify ticket resolutions");
+                            // All acknowledgements that resulted in winning tickets go upstream
+                            if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await
+                            {
+                                tracing::error!(%error, "failed to notify ticket resolutions");
+                            }
+                        }
+                        Ok(Ok(_)) => {
+                            tracing::debug!("acknowledgement batch could not acknowledge any ticket");
+                        }
+                        Ok(Err(TicketAcknowledgementError::UnexpectedAcknowledgement)) => {
+                            // Unexpected acknowledgements naturally happen
+                            // as acknowledgements of 0-hop packets
+                            tracing::trace!("received unexpected acknowledgement");
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(%error, "failed to acknowledge ticket");
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
                         }
                     }
-                    Ok(Ok(_)) => {
-                        tracing::debug!("acknowledgement batch could not acknowledge any ticket");
-                    }
-                    Ok(Err(TicketAcknowledgementError::UnexpectedAcknowledgement)) => {
-                        // Unexpected acknowledgements naturally happen
-                        // as acknowledgements of 0-hop packets
-                        tracing::trace!("received unexpected acknowledgement");
-                    }
-                    Ok(Err(error)) => {
-                        tracing::error!(%error, "failed to acknowledge ticket");
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
-                    }
                 }
-            }
-            .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
+                .instrument(tracing::debug_span!("incoming_ack_batch", peer = peer.to_peerid_str()))
         })
         .in_current_span()
         .await;

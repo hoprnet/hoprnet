@@ -1,7 +1,17 @@
 //! Executor API for HOPR which exposes the necessary async functions depending on the enabled
 //! runtime.
 
-use std::hash::Hash;
+use std::{
+    future::Future,
+    hash::Hash,
+    pin::Pin,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
 pub use futures::future::AbortHandle;
 
@@ -20,13 +30,343 @@ pub mod prelude {
     };
 }
 
+/// Passive diagnostics for attributing high-frequency async polling.
+///
+/// Diagnostics are disabled unless `HOPR_RUNTIME_POLL_DIAGNOSTICS=1` is set.
+/// When enabled, warnings are rate-limited by `HOPR_RUNTIME_POLL_WARN_EVERY`
+/// and start after `HOPR_RUNTIME_POLL_WARN_AFTER` polls or child futures.
+pub mod diagnostics {
+    use super::*;
+
+    const ENV_ENABLED: &str = "HOPR_RUNTIME_POLL_DIAGNOSTICS";
+    const ENV_WARN_AFTER: &str = "HOPR_RUNTIME_POLL_WARN_AFTER";
+    const ENV_WARN_EVERY: &str = "HOPR_RUNTIME_POLL_WARN_EVERY";
+    const DEFAULT_WARN_AFTER: u64 = 100_000;
+    const DEFAULT_WARN_EVERY: Duration = Duration::from_secs(5);
+
+    #[derive(Debug)]
+    struct DiagnosticsConfig {
+        enabled: bool,
+        warn_after: u64,
+        warn_every: Duration,
+    }
+
+    static CONFIG: OnceLock<DiagnosticsConfig> = OnceLock::new();
+
+    fn parse_bool(value: &str) -> bool {
+        matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on")
+    }
+
+    fn parse_duration(value: &str) -> Option<Duration> {
+        let trimmed = value.trim();
+        if let Some(stripped) = trimmed.strip_suffix("ms") {
+            stripped.trim().parse::<u64>().ok().map(Duration::from_millis)
+        } else if let Some(stripped) = trimmed.strip_suffix('s') {
+            stripped.trim().parse::<u64>().ok().map(Duration::from_secs)
+        } else {
+            trimmed.parse::<u64>().ok().map(Duration::from_secs)
+        }
+    }
+
+    fn config() -> &'static DiagnosticsConfig {
+        CONFIG.get_or_init(|| DiagnosticsConfig {
+            enabled: std::env::var(ENV_ENABLED).is_ok_and(|v| parse_bool(&v)),
+            warn_after: std::env::var(ENV_WARN_AFTER)
+                .ok()
+                .and_then(|v| v.trim().parse::<u64>().ok())
+                .filter(|&v| v > 0)
+                .unwrap_or(DEFAULT_WARN_AFTER),
+            warn_every: std::env::var(ENV_WARN_EVERY)
+                .ok()
+                .and_then(|v| parse_duration(&v))
+                .filter(|&v| v > Duration::ZERO)
+                .unwrap_or(DEFAULT_WARN_EVERY),
+        })
+    }
+
+    /// Returns whether runtime poll diagnostics are enabled for this process.
+    pub fn enabled() -> bool {
+        config().enabled
+    }
+
+    fn location(module_path: &'static str, file: &'static str, line: u32) -> String {
+        format!("{module_path} at {file}:{line}")
+    }
+
+    fn should_warn(last_warn_nanos: &AtomicU64, elapsed: Duration, warn_every: Duration) -> bool {
+        let elapsed_nanos = elapsed.as_nanos().min(u64::MAX as u128) as u64;
+        let warn_every_nanos = warn_every.as_nanos().min(u64::MAX as u128) as u64;
+
+        loop {
+            let last = last_warn_nanos.load(Ordering::Relaxed);
+            if elapsed_nanos.saturating_sub(last) < warn_every_nanos {
+                return false;
+            }
+
+            if last_warn_nanos
+                .compare_exchange(last, elapsed_nanos, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                return true;
+            }
+        }
+    }
+
+    fn warn_high_poll_rate(name: &str, location: &str, total_polls: u64, elapsed: Duration, polls_per_sec: f64) {
+        #[cfg(feature = "runtime-tokio")]
+        tracing::warn!(
+            task = name,
+            location,
+            total_polls,
+            elapsed_ms = elapsed.as_millis() as u64,
+            polls_per_sec,
+            "high-frequency polling detected"
+        );
+
+        #[cfg(not(feature = "runtime-tokio"))]
+        eprintln!(
+            "high-frequency polling detected: task={name} location={location} total_polls={total_polls} elapsed_ms={} polls_per_sec={polls_per_sec}",
+            elapsed.as_millis()
+        );
+    }
+
+    fn warn_high_child_rate(
+        name: &str,
+        location: &str,
+        started: u64,
+        completed: u64,
+        dropped: u64,
+        in_flight: u64,
+        elapsed: Duration,
+        completed_per_sec: f64,
+    ) {
+        #[cfg(feature = "runtime-tokio")]
+        tracing::warn!(
+            task = name,
+            location,
+            started,
+            completed,
+            dropped,
+            in_flight,
+            elapsed_ms = elapsed.as_millis() as u64,
+            completed_per_sec,
+            "high-frequency concurrent child churn detected"
+        );
+
+        #[cfg(not(feature = "runtime-tokio"))]
+        eprintln!(
+            "high-frequency concurrent child churn detected: task={name} location={location} started={started} completed={completed} dropped={dropped} in_flight={in_flight} elapsed_ms={} completed_per_sec={completed_per_sec}",
+            elapsed.as_millis()
+        );
+    }
+
+    struct PollDiagnosticState {
+        name: String,
+        location: String,
+        started_at: Instant,
+        total_polls: AtomicU64,
+        last_warn_nanos: AtomicU64,
+    }
+
+    /// Future wrapper that counts polls and emits rate-limited warnings.
+    #[must_use = "futures do nothing unless polled or awaited"]
+    pub struct PollDiagnosticFuture<F> {
+        inner: F,
+        state: Option<Arc<PollDiagnosticState>>,
+    }
+
+    impl<F> PollDiagnosticFuture<F> {
+        fn new(inner: F, name: String, module_path: &'static str, file: &'static str, line: u32) -> Self {
+            let state = enabled().then(|| {
+                Arc::new(PollDiagnosticState {
+                    name,
+                    location: location(module_path, file, line),
+                    started_at: Instant::now(),
+                    total_polls: AtomicU64::new(0),
+                    last_warn_nanos: AtomicU64::new(0),
+                })
+            });
+
+            Self { inner, state }
+        }
+    }
+
+    impl<F: Future> Future for PollDiagnosticFuture<F> {
+        type Output = F::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            // SAFETY: `inner` is pinned in place as part of `self`; we never move it.
+            let this = unsafe { self.get_unchecked_mut() };
+
+            if let Some(state) = &this.state {
+                let total_polls = state.total_polls.fetch_add(1, Ordering::Relaxed) + 1;
+                let cfg = config();
+                if total_polls >= cfg.warn_after {
+                    let elapsed = state.started_at.elapsed();
+                    if should_warn(&state.last_warn_nanos, elapsed, cfg.warn_every) {
+                        let polls_per_sec = total_polls as f64 / elapsed.as_secs_f64().max(0.001);
+                        warn_high_poll_rate(&state.name, &state.location, total_polls, elapsed, polls_per_sec);
+                    }
+                }
+            }
+
+            // SAFETY: see above; projecting only the pinned `inner` field.
+            unsafe { Pin::new_unchecked(&mut this.inner) }.poll(cx)
+        }
+    }
+
+    /// Instruments a future using callsite metadata.
+    pub fn instrument<F>(
+        inner: F,
+        name: &'static str,
+        module_path: &'static str,
+        file: &'static str,
+        line: u32,
+    ) -> PollDiagnosticFuture<F> {
+        PollDiagnosticFuture::new(inner, name.to_owned(), module_path, file, line)
+    }
+
+    struct ConcurrentDiagnosticState {
+        name: String,
+        location: String,
+        started_at: Instant,
+        started: AtomicU64,
+        completed: AtomicU64,
+        dropped: AtomicU64,
+        in_flight: AtomicU64,
+        last_warn_nanos: AtomicU64,
+    }
+
+    /// Shared diagnostics for `for_each_concurrent`/`try_for_each_concurrent`
+    /// child futures.
+    #[derive(Clone)]
+    pub struct ConcurrentDiagnostics {
+        state: Option<Arc<ConcurrentDiagnosticState>>,
+    }
+
+    impl ConcurrentDiagnostics {
+        /// Creates a diagnostics handle for one concurrent stream operator.
+        pub fn new(name: &'static str, module_path: &'static str, file: &'static str, line: u32) -> Self {
+            let state = enabled().then(|| {
+                Arc::new(ConcurrentDiagnosticState {
+                    name: name.to_owned(),
+                    location: location(module_path, file, line),
+                    started_at: Instant::now(),
+                    started: AtomicU64::new(0),
+                    completed: AtomicU64::new(0),
+                    dropped: AtomicU64::new(0),
+                    in_flight: AtomicU64::new(0),
+                    last_warn_nanos: AtomicU64::new(0),
+                })
+            });
+
+            Self { state }
+        }
+
+        /// Wraps one child future produced by a concurrent stream operator.
+        pub fn wrap<F>(&self, inner: F) -> ConcurrentDiagnosticFuture<F> {
+            if let Some(state) = &self.state {
+                state.started.fetch_add(1, Ordering::Relaxed);
+                state.in_flight.fetch_add(1, Ordering::Relaxed);
+            }
+
+            ConcurrentDiagnosticFuture {
+                inner,
+                state: self.state.clone(),
+                finished: AtomicBool::new(false),
+            }
+        }
+    }
+
+    /// Child-future wrapper for concurrent stream diagnostics.
+    #[must_use = "futures do nothing unless polled or awaited"]
+    pub struct ConcurrentDiagnosticFuture<F> {
+        inner: F,
+        state: Option<Arc<ConcurrentDiagnosticState>>,
+        finished: AtomicBool,
+    }
+
+    impl<F> ConcurrentDiagnosticFuture<F> {
+        fn mark_finished(&self, completed: bool) {
+            if self.finished.swap(true, Ordering::Relaxed) {
+                return;
+            }
+
+            let Some(state) = &self.state else {
+                return;
+            };
+
+            state.in_flight.fetch_sub(1, Ordering::Relaxed);
+            if completed {
+                let completed = state.completed.fetch_add(1, Ordering::Relaxed) + 1;
+                let cfg = config();
+                if completed >= cfg.warn_after {
+                    let elapsed = state.started_at.elapsed();
+                    if should_warn(&state.last_warn_nanos, elapsed, cfg.warn_every) {
+                        let started = state.started.load(Ordering::Relaxed);
+                        let dropped = state.dropped.load(Ordering::Relaxed);
+                        let in_flight = state.in_flight.load(Ordering::Relaxed);
+                        let completed_per_sec = completed as f64 / elapsed.as_secs_f64().max(0.001);
+                        warn_high_child_rate(
+                            &state.name,
+                            &state.location,
+                            started,
+                            completed,
+                            dropped,
+                            in_flight,
+                            elapsed,
+                            completed_per_sec,
+                        );
+                    }
+                }
+            } else {
+                state.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    impl<F: Future> Future for ConcurrentDiagnosticFuture<F> {
+        type Output = F::Output;
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            // SAFETY: `inner` is pinned in place as part of `self`; we never move it.
+            let this = unsafe { self.get_unchecked_mut() };
+
+            // SAFETY: see above; projecting only the pinned `inner` field.
+            match unsafe { Pin::new_unchecked(&mut this.inner) }.poll(cx) {
+                Poll::Ready(output) => {
+                    this.mark_finished(true);
+                    Poll::Ready(output)
+                }
+                Poll::Pending => Poll::Pending,
+            }
+        }
+    }
+
+    impl<F> Drop for ConcurrentDiagnosticFuture<F> {
+        fn drop(&mut self) {
+            self.mark_finished(false);
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! spawn_as_abortable {
-    ($($expr:expr),*) => {{
-        let (proc, abort_handle) = $crate::runtime::prelude::abortable($($expr),*);
+    ($expr:expr $(,)?) => {{
+        let (proc, abort_handle) = $crate::runtime::prelude::abortable($expr);
         let _jh = $crate::runtime::prelude::spawn(proc);
         abort_handle
-    }}
+    }};
+}
+
+#[macro_export]
+macro_rules! spawn_as_abortable_named {
+    ($name:expr, $expr:expr $(,)?) => {{
+        let proc = $crate::runtime::diagnostics::instrument($expr, $name, module_path!(), file!(), line!());
+        let (proc, abort_handle) = $crate::runtime::prelude::abortable(proc);
+        let _jh = $crate::runtime::prelude::spawn(proc);
+        abort_handle
+    }};
 }
 
 /// Abstraction over tasks that can be aborted (such as join or abort handles).

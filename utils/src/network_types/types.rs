@@ -70,23 +70,16 @@ impl IpOrHost {
     /// If this enum is already an IP address and port, it will simply return it.
     ///
     /// Uses `tokio` resolver.
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                #[cfg(test)]
                 let resolver = hickory_resolver::Resolver::builder_with_config(
                     hickory_resolver::config::ResolverConfig::default(),
                     hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
                 )
                 .build()
                 .map_err(std::io::Error::other)?;
-
-                #[cfg(not(test))]
-                let resolver = hickory_resolver::Resolver::builder_tokio()
-                    .map_err(std::io::Error::other)?
-                    .build()
-                    .map_err(std::io::Error::other)?;
 
                 let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
                 Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
