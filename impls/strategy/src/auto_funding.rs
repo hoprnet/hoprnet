@@ -38,10 +38,10 @@ use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
-    static ref METRIC_COUNT_AUTO_FUNDING_FAILURES: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_failure_count", "Count of failed automatic funding attempts").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDING_FAILURES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_failure_count", "Count of failed automatic funding attempts").unwrap();
 }
 
 fn validate_funding_amount(amount: &HoprBalance) -> std::result::Result<(), ValidationError> {

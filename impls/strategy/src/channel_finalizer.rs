@@ -20,7 +20,7 @@ use crate::{errors, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_strategy_closure_auto_finalization_count",
         "Count of channels where closure finalizing was initiated automatically"
     )

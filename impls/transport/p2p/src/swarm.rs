@@ -21,16 +21,16 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_types::telemetry::SimpleGauge =  hopr_types::telemetry::SimpleGauge::new(
+    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_api::types::telemetry::SimpleGauge =  hopr_api::types::telemetry::SimpleGauge::new(
         "hopr_transport_p2p_active_connection_count",
         "Number of currently active p2p connections as observed from libp2p events"
     ).unwrap();
-    static ref METRIC_TRANSPORT_NAT_STATUS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
+    static ref METRIC_TRANSPORT_NAT_STATUS: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
         "hopr_transport_p2p_nat_status",
         "Current NAT status as reported by libp2p autonat. 0=Unknown, 1=Public, 2=Private"
     ).unwrap();
-    static ref METRIC_NETWORK_HEALTH: hopr_types::telemetry::SimpleGauge =
-         hopr_types::telemetry::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
+    static ref METRIC_NETWORK_HEALTH: hopr_api::types::telemetry::SimpleGauge =
+         hopr_api::types::telemetry::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
 }
 
 pub struct InactiveNetwork {

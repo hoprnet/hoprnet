@@ -42,8 +42,8 @@ const REDEMPTION_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_REDEEMS:  hopr_types::telemetry::SimpleCounter =
-         hopr_types::telemetry::SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
+    static ref METRIC_COUNT_AUTO_REDEEMS:  hopr_api::types::telemetry::SimpleCounter =
+         hopr_api::types::telemetry::SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
 fn min_redeem_hopr() -> HoprBalance {

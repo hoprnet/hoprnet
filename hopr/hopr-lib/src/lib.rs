@@ -67,7 +67,7 @@ use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprT
 use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
-pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+pub use hopr_api::types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::debug;
@@ -723,7 +723,7 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 /// Only available when compiled with the `telemetry` feature.
 #[cfg(feature = "telemetry")]
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    hopr_types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
+    hopr_api::types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
 }
 
 /// Converts a PeerId to an OffchainPublicKey.

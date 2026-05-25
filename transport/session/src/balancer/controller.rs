@@ -18,32 +18,32 @@ use crate::SessionId;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_types::telemetry::MultiGauge =
-        hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_target_error_estimate",
             "Target error estimation by the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CONTROL_OUTPUT: hopr_types::telemetry::MultiGauge =
-        hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_CONTROL_OUTPUT: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_control_output",
             "Control output of the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_BUFFER: hopr_types::telemetry::MultiGauge =
-        hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_CURRENT_BUFFER: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_estimate",
             "Estimated number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_TARGET: hopr_types::telemetry::MultiGauge =
-        hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_CURRENT_TARGET: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_target",
             "Current target (setpoint) number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_SURB_RATE: hopr_types::telemetry::MultiGauge =
-        hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_SURB_RATE: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
             "hopr_surb_balancer_surbs_rate",
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
@@ -394,7 +394,7 @@ where
 mod tests {
     use std::sync::{Arc, atomic::AtomicU64};
 
-    use hopr_types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
     use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
