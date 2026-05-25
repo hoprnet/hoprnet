@@ -484,6 +484,17 @@ mod tests {
                 .context("egress queue should accept test packet")?;
         }
 
+        // Wait for at least one stream open (first cache miss).
+        let open_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+        while control.open_calls() < 1 && tokio::time::Instant::now() < open_deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        assert!(
+            control.open_calls() >= 1,
+            "stream was never opened — egress task did not process any packet"
+        );
+
+        // Now give it another second to reopen pathologically; it must not.
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
         while control.open_calls() < 2 && tokio::time::Instant::now() < deadline {
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;

@@ -353,14 +353,7 @@ pub mod diagnostics {
 #[macro_export]
 macro_rules! spawn_as_abortable {
     ($expr:expr $(,)?) => {{
-        let proc = $crate::runtime::diagnostics::instrument(
-            $expr,
-            concat!(module_path!(), "::abortable_task"),
-            module_path!(),
-            file!(),
-            line!(),
-        );
-        let (proc, abort_handle) = $crate::runtime::prelude::abortable(proc);
+        let (proc, abort_handle) = $crate::runtime::prelude::abortable($expr);
         let _jh = $crate::runtime::prelude::spawn(proc);
         abort_handle
     }};
