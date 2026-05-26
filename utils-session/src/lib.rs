@@ -64,7 +64,7 @@ pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_CLIENTS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_ACTIVE_CLIENTS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_hoprd_clients",
         "Number of clients connected at this Entry node",
         &["type"]
@@ -323,6 +323,9 @@ where
     }
 
     fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
+        // `.into()` is a no-op when explicit-path is off (Routing = HopRouting) but
+        // required when explicit-path is on (Routing = RoutingOptions).
+        #[allow(clippy::useless_conversion)]
         Ok((cfg.forward_path.into(), cfg.return_path.into()))
     }
 

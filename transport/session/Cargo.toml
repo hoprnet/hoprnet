@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.22.0"
+version = "0.22.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -23,7 +23,7 @@ runtime-tokio = [
 telemetry = [
   "hopr-utils/network-types-telemetry",
   "hopr-protocol-session/telemetry",
-  "hopr-types/telemetry",
+  "hopr-api/types-telemetry",
   "dep:lazy_static",
 ]
 allocator-mimalloc = [
@@ -54,12 +54,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, optional = true }
 
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "internal",
-  "primitive",
-  "random",
-] }
+hopr-api = { workspace = true, features = ["types-random"] }
 hopr-utils = { workspace = true, features = [
   "network-types",
   "network-types-serde",

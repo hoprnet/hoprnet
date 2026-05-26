@@ -60,16 +60,16 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PROCESS_START_TIME:  hopr_types::telemetry::SimpleGauge =  hopr_types::telemetry::SimpleGauge::new(
+    static ref METRIC_PROCESS_START_TIME:  hopr_api::types::telemetry::SimpleGauge =  hopr_api::types::telemetry::SimpleGauge::new(
         "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
-    static ref METRIC_HOPR_LIB_VERSION:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_HOPR_LIB_VERSION:  hopr_api::types::telemetry::MultiGauge =  hopr_api::types::telemetry::MultiGauge::new(
         "hopr_lib_version",
         "Executed version of hopr-lib",
         &["version"]
     ).unwrap();
-    static ref METRIC_HOPR_NODE_INFO:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_HOPR_NODE_INFO:  hopr_api::types::telemetry::MultiGauge =  hopr_api::types::telemetry::MultiGauge::new(
         "hopr_node_addresses",
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
@@ -240,11 +240,19 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
-        let handle = hopr_utils::spawn_as_abortable!(
+        let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_server_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let handle = hopr_utils::spawn_as_abortable_named!(
+            "hopr_lib_session_server",
             session_rx
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
-                    async move {
+                    let session_diag = session_diag.clone();
+                    session_diag.wrap(async move {
                         let session_id = *session.session.id();
                         match server.process(session).await {
                             Ok(()) => tracing::debug!(?session_id, "session processed successfully"),
@@ -252,7 +260,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
                                 tracing::error!(?session_id, %error, "session processing failed")
                             }
                         }
-                    }
+                    })
                 })
                 .inspect(|_| tracing::warn!(
                     task = %HoprLibProcess::SessionServer,
@@ -776,7 +784,8 @@ macro_rules! impl_build_methods {
             let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
             let tmgr_clone = ticket_manager.clone();
             spawn(
-                tickets_rx_stream
+                hopr_utils::runtime::diagnostics::instrument(
+                    tickets_rx_stream
                     .for_each(move |event| {
                         if let TicketEvent::WinningTicket(ticket) = &event
                             && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
@@ -791,6 +800,11 @@ macro_rules! impl_build_methods {
                     .inspect(|_| {
                         tracing::warn!(task = %HoprLibProcess::TicketEvents, "long-running background task finished")
                     }),
+                    "hopr_lib_ticket_events",
+                    module_path!(),
+                    file!(),
+                    line!(),
+                ),
             );
 
             {
@@ -798,51 +812,56 @@ macro_rules! impl_build_methods {
                 let tmgr_for_neglect = ticket_manager.clone();
                 let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
                 let (neglect_handle, neglect_reg) = hopr_utils::runtime::AbortHandle::new_pair();
-                spawn(
-                    futures::stream::Abortable::new(
-                        events.filter_map(move |event| {
-                            futures::future::ready(match event {
-                                ChainEvent::ChannelClosed(ch) => Some(ch),
-                                _ => None,
-                            })
-                        }),
-                        neglect_reg,
-                    )
-                    .for_each(move |closed_channel| {
-                        let chain = chain_for_neglect.clone();
-                        let tmgr = tmgr_for_neglect.clone();
-                        async move {
-                            match closed_channel.direction(chain.me()) {
-                                Some(ChannelDirection::Incoming) => {
-                                    match tmgr.neglect_tickets(closed_channel.get_id(), None) {
-                                        Ok(neglected) if !neglected.is_empty() => {
-                                            tracing::warn!(
-                                                num_neglected = neglected.len(),
-                                                %closed_channel,
-                                                "tickets on incoming closed channel were neglected"
-                                            );
-                                        }
-                                        Ok(_) => {}
-                                        Err(error) => {
-                                            tracing::error!(
-                                                %error, %closed_channel,
-                                                "failed to neglect tickets on closed channel"
-                                            );
-                                        }
+                let neglect_task = futures::stream::Abortable::new(
+                    events.filter_map(move |event| {
+                        futures::future::ready(match event {
+                            ChainEvent::ChannelClosed(ch) => Some(ch),
+                            _ => None,
+                        })
+                    }),
+                    neglect_reg,
+                )
+                .for_each(move |closed_channel| {
+                    let chain = chain_for_neglect.clone();
+                    let tmgr = tmgr_for_neglect.clone();
+                    async move {
+                        match closed_channel.direction(chain.me()) {
+                            Some(ChannelDirection::Incoming) => {
+                                match tmgr.neglect_tickets(closed_channel.get_id(), None) {
+                                    Ok(neglected) if !neglected.is_empty() => {
+                                        tracing::warn!(
+                                            num_neglected = neglected.len(),
+                                            %closed_channel,
+                                            "tickets on incoming closed channel were neglected"
+                                        );
+                                    }
+                                    Ok(_) => {}
+                                    Err(error) => {
+                                        tracing::error!(
+                                            %error, %closed_channel,
+                                            "failed to neglect tickets on closed channel"
+                                        );
                                     }
                                 }
-                                Some(ChannelDirection::Outgoing) => {}
-                                _ => {}
                             }
+                            Some(ChannelDirection::Outgoing) => {}
+                            _ => {}
                         }
-                    })
-                    .inspect(|_| {
-                        tracing::warn!(
-                            task = %HoprLibProcess::ChannelClosureNeglect,
-                            "channel closure ticket neglect task finished"
-                        )
-                    }),
-                );
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::ChannelClosureNeglect,
+                        "channel closure ticket neglect task finished"
+                    )
+                });
+                spawn(hopr_utils::runtime::diagnostics::instrument(
+                    neglect_task,
+                    "hopr_lib_channel_closure_neglect",
+                    module_path!(),
+                    file!(),
+                    line!(),
+                ));
                 processes.insert(HoprLibProcess::ChannelClosureNeglect, neglect_handle);
             }
 

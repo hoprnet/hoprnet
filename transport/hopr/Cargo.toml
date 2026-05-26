@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.28.1"
+version = "0.28.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -16,7 +16,7 @@ all-benchmarks = []
 capture = ["dep:pcap-file"]
 telemetry = [
   "serde",
-  "hopr-types/telemetry",
+  "hopr-api/types-telemetry",
   "hopr-protocol-hopr/telemetry",
   "hopr-transport-session/telemetry",
   "hopr-utils/network-types-telemetry",
@@ -67,18 +67,12 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = [
   "types-random",
+  "types-internal",
   "tickets",
   "node",
   "network",
   "chain",
   "graph",
-] }
-hopr-types = { workspace = true, features = [
-  "crypto",
-  "random",
-  "internal",
-  "primitive",
-  "serde",
 ] }
 
 hopr-utils = { workspace = true, features = [

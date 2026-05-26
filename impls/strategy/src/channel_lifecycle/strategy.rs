@@ -9,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
 use futures::StreamExt as _;
-use hopr_lib::api::{
+use hopr_api::{
     chain::{
         ChainEvent, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
         ChainWriteChannelOperations,

@@ -3,7 +3,7 @@
 
 use std::time::Instant;
 
-use hopr_lib::api::{
+use hopr_api::{
     chain::{
         ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
         ChainWriteChannelOperations,

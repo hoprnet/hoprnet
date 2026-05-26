@@ -3447,9 +3447,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "253cae294dced141adf9e102a09bd4bcbac36efaf13451d1fad93661b59c5a16"
+checksum = "e33fb0c32d216e93e58a050edea339bc8ed5bd8fe844bf893b849fc402824412"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -3784,7 +3784,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3796,8 +3796,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
- "hopr-lib",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3845,7 +3843,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3875,7 +3873,6 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4040,9 +4037,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.8.0"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f06ce2e57452d2b33e65e6fe9f320422fee2b87970e6ef07803005827e28dfb"
+checksum = "75e82a6426de74cdef7bbef15f651ce546ab39fc77ef1dc4002247b6bbf034fc"
 dependencies = [
  "aes",
  "anyhow",
