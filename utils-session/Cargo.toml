@@ -1,6 +1,6 @@
 [package]
 name = "hopr-utils-session"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -22,7 +22,7 @@ runtime-tokio = [
 ]
 explicit-path = ["hopr-lib/explicit-path"]
 telemetry = [
-  "hopr-types/telemetry",
+  "hopr-api/types-telemetry",
   "hopr-transport/telemetry",
   "hopr-utils/network-types-telemetry",
 ]
@@ -47,7 +47,6 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-lib = { workspace = true, features = ["session-client"] }
-hopr-types = { workspace = true }
 hopr-utils = { workspace = true, features = ["network-types"] }
 hopr-transport = { workspace = true }
 

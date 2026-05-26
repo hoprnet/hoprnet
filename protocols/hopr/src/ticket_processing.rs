@@ -15,42 +15,42 @@ lazy_static::lazy_static! {
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
 
-        static ref UNACK_PEERS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
+        static ref UNACK_PEERS: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
             "hopr_tickets_unack_peers_total",
             "Number of peers with unacknowledged tickets in cache",
         )
         .unwrap();
-        static ref UNACK_TICKETS: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
+        static ref UNACK_TICKETS: hopr_api::types::telemetry::SimpleGauge = hopr_api::types::telemetry::SimpleGauge::new(
             "hopr_tickets_unack_tickets_total",
             "Total number of unacknowledged tickets across all peer caches",
         )
         .unwrap();
-        static ref UNACK_INSERTIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+        static ref UNACK_INSERTIONS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_tickets_unack_insertions_total",
             "Total number of unacknowledged tickets inserted into cache",
         )
         .unwrap();
-        static ref UNACK_LOOKUPS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+        static ref UNACK_LOOKUPS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_tickets_unack_lookups_total",
             "Total number of ticket acknowledgement lookups",
         )
         .unwrap();
-        static ref UNACK_LOOKUP_MISSES: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+        static ref UNACK_LOOKUP_MISSES: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_tickets_unack_lookup_misses_total",
             "Total number of ticket lookup failures (unknown ticket)",
         )
         .unwrap();
-        static ref UNACK_EVICTIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+        static ref UNACK_EVICTIONS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_tickets_unack_evictions_total",
             "Total number of unacknowledged tickets evicted from cache due to TTL or capacity limits",
         )
         .unwrap();
-        static ref UNACK_PEER_EVICTIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+        static ref UNACK_PEER_EVICTIONS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_tickets_unack_peer_evictions_total",
             "Total number of peer caches evicted from the outer unacknowledged ticket cache",
         )
         .unwrap();
-        static ref UNACK_TICKETS_PER_PEER: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
+        static ref UNACK_TICKETS_PER_PEER: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
             "hopr_tickets_unack_tickets_per_peer",
             "Number of unacknowledged tickets per peer in cache (enable with HOPR_METRICS_UNACK_PER_PEER=1)",
             &["peer"],

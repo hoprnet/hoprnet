@@ -17,7 +17,7 @@ mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_protocol_session::AcknowledgementMode;
-use hopr_types::internal::routing::RoutingOptions;
+use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_utils::network_types::types::*;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
@@ -75,17 +75,17 @@ pub type Capabilities = flagset::FlagSet<Capability>;
 #[derive(Debug, PartialEq, Clone, smart_default::SmartDefault)]
 pub struct SessionClientConfig {
     /// The forward path options for the session.
-    #[default(RoutingOptions::Hops(hopr_types::primitive::bounded::BoundedSize::MIN))]
+    #[default(RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN))]
     pub forward_path_options: RoutingOptions,
     /// The return path options for the session.
-    #[default(RoutingOptions::Hops(hopr_types::primitive::bounded::BoundedSize::MIN))]
+    #[default(RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN))]
     pub return_path_options: RoutingOptions,
     /// Capabilities offered by the session.
     #[default(_code = "Capability::Segmentation.into()")]
     pub capabilities: Capabilities,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
     #[default(None)]
-    pub pseudonym: Option<hopr_types::internal::protocol::HoprPseudonym>,
+    pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the Session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
@@ -110,7 +110,7 @@ mod tests {
     use hopr_protocol_start::{
         KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
     };
-    use hopr_types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
     use crate::types::HoprStartProtocol;
