@@ -18,7 +18,7 @@ use std::{
 use async_trait::async_trait;
 use dashmap::DashSet;
 use futures::StreamExt;
-use hopr_lib::api::{
+use hopr_api::{
     chain::{
         ChainReadChannelOperations, ChainReadSafeOperations, ChainValues, ChainWriteChannelOperations, ChannelSelector,
         SafeSelector,
@@ -38,10 +38,10 @@ use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
-    static ref METRIC_COUNT_AUTO_FUNDING_FAILURES: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_failure_count", "Count of failed automatic funding attempts").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDING_FAILURES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new("hopr_strategy_auto_funding_failure_count", "Count of failed automatic funding attempts").unwrap();
 }
 
 fn validate_funding_amount(amount: &HoprBalance) -> std::result::Result<(), ValidationError> {
@@ -287,7 +287,7 @@ where
         + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
-        use hopr_lib::api::{chain::ChainEvent, node::ActionableEvent};
+        use hopr_api::{chain::ChainEvent, node::ActionableEvent};
 
         enum Event {
             Tick,
@@ -399,8 +399,7 @@ mod tests {
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::api::{
+    use hopr_api::{
         chain::{
             AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainWriteAccountOperations,
             HoprChainApi,
@@ -415,6 +414,7 @@ mod tests {
             primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
     };
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
     use super::*;
 

@@ -3784,7 +3784,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3796,8 +3796,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
- "hopr-lib",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",

@@ -1,19 +1,19 @@
 use std::{sync::Arc, time::Duration};
 
 use futures::{StreamExt as _, TryStreamExt, stream::FuturesUnordered};
-use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
-use hopr_crypto_packet::prelude::*;
-use hopr_protocol_hopr::{FoundSurb, SurbStore};
 #[cfg(all(feature = "telemetry", not(test)))]
 use hopr_api::types::internal::path::Path;
 use hopr_api::{
     OffchainPublicKey,
+    chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations},
     types::{
         crypto::crypto_traits::Randomizable,
         internal::{errors::PathError, prelude::*},
         primitive::traits::ToHex,
     },
 };
+use hopr_crypto_packet::prelude::*;
+use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
@@ -372,7 +372,9 @@ where
                             let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
                                 Ok(vp) => valid_paths.push((vp, pwc.cost)),
-                                Err(e) => tracing::debug!(error = %e, "background refresh: path candidate failed validation"),
+                                Err(e) => {
+                                    tracing::debug!(error = %e, "background refresh: path candidate failed validation")
+                                }
                             }
                         }
 
@@ -404,13 +406,13 @@ mod tests {
             NetworkGraphWrite,
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
+        types::{
+            crypto::prelude::{Keypair, OffchainKeypair},
+            internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
+            primitive::prelude::*,
+        },
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_api::types::{
-        crypto::prelude::{Keypair, OffchainKeypair},
-        internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
-        primitive::prelude::*,
-    };
 
     use super::*;
     use crate::path::selector::HoprGraphPathSelector;
