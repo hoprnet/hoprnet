@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use hopr_lib::api::types::primitive::prelude::{Address, HoprBalance};
+use hopr_api::types::primitive::prelude::{Address, HoprBalance};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;

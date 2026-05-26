@@ -10,7 +10,7 @@ use std::{
 };
 
 use futures::StreamExt as _;
-use hopr_lib::api::{
+use hopr_api::{
     PeerId,
     chain::{
         AccountSelector, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
@@ -696,8 +696,7 @@ mod tests {
     use dashmap::DashMap;
     use futures::StreamExt as _;
     use hex_literal::hex;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::api::{
+    use hopr_api::{
         PeerId,
         chain::{
             AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainReadChannelOperations,
@@ -716,6 +715,7 @@ mod tests {
             primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
     };
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
     // `super` here is `pipeline`; `super::super` is `channel_lifecycle`.
     // Private items (ChannelLifecycleStrategyInner) are accessible from descendant modules.
@@ -788,12 +788,12 @@ mod tests {
 
     struct StubNetworkView;
 
-    impl hopr_lib::api::network::NetworkView for StubNetworkView {
-        fn listening_as(&self) -> HashSet<hopr_lib::api::Multiaddr> {
+    impl hopr_api::network::NetworkView for StubNetworkView {
+        fn listening_as(&self) -> HashSet<hopr_api::Multiaddr> {
             HashSet::new()
         }
 
-        fn multiaddress_of(&self, _peer: &PeerId) -> Option<HashSet<hopr_lib::api::Multiaddr>> {
+        fn multiaddress_of(&self, _peer: &PeerId) -> Option<HashSet<hopr_api::Multiaddr>> {
             None
         }
 
@@ -809,13 +809,13 @@ mod tests {
             false
         }
 
-        fn health(&self) -> hopr_lib::api::network::Health {
-            hopr_lib::api::network::Health::Red
+        fn health(&self) -> hopr_api::network::Health {
+            hopr_api::network::Health::Red
         }
 
         fn subscribe_network_events(
             &self,
-        ) -> impl futures::Stream<Item = hopr_lib::api::network::NetworkEvent> + Send + 'static {
+        ) -> impl futures::Stream<Item = hopr_api::network::NetworkEvent> + Send + 'static {
             futures::stream::pending()
         }
     }
@@ -838,7 +838,7 @@ mod tests {
 
     struct StubGraph;
 
-    impl hopr_lib::api::graph::NetworkGraphView for StubGraph {
+    impl hopr_api::graph::NetworkGraphView for StubGraph {
         type NodeId = OffchainPublicKey;
         type Observed = StubEdge;
 
@@ -861,15 +861,15 @@ mod tests {
         fn identity(&self) -> &OffchainPublicKey {
             static KEY: std::sync::OnceLock<OffchainPublicKey> = std::sync::OnceLock::new();
             KEY.get_or_init(|| {
-                use hopr_lib::api::types::crypto::keypairs::Keypair as _;
-                *hopr_lib::api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
+                use hopr_api::types::crypto::keypairs::Keypair as _;
+                *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
                     .expect("test key")
                     .public()
             })
         }
     }
 
-    impl hopr_lib::api::graph::NetworkGraphConnectivity for StubGraph {
+    impl hopr_api::graph::NetworkGraphConnectivity for StubGraph {
         type NodeId = OffchainPublicKey;
         type Observed = StubEdge;
 
@@ -882,11 +882,11 @@ mod tests {
         }
     }
 
-    impl hopr_lib::api::graph::NetworkGraphTraverse for StubGraph {
+    impl hopr_api::graph::NetworkGraphTraverse for StubGraph {
         type NodeId = OffchainPublicKey;
         type Observed = StubEdge;
 
-        fn simple_paths<V: hopr_lib::api::graph::ValueFn<Weight = StubEdge>>(
+        fn simple_paths<V: hopr_api::graph::ValueFn<Weight = StubEdge>>(
             &self,
             _source: &OffchainPublicKey,
             _destination: &OffchainPublicKey,
@@ -897,7 +897,7 @@ mod tests {
             Vec::new()
         }
 
-        fn simple_paths_from<V: hopr_lib::api::graph::ValueFn<Weight = StubEdge>>(
+        fn simple_paths_from<V: hopr_api::graph::ValueFn<Weight = StubEdge>>(
             &self,
             _source: &OffchainPublicKey,
             _length: usize,
@@ -918,7 +918,7 @@ mod tests {
 
     struct StubEdge;
 
-    impl hopr_lib::api::graph::EdgeObservableRead for StubEdge {
+    impl hopr_api::graph::EdgeObservableRead for StubEdge {
         type ImmediateMeasurement = StubMeasurement;
         type IntermediateMeasurement = StubMeasurement;
 
@@ -939,14 +939,14 @@ mod tests {
         }
     }
 
-    impl hopr_lib::api::graph::traits::EdgeObservableWrite for StubEdge {
-        fn record(&mut self, _measurement: hopr_lib::api::graph::traits::EdgeWeightType) {}
+    impl hopr_api::graph::traits::EdgeObservableWrite for StubEdge {
+        fn record(&mut self, _measurement: hopr_api::graph::traits::EdgeWeightType) {}
     }
 
     struct StubMeasurement;
 
-    impl hopr_lib::api::graph::EdgeLinkObservable for StubMeasurement {
-        fn record(&mut self, _: hopr_lib::api::graph::traits::EdgeTransportMeasurement) {}
+    impl hopr_api::graph::EdgeLinkObservable for StubMeasurement {
+        fn record(&mut self, _: hopr_api::graph::traits::EdgeTransportMeasurement) {}
 
         fn average_latency(&self) -> Option<Duration> {
             None
@@ -961,19 +961,19 @@ mod tests {
         }
     }
 
-    impl hopr_lib::api::graph::traits::EdgeNetworkObservableRead for StubMeasurement {
+    impl hopr_api::graph::traits::EdgeNetworkObservableRead for StubMeasurement {
         fn is_connected(&self) -> bool {
             false
         }
     }
 
-    impl hopr_lib::api::graph::EdgeImmediateProtocolObservable for StubMeasurement {
+    impl hopr_api::graph::EdgeImmediateProtocolObservable for StubMeasurement {
         fn ack_rate(&self) -> Option<f64> {
             None
         }
     }
 
-    impl hopr_lib::api::graph::traits::EdgeProtocolObservable for StubMeasurement {
+    impl hopr_api::graph::traits::EdgeProtocolObservable for StubMeasurement {
         fn capacity(&self) -> Option<u128> {
             None
         }
@@ -1540,7 +1540,11 @@ mod tests {
         let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32));
 
         // Should return Some(topup_balance) (fund tx submitted) and clear open_in_flight.
-        assert_eq!(result, Some(topup_balance), "try_open_channel should return Some(topup_balance) when delegating to fund");
+        assert_eq!(
+            result,
+            Some(topup_balance),
+            "try_open_channel should return Some(topup_balance) when delegating to fund"
+        );
         assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
 
         // Wait for the fund tx to confirm.
@@ -1597,7 +1601,11 @@ mod tests {
         let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
         let result = inner.try_open_channel(*ALICE, initial_balance);
-        assert_eq!(result, Some(initial_balance), "try_open_channel should return Some(initial_balance) for a fresh channel");
+        assert_eq!(
+            result,
+            Some(initial_balance),
+            "try_open_channel should return Some(initial_balance) for a fresh channel"
+        );
 
         // Wait for the open tx to confirm.
         tokio::time::sleep(Duration::from_secs(1)).await;

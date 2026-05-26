@@ -1,7 +1,8 @@
-use hopr_api::graph::{
-    NetworkGraphTraverse, NetworkGraphView, ValueFn, function::EdgeValueFn, traits::EdgeObservableRead,
+use hopr_api::{
+    OffchainPublicKey,
+    graph::{NetworkGraphTraverse, NetworkGraphView, ValueFn, function::EdgeValueFn, traits::EdgeObservableRead},
+    types::internal::errors::PathError,
 };
-use hopr_api::{OffchainPublicKey, types::internal::errors::PathError};
 
 use super::{
     errors::{PathPlannerError, Result},
@@ -248,15 +249,17 @@ mod tests {
 
     use anyhow::Context;
     use hex_literal::hex;
-    use hopr_api::graph::{
-        NetworkGraphWrite,
-        traits::{EdgeObservableWrite, EdgeWeightType},
+    use hopr_api::{
+        graph::{
+            NetworkGraphWrite,
+            traits::{EdgeObservableWrite, EdgeWeightType},
+        },
+        types::{
+            crypto::prelude::{Keypair, OffchainKeypair},
+            internal::routing::RoutingOptions,
+        },
     };
     use hopr_network_graph::ChannelGraph;
-    use hopr_api::types::{
-        crypto::prelude::{Keypair, OffchainKeypair},
-        internal::routing::RoutingOptions,
-    };
 
     use super::*;
     use crate::path::{PathPlannerConfig, traits::PathSelector};
