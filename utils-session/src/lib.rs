@@ -323,6 +323,9 @@ where
     }
 
     fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
+        // `.into()` is a no-op when explicit-path is off (Routing = HopRouting) but
+        // required when explicit-path is on (Routing = RoutingOptions).
+        #[allow(clippy::useless_conversion)]
         Ok((cfg.forward_path.into(), cfg.return_path.into()))
     }
 

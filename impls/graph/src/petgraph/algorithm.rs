@@ -36,10 +36,10 @@ use petgraph::{
 /// * `graph`: an input graph.
 /// * `from`: an initial node of desired paths.
 /// * `to`: a `HashSet` of target nodes. A path is yielded as soon as it reaches any node in this set.
-/// * `excluded_nodes`: an optional set of nodes to exclude from all returned paths. Excluded nodes are
-///   pre-seeded into the visited set so the DFS never enters a branch containing them. Passing `Some(&empty)`
-///   or `None` is equivalent to the default behavior (no exclusions). If `from` is in the excluded set, it
-///   is ignored — the source is always reachable.
+/// * `excluded_nodes`: an optional set of nodes to exclude from all returned paths. Excluded nodes are pre-seeded into
+///   the visited set so the DFS never enters a branch containing them. Passing `Some(&empty)` or `None` is equivalent
+///   to the default behavior (no exclusions). If `from` is in the excluded set, it is ignored — the source is always
+///   reachable.
 /// * `min_intermediate_nodes`: the minimum number of nodes in the desired paths.
 /// * `max_intermediate_nodes`: the maximum number of nodes in the desired paths (optional).
 /// * `initial_cost`: the starting cost value before any edges are traversed.
@@ -588,7 +588,15 @@ mod test {
 
         // ── Without exclusions ─────────────────────────────────────────────
         let all_paths: Vec<(Vec<NodeIndex>, i32)> = all_simple_paths_multi::<_, _, RandomState, _, _>(
-            &graph, src, &targets, None, 0, None, 0, None, |c, _, _| c,
+            &graph,
+            src,
+            &targets,
+            None,
+            0,
+            None,
+            0,
+            None,
+            |c, _, _| c,
         )
         .collect();
 
@@ -611,7 +619,15 @@ mod test {
         // ── With excluded_nodes = {2} ──────────────────────────────────────
         let excluded: HashSet<NodeIndex, RandomState> = HashSet::from_iter([NodeIndex::from(2u32)]);
         let restricted: Vec<(Vec<NodeIndex>, i32)> = all_simple_paths_multi::<_, _, RandomState, _, _>(
-            &graph, src, &targets, Some(&excluded), 0, None, 0, None, |c, _, _| c,
+            &graph,
+            src,
+            &targets,
+            Some(&excluded),
+            0,
+            None,
+            0,
+            None,
+            |c, _, _| c,
         )
         .collect();
 
@@ -620,7 +636,10 @@ mod test {
         assert_eq!(restricted.len(), 5, "expected 5 paths when node 2 is excluded");
 
         for (path, _) in &restricted {
-            assert!(!path.contains(&NodeIndex::from(2u32)), "excluded node 2 in path: {path:?}");
+            assert!(
+                !path.contains(&NodeIndex::from(2u32)),
+                "excluded node 2 in path: {path:?}"
+            );
             let unique: HashSet<&NodeIndex, RandomState> = path.iter().collect();
             assert_eq!(unique.len(), path.len(), "duplicate node in path: {path:?}");
         }
@@ -632,7 +651,10 @@ mod test {
             .collect();
         for (path, _) in &restricted {
             let as_usize: Vec<usize> = path.iter().map(|n| n.index()).collect();
-            assert!(all_set.contains(&as_usize), "restricted path not in all-paths: {path:?}");
+            assert!(
+                all_set.contains(&as_usize),
+                "restricted path not in all-paths: {path:?}"
+            );
         }
     }
 

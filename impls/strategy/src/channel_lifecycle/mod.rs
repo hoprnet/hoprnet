@@ -66,7 +66,7 @@ mod strategy;
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use dashmap::{DashMap, DashSet};
-use hopr_lib::api::{
+use hopr_api::{
     PeerId,
     types::{
         crypto::prelude::OffchainPublicKey,

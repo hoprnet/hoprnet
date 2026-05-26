@@ -12,7 +12,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
-use hopr_lib::api::{
+use hopr_api::{
     chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
     node::{
         ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasTicketManagement,
@@ -405,25 +405,23 @@ mod tests {
     use futures_time::future::FutureExt as TimeExt;
     use hex_literal::hex;
     use hopr_api::{
-        tickets::{ChannelStats, RedemptionResult},
-        types::crypto_random::Randomizable,
-    };
-    use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
-    use hopr_lib::api::{
         chain::{ChainEvent, ChainEvents, ChainWriteTicketOperations, HoprChainApi},
         node::{
             ActionableEvent, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi,
             HasTicketManagement, NodeOnchainIdentity, TicketEvent,
         },
+        tickets::{ChannelStats, RedemptionResult},
         types::{
             crypto::{
                 keypairs::Keypair,
                 prelude::{ChainKeypair, HalfKey, Hash, Response},
             },
+            crypto_random::Randomizable,
             internal::prelude::{RedeemableTicket, TicketBuilder, WinningProbability},
             primitive::prelude::{Address, BytesRepresentable, HoprBalance, UnitaryFloatOps, XDaiBalance},
         },
     };
+    use hopr_chain_connector::{HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector, testing::*};
 
     use super::*;
 
