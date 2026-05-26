@@ -42,6 +42,12 @@ pub struct SafeModule {
     pub module_address: Address,
 }
 
+#[cfg(feature = "session-server")]
+#[inline]
+fn default_incoming_session_capacity() -> usize {
+    256
+}
+
 #[allow(dead_code)]
 fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     if std::path::Path::new(s).is_dir() {
@@ -90,21 +96,17 @@ pub struct HoprLibConfig {
     pub out_index_sync_period: Duration,
     /// Capacity of the incoming session channel (number of buffered sessions).
     ///
-    /// Used only when the `session-server` feature is enabled.
-    /// Default is 256.
+    /// Only relevant when the `session-server` feature is enabled. Default is 256.
+    #[cfg(feature = "session-server")]
     #[default(default_incoming_session_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_incoming_session_capacity"))]
     pub incoming_session_capacity: usize,
     /// Disables win-probability and ticket-price protocol safety checks.
     ///
-    /// Should only be set in testing or local-cluster environments.
-    /// Default is false.
+    /// Only available in debug builds. Never set in production.
+    #[cfg(debug_assertions)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub disable_protocol_checks: bool,
-}
-
-fn default_incoming_session_capacity() -> usize {
-    256
 }
 
 const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);

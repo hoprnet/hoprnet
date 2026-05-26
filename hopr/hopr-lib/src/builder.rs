@@ -405,9 +405,14 @@ where
         ));
     }
 
+    #[cfg(debug_assertions)]
+    let skip_protocol_checks = ctx.cfg.disable_protocol_checks;
+    #[cfg(not(debug_assertions))]
+    let skip_protocol_checks = false;
+
     let network_min_ticket_price = chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
     let configured_ticket_price = ctx.cfg.protocol.packet.codec.outgoing_ticket_price;
-    if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
+    if !skip_protocol_checks && configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
         return Err(HoprLibError::GeneralError(format!(
             "configured outgoing ticket price < network minimum: {configured_ticket_price:?} < \
              {network_min_ticket_price}"
@@ -419,7 +424,8 @@ where
         .await
         .map_err(HoprLibError::chain)?;
     let configured_win_prob = ctx.cfg.protocol.packet.codec.outgoing_win_prob;
-    if !ctx.cfg.disable_protocol_checks
+
+    if !skip_protocol_checks
         && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
     {
         return Err(HoprLibError::GeneralError(format!(
