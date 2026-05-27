@@ -19,6 +19,8 @@ use hopr_api::{
     },
 };
 
+use tracing::info;
+
 use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
@@ -101,6 +103,13 @@ where
         + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
+        info!(
+            target = self.cfg.population.target_open_channels,
+            min = self.cfg.population.min_open_channels,
+            tick_interval_secs = self.cfg.tick_interval.as_secs(),
+            initial_balance = %self.cfg.funding.initial_balance,
+            "channel-lifecycle: strategy started"
+        );
         self.run_pipeline().await;
 
         let me = *self.node.chain_api().me();

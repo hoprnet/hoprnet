@@ -73,6 +73,11 @@ pub use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::debug;
 
 pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
+/// Maximum user-data payload per HOPR session frame (bytes).
+///
+/// Use this when sizing buffers or computing how many session frames a given
+/// wxHOPR balance can fund (together with the on-chain ticket price).
+pub use hopr_transport::SESSION_MTU;
 use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.

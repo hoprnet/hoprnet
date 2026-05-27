@@ -14,7 +14,7 @@ use hopr_api::{
         primitive::prelude::Address,
     },
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 use super::{ChannelLifecycleStrategyInner, ChannelObservation};
 
@@ -75,17 +75,17 @@ where
         self.last_observed.entry(*ch.get_id()).and_modify(|obs| {
             obs.balance = ch.balance;
         });
-        debug!(%ch, "channel-lifecycle: cleared fund in-flight after balance increase");
+        info!(%ch, "channel-lifecycle: channel balance increased");
     }
 
     pub(super) fn on_channel_opened(&self, ch: ChannelEntry) {
         self.open_in_flight.remove(&ch.destination);
-        debug!(%ch, "channel-lifecycle: channel opened, cleared open in-flight");
+        info!(%ch, "channel-lifecycle: channel opened");
     }
 
     pub(super) fn on_channel_closure_initiated(&self, ch: ChannelEntry) {
         self.close_in_flight.remove(ch.get_id());
-        debug!(%ch, "channel-lifecycle: closure initiated, cleared close in-flight");
+        info!(%ch, "channel-lifecycle: channel closure initiated");
     }
 
     /// Starts the peer cooldown so the channel is not immediately re-opened.
@@ -95,7 +95,7 @@ where
         self.peer_ticket_activity.remove(&ch.destination);
         let until = Instant::now() + self.cfg.population.peer_reopen_cooldown;
         self.cooldown.insert(ch.destination, until);
-        debug!(%ch, "channel-lifecycle: channel closed, peer on cooldown");
+        info!(%ch, "channel-lifecycle: channel closed");
     }
 
     /// Records ticket activity for the proactive drain-rate estimate.
