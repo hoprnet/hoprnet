@@ -402,10 +402,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::{
         chain::{ChainKeyOperations, ChainReadChannelOperations, ChannelSelector, HoprKeyIdent},
-        graph::{
-            NetworkGraphWrite,
-            traits::{EdgeObservableWrite, EdgeWeightType},
-        },
+        graph::{NetworkGraphWrite, traits::EdgeObservableWrite},
         types::{
             crypto::prelude::{Keypair, OffchainKeypair},
             internal::channels::{ChannelEntry, ChannelStatus, generate_channel_id},
