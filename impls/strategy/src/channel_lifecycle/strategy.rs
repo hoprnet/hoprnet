@@ -103,7 +103,7 @@ where
         + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
-        info!(
+        tracing::info!(
             target = self.cfg.population.target_open_channels,
             min = self.cfg.population.min_open_channels,
             tick_interval_secs = self.cfg.tick_interval.as_secs(),

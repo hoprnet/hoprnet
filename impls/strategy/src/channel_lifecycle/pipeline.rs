@@ -25,7 +25,7 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 
 use super::{ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache};
 use crate::errors::StrategyError;
