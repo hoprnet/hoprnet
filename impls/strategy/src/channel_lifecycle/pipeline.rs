@@ -684,7 +684,7 @@ where
             // retire every unprobed channel — including channels that were
             // opened before this strategy instance started.
             if !self.has_probing_data(pk) {
-                trace!(%dest, "channel-lifecycle: skipping close evaluation — no graph observations yet");
+                tracing::trace!(%dest, "channel-lifecycle: skipping close evaluation — no graph observations yet");
                 return false;
             }
 
