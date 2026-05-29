@@ -520,15 +520,17 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 
 /// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
 ///
-/// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
-/// development), but since they never receive tickets, they have nothing to acknowledge.
-async fn start_exit_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
+/// Used by Entry and Exit nodes — neither processes incoming ticket acknowledgements.
+/// Entry nodes receive acks from relays (they pay for forwarding), Exit nodes keep
+/// the pipeline alive for future PIX use. In both cases the queue must be actively
+/// drained; dropping the receiver causes every inbound ack dispatch to fail with
+/// `SendError(disconnected)`.
+async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
 where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
 {
     ack_incoming
         .for_each(move |(peer, acks)| {
-            // TODO: PIX will make use of acknowledgements at Exits
             tracing::trace!(%peer, num = acks.len(), "received acknowledgements (drained, not processed)");
             futures::future::ready(())
         })
@@ -784,22 +786,71 @@ where
             );
         }
         NodeType::Exit => {
-            // Exit nodes still run the incoming acknowledgement pipeline (for future use),
+            // Exit nodes still run the incoming acknowledgement pipeline (for future PIX use),
             // but only drain the stream — incoming acknowledgements are NOT forwarded to the
             // UnacknowledgedTicketProcessor because Exit nodes do not process tickets.
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_exit_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
             );
         }
         NodeType::Entry => {
-            // Entry nodes do not process tickets at all and do not even start the incoming
-            // acknowledgement pipeline. The receiver is dropped here, which propagates back
-            // pressure to senders of `incoming_ack_tx`.
-            let _ = (ticket_events, ticket_proc, ack_input_concurrency, incoming_ack_rx);
+            // Entry nodes do not process tickets, but they DO receive ticket acknowledgements
+            // (they pay relays for forwarding). The queue must be actively drained so the
+            // inbound dispatcher can keep sending without hitting `SendError(disconnected)`.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency);
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+            );
         }
     }
 
     processes
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::channel::mpsc;
+
+    use super::*;
+
+    /// Regression test for the Entry-node ack-sink bug.
+    ///
+    /// Before the fix, `NodeType::Entry` dropped `incoming_ack_rx` immediately at
+    /// pipeline startup. Every subsequent call to `incoming_ack_tx.send(…)` then
+    /// returned `SendError(disconnected)`, flooding logs with ~300 errors per run.
+    ///
+    /// `start_drain_incoming_ack_pipeline` must hold the receiver open for the
+    /// lifetime of its task; once the sender side is dropped the task completes
+    /// cleanly.
+    #[tokio::test]
+    async fn drain_pipeline_keeps_receiver_alive() {
+        let (tx, rx) = mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(16);
+        let drain = tokio::spawn(start_drain_incoming_ack_pipeline(rx));
+
+        // Give the drain task a chance to start up.
+        tokio::task::yield_now().await;
+
+        // With the old code (drop receiver) tx.is_closed() would be true here.
+        assert!(!tx.is_closed(), "drain task must hold the receiver alive");
+
+        // Drop the sender — drain task should complete cleanly.
+        drop(tx);
+        drain
+            .await
+            .expect("drain task must finish cleanly after sender is dropped");
+    }
+
+    /// Regression: the drain must complete cleanly when the sender is dropped (no deadlock/panic).
+    #[tokio::test]
+    async fn drain_pipeline_completes_on_empty_stream() {
+        let (tx, rx) = mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(32);
+        let drain = tokio::spawn(start_drain_incoming_ack_pipeline(rx));
+        drop(tx);
+        drain
+            .await
+            .expect("drain task must finish cleanly after sender is dropped");
+    }
 }

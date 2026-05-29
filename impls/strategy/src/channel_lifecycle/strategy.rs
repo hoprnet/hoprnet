@@ -19,6 +19,8 @@ use hopr_api::{
     },
 };
 
+use tracing::info;
+
 use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 

@@ -132,6 +132,22 @@ where
             + self.cfg.eligibility.ticket_activity_weight * ticket_score
     }
 
+    /// Returns `true` when the graph has at least one observation for the edge
+    /// `me → peer` (i.e. `last_update > Duration::ZERO`).
+    ///
+    /// `EdgeObservableRead::last_update()` is `Duration::ZERO` for edges that
+    /// have never received any `EdgeWeightType` record.  Any record —
+    /// `Immediate`, `Intermediate`, `Connected`, `Capacity`, or
+    /// `ImmediateProtocolConformance` — counts as "probing established."
+    fn has_probing_data(&self, peer_offchain: &OffchainPublicKey) -> bool {
+        let my_key = self.node.graph().identity();
+        self.node
+            .graph()
+            .edge(my_key, peer_offchain)
+            .map(|e| e.last_update() > Duration::ZERO)
+            .unwrap_or(false)
+    }
+
     /// Returns `true` if the channel should be proactively funded before the
     /// next transaction confirms.
     ///
@@ -485,7 +501,11 @@ where
                     self.proactive_fund_needed(ch, &prev_observations, est_tx_secs, min_ticket_price_wei);
 
                 if needs_topup || needs_proactive {
-                    let reason = if needs_topup { "below_lower_threshold" } else { "proactive_drain" };
+                    let reason = if needs_topup {
+                        "below_lower_threshold"
+                    } else {
+                        "proactive_drain"
+                    };
                     debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
                     if safe_remaining < self.cfg.funding.topup_balance {
                         debug!("channel-lifecycle: safe balance exhausted in fund pass");
@@ -507,7 +527,12 @@ where
         // ── 3. Close pass ─────────────────────────────────────────────────────
         if self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period {
             let mut close_count = self.close_in_flight.len();
-            debug!(in_flight = close_count, open = open_count, min = self.cfg.population.min_open_channels, "channel-lifecycle: close pass");
+            debug!(
+                in_flight = close_count,
+                open = open_count,
+                min = self.cfg.population.min_open_channels,
+                "channel-lifecycle: close pass"
+            );
 
             for ch in &open_channels {
                 if close_count >= self.cfg.closure.close_max_concurrent {
@@ -550,7 +575,12 @@ where
 
         // ── 5. Open pass ──────────────────────────────────────────────────────
         let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
-        debug!(deficit, open = open_count, target = self.cfg.population.target_open_channels, "channel-lifecycle: open pass");
+        debug!(
+            deficit,
+            open = open_count,
+            target = self.cfg.population.target_open_channels,
+            "channel-lifecycle: open pass"
+        );
 
         if deficit == 0 {
             return Ok(());
@@ -612,7 +642,10 @@ where
 
         candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
         candidates.truncate(deficit);
-        debug!(candidates = candidates.len(), deficit, "channel-lifecycle: open pass candidates");
+        debug!(
+            candidates = candidates.len(),
+            deficit, "channel-lifecycle: open pass candidates"
+        );
 
         for (addr, ..) in candidates {
             if safe_remaining < self.cfg.funding.initial_balance {
@@ -645,6 +678,16 @@ where
 
         let dest = ch.destination;
         if let Some(pk) = addr_to_key.get(&dest) {
+            // Gate: skip all graph-derived close reasons until the strategy has
+            // received at least one observation for this peer.  Without any
+            // graph data `peer_score_for` returns 0.0, which would immediately
+            // retire every unprobed channel — including channels that were
+            // opened before this strategy instance started.
+            if !self.has_probing_data(pk) {
+                tracing::trace!(%dest, "channel-lifecycle: skipping close evaluation — no graph observations yet");
+                return false;
+            }
+
             let score = self.peer_score_for(pk, &dest, max_activity);
             if score < self.cfg.closure.close_below_quality_score {
                 debug!(
@@ -773,7 +816,21 @@ mod tests {
     }
 
     /// Minimal node wrapper — same pattern as in auto_funding tests.
-    struct ChainNode<C>(C);
+    /// The second field is a shared stub graph; tests that need configurable
+    /// per-peer edges use `Arc::clone` of the graph to insert edges while the
+    /// strategy is running.  Constructed via `ChainNode::new` for the common
+    /// case (empty graph) or `ChainNode::with_graph` for custom graphs.
+    struct ChainNode<C>(C, Arc<StubGraph>);
+
+    impl<C> ChainNode<C> {
+        fn new(chain: C) -> Self {
+            ChainNode(chain, Arc::new(StubGraph::default()))
+        }
+
+        fn with_graph(chain: C, graph: Arc<StubGraph>) -> Self {
+            ChainNode(chain, graph)
+        }
+    }
 
     impl<C> HasChainApi for ChainNode<C>
     where
@@ -875,7 +932,19 @@ mod tests {
         }
     }
 
-    struct StubGraph;
+    /// Programmable stub graph.  By default all edge queries return `None`
+    /// (behaviour identical to the former unit-struct).  Tests that need
+    /// configurable edges use `insert_edge` to pre-populate the map.
+    #[derive(Clone, Default)]
+    struct StubGraph {
+        edges: Arc<DashMap<(OffchainPublicKey, OffchainPublicKey), StubEdge>>,
+    }
+
+    impl StubGraph {
+        fn insert_edge(&self, src: OffchainPublicKey, dest: OffchainPublicKey, edge: StubEdge) {
+            self.edges.insert((src, dest), edge);
+        }
+    }
 
     impl hopr_api::graph::NetworkGraphView for StubGraph {
         type NodeId = OffchainPublicKey;
@@ -893,8 +962,8 @@ mod tests {
             Box::pin(futures::stream::empty())
         }
 
-        fn edge(&self, _src: &OffchainPublicKey, _dest: &OffchainPublicKey) -> Option<StubEdge> {
-            None
+        fn edge(&self, src: &OffchainPublicKey, dest: &OffchainPublicKey) -> Option<StubEdge> {
+            self.edges.get(&(*src, *dest)).map(|v| v.clone())
         }
 
         fn identity(&self) -> &OffchainPublicKey {
@@ -955,14 +1024,27 @@ mod tests {
         }
     }
 
-    struct StubEdge;
+    #[derive(Clone)]
+    struct StubEdge {
+        last_update: Duration,
+        score: f64,
+    }
+
+    impl Default for StubEdge {
+        fn default() -> Self {
+            Self {
+                last_update: Duration::ZERO,
+                score: 0.5,
+            }
+        }
+    }
 
     impl hopr_api::graph::EdgeObservableRead for StubEdge {
         type ImmediateMeasurement = StubMeasurement;
         type IntermediateMeasurement = StubMeasurement;
 
         fn last_update(&self) -> Duration {
-            Duration::ZERO
+            self.last_update
         }
 
         fn immediate_qos(&self) -> Option<&Self::ImmediateMeasurement> {
@@ -974,7 +1056,7 @@ mod tests {
         }
 
         fn score(&self) -> f64 {
-            0.5
+            self.score
         }
     }
 
@@ -1025,8 +1107,7 @@ mod tests {
         type Graph = StubGraph;
 
         fn graph(&self) -> &Self::Graph {
-            static G: StubGraph = StubGraph;
-            &G
+            self.1.as_ref()
         }
 
         fn status(&self) -> ComponentStatus {
@@ -1091,7 +1172,7 @@ mod tests {
         let connector = Arc::new(connector);
         register_test_safe(&*connector, *BOB).await?;
 
-        let node = Arc::new(ChainNode(Arc::clone(&connector)));
+        let node = Arc::new(ChainNode::new(Arc::clone(&connector)));
 
         let cfg = ChannelLifecycleConfig {
             tick_interval: Duration::from_millis(100),
@@ -1168,7 +1249,7 @@ mod tests {
                 .await?;
         chain_connector.connect().await?;
         let chain_connector = Arc::new(chain_connector);
-        let node = Arc::new(ChainNode(Arc::clone(&chain_connector)));
+        let node = Arc::new(ChainNode::new(Arc::clone(&chain_connector)));
 
         let strategy: Box<dyn crate::strategy::Strategy + Send> =
             ChannelLifecycleStrategy::new(ChannelLifecycleConfig::default()).build(node);
@@ -1365,7 +1446,7 @@ mod tests {
         {
             let old = ChannelLifecycleStrategyInner {
                 cfg: ChannelLifecycleConfig::default(),
-                node: Arc::new(ChainNode(Arc::clone(&connector))),
+                node: Arc::new(ChainNode::new(Arc::clone(&connector))),
                 open_in_flight: Arc::new(DashSet::new()),
                 fund_in_flight: Arc::new(DashSet::new()),
                 close_in_flight: Arc::new(DashSet::new()),
@@ -1386,7 +1467,7 @@ mod tests {
         // ── Fresh instance starts cold ────────────────────────────────────────
         let fresh = ChannelLifecycleStrategyInner {
             cfg: ChannelLifecycleConfig::default(),
-            node: Arc::new(ChainNode(Arc::clone(&connector))),
+            node: Arc::new(ChainNode::new(Arc::clone(&connector))),
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),
@@ -1407,14 +1488,14 @@ mod tests {
         // Deliver the old instance's in-flight events that confirm post-restart.
 
         // Old close tx confirmed.
-        fresh.on_channel_closure_initiated(ch_close.clone());
+        fresh.on_channel_closure_initiated(ch_close);
         assert!(
             fresh.close_in_flight.is_empty(),
             "close_in_flight stays empty — remove was a no-op"
         );
 
         // Old finalize tx confirmed.
-        fresh.on_channel_closed(ch_close.clone());
+        fresh.on_channel_closed(ch_close);
         assert!(
             fresh.finalize_in_flight.is_empty(),
             "finalize_in_flight stays empty — remove was a no-op"
@@ -1426,14 +1507,14 @@ mod tests {
         );
 
         // Old fund tx confirmed.
-        fresh.on_balance_increased(ch_fund.clone());
+        fresh.on_balance_increased(ch_fund);
         assert!(
             fresh.fund_in_flight.is_empty(),
             "fund_in_flight stays empty — remove was a no-op"
         );
 
         // Old open tx confirmed.
-        fresh.on_channel_opened(ch_open.clone());
+        fresh.on_channel_opened(ch_open);
         assert!(
             fresh.open_in_flight.is_empty(),
             "open_in_flight stays empty — remove was a no-op"
@@ -1446,9 +1527,17 @@ mod tests {
         cfg: ChannelLifecycleConfig,
         connector: Arc<C>,
     ) -> ChannelLifecycleStrategyInner<ChainNode<Arc<C>>> {
+        fresh_inner_with_chain_and_graph(cfg, connector, Arc::new(StubGraph::default()))
+    }
+
+    fn fresh_inner_with_chain_and_graph<C>(
+        cfg: ChannelLifecycleConfig,
+        connector: Arc<C>,
+        graph: Arc<StubGraph>,
+    ) -> ChannelLifecycleStrategyInner<ChainNode<Arc<C>>> {
         ChannelLifecycleStrategyInner {
             cfg,
-            node: Arc::new(ChainNode(connector)),
+            node: Arc::new(ChainNode::with_graph(connector, graph)),
             open_in_flight: Arc::new(dashmap::DashSet::new()),
             fund_in_flight: Arc::new(dashmap::DashSet::new()),
             close_in_flight: Arc::new(dashmap::DashSet::new()),
@@ -1661,6 +1750,330 @@ mod tests {
             "BOB→ALICE channel must be Open after open tx; got {channels:?}"
         );
 
+        Ok(())
+    }
+
+    /// Gate returns `false` for a peer with no graph observations.
+    ///
+    /// Verifies that `should_close` defers all graph-derived close reasons
+    /// when `edge.last_update() == Duration::ZERO` for the destination peer.
+    #[tokio::test]
+    async fn should_close_returns_false_for_peer_without_probing_data() -> anyhow::Result<()> {
+        use std::collections::HashMap;
+
+        // Compute Alice's offchain key using the same derivation BlokliTestStateBuilder uses.
+        let alice_pk = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            let pseudo = hopr_api::types::crypto::types::Hash::create(&[(*ALICE).as_ref()]);
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(pseudo.as_ref())
+                .expect("alice offchain key")
+                .public()
+        };
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([])
+            .build_dynamic_client([1; Address::SIZE].into());
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+
+        // Empty graph — no edge observations for (my_key → alice_pk).
+        let inner = fresh_inner_with_chain_and_graph(
+            ChannelLifecycleConfig::default(),
+            Arc::clone(&connector),
+            Arc::new(StubGraph::default()),
+        );
+
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(125_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let addr_to_key = HashMap::from([(*ALICE, alice_pk)]);
+
+        assert!(
+            !inner.should_close(&ch, &addr_to_key, 1),
+            "should_close must return false for a peer with no graph observations"
+        );
+        Ok(())
+    }
+
+    /// Gate lifts after the first graph observation: `should_close` fires.
+    ///
+    /// Inserts an edge with `last_update > Duration::ZERO` and `score = 0.0`
+    /// (below `close_below_quality_score = 0.3`) and confirms the close fires.
+    #[tokio::test]
+    async fn should_close_returns_true_once_probing_data_arrives() -> anyhow::Result<()> {
+        use std::collections::HashMap;
+
+        let alice_pk = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            let pseudo = hopr_api::types::crypto::types::Hash::create(&[(*ALICE).as_ref()]);
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(pseudo.as_ref())
+                .expect("alice offchain key")
+                .public()
+        };
+        // The graph identity key (mirrors StubGraph::identity()).
+        let my_key = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
+                .expect("my key")
+                .public()
+        };
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([])
+            .build_dynamic_client([1; Address::SIZE].into());
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+
+        let graph = Arc::new(StubGraph::default());
+        let inner = fresh_inner_with_chain_and_graph(
+            ChannelLifecycleConfig::default(),
+            Arc::clone(&connector),
+            Arc::clone(&graph),
+        );
+
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(125_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let addr_to_key = HashMap::from([(*ALICE, alice_pk)]);
+
+        // No observations yet — gate returns false.
+        assert!(
+            !inner.should_close(&ch, &addr_to_key, 1),
+            "should_close must return false before probing data arrives"
+        );
+
+        // Insert an edge with last_update > 0 and score below the close threshold.
+        graph.insert_edge(
+            my_key,
+            alice_pk,
+            StubEdge {
+                last_update: Duration::from_secs(1),
+                score: 0.0, // below close_below_quality_score = 0.3
+            },
+        );
+
+        // Gate is now lifted; score 0.0 < 0.3 triggers low_quality_score.
+        assert!(
+            inner.should_close(&ch, &addr_to_key, 1),
+            "should_close must return true once probing data arrives with low score"
+        );
+        Ok(())
+    }
+
+    /// Full-pipeline test: preexisting channel survives one tick when graph is empty.
+    ///
+    /// The strategy's close pass must not retire a channel whose peer has never
+    /// been observed in the network graph, even after the restart grace window.
+    #[tokio::test]
+    async fn preexisting_channel_not_closed_in_pipeline_without_probing_data() -> anyhow::Result<()> {
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(125_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        // Alice must be announced (public: true) so she appears in addr_to_key
+        // during the pipeline's peer_addr_map pass.
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                true,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([ch])
+            .build_dynamic_client([1; Address::SIZE].into());
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            restart: RestartGuardConfig {
+                startup_close_grace_period: Duration::ZERO,
+            },
+            population: PopulationConfig {
+                // Allow closing the last channel so the population guard does
+                // not mask the probing gate we are testing.
+                min_open_channels: 0,
+                ..Default::default()
+            },
+            // Require an unfeasibly high safe balance so the fund/open passes
+            // are skipped, isolating the close pass.
+            funding: FundingConfig {
+                min_safe_balance_required: HoprBalance::new_base(10_000),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Leave the graph empty — no observations for any peer.
+        let node = Arc::new(ChainNode::new(Arc::clone(&connector)));
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        handle.abort();
+        let _ = handle.await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+
+        assert!(
+            channels
+                .iter()
+                .any(|c| c.destination == *ALICE && c.status == ChannelStatus::Open),
+            "preexisting channel must not be closed when the graph has no observations; got {channels:?}"
+        );
+        Ok(())
+    }
+
+    /// Full-pipeline test: close fires after the first graph observation arrives.
+    ///
+    /// Companion to `preexisting_channel_not_closed_in_pipeline_without_probing_data`.
+    /// After the graph receives a low-score edge for Alice the strategy must
+    /// initiate closure on the next tick.
+    #[tokio::test]
+    async fn preexisting_channel_closed_once_probing_data_arrives() -> anyhow::Result<()> {
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(125_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                true,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([ch])
+            .build_dynamic_client([1; Address::SIZE].into());
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            restart: RestartGuardConfig {
+                startup_close_grace_period: Duration::ZERO,
+            },
+            population: PopulationConfig {
+                // Allow closing the last channel so the population guard
+                // does not suppress our single-channel close.
+                min_open_channels: 0,
+                ..Default::default()
+            },
+            closure: ClosureConfig {
+                close_below_quality_score: 0.3,
+                ..Default::default()
+            },
+            funding: FundingConfig {
+                min_safe_balance_required: HoprBalance::new_base(10_000),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Keep a handle to the graph so we can inject an edge mid-run.
+        let graph = Arc::new(StubGraph::default());
+        let node = Arc::new(ChainNode::with_graph(Arc::clone(&connector), Arc::clone(&graph)));
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
+
+        // First window: no probing data — close must not fire.
+        tokio::time::sleep(Duration::from_millis(400)).await;
+
+        // Inject a low-score edge to simulate a completed probe round.
+        let alice_pk = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            let pseudo = hopr_api::types::crypto::types::Hash::create(&[(*ALICE).as_ref()]);
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(pseudo.as_ref())
+                .expect("alice offchain key")
+                .public()
+        };
+        let my_key = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
+                .expect("my key")
+                .public()
+        };
+        graph.insert_edge(
+            my_key,
+            alice_pk,
+            StubEdge {
+                last_update: Duration::from_secs(1),
+                score: 0.0, // forces low_quality_score close
+            },
+        );
+
+        // Second window: probing data present — close should fire and confirm.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        handle.abort();
+        let _ = handle.await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+
+        assert!(
+            channels
+                .iter()
+                .any(|c| c.destination == *ALICE && matches!(c.status, ChannelStatus::PendingToClose(_))),
+            "channel must be PendingToClose after a low-score observation arrives; got {channels:?}"
+        );
         Ok(())
     }
 }
