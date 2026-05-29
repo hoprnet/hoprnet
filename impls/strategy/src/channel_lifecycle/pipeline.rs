@@ -25,7 +25,7 @@ use hopr_api::{
         primitive::prelude::{Address, HoprBalance},
     },
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use super::{ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache};
 use crate::errors::StrategyError;
@@ -198,7 +198,7 @@ where
             return false;
         }
 
-        info!(%channel, %topup, "channel-lifecycle: funding channel");
+        debug!(%channel, %topup, "channel-lifecycle: funding channel");
         #[cfg(all(feature = "telemetry", not(test)))]
         super::METRIC_CHANNEL_FUNDS.increment();
 
@@ -236,7 +236,7 @@ where
             return false;
         }
 
-        info!(%channel, "channel-lifecycle: closing channel");
+        debug!(%channel, "channel-lifecycle: closing channel");
         #[cfg(all(feature = "telemetry", not(test)))]
         super::METRIC_CHANNEL_CLOSES.increment();
 
@@ -275,7 +275,7 @@ where
             return false;
         }
 
-        info!(%channel, "channel-lifecycle: finalizing closure");
+        debug!(%channel, "channel-lifecycle: finalizing closure");
         #[cfg(all(feature = "telemetry", not(test)))]
         super::METRIC_CHANNEL_FINALIZES.increment();
 
@@ -330,10 +330,10 @@ where
                     ChannelStatus::Open => {
                         self.open_in_flight.remove(&dest);
                         if existing.balance >= self.cfg.funding.lower_balance_threshold {
-                            info!(%dest, balance = %existing.balance, "channel-lifecycle: already open at desired stake, skipping");
+                            debug!(%dest, balance = %existing.balance, "channel-lifecycle: already open at desired stake, skipping");
                             return None;
                         }
-                        info!(%dest, balance = %existing.balance, "channel-lifecycle: already open below threshold, funding immediately");
+                        debug!(%dest, balance = %existing.balance, "channel-lifecycle: already open below threshold, funding immediately");
                         let topup = self.cfg.funding.topup_balance;
                         return self.try_fund_channel(&existing, topup).then_some(topup);
                     }
@@ -351,7 +351,7 @@ where
             }
         }
 
-        info!(%dest, %amount, "channel-lifecycle: opening channel");
+        debug!(%dest, %amount, "channel-lifecycle: opening channel");
         #[cfg(all(feature = "telemetry", not(test)))]
         super::METRIC_CHANNEL_OPENS.increment();
 
@@ -452,6 +452,13 @@ where
             .filter(|c| c.status == ChannelStatus::Open)
             .collect();
         let open_count = open_channels.len() + self.open_in_flight.len();
+        debug!(
+            open = open_count,
+            in_flight = self.total_in_flight(),
+            safe = %safe_balance,
+            channels = all_channels.len(),
+            "channel-lifecycle: tick"
+        );
 
         // Computed once here so close and open passes don't each iterate all
         // activity.  Floored at 1 to keep `peer_score_for` from dividing by 0.
@@ -478,6 +485,8 @@ where
                     self.proactive_fund_needed(ch, &prev_observations, est_tx_secs, min_ticket_price_wei);
 
                 if needs_topup || needs_proactive {
+                    let reason = if needs_topup { "below_lower_threshold" } else { "proactive_drain" };
+                    debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
                     if safe_remaining < self.cfg.funding.topup_balance {
                         debug!("channel-lifecycle: safe balance exhausted in fund pass");
                         break;
@@ -487,11 +496,18 @@ where
                     }
                 }
             }
+        } else {
+            debug!(
+                safe = %safe_balance,
+                min_required = %self.cfg.funding.min_safe_balance_required,
+                "channel-lifecycle: fund pass skipped: safe below minimum"
+            );
         }
 
         // ── 3. Close pass ─────────────────────────────────────────────────────
         if self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period {
             let mut close_count = self.close_in_flight.len();
+            debug!(in_flight = close_count, open = open_count, min = self.cfg.population.min_open_channels, "channel-lifecycle: close pass");
 
             for ch in &open_channels {
                 if close_count >= self.cfg.closure.close_max_concurrent {
@@ -534,6 +550,7 @@ where
 
         // ── 5. Open pass ──────────────────────────────────────────────────────
         let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
+        debug!(deficit, open = open_count, target = self.cfg.population.target_open_channels, "channel-lifecycle: open pass");
 
         if deficit == 0 {
             return Ok(());
@@ -595,6 +612,7 @@ where
 
         candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
         candidates.truncate(deficit);
+        debug!(candidates = candidates.len(), deficit, "channel-lifecycle: open pass candidates");
 
         for (addr, ..) in candidates {
             if safe_remaining < self.cfg.funding.initial_balance {
@@ -615,6 +633,13 @@ where
         max_activity: u64,
     ) -> bool {
         if ch.balance <= self.cfg.closure.close_when_drained_below {
+            debug!(
+                dest = %ch.destination,
+                balance = %ch.balance,
+                threshold = %self.cfg.closure.close_when_drained_below,
+                reason = "balance_drained",
+                "channel-lifecycle: close candidate"
+            );
             return true;
         }
 
@@ -622,6 +647,13 @@ where
         if let Some(pk) = addr_to_key.get(&dest) {
             let score = self.peer_score_for(pk, &dest, max_activity);
             if score < self.cfg.closure.close_below_quality_score {
+                debug!(
+                    %dest,
+                    score,
+                    threshold = self.cfg.closure.close_below_quality_score,
+                    reason = "low_quality_score",
+                    "channel-lifecycle: close candidate"
+                );
                 return true;
             }
 
@@ -635,6 +667,13 @@ where
                 let observed_since_start = last_update < self.start_epoch.elapsed();
                 let guard_passed = !self.cfg.eligibility.require_observed_since_start || observed_since_start;
                 if stale && guard_passed {
+                    debug!(
+                        %dest,
+                        last_update_secs = last_update.as_secs(),
+                        unseen_threshold_secs = self.cfg.closure.close_when_peer_unseen_for.as_secs(),
+                        reason = "peer_stale",
+                        "channel-lifecycle: close candidate"
+                    );
                     return true;
                 }
             }
