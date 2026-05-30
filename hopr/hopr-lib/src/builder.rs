@@ -724,7 +724,7 @@ macro_rules! impl_build_methods {
             let pre = pre_build_inner(configured, session_tx, processes).await?;
 
             tracing::info!("starting transport for edge (entry) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_entry(
                     pre.cover_traffic,
@@ -733,6 +733,29 @@ macro_rules! impl_build_methods {
                     ticket_factory,
                 )
                 .await?;
+
+            // Drain unrelated packets so SessionsManagement(0) can forward without hitting
+            // SendError(disconnected). Logs received/discarded counts every ~60 seconds.
+            hopr_utils::spawn_as_abortable!(async move {
+                let mut received: u64 = 0;
+                let mut discarded: u64 = 0;
+                let mut last_report = std::time::Instant::now();
+                let mut stream = socket.reader();
+                while let Some(_) = stream.next().await {
+                    received += 1;
+                    discarded += 1;
+                    if last_report.elapsed().as_secs() >= 60 {
+                        tracing::info!(
+                            received,
+                            discarded,
+                            "incoming-data drain: unrelated packets discarded in last ~1 min"
+                        );
+                        received = 0;
+                        discarded = 0;
+                        last_report = std::time::Instant::now();
+                    }
+                }
+            });
 
             let mut processes = pre.processes;
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
@@ -866,7 +889,7 @@ macro_rules! impl_build_methods {
             }
 
             tracing::info!("starting transport for full (relay) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_relay(
                     pre.cover_traffic,
@@ -877,6 +900,28 @@ macro_rules! impl_build_methods {
                     pre.session_tx,
                 )
                 .await?;
+            // Drain unrelated packets so SessionsManagement(0) can forward without hitting
+            // SendError(disconnected). Logs received/discarded counts every ~60 seconds.
+            hopr_utils::spawn_as_abortable!(async move {
+                let mut received: u64 = 0;
+                let mut discarded: u64 = 0;
+                let mut last_report = std::time::Instant::now();
+                let mut stream = socket.reader();
+                while let Some(_) = stream.next().await {
+                    received += 1;
+                    discarded += 1;
+                    if last_report.elapsed().as_secs() >= 60 {
+                        tracing::info!(
+                            received,
+                            discarded,
+                            "incoming-data drain: unrelated packets discarded in last ~1 min"
+                        );
+                        received = 0;
+                        discarded = 0;
+                        last_report = std::time::Instant::now();
+                    }
+                }
+            });
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
             let hopr = Hopr {

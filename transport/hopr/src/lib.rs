@@ -37,7 +37,7 @@ use std::{
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, StreamExt,
+    FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
@@ -763,14 +763,21 @@ where
         // Wire incoming: cover-traffic-filtered stream → probe classify → (session dispatch).
         // This stage must run in a background task, so the pipeline drains even when the
         // caller discards the returned HoprSocket (e.g. edge-node builder).
+        //
+        // The channel uses a resilient for_each rather than .forward() so that a disconnected
+        // receiver (HoprSocket dropped without consuming) logs an error and continues rather
+        // than collapsing the entire ingress pipeline. Callers should use HoprSocket::reader()
+        // and actively drain the stream; see hopr-lib builder for the reference drain.
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
         let smgr = self.smgr.clone();
+        // Clone before the async move so the original remains available for the HoprSocket return.
+        let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            hopr_utils::spawn_as_abortable!(
+            hopr_utils::spawn_as_abortable!(async move {
                 probe_classifier
-                    .filter_stream(unresolved_routing_msg_tx.clone(), rx_from_protocol)
+                    .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
                         let smgr = smgr.clone();
                         async move {
@@ -790,13 +797,24 @@ where
                             }
                         }
                     })
-                    .map(Ok)
-                    .forward(on_incoming_data_tx)
-                    .inspect(|_| tracing::warn!(
-                        task = %HoprTransportProcess::SessionsManagement(0),
-                        "long-running background task finished"
-                    ))
-            ),
+                    .for_each(move |data| {
+                        let mut tx = on_incoming_data_tx.clone();
+                        async move {
+                            if let Err(_) = tx.send(data).await {
+                                tracing::error!(
+                                    task = %HoprTransportProcess::SessionsManagement(0),
+                                    "incoming-data channel disconnected — dropping unrelated packet; \
+                                     HoprSocket must be consumed or drained by the caller"
+                                );
+                            }
+                        }
+                    })
+                    .await;
+                tracing::warn!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "long-running background task finished"
+                );
+            }),
         );
 
         // Populate the OnceLock at the end, making sure everything before didn't fail.
