@@ -129,6 +129,18 @@ pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaSh
 /// itself as another generic argument.
 pub type HoprPixScalar = k256::Scalar;
 
+/// HOPR-specific PIX group element representation type.
+///
+/// This is the normalized (concrete) form of `hopr_protocol_pix::PixGroupRepr<HoprPixSpec>`
+/// (i.e. `<PixGroup<HoprPixSpec> as GroupEncoding>::Repr`), re-exported here as the concrete
+/// `k256::CompressedPoint` type.
+///
+/// Using the concrete type instead of the associated-type projection avoids a Rust coherence
+/// error (E0119): implementing `From`/`TryFrom` for a new-type wrapping the projection conflicts
+/// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
+/// projection is distinct from the wrapper type.
+pub type HoprPixGroupRepr = k256::CompressedPoint;
+
 #[cfg(test)]
 mod tests {
     use sphinx::prelude::MetaPacket;

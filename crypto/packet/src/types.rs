@@ -1,11 +1,11 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
 use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
-use hopr_protocol_pix::{GroupEncoding, PixGroup, PixGroupRepr};
+use hopr_protocol_pix::{GroupEncoding, PixGroup};
 use crate::{por::ProofOfRelayValues, sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB},
-}, HoprEncryptedPartialSsaShare, HoprPixSpec, HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
+}, HoprEncryptedPartialSsaShare, HoprPixGroupRepr, HoprPixSpec, HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
 flagset::flags! {
    /// Individual packet signals passed up between the packet sender and destination.
@@ -249,9 +249,9 @@ impl BytesRepresentable for SurbReceiverInfo {
     const SIZE: usize = ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE;
 }
 
-/// New-type wrapper for PixGroupRepr<HoprPixSpec> to provide additional functionality.
+/// New-type wrapper for the PIX group element representation to provide additional functionality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct HoprPixGroupElement(pub PixGroupRepr<HoprPixSpec>);
+pub struct HoprPixGroupElement(pub HoprPixGroupRepr);
 
 impl HoprPixGroupElement {
     /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
@@ -261,8 +261,8 @@ impl HoprPixGroupElement {
     }
 }
 
-impl From<PixGroupRepr<HoprPixSpec>> for HoprPixGroupElement {
-    fn from(value: PixGroupRepr<HoprPixSpec>) -> Self {
+impl From<HoprPixGroupRepr> for HoprPixGroupElement {
+    fn from(value: HoprPixGroupRepr) -> Self {
         Self(value)
     }
 }
@@ -277,10 +277,10 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
     type Error = GeneralError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() != size_of::<PixGroupRepr<HoprPixSpec>>() {
+        if value.len() != size_of::<HoprPixGroupRepr>() {
             return Err(GeneralError::ParseError("pix repr length".into()));
         }
-        Ok(Self(PixGroupRepr::<HoprPixSpec>::clone_from_slice(value)))
+        Ok(Self(HoprPixGroupRepr::clone_from_slice(value)))
     }
 }
 
