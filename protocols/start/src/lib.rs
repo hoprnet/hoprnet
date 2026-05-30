@@ -163,7 +163,7 @@ pub struct SsaClientCommitmentMessage<I, G> {
     pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
 }
 
-impl<I, G> SsaClientCommitmentMessage<I, G> {
+impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
     /// Uses given the `session_id` and an [`SsaCommitment`] that will be split across multiple messages.
     ///
     /// The returned messages are ordered by coefficient index, making sure the constant terms
@@ -173,8 +173,7 @@ impl<I, G> SsaClientCommitmentMessage<I, G> {
         commitment: SsaCommitment<S, S::Pseudonym>,
     ) -> Vec<Self>
     where
-        I: Clone,
-        G: Clone + From<hopr_protocol_pix::PixGroupRepr<S>>,
+        G: From<hopr_protocol_pix::PixGroupRepr<S>>,
     {
         let ssa_index = commitment.ssa_id.ssa_index();
 
@@ -192,10 +191,8 @@ impl<I, G> SsaClientCommitmentMessage<I, G> {
         // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
         // guarantee that the resulting messages are ordered by coefficient index, making sure the
         // constant terms (coefficient index 0) of the polynomials are delivered first.
-        let mut by_coefficient: std::collections::BTreeMap<
-            u16,
-            Vec<(hopr_protocol_pix::PolynomialIndex, G)>,
-        > = std::collections::BTreeMap::new();
+        let mut by_coefficient: std::collections::BTreeMap<u16, Vec<(hopr_protocol_pix::PolynomialIndex, G)>> =
+            std::collections::BTreeMap::new();
 
         for (coefficient_index, coefficients) in commitment.verifiers {
             let entry = by_coefficient.entry(coefficient_index).or_default();
@@ -701,12 +698,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::crypto::prelude::SimplePseudonym;
-    use hopr_types::crypto_random::Randomizable;
-    use hopr_crypto_packet::HoprPixSpec;
-    use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
+    use hopr_crypto_packet::{
+        HoprPixSpec,
+        prelude::{HoprPacket, HoprPixGroupElement},
+    };
     use hopr_protocol_app::prelude::Tag;
     use hopr_protocol_pix::{EntryShareGenerator, PolynomialIndex, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
+    use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
 
     use super::*;
 
@@ -999,8 +997,10 @@ mod tests {
         let pseudonym = SimplePseudonym::random();
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
-        let session_id = 0xfeedbeef_u32;
-        let messages: Vec<SsaClientCommitmentMessage<u32, HoprPixGroupElement>> =
+        type DummySessionId = [u8; 20];
+
+        let session_id: DummySessionId = Default::default();
+        let messages: Vec<SsaClientCommitmentMessage<DummySessionId, HoprPixGroupElement>> =
             SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment);
 
         // Since 2048 polynomials per coefficient cannot fit into a single packet, the commitments
@@ -1013,20 +1013,24 @@ mod tests {
         // Each coefficient index in 0..threshold must carry exactly 2048 commitments in total.
         let mut commitments_per_coefficient = std::collections::BTreeMap::<u16, usize>::new();
         for message in &messages {
-            *commitments_per_coefficient.entry(message.coefficient_index).or_default() +=
-                message.coefficient_commitments.len();
+            *commitments_per_coefficient
+                .entry(message.coefficient_index)
+                .or_default() += message.coefficient_commitments.len();
         }
-        assert_eq!((0u16..64).collect::<Vec<_>>(), commitments_per_coefficient.keys().copied().collect::<Vec<_>>());
+        assert_eq!(
+            (0u16..64).collect::<Vec<_>>(),
+            commitments_per_coefficient.keys().copied().collect::<Vec<_>>()
+        );
         assert!(commitments_per_coefficient.values().all(|&count| count == 2048));
 
         for message in messages {
-            let msg_1 = StartProtocol::<u32, String, u8, HoprPixGroupElement>::SsaCommit(message);
+            let msg_1 = StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement>::SsaCommit(message);
 
             let (tag, encoded) = msg_1.clone().encode()?;
             let expected: Tag = StartProtocol::<(), (), (), HoprPixGroupElement>::START_PROTOCOL_MESSAGE_TAG;
             assert_eq!(tag, expected);
 
-            let msg_2 = StartProtocol::<u32, String, u8, HoprPixGroupElement>::decode(tag, &encoded)?;
+            let msg_2 = StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement>::decode(tag, &encoded)?;
             assert_eq!(msg_1, msg_2);
         }
 

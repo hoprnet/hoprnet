@@ -1,11 +1,17 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 use hopr_protocol_pix::{GroupEncoding, PixGroup};
-use crate::{por::ProofOfRelayValues, sphinx::{
-    errors::SphinxError,
-    prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB},
-}, HoprEncryptedPartialSsaShare, HoprPixGroupRepr, HoprPixSpec, HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
+use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
+
+use crate::{
+    HoprEncryptedPartialSsaShare, HoprPixGroupRepr, HoprPixSpec, HoprSphinxHeaderSpec, HoprSphinxSuite,
+    PAYLOAD_SIZE_INT,
+    por::ProofOfRelayValues,
+    sphinx::{
+        errors::SphinxError,
+        prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
+    },
+};
 
 flagset::flags! {
    /// Individual packet signals passed up between the packet sender and destination.
@@ -301,8 +307,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        packet::HoprPacket, por::generate_proof_of_relay, sphinx::prelude::*, types::SurbReceiverInfo, HoprEncryptedPartialSsaShare,
-        HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
+        HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, packet::HoprPacket,
+        por::generate_proof_of_relay, sphinx::prelude::*, types::SurbReceiverInfo,
     };
 
     lazy_static::lazy_static! {

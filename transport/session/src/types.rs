@@ -29,7 +29,8 @@ use hopr_utils::network_types::{
     utils::{AsyncWriteSink, DuplexIO},
 };
 use tracing::{debug, instrument};
-use crate::{errors::TransportSessionError, Capabilities, Capability};
+
+use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

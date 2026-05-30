@@ -1,19 +1,19 @@
 use std::{
     ops::{Range, RangeInclusive},
     pin::Pin,
-    sync::{atomic::AtomicU32, Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::AtomicU32},
     time::Duration,
 };
 
 use anyhow::anyhow;
 use futures::{
-    channel::mpsc::{Sender, UnboundedSender}, future::AbortHandle, pin_mut, FutureExt, Sink,
-    SinkExt,
-    StreamExt,
-    TryStreamExt,
+    FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    channel::mpsc::{Sender, UnboundedSender},
+    future::AbortHandle,
+    pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::{prelude::HoprPacket, HoprPixSpec};
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket, types::HoprPixGroupElement};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor,
@@ -34,25 +34,25 @@ use hopr_types::{
 };
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
-use hopr_crypto_packet::types::HoprPixGroupElement;
+
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data, set_session_state,
-    SessionLifecycleState,
+    self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
+    set_session_state,
 };
 use crate::{
+    AgreedSsaQuota, Capability, HoprSession, HoprSessionPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig,
+    SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
-        pid::{PidBalancerController, PidControllerGains}, simple::SimpleBalancerController, AtomicSurbFlowEstimator, BalancerStateValues, RateController,
-        RateLimitSinkExt,
-        SurbBalancer,
+        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
-    }, errors::{self, SessionManagerError, TransportSessionError}, types::{ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol}, utils, utils::{insert_into_next_slot, SurbNotificationMode}, AgreedSsaQuota, Capability,
-    HoprSession, HoprSessionPixEvent, IncomingSession,
-    SessionClientConfig,
-    SessionId,
-    SessionTarget,
-    SurbBalancerConfig,
-    SESSION_MTU,
+        pid::{PidBalancerController, PidControllerGains},
+        simple::SimpleBalancerController,
+    },
+    errors::{self, SessionManagerError, TransportSessionError},
+    types::{ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
+    utils,
+    utils::{SurbNotificationMode, insert_into_next_slot},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -1945,7 +1945,7 @@ where
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use futures::{future::BoxFuture, AsyncWriteExt};
+    use futures::{AsyncWriteExt, future::BoxFuture};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -1957,7 +1957,7 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{balancer::SurbBalancerConfig, types::SessionTarget, Capabilities, Capability};
+    use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
 
     /// Create a test tag allocator with a large partition.
     fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
