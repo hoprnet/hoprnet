@@ -1593,6 +1593,8 @@ where
                     "generated exit commitment"
                 );
 
+                // Construct and send the Exit SSA commitment request message
+                // The parameters were previously verified to be acceptable.
                 let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
                     session_id,
                     client_polys_per_ssa as u32,
@@ -1812,7 +1814,7 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
-        // See if we haven't received a SSA commitment for a Session that we did not register PIX-capable
+        // See if we haven't received an SSA commitment for a Session that we did not register PIX-capable
         let Some(quota_per_ssa) = session_slot.current_ssa_state.lock().map(|s| s.quota_per_ssa) else {
             return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
         };

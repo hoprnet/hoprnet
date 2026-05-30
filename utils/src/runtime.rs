@@ -92,8 +92,12 @@ impl<T: std::fmt::Debug> std::fmt::Debug for AbortableList<T> {
 
 impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
+    ///
+    /// If a task with the same key was previously present on the list, it will be aborted.
     pub fn insert<A: Abortable + Send + Sync + 'static>(&mut self, process: T, task: A) {
-        self.0.insert(process, Box::new(task));
+        if let Some(old_task) = self.0.insert(process, Box::new(task)) {
+            old_task.abort_task();
+        }
     }
 
     /// Checks if the list contains a task with the given key.
@@ -211,6 +215,20 @@ mod tests {
         assert!(!list.contains(&"task3"));
         assert_eq!(list.size(), 2);
         assert!(!list.is_empty());
+    }
+
+    #[test]
+    fn test_insert_should_abort_previous() {
+        let mut list = AbortableList::default();
+
+        let task1 = Arc::new(MockTask::default());
+        list.insert("task1", task1.clone());
+
+        let task2 = Arc::new(MockTask::default());
+        list.insert("task1", task2.clone());
+
+        assert!(task1.was_aborted());
+        assert!(!task2.was_aborted());
     }
 
     #[test]
