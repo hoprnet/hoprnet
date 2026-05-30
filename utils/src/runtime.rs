@@ -122,16 +122,24 @@ impl<T: Hash + Eq> AbortableList<T> {
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
+    ///
+    /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn extend_from(&mut self, mut other: AbortableList<T>) {
-        self.0.extend(other.0.drain(..));
+        for (k, v) in other.0.drain(..) {
+            self.insert(k, v);
+        }
     }
 
     /// Extends this list by appending `other` while mapping its keys to the ones in this list.
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
+    ///
+    /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn flat_map_extend_from<U>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
-        self.0.extend(other.0.drain(..).map(|(k, v)| (key_map(k), v)));
+        for (k, v) in other.0.drain(..).map(|(k, v)| (key_map(k), v)) {
+            self.insert(k, v)
+        }
     }
 }
 impl<T> AbortableList<T> {
