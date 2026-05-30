@@ -108,13 +108,26 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
+        // The share cannot be empty at this point, because we prevent empty share insertions
         let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
-        let Some(ssa_part) = reconstructor.lock().add_share(share.nonce, partial_share)? else {
-            tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
-            return Ok(None);
-        };
 
-        tracing::trace!(%spi, "ssa part complete");
+        let ssa_part = match reconstructor.lock().add_share(share.nonce, partial_share) {
+            Ok(Some(share)) => {
+                tracing::trace!(%spi, "ssa part complete");
+                share
+            }
+            Ok(None) => {
+                tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
+                return Ok(None);
+            }
+            Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
+                // We need to treat this error differently, because it is critical
+                // and may be differently handled by the upper-layer components
+                tracing::error!(%spi, "share verification failed");
+                return Err(PixError::InvalidShare((*spi.pseudonym()).into(), spi.ssa_index()));
+            }
+            Err(e) => return Err(e),
+        };
 
         let builder = self
             .ssa_builders
@@ -265,6 +278,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 Ok(Some(ssa)) => res.push(ssa),
                 Ok(None) => {}
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
+                Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
+                    // TODO: should notify when a share could not be verified!
+                    tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
+                }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
                 }

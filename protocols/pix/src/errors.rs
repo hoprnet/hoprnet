@@ -1,3 +1,7 @@
+use hopr_types::crypto::prelude::Pseudonym;
+
+use crate::SsaIndex;
+
 /// List of all errors that can occur in the PIX protocol.
 #[derive(Debug, thiserror::Error)]
 pub enum PixError {
@@ -5,6 +9,8 @@ pub enum PixError {
     InvalidInput,
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
+    #[error("received an ssa share from {0} #{1} that could not be verified")]
+    InvalidShare(Box<dyn Pseudonym>, SsaIndex),
     #[error("encrypted partial ssa share is empty")]
     ShareIsEmpty,
     #[error("ssa commitment does not match ssa")]

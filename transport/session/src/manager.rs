@@ -1814,13 +1814,14 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
-        // See if we haven't received an SSA commitment for a Session that we did not register PIX-capable
+        // See if we haven't received an SSA commitment for a Session that we did not register as PIX-capable
         let Some(quota_per_ssa) = session_slot.current_ssa_state.lock().map(|s| s.quota_per_ssa) else {
             return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
         };
 
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
+        // Insert the newly received coefficients into the SSA Reconstructor
         let ssa_client_commitment_state = pix_toolbox
             .share_processor
             .insert_coefficient_commitments(
