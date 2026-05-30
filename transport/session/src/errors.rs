@@ -62,6 +62,8 @@ pub enum SessionManagerError {
     Loopback,
     #[error("received a Start protocol message that is not supported")]
     UnsupportedMessage,
+    #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
+    Unacceptable(String),
     #[error(transparent)]
     PixError(#[from] hopr_protocol_pix::errors::PixError),
     #[error(transparent)]

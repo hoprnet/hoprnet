@@ -15,6 +15,8 @@ pub enum PixError {
     MissingSsaCommitment,
     #[error("missing verifier for partial ssa reconstruction")]
     MissingVerifier,
+    #[error("ssa index will overflow")]
+    SsaIndexOverflow,
     #[error("crypto error: {0}")]
     CryptoError(#[from] hopr_types::crypto::errors::CryptoError),
     #[error("ecc calculation error: {0}")]

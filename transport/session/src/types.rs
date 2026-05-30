@@ -8,9 +8,9 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPixGroupElement};
+use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_pix::{GroupEncoding, PixGroup, PixGroupRepr, SsaId, SsaIndex};
+use hopr_protocol_pix::{SsaId, SsaIndex};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -73,6 +73,13 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 /// Start protocol instantiation for HOPR.
 pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
 
+/// Quota per single SSA in bytes.
+pub type SsaQuota = u64;
+
+pub(crate) const fn pix_params_to_quota(polys_per_ssa: u32, shares_per_poly: u32) -> SsaQuota {
+    (polys_per_ssa * shares_per_poly * HoprPacket::SIZE as u32) as SsaQuota
+}
+
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgreedSsaQuota {
@@ -81,7 +88,7 @@ pub struct AgreedSsaQuota {
     /// Deposit address of the SSA.
     pub deposit_address: Address,
     /// Quota of the SSA in bytes.
-    pub quota_per_ssa: u64,
+    pub quota_per_ssa: SsaQuota,
 }
 
 /// Events raised by the Session Manager in response to received PIX messages.

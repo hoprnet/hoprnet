@@ -1,7 +1,7 @@
 use std::{
     ops::{Range, RangeInclusive},
     pin::Pin,
-    sync::{Arc, OnceLock, atomic::AtomicU32},
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
@@ -13,11 +13,14 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket, types::HoprPixGroupElement};
+use hopr_crypto_packet::{
+    HoprPixSpec,
+    prelude::{HoprPacket, HoprPixGroupElement},
+};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor,
-    SsaShareGenerator,
+    SsaShareGenerator, errors::PixError,
 };
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
@@ -50,7 +53,9 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{self, SessionManagerError, TransportSessionError},
-    types::{ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol},
+    types::{
+        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprStartProtocol, SsaQuota, pix_params_to_quota,
+    },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
@@ -135,6 +140,30 @@ enum SessionTasks {
     DepositAwaiter,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SessionSsaState {
+    current_index: SsaIndex,
+    pub(crate) quota_per_ssa: SsaQuota,
+}
+
+impl SessionSsaState {
+    pub fn new(quota_per_ssa: SsaQuota) -> Self {
+        Self {
+            current_index: SsaIndex::MIN,
+            quota_per_ssa,
+        }
+    }
+
+    /// Increases the [`SsaIndex`] or returns an error on overflow.
+    pub fn increase_index(&mut self) -> Result<(), SessionManagerError> {
+        self.current_index = self
+            .current_index
+            .checked_add(1)
+            .ok_or(SessionManagerError::PixError(PixError::SsaIndexOverflow))?;
+        Ok(())
+    }
+}
+
 #[derive(Clone)]
 struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
@@ -153,7 +182,8 @@ struct SessionSlot {
     // `None` for outgoing sessions where the tag was assigned by the remote peer.
     #[allow(dead_code, reason = "kept alive for Drop-based tag deallocation")]
     allocated_tag: Option<Arc<AllocatedTag>>,
-    ssa_index: Arc<AtomicU32>,
+    // Contains currently active SSA for this Session and its quota
+    current_ssa_state: Arc<parking_lot::Mutex<Option<SessionSsaState>>>,
 }
 
 /// Indicates the result of processing a message.
@@ -165,8 +195,9 @@ pub enum DispatchResult {
     Unrelated(ApplicationDataIn),
 }
 
+/// Configuration of the PIX protocol for incoming Sessions on Exit nodes.
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
-pub struct SessionPixConfig {
+pub struct IncomingSessionPixConfig {
     /// If set to true, incoming Session without the [`Capability::UsePIX`] will be rejected.
     ///
     /// Default `false`.
@@ -174,7 +205,7 @@ pub struct SessionPixConfig {
     pub enforce_pix: bool,
     /// Acceptable range of data quota per one SSA in bytes.
     ///
-    /// If a client sends PIX parameters for SSA reconstruction that are outside this quota range,
+    /// If an Entry sends PIX parameters for SSA reconstruction that are outside this quota range,
     /// the incoming Session will be rejected.
     ///
     /// Default is 128 MB to 512 MB (inclusive).
@@ -283,7 +314,7 @@ pub struct SessionManagerConfig {
     #[default(true)]
     pub surb_target_notify: bool,
     /// Configuration of the PIX protocol for the Exit nodes.
-    pub pix_config: SessionPixConfig,
+    pub pix_config: IncomingSessionPixConfig,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -712,6 +743,8 @@ where
         .await
         .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
+        let mut current_ssa_state = None;
+
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
         let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
@@ -730,6 +763,12 @@ where
                                 .as_secs(),
                     )
                     .min(u32::MAX as u64)
+            } else if cfg.capabilities.contains(Capability::UsePIX)
+                && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
+            {
+                current_ssa_state = Some(SessionSsaState::new(pix_params_to_quota(polys_per_ssa, shares_per_ssa)));
+
+                (polys_per_ssa as u64) << 32 | shares_per_ssa as u64
             } else {
                 0
             },
@@ -874,7 +913,7 @@ where
                             surb_mgmt: surb_mgmt.clone(),
                             surb_estimator: surb_estimator.clone(),
                             allocated_tag: None,
-                            ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
+                            current_ssa_state: Arc::new(parking_lot::Mutex::new(current_ssa_state)),
                         },
                     )
                     .await?;
@@ -953,7 +992,7 @@ where
                             surb_mgmt: Default::default(),      // Disabled SURB management
                             surb_estimator: Default::default(), // No SURB estimator needed
                             allocated_tag: None,
-                            ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
+                            current_ssa_state: Arc::new(parking_lot::Mutex::new(current_ssa_state)),
                         },
                     )
                     .await?;
@@ -1195,10 +1234,10 @@ where
     ) -> Option<(usize, usize)> {
         if req.capabilities.0.contains(Capability::UsePIX) {
             // Client offered PIX, validate parameters
-            let polys_per_ssa = (req.additional_data & 0xFFFF0000_00000000_u64) >> 48;
-            let shares_per_ssa = (req.additional_data & 0x0000FFFF_00000000_u64) >> 32;
+            let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u32;
+            let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u32;
 
-            let quota_per_ssa = polys_per_ssa * shares_per_ssa * HoprPacket::PAYLOAD_SIZE as u64;
+            let quota_per_ssa = pix_params_to_quota(polys_per_ssa, shares_per_ssa);
             debug!(
                 challenge = req.challenge,
                 offered_quota_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
@@ -1297,7 +1336,7 @@ where
                 surb_mgmt: Default::default(),
                 surb_estimator: Default::default(),
                 allocated_tag: Some(allocated_tag),
-                ssa_index: Arc::new(AtomicU32::new(SsaIndex::MIN.get())),
+                current_ssa_state: Default::default(),
             };
             self.sessions.insert(session_id, slot.clone()).await;
 
@@ -1522,7 +1561,10 @@ where
             if let Some(pix_toolbox) = self.pix_toolbox.get().cloned()
                 && session_req.capabilities.0.contains(Capability::UsePIX)
             {
-                let initial_ssa_index = SsaIndex::MIN;
+                let initial_ssa_state = SessionSsaState::new(pix_params_to_quota(
+                    client_polys_per_ssa as u32,
+                    client_shares_per_ssa as u32,
+                ));
 
                 // TODO: based on the offered quota, the Exit can decide here whether to ask for more than just one SSA
                 // commitment
@@ -1531,7 +1573,7 @@ where
                         pix_toolbox
                             .share_processor
                             .new_exit_commitment(
-                                SsaId::new(*session_id.pseudonym(), initial_ssa_index),
+                                SsaId::new(*session_id.pseudonym(), initial_ssa_state.current_index),
                                 client_polys_per_ssa,
                                 client_shares_per_ssa,
                             )
@@ -1555,7 +1597,7 @@ where
                     session_id,
                     client_polys_per_ssa as u32,
                     client_shares_per_ssa as u32,
-                    [(initial_ssa_index, exit_commitment)],
+                    [(initial_ssa_state.current_index, exit_commitment)],
                 ));
 
                 msg_sender
@@ -1585,6 +1627,7 @@ where
                         }
                     )),
                 );
+                *slot.current_ssa_state.lock() = Some(initial_ssa_state);
             }
 
             #[cfg(all(feature = "telemetry", not(test)))]
@@ -1769,6 +1812,11 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
+        // See if we haven't received a SSA commitment for a Session that we did not register PIX-capable
+        let Some(quota_per_ssa) = session_slot.current_ssa_state.lock().map(|s| s.quota_per_ssa) else {
+            return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
+        };
+
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
         let ssa_client_commitment_state = pix_toolbox
@@ -1818,7 +1866,7 @@ where
                     AgreedSsaQuota {
                         ssa_id,
                         deposit_address,
-                        quota_per_ssa: 0, // TODO: where to get the quota from?
+                        quota_per_ssa,
                     },
                     deposit_done_tx,
                 ))
@@ -1855,8 +1903,23 @@ where
             "received Exit SSA commitments"
         );
 
+        let Some(quota_per_ssa) = session_slot.current_ssa_state.lock().map(|s| s.quota_per_ssa) else {
+            return Err(
+                SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {}", msg.session_id)).into(),
+            );
+        };
+
+        // We (Entry) offered some quota in the Session Initiation message, the Exit has accepted it,
+        // but could have still replaced it with a different one from its range.
+        let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
+        if quota_per_ssa != server_quota {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
+            ))
+            .into());
+        }
+
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-        let quota_per_ssa = (msg.polys_per_ssa() * msg.shares_per_poly() * HoprPacket::SIZE as u32) as u64;
 
         // The server can theoretically send multiple SSA commitments
         // asking us to make the equal number of client commitments and deposits
@@ -2355,7 +2418,7 @@ mod tests {
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
-                    ssa_index: Arc::new(AtomicU32::new(1)),
+                    current_ssa_state: Default::default(),
                 },
             )
             .await;
@@ -2403,7 +2466,7 @@ mod tests {
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
-                    ssa_index: Arc::new(AtomicU32::new(1)),
+                    current_ssa_state: Default::default(),
                 },
             )
             .await;
@@ -2516,7 +2579,7 @@ mod tests {
                     surb_mgmt: Default::default(),
                     surb_estimator: Default::default(),
                     allocated_tag: None,
-                    ssa_index: Arc::new(AtomicU32::new(1)),
+                    current_ssa_state: Default::default(),
                 },
             )
             .await;
