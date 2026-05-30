@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_crypto_packet::HoprPixSpec;
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPixGroupElement};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_pix::{GroupEncoding, PixGroup, PixGroupRepr, SsaId, SsaIndex};
 use hopr_protocol_session::{
@@ -29,8 +29,7 @@ use hopr_utils::network_types::{
     utils::{AsyncWriteSink, DuplexIO},
 };
 use tracing::{debug, instrument};
-
-use crate::{Capabilities, Capability, errors::TransportSessionError};
+use crate::{errors::TransportSessionError, Capabilities, Capability};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,40 +66,6 @@ impl From<Capabilities> for HoprSessionCapabilities {
 impl AsRef<Capabilities> for HoprSessionCapabilities {
     fn as_ref(&self) -> &Capabilities {
         &self.0
-    }
-}
-
-/// New-type wrapper for PixGroupRepr<HoprPixSpec> to provide additional functionality.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct HoprPixGroupElement(pub PixGroupRepr<HoprPixSpec>);
-
-impl HoprPixGroupElement {
-    /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
-    pub fn try_into_pix_group(self) -> Result<PixGroup<HoprPixSpec>, GeneralError> {
-        Option::<PixGroup<HoprPixSpec>>::from(PixGroup::<HoprPixSpec>::from_bytes(&self.0))
-            .ok_or(GeneralError::ParseError("pix group from bytes failed".into()))
-    }
-}
-
-impl AsRef<[u8]> for HoprPixGroupElement {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() != size_of::<PixGroupRepr<HoprPixSpec>>() {
-            return Err(GeneralError::ParseError("pix repr length".into()));
-        }
-        Ok(Self(PixGroupRepr::<HoprPixSpec>::clone_from_slice(value)))
-    }
-}
-impl std::fmt::Display for HoprPixGroupElement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.0))
     }
 }
 

@@ -44,7 +44,7 @@ pub mod prelude {
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{PacketSignal, PacketSignals},
+        types::{PacketSignal, PacketSignals, HoprPixGroupElement},
         validation::validate_unacknowledged_ticket,
     };
 }

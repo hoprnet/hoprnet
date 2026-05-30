@@ -37,6 +37,11 @@ pub use types::{
 };
 pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
 
+#[doc(hidden)]
+pub mod prelude {
+    pub use super::*;
+}
+
 /// Number of polynomials per SSA.
 pub const DEFAULT_POLYS_PER_SSA: usize = 8192;
 /// Minimum number of shares to recover a part of an SSA.

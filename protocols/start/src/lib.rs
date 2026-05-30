@@ -164,11 +164,60 @@ pub struct SsaClientCommitmentMessage<I, G> {
 }
 
 impl<I, G> SsaClientCommitmentMessage<I, G> {
+    /// Uses given the `session_id` and an [`SsaCommitment`] that will be split across multiple messages.
+    ///
+    /// The returned messages are ordered by coefficient index, making sure the constant terms
+    /// of the polynomials are delivered first.
     pub fn new_multiple<S: hopr_protocol_pix::PixSpec>(
         session_id: I,
         commitment: SsaCommitment<S, S::Pseudonym>,
-    ) -> Vec<Self> {
-        todo!()
+    ) -> Vec<Self>
+    where
+        I: Clone,
+        G: Clone + From<hopr_protocol_pix::PixGroupRepr<S>>,
+    {
+        let ssa_index = commitment.ssa_id.ssa_index();
+
+        // A single message can only carry a limited number of coefficient commitments so that the
+        // resulting encoded message still fits within a HOPR packet payload. The commitments of a
+        // single coefficient (across all polynomials) might therefore need to be split across
+        // multiple messages. The bound below mirrors the conservative estimate used by the encoder
+        // (it intentionally over-reserves space for the per-commitment polynomial index and the
+        // message header), guaranteeing that every produced message encodes successfully.
+        let max_commitments_per_message = ((ApplicationData::PAYLOAD_SIZE
+            - StartProtocol::<I, (), (), G>::START_HEADER_SIZE)
+            / (size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<G>()))
+        .max(1);
+
+        // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
+        // guarantee that the resulting messages are ordered by coefficient index, making sure the
+        // constant terms (coefficient index 0) of the polynomials are delivered first.
+        let mut by_coefficient: std::collections::BTreeMap<
+            u16,
+            Vec<(hopr_protocol_pix::PolynomialIndex, G)>,
+        > = std::collections::BTreeMap::new();
+
+        for (coefficient_index, coefficients) in commitment.verifiers {
+            let entry = by_coefficient.entry(coefficient_index).or_default();
+            for (poly_index, coefficient_commitment) in coefficients {
+                entry.push((poly_index, G::from(coefficient_commitment)));
+            }
+        }
+
+        let mut messages = Vec::new();
+        for (coefficient_index, coefficients) in by_coefficient {
+            // Split the commitments of this coefficient into chunks that each fit within a packet.
+            for chunk in coefficients.chunks(max_commitments_per_message) {
+                messages.push(Self {
+                    session_id: session_id.clone(),
+                    ssa_index,
+                    coefficient_index,
+                    coefficient_commitments: chunk.iter().cloned().collect(),
+                });
+            }
+        }
+
+        messages
     }
 }
 
@@ -196,21 +245,23 @@ impl<I, G> SsaServerCommitmentMessage<I, G> {
     pub fn new(
         session_id: I,
         polys_per_ssa: u32,
-        shares_per_ssa: u32,
+        shares_per_poly: u32,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
     ) -> Self {
         Self {
             session_id,
-            params: ((polys_per_ssa as u64) << 32) | shares_per_ssa as u64,
+            params: ((polys_per_ssa as u64) << 32) | shares_per_poly as u64,
             commitments: commitments.into_iter().collect(),
         }
     }
 
+    /// Number of polynomials required to reconstruct an SSA.
     pub fn polys_per_ssa(&self) -> u32 {
         (self.params >> 32) as u32
     }
 
-    pub fn shares_per_ssa(&self) -> u32 {
+    /// Number of shares required to reconstruct a single polynomial.
+    pub fn shares_per_poly(&self) -> u32 {
         self.params as u32
     }
 }
@@ -650,9 +701,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_packet::prelude::HoprPacket;
+    use hopr_types::crypto::prelude::SimplePseudonym;
+    use hopr_types::crypto_random::Randomizable;
+    use hopr_crypto_packet::HoprPixSpec;
+    use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
     use hopr_protocol_app::prelude::Tag;
-    use hopr_protocol_pix::{PolynomialIndex, SsaIndex};
+    use hopr_protocol_pix::{EntryShareGenerator, PolynomialIndex, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
 
     use super::*;
 
@@ -928,6 +982,53 @@ mod tests {
             len,
             KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_new_multiple_messages_should_encode_and_decode() -> anyhow::Result<()> {
+        // Generate a real SSA commitment using the same setup as the PIX
+        // `test_generator_reconstructor`, but with 2048 polynomials per SSA and threshold 64.
+        let generator = SsaShareGenerator::<HoprPixSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2048,
+            threshold: 64,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let session_id = 0xfeedbeef_u32;
+        let messages: Vec<SsaClientCommitmentMessage<u32, HoprPixGroupElement>> =
+            SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment);
+
+        // Since 2048 polynomials per coefficient cannot fit into a single packet, the commitments
+        // of each coefficient are split across multiple messages, so there are far more messages
+        // than the threshold (= number of coefficient indices). The constant terms (coefficient
+        // index 0) must still be delivered first.
+        assert!(messages.len() > 64);
+        assert_eq!(0, messages[0].coefficient_index);
+
+        // Each coefficient index in 0..threshold must carry exactly 2048 commitments in total.
+        let mut commitments_per_coefficient = std::collections::BTreeMap::<u16, usize>::new();
+        for message in &messages {
+            *commitments_per_coefficient.entry(message.coefficient_index).or_default() +=
+                message.coefficient_commitments.len();
+        }
+        assert_eq!((0u16..64).collect::<Vec<_>>(), commitments_per_coefficient.keys().copied().collect::<Vec<_>>());
+        assert!(commitments_per_coefficient.values().all(|&count| count == 2048));
+
+        for message in messages {
+            let msg_1 = StartProtocol::<u32, String, u8, HoprPixGroupElement>::SsaCommit(message);
+
+            let (tag, encoded) = msg_1.clone().encode()?;
+            let expected: Tag = StartProtocol::<(), (), (), HoprPixGroupElement>::START_PROTOCOL_MESSAGE_TAG;
+            assert_eq!(tag, expected);
+
+            let msg_2 = StartProtocol::<u32, String, u8, HoprPixGroupElement>::decode(tag, &encoded)?;
+            assert_eq!(msg_1, msg_2);
+        }
 
         Ok(())
     }
