@@ -16,7 +16,10 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_protocol_pix::{CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare};
+use hopr_protocol_pix::{
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
+    ShareResolution, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+};
 use hopr_types::primitive::prelude::Address;
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},

@@ -9,7 +9,7 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, RecoveredSsa, ShareResolution};
+use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
 use hopr_utils::runtime::AbortableList;
 
 use super::{

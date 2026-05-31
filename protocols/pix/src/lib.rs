@@ -68,7 +68,7 @@ where
     /// Digest used for hashing operations.
     type Digest: BlockSizeUser + FixedOutput + std::fmt::Debug + Default + HashMarker;
     /// Pseudonym used to identify groups of SURBs.
-    type Pseudonym: Pseudonym + Copy + Send + Sync + 'static;
+    type Pseudonym: Pseudonym + std::fmt::Debug + Copy + Send + Sync + 'static;
     /// Stream cipher used to encrypt the SSA shares.
     type Cipher: StreamCipher + KeyIvInit;
     /// Deposit address type.
@@ -82,7 +82,10 @@ where
     const HASH_SCALAR_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE_SCALAR";
 
     /// Performs conversion of the given `spi` and `msg` into [`PixScalar`] of this spec.
-    fn msg_to_scalar(spi: &SsaPolynomialId<Self::Pseudonym>, msg: impl AsRef<[u8]>) -> errors::Result<PixScalar<Self>>
+    fn msg_to_scalar(
+        spi: &SsaPolynomialId<Self::Pseudonym>,
+        msg: impl AsRef<[u8]>,
+    ) -> errors::Result<PixScalar<Self>, Self::Pseudonym>
     where
         Self: Sized,
     {
@@ -131,7 +134,7 @@ pub(crate) type CompletedShare<S> =
 pub(crate) fn into_completed_share<S: PixSpec>(
     identifier: PixScalar<S>,
     share: &PartialSsaShare<S>,
-) -> errors::Result<CompletedShare<S>> {
+) -> errors::Result<CompletedShare<S>, S::Pseudonym> {
     Ok(DefaultShare {
         identifier: identifier.into(),
         value: Option::from(PixScalar::<S>::from_repr(share.0.clone()))
@@ -193,7 +196,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
     pub fn from_serializable_commitments(
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
-    ) -> errors::Result<Self> {
+    ) -> errors::Result<Self, S::Pseudonym> {
         if poly_commitments.is_empty() {
             return Err(errors::PixError::InvalidInput);
         }
@@ -205,7 +208,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
                     .map(ShareVerifierGroup::<PixGroup<S>>::from)
                     .ok_or(errors::PixError::InvalidInput)
             })
-            .filter(|res: &errors::Result<ShareVerifierGroup<PixGroup<S>>>| {
+            .filter(|res: &errors::Result<ShareVerifierGroup<PixGroup<S>>, S::Pseudonym>| {
                 // Explicitly filter out the generator, because we're adding it later.
                 // It is therefore allowed for the generator not to be present in the commitments.
                 res.is_err() || res.as_ref().is_ok_and(|e| e.0 != PixGroup::<S>::generator())
@@ -214,11 +217,11 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         // Re-add the generator as the first entry
         let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
             .chain(recv_commitments)
-            .collect::<errors::Result<Vec<_>>>()?;
+            .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
         Ok(Self { spi, poly_commitment })
     }
 
-    pub(crate) fn verify_completed_share(&self, share: &CompletedShare<S>) -> errors::Result<()> {
+    pub(crate) fn verify_completed_share(&self, share: &CompletedShare<S>) -> errors::Result<(), S::Pseudonym> {
         if (share.value().is_zero() | share.identifier().is_zero()).into() {
             return Err(vsss_rs::Error::InvalidShare.into());
         }
@@ -265,7 +268,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 
     /// Verifies that the given `share` corresponding to `msg` belongs to the polynomial associated with this verifier.
     #[inline]
-    pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<()> {
+    pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<(), S::Pseudonym> {
         let msg = S::msg_to_scalar(&self.spi, msg)?;
         self.verify_completed_share(&into_completed_share(msg, share)?)
     }

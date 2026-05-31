@@ -24,7 +24,10 @@ impl<S: PixSpec> SsaBuilder<S> {
         }
     }
 
-    pub fn add_recovered_ssa_part(&mut self, sub_secret: PixScalar<S>) -> errors::Result<Option<PixScalar<S>>> {
+    pub fn add_recovered_ssa_part(
+        &mut self,
+        sub_secret: PixScalar<S>,
+    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
         if let Some(n) = self.num_polys.checked_sub(1) {
             self.num_polys = n;
             self.builder += sub_secret;
@@ -56,7 +59,11 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         }
     }
 
-    pub fn add_share(&mut self, msg: PixScalar<S>, share: PartialSsaShare<S>) -> errors::Result<Option<PixScalar<S>>> {
+    pub fn add_share(
+        &mut self,
+        msg: PixScalar<S>,
+        share: PartialSsaShare<S>,
+    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
         let share = into_completed_share(msg, &share)?;
 
         self.verifier.verify_completed_share(&share)?;
@@ -125,7 +132,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         &mut self,
         coeff_index: CoefficientIndex,
         polynomial_coeff_commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
-    ) -> errors::Result<CommitmentResult<S>> {
+    ) -> errors::Result<CommitmentResult<S>, S::Pseudonym> {
         // Cannot add more commitments if we already have all
         if self.complete {
             return Err(errors::PixError::DuplicateCommitment);
@@ -182,7 +189,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                     )
                 })
                 .map(|v| v.map(SsaPartBuilder::new))
-                .collect::<errors::Result<Vec<_>>>()?;
+                .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
             // Full client SSA commitment is the sum of all constant term commitments on all polynomials
             let client_ssa_commitment: PixGroup<S> =
@@ -209,7 +216,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                     Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(const_term))
                         .ok_or(errors::PixError::InvalidInput)
                 })
-                .sum::<errors::Result<PixGroup<S>>>()?;
+                .sum::<errors::Result<PixGroup<S>, S::Pseudonym>>()?;
 
             let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
             self.full_ssa_commitment = Some(full_ssa_commitment);

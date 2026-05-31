@@ -323,7 +323,7 @@ where
     }
 
     fn routing_from_cfg(&self, cfg: &Self::Cfg) -> Result<(Routing, Routing), anyhow::Error> {
-        Ok((cfg.forward_path.into(), cfg.return_path.into()))
+        Ok((cfg.forward_path, cfg.return_path))
     }
 
     fn listener_limits(

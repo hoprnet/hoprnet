@@ -64,8 +64,8 @@ pub use hopr_crypto_packet::HoprPixSpec;
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
-use hopr_protocol_pix::ExitAcknowledgementShareProcessor;
 pub use hopr_protocol_pix::RecoveredSsa;
+use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
@@ -718,7 +718,7 @@ where
             let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
             pix_toolbox = Some(pix_tools);
 
-            let (ssa_recovery_events_tx, ssa_recovery_events_rx) = channel(1024);
+            let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = channel(1024);
             processes.insert(
                 HoprTransportProcess::PixEvents,
                 hopr_utils::spawn_as_abortable!(
@@ -744,16 +744,28 @@ where
                             ),
                         })
                         .merge(
-                            // TODO: feed this back to the SessionManager to ensure new Exit commitment is made
-                            ssa_recovery_events_rx.map(|ssa_recovery_event: RecoveredSsa<HoprPixSpec>| {
-                                PixEvent::PrivateKeyRecovered(
-                                    (
-                                        *ssa_recovery_event.ssa_id.pseudonym(),
-                                        ssa_recovery_event.ssa_id.ssa_index(),
-                                    ),
-                                    ssa_recovery_event.ssa,
-                                )
-                            })
+                            ssa_share_resolution_events_rx
+                                .filter_map(|ssa_resolution: ShareResolution<HoprPixSpec>| {
+                                    futures::future::ready(
+                                    match ssa_resolution {
+                                        ShareResolution::RecoveredSsa(ssa_recovery_event) => {
+                                            // TODO: feed this back to the SessionManager to ensure new Exit commitment is made
+                                            Some(PixEvent::PrivateKeyRecovered(
+                                                (
+                                                    *ssa_recovery_event.ssa_id.pseudonym(),
+                                                    ssa_recovery_event.ssa_id.ssa_index(),
+                                                ),
+                                                ssa_recovery_event.ssa,
+                                            ))
+                                        }
+                                        ShareResolution::InvalidShare(peer, pseudonym, ssa_index) => {
+                                            // TODO: feed this back to the SessionManager to ensure the Session is terminated
+                                            error!(%peer, %pseudonym, ssa_index, "RP peer sent acknowledgement indicating invalid PIX share from Entry");
+                                            None
+                                        }
+                                    })
+
+                                })
                         )
                         .map(Ok)
                         .forward(ssa_events.sink_map_err(HoprTransportError::other))
@@ -763,7 +775,7 @@ where
             // SsaReconstructor must be embedded into the packet pipeline, and the pipeline can emit
             // SSA recovery events.
             let pipeline_builder =
-                pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_recovery_events_tx);
+                pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
 
             match role {
                 protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),

@@ -1843,7 +1843,7 @@ where
             session_slot.abort_handles.lock().insert(
                 SessionTasks::DepositAwaiter,
                 hopr_utils::spawn_as_abortable!(async move {
-                    if let Ok(_) = deposit_done_rx
+                    if deposit_done_rx
                         .filter(|((evt_pseudonym, evt_index), _)| {
                             futures::future::ready(
                                 evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym(),
@@ -1853,6 +1853,7 @@ where
                         .delay(futures_time::time::Duration::from_millis(100))
                         .timeout(futures_time::time::Duration::from(max_deposit_wait))
                         .await
+                        .is_ok()
                     {
                         // Abort the kill switch once the deposit has been done
                         // This kill-switch is reinstated once the SSA has been recovered and a new Client commitment is

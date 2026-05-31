@@ -46,7 +46,7 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     secret: PixScalar<S>,
     t: usize,
     rng: impl RngCore + CryptoRng,
-) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>)> {
+) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>), S::Pseudonym> {
     let mut polynomial = RawPolynomial::<S>::create(t);
     polynomial.fill(&secret.into(), rng, t)?;
 
@@ -124,7 +124,7 @@ impl<S: PixSpec> SsaShareGenerator<S> {
 }
 
 impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
-    type Error = PixError;
+    type Error = PixError<S::Pseudonym>;
 
     /// Generate the next [`PartialSsaShare`] for the given pseudonym and message `msg`.
     ///
@@ -136,7 +136,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         &self,
         pseudonym: &S::Pseudonym,
         msg: &impl AsRef<[u8]>,
-    ) -> errors::Result<Option<GeneratedShare<S>>> {
+    ) -> errors::Result<Option<GeneratedShare<S>>, S::Pseudonym> {
         if let Some(entry) = self.polynomials.get(pseudonym) {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
@@ -168,7 +168,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     /// Generates a new SSA commitment from the sender side, for the given `pseudonym`.
     ///
     /// Returns the new random SSA-commitment and the corresponding SSA share verifier.
-    fn new_ssa_commitment(&self, pseudonym: &S::Pseudonym, ssa_index: SsaIndex) -> errors::Result<SsaCommitment<S>> {
+    fn new_ssa_commitment(
+        &self,
+        pseudonym: &S::Pseudonym,
+        ssa_index: SsaIndex,
+    ) -> errors::Result<SsaCommitment<S>, S::Pseudonym> {
         let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
 
         // Generate sub-secrets for each polynomial
@@ -188,7 +192,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         // Generate polynomial and verifier for each sub-secret
         let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
             .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, rng))
-            .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>>>()?
+            .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>, S::Pseudonym>>()?
             .into_iter()
             .unzip();
 
@@ -210,7 +214,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                 poly_commitment,
                             }),
                     );
-                    Ok::<_, PixError>(moka::ops::compute::Op::Put(std::sync::Arc::new(
+                    Ok::<_, PixError<S::Pseudonym>>(moka::ops::compute::Op::Put(std::sync::Arc::new(
                         parking_lot::Mutex::new(SsaPseudonymEntry {
                             ssa_index,
                             poly_queue: raw_polynomials

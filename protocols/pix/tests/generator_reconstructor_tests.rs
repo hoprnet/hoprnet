@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use hopr_protocol_pix::{
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixScalar, PixSpec, SsaCommitment,
-    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixScalar, PixSpec, ShareResolution,
+    SsaCommitment, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
+    TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::{
@@ -133,8 +134,9 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
     let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
     assert!(!res.is_empty());
 
-    assert_eq!(res[0].ssa_id, ssa_id);
-    assert_eq!(res[0].ssa.public().to_address(), full_ssa_deposit_address);
+    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
+        if res.ssa_id == ssa_id && res.ssa.public().to_address() == full_ssa_deposit_address
+    ));
 
     Ok(())
 }

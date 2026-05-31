@@ -1,16 +1,14 @@
-use hopr_types::crypto::prelude::Pseudonym;
-
 use crate::SsaIndex;
 
 /// List of all errors that can occur in the PIX protocol.
 #[derive(Debug, thiserror::Error)]
-pub enum PixError {
+pub enum PixError<P: std::fmt::Display> {
     #[error("invalid input to the function")]
     InvalidInput,
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
     #[error("received an ssa share from pseudonym {0} #{1} that could not be verified")]
-    InvalidShare(Box<dyn Pseudonym>, SsaIndex),
+    InvalidShare(P, SsaIndex),
     #[error("encrypted partial ssa share is empty")]
     ShareIsEmpty,
     #[error("ssa commitment does not match ssa")]
@@ -31,10 +29,10 @@ pub enum PixError {
     VsssError(vsss_rs::Error),
 }
 
-impl From<vsss_rs::Error> for PixError {
+impl<P: std::fmt::Display> From<vsss_rs::Error> for PixError<P> {
     fn from(err: vsss_rs::Error) -> Self {
         PixError::VsssError(err)
     }
 }
 
-pub type Result<T> = std::result::Result<T, PixError>;
+pub type Result<T, P> = std::result::Result<T, PixError<P>>;

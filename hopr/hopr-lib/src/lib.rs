@@ -145,6 +145,10 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<(u32, u32)>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -171,6 +175,10 @@ pub struct HoprSessionClientExplicitPathConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<(u32, u32)>,
 }
 
 #[cfg(feature = "session-client")]
@@ -183,6 +191,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            pix_ssa_quota: value.pix_ssa_quota,
         }
     }
 }

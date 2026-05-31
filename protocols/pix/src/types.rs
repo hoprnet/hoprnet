@@ -160,7 +160,7 @@ impl<S: PixSpec> PartialSsaShare<S> {
         mut self,
         spi: &SsaPolynomialId<S::Pseudonym>,
         ack_key: &HalfKey,
-    ) -> errors::Result<EncryptedPartialSsaShare<S>>
+    ) -> errors::Result<EncryptedPartialSsaShare<S>, S::Pseudonym>
     where
         FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
         EncShareSize<S>: ArrayLength<u8>,
@@ -186,7 +186,7 @@ impl<S: PixSpec> AsRef<<PixScalar<S> as PrimeField>::Repr> for PartialSsaShare<S
 fn derive_ssa_encryption_key<S: PixSpec>(
     spi: &SsaPolynomialId<S::Pseudonym>,
     ack: &HalfKey,
-) -> errors::Result<S::Cipher> {
+) -> errors::Result<S::Cipher, S::Pseudonym> {
     let mut output = Blake3::new_derive_key(S::KEY_DERIVATION_CONTEXT)
         .update_reader(ack.as_ref())
         .and_then(|h| h.update_reader(spi.id.pseudonym.as_ref()))
@@ -280,7 +280,11 @@ where
     /// acknowledgement [`HalfKey`].
     ///
     /// NOTE: that the share must be verified by the reconstructor.
-    pub(crate) fn decrypt(self, pseudonym: &S::Pseudonym, ack_key: &HalfKey) -> errors::Result<PartialSsaShare<S>> {
+    pub(crate) fn decrypt(
+        self,
+        pseudonym: &S::Pseudonym,
+        ack_key: &HalfKey,
+    ) -> errors::Result<PartialSsaShare<S>, S::Pseudonym> {
         if let Some((ssa_index, poly_index)) = self.indices() {
             let spi = SsaPolynomialId::new(SsaId::new(*pseudonym, ssa_index), poly_index);
             let mut cipher = derive_ssa_encryption_key::<S>(&spi, ack_key)?;
@@ -372,7 +376,7 @@ impl<S: PixSpec> TaggedEncryptedPartialSsaShare<S, S::Pseudonym, PixScalar<S>> {
         pseudonym: S::Pseudonym,
         nonce: &impl AsRef<[u8]>,
         partial_share: EncryptedPartialSsaShare<S>,
-    ) -> errors::Result<Self> {
+    ) -> errors::Result<Self, S::Pseudonym> {
         if let Some((ssa_index, poly_index)) = partial_share.indices() {
             Ok(Self {
                 pseudonym,
@@ -427,7 +431,7 @@ pub struct GeneratedShare<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
 impl<S: PixSpec> GeneratedShare<S, S::Pseudonym> {
     /// Convenience method to [encrypt](PartialSsaShare::encrypt) the share using an acknowledgement [`HalfKey`].
     #[inline]
-    pub fn encrypt(self, ack: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>> {
+    pub fn encrypt(self, ack: &HalfKey) -> errors::Result<EncryptedPartialSsaShare<S>, S::Pseudonym> {
         self.share.encrypt(&self.id, ack)
     }
 }
@@ -463,7 +467,7 @@ impl<S: PixSpec, P> IntoIterator for SsaCommitment<S, P> {
 
 impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
     /// Reconstructs the verifiers from the internal transposed representation.
-    pub fn reconstruct_verifiers(self) -> errors::Result<Vec<PartialSsaShareVerifier<S>>> {
+    pub fn reconstruct_verifiers(self) -> errors::Result<Vec<PartialSsaShareVerifier<S>>, S::Pseudonym> {
         let mut poly_coeffs: BTreeMap<PolynomialIndex, BTreeMap<CoefficientIndex, PixGroupRepr<S>>> = BTreeMap::new();
         for (coeff_idx, coeffs) in self.verifiers {
             for (poly_idx, commitment) in coeffs {

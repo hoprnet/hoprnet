@@ -15,7 +15,7 @@ pub enum ShareResolution<S: PixSpec> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<S>),
     /// An invalid share was encountered.
-    InvalidShare(Box<OffchainPublicKey>, S::Pseudonym, SsaIndex)
+    InvalidShare(Box<OffchainPublicKey>, S::Pseudonym, SsaIndex),
 }
 
 /// Allows reconstruction of SSAs at the Exit node.
@@ -72,9 +72,9 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     /// to challenges of previously
     /// [inserted encrypted shares](ExitAcknowledgementShareProcessor::insert_encrypted_share).
     ///
-    /// On success, the [resolutions](ShareResolution) contain any fully recovered SSA shares that were completed as result
-    /// of the given acknowledgements, or particular cases that lead to invalid (unverifiable) share. That might
-    /// indicate faulty behavior of the Entry, or a malicious attempt to disrupt the protocol.
+    /// On success, the [resolutions](ShareResolution) contain any fully recovered SSA shares that were completed as
+    /// result of the given acknowledgements, or particular cases that lead to invalid (unverifiable) share. That
+    /// might indicate faulty behavior of the Entry, or a malicious attempt to disrupt the protocol.
     ///
     /// Challenges for which encrypted shares were not found are skipped.
     ///

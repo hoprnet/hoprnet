@@ -6,7 +6,11 @@ use hopr_types::{
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
 
-use crate::{CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId, ShareResolution};
+use crate::{
+    CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr,
+    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaPolynomialId,
+    TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+};
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
@@ -94,7 +98,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         ack: HalfKey,
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
-    ) -> Result<Option<RecoveredSsa<S>>, PixError> {
+    ) -> Result<Option<RecoveredSsa<S>>, PixError<S::Pseudonym>> {
         let Some(share) = awaiting_ack_from_peer.remove(&ack_challenge) else {
             tracing::trace!(?ack_challenge, "received ack for unknown share");
             return Ok(None);
@@ -120,7 +124,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 // We need to treat this error differently, because it is critical
                 // and may be differently handled by the upper-layer components
                 tracing::error!(%spi, "share verification failed");
-                return Err(PixError::InvalidShare((*spi.pseudonym()).into(), spi.ssa_index()));
+                return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
             }
             Err(e) => return Err(e),
         };
@@ -147,7 +151,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 }
 
 impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
-    type Error = PixError;
+    type Error = PixError<S::Pseudonym>;
 
     fn new_exit_commitment(
         &self,
