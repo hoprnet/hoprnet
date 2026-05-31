@@ -518,12 +518,26 @@ impl<P, A> SsaCommitmentState<P, A> {
 }
 
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RecoveredSsa<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+#[derive(Debug, Clone, Copy)]
+pub struct RecoveredSsa<P, A> {
     /// ID of the SSA that was recovered.
     pub ssa_id: SsaId<P>,
     /// Recovered secret scalar (private key corresponding to the SSA deposit address).
-    pub ssa: S::AddressPrivateKey,
+    pub ssa: A,
+}
+
+impl<P: PartialEq, A> PartialEq for RecoveredSsa<P, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ssa_id == other.ssa_id
+    }
+}
+
+impl<P: Eq, A> Eq for RecoveredSsa<P, A> {}
+
+impl<P: std::hash::Hash, A> std::hash::Hash for RecoveredSsa<P, A> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ssa_id.hash(state);
+    }
 }
 
 #[cfg(test)]

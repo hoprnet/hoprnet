@@ -1,4 +1,6 @@
 mod utils;
+
+use ahash::HashSetExt;
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
@@ -98,7 +100,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         ack: HalfKey,
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
-    ) -> Result<Option<RecoveredSsa<S>>, PixError<S::Pseudonym>> {
+    ) -> Result<Option<RecoveredSsa<S::Pseudonym, S::AddressPrivateKey>>, PixError<S::Pseudonym>> {
         let Some(share) = awaiting_ack_from_peer.remove(&ack_challenge) else {
             tracing::trace!(?ack_challenge, "received ack for unknown share");
             return Ok(None);
@@ -262,7 +264,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
-    ) -> Result<Vec<ShareResolution<S>>, Self::Error> {
+    ) -> Result<Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>>, Self::Error> {
         let Some((awaiting_ack_from_peer, half_keys_challenges)) = crate::ack_verify::verify_expected_acknowledgements(
             peer,
             acks,
@@ -272,15 +274,18 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::UnexpectedShare);
         };
 
-        let mut res = Vec::with_capacity(half_keys_challenges.len());
+        // Feed output into HashSet, that deduplicates
+        let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
-                Ok(Some(ssa)) => res.push(ShareResolution::RecoveredSsa(ssa)),
+                Ok(Some(ssa)) => {
+                    res.insert(ShareResolution::RecoveredSsa(ssa));
+                }
                 Ok(None) => {}
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
                     tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
-                    res.push(ShareResolution::InvalidShare(peer.into(), pseudonym, ssa_index))
+                    res.insert(ShareResolution::InvalidShare(peer.into(), pseudonym, ssa_index));
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
@@ -288,7 +293,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             }
         }
 
-        Ok(res)
+        Ok(res.into_iter().collect())
     }
 }
 

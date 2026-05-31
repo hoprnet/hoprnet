@@ -26,7 +26,7 @@ pub use manager::{
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
-    AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionPixEvent, IncomingSession,
+    AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionOutPixEvent, IncomingSession,
     ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]

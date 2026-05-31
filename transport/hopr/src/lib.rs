@@ -76,7 +76,7 @@ pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 use hopr_transport_session::{
-    AgreedSsaQuota, DispatchResult, HoprSessionPixEvent, PixToolbox, SessionManager, SessionManagerConfig,
+    AgreedSsaQuota, DispatchResult, HoprSessionOutPixEvent, PixToolbox, SessionManager, SessionManagerConfig,
 };
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
@@ -724,13 +724,13 @@ where
                 hopr_utils::spawn_as_abortable!(
                     session_pix_events
                         .map(|session_pix_event| match session_pix_event {
-                            HoprSessionPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                            HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
                                 ssa_id,
                                 deposit_address,
                                 ..
                             }) =>
                                 PixEvent::NewDepositAddress((*ssa_id.pseudonym(), ssa_id.ssa_index()), deposit_address),
-                            HoprSessionPixEvent::DepositNeeded(
+                            HoprSessionOutPixEvent::DepositNeeded(
                                 AgreedSsaQuota {
                                     ssa_id,
                                     deposit_address,

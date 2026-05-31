@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use hopr_types::{
     crypto::prelude::{HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
@@ -10,12 +12,37 @@ use crate::{
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
 /// an encrypted PIX share.
-#[derive(Clone)]
-pub enum ShareResolution<S: PixSpec> {
+#[derive(Debug, Clone)]
+pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
-    RecoveredSsa(RecoveredSsa<S>),
+    RecoveredSsa(RecoveredSsa<P, A>),
     /// An invalid share was encountered.
-    InvalidShare(Box<OffchainPublicKey>, S::Pseudonym, SsaIndex),
+    InvalidShare(Box<OffchainPublicKey>, P, SsaIndex),
+}
+
+impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::RecoveredSsa(a), Self::RecoveredSsa(b)) => a == b,
+            (Self::InvalidShare(k1, p1, s1), Self::InvalidShare(k2, p2, s2)) => k1 == k2 && p1 == p2 && s1 == s2,
+            _ => false,
+        }
+    }
+}
+
+impl<P: Eq, A> Eq for ShareResolution<P, A> {}
+
+impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::RecoveredSsa(recovered) => recovered.hash(state),
+            Self::InvalidShare(k, p, b) => {
+                k.hash(state);
+                p.hash(state);
+                b.hash(state);
+            }
+        }
+    }
 }
 
 /// Allows reconstruction of SSAs at the Exit node.
@@ -85,7 +112,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
-    ) -> Result<Vec<ShareResolution<S>>, Self::Error>;
+    ) -> Result<Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>>, Self::Error>;
 }
 
 #[auto_impl::auto_impl(&, Arc, Box)]

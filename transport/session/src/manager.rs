@@ -44,7 +44,7 @@ use crate::telemetry::{
     set_session_state,
 };
 use crate::{
-    AgreedSsaQuota, Capability, HoprSession, HoprSessionPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig,
+    AgreedSsaQuota, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig,
     SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
@@ -331,14 +331,14 @@ type SessionNotifiers = (
 pub struct PixToolbox {
     share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
     share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
-    pix_events: Sender<HoprSessionPixEvent>,
+    pix_events: Sender<HoprSessionOutPixEvent>,
 }
 
 impl PixToolbox {
     pub fn new(
         share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
         share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
-    ) -> (Self, impl futures::Stream<Item = HoprSessionPixEvent>) {
+    ) -> (Self, impl futures::Stream<Item = HoprSessionOutPixEvent>) {
         let (pix_events, pix_events_rx) = futures::channel::mpsc::channel(1024);
         (
             Self {
@@ -1866,7 +1866,7 @@ where
 
             pix_toolbox
                 .pix_events
-                .send(HoprSessionPixEvent::DepositNeeded(
+                .send(HoprSessionOutPixEvent::DepositNeeded(
                     AgreedSsaQuota {
                         ssa_id,
                         deposit_address,
@@ -1956,7 +1956,7 @@ where
             // Notify the new SSA deposit address to allow the deposit to happen
             pix_toolbox
                 .pix_events
-                .send(HoprSessionPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                .send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
                     ssa_id: SsaId::new(pseudonym, ssa_index),
                     deposit_address,
                     quota_per_ssa,

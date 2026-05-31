@@ -91,9 +91,9 @@ pub struct AgreedSsaQuota {
     pub quota_per_ssa: SsaQuota,
 }
 
-/// Events raised by the Session Manager in response to received PIX messages.
+/// Events raised by the [`SessionManager`] in response to received PIX messages.
 #[derive(Debug, Clone)]
-pub enum HoprSessionPixEvent {
+pub enum HoprSessionOutPixEvent {
     /// Event raised by the [`SessionManager`] of an Entry node can deposit funds to an SSA for the agreed data quota.
     ReadyToDeposit(AgreedSsaQuota),
     /// Event raised by the [`SessionManager`] of an Exit node, whenever it knows a new SSA and expects funds to be
@@ -104,6 +104,15 @@ pub enum HoprSessionPixEvent {
         AgreedSsaQuota,
         futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
     ),
+}
+
+/// Events received by the [`SessionManager`] in reaction to received shares from the packet pipeline.
+#[derive(Debug, Clone)]
+pub enum HoprSessionInPixEvent {
+    /// Informs the [`SessionManager`] that an SSA was fully recovered.
+    SsaRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`SessionManager`] that unverifiable shares were encountered.
+    UnverifiableShare(SsaId<HoprPseudonym>),
 }
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.

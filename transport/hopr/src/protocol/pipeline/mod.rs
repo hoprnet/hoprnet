@@ -757,7 +757,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         &self,
         _: OffchainPublicKey,
         _: Vec<Acknowledgement>,
-    ) -> Result<Vec<ShareResolution<HoprPixSpec>>, Self::Error> {
+    ) -> Result<Vec<ShareResolution<HoprPseudonym, ChainKeypair>>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
 }
