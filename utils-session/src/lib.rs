@@ -234,6 +234,21 @@ impl ListenerJoinHandles {
                 .map(|client| client.value().configurator.clone())
         })
     }
+
+    /// Returns all active session configurators for the given bound TCP host.
+    /// Intended for callers that only know the local TCP port they bound.
+    pub fn configurators_for(&self, bound_host: std::net::SocketAddr) -> Vec<HoprSessionConfigurator> {
+        self.0
+            .get(&ListenerId(IpProtocol::TCP, bound_host))
+            .map(|entry| {
+                entry
+                    .get_clients()
+                    .iter()
+                    .map(|client| client.value().configurator.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 
 impl Abortable for ListenerJoinHandles {
@@ -921,7 +936,6 @@ mod tests {
     use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_api::types::crypto::crypto_traits::Randomizable;
     use hopr_lib::{
-        HopRouting,
         api::types::{
             internal::{
                 prelude::HoprPseudonym,
@@ -1083,6 +1097,31 @@ mod tests {
 
         let session_id = SessionId::new(5678u64, HoprPseudonym::random());
         assert!(handles.find_configurator(&session_id).is_none());
+    }
+
+    #[test]
+    fn configurators_for_returns_empty_for_unknown_host() {
+        let handles = ListenerJoinHandles::default();
+        let addr: std::net::SocketAddr = "127.0.0.1:9999".parse().unwrap();
+        assert!(handles.configurators_for(addr).is_empty());
+    }
+
+    #[test]
+    fn configurators_for_returns_empty_vec_when_listener_has_no_clients() {
+        let handles = ListenerJoinHandles::default();
+        let addr: std::net::SocketAddr = "127.0.0.1:9091".parse().unwrap();
+        handles.0.insert(ListenerId(IpProtocol::TCP, addr), stub_stored_entry());
+        // Entry exists but has no clients, so the result must be an empty Vec.
+        assert!(handles.configurators_for(addr).is_empty());
+    }
+
+    #[test]
+    fn configurators_for_ignores_udp_listener_on_same_port() {
+        let handles = ListenerJoinHandles::default();
+        let addr: std::net::SocketAddr = "127.0.0.1:9092".parse().unwrap();
+        handles.0.insert(ListenerId(IpProtocol::UDP, addr), stub_stored_entry());
+        // Only TCP listeners are looked up; a UDP entry on the same address must not match.
+        assert!(handles.configurators_for(addr).is_empty());
     }
 
     #[test]

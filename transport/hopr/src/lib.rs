@@ -800,7 +800,7 @@ where
                     .for_each(move |data| {
                         let mut tx = on_incoming_data_tx.clone();
                         async move {
-                            if let Err(_) = tx.send(data).await {
+                            if tx.send(data).await.is_err() {
                                 tracing::error!(
                                     task = %HoprTransportProcess::SessionsManagement(0),
                                     "incoming-data channel disconnected — dropping unrelated packet; \
