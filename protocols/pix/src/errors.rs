@@ -9,7 +9,7 @@ pub enum PixError {
     InvalidInput,
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
-    #[error("received an ssa share from {0} #{1} that could not be verified")]
+    #[error("received an ssa share from pseudonym {0} #{1} that could not be verified")]
     InvalidShare(Box<dyn Pseudonym>, SsaIndex),
     #[error("encrypted partial ssa share is empty")]
     ShareIsEmpty,

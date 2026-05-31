@@ -6,11 +6,7 @@ use hopr_types::{
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
 
-use crate::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
-};
+use crate::{CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId, ShareResolution};
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
@@ -262,7 +258,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
-    ) -> Result<Vec<RecoveredSsa<S>>, Self::Error> {
+    ) -> Result<Vec<ShareResolution<S>>, Self::Error> {
         let Some((awaiting_ack_from_peer, half_keys_challenges)) = crate::ack_verify::verify_expected_acknowledgements(
             peer,
             acks,
@@ -275,12 +271,12 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         let mut res = Vec::with_capacity(half_keys_challenges.len());
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
-                Ok(Some(ssa)) => res.push(ssa),
+                Ok(Some(ssa)) => res.push(ShareResolution::RecoveredSsa(ssa)),
                 Ok(None) => {}
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
-                    // TODO: should notify when a share could not be verified!
                     tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
+                    res.push(ShareResolution::InvalidShare(peer.into(), pseudonym, ssa_index))
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");

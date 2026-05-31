@@ -8,6 +8,16 @@ use crate::{
     SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
 };
 
+/// Possible resolutions of a received acknowledgement that might be bound to decrypt
+/// an encrypted PIX share.
+#[derive(Clone)]
+pub enum ShareResolution<S: PixSpec> {
+    /// Full SSA was recovered.
+    RecoveredSsa(RecoveredSsa<S>),
+    /// An invalid share was encountered.
+    InvalidShare(Box<OffchainPublicKey>, S::Pseudonym, SsaIndex)
+}
+
 /// Allows reconstruction of SSAs at the Exit node.
 ///
 /// There are 3 inputs that the implementor is dependent on (in order):
@@ -59,13 +69,14 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     /// Function should first check if any acknowledgements are expected from the given `peer`.
     ///
     /// Furthermore, the function must verify each given acknowledgement and find if it evaluates to any solutions
-    /// to challenges of previously [inserted encrypted
-    /// shares](ExitAcknowledgementShareProcessor::insert_encrypted_share).
+    /// to challenges of previously
+    /// [inserted encrypted shares](ExitAcknowledgementShareProcessor::insert_encrypted_share).
     ///
-    /// On success, the [resolutions](RecoveredSsa) contain any fully recovered SSA shares that were completed as result
-    /// of the given acknowledgements.
+    /// On success, the [resolutions](ShareResolution) contain any fully recovered SSA shares that were completed as result
+    /// of the given acknowledgements, or particular cases that lead to invalid (unverifiable) share. That might
+    /// indicate faulty behavior of the Entry, or a malicious attempt to disrupt the protocol.
     ///
-    /// Challenges for which tickets were not found are skipped.
+    /// Challenges for which encrypted shares were not found are skipped.
     ///
     /// Must return an error if no `Acknowledgements` from the given `peer` were expected.
     ///
@@ -74,7 +85,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
-    ) -> Result<Vec<RecoveredSsa<S>>, Self::Error>;
+    ) -> Result<Vec<ShareResolution<S>>, Self::Error>;
 }
 
 #[auto_impl::auto_impl(&, Arc, Box)]

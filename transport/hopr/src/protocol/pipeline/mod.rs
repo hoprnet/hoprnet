@@ -16,10 +16,7 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_protocol_pix::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
-    RecoveredSsa, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
-};
+use hopr_protocol_pix::{CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare};
 use hopr_types::primitive::prelude::Address;
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
@@ -562,7 +559,7 @@ where
     S: PixSpec,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<S>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<ShareResolution<S>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
 {
     ack_incoming
@@ -757,7 +754,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         &self,
         _: OffchainPublicKey,
         _: Vec<Acknowledgement>,
-    ) -> Result<Vec<RecoveredSsa<HoprPixSpec>>, Self::Error> {
+    ) -> Result<Vec<ShareResolution<HoprPixSpec>>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
 }
@@ -793,7 +790,7 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,

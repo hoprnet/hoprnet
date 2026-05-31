@@ -10,7 +10,7 @@ use hopr_api::{
 use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_protocol_pix::{EntryShareGenerator, ExitAcknowledgementShareProcessor, RecoveredSsa};
+use hopr_protocol_pix::{EntryShareGenerator, ExitAcknowledgementShareProcessor, RecoveredSsa, ShareResolution};
 use hopr_utils::runtime::AbortableList;
 
 use crate::{
@@ -57,7 +57,7 @@ pub struct HoprPacketPipelineBuilder<
     AppIn,
     TEvt = futures::sink::Drain<hopr_api::node::TicketEvent>,
     A = NopExitAcknowledgementShareProcessor,
-    SEvt = futures::sink::Drain<RecoveredSsa<HoprPixSpec>>,
+    SEvt = futures::sink::Drain<ShareResolution<HoprPixSpec>>,
 > {
     packet_key: Option<OffchainKeypair>,
     chain_key: Option<ChainKeypair>,
@@ -87,7 +87,7 @@ impl Default
         Unset,
         futures::sink::Drain<hopr_api::node::TicketEvent>,
         NopExitAcknowledgementShareProcessor,
-        futures::sink::Drain<RecoveredSsa<HoprPixSpec>>,
+        futures::sink::Drain<ShareResolution<HoprPixSpec>>,
     >
 {
     fn default() -> Self {
@@ -107,7 +107,7 @@ impl
         Unset,
         futures::sink::Drain<hopr_api::node::TicketEvent>,
         NopExitAcknowledgementShareProcessor,
-        futures::sink::Drain<RecoveredSsa<HoprPixSpec>>,
+        futures::sink::Drain<ShareResolution<HoprPixSpec>>,
     >
 {
     /// Creates a new empty builder. All required components must then be supplied via the
@@ -551,7 +551,7 @@ where
     TFact: TicketFactory + Clone + Send + Sync + 'static,
     G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
@@ -611,7 +611,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<RecoveredSsa<HoprPixSpec, HoprPseudonym>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
@@ -626,7 +626,7 @@ where
         + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
-    G: EntryShareGenerator<hopr_crypto_packet::HoprPixSpec> + Clone + Send + Sync + 'static,
+    G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
