@@ -751,7 +751,7 @@ macro_rules! impl_build_methods {
 
             // Drain unrelated packets so SessionsManagement(0) can forward without hitting
             // SendError(disconnected).
-            hopr_utils::spawn_as_abortable!(drain_incoming_data(socket.reader()));
+            spawn(drain_incoming_data(socket.reader()));
 
             let mut processes = pre.processes;
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
@@ -898,7 +898,7 @@ macro_rules! impl_build_methods {
                 .await?;
             // Drain unrelated packets so SessionsManagement(0) can forward without hitting
             // SendError(disconnected).
-            hopr_utils::spawn_as_abortable!(drain_incoming_data(socket.reader()));
+            spawn(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
             let hopr = Hopr {

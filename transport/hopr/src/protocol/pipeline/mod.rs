@@ -910,7 +910,7 @@ mod tests {
         drop(data_rx); // receiver gone from the start
 
         let (upstream_tx, upstream_rx) = mpsc::channel::<u8>(16);
-        let upstream = upstream_rx; // unbounded receiver as upstream
+        let upstream = upstream_rx;
 
         let dispatcher = tokio::spawn(async move {
             upstream
