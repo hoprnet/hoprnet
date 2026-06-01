@@ -317,6 +317,21 @@ struct PreHopr<Chain, Graph, Net, Ct> {
 // Shared pre_build logic
 // ---------------------------------------------------------------------------
 
+/// Drains a HoprSocket reader, discarding all packets and logging throughput every ~60 seconds.
+/// Runs until the stream ends (sender side dropped).
+async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
+    let mut received: u64 = 0;
+    let mut last_report = std::time::Instant::now();
+    while reader.next().await.is_some() {
+        received += 1;
+        if last_report.elapsed().as_secs() >= 60 {
+            tracing::info!(received, "incoming-data drain: unrelated packets discarded in last ~1 min");
+            received = 0;
+            last_report = std::time::Instant::now();
+        }
+    }
+}
+
 async fn pre_build_inner<Chain, Graph, Net, Ct>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -724,7 +739,7 @@ macro_rules! impl_build_methods {
             let pre = pre_build_inner(configured, session_tx, processes).await?;
 
             tracing::info!("starting transport for edge (entry) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_entry(
                     pre.cover_traffic,
@@ -733,6 +748,9 @@ macro_rules! impl_build_methods {
                     ticket_factory,
                 )
                 .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
 
             let mut processes = pre.processes;
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
@@ -866,7 +884,7 @@ macro_rules! impl_build_methods {
             }
 
             tracing::info!("starting transport for full (relay) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_relay(
                     pre.cover_traffic,
@@ -877,6 +895,8 @@ macro_rules! impl_build_methods {
                     pre.session_tx,
                 )
                 .await?;
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
             let hopr = Hopr {
