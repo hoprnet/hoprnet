@@ -854,18 +854,6 @@ mod tests {
             .expect("drain task must finish cleanly after sender is dropped");
     }
 
-    // ── SessionsManagement(0) incoming-data dispatcher regression tests ──────────
-    //
-    // Before the fix, `HoprSocket` (which owns `on_incoming_data_rx`) was dropped
-    // immediately after `run_entry`/`run_relay` in hopr-lib's builder. The first
-    // `Unrelated` packet caused `.forward(on_incoming_data_tx)` to return
-    // `SendError(disconnected)`, collapsing `SessionsManagement(0)` and dropping
-    // `rx_from_protocol` — which then caused msg_ingress to fail with
-    // "send failed because receiver is gone", taking down the entire pipeline.
-    //
-    // The fix replaces `.forward()` with a `for_each` loop that logs an error on
-    // disconnected but keeps the task — and thus `rx_from_protocol` — alive.
-
     /// A disconnected `futures::mpsc::Sender` must not panic; `send` returns `Err`.
     #[tokio::test]
     async fn disconnected_sender_returns_err_not_panic() {

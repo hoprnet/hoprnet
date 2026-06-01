@@ -521,16 +521,14 @@ where
             HoprTransportProcess::MixerForwarder,
             hopr_utils::spawn_as_abortable!(async move {
                 mix_rx
-                    .for_each(|item| {
-                        let mut sink = wire_msg_tx.clone();
-                        async move {
-                            if sink.send(item).await.is_err() {
-                                tracing::error!(
-                                    task = %HoprTransportProcess::MixerForwarder,
-                                    "wire sink dropped — discarding mixed packet"
-                                );
-                            }
+                    .fold(wire_msg_tx, |mut sink, item| async move {
+                        if sink.send(item).await.is_err() {
+                            tracing::error!(
+                                task = %HoprTransportProcess::MixerForwarder,
+                                "wire sink dropped — discarding mixed packet"
+                            );
                         }
+                        sink
                     })
                     .await;
                 tracing::warn!(
@@ -799,7 +797,6 @@ where
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
         let smgr = self.smgr.clone();
-        // Clone before the async move so the original remains available for the HoprSocket return.
         let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
@@ -825,17 +822,15 @@ where
                             }
                         }
                     })
-                    .for_each(move |data| {
-                        let mut tx = on_incoming_data_tx.clone();
-                        async move {
-                            if tx.send(data).await.is_err() {
-                                tracing::error!(
-                                    task = %HoprTransportProcess::SessionsManagement(0),
-                                    "incoming-data channel disconnected — dropping unrelated packet; \
-                                     HoprSocket must be consumed or drained by the caller"
-                                );
-                            }
+                    .fold(on_incoming_data_tx, |mut tx, data| async move {
+                        if tx.send(data).await.is_err() {
+                            tracing::error!(
+                                task = %HoprTransportProcess::SessionsManagement(0),
+                                "incoming-data channel disconnected — dropping unrelated packet; \
+                                 HoprSocket must be consumed or drained by the caller"
+                            );
                         }
+                        tx
                     })
                     .await;
                 tracing::warn!(

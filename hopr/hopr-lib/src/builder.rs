@@ -317,6 +317,21 @@ struct PreHopr<Chain, Graph, Net, Ct> {
 // Shared pre_build logic
 // ---------------------------------------------------------------------------
 
+/// Drains a HoprSocket reader, discarding all packets and logging throughput every ~60 seconds.
+/// Runs until the stream ends (sender side dropped).
+async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
+    let mut received: u64 = 0;
+    let mut last_report = std::time::Instant::now();
+    while reader.next().await.is_some() {
+        received += 1;
+        if last_report.elapsed().as_secs() >= 60 {
+            tracing::info!(received, "incoming-data drain: unrelated packets discarded in last ~1 min");
+            received = 0;
+            last_report = std::time::Instant::now();
+        }
+    }
+}
+
 async fn pre_build_inner<Chain, Graph, Net, Ct>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -735,27 +750,8 @@ macro_rules! impl_build_methods {
                 .await?;
 
             // Drain unrelated packets so SessionsManagement(0) can forward without hitting
-            // SendError(disconnected). Logs received/discarded counts every ~60 seconds.
-            hopr_utils::spawn_as_abortable!(async move {
-                let mut received: u64 = 0;
-                let mut discarded: u64 = 0;
-                let mut last_report = std::time::Instant::now();
-                let mut stream = socket.reader();
-                while let Some(_) = stream.next().await {
-                    received += 1;
-                    discarded += 1;
-                    if last_report.elapsed().as_secs() >= 60 {
-                        tracing::info!(
-                            received,
-                            discarded,
-                            "incoming-data drain: unrelated packets discarded in last ~1 min"
-                        );
-                        received = 0;
-                        discarded = 0;
-                        last_report = std::time::Instant::now();
-                    }
-                }
-            });
+            // SendError(disconnected).
+            hopr_utils::spawn_as_abortable!(drain_incoming_data(socket.reader()));
 
             let mut processes = pre.processes;
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
@@ -901,27 +897,8 @@ macro_rules! impl_build_methods {
                 )
                 .await?;
             // Drain unrelated packets so SessionsManagement(0) can forward without hitting
-            // SendError(disconnected). Logs received/discarded counts every ~60 seconds.
-            hopr_utils::spawn_as_abortable!(async move {
-                let mut received: u64 = 0;
-                let mut discarded: u64 = 0;
-                let mut last_report = std::time::Instant::now();
-                let mut stream = socket.reader();
-                while let Some(_) = stream.next().await {
-                    received += 1;
-                    discarded += 1;
-                    if last_report.elapsed().as_secs() >= 60 {
-                        tracing::info!(
-                            received,
-                            discarded,
-                            "incoming-data drain: unrelated packets discarded in last ~1 min"
-                        );
-                        received = 0;
-                        discarded = 0;
-                        last_report = std::time::Instant::now();
-                    }
-                }
-            });
+            // SendError(disconnected).
+            hopr_utils::spawn_as_abortable!(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
             let hopr = Hopr {
