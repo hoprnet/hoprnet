@@ -118,7 +118,12 @@ where
             let sleep_for = next_release.saturating_duration_since(now);
 
             if sleep_for.is_zero() {
-                continue;
+                // Reachable only because inner.poll_ready returned Pending earlier in
+                // this poll (we pushed the item back with release_at = now). The inner
+                // sink already registered its waker via that poll_ready call, and any
+                // items it had buffered were flushed by the poll_flush call above —
+                // delegate to the lower sink's wake-up signal and yield.
+                return Poll::Pending;
             }
 
             this.timer.reset(sleep_for);
@@ -216,5 +221,60 @@ mod tests {
         assert_eq!(item, 1);
 
         assert!(timeout(Duration::from_millis(10), rx.next()).await.is_err());
+    }
+
+    /// Regression test for the `poll_flush` busy-spin bug.
+    ///
+    /// When `inner.poll_ready` returns `Poll::Pending` (inner sink is full) and
+    /// `inner.poll_flush` returns `Poll::Ready(Ok(()))` (channels are no-op flush),
+    /// the outer loop must return `Poll::Pending` instead of spinning.
+    ///
+    /// If this test hangs, the busy-spin bug has been re-introduced: the executor
+    /// thread is pegged and the timeout future can never fire.
+    #[tokio::test]
+    async fn poll_flush_returns_pending_not_spin_when_inner_full() {
+        use std::convert::Infallible;
+        use futures::Sink;
+
+        struct AlwaysFullNoOpFlushSink;
+
+        impl Sink<u32> for AlwaysFullNoOpFlushSink {
+            type Error = Infallible;
+
+            fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Infallible>> {
+                Poll::Pending // always full — simulates a saturated mpsc channel
+            }
+
+            fn start_send(self: Pin<&mut Self>, _: u32) -> Result<(), Infallible> {
+                unreachable!("start_send must not be called when poll_ready returns Pending")
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Infallible>> {
+                Poll::Ready(Ok(())) // no-op flush — identical to futures::channel::mpsc
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Infallible>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        let cfg = MixerConfig {
+            min_delay: Duration::from_millis(0),
+            delay_range: Duration::from_millis(0),
+            capacity: 16,
+            metric_delay_window: 100,
+        };
+        let mut sink = MixerSink::new(AlwaysFullNoOpFlushSink, cfg);
+        sink.start_send_unpin(42u32).unwrap();
+
+        // flush() must return Poll::Pending (inner not ready), allowing the timeout to fire.
+        // If the spin bug is present, poll_flush loops forever on the single-threaded
+        // executor and the timeout can never be polled — the test hangs.
+        let result = timeout(Duration::from_millis(50), sink.flush()).await;
+        assert!(
+            result.is_err(),
+            "flush should have returned Pending (inner is full) and triggered the timeout, \
+             but it completed — inner should not have become ready"
+        );
     }
 }
