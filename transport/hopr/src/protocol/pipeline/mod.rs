@@ -867,7 +867,8 @@ mod tests {
     /// The `for_each` loop used in `SessionsManagement(0)` must not terminate when
     /// the receiver is dropped; it must continue consuming the upstream stream.
     #[tokio::test]
-    async fn session_management_dispatcher_survives_disconnected_sink() {
+    async fn session_management_dispatcher_survives_disconnected_sink() -> anyhow::Result<()> {
+        use anyhow::Context;
         use futures::SinkExt;
 
         let (data_tx, data_rx) = mpsc::channel::<u8>(4);
@@ -894,13 +895,15 @@ mod tests {
         // Task must complete without panic even though every send fails.
         dispatcher
             .await
-            .expect("dispatcher must complete cleanly even with a disconnected sink");
+            .context("dispatcher must complete cleanly even with a disconnected sink")?;
+        Ok(())
     }
 
     /// Regression: previously, the first `Unrelated` packet triggered task exit and
     /// dropped `rx_from_protocol`.  After the fix the task must run to completion.
     #[tokio::test]
-    async fn session_management_dispatcher_does_not_drop_upstream_on_disconnected_sink() {
+    async fn session_management_dispatcher_does_not_drop_upstream_on_disconnected_sink() -> anyhow::Result<()> {
+        use anyhow::Context;
         use futures::SinkExt;
 
         let (data_tx, data_rx) = mpsc::channel::<u8>(1);
@@ -923,12 +926,13 @@ mod tests {
         // Send several items; the dispatcher must process them all.
         let mut sender = upstream_tx;
         for i in 0u8..20 {
-            sender.send(i).await.expect("upstream send must succeed");
+            sender.send(i).await.context("upstream send must succeed")?;
         }
         drop(sender); // close upstream → dispatcher finishes
 
         dispatcher
             .await
-            .expect("dispatcher must complete when upstream closes, even with disconnected sink");
+            .context("dispatcher must complete when upstream closes, even with disconnected sink")?;
+        Ok(())
     }
 }

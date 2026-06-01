@@ -25,6 +25,7 @@
 ///   `bs_in_first_half >> 0`.
 use std::time::Duration;
 
+use anyhow::Context;
 use futures::StreamExt;
 use hopr_transport_mixer::{MixerConfig, channel};
 use tokio::time::timeout;
@@ -33,17 +34,17 @@ const PROCESSING_LEEWAY: Duration = Duration::from_millis(500);
 
 /// Items from different `Sender` clones appear interleaved in the receiver output.
 #[tokio::test(flavor = "current_thread")]
-async fn wire_mixer_interleaves_across_clones() {
+async fn wire_mixer_interleaves_across_clones() -> anyhow::Result<()> {
     let cfg = MixerConfig::default(); // 10..210ms uniform random delay
     let (tx_a, rx) = channel::<(u8, u32)>(cfg);
     let tx_b = tx_a.clone();
 
     const N: u32 = 200;
     for i in 0..N {
-        tx_a.send((b'A', i)).expect("send A");
+        tx_a.send((b'A', i)).context("send A")?;
     }
     for i in 0..N {
-        tx_b.send((b'B', i)).expect("send B");
+        tx_b.send((b'B', i)).context("send B")?;
     }
     drop(tx_a);
     drop(tx_b);
@@ -54,7 +55,7 @@ async fn wire_mixer_interleaves_across_clones() {
     let max_wait = Duration::from_millis(210) * 2 + PROCESSING_LEEWAY;
     let out: Vec<(u8, u32)> = timeout(max_wait, rx.take(2 * N as usize).collect())
         .await
-        .expect("timed out collecting mixed output");
+        .context("timed out collecting mixed output")?;
 
     assert_eq!(out.len(), 2 * N as usize, "not all items received");
 
@@ -70,4 +71,5 @@ async fn wire_mixer_interleaves_across_clones() {
          heap is not shared across Sender clones (first 20: {:?})",
         &out[..20.min(out.len())]
     );
+    Ok(())
 }
