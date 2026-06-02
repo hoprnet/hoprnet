@@ -104,19 +104,14 @@ async fn create_default_blokli_connector(
     chain_key: &ChainKeypair,
     blokli_url: String,
     module_address: Address,
+    tx_timeout_multiplier: Option<u32>,
 ) -> anyhow::Result<Arc<HoprBlockchainSafeConnector<BlokliClient>>> {
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         chain_key,
         BlockchainConnectorConfig {
             connection_sync_timeout: std::time::Duration::from_mins(1),
             sync_tolerance: 90,
-            tx_timeout_multiplier: std::env::var("HOPR_TX_TIMEOUT_MULTIPLIER")
-                .ok()
-                .and_then(|p| {
-                    p.parse()
-                        .inspect_err(|error| tracing::warn!(%error, "failed to parse HOPR_TX_TIMEOUT_MULTIPLIER"))
-                        .ok()
-                })
+            tx_timeout_multiplier: tx_timeout_multiplier
                 .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
@@ -246,11 +241,13 @@ pub async fn build_edge<
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
+    tx_timeout_multiplier: Option<u32>,
     #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
-    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
+    let chain_connector =
+        create_default_blokli_connector(chain_key, blokli_url, module_address, tx_timeout_multiplier).await?;
 
     build_edge_with_chain(
         chain_key,
@@ -277,11 +274,13 @@ pub async fn build_full_with_session_server(
     identity: (&ChainKeypair, &OffchainKeypair),
     config: HoprLibConfig,
     blokli_url: String,
+    tx_timeout_multiplier: Option<u32>,
     #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
 ) -> anyhow::Result<Arc<FullHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
-    let chain_connector = create_default_blokli_connector(chain_key, blokli_url, module_address).await?;
+    let chain_connector =
+        create_default_blokli_connector(chain_key, blokli_url, module_address, tx_timeout_multiplier).await?;
 
     #[cfg(feature = "session-server")]
     let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);

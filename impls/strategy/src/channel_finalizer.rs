@@ -7,7 +7,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hopr_lib::api::{
+use hopr_api::{
     chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
     node::HasChainApi,
     types::{internal::prelude::ChannelStatusDiscriminants, primitive::prelude::Utc},
@@ -20,7 +20,7 @@ use crate::{errors, strategy::Strategy as StrategyTrait};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_strategy_closure_auto_finalization_count",
         "Count of channels where closure finalizing was initiated automatically"
     )
@@ -165,8 +165,7 @@ mod tests {
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::api::{
+    use hopr_api::{
         chain::{ChainEvent, ChainEvents, HoprChainApi},
         node::{ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity},
         types::{
@@ -175,6 +174,7 @@ mod tests {
             primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDaiBalance},
         },
     };
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use lazy_static::lazy_static;
 
     use super::*;

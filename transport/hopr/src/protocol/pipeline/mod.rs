@@ -37,12 +37,12 @@ const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_m
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PACKET_COUNT:  hopr_types::telemetry::MultiCounter =  hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_PACKET_REJECTED_COUNT: hopr_types::telemetry::MultiCounter = hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_PACKET_REJECTED_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_rejected_count",
         "Number of incoming packets rejected due various reasons",
         &["reason"]
@@ -51,11 +51,11 @@ lazy_static::lazy_static! {
     // A sustained non-zero rate here indicates the Rayon pool is saturated—correlate with
     // `hopr_rayon_tasks_cancelled_total` and hopr_rayon_queue_wait_seconds to diagnose whether
     // the bottleneck is queue depth, individual task duration, or both.
-    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_types::telemetry::SimpleCounter = hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_PACKET_DECODE_TIMEOUTS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
         "hopr_packet_decode_timeouts_total",
         "Number of incoming packets dropped due to decode timeout (sustained rate indicates Rayon pool saturation)"
     ).unwrap();
-    static ref METRIC_VALIDATION_ERRORS: hopr_types::telemetry::MultiCounter =  hopr_types::telemetry::MultiCounter::new(
+    static ref METRIC_VALIDATION_ERRORS: hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
         "hopr_packet_ticket_validation_errors",
         "Number of different ticket validation errors encountered during packet processing",
         &["type"]
@@ -520,15 +520,17 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 
 /// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
 ///
-/// Used by Exit nodes: they keep the incoming acknowledgement pipeline running (for future
-/// development), but since they never receive tickets, they have nothing to acknowledge.
-async fn start_exit_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
+/// Used by Entry and Exit nodes — neither processes incoming ticket acknowledgements.
+/// Entry nodes receive acks from relays (they pay for forwarding), Exit nodes keep
+/// the pipeline alive for future PIX use. In both cases the queue must be actively
+/// drained; dropping the receiver causes every inbound ack dispatch to fail with
+/// `SendError(disconnected)`.
+async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
 where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
 {
     ack_incoming
         .for_each(move |(peer, acks)| {
-            // TODO: PIX will make use of acknowledgements at Exits
             tracing::trace!(%peer, num = acks.len(), "received acknowledgements (drained, not processed)");
             futures::future::ready(())
         })
@@ -784,22 +786,153 @@ where
             );
         }
         NodeType::Exit => {
-            // Exit nodes still run the incoming acknowledgement pipeline (for future use),
+            // Exit nodes still run the incoming acknowledgement pipeline (for future PIX use),
             // but only drain the stream — incoming acknowledgements are NOT forwarded to the
             // UnacknowledgedTicketProcessor because Exit nodes do not process tickets.
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_exit_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
             );
         }
         NodeType::Entry => {
-            // Entry nodes do not process tickets at all and do not even start the incoming
-            // acknowledgement pipeline. The receiver is dropped here, which propagates back
-            // pressure to senders of `incoming_ack_tx`.
-            let _ = (ticket_events, ticket_proc, ack_input_concurrency, incoming_ack_rx);
+            // Entry nodes do not process tickets, but they DO receive ticket acknowledgements
+            // (they pay relays for forwarding). The queue must be actively drained so the
+            // inbound dispatcher can keep sending without hitting `SendError(disconnected)`.
+            let _ = (ticket_events, ticket_proc, ack_input_concurrency);
+            processes.insert(
+                PacketPipelineProcesses::AckIn,
+                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+            );
         }
     }
 
     processes
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::channel::mpsc;
+
+    use super::*;
+
+    /// Regression test for the Entry-node ack-sink bug.
+    ///
+    /// Before the fix, `NodeType::Entry` dropped `incoming_ack_rx` immediately at
+    /// pipeline startup. Every subsequent call to `incoming_ack_tx.send(…)` then
+    /// returned `SendError(disconnected)`, flooding logs with ~300 errors per run.
+    ///
+    /// `start_drain_incoming_ack_pipeline` must hold the receiver open for the
+    /// lifetime of its task; once the sender side is dropped the task completes
+    /// cleanly.
+    #[tokio::test]
+    async fn drain_pipeline_keeps_receiver_alive() {
+        let (tx, rx) = mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(16);
+        let drain = tokio::spawn(start_drain_incoming_ack_pipeline(rx));
+
+        // Give the drain task a chance to start up.
+        tokio::task::yield_now().await;
+
+        // With the old code (drop receiver) tx.is_closed() would be true here.
+        assert!(!tx.is_closed(), "drain task must hold the receiver alive");
+
+        // Drop the sender — drain task should complete cleanly.
+        drop(tx);
+        drain
+            .await
+            .expect("drain task must finish cleanly after sender is dropped");
+    }
+
+    /// Regression: the drain must complete cleanly when the sender is dropped (no deadlock/panic).
+    #[tokio::test]
+    async fn drain_pipeline_completes_on_empty_stream() {
+        let (tx, rx) = mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(32);
+        let drain = tokio::spawn(start_drain_incoming_ack_pipeline(rx));
+        drop(tx);
+        drain
+            .await
+            .expect("drain task must finish cleanly after sender is dropped");
+    }
+
+    /// A disconnected `futures::mpsc::Sender` must not panic; `send` returns `Err`.
+    #[tokio::test]
+    async fn disconnected_sender_returns_err_not_panic() {
+        let (tx, rx) = mpsc::channel::<u8>(4);
+        drop(rx);
+        let mut tx2 = tx.clone();
+        let result = tx2.send(42u8).await;
+        assert!(result.is_err(), "send to disconnected receiver must return Err");
+    }
+
+    /// The `for_each` loop used in `SessionsManagement(0)` must not terminate when
+    /// the receiver is dropped; it must continue consuming the upstream stream.
+    #[tokio::test]
+    async fn session_management_dispatcher_survives_disconnected_sink() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use futures::SinkExt;
+
+        let (data_tx, data_rx) = mpsc::channel::<u8>(4);
+
+        // Drop the receiver immediately — simulates HoprSocket being dropped.
+        drop(data_rx);
+
+        // Upstream stream of 10 items.
+        let upstream = futures::stream::iter(0u8..10);
+
+        // Run the resilient for_each pattern used in SessionsManagement(0).
+        let dispatcher = tokio::spawn(async move {
+            upstream
+                .for_each(move |item| {
+                    let mut tx = data_tx.clone();
+                    async move {
+                        // Error is expected (disconnected); we must NOT abort the stream.
+                        let _ = tx.send(item).await;
+                    }
+                })
+                .await;
+        });
+
+        // Task must complete without panic even though every send fails.
+        dispatcher
+            .await
+            .context("dispatcher must complete cleanly even with a disconnected sink")?;
+        Ok(())
+    }
+
+    /// Regression: previously, the first `Unrelated` packet triggered task exit and
+    /// dropped `rx_from_protocol`.  After the fix the task must run to completion.
+    #[tokio::test]
+    async fn session_management_dispatcher_does_not_drop_upstream_on_disconnected_sink() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use futures::SinkExt;
+
+        let (data_tx, data_rx) = mpsc::channel::<u8>(1);
+        drop(data_rx); // receiver gone from the start
+
+        let (upstream_tx, upstream_rx) = mpsc::channel::<u8>(16);
+        let upstream = upstream_rx;
+
+        let dispatcher = tokio::spawn(async move {
+            upstream
+                .for_each(move |item| {
+                    let mut tx = data_tx.clone();
+                    async move {
+                        let _ = tx.send(item).await;
+                    }
+                })
+                .await;
+        });
+
+        // Send several items; the dispatcher must process them all.
+        let mut sender = upstream_tx;
+        for i in 0u8..20 {
+            sender.send(i).await.context("upstream send must succeed")?;
+        }
+        drop(sender); // close upstream → dispatcher finishes
+
+        dispatcher
+            .await
+            .context("dispatcher must complete when upstream closes, even with disconnected sink")?;
+        Ok(())
+    }
 }

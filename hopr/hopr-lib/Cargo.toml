@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "4.0.2-rc.1"
+version = "4.0.2-rc.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -17,7 +17,7 @@ capture = ["hopr-transport/capture"]
 default = []
 telemetry = [
   "hopr-transport/telemetry",
-  "hopr-types/telemetry",
+  "hopr-api/types-telemetry",
   "hopr-utils/telemetry",
 ]
 fixed-rng = ["hopr-api/types-fixed-rng"]
@@ -74,7 +74,7 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["full", "types-random"] }
+hopr-api = { workspace = true, features = ["full", "types-random", "types-keypair"] }
 
 hopr-utils = { workspace = true, features = [
   "network-types",
@@ -82,7 +82,6 @@ hopr-utils = { workspace = true, features = [
   "parallelize-rayon",
   "platform",
 ] }
-hopr-types = { workspace = true, features = ["keypair"] }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

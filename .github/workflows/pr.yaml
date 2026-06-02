@@ -58,7 +58,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           disable-sudo: true
           egress-policy: audit
@@ -129,7 +129,7 @@ jobs:
 
   checks:
     name: Check
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@64cb8ba34ff2e8caa43e366207d0cb1faa8d43d4 # workflow-checks-v1
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: depot-ubuntu-24.04
@@ -139,7 +139,7 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@68c55f5bd5bd5a74a92b03f7cd72970f862894d0 # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@64cb8ba34ff2e8caa43e366207d0cb1faa8d43d4 # workflow-tests-v4
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       enable_unit_tests: true

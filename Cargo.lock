@@ -2347,7 +2347,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 2.0.117",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -3148,6 +3148,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "granit-parser"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7e736dfe3881c53a7dce0685eb18202d0d9fe6911782f9870946eb9ee89d778"
+dependencies = [
+ "arraydeque",
+ "smallvec",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3234,9 +3244,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -3437,9 +3447,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "253cae294dced141adf9e102a09bd4bcbac36efaf13451d1fad93661b59c5a16"
+checksum = "e33fb0c32d216e93e58a050edea339bc8ed5bd8fe844bf893b849fc402824412"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -3579,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.1"
+version = "4.0.3-rc.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -3592,7 +3602,6 @@ dependencies = [
  "futures-time",
  "hopr-api",
  "hopr-transport",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "lazy_static",
@@ -3644,7 +3653,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.6.0"
+version = "4.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3659,7 +3668,6 @@ dependencies = [
  "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-ticket-manager",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "lazy_static",
@@ -3693,7 +3701,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-protocol-app",
@@ -3739,7 +3747,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-reference"
-version = "4.2.1"
+version = "4.2.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3754,7 +3762,6 @@ dependencies = [
  "hopr-reference",
  "hopr-ticket-manager",
  "hopr-transport-p2p",
- "hopr-types",
  "lazy_static",
  "opentelemetry-prometheus-text-exporter",
  "opentelemetry_sdk",
@@ -3774,7 +3781,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.19.0"
+version = "0.19.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3786,8 +3793,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
- "hopr-lib",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3815,7 +3820,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "futures",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "hopr-api",
  "hopr-chain-connector",
  "hopr-utils",
@@ -3835,7 +3840,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.1"
+version = "0.28.4"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3865,7 +3870,6 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3892,7 +3896,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -3916,7 +3920,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -3929,7 +3933,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-transport",
  "hopr-transport-probe",
- "hopr-types",
  "hopr-utils",
  "lazy_static",
  "libp2p",
@@ -3975,7 +3978,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -3990,7 +3993,6 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4030,9 +4032,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.8.0"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f06ce2e57452d2b33e65e6fe9f320422fee2b87970e6ef07803005827e28dfb"
+checksum = "75e82a6426de74cdef7bbef15f651ce546ab39fc77ef1dc4002247b6bbf034fc"
 dependencies = [
  "aes",
  "anyhow",
@@ -4124,7 +4126,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.1.3"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4136,7 +4138,6 @@ dependencies = [
  "hopr-api",
  "hopr-lib",
  "hopr-transport",
- "hopr-types",
  "hopr-utils",
  "human-bandwidth",
  "lazy_static",
@@ -4569,7 +4570,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "rayon",
  "serde",
  "serde_core",
@@ -6048,18 +6049,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.1.11"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1749c7ed4bcaf4c3d0a3efc28538844fb29bcdd7d2b67b2be7e20ba861ff517"
+checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.11"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b20ed30f105399776b9c883e68e536ef602a16ae6f596d2c473591d6ad64c6"
+checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7034,17 +7035,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "saphyr-parser-bw"
-version = "0.0.611"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67dec0c833db75dc98957956b303fe447ffc5eb13f2325ef4c2350f7f3aa69e3"
-dependencies = [
- "arraydeque",
- "smallvec",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "scc"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7226,18 +7216,18 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.24"
+version = "0.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83ad47c2f14654528a89495f8d0dbc64173176f8512c7c72386cbe81009f661"
+checksum = "dcc7fe48e34d02a97bc8e6253b8b91e5a47fe2c47eaacb5149cefbb69922eaf0"
 dependencies = [
  "ahash",
  "annotate-snippets",
  "base64",
  "encoding_rs_io",
  "getrandom 0.3.4",
+ "granit-parser",
  "nohash-hasher",
  "num-traits",
- "saphyr-parser-bw",
  "serde",
  "smallvec",
  "zmij",
@@ -7321,11 +7311,12 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.19.0"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05839ce67618e14a09b286535c0d9c94e85ef25469b0e13cb4f844e5593eb19"
+checksum = "e72c1c2cb7b223fafb600a619537a871c2818583d619401b785e7c0b746ccde2"
 dependencies = [
  "base64",
+ "bs58",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -7340,9 +7331,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.19.0"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf2ebbe86054f9b45bc3881e865683ccfaccce97b9b4cb53f3039d67f355a334"
+checksum = "b90c488738ecb4fb0262f41f43bc40efc5868d9fb744319ddf5f5317f417bfac"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -7955,9 +7946,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.1"
+version = "1.52.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
  "bytes",
  "libc",

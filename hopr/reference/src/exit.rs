@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, num::NonZeroUsize};
+use std::net::SocketAddr;
 
 use hopr_lib::{
     api::types::crypto::prelude::OffchainKeypair,
@@ -16,7 +16,7 @@ use crate::config::SessionIpForwardingConfig;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_TARGETS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_ACTIVE_TARGETS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_hoprd_target_connections",
         "Number of currently active HOPR session target connections on this Exit node",
         &["type"]
@@ -118,9 +118,8 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
                     .with_receiver_parallelism(
-                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
-                            .ok()
-                            .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                        self.cfg
+                            .udp_rx_parallelism
                             .map(UdpStreamParallelism::Specific)
                             .unwrap_or(UdpStreamParallelism::Auto),
                     )
@@ -139,7 +138,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
+                    let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
@@ -216,7 +215,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
+                    let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
@@ -242,7 +241,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
                 #[cfg(all(feature = "telemetry", not(test)))]
-                let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
+                let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {

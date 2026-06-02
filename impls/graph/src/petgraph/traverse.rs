@@ -41,6 +41,7 @@ where
         &inner.graph,
         source,
         destinations,
+        None,
         intermediates,
         Some(intermediates),
         initial_value,
@@ -57,13 +58,16 @@ where
             path_id[i] = node_idx.index() as u64;
         }
 
-        // Convert node indices to public keys
+        // Convert node indices to public keys; strip `source` (first element).
+        // path_id retains all indices including source for stable caching.
         let nodes = node_indices
             .into_iter()
+            .skip(1)
             .filter_map(|v| inner.indices.get_by_right(&v).copied())
             .collect::<Vec<_>>();
-        // Path includes source + intermediates + destination = length + 1 nodes
-        (nodes.len() == length + 1).then_some((nodes, path_id, final_cost))
+        // After stripping source: intermediates + destination = length nodes.
+        // `simple_paths` additionally pops the destination; the others return as-is.
+        (nodes.len() == length).then_some((nodes, path_id, final_cost))
     });
 
     if let Some(take_count) = take_count {
@@ -98,6 +102,8 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
         };
         let end = HashSet::from_iter([*end]);
 
+        // find_paths returns [intermediates…, destination]; pop destination since caller
+        // supplies it as an explicit input argument and it must not repeat in the path body.
         find_paths(
             &inner,
             *start,
@@ -108,6 +114,12 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
             value_fn.min_value(),
             value_fn.into_value_fn(),
         )
+        .into_iter()
+        .map(|(mut nodes, path_id, cost)| {
+            nodes.pop(); // strip destination — caller already knows it
+            (nodes, path_id, cost)
+        })
+        .collect()
     }
 
     fn simple_paths_from<C: ValueFn<Weight = Self::Observed>>(
@@ -172,10 +184,15 @@ impl hopr_api::graph::NetworkGraphTraverse for ChannelGraph {
                 )
                 .into_iter()
                 .map(|(mut a, mut b, _c)| {
-                    // Append me's node index to close the loopback in the PathId
+                    // find_paths already strips the leading `me` (source), so `a` is
+                    // [intermediates…, connected_neighbor]. Append `me` to close the loopback;
+                    // this is the only sanctioned position where `me` appears as a "destination".
+                    //
+                    // b is filled by find_paths BEFORE skip(1), so b[0] = me_idx and
+                    // b[1..=path_node_count] = path nodes. Closing me goes at b[path_node_count + 1].
                     let path_node_count = a.len();
-                    if path_node_count < b.len() {
-                        b[path_node_count] = me_idx.index() as u64;
+                    if path_node_count + 1 < b.len() {
+                        b[path_node_count + 1] = me_idx.index() as u64;
                     }
                     a.push(self.me);
                     (a, b)
@@ -648,12 +665,17 @@ mod tests {
         );
         assert_eq!(routes_3.len(), 5, "should find exactly 5 three-edge paths");
 
-        // Verify all returned paths have positive cost
+        // Verify all returned paths have positive cost.
+        // simple_paths strips both src and dest, so a 3-edge path has 2 intermediates.
         for (path, _path_id, cost) in &routes_3 {
             assert!(*cost > 0.0, "path {path:?} should have positive cost, got {cost}");
-            assert_eq!(path.len(), 4, "3-edge path should contain 4 nodes");
-            assert_eq!(path.first(), Some(&me), "path should start at me");
-            assert_eq!(path.last(), Some(&f), "path should end at f");
+            assert_eq!(
+                path.len(),
+                2,
+                "3-edge path should contain 2 intermediates (src and dest stripped)"
+            );
+            assert!(!path.contains(&me), "path must not contain src");
+            assert!(!path.contains(&f), "path must not contain dest");
         }
 
         // --- 1-edge path: no direct me→f edge ---
@@ -1179,15 +1201,12 @@ mod tests {
         assert_eq!(routes.len(), 1, "should find exactly one 2-edge loopback");
 
         let (path, _path_id) = &routes[0];
-        assert_eq!(
-            path.len(),
-            4,
-            "loopback path should have 4 nodes (2 internal edges + appended me)"
-        );
-        assert_eq!(path.first(), Some(&me), "path should start with me");
-        assert_eq!(path.last(), Some(&me), "path should end with me (appended)");
-        assert_eq!(path[1], a, "first intermediate should be a");
-        assert_eq!(path[2], b, "destination (connected neighbor) should be b");
+        // simple_loopback_to_self strips the leading `me` and keeps the closing `me`.
+        // For a 2-edge internal path (me → a → b), the result is [a, b, me].
+        assert_eq!(path.len(), 3, "loopback path: 2 internal nodes + closing me");
+        assert_eq!(path.last(), Some(&me), "path should end with me (closing loopback)");
+        assert_eq!(path[0], a, "first intermediate should be a");
+        assert_eq!(path[1], b, "destination (connected neighbor) should be b");
 
         Ok(())
     }
@@ -1218,10 +1237,11 @@ mod tests {
         assert_eq!(routes.len(), 1, "should find exactly one 3-edge loopback");
 
         let (path, _path_id) = &routes[0];
-        assert_eq!(path.len(), 5, "3-edge internal path + appended me = 5 nodes");
-        assert_eq!(path.first(), Some(&me), "starts with me");
+        // simple_loopback_to_self strips leading `me`, keeps closing `me`.
+        // For a 3-edge internal path (me → a → b → c), result is [a, b, c, me].
+        assert_eq!(path.len(), 4, "3-edge internal path + closing me = 4 nodes");
         assert_eq!(path.last(), Some(&me), "ends with me");
-        assert_eq!(&path[1..4], &[a, b, c], "interior nodes");
+        assert_eq!(&path[0..3], &[a, b, c], "interior nodes");
 
         Ok(())
     }
@@ -1255,13 +1275,13 @@ mod tests {
         assert_eq!(routes.len(), 2, "diamond should yield two 2-edge loopback paths");
 
         for (path, _path_id) in &routes {
-            assert_eq!(path.first(), Some(&me), "every path starts with me");
+            // Leading `me` is stripped; path is [intermediate, c, me].
             assert_eq!(path.last(), Some(&me), "every path ends with me");
             assert_eq!(path[path.len() - 2], c, "penultimate node is c (connected neighbor)");
         }
 
-        // Verify distinct intermediates (a and b)
-        let intermediates: HashSet<_> = routes.iter().map(|(p, _)| p[1]).collect();
+        // Verify distinct first intermediates (a and b)
+        let intermediates: HashSet<_> = routes.iter().map(|(p, _)| p[0]).collect();
         assert!(intermediates.contains(&a), "should include path through a");
         assert!(intermediates.contains(&b), "should include path through b");
 
@@ -1296,9 +1316,8 @@ mod tests {
             "should find loopback paths to both connected neighbors"
         );
 
-        // Both paths start and end with me
+        // Leading `me` is stripped; path is [intermediate, connected_neighbor, me].
         for (path, _) in &routes {
-            assert_eq!(path.first(), Some(&me));
             assert_eq!(path.last(), Some(&me));
         }
 

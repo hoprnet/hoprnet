@@ -306,17 +306,24 @@ impl Probe {
         let tag_allocator = self.tag_allocator.clone();
         let classifier_neighbor_probes = active_neighbor_probes.clone();
         let classifier_path_probes = active_path_probes.clone();
+        let emit_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "probe_emit_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_utils::spawn_as_abortable!(async move {
+            hopr_utils::spawn_as_abortable_named!("probe_emit", async move {
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                         let active_neighbor_probes = active_neighbor_probes.clone();
                         let active_path_probes = active_path_probes.clone();
                         let push_to_network = push_to_network.clone();
                         let tag_allocator = tag_allocator.clone();
+                        let emit_diag = emit_diag.clone();
 
-                        async move {
+                        emit_diag.wrap(async move {
                             match peer {
                                 ProbeRouting::Neighbor(DestinationRouting::Forward {
                                     destination,
@@ -419,7 +426,7 @@ impl Probe {
                                     }
                                 }
                             }
-                        }
+                        })
                     })
                     .inspect(|_| {
                         tracing::warn!(

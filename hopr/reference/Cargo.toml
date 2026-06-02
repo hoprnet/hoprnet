@@ -1,6 +1,6 @@
 [package]
 name = "hopr-reference"
-version = "4.2.1"
+version = "4.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -48,7 +48,7 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
-telemetry = ["hopr-lib/telemetry", "dep:hopr-types", "dep:lazy_static"]
+telemetry = ["hopr-lib/telemetry", "hopr-api/types-telemetry", "dep:lazy_static"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -68,8 +68,8 @@ tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true, optional = true }
 
+hopr-api = { workspace = true }
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
-hopr-types = { workspace = true, optional = true }
 # impls
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
@@ -85,8 +85,7 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-reference = { workspace = true, features = ["testing"] }
-hopr-api = { workspace = true, features = ["types-random"] }
-hopr-types = { workspace = true, features = ["telemetry"] }
+hopr-api = { workspace = true, features = ["types-random", "types-telemetry"] }
 opentelemetry_sdk = { workspace = true, features = [
   "metrics",
   "experimental_metrics_custom_reader",

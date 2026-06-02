@@ -9,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
 use futures::StreamExt as _;
-use hopr_lib::api::{
+use hopr_api::{
     chain::{
         ChainEvent, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
         ChainWriteChannelOperations,
@@ -18,6 +18,8 @@ use hopr_lib::api::{
         ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView,
     },
 };
+
+use tracing::info;
 
 use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
@@ -101,6 +103,13 @@ where
         + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
+        tracing::info!(
+            target = self.cfg.population.target_open_channels,
+            min = self.cfg.population.min_open_channels,
+            tick_interval_secs = self.cfg.tick_interval.as_secs(),
+            initial_balance = %self.cfg.funding.initial_balance,
+            "channel-lifecycle: strategy started"
+        );
         self.run_pipeline().await;
 
         let me = *self.node.chain_api().me();
