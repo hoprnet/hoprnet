@@ -8,12 +8,6 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    UnreliableSocket,
-};
-use hopr_protocol_start::StartProtocol;
 use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::{
@@ -21,6 +15,12 @@ use hopr_api::types::{
         prelude::{BytesRepresentable, ToHex},
     },
 };
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_session::{
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
+    UnreliableSocket,
+};
+use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::{
     prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},
@@ -402,11 +402,18 @@ impl HoprSession {
 
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
+            // `NoDelay` flushes each write as its own frame (frame = datagram), which is
+            // exactly the precondition that makes unordered delivery safe: datagram payloads
+            // (e.g. UDP/WireGuard) tolerate reordering, so frames are delivered in arrival
+            // order rather than sequenced and discarded on a gap. Without `NoDelay`, writes
+            // coalesce into frames (frame != datagram) and strict ordering must be preserved.
+            let no_delay = cfg.capabilities.contains(Capability::NoDelay);
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
                 capacity: SESSION_SOCKET_CAPACITY,
-                flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
+                flush_immediately: no_delay,
+                deliver_in_order: !no_delay,
                 ..Default::default()
             };
 

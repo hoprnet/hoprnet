@@ -48,6 +48,12 @@ pub struct Sequencer<S: futures::Stream> {
     last_emitted: Instant,
     max_wait: Duration,
     state: State,
+    /// When `false`, the Sequencer is a pass-through: items are yielded in arrival
+    /// order without in-order buffering and without discarding gaps. This is the
+    /// correct delivery mode for datagram sessions (e.g. UDP/WireGuard), where the
+    /// payload tolerates reordering and a missing frame must not stall or discard
+    /// later frames.
+    ordered: bool,
 }
 
 impl<S> Sequencer<S>
@@ -69,6 +75,25 @@ where
             last_emitted: Instant::now(),
             max_wait,
             state: State::Polling,
+            ordered: true,
+        }
+    }
+
+    /// Creates a pass-through (unordered) Sequencer for datagram delivery.
+    ///
+    /// Items are yielded in arrival order; there is no in-order buffering, no
+    /// `max_wait` timer, and gaps are never discarded. The `buffer`/`timer` fields
+    /// are kept inert so the struct type is unchanged.
+    fn new_unordered(inner: S) -> Self {
+        Self {
+            inner,
+            buffer: BinaryHeap::new(),
+            timer: futures_time::task::sleep(Duration::from_millis(1).into()),
+            next_id: 1,
+            last_emitted: Instant::now(),
+            max_wait: Duration::from_millis(1),
+            state: State::Polling,
+            ordered: false,
         }
     }
 }
@@ -90,6 +115,14 @@ where
     #[instrument(name = "Sequencer::poll_next", level = "trace", skip(self, cx), fields(next_frame_id = self.next_id, state = ?self.state))]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
+
+        // Datagram mode: yield items as they arrive, in arrival order. No in-order
+        // buffering, no timer, no gap discarding — a slow/late frame must not stall
+        // or drop the frames around it.
+        if !*this.ordered {
+            return this.inner.poll_next(cx).map(|opt| opt.map(Ok));
+        }
+
         if *this.next_id == 0 {
             tracing::debug!("end of frame sequence reached");
             return Poll::Ready(None);
@@ -223,6 +256,18 @@ pub trait SequencerExt: futures::Stream {
     {
         Sequencer::new(self, timeout, capacity)
     }
+
+    /// Attaches a pass-through (unordered) [`Sequencer`] for datagram delivery:
+    /// items are yielded in arrival order, gaps are never discarded, and there is
+    /// no `max_wait` timer. Use for UDP/datagram sessions where reordering is
+    /// tolerated by the payload (e.g. WireGuard).
+    fn sequencer_unordered(self) -> Sequencer<Self>
+    where
+        Self::Item: Ord + PartialOrd<FrameId>,
+        Self: Sized,
+    {
+        Sequencer::new_unordered(self)
+    }
 }
 
 impl<T: ?Sized> SequencerExt for T where T: futures::Stream {}
@@ -246,6 +291,44 @@ mod tests {
 
         expected.sort();
         assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn unordered_sequencer_should_yield_items_in_arrival_order() -> anyhow::Result<()> {
+        let input = vec![4u32, 1, 5, 7, 8, 6, 2, 3];
+
+        let actual: Vec<u32> = futures::stream::iter(input.clone())
+            .sequencer_unordered()
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
+
+        // Pass-through: arrival order is preserved, nothing is reordered or dropped.
+        assert_eq!(input, actual);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn unordered_sequencer_should_not_discard_on_gap_or_late_item() -> anyhow::Result<()> {
+        let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+        let seq_stream = seq_stream.sequencer_unordered();
+        pin_mut!(seq_stream);
+
+        // Frame 1 is missing; later frames must still be delivered immediately
+        // (no head-of-line stall, no FrameDiscarded for the gap).
+        seq_sink.send(2u32).await?;
+        assert_eq!(Some(2), seq_stream.try_next().await?);
+
+        seq_sink.send(3u32).await?;
+        assert_eq!(Some(3), seq_stream.try_next().await?);
+
+        // The straggler arrives very late and out of order — it must still be
+        // delivered, not rejected.
+        seq_sink.send(1u32).await?;
+        assert_eq!(Some(1), seq_stream.try_next().await?);
 
         Ok(())
     }
