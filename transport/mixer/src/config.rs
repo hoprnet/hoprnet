@@ -5,6 +5,10 @@ pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
+fn default_metric_delay_window() -> u64 {
+    HOPR_MIXER_DELAY_METRIC_WINDOW
+}
+
 /// Mixer configuration.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -24,7 +28,7 @@ pub struct MixerConfig {
     #[default(HOPR_MIXER_CAPACITY)]
     pub capacity: usize,
     #[default(HOPR_MIXER_DELAY_METRIC_WINDOW)]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing, default = "default_metric_delay_window"))]
     pub metric_delay_window: u64,
 }
 
