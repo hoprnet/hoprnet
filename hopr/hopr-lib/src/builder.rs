@@ -26,7 +26,9 @@
 //!     .with_cover_traffic(|_ctx| { /* ... */ todo!() });
 //! ```
 
-use std::{convert::identity, future::Future, pin::Pin, sync::Arc, time::Duration};
+mod chain_wiring;
+
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::channel};
 pub use hopr_api::types::crypto::{
@@ -36,14 +38,14 @@ pub use hopr_api::types::crypto::{
 use hopr_api::{
     chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    graph::{EdgeCapacityUpdate, HoprGraphApi},
+    graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
     types::{
         chain::chain_events::ChainEvent,
-        internal::prelude::{ChannelDirection, ChannelStatus},
-        primitive::prelude::{Address, UnitaryFloatOps},
+        internal::prelude::ChannelDirection,
+        primitive::prelude::Address,
     },
 };
 use hopr_transport::{HoprTransport, IncomingSession};
@@ -578,109 +580,15 @@ where
                 .unwrap_or_default(),
         ));
 
-        let proc = async move {
-            chain_events
-                .for_each(|chain_event| {
-                    let chain_reader = chain_reader.clone();
-                    let graph_updater = graph_updater.clone();
-                    let ticket_price = ticket_price.clone();
-                    let win_probability = win_probability.clone();
-
-                    async move {
-                        tracing::debug!(event = %chain_event, "processing chain event");
-                        match chain_event {
-                            ChainEvent::Announcement(account) => {
-                                tracing::debug!(
-                                    account = %account.public_key,
-                                    "recording graph node for announced account"
-                                );
-                                graph_updater.record_node(account.public_key);
-                            }
-                            ChainEvent::ChannelOpened(channel)
-                            | ChainEvent::ChannelClosed(channel)
-                            | ChainEvent::ChannelBalanceIncreased(channel, _)
-                            | ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                let src_addr = channel.source;
-                                let dst_addr = channel.destination;
-                                let keys = hopr_utils::runtime::prelude::spawn_blocking(move || {
-                                    let resolve = |addr: Address| {
-                                        if addr == own_chain_addr {
-                                            return Ok(Some(own_packet_key));
-                                        }
-                                        chain_reader.chain_key_to_packet_key(&addr).map_err(anyhow::Error::from)
-                                    };
-                                    resolve(src_addr).and_then(|src| resolve(dst_addr).map(|dst| src.zip(dst)))
-                                })
-                                .await
-                                .map_err(anyhow::Error::from)
-                                .and_then(identity);
-
-                                match keys {
-                                    Ok(Some((from, to))) => {
-                                        let capacity = if matches!(channel.status, ChannelStatus::Closed) {
-                                            None
-                                        } else if let Ok(ticket_value) =
-                                            ticket_price.read().div_f64(win_probability.read().as_f64())
-                                        {
-                                            Some(
-                                                channel
-                                                    .balance
-                                                    .amount()
-                                                    .checked_div(ticket_value.amount())
-                                                    .map(|v| v.low_u128())
-                                                    .unwrap_or(u128::MAX),
-                                            )
-                                        } else {
-                                            None
-                                        };
-
-                                        tracing::debug!(
-                                            %channel, ?capacity,
-                                            "recording graph edge for channel capacity"
-                                        );
-                                        graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<
-                                            hopr_transport::NeighborTelemetry,
-                                            hopr_transport::PathTelemetry,
-                                        >::Capacity(
-                                            Box::new(EdgeCapacityUpdate {
-                                                capacity,
-                                                src: from,
-                                                dest: to,
-                                            }),
-                                        ));
-                                    }
-                                    Ok(None) => {
-                                        tracing::error!(
-                                            %channel,
-                                            "could not find packet keys for channel endpoints"
-                                        );
-                                    }
-                                    Err(error) => {
-                                        tracing::error!(
-                                            %error, %channel,
-                                            "failed to convert chain keys to packet keys"
-                                        );
-                                    }
-                                }
-                            }
-                            ChainEvent::ChannelClosureInitiated(channel) => {
-                                tracing::debug!(%channel, "channel closure initiated; no graph update");
-                            }
-                            ChainEvent::WinningProbabilityIncreased(prob)
-                            | ChainEvent::WinningProbabilityDecreased(prob) => {
-                                tracing::debug!(%prob, "recording winning probability change");
-                                *win_probability.write() = prob;
-                            }
-                            ChainEvent::TicketPriceChanged(price) => {
-                                tracing::debug!(%price, "recording ticket price change");
-                                *ticket_price.write() = price;
-                            }
-                            _ => {}
-                        }
-                    }
-                })
-                .await;
-        }
+        let proc = chain_wiring::process_chain_events(
+            chain_reader,
+            graph_updater,
+            chain_events,
+            own_chain_addr,
+            own_packet_key,
+            ticket_price,
+            win_probability,
+        )
         .inspect(|_| {
             tracing::warn!(
                 task = "chain-to-graph event wiring",
