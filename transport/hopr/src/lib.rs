@@ -62,7 +62,6 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
-use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -516,7 +515,11 @@ where
         // heap, so cross-destination packets are mixed together rather than each destination
         // getting its own independent delay queue. The single forwarder task owns the receiver
         // (and therefore the heap timer) — no per-clone waker coordination is needed.
-        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(build_mixer_cfg_from_env());
+        let mut mixer_cfg = self.cfg.mixer;
+        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
+            .unwrap_or(u64::MAX)
+            .max(1);
+        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
         processes.insert(
             HoprTransportProcess::MixerForwarder,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1033,41 +1036,6 @@ where
     }
 }
 
-fn build_mixer_cfg_from_env() -> MixerConfig {
-    let mixer_cfg = MixerConfig {
-        min_delay: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-        ),
-        delay_range: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-        ),
-        capacity: {
-            let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .ok()
-                .and_then(|s| s.trim().parse::<usize>().ok())
-                .filter(|&c| c > 0)
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
-            debug!(capacity = capacity, "Setting mixer capacity");
-            capacity
-        },
-        ..MixerConfig::default()
-    };
-    debug!(?mixer_cfg, "Mixer configuration");
-
-    mixer_cfg
-}
 
 // ---------------------------------------------------------------------------
 // NetworkView impl for HoprTransport — wraps OnceLock<Net> access

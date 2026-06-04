@@ -86,6 +86,7 @@ hopr-transport = { workspace = true }
 
 [dev-dependencies]
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
+insta = { workspace = true }
 serde-saphyr = { workspace = true }
 tokio = { workspace = true }
 

@@ -4,8 +4,8 @@ use hopr_api::types::primitive::prelude::*;
 pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
-        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
-        TransportConfig, looks_like_domain,
+        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig,
+        ProbeConfig, SessionGlobalConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};
@@ -143,6 +143,27 @@ mod tests {
         let yaml = serde_saphyr::to_string(&cfg)?;
         let cfg_after_serde: super::HoprLibConfig = serde_saphyr::from_str(&yaml)?;
         assert_eq!(cfg, cfg_after_serde);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn explicit_mixer_section_round_trips() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        let mut cfg = super::HoprLibConfig::default();
+        cfg.protocol.mixer = super::MixerConfig {
+            min_delay: Duration::from_millis(5),
+            delay_range: Duration::from_millis(50),
+            capacity: 1_000,
+            ..Default::default()
+        };
+        insta::assert_yaml_snapshot!(cfg.protocol.mixer);
+
+        let yaml = serde_saphyr::to_string(&cfg.protocol.mixer)?;
+        let parsed: super::MixerConfig = serde_saphyr::from_str(&yaml)?;
+        assert_eq!(cfg.protocol.mixer, parsed);
 
         Ok(())
     }
