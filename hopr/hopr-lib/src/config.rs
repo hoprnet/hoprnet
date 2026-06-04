@@ -149,7 +149,7 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn explicit_mixer_section_round_trips() -> Result<(), Box<dyn std::error::Error>> {
+    fn explicit_mixer_section_round_trips() -> anyhow::Result<()> {
         use std::time::Duration;
 
         let mut cfg = super::HoprLibConfig::default();
@@ -159,10 +159,7 @@ mod tests {
             capacity: 1_000,
             ..Default::default()
         };
-        let yaml = serde_saphyr::to_string(&cfg)?;
-        let parsed: super::HoprLibConfig = serde_saphyr::from_str(&yaml)?;
-        assert_eq!(cfg, parsed);
-        assert!(!yaml.contains("metric_delay_window"));
+        insta::assert_yaml_snapshot!(cfg.protocol.mixer);
 
         Ok(())
     }
