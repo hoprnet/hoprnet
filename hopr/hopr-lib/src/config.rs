@@ -3,7 +3,6 @@ use std::time::Duration;
 use hopr_api::types::primitive::prelude::*;
 pub use hopr_transport::{
     TagAllocatorConfig,
-    build_mixer_cfg_from_env,
     config::{
         HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig,
         ProbeConfig, SessionGlobalConfig, TransportConfig, looks_like_domain,

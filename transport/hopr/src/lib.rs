@@ -62,7 +62,6 @@ use hopr_api::{
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
-use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -1035,46 +1034,6 @@ where
     }
 }
 
-/// Builds a [`MixerConfig`] from environment variables with compiled-in defaults as fallback.
-///
-/// - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` — minimum delay in milliseconds
-/// - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` — delay spread in milliseconds
-/// - `HOPR_INTERNAL_MIXER_CAPACITY` — mixer buffer capacity
-pub fn build_mixer_cfg_from_env() -> MixerConfig {
-    let mixer_cfg = MixerConfig {
-        min_delay: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-        ),
-        delay_range: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-        ),
-        capacity: {
-            let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .ok()
-                .and_then(|s| s.trim().parse::<usize>().ok())
-                .filter(|&c| c > 0)
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
-            debug!(capacity = capacity, "Setting mixer capacity");
-            capacity
-        },
-        ..MixerConfig::default()
-    };
-    debug!(?mixer_cfg, "Mixer configuration");
-
-    mixer_cfg
-}
 
 // ---------------------------------------------------------------------------
 // NetworkView impl for HoprTransport — wraps OnceLock<Net> access
