@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
-pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 200;
+pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
@@ -24,6 +24,7 @@ pub struct MixerConfig {
     #[default(HOPR_MIXER_CAPACITY)]
     pub capacity: usize,
     #[default(HOPR_MIXER_DELAY_METRIC_WINDOW)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub metric_delay_window: u64,
 }
 
