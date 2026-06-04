@@ -16,8 +16,8 @@ mod types;
 mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
-pub use hopr_protocol_session::AcknowledgementMode;
 use hopr_api::types::internal::routing::RoutingOptions;
+pub use hopr_protocol_session::AcknowledgementMode;
 pub use hopr_utils::network_types::types::*;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
@@ -104,13 +104,13 @@ pub struct SessionClientConfig {
 
 #[cfg(test)]
 mod tests {
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_protocol_app::v1::ApplicationData;
     use hopr_protocol_session::session_socket_mtu;
     use hopr_protocol_start::{
         KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
     };
-    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
 
     use super::*;
     use crate::types::HoprStartProtocol;

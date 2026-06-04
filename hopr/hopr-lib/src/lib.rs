@@ -49,6 +49,7 @@ use std::{
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
 use futures_concurrency::stream::Merge as _;
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
+pub use hopr_api::types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_api::{
     PeerId,
     chain::*,
@@ -62,22 +63,21 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
-use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
-#[cfg(feature = "session-client")]
-use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
-};
-pub use hopr_api::types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-use hopr_utils::runtime::prelude::spawn;
-pub use hopr_utils::runtime::{Abortable, AbortableList};
-use tracing::debug;
-
-pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 /// Maximum user-data payload per HOPR session frame (bytes).
 ///
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
 pub use hopr_transport::SESSION_MTU;
+use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
+#[cfg(feature = "session-client")]
+use hopr_transport::{
+    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+};
+use hopr_utils::runtime::prelude::spawn;
+pub use hopr_utils::runtime::{Abortable, AbortableList};
+use tracing::debug;
+
+pub use crate::constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE};
 use crate::errors::HoprLibError;
 
 /// Public routing configuration for session opening in `hopr-lib`.
@@ -264,11 +264,7 @@ pub fn prepare_tokio_runtime(
                 .max(1),
         )
         .thread_name("hoprd")
-        .thread_stack_size(
-            thread_stack_size
-                .unwrap_or(10 * 1024 * 1024)
-                .max(2 * 1024 * 1024),
-        )
+        .thread_stack_size(thread_stack_size.unwrap_or(10 * 1024 * 1024).max(2 * 1024 * 1024))
         .build()?)
 }
 

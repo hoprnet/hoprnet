@@ -269,6 +269,10 @@ impl SurbStore for MemorySurbStore {
             .get(&sender_id.pseudonym())
             .and_then(|cache| cache.remove(&sender_id.surb_id()))
     }
+
+    fn surb_count(&self, pseudonym: HoprPseudonym) -> usize {
+        self.surbs_per_pseudonym.get(&pseudonym).map(|rb| rb.len()).unwrap_or(0)
+    }
 }
 
 /// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
@@ -294,6 +298,11 @@ impl<S> SurbRingBuffer<S> {
         Self(Arc::new(parking_lot::Mutex::new(ringbuffer::AllocRingBuffer::new(
             capacity,
         ))))
+    }
+
+    /// Returns the current number of SURBs held in the ring buffer.
+    pub fn len(&self) -> usize {
+        self.0.lock().len()
     }
 
     /// Push all SURBs with their IDs into the RB.
@@ -358,6 +367,23 @@ mod tests {
         assert_eq!(0, popped.remaining);
 
         assert!(rb.pop_one().is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_len_tracks_occupancy() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::<i32>::new(4);
+        assert_eq!(0, rb.len());
+
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
+        assert_eq!(2, rb.len());
+
+        rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!(1, rb.len());
+
+        rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!(0, rb.len());
 
         Ok(())
     }

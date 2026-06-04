@@ -44,6 +44,13 @@ pub trait SurbStore {
     ///
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener>;
+
+    /// Returns the number of SURBs currently held for the given [`pseudonym`](HoprPseudonym).
+    ///
+    /// This is the actual, expiry-aware occupancy of the reply-SURB buffer (expired SURBs are
+    /// not counted), as opposed to an open-loop estimate. It is used by the replying side to
+    /// report the ground-truth SURB buffer level back to the sender's SURB balancer.
+    fn surb_count(&self, pseudonym: HoprPseudonym) -> usize;
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).

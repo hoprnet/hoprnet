@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use hopr_protocol_start::{KeepAliveFlag, KeepAliveMessage};
-use hopr_api::types::internal::routing::DestinationRouting;
 use hopr_utils::runtime::AbortHandle;
 use tracing::{Instrument, debug, error, instrument};
 
@@ -117,16 +117,37 @@ where
     }
 }
 
+/// Source of the ground-truth SURB buffer level (real SURB-store occupancy) for a session,
+/// already bound to the session's pseudonym. Returns the number of SURBs currently held.
+pub(crate) type SurbLevelSource = std::sync::Arc<dyn Fn() -> u64 + Send + Sync>;
+
 /// Indicates whether the [keep-alive stream](spawn_keep_alive_stream) should notify the Session counterparty
 /// about the SURB target (Entry) or SURB level (Exit).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) enum SurbNotificationMode {
     /// No keep-alive messages are sent to the Session counterparty.
     DoNotNotify,
     /// Session initiator notifies the Session recipient about the desired SURB target level.
     Target,
     /// Session recipient notifies the Session initiator about the current SURB level.
-    Level(AtomicSurbFlowEstimator),
+    ///
+    /// When `real_level` is set, the reported level is the actual SURB-store occupancy
+    /// (expiry-aware ground truth); otherwise it falls back to the open-loop estimator.
+    Level {
+        estimator: AtomicSurbFlowEstimator,
+        real_level: Option<SurbLevelSource>,
+    },
+}
+
+/// Computes the SURB buffer level to report in a `BalancerState` keep-alive.
+///
+/// Prefers the real SURB-store occupancy (expiry-aware ground truth) when a source is wired,
+/// otherwise falls back to the open-loop produced-minus-consumed estimate.
+fn reported_surb_level(estimator: &AtomicSurbFlowEstimator, real_level: &Option<SurbLevelSource>) -> u64 {
+    real_level
+        .as_ref()
+        .map(|src| src())
+        .unwrap_or_else(|| estimator.saturating_diff())
 }
 
 /// Spawns a task for a rate-limited stream of Keep-Alive messages to the Session counterparty.
@@ -152,10 +173,10 @@ where
                 flags: KeepAliveFlag::BalancerTarget.into(),
                 additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
             }),
-            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+            SurbNotificationMode::Level { estimator, real_level } => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
                 flags: KeepAliveFlag::BalancerState.into(),
-                additional_data: estimator.saturating_diff(),
+                additional_data: reported_surb_level(estimator, real_level),
             }),
             SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
                 session_id,
@@ -218,9 +239,26 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::Ordering;
+
     use anyhow::anyhow;
 
     use super::*;
+
+    #[test]
+    fn reported_surb_level_prefers_real_occupancy_over_open_loop_estimate() {
+        let estimator = AtomicSurbFlowEstimator::default();
+        // Open-loop estimate would report produced - consumed = 5000 (the over-counted value).
+        estimator.produced.store(5_000, Ordering::Relaxed);
+        estimator.consumed.store(0, Ordering::Relaxed);
+
+        // Without a real source, the open-loop estimate is reported.
+        assert_eq!(5_000, reported_surb_level(&estimator, &None));
+
+        // With a real source, the actual (e.g. expiry-drained) occupancy is reported instead.
+        let real: SurbLevelSource = std::sync::Arc::new(|| 12);
+        assert_eq!(12, reported_surb_level(&estimator, &Some(real)));
+    }
 
     #[tokio::test]
     async fn test_insert_into_next_slot() -> anyhow::Result<()> {

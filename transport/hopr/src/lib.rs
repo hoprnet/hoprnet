@@ -61,7 +61,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::MemorySurbStore;
+use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
@@ -318,6 +318,10 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
+        // Single shared SURB store: used both by the path planner (SURB lookup) and as the
+        // ground-truth occupancy source for the session SURB balancer.
+        let surb_store = MemorySurbStore::new(cfg.packet.surb_store);
+
         Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
@@ -326,35 +330,43 @@ where
             graph,
             path_planner: PathPlanner::new(
                 me_offchain,
-                MemorySurbStore::new(cfg.packet.surb_store),
+                surb_store.clone(),
                 resolver.clone(),
                 selector,
                 planner_config,
             ),
             my_multiaddresses,
-            smgr: Arc::new(SessionManager::new(
-                SessionManagerConfig {
-                    frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                        .ok()
-                        .and_then(|s| s.parse::<usize>().ok())
-                        .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                        .max(ApplicationData::PAYLOAD_SIZE),
-                    max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                        .ok()
-                        .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                        .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                        .max(Duration::from_millis(100)),
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                    balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                    initial_return_session_egress_rate: 10,
-                    minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
-                    maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                    surb_balance_notify_period: None,
-                    surb_target_notify: true,
-                },
-                session_tag_allocator,
-            )),
+            smgr: Arc::new(
+                SessionManager::new(
+                    SessionManagerConfig {
+                        frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                            .ok()
+                            .and_then(|s| s.parse::<usize>().ok())
+                            .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                            .max(ApplicationData::PAYLOAD_SIZE),
+                        max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                            .ok()
+                            .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                            .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                            .max(Duration::from_millis(100)),
+                        initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                        idle_timeout: cfg.session.idle_timeout,
+                        balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                        initial_return_session_egress_rate: 10,
+                        minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
+                        maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                        // Enable the Exit→Entry SURB level feedback, reusing the balancer sampling
+                        // interval as the notification period (no separate config knob).
+                        surb_balance_notify_period: Some(cfg.session.balancer_sampling_interval),
+                        surb_target_notify: true,
+                    },
+                    session_tag_allocator,
+                )
+                .with_surb_buffer_level_source({
+                    let surb_store = surb_store.clone();
+                    Arc::new(move |pseudonym: &HoprPseudonym| surb_store.surb_count(*pseudonym) as u64)
+                }),
+            ),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,

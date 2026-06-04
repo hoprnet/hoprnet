@@ -70,19 +70,25 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
         .context("SimpleCounter::new")?;
     counter.increment_by(42);
 
-    let gauge =
-        hopr_api::types::telemetry::SimpleGauge::new("it_gauge", "integration test gauge").context("SimpleGauge::new")?;
+    let gauge = hopr_api::types::telemetry::SimpleGauge::new("it_gauge", "integration test gauge")
+        .context("SimpleGauge::new")?;
     gauge.set(std::f64::consts::PI);
 
-    let histogram =
-        hopr_api::types::telemetry::SimpleHistogram::new("it_histogram", "integration test histogram", vec![1.0, 5.0, 10.0])
-            .context("SimpleHistogram::new")?;
+    let histogram = hopr_api::types::telemetry::SimpleHistogram::new(
+        "it_histogram",
+        "integration test histogram",
+        vec![1.0, 5.0, 10.0],
+    )
+    .context("SimpleHistogram::new")?;
     histogram.observe(2.5);
     histogram.observe(7.0);
 
-    let multi_counter =
-        hopr_api::types::telemetry::MultiCounter::new("it_multi_counter", "integration test multi counter", &["version"])
-            .context("MultiCounter::new")?;
+    let multi_counter = hopr_api::types::telemetry::MultiCounter::new(
+        "it_multi_counter",
+        "integration test multi counter",
+        &["version"],
+    )
+    .context("MultiCounter::new")?;
     multi_counter.increment_by(&["1.0.0"], 10);
     multi_counter.increment_by(&["2.0.0"], 5);
 
@@ -184,8 +190,8 @@ async fn metrics_are_collected_by_otlp_reader_and_prometheus_exporter() -> anyho
 async fn prometheus_text_format_contains_expected_lines() -> anyhow::Result<()> {
     let _state = test_state();
 
-    let gauge =
-        hopr_api::types::telemetry::SimpleGauge::new("it_prom_gauge", "prom format gauge").context("SimpleGauge::new")?;
+    let gauge = hopr_api::types::telemetry::SimpleGauge::new("it_prom_gauge", "prom format gauge")
+        .context("SimpleGauge::new")?;
     gauge.set(99.0);
 
     let text = hopr_api::types::telemetry::gather_all_metrics()

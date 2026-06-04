@@ -13,13 +13,6 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_protocol_app::prelude::*;
-use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
-    StartInitiation,
-};
-use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_api::types::{
     crypto_random::Randomizable,
     internal::{
@@ -28,6 +21,13 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_protocol_app::prelude::*;
+use hopr_protocol_start::{
+    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+    StartInitiation,
+};
+use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
@@ -395,6 +395,11 @@ type SessionNotifiers = (
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
+/// Source of the ground-truth SURB buffer level for a given pseudonym, i.e. the actual,
+/// expiry-aware occupancy of the reply-SURB store. The Exit uses it to report the real SURB
+/// buffer level to the Entry's SURB balancer instead of an open-loop estimate.
+pub type SurbBufferLevelSource = Arc<dyn Fn(&HoprPseudonym) -> u64 + Send + Sync>;
+
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
@@ -405,6 +410,9 @@ pub struct SessionManager<S> {
     session_tag_range: Range<u64>,
     /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
     maximum_sessions: usize,
+    /// Optional source of the real reply-SURB buffer occupancy, used by the Exit to report
+    /// ground-truth SURB levels to the Entry's balancer.
+    surb_buffer_level_source: Option<SurbBufferLevelSource>,
     cfg: SessionManagerConfig,
 }
 
@@ -419,6 +427,7 @@ impl<S> Clone for SessionManager<S> {
             tag_allocator: self.tag_allocator.clone(),
             session_tag_range: self.session_tag_range.clone(),
             maximum_sessions: self.maximum_sessions,
+            surb_buffer_level_source: self.surb_buffer_level_source.clone(),
         }
     }
 }
@@ -455,6 +464,7 @@ where
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
+            surb_buffer_level_source: None,
             session_initiations: moka::future::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_live(
@@ -481,6 +491,17 @@ where
             maximum_sessions,
             cfg,
         }
+    }
+
+    /// Sets the source of the ground-truth reply-SURB buffer occupancy.
+    ///
+    /// When set, the Exit reports the real SURB-store occupancy (expiry-aware) to the Entry's
+    /// SURB balancer via keep-alive messages, instead of an open-loop produced-minus-consumed
+    /// estimate. This keeps the Entry's SURB production grounded in reality and prevents
+    /// starvation when SURBs are lost or expire.
+    pub fn with_surb_buffer_level_source(mut self, source: SurbBufferLevelSource) -> Self {
+        self.surb_buffer_level_source = Some(source);
+        self
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`
@@ -1242,6 +1263,13 @@ where
                 // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
                 if let Some(period) = self.cfg.surb_balance_notify_period {
                     let surb_estimator_clone = slot.surb_estimator.clone();
+                    // Bind the real reply-SURB occupancy source (if any) to this session's pseudonym,
+                    // so the Exit reports ground-truth SURB levels instead of an open-loop estimate.
+                    let real_level = self.surb_buffer_level_source.as_ref().map(|src| {
+                        let src = src.clone();
+                        let pseudonym = *session_id.pseudonym();
+                        std::sync::Arc::new(move || src(&pseudonym)) as crate::utils::SurbLevelSource
+                    });
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
                         session_id,
                         // Sent Keep-Alive packets also contribute to SURB consumption
@@ -1257,7 +1285,10 @@ where
                                 futures::future::ok::<_, S::Error>((routing, data))
                             }),
                         slot.routing_opts.clone(),
-                        SurbNotificationMode::Level(slot.surb_estimator.clone()),
+                        SurbNotificationMode::Level {
+                            estimator: slot.surb_estimator.clone(),
+                            real_level,
+                        },
                         slot.surb_mgmt.clone(),
                     );
 
@@ -1519,13 +1550,13 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 

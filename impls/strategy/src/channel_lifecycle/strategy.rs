@@ -18,7 +18,6 @@ use hopr_api::{
         ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView,
     },
 };
-
 use tracing::info;
 
 use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};

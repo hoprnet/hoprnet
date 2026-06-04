@@ -48,7 +48,11 @@ testing = [
   "dep:rstest",
   "hopr-chain-connector/testing",
 ]
-telemetry = ["hopr-lib/telemetry", "hopr-api/types-telemetry", "dep:lazy_static"]
+telemetry = [
+  "hopr-lib/telemetry",
+  "hopr-api/types-telemetry",
+  "dep:lazy_static",
+]
 
 [dependencies]
 anyhow = { workspace = true }
