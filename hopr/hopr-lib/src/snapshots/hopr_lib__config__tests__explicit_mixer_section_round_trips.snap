@@ -1,0 +1,7 @@
+---
+source: hopr/hopr-lib/src/config.rs
+expression: cfg.protocol.mixer
+---
+min_delay: 5ms
+delay_range: 50ms
+capacity: 1000

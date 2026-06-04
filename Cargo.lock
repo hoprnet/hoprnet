@@ -3589,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.3"
+version = "4.0.2-rc.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -3604,6 +3604,7 @@ dependencies = [
  "hopr-transport",
  "hopr-utils",
  "humantime-serde",
+ "insta",
  "lazy_static",
  "parking_lot",
  "serde",
@@ -3840,7 +3841,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.2"
+version = "0.28.4"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3896,7 +3897,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bytesize",

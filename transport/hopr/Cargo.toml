@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.28.2"
+version = "0.28.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition.workspace = true
@@ -34,6 +34,7 @@ serde = [
   "hopr-api/serde",
   "hopr-protocol-app/serde",
   "hopr-protocol-hopr/serde",
+  "hopr-transport-mixer/serde",
   "hopr-transport-tag-allocator/serde",
 ]
 
@@ -157,6 +158,10 @@ path = "tests/protocol/pipeline_stage_isolation.rs"
 [[test]]
 name = "protocol_stress_throughput"
 path = "tests/protocol/stress_throughput.rs"
+
+[[test]]
+name = "mixer_shared_heap"
+path = "tests/mixer_shared_heap.rs"
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
