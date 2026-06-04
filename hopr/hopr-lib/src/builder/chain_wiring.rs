@@ -141,6 +141,7 @@ mod tests {
             primitive::prelude::Address,
         },
     };
+    use anyhow::Context as _;
     use parking_lot::RwLock;
 
     use super::process_chain_events;
@@ -489,7 +490,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn win_probability_change_affects_subsequent_capacity() {
+    async fn win_probability_change_affects_subsequent_capacity() -> anyhow::Result<()> {
         let (src_offchain, src_chain) = make_keypairs();
         let (dst_offchain, dst_chain) = make_keypairs();
         let src_addr = src_chain.public().to_address();
@@ -499,7 +500,7 @@ mod tests {
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
         // initial win_prob=1.0; after decrease to 0.5, balance=100, price=10 → 100/(10/0.5) = 5
-        let new_prob = WinningProbability::try_from_f64(0.5).expect("valid probability");
+        let new_prob = WinningProbability::try_from_f64(0.5).context("0.5 is a valid winning probability")?;
         run(
             vec![
                 ChainEvent::WinningProbabilityDecreased(new_prob),
@@ -517,6 +518,7 @@ mod tests {
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].capacity, Some(5));
+        Ok(())
     }
 
     #[tokio::test]
