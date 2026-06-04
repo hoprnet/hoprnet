@@ -161,6 +161,10 @@ mod tests {
         };
         insta::assert_yaml_snapshot!(cfg.protocol.mixer);
 
+        let yaml = serde_saphyr::to_string(&cfg.protocol.mixer)?;
+        let parsed: super::MixerConfig = serde_saphyr::from_str(&yaml)?;
+        assert_eq!(cfg.protocol.mixer, parsed);
+
         Ok(())
     }
 }

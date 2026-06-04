@@ -3604,6 +3604,7 @@ dependencies = [
  "hopr-transport",
  "hopr-utils",
  "humantime-serde",
+ "insta",
  "lazy_static",
  "parking_lot",
  "serde",

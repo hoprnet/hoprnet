@@ -5,6 +5,7 @@ pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
+#[cfg(feature = "serde")]
 fn default_metric_delay_window() -> u64 {
     HOPR_MIXER_DELAY_METRIC_WINDOW
 }

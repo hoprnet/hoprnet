@@ -516,7 +516,9 @@ where
         // getting its own independent delay queue. The single forwarder task owns the receiver
         // (and therefore the heap timer) — no per-clone waker coordination is needed.
         let mut mixer_cfg = self.cfg.mixer;
-        mixer_cfg.metric_delay_window = 5 * mixer_cfg.delay_range.as_millis() as u64;
+        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
+            .unwrap_or(u64::MAX)
+            .max(1);
         let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
         processes.insert(
             HoprTransportProcess::MixerForwarder,

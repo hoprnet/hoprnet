@@ -34,6 +34,7 @@ serde = [
   "hopr-api/serde",
   "hopr-protocol-app/serde",
   "hopr-protocol-hopr/serde",
+  "hopr-transport-mixer/serde",
   "hopr-transport-tag-allocator/serde",
 ]
 
@@ -86,7 +87,7 @@ hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
 hopr-ticket-manager = { workspace = true }
-hopr-transport-mixer = { workspace = true, features = ["serde"] }
+hopr-transport-mixer = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
