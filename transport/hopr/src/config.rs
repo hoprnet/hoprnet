@@ -18,6 +18,35 @@ use crate::{errors::HoprTransportError, protocol::PacketPipelineConfig};
 
 const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 
+const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
+
+fn default_per_peer_channel_capacity() -> usize {
+    DEFAULT_PER_PEER_CHANNEL_CAPACITY
+}
+
+/// Configuration of the per-peer egress stream layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Validate, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct StreamProtocolConfig {
+    /// Capacity of the per-peer outgoing mpsc channel in packets.
+    ///
+    /// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
+    /// target 7 000 / max 5 000/s) so the 50 ms per-peer send timeout is
+    /// only reached under genuine sustained overload, not on normal pre-fill
+    /// traffic. Packets that still exceed the timeout are dropped as
+    /// intentional transport drops.
+    ///
+    /// Defaults to 5 000.
+    #[validate(range(min = 1))]
+    #[default(default_per_peer_channel_capacity())]
+    #[cfg_attr(feature = "serde", serde(default = "default_per_peer_channel_capacity"))]
+    pub per_peer_channel_capacity: usize,
+}
+
 fn default_counter_flush_interval() -> Duration {
     DEFAULT_COUNTER_FLUSH_INTERVAL
 }
@@ -49,6 +78,10 @@ pub struct HoprProtocolConfig {
     /// Mixer configuration.
     #[cfg_attr(feature = "serde", serde(default))]
     pub mixer: MixerConfig,
+    /// Per-peer egress stream configuration
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub stream: StreamProtocolConfig,
     /// Path planner configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(skip))]

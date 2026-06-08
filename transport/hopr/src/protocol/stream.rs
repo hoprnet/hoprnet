@@ -35,12 +35,6 @@ const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::fro
 const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
-/// Per-peer outgoing channel capacity.
-/// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
-/// target 7000 / max 5000/s) so `DEFAULT_PER_PEER_SEND_TIMEOUT` is only
-/// reached under genuine sustained overload, not on normal pre-fill traffic.
-pub const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
-
 /// Default pending-write-buffer byte threshold on the framed writer before a flush is
 /// forced. **This value is in bytes, not in messages** — that is how
 /// `tokio_util::codec::FramedWrite::set_backpressure_boundary` is defined.
@@ -143,6 +137,7 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
+    stream_cfg: crate::config::StreamProtocolConfig,
 ) -> super::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
@@ -197,11 +192,7 @@ where
         .map(std::time::Duration::from_millis)
         .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
 
-    let per_peer_channel_capacity = std::env::var("HOPR_TRANSPORT_PER_PEER_CHANNEL_CAPACITY")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .filter(|&n: &usize| n > 0)
-        .unwrap_or(DEFAULT_PER_PEER_CHANNEL_CAPACITY);
+    let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
 
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
@@ -484,16 +475,21 @@ mod tests {
     #[tokio::test]
     async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
         let control = CountingControl::default();
-        let (mut tx_out, _rx_in) = process_stream_protocol(BytesCodec::new(), control.clone()).await?;
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig::default(),
+        )
+        .await?;
 
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"x"[..]);
 
         // The stalled writer stops draining the per-peer stream channel. The channel
-        // absorbs the burst (DEFAULT_PER_PEER_CHANNEL_CAPACITY = 5000 > 1200 sent
-        // here); any packets still sitting after DEFAULT_PER_PEER_SEND_TIMEOUT are
-        // dropped as a transport drop, but the cached sender must not be evicted and
-        // the stream must not be reopened under normal burst traffic.
+        // absorbs the burst (default capacity 5 000 > 1 200 sent here); any packets
+        // still sitting after DEFAULT_PER_PEER_SEND_TIMEOUT are dropped as a
+        // transport drop, but the cached sender must not be evicted and the stream
+        // must not be reopened under normal burst traffic.
         for _ in 0..1200 {
             tx_out
                 .send((peer, msg.clone()))
