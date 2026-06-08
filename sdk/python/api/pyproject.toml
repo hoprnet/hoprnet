@@ -3,7 +3,7 @@ name = "sdk-api"
 version = "1.1.0"
 requires-python = ">=3.14.5,<3.15"
 dependencies = [
-  "aiohttp>=3.13.5",
+  "aiohttp>=3.14.1",
   "api-lib>=0.0.4",
   "base58>=2.1.1",
   "cryptography>=46.0.7",
