@@ -35,6 +35,12 @@ const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::fro
 const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const MAX_CONCURRENT_PACKETS: usize = 30;
 
+/// Per-peer outgoing channel capacity.
+/// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
+/// target 7000 / max 5000/s) so `DEFAULT_PER_PEER_SEND_TIMEOUT` is only
+/// reached under genuine sustained overload, not on normal pre-fill traffic.
+pub const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
+
 /// Default pending-write-buffer byte threshold on the framed writer before a flush is
 /// forced. **This value is in bytes, not in messages** — that is how
 /// `tokio_util::codec::FramedWrite::set_backpressure_boundary` is defined.
@@ -58,6 +64,7 @@ fn build_peer_stream_io<S, C>(
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
+    per_peer_channel_capacity: usize,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -67,7 +74,7 @@ where
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
+    let (send, recv) = channel::<<C as Decoder>::Item>(per_peer_channel_capacity);
     let cache_for_write = cache.clone();
     let cache_for_read = cache.clone();
 
@@ -190,6 +197,12 @@ where
         .map(std::time::Duration::from_millis)
         .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
 
+    let per_peer_channel_capacity = std::env::var("HOPR_TRANSPORT_PER_PEER_CHANNEL_CAPACITY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|&n: &usize| n > 0)
+        .unwrap_or(DEFAULT_PER_PEER_CHANNEL_CAPACITY);
+
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
     // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
@@ -215,6 +228,7 @@ where
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
+                    per_peer_channel_capacity,
                 );
 
                 async move { cache.insert(peer, send) }
@@ -283,6 +297,7 @@ where
                                         codec.clone(),
                                         tx_in.clone(),
                                         frame_writer_backpressure_bytes,
+                                        per_peer_channel_capacity,
                                     );
                                     cache.insert(peer, send.clone());
                                     Ok(send)
@@ -474,9 +489,11 @@ mod tests {
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"x"[..]);
 
-        // The stalled writer stops draining the per-peer stream channel. Once that
-        // channel fills, sends time out and packets are dropped, but short
-        // backpressure must not evict the cached stream sender and reopen the stream.
+        // The stalled writer stops draining the per-peer stream channel. The channel
+        // absorbs the burst (DEFAULT_PER_PEER_CHANNEL_CAPACITY = 5000 > 1200 sent
+        // here); any packets still sitting after DEFAULT_PER_PEER_SEND_TIMEOUT are
+        // dropped as a transport drop, but the cached sender must not be evicted and
+        // the stream must not be reopened under normal burst traffic.
         for _ in 0..1200 {
             tx_out
                 .send((peer, msg.clone()))
