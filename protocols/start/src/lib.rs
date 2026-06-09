@@ -512,6 +512,28 @@ mod tests {
     }
 
     #[test]
+    fn start_protocol_keep_alive_message_should_reject_undersized_payload_without_panicking() {
+        // A KeepAlive frame whose declared length clears the header and length guards but is too
+        // short to contain the mandatory 1-byte flags + 8-byte additional_data fields.
+        // version=0x02, discriminant=KeepAlive, declared len=5, followed by 5 payload bytes.
+        // Total 9 bytes: it passes `data.len() < data_offset + len` (9 < 9 is false) yet decoding
+        // then slices data[5..13], which requires at least 13 bytes.
+        let mut data = vec![
+            StartProtocol::<i32, String, u8>::START_PROTOCOL_VERSION,
+            StartProtocolDiscriminants::KeepAlive as u8,
+        ];
+        data.extend_from_slice(&5u16.to_be_bytes());
+        data.extend_from_slice(&[0u8; 5]);
+
+        let tag = StartProtocol::<i32, String, u8>::START_PROTOCOL_MESSAGE_TAG;
+
+        assert!(matches!(
+            StartProtocol::<i32, String, u8>::decode(tag, &data),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
