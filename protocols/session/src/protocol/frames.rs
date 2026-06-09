@@ -327,4 +327,16 @@ mod tests {
         assert_eq!(seg_1, seg_2);
         Ok(())
     }
+
+    #[test]
+    fn segment_is_last_should_not_underflow_zero_length_sequence() {
+        let segment = Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new(0),
+            data: Box::new([]),
+        };
+
+        assert!(!segment.is_last());
+    }
 }
