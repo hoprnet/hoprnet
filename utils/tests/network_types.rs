@@ -1,6 +1,6 @@
 #![cfg(feature = "network-types")]
 
-use hopr_utils::network_types::{IpOrHost, SealedHost};
+use hopr_utils::network_types::types::{IpOrHost, SealedHost};
 
 #[test]
 fn network_types_feature_exposes_sealed_host() -> anyhow::Result<()> {

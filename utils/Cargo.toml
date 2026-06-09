@@ -25,6 +25,7 @@ network-types = [
   "dep:flume",
   "dep:futures-time",
   "dep:hickory-resolver",
+  "dep:hopr-types",
   "dep:libp2p-identity",
   "dep:multiaddr",
   "dep:pin-project",
