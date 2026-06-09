@@ -217,7 +217,10 @@ impl Segment {
     /// Indicates whether this segment is the last one from the frame.
     #[inline]
     pub fn is_last(&self) -> bool {
-        self.seq_idx == self.seq_flags.seq_len() - 1
+        self.seq_flags
+            .seq_len()
+            .checked_sub(1)
+            .is_some_and(|last_idx| self.seq_idx == last_idx)
     }
 
     /// Short-cut to check if this segment is a terminating segment.
