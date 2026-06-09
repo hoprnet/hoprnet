@@ -475,21 +475,23 @@ mod tests {
     #[tokio::test]
     async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
         let control = CountingControl::default();
+        // Use a small channel so the 1 200 sends overflow it quickly, exercising
+        // the send-timeout/drop path. The timeout fires when trying to push into a
+        // full channel (not based on queued-packet age); on timeout the packet is
+        // dropped as a transport loss, but the cached sender must not be evicted and
+        // the stream must not be reopened.
         let (mut tx_out, _rx_in) = process_stream_protocol(
             BytesCodec::new(),
             control.clone(),
-            crate::config::StreamProtocolConfig::default(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 16,
+            },
         )
         .await?;
 
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"x"[..]);
 
-        // The stalled writer stops draining the per-peer stream channel. The channel
-        // absorbs the burst (default capacity 5 000 > 1 200 sent here); any packets
-        // still sitting after DEFAULT_PER_PEER_SEND_TIMEOUT are dropped as a
-        // transport drop, but the cached sender must not be evicted and the stream
-        // must not be reopened under normal burst traffic.
         for _ in 0..1200 {
             tx_out
                 .send((peer, msg.clone()))
