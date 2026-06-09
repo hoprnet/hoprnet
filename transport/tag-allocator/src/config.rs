@@ -218,4 +218,31 @@ mod tests {
         assert_eq!(full.start, cfg.range_for(Usage::Session).start);
         assert_eq!(full.end, cfg.range_for(Usage::ProvingTelemetry).end);
     }
+
+    #[test]
+    fn tag_range_should_saturate_overflowing_capacity() {
+        let cfg = TagAllocatorConfig {
+            session: u64::MAX,
+            session_probing: 1,
+            probing_telemetry: 1,
+        };
+
+        assert_eq!(cfg.tag_range(), ReservedTag::UPPER_BOUND..u64::MAX);
+    }
+
+    #[rstest]
+    #[case::session(Usage::Session)]
+    #[case::session_terminal(Usage::SessionTerminalTelemetry)]
+    #[case::proving(Usage::ProvingTelemetry)]
+    fn range_for_should_saturate_overflowing_capacity(#[case] usage: Usage) {
+        let cfg = TagAllocatorConfig {
+            session: u64::MAX,
+            session_probing: 1,
+            probing_telemetry: 1,
+        };
+
+        let range = cfg.range_for(usage);
+        assert!(range.start <= range.end);
+        assert_eq!(range.end, u64::MAX);
+    }
 }
