@@ -309,6 +309,33 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    pub async fn reassembler_should_treat_zero_capacity_as_one() -> anyhow::Result<()> {
+        let expected = Frame {
+            frame_id: 1,
+            data: b"single segment frame".as_slice().into(),
+            is_terminating: false,
+        };
+
+        let mut segments = segment(expected.data.clone(), 64, expected.frame_id)?;
+        assert_eq!(1, segments.len());
+
+        let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
+        let mut r_stream = r_stream.reassembler(Duration::from_secs(5), 0);
+
+        pin_mut!(r_sink);
+        r_sink.send(segments.remove(0)).await?;
+
+        let actual = r_stream
+            .next()
+            .timeout(futures_time::time::Duration::from_millis(100))
+            .await?
+            .ok_or(anyhow!("missing frame"))??;
+
+        assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_discard_incomplete_frames_on_expiration() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
