@@ -298,4 +298,19 @@ mod tests {
         ];
         assert_eq!(missing, expected);
     }
+
+    #[test]
+    fn message_payload_sizes_should_saturate_for_too_small_mtu() {
+        const HEADER_SIZE: usize = SessionMessage::<0>::HEADER_SIZE;
+
+        assert_eq!(0, SegmentRequest::<0>::SIZE);
+        assert_eq!(0, SegmentRequest::<{ HEADER_SIZE - 1 }>::SIZE);
+        assert_eq!(0, SegmentRequest::<HEADER_SIZE>::SIZE);
+        assert_eq!(1, SegmentRequest::<{ HEADER_SIZE + 1 }>::SIZE);
+
+        assert_eq!(0, FrameAcknowledgements::<0>::SIZE);
+        assert_eq!(0, FrameAcknowledgements::<{ HEADER_SIZE - 1 }>::SIZE);
+        assert_eq!(0, FrameAcknowledgements::<HEADER_SIZE>::SIZE);
+        assert_eq!(1, FrameAcknowledgements::<{ HEADER_SIZE + 1 }>::SIZE);
+    }
 }
