@@ -93,7 +93,10 @@ pub fn create_allocators(range: Range<u64>, partitions: [(Usage, u64); 3]) -> Cr
         }
     }
 
-    let total_requested: u64 = partitions.iter().map(|(_, cap)| cap).sum();
+    let total_requested = partitions
+        .iter()
+        .map(|(_, cap)| *cap)
+        .fold(0_u64, u64::saturating_add);
     if total_requested > range_size {
         return Err(TagAllocatorError::CapacityExceedsRange {
             total_requested,

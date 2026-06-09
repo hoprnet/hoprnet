@@ -94,7 +94,10 @@ impl Validate for TagAllocatorConfig {
             );
         }
 
-        let total = self.session + self.session_probing + self.probing_telemetry;
+        let total = self
+            .session
+            .saturating_add(self.session_probing)
+            .saturating_add(self.probing_telemetry);
         if total > TAG_RANGE_SIZE {
             let mut err = ValidationError::new("total capacity exceeds available tag range");
             err.add_param(std::borrow::Cow::Borrowed("total"), &total);
