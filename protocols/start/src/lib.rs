@@ -302,7 +302,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
-                    if data.len() <= data_offset + size_of::<u32>() {
+                    if data.len() <= data_offset + 1 + size_of::<u64>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
