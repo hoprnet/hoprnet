@@ -25,9 +25,3 @@ The close release workflow is manually triggered and is used to close a release.
 ## Promote Release Workflow
 
 The promote release workflow is manually triggered and is used to create or update a release tag, branch, and artifacts based on the recently closed release. This workflow is defined in [promote-release.yaml](./promote-release.yaml).
-
-## Update DAppNode Release Workflow
-
-The update DAppNode release workflow is triggered after the close release workflow. It creates a new PR named `Update to release <RELEASE_NUMBER>` on the DAppNode repository. This workflow is defined in [generate-dappnode-pr.yaml](./generate-dappnode-pr.yaml).
-
-Please refer to the individual workflow files for more detailed information about each workflow.

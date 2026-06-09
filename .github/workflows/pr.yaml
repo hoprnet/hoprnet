@@ -7,8 +7,6 @@
 name: PR
 
 on:
-  merge_group:
-    types: [checks_requested]
   pull_request:
     types:
       - opened
@@ -100,6 +98,34 @@ jobs:
             nix develop -c env -u VIRTUAL_ENV UV_CACHE_DIR=.ci/no-git-dependencies/.uv-cache \
               uv run --project .ci/no-git-dependencies \
               python .ci/no-git-dependencies/src/no_git_dependencies_check/main.py
+
+  build-library:
+    name: Library ${{ matrix.architecture }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64-linux
+            runner: depot-ubuntu-24.04-4
+            required_label: ""
+          - architecture: aarch64-linux
+            runner: depot-ubuntu-24.04-arm-4
+            required_label: "lib:aarch64-linux"
+          - architecture: aarch64-darwin
+            runner: depot-macos-15
+            required_label: "lib:aarch64-darwin"
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@build-library-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: commit
+      architecture: ${{ matrix.architecture }}
+      package_name: hopr-lib
+      runner: ${{ matrix.runner }}
+      enabled: ${{ matrix.required_label == '' || contains(github.event.pull_request.labels.*.name, matrix.required_label) }}
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
   checks:
     name: Check

@@ -19,20 +19,34 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  build-library:
+    name: Build Library
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@build-library-v2
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.ref_name }}
+      version_type: release
+      architecture: x86_64-linux
+      package_name: hopr-lib
+      runner: depot-ubuntu-24.04-4
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      cargo_registry_token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
   release:
     name: Close release
     runs-on: depot-ubuntu-24.04
+    needs:
+      - build-library
     permissions:
       contents: write
     steps:
       - name: Release version
-        uses: hoprnet/hopr-workflows/actions/release-version@4e3c270b51ed1817bc0b0f6996dfc8a7b0e757c1 # release-version-v2
+        uses: hoprnet/hopr-workflows/actions/release-version@release-version-v4
         with:
           source_branch: ${{ github.ref_name }}
           file: ./hopr/hopr-lib/Cargo.toml
           release_type: ${{ inputs.release_type }}
-          package_name: hoprd
-          cachix_cache_name: hoprnet
           cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           zulip_api_key: ${{ secrets.ZULIP_API_KEY }}
           zulip_email: ${{ secrets.ZULIP_EMAIL }}
@@ -40,18 +54,3 @@ jobs:
           zulip_topic: Releases
           gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           github_token: ${{ secrets.GH_RUNNER_TOKEN }}
-  build-dappnode:
-    name: Build dappNode
-    needs:
-      - release
-    permissions:
-      contents: write
-      pull-requests: write
-    uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      source_repo: ${{ github.repository }}
-      source_branch: ${{ github.ref_name }}
-      network: dufour
-    secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

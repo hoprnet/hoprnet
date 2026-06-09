@@ -5,8 +5,8 @@ description = "Contains high-level HOPR protocol building blocks for packet inte
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
+homepage.workspace = true
+repository.workspace = true
 license = "GPL-3.0-only"
 
 [lib]

@@ -31,6 +31,8 @@ members = [
 rust-version = "1.91"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2024"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 
 [workspace.dependencies]
 ahash = "0.8.12"

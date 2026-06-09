@@ -5,8 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
+homepage.workspace = true
+repository.workspace = true
 license = "GPL-3.0-only"
 publish = false
 

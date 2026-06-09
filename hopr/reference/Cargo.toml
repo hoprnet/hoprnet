@@ -4,9 +4,9 @@ version = "4.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
-description = "Referentail omplementation of the hopr-lib object using canonical trait implementations"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
+description = "Referential implementation of the hopr-lib object using canonical trait implementations"
+homepage.workspace = true
+repository.workspace = true
 license = "GPL-3.0-only"
 publish = false
 
