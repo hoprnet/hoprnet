@@ -39,4 +39,16 @@ mod tests {
         assert_eq!(outputs, [10, 100, 100]);
         assert_eq!(100, controller.bounds.target());
     }
+
+    #[test]
+    fn simple_balancer_with_zero_target_should_allow_maximum_egress() {
+        // A zero target means SURB balancing is disabled, so the maximum egress (the output limit)
+        // must always be allowed regardless of the buffer level. A naive `level / target` division
+        // yields a non-finite ratio (0 / 0 = NaN) that floors to 0, wrongly throttling egress to zero.
+        let mut controller = SimpleBalancerController::default();
+        controller.set_target_and_limit(BalancerControllerBounds::new(0, 100));
+
+        assert_eq!(100, controller.next_control_output(0));
+        assert_eq!(100, controller.next_control_output(5));
+    }
 }
