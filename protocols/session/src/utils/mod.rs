@@ -66,8 +66,16 @@ pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
 const MAX_BACKOFF: Duration = Duration::from_secs(300);
 
 pub(crate) fn next_deadline_with_backoff(n: usize, base: f64, duration: Duration) -> Instant {
-    let backoff = duration.mul_f64(base.powi(n.min((i32::MAX / 2) as usize) as i32 + 1));
-    Instant::now() + backoff.min(MAX_BACKOFF)
+    let exponent = n.min((i32::MAX / 2) as usize) as i32 + 1;
+    let factor = base.powi(exponent);
+    let backoff_secs = duration.as_secs_f64() * factor;
+    let backoff = if backoff_secs.is_finite() && backoff_secs < MAX_BACKOFF.as_secs_f64() {
+        duration.mul_f64(factor)
+    } else {
+        MAX_BACKOFF
+    };
+
+    Instant::now() + backoff
 }
 
 #[derive(Debug, Copy, Clone, Eq)]
@@ -221,9 +229,9 @@ mod tests {
 
     #[test]
     fn next_deadline_with_backoff_should_cap_huge_finite_backoff() {
-        let start = Instant::now();
         let deadline = next_deadline_with_backoff(usize::MAX, f64::MAX, Duration::from_millis(1));
+        let remaining = deadline.saturating_duration_since(Instant::now());
 
-        assert!(deadline.saturating_duration_since(start) <= MAX_BACKOFF);
+        assert!(remaining <= MAX_BACKOFF);
     }
 }
