@@ -633,4 +633,19 @@ mod tests {
         };
         assert!(cfg.validate().is_err());
     }
+
+    #[test]
+    fn stream_protocol_config_default_has_expected_capacity() {
+        let cfg = StreamProtocolConfig::default();
+        assert_eq!(cfg.per_peer_channel_capacity, DEFAULT_PER_PEER_CHANNEL_CAPACITY);
+        cfg.validate().expect("default StreamProtocolConfig must be valid");
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_capacity_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            per_peer_channel_capacity: 0,
+        };
+        assert!(cfg.validate().is_err());
+    }
 }
