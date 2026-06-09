@@ -74,7 +74,11 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["full", "types-random", "types-keypair"] }
+hopr-api = { workspace = true, features = [
+  "full",
+  "types-random",
+  "types-keypair",
+] }
 
 hopr-utils = { workspace = true, features = [
   "network-types",

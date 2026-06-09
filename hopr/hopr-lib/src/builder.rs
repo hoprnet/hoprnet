@@ -42,11 +42,7 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
-    types::{
-        chain::chain_events::ChainEvent,
-        internal::prelude::ChannelDirection,
-        primitive::prelude::Address,
-    },
+    types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
@@ -327,7 +323,10 @@ async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
     while reader.next().await.is_some() {
         received += 1;
         if last_report.elapsed().as_secs() >= 60 {
-            tracing::info!(received, "incoming-data drain: unrelated packets discarded in last ~1 min");
+            tracing::info!(
+                received,
+                "incoming-data drain: unrelated packets discarded in last ~1 min"
+            );
             received = 0;
             last_report = std::time::Instant::now();
         }
@@ -450,9 +449,7 @@ where
         .map_err(HoprLibError::chain)?;
     let configured_win_prob = ctx.cfg.protocol.packet.codec.outgoing_win_prob;
 
-    if !skip_protocol_checks
-        && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-    {
+    if !skip_protocol_checks && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt()) {
         return Err(HoprLibError::GeneralError(format!(
             "configured outgoing win probability < network minimum: {configured_win_prob:?} < {network_min_win_prob}"
         )));
