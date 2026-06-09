@@ -457,8 +457,8 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
 
 #[cfg(test)]
 mod tests {
-    use hopr_protocol_session::SessionTelemetryTracker;
     use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_protocol_session::SessionTelemetryTracker;
 
     use super::*;
 
