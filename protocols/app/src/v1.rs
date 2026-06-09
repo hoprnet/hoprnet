@@ -303,12 +303,17 @@ impl TryFrom<&[u8]> for ApplicationData {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() >= Tag::SIZE && value.len() <= HoprPacket::PAYLOAD_SIZE {
+            let raw_tag = u64::from_be_bytes(
+                value[0..Tag::SIZE]
+                    .try_into()
+                    .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
+            );
+            if raw_tag > Tag::MAX {
+                return Err(ApplicationLayerError::TagError("tag exceeds v1 range".into()));
+            }
+
             Ok(Self {
-                application_tag: Tag::from_be_bytes(
-                    value[0..Tag::SIZE]
-                        .try_into()
-                        .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
-                ),
+                application_tag: raw_tag.into(),
                 plain_text: Box::from(&value[Tag::SIZE..]),
             })
         } else {
