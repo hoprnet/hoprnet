@@ -129,10 +129,11 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         I: std::fmt::Display + Clone,
     {
         // The maximum frame size in a stateless socket is only bounded by the size of the SeqIndicator
-        let frame_size = cfg.frame_size.clamp(
-            C,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
-        );
+        let max_frame_size = crate::session_socket_mtu::<C>().saturating_mul((SeqIndicator::MAX + 1) as usize);
+        if max_frame_size < C {
+            return Err(SessionError::IncorrectMessageLength);
+        }
+        let frame_size = cfg.frame_size.clamp(C, max_frame_size);
 
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
@@ -276,11 +277,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
         // The maximum frame size is reduced due to the size of the missing segment bitmap in SegmentRequests
-        let frame_size = cfg.frame_size.clamp(
-            C,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
-                * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
-        );
+        let max_frame_size = crate::session_socket_mtu::<C>()
+            .saturating_mul(SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize));
+        if max_frame_size < C {
+            return Err(SessionError::IncorrectMessageLength);
+        }
+        let frame_size = cfg.frame_size.clamp(C, max_frame_size);
 
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
