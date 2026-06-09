@@ -4,8 +4,8 @@ use hopr_api::types::primitive::prelude::*;
 pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
-        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig,
-        ProbeConfig, SessionGlobalConfig, TransportConfig, looks_like_domain,
+        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig, ProbeConfig,
+        SessionGlobalConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};

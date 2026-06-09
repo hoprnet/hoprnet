@@ -234,6 +234,7 @@ mod tests {
     #[tokio::test]
     async fn poll_flush_returns_pending_not_spin_when_inner_full() {
         use std::convert::Infallible;
+
         use futures::Sink;
 
         struct AlwaysFullNoOpFlushSink;
@@ -273,8 +274,8 @@ mod tests {
         let result = timeout(Duration::from_millis(50), sink.flush()).await;
         assert!(
             result.is_err(),
-            "flush should have returned Pending (inner is full) and triggered the timeout, \
-             but it completed — inner should not have become ready"
+            "flush should have returned Pending (inner is full) and triggered the timeout, but it completed — inner \
+             should not have become ready"
         );
     }
 }

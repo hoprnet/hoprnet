@@ -17,12 +17,10 @@
 ///
 /// Given two `Sender` clones, A and B:
 /// - Push N items tagged with 'A' on clone A, then N items tagged with 'B' on clone B.
-/// - With per-clone heaps (the old, broken topology): the first N items in the output
-///   are all 'A'-tagged (clone A's heap drained first), then all 'B'-tagged.
-///   `bs_in_first_half == 0`.
-/// - With a shared heap (the new, correct topology): 'A' and 'B' items are interleaved
-///   because they compete in the same heap under random delays.
-///   `bs_in_first_half >> 0`.
+/// - With per-clone heaps (the old, broken topology): the first N items in the output are all 'A'-tagged (clone
+///   A's heap drained first), then all 'B'-tagged. `bs_in_first_half == 0`.
+/// - With a shared heap (the new, correct topology): 'A' and 'B' items are interleaved because they compete in the
+///   same heap under random delays. `bs_in_first_half >> 0`.
 use std::time::Duration;
 
 use anyhow::Context;
@@ -67,8 +65,8 @@ async fn wire_mixer_interleaves_across_clones() -> anyhow::Result<()> {
     let bs_in_first_half = out[..N as usize].iter().filter(|(c, _)| *c == b'B').count();
     assert!(
         bs_in_first_half > N as usize / 10,
-        "only {bs_in_first_half}/{N} 'B'-tagged items in the first half — \
-         heap is not shared across Sender clones (first 20: {:?})",
+        "only {bs_in_first_half}/{N} 'B'-tagged items in the first half — heap is not shared across Sender clones \
+         (first 20: {:?})",
         &out[..20.min(out.len())]
     );
     Ok(())

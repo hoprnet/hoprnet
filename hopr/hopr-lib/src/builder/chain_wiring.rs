@@ -65,34 +65,32 @@ pub(super) async fn process_chain_events<C, G>(
 
                 match keys {
                     Ok(Some((from, to))) => {
-                        let capacity = match channel.status {
-                            ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
-                            _ => ticket_price
-                                .read()
-                                .div_f64(win_probability.read().as_f64())
-                                .ok()
-                                .map(|ticket_value| {
-                                    channel
-                                        .balance
-                                        .amount()
-                                        .checked_div(ticket_value.amount())
-                                        .map(|v| v.low_u128())
-                                        .unwrap_or(u128::MAX)
-                                }),
-                        };
+                        let capacity =
+                            match channel.status {
+                                ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
+                                _ => ticket_price.read().div_f64(win_probability.read().as_f64()).ok().map(
+                                    |ticket_value| {
+                                        channel
+                                            .balance
+                                            .amount()
+                                            .checked_div(ticket_value.amount())
+                                            .map(|v| v.low_u128())
+                                            .unwrap_or(u128::MAX)
+                                    },
+                                ),
+                            };
 
                         tracing::debug!(
                             %channel, ?capacity,
                             "recording graph edge for channel capacity"
                         );
-                        graph_updater.record_edge(MeasurableEdge::<
-                            NeighborTelemetry,
-                            PathTelemetry,
-                        >::Capacity(Box::new(EdgeCapacityUpdate {
-                            capacity,
-                            src: from,
-                            dest: to,
-                        })));
+                        graph_updater.record_edge(MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(
+                            Box::new(EdgeCapacityUpdate {
+                                capacity,
+                                src: from,
+                                dest: to,
+                            }),
+                        ));
                     }
                     Ok(None) => {
                         tracing::error!(
@@ -108,8 +106,7 @@ pub(super) async fn process_chain_events<C, G>(
                     }
                 }
             }
-            ChainEvent::WinningProbabilityIncreased(prob)
-            | ChainEvent::WinningProbabilityDecreased(prob) => {
+            ChainEvent::WinningProbabilityIncreased(prob) | ChainEvent::WinningProbabilityDecreased(prob) => {
                 tracing::debug!(%prob, "recording winning probability change");
                 *win_probability.write() = prob;
             }
@@ -130,6 +127,7 @@ mod tests {
         time::SystemTime,
     };
 
+    use anyhow::Context as _;
     use hopr_api::{
         HoprBalance, OffchainPublicKey,
         chain::{ChainKeyOperations, HoprKeyIdent, KeyIdMapping, WinningProbability},
@@ -141,7 +139,6 @@ mod tests {
             primitive::prelude::Address,
         },
     };
-    use anyhow::Context as _;
     use parking_lot::RwLock;
 
     use super::process_chain_events;
@@ -245,10 +242,7 @@ mod tests {
         where
             N: hopr_api::graph::MeasurableNode + Clone + Send + Sync + 'static,
         {
-            self.calls
-                .lock()
-                .unwrap()
-                .push(GraphCall::Node(update.into()));
+            self.calls.lock().unwrap().push(GraphCall::Node(update.into()));
         }
     }
 
