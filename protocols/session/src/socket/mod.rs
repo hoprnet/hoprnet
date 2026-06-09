@@ -570,6 +570,36 @@ mod tests {
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
 
+    #[test]
+    fn new_stateless_should_reject_mtu_smaller_than_segment_overhead() {
+        // An MTU `C` smaller than the per-segment overhead leaves no room for any payload, so the
+        // maximum frame size collapses below `C`. Construction must return an error instead of
+        // underflowing the `C - SEGMENT_OVERHEAD` subtraction (or panicking in the following clamp).
+        let transport = futures::io::Cursor::new(Vec::<u8>::new());
+        let result = SessionSocket::<5, _>::new_stateless(
+            "tiny",
+            transport,
+            SessionSocketConfig::default(),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::IncorrectMessageLength)));
+    }
+
+    #[test]
+    fn new_should_reject_mtu_smaller_than_segment_overhead() {
+        // Same degenerate MTU as the stateless case, exercised through the stateful constructor.
+        let transport = futures::io::Cursor::new(Vec::<u8>::new());
+        let result = SessionSocket::<5, _>::new(
+            transport,
+            AcknowledgementState::<5>::new("tiny", AcknowledgementStateConfig::default()),
+            SessionSocketConfig::default(),
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        );
+        assert!(matches!(result, Err(SessionError::IncorrectMessageLength)));
+    }
+
     #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
