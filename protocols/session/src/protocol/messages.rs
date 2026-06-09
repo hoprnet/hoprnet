@@ -161,6 +161,10 @@ impl<const C: usize> FrameAcknowledgements<C> {
     /// Creates a vector of [`FrameAcknowledgements`] from the given iterator
     /// of acknowledged [`FrameIds`](FrameId).
     pub fn new_multiple<T: IntoIterator<Item = FrameId>>(items: T) -> Vec<Self> {
+        if Self::MAX_ACK_FRAMES == 0 {
+            return Vec::new();
+        }
+
         let mut out = Vec::with_capacity(2);
         let mut frame_ack = Self::default();
         for frame_id in items {
