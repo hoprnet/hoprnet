@@ -52,14 +52,14 @@ impl TagAllocatorConfig {
     pub fn range_for(&self, usage: Usage) -> Range<u64> {
         let base = ReservedTag::UPPER_BOUND;
         match usage {
-            Usage::Session => base..base + self.session,
+            Usage::Session => base..base.saturating_add(self.session),
             Usage::SessionTerminalTelemetry => {
-                let start = base + self.session;
-                start..start + self.session_probing
+                let start = base.saturating_add(self.session);
+                start..start.saturating_add(self.session_probing)
             }
             Usage::ProvingTelemetry => {
-                let start = base + self.session + self.session_probing;
-                start..start + self.probing_telemetry
+                let start = base.saturating_add(self.session).saturating_add(self.session_probing);
+                start..start.saturating_add(self.probing_telemetry)
             }
         }
     }
@@ -70,7 +70,11 @@ impl TagAllocatorConfig {
     /// configured partition capacities.
     pub fn tag_range(&self) -> Range<u64> {
         let start = ReservedTag::UPPER_BOUND;
-        start..start + self.session + self.session_probing + self.probing_telemetry
+        start
+            ..start
+                .saturating_add(self.session)
+                .saturating_add(self.session_probing)
+                .saturating_add(self.probing_telemetry)
     }
 }
 
