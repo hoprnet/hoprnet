@@ -103,10 +103,16 @@ pub struct AcknowledgementStateConfig {
 
 impl AcknowledgementStateConfig {
     fn normalize(self) -> AcknowledgementStateConfig {
+        let backoff_base = if self.backoff_base.is_finite() {
+            self.backoff_base.max(1.0)
+        } else {
+            1.0
+        };
+
         Self {
             mode: self.mode,
             expected_packet_latency: self.expected_packet_latency.max(Duration::from_millis(1)),
-            backoff_base: self.backoff_base.max(1.0),
+            backoff_base,
             max_incoming_frame_retries: self.max_incoming_frame_retries,
             max_outgoing_frame_retries: self.max_outgoing_frame_retries,
             acknowledgement_delay: self.acknowledgement_delay.max(Duration::from_millis(1)),
