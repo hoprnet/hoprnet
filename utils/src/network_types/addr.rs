@@ -54,6 +54,11 @@ mod tests {
         // IPv4 unspecified - should return false
         assert!(!is_public_address(&Multiaddr::from_str("/ip4/0.0.0.0")?));
 
+        // IPv4 multicast and broadcast - should return false
+        assert!(!is_public_address(&Multiaddr::from_str("/ip4/224.0.0.1")?));
+        assert!(!is_public_address(&Multiaddr::from_str("/ip4/239.255.255.255")?));
+        assert!(!is_public_address(&Multiaddr::from_str("/ip4/255.255.255.255")?));
+
         Ok(())
     }
 
@@ -87,6 +92,10 @@ mod tests {
 
         // IPv6 unspecified - should return false
         assert!(!is_public_address(&Multiaddr::from_str("/ip6/::")?));
+
+        // IPv6 multicast - should return false
+        assert!(!is_public_address(&Multiaddr::from_str("/ip6/ff02::1")?));
+        assert!(!is_public_address(&Multiaddr::from_str("/ip6/ff0e::1")?));
 
         Ok(())
     }
