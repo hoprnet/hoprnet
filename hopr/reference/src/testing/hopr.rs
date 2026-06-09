@@ -56,6 +56,7 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
                 ..Default::default()
             },
             mixer: Default::default(),
+            stream: Default::default(),
             path_planner: Default::default(),
             counter_flush_interval: Default::default(),
         },
