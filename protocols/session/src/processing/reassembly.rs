@@ -71,6 +71,7 @@ pub struct Reassembler<S, M> {
 
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
+        let capacity = capacity.max(1);
         Self {
             inner,
             timer: futures_time::task::sleep(
