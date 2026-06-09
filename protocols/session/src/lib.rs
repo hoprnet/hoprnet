@@ -110,3 +110,18 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
 }
 
 impl<T: ?Sized> SessionSocketExt for T where T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_socket_mtu_should_saturate_for_too_small_transport_mtu() {
+        const OVERHEAD: usize = protocol::SessionMessage::<0>::SEGMENT_OVERHEAD;
+
+        assert_eq!(0, session_socket_mtu::<0>());
+        assert_eq!(0, session_socket_mtu::<{ OVERHEAD - 1 }>());
+        assert_eq!(0, session_socket_mtu::<OVERHEAD>());
+        assert_eq!(1, session_socket_mtu::<{ OVERHEAD + 1 }>());
+    }
+}
