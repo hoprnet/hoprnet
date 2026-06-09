@@ -144,7 +144,7 @@ pub fn segment_into<T: AsRef<[u8]>, E: Extend<Segment>>(
     let data = data.as_ref();
 
     let num_chunks = data.len().div_ceil(max_segment_size);
-    if num_chunks > SeqNum::MAX as usize {
+    if num_chunks > SeqIndicator::MAX as usize {
         return Err(SessionError::DataTooLong);
     }
 
