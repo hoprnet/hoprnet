@@ -17,8 +17,16 @@ impl SurbBalancerController for SimpleBalancerController {
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        let ratio = current_buffer_level as f64 / self.bounds.target() as f64;
-        (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
+        let (target, output_limit) = self.bounds.unzip();
+        // A zero target disables balancing: the buffer is always considered to be at or above the
+        // target, so the maximum egress (the output limit) is allowed. Dividing by a zero target
+        // would otherwise yield a non-finite ratio (e.g. 0 / 0 = NaN) that floors to zero.
+        let ratio = if target == 0 {
+            1.0
+        } else {
+            current_buffer_level as f64 / target as f64
+        };
+        (output_limit as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
     }
 }
 
