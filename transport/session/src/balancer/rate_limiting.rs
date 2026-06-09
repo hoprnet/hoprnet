@@ -390,6 +390,18 @@ mod tests {
         assert_eq!(rc.get_rate_per_sec(), 1250.0);
     }
 
+    #[test]
+    fn set_rate_per_unit_should_clamp_non_representable_delay_instead_of_panicking() {
+        // A single element spread over an enormous unit makes the per-element delay (1 / rate)
+        // exceed what a `Duration` can represent. The conversion must be clamped rather than
+        // panicking with "cannot convert float seconds to Duration".
+        let rc = RateController::default();
+        rc.set_rate_per_unit(1, Duration::from_secs(u64::MAX));
+
+        assert!(!rc.has_zero_rate());
+        assert_eq!(rc.get_delay_per_element(), Duration::from_micros(u64::MAX));
+    }
+
     #[tokio::test]
     async fn test_rate_limited_stream_respects_rate() {
         // Create a stream with 5 elements
