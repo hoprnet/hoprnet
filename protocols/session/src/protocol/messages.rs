@@ -30,7 +30,7 @@ impl<const C: usize> SegmentRequest<C> {
     /// Maximum number of missing segments per frame.
     pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
     /// Size of the message.
-    pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
+    pub const SIZE: usize = C.saturating_sub(SessionMessage::<C>::HEADER_SIZE);
 
     /// Returns the total number of segments to retransmit for all frames in this request.
     pub fn len(&self) -> usize {
@@ -130,7 +130,7 @@ impl<const C: usize> FrameAcknowledgements<C> {
     /// Maximum number of [`FrameIds`](FrameId) that can be accommodated.
     pub const MAX_ACK_FRAMES: usize = Self::SIZE / size_of::<FrameId>();
     /// Size of the message.
-    pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
+    pub const SIZE: usize = C.saturating_sub(SessionMessage::<C>::HEADER_SIZE);
 
     /// Pushes the frame ID.
     /// Returns true if the value has been pushed or false it the container is full or already
