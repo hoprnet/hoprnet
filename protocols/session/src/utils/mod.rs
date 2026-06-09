@@ -218,4 +218,12 @@ mod tests {
 
         assert!(matches!(segment(data, 1, 1), Err(SessionError::DataTooLong)));
     }
+
+    #[test]
+    fn next_deadline_with_backoff_should_cap_huge_finite_backoff() {
+        let start = Instant::now();
+        let deadline = next_deadline_with_backoff(usize::MAX, f64::MAX, Duration::from_millis(1));
+
+        assert!(deadline.saturating_duration_since(start) <= MAX_BACKOFF);
+    }
 }
