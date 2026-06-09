@@ -164,6 +164,27 @@ mod tests {
     }
 
     #[test]
+    fn pick_one_returns_none_for_sole_item_with_non_finite_weight() {
+        let wc = WeightedCollection::new(vec![("only", f64::INFINITY)]);
+        assert!(wc.pick_one().is_none());
+
+        let wc = WeightedCollection::new(vec![("only", f64::NAN)]);
+        assert!(wc.pick_one().is_none());
+    }
+
+    #[test]
+    fn shuffled_places_non_finite_weights_after_finite_weights() {
+        let shuffled = WeightedCollection::new(vec![
+            ("infinite", f64::INFINITY),
+            ("finite", 1.0),
+            ("not-a-number", f64::NAN),
+        ])
+        .into_shuffled();
+
+        assert_eq!(shuffled[0], "finite");
+    }
+
+    #[test]
     fn pick_index_returns_valid_index() {
         let wc = WeightedCollection::new(vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
         for _ in 0..100 {
