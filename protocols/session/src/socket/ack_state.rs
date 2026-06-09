@@ -617,6 +617,17 @@ mod tests {
 
     const MTU: usize = 1000;
 
+    #[test]
+    fn acknowledgement_config_should_normalize_non_finite_backoff_base() {
+        let cfg = AcknowledgementStateConfig {
+            backoff_base: f64::INFINITY,
+            ..Default::default()
+        }
+        .normalize();
+
+        assert!(cfg.backoff_base.is_finite());
+    }
+
     #[test_log::test(tokio::test)]
     async fn ack_state_sender_must_acknowledge_completed_frames() -> anyhow::Result<()> {
         let cfg = AcknowledgementStateConfig {
