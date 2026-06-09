@@ -164,6 +164,10 @@ pub fn segment_into<T: AsRef<[u8]>, E: Extend<Segment>>(
 /// Convenience wrapper for [`segment_into`] that allocates its own output buffer and returns it.
 #[allow(unused)]
 pub fn segment<T: AsRef<[u8]>>(data: T, max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
+    if max_segment_size == 0 {
+        return Err(SessionError::IncorrectMessageLength);
+    }
+
     let mut out = Vec::with_capacity(data.as_ref().len().div_ceil(max_segment_size));
     segment_into(data, max_segment_size, frame_id, &mut out)?;
     Ok(out)
