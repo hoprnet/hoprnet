@@ -160,6 +160,17 @@ mod tests {
     }
 
     #[test]
+    fn overflowing_total_capacity_is_invalid() {
+        let cfg = TagAllocatorConfig {
+            session: u64::MAX,
+            session_probing: 1,
+            probing_telemetry: 1,
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.field_errors().contains_key("probing_telemetry"));
+    }
+
+    #[test]
     fn custom_config_within_range_is_valid() {
         let cfg = TagAllocatorConfig {
             session: 1000,

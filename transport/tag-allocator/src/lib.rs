@@ -179,6 +179,25 @@ mod tests {
     }
 
     #[test]
+    fn error_if_partition_capacity_sum_overflows() {
+        let result = create_allocators(
+            ReservedTag::range().end..100,
+            [
+                (Usage::Session, u64::MAX),
+                (Usage::SessionTerminalTelemetry, 1),
+                (Usage::ProvingTelemetry, 1),
+            ],
+        );
+        assert!(matches!(
+            result,
+            Err(TagAllocatorError::CapacityExceedsRange {
+                total_requested: u64::MAX,
+                range_size: 84,
+            })
+        ));
+    }
+
+    #[test]
     fn error_if_empty_range() {
         let result = create_allocators(
             0..0,
