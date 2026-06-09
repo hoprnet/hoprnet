@@ -211,4 +211,11 @@ mod tests {
             Err(SessionError::IncorrectMessageLength)
         ));
     }
+
+    #[test]
+    fn segment_should_reject_more_chunks_than_sequence_indicator_can_encode() {
+        let data = vec![0_u8; SeqIndicator::MAX as usize + 1];
+
+        assert!(matches!(segment(data, 1, 1), Err(SessionError::DataTooLong)));
+    }
 }
