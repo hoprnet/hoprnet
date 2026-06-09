@@ -113,7 +113,7 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@64cb8ba34ff2e8caa43e366207d0cb1faa8d43d4 # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@69d61153fe24338ea983dd657496f0bc8b4cd819 # workflow-tests-v5
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       enable_unit_tests: true
