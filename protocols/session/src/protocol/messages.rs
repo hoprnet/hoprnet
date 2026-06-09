@@ -313,4 +313,12 @@ mod tests {
         assert_eq!(0, FrameAcknowledgements::<HEADER_SIZE>::SIZE);
         assert_eq!(1, FrameAcknowledgements::<{ HEADER_SIZE + 1 }>::SIZE);
     }
+
+    #[test]
+    fn frame_acknowledgements_should_not_emit_empty_batches_for_zero_payload_capacity() {
+        const HEADER_SIZE: usize = SessionMessage::<0>::HEADER_SIZE;
+
+        assert!(FrameAcknowledgements::<0>::new_multiple([1, 2, 3]).is_empty());
+        assert!(FrameAcknowledgements::<HEADER_SIZE>::new_multiple([1, 2, 3]).is_empty());
+    }
 }
