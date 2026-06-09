@@ -58,6 +58,7 @@ fn build_peer_stream_io<S, C>(
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
+    per_peer_channel_capacity: usize,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -67,7 +68,7 @@ where
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
+    let (send, recv) = channel::<<C as Decoder>::Item>(per_peer_channel_capacity);
     let cache_for_write = cache.clone();
     let cache_for_read = cache.clone();
 
@@ -136,6 +137,7 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
+    stream_cfg: crate::config::StreamProtocolConfig,
 ) -> super::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
@@ -190,6 +192,8 @@ where
         .map(std::time::Duration::from_millis)
         .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
 
+    let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
+
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
     // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
@@ -215,6 +219,7 @@ where
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
+                    per_peer_channel_capacity,
                 );
 
                 async move { cache.insert(peer, send) }
@@ -283,6 +288,7 @@ where
                                         codec.clone(),
                                         tx_in.clone(),
                                         frame_writer_backpressure_bytes,
+                                        per_peer_channel_capacity,
                                     );
                                     cache.insert(peer, send.clone());
                                     Ok(send)
@@ -469,14 +475,23 @@ mod tests {
     #[tokio::test]
     async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
         let control = CountingControl::default();
-        let (mut tx_out, _rx_in) = process_stream_protocol(BytesCodec::new(), control.clone()).await?;
+        // Use a small channel so the 1 200 sends overflow it quickly, exercising
+        // the send-timeout/drop path. The timeout fires when trying to push into a
+        // full channel (not based on queued-packet age); on timeout the packet is
+        // dropped as a transport loss, but the cached sender must not be evicted and
+        // the stream must not be reopened.
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 16,
+            },
+        )
+        .await?;
 
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"x"[..]);
 
-        // The stalled writer stops draining the per-peer stream channel. Once that
-        // channel fills, sends time out and packets are dropped, but short
-        // backpressure must not evict the cached stream sender and reopen the stream.
         for _ in 0..1200 {
             tx_out
                 .send((peer, msg.clone()))

@@ -13,13 +13,6 @@ use futures::{
     pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_protocol_app::prelude::*;
-use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
-    StartInitiation,
-};
-use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_api::types::{
     crypto_random::Randomizable,
     internal::{
@@ -28,6 +21,13 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_protocol_app::prelude::*;
+use hopr_protocol_start::{
+    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+    StartInitiation,
+};
+use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
@@ -1519,13 +1519,13 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
-    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 

@@ -509,7 +509,7 @@ where
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
-            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
+            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone(), self.cfg.stream).await?;
 
         // Shared mixing channel: all per-destination clones of `mixing_channel_tx` push into one
         // heap, so cross-destination packets are mixed together rather than each destination
@@ -1035,7 +1035,6 @@ where
             .collect::<Vec<_>>())
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // NetworkView impl for HoprTransport — wraps OnceLock<Net> access

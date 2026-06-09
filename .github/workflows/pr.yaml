@@ -103,7 +103,7 @@ jobs:
 
   checks:
     name: Check
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@69d61153fe24338ea983dd657496f0bc8b4cd819 # workflow-checks-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@d0cffaf9e9209c8eca00e8c74e82ac3f5f3cf7bb # workflow-checks-v2
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: depot-ubuntu-24.04

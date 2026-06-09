@@ -8,12 +8,6 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_session::{
-    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    UnreliableSocket,
-};
-use hopr_protocol_start::StartProtocol;
 use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::{
@@ -21,6 +15,12 @@ use hopr_api::types::{
         prelude::{BytesRepresentable, ToHex},
     },
 };
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_session::{
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
+    UnreliableSocket,
+};
+use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::{
     prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},
