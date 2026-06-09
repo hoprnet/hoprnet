@@ -63,7 +63,7 @@ pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<
 
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {
-    C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD
+    C.saturating_sub(protocol::SessionMessage::<C>::SEGMENT_OVERHEAD)
 }
 
 /// Adaptors for [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport to use Session protocol.
