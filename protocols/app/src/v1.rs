@@ -363,6 +363,17 @@ mod tests {
     }
 
     #[test]
+    fn application_data_should_reject_non_canonical_v1_tag_bits() {
+        let mut data = Vec::from((Tag::MAX + 1).to_be_bytes());
+        data.extend_from_slice(b"payload");
+
+        assert!(matches!(
+            ApplicationData::try_from(data.as_slice()),
+            Err(ApplicationLayerError::TagError(_))
+        ));
+    }
+
+    #[test]
     fn test_application_data() -> anyhow::Result<()> {
         let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
         let ad_2 = ApplicationData::try_from(ad_1.to_bytes().as_ref())?;
