@@ -5,9 +5,20 @@ use multiaddr::Multiaddr;
 /// Check if an IP address is a public/routable one.
 pub fn is_public(ip_addr: IpAddr) -> bool {
     match ip_addr {
-        IpAddr::V4(ip) => !ip.is_unspecified() && !ip.is_private() && !ip.is_loopback() && !ip.is_link_local(),
+        IpAddr::V4(ip) => {
+            !ip.is_unspecified()
+                && !ip.is_private()
+                && !ip.is_loopback()
+                && !ip.is_link_local()
+                && !ip.is_multicast()
+                && !ip.is_broadcast()
+        }
         IpAddr::V6(ip) => {
-            !ip.is_unspecified() && !ip.is_loopback() && !ip.is_unicast_link_local() && !ip.is_unique_local()
+            !ip.is_unspecified()
+                && !ip.is_loopback()
+                && !ip.is_unicast_link_local()
+                && !ip.is_unique_local()
+                && !ip.is_multicast()
         }
     }
 }
