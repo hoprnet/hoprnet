@@ -199,4 +199,12 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn segment_should_reject_zero_max_segment_size() {
+        assert!(matches!(
+            segment(hex!("deadbeef"), 0, 1),
+            Err(SessionError::IncorrectMessageLength)
+        ));
+    }
 }
