@@ -48,8 +48,11 @@ impl RateController {
             // Calculate the next allowable time based on the rate
             let rate_per_sec = (elements_per_unit as f64 / unit.as_secs_f64());
 
-            // Convert to duration (seconds per element)
-            let new_rate = Duration::from_secs_f64(1.0 / rate_per_sec)
+            // Convert to duration (seconds per element). A non-finite or too-large inverse rate
+            // (e.g. a single element spread over an enormous unit) is clamped to the maximum
+            // duration instead of panicking in the float-to-Duration conversion.
+            let new_rate = Duration::try_from_secs_f64(1.0 / rate_per_sec)
+                .unwrap_or(Duration::MAX)
                 .max(Self::MIN_DELAY)
                 .as_micros()
                 .min(u64::MAX as u128) as u64; // Clamp to u64 to avoid overflow
