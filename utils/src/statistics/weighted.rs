@@ -2,10 +2,10 @@ use rand::RngExt;
 
 /// A collection of items with associated weights for probabilistic selection.
 ///
-/// Weights must be positive (`> 0.0`); items with non-positive weights are
-/// treated as having zero probability for [`pick_one`](Self::pick_one) /
-/// [`pick_index`](Self::pick_index) and are placed at the end of the shuffled
-/// output in [`into_shuffled`](Self::into_shuffled).
+/// Weights must be finite and positive (`> 0.0`); items with non-positive or
+/// non-finite weights are treated as having zero probability for
+/// [`pick_one`](Self::pick_one) / [`pick_index`](Self::pick_index) and are
+/// placed at the end of the shuffled output in [`into_shuffled`](Self::into_shuffled).
 ///
 /// # Examples
 ///
@@ -18,15 +18,33 @@ use rand::RngExt;
 /// ```
 pub struct WeightedCollection<T> {
     items: Vec<(T, f64)>,
-    /// Pre-computed sum of positive weights (cached to avoid recomputing on every pick).
+    /// Pre-computed sum of normalized positive weights (cached to avoid recomputing on every pick).
     total_weight: f64,
+    /// Largest finite positive weight, used to keep `total_weight` finite without changing probabilities.
+    max_weight: f64,
 }
 
 impl<T> WeightedCollection<T> {
     /// Create a new weighted collection from items paired with their weights.
     pub fn new(items: Vec<(T, f64)>) -> Self {
-        let total_weight: f64 = items.iter().map(|(_, w)| w.max(0.0)).sum();
-        Self { items, total_weight }
+        let max_weight = items
+            .iter()
+            .map(|(_, weight)| finite_positive_weight(*weight))
+            .fold(0.0, f64::max);
+        let total_weight = if max_weight > 0.0 {
+            items
+                .iter()
+                .map(|(_, weight)| finite_positive_weight(*weight) / max_weight)
+                .sum()
+        } else {
+            0.0
+        };
+
+        Self {
+            items,
+            total_weight,
+            max_weight,
+        }
     }
 
     /// Returns `true` if the collection contains no items.
@@ -61,14 +79,24 @@ impl<T> WeightedCollection<T> {
         let r = rng.random_range(0.0..self.total_weight);
         let mut cumulative = 0.0;
         for (i, (_, weight)) in self.items.iter().enumerate() {
-            cumulative += weight.max(0.0);
+            cumulative += self.normalized_weight(*weight);
             if r < cumulative {
                 return Some(i);
             }
         }
 
         // Floating-point edge case: return the last positive-weight item.
-        self.items.iter().rposition(|(_, weight)| *weight > 0.0)
+        self.items
+            .iter()
+            .rposition(|(_, weight)| self.normalized_weight(*weight) > 0.0)
+    }
+
+    fn normalized_weight(&self, weight: f64) -> f64 {
+        if self.max_weight > 0.0 {
+            finite_positive_weight(weight) / self.max_weight
+        } else {
+            0.0
+        }
     }
 }
 
@@ -100,13 +128,20 @@ impl<T> WeightedCollection<T> {
     /// items retain a nonzero chance of appearing at any position.
     pub fn into_shuffled(self) -> Vec<T> {
         let mut rng = rand::rng();
+        let max_weight = self.max_weight;
 
         // Reuse the existing Vec — replace weights with Efraimidis–Spirakis keys in-place.
         let mut keyed = self.items;
         for (_, weight) in keyed.iter_mut() {
-            *weight = if *weight > 0.0 {
+            let normalized_weight = if max_weight > 0.0 {
+                finite_positive_weight(*weight) / max_weight
+            } else {
+                0.0
+            };
+
+            *weight = if normalized_weight > 0.0 {
                 let u: f64 = rng.random_range(f64::EPSILON..1.0);
-                u.powf(1.0 / *weight)
+                u.powf(1.0 / normalized_weight)
             } else {
                 0.0
             };
@@ -114,6 +149,14 @@ impl<T> WeightedCollection<T> {
 
         keyed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         keyed.into_iter().map(|(item, _)| item).collect()
+    }
+}
+
+fn finite_positive_weight(weight: f64) -> f64 {
+    if weight.is_finite() && weight > 0.0 {
+        weight
+    } else {
+        0.0
     }
 }
 
