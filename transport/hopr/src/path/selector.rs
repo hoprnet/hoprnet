@@ -42,6 +42,27 @@ impl PartialEq for PathCostWithMetrics {
     }
 }
 
+impl PathCostWithMetrics {
+    fn into_path_with_metrics(self, path: Vec<OffchainPublicKey>) -> PathWithMetrics {
+        PathWithMetrics {
+            path,
+            cost: self.cost,
+            total_latency_ms: self.total_latency_ms,
+            min_probe_success_rate: self.min_probe_rate,
+            min_ack_rate: self.min_ack_rate,
+            capacity_floor: self.capacity_floor,
+        }
+    }
+}
+
+/// Returns the minimum of two `Option<T>` values, preferring `Some` over `None`.
+fn opt_min<T: PartialOrd>(a: Option<T>, b: Option<T>) -> Option<T> {
+    match (a, b) {
+        (Some(x), Some(y)) => Some(if x <= y { x } else { y }),
+        (x, y) => x.or(y),
+    }
+}
+
 /// Wraps an `EdgeValueFn<f64, W>` as a `ValueFn` whose `Value` type carries
 /// both the cost and per-path quality aggregates.
 ///
@@ -93,35 +114,21 @@ where
                 _ => None,
             };
 
-            // Combine immediate + intermediate probe rates: take the minimum of whichever are present.
+            // Probe rate: taking the min of immediate and intermediate guards against nodes that
+            // look good on direct probes but degrade under multi-hop load.
             let edge_probe = observed
                 .immediate_qos()
                 .map(|m| m.average_probe_rate())
                 .into_iter()
                 .chain(observed.intermediate_qos().map(|m| m.average_probe_rate()))
                 .reduce(f64::min);
-            let min_probe_rate = match (prev.min_probe_rate, edge_probe) {
-                (Some(a), Some(b)) => Some(a.min(b)),
-                (None, Some(b)) => Some(b),
-                (Some(a), None) => Some(a),
-                _ => None,
-            };
+            let min_probe_rate = opt_min(prev.min_probe_rate, edge_probe);
 
             let edge_ack = observed.immediate_qos().and_then(|m| m.ack_rate());
-            let min_ack_rate = match (prev.min_ack_rate, edge_ack) {
-                (Some(a), Some(b)) => Some(a.min(b)),
-                (None, Some(b)) => Some(b),
-                (Some(a), None) => Some(a),
-                _ => None,
-            };
+            let min_ack_rate = opt_min(prev.min_ack_rate, edge_ack);
 
             let edge_cap = observed.intermediate_qos().and_then(|m| m.capacity());
-            let capacity_floor = match (prev.capacity_floor, edge_cap) {
-                (Some(a), Some(b)) => Some(a.min(b)),
-                (None, Some(b)) => Some(b),
-                (Some(a), None) => Some(a),
-                _ => None,
-            };
+            let capacity_floor = opt_min(prev.capacity_floor, edge_cap);
 
             PathCostWithMetrics {
                 cost,
@@ -177,14 +184,7 @@ where
             if metrics.cost > 0.0 {
                 let mut path = path;
                 path.push(*dest);
-                Some(PathWithMetrics {
-                    path,
-                    cost: metrics.cost,
-                    total_latency_ms: metrics.total_latency_ms,
-                    min_probe_success_rate: metrics.min_probe_rate,
-                    min_ack_rate: metrics.min_ack_rate,
-                    capacity_floor: metrics.capacity_floor,
-                })
+                Some(metrics.into_path_with_metrics(path))
             } else {
                 None
             }
@@ -294,14 +294,7 @@ where
                 }
 
                 tracing::trace!(?candidate, cost = metrics.cost, "extended forward path candidate");
-                Some(PathWithMetrics {
-                    path: candidate,
-                    cost: metrics.cost,
-                    total_latency_ms: metrics.total_latency_ms,
-                    min_probe_success_rate: metrics.min_probe_rate,
-                    min_ack_rate: metrics.min_ack_rate,
-                    capacity_floor: metrics.capacity_floor,
-                })
+                Some(metrics.into_path_with_metrics(candidate))
             })
             .take(take)
             .collect()
