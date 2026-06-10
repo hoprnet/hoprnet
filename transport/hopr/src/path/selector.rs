@@ -93,22 +93,16 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize) -> 
     // Sort populated ascending by latency (lowest first → drop from the end).
     populated.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
 
-    let total_unpopulated = unpopulated.len();
-    let target_populated = floor.saturating_sub(total_unpopulated);
-    populated.truncate(populated.len().max(target_populated).min(populated.len()));
-    // Clamp: keep at most `target_populated` populated paths.
-    if populated.len() > target_populated {
-        populated.truncate(target_populated);
-    }
+    // Prefer measured paths: keep as many populated paths as fit within the floor,
+    // then fill the remaining slots with unpopulated paths.  This ensures that
+    // latency-measured candidates are never discarded when unprobed paths alone
+    // would satisfy the floor.
+    let target_populated = populated.len().min(floor);
+    populated.truncate(target_populated);
+    let remaining = floor - target_populated;
 
     let mut result = populated;
-    result.extend(unpopulated);
-
-    // If we're still over the floor (all populated were dropped and unpopulated > floor),
-    // trim the unpopulated tail.
-    if result.len() > floor {
-        result.truncate(floor);
-    }
+    result.extend(unpopulated.into_iter().take(remaining));
 
     result
 }
@@ -889,9 +883,10 @@ mod tests {
     }
 
     #[test]
-    fn prune_preserves_unpopulated_paths_correctly() {
+    fn prune_preserves_populated_paths_over_unpopulated() {
         // 3 populated + 6 unpopulated, floor=8
-        // total=9 > floor=8 → prune 1 populated (the highest-latency one)
+        // total=9 > floor=8: all 3 populated are kept (populated always preferred),
+        // then 5 unpopulated fill the remaining slots.
         let mut candidates: Vec<_> = vec![
             make_path_with_latency(Some(10)),
             make_path_with_latency(Some(30)),
@@ -900,11 +895,12 @@ mod tests {
         candidates.extend((0..6).map(|_| make_path_with_latency(None)));
         let result = prune_for_consistency(candidates, 8);
         assert_eq!(result.len(), 8);
-        // The lowest 2 populated (10ms, 20ms) should survive; 30ms should be dropped.
+        // All 3 populated paths survive; 1 unpopulated is trimmed.
         let populated: Vec<_> = result.iter().filter(|p| p.total_latency_ms.is_some()).collect();
-        assert_eq!(populated.len(), 2);
+        assert_eq!(populated.len(), 3);
         assert!(populated.iter().any(|p| p.total_latency_ms == Some(10)));
         assert!(populated.iter().any(|p| p.total_latency_ms == Some(20)));
+        assert!(populated.iter().any(|p| p.total_latency_ms == Some(30)));
     }
 
     #[test]
@@ -913,6 +909,21 @@ mod tests {
         let candidates: Vec<_> = (0..20).map(|_| make_path_with_latency(None)).collect();
         let result = prune_for_consistency(candidates, 8);
         assert_eq!(result.len(), 8);
+    }
+
+    #[test]
+    fn prune_keeps_populated_when_unpopulated_exceeds_floor() {
+        // Regression: 2 populated + 10 unpopulated, floor=8.
+        // Old formula: target_populated = 8.saturating_sub(10) = 0 → both populated dropped.
+        // Correct: keep up to 8 populated (only 2 exist), fill 6 remaining with unpopulated.
+        let mut candidates: Vec<_> = vec![make_path_with_latency(Some(10)), make_path_with_latency(Some(20))];
+        candidates.extend((0..10).map(|_| make_path_with_latency(None)));
+        let result = prune_for_consistency(candidates, 8);
+        assert_eq!(result.len(), 8);
+        let populated: Vec<_> = result.iter().filter(|p| p.total_latency_ms.is_some()).collect();
+        assert_eq!(populated.len(), 2, "both measured paths must survive");
+        assert!(populated.iter().any(|p| p.total_latency_ms == Some(10)));
+        assert!(populated.iter().any(|p| p.total_latency_ms == Some(20)));
     }
 
     #[test]
