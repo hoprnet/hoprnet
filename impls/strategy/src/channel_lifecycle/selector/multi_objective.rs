@@ -128,6 +128,11 @@ impl Selector for MultiObjectiveSelector {
             .iter()
             .filter(|c| DefaultSelector::should_close(c, ctx.cfg, ctx.start_epoch_elapsed, quality_override))
             .filter(|c| {
+                // Balance-drained channels bypass the k-floor veto: an on-chain fact
+                // (zero balance) must close regardless of anonymity constraints.
+                if c.channel.balance <= ctx.cfg.closure.close_when_drained_below {
+                    return true;
+                }
                 // K-floor veto: refuse to close the sole occupant of any known cell.
                 // Unknown-subnet channels are never vetoed by this guard.
                 if let Some(cell) = ctx.bucket_view.cell_for(c.channel.get_id()) {
@@ -170,9 +175,12 @@ impl Selector for MultiObjectiveSelector {
                 break;
             }
             let id = c.channel.get_id();
-            if let Some(cell) = ctx
-                .bucket_view
-                .cell_for(id)
+            // Balance-drained channels bypass the simulation k-floor check:
+            // an on-chain zero-balance fact must close regardless of bucket constraints.
+            let is_drained = c.channel.balance <= ctx.cfg.closure.close_when_drained_below;
+            if let Some(cell) = (!is_drained)
+                .then(|| ctx.bucket_view.cell_for(id))
+                .flatten()
                 .filter(|cell| !matches!(cell.1, SubnetBucket::Unknown))
             {
                 let remaining = simulated_counts.get(cell).copied().unwrap_or(0);
@@ -180,7 +188,7 @@ impl Selector for MultiObjectiveSelector {
                     // This cell is at or below floor; closing would breach it.
                     continue;
                 }
-                *simulated_counts.entry(cell.clone()).or_insert(1) -= 1;
+                *simulated_counts.entry(cell.clone()).or_insert(0) -= 1;
             }
             debug!(
                 dest = %c.channel.destination,
@@ -568,6 +576,69 @@ mod tests {
 
         let closes = sel.select_closes(&ctx).await;
         assert!(closes.is_empty(), "sole-occupant channel must not be closed");
+    }
+
+    /// Balance-drained channels bypass the k-floor veto and are always closed,
+    /// even when they are the sole occupant of their bucket cell.
+    #[tokio::test]
+    async fn balance_drained_channel_bypasses_k_floor_veto() {
+        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelId, ChannelStatus};
+        use hopr_api::types::primitive::prelude::HoprBalance;
+        use std::collections::HashMap;
+        use std::time::Duration;
+
+        let dest = addr(5);
+
+        let ch = ChannelEntry::builder()
+            .between(addr(0), dest)
+            .balance(HoprBalance::zero()) // fully drained
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+
+        let unique_cell = BucketCell(LatencyBucket::Fast, SubnetBucket::V4Prefix([5, 0, 0]));
+        let mut bucket_cells: HashMap<ChannelId, BucketCell> = HashMap::new();
+        bucket_cells.insert(*ch.get_id(), unique_cell);
+        let bucket_view = BucketView::new(bucket_cells);
+
+        let candidate = crate::channel_lifecycle::selector::CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(5)),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.5),
+                last_update: Duration::from_secs(10),
+                average_latency: Some(Duration::from_millis(50)),
+                probe_success_rate: 0.9,
+                ack_rate: Some(0.9),
+            },
+            ticket_score: 0.5,
+        };
+
+        let mut mo_cfg = MultiObjectiveSelectorConfig::dispersed(); // k_floor=4
+        mo_cfg.close_per_tick = 4;
+        let sel = mk_selector(mo_cfg);
+
+        // close_when_drained_below is HoprBalance::zero() by default, so balance=0 triggers drain.
+        let lc_cfg = ChannelLifecycleConfig::default();
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view,
+            stake_view: StakeView::empty(),
+        };
+
+        let closes = sel.select_closes(&ctx).await;
+        assert_eq!(
+            closes.len(),
+            1,
+            "drained sole-occupant channel must be closed despite k-floor veto"
+        );
     }
 
     // ── PR5: monetary throttle + hysteresis tests ────────────────────────────
