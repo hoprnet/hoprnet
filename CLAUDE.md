@@ -35,13 +35,20 @@ cargo nextest run --test '*' -j 1                          # All integration tes
 cargo nextest run -p <crate> --test <test_name> -j 1       # Single test file
 ```
 
-For `hopr-reference` integration tests specifically:
+For `hopr-node` cluster integration tests specifically:
 
 ```bash
-cargo nextest run -p hopr-reference --test transport_tickets -j 1
-cargo nextest run -p hopr-reference --test transport_session -j 1
-cargo nextest run -p hopr-reference --test chain_operations-size2 -j 1
-cargo nextest run -p hopr-reference --test chain_operations-size3 -j 1
+cargo nextest run -p hopr-node --test transport_tickets -j 1
+cargo nextest run -p hopr-node --test transport_session -j 1
+cargo nextest run -p hopr-node --test chain_operations-size2 -j 1
+cargo nextest run -p hopr-node --test chain_operations-size3 -j 1
+```
+
+For `hopr-lib` non-cluster integration tests:
+
+```bash
+cargo nextest run -p hopr-lib --test session_integration_tests -j 1
+cargo nextest run -p hopr-lib --test telemetry_integration -j 1
 ```
 
 ## Permissions
