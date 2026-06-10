@@ -23,7 +23,7 @@ use {
     hopr_chain_connector::{
         BlockchainConnectorConfig, HoprBlockchainSafeConnector,
         api::HoprChainApi,
-        blokli_client::{BlokliClient, BlokliClientConfig},
+        blokli_client::{BlokliClient, BlokliClientConfig, BlokliDnsOverride},
         create_trustful_hopr_blokli_connector,
     },
     hopr_lib::builder::{ChainKeypair, HoprBuilderConfigured, Keypair, OffchainKeypair},
@@ -38,6 +38,20 @@ use crate::{config::SessionIpForwardingConfig, exit::HoprServerIpForwardingReact
 
 /// Shareable [`HoprTicketManager`] with [`RedbStore`] backend.
 pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>>;
+
+/// Client-side Blokli options used by the convenience builders in this crate.
+///
+/// Keep using the hostname-based Blokli URL when setting [`dns_override`]. The
+/// override pins the hostname to a fixed IP address while preserving the
+/// original host for HTTP `Host` headers and TLS SNI.
+#[cfg(feature = "runtime-tokio")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct BlokliClientOptions {
+    /// Optional DNS override for the configured Blokli hostname.
+    pub dns_override: Option<BlokliDnsOverride>,
+    /// Optional transaction timeout multiplier passed into the chain connector.
+    pub tx_timeout_multiplier: Option<u32>,
+}
 
 /// The canonical full relay HOPR node type using the Blokli chain connector.
 #[cfg(feature = "runtime-tokio")]
@@ -104,14 +118,15 @@ async fn create_default_blokli_connector(
     chain_key: &ChainKeypair,
     blokli_url: String,
     module_address: Address,
-    tx_timeout_multiplier: Option<u32>,
+    blokli_options: BlokliClientOptions,
 ) -> anyhow::Result<Arc<HoprBlockchainSafeConnector<BlokliClient>>> {
     let mut chain_connector = create_trustful_hopr_blokli_connector(
         chain_key,
         BlockchainConnectorConfig {
             connection_sync_timeout: std::time::Duration::from_mins(1),
             sync_tolerance: 90,
-            tx_timeout_multiplier: tx_timeout_multiplier
+            tx_timeout_multiplier: blokli_options
+                .tx_timeout_multiplier
                 .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
@@ -120,6 +135,7 @@ async fn create_default_blokli_connector(
                 timeout: std::time::Duration::from_secs(30),
                 stream_reconnect_timeout: std::time::Duration::from_secs(30),
                 subscription_stream_restart_delay: Some(std::time::Duration::from_secs(1)),
+                dns_override: blokli_options.dns_override,
                 ..Default::default()
             },
         ),
@@ -244,10 +260,41 @@ pub async fn build_edge<
     tx_timeout_multiplier: Option<u32>,
     #[cfg(feature = "session-server")] server: Srv,
 ) -> anyhow::Result<Arc<EdgeHopr>> {
+    build_edge_with_blokli_options(
+        identity,
+        config,
+        blokli_url,
+        BlokliClientOptions {
+            tx_timeout_multiplier,
+            ..Default::default()
+        },
+        #[cfg(feature = "session-server")]
+        server,
+    )
+    .await
+}
+
+/// Builds an edge (entry/exit) [`EdgeHopr`] node using the default Blokli chain connector
+/// configured through [`BlokliClientOptions`].
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_edge_with_blokli_options<
+    #[cfg(feature = "session-server")] Srv: hopr_lib::api::node::HoprSessionServer<
+            Session = hopr_lib::exports::transport::IncomingSession,
+            Error: std::fmt::Display,
+        > + Clone
+        + Send
+        + 'static,
+>(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+    blokli_options: BlokliClientOptions,
+    #[cfg(feature = "session-server")] server: Srv,
+) -> anyhow::Result<Arc<EdgeHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
     let chain_connector =
-        create_default_blokli_connector(chain_key, blokli_url, module_address, tx_timeout_multiplier).await?;
+        create_default_blokli_connector(chain_key, blokli_url, module_address, blokli_options).await?;
 
     build_edge_with_chain(
         chain_key,
@@ -277,10 +324,34 @@ pub async fn build_full_with_session_server(
     tx_timeout_multiplier: Option<u32>,
     #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
 ) -> anyhow::Result<Arc<FullHopr>> {
+    build_full_with_session_server_and_blokli_options(
+        identity,
+        config,
+        blokli_url,
+        BlokliClientOptions {
+            tx_timeout_multiplier,
+            ..Default::default()
+        },
+        #[cfg(feature = "session-server")]
+        server_config,
+    )
+    .await
+}
+
+/// Builds a full relay [`FullHopr`] node with a session server using the default
+/// Blokli chain connector configured through [`BlokliClientOptions`].
+#[cfg(feature = "runtime-tokio")]
+pub async fn build_full_with_session_server_and_blokli_options(
+    identity: (&ChainKeypair, &OffchainKeypair),
+    config: HoprLibConfig,
+    blokli_url: String,
+    blokli_options: BlokliClientOptions,
+    #[cfg(feature = "session-server")] server_config: SessionIpForwardingConfig,
+) -> anyhow::Result<Arc<FullHopr>> {
     let (chain_key, packet_key) = identity;
     let module_address = config.safe_module.module_address;
     let chain_connector =
-        create_default_blokli_connector(chain_key, blokli_url, module_address, tx_timeout_multiplier).await?;
+        create_default_blokli_connector(chain_key, blokli_url, module_address, blokli_options).await?;
 
     #[cfg(feature = "session-server")]
     let session_server = HoprServerIpForwardingReactor::new(packet_key.clone(), server_config);
@@ -428,4 +499,43 @@ where
     let node = builder.build_full(ticket_manager, ticket_factory).await?;
 
     Ok(Arc::new(node))
+}
+
+#[cfg(all(test, feature = "runtime-tokio"))]
+mod tests {
+    use std::net::IpAddr;
+
+    use super::BlokliClientOptions;
+    use crate::hopr_chain_connector::blokli_client::BlokliDnsOverride;
+
+    #[test]
+    fn blokli_client_options_default_to_no_dns_override() {
+        assert_eq!(
+            BlokliClientOptions::default(),
+            BlokliClientOptions {
+                dns_override: None,
+                tx_timeout_multiplier: None,
+            }
+        );
+    }
+
+    #[test]
+    fn blokli_client_options_store_dns_override() {
+        let options = BlokliClientOptions {
+            dns_override: Some(BlokliDnsOverride {
+                ip: IpAddr::from([203, 0, 113, 10]),
+                port: Some(8443),
+            }),
+            tx_timeout_multiplier: Some(3),
+        };
+
+        assert_eq!(options.tx_timeout_multiplier, Some(3));
+        assert_eq!(
+            options.dns_override,
+            Some(BlokliDnsOverride {
+                ip: IpAddr::from([203, 0, 113, 10]),
+                port: Some(8443),
+            })
+        );
+    }
 }

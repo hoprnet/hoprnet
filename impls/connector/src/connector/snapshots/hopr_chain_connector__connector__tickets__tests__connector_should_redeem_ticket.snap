@@ -102,7 +102,7 @@ chain_info:
 version: "1"
 client_compatibility:
   api_version: "1"
-  supported_client_versions: ^0.29.0
+  supported_client_versions: ^0.29.1
   features:
     - indexes_safe_events
 health: OK
