@@ -102,7 +102,7 @@ impl DefaultSelector {
 #[async_trait]
 impl Selector for DefaultSelector {
     fn required_signals(&self) -> super::SignalSet {
-        super::SignalSet::empty()
+        super::SignalSet::default()
     }
 
     async fn select_closes(&self, ctx: &SelectorContext<'_>) -> Vec<ChannelId> {
@@ -128,10 +128,119 @@ impl Selector for DefaultSelector {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use hopr_api::types::{
+        crypto::prelude::{Keypair, OffchainKeypair, OffchainPublicKey},
+        internal::prelude::{ChannelEntry, ChannelStatus},
+        primitive::prelude::{Address, BytesRepresentable, HoprBalance},
+    };
+
     use super::*;
+    use crate::channel_lifecycle::{
+        ChannelLifecycleConfig,
+        selector::{CloseCandidate, PeerEdgeInfo},
+    };
+
+    fn addr(seed: u8) -> Address {
+        [seed; Address::SIZE].into()
+    }
+
+    fn offchain_key(seed: u8) -> OffchainPublicKey {
+        *OffchainKeypair::from_secret(&[seed; 32]).expect("test key").public()
+    }
+
+    fn open_channel(src: Address, dest: Address) -> ChannelEntry {
+        ChannelEntry::builder()
+            .between(src, dest)
+            .balance(HoprBalance::new_base(10))
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel")
+    }
 
     #[test]
     fn default_selector_requires_no_signals() {
-        assert_eq!(DefaultSelector.required_signals(), super::super::SignalSet::empty());
+        assert_eq!(DefaultSelector.required_signals(), super::super::SignalSet::default());
+    }
+
+    /// A close candidate with `offchain_key = None` (key not resolvable from address map)
+    /// must never be closed by `should_close`, regardless of other signals.
+    #[test]
+    fn should_close_returns_false_when_offchain_key_is_none() {
+        let ch = open_channel(addr(0), addr(1));
+        let candidate = CloseCandidate {
+            channel: ch,
+            offchain_key: None, // key not resolvable
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.0), // terrible quality — would normally close
+                last_update: Duration::from_secs(9999),
+                average_latency: Some(Duration::from_millis(300)),
+                probe_success_rate: 0.0,
+                ack_rate: Some(0.0),
+            },
+            ticket_score: 0.0,
+        };
+        let cfg = ChannelLifecycleConfig::default();
+        assert!(
+            !DefaultSelector::should_close(&candidate, &cfg, Duration::from_secs(600), None),
+            "channel without a resolvable offchain key must not be closed"
+        );
+    }
+
+    /// A channel with no graph observations yet (last_update = ZERO) must not be closed.
+    #[test]
+    fn should_close_returns_false_when_no_probing_data() {
+        let ch = open_channel(addr(0), addr(2));
+        let candidate = CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(2)),
+            edge_info: PeerEdgeInfo {
+                edge_score: None,
+                last_update: Duration::ZERO, // no observations at all
+                average_latency: None,
+                probe_success_rate: 0.0,
+                ack_rate: None,
+            },
+            ticket_score: 0.0,
+        };
+        let mut cfg = ChannelLifecycleConfig::default();
+        cfg.closure.close_below_quality_score = 1.0; // would close anything with data
+        assert!(
+            !DefaultSelector::should_close(&candidate, &cfg, Duration::from_secs(600), None),
+            "channel with no graph observations must not be closed"
+        );
+    }
+
+    /// A balance-drained channel must be closed regardless of other signals.
+    #[test]
+    fn should_close_returns_true_when_balance_drained() {
+        let ch = ChannelEntry::builder()
+            .between(addr(0), addr(3))
+            .balance(HoprBalance::zero()) // fully drained
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+        let candidate = CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(3)),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(1.0), // excellent quality — would normally keep open
+                last_update: Duration::from_secs(10),
+                average_latency: Some(Duration::from_millis(50)),
+                probe_success_rate: 1.0,
+                ack_rate: Some(1.0),
+            },
+            ticket_score: 1.0,
+        };
+        let cfg = ChannelLifecycleConfig::default();
+        assert!(
+            DefaultSelector::should_close(&candidate, &cfg, Duration::from_secs(600), None),
+            "balance-drained channel must always be closed"
+        );
     }
 }

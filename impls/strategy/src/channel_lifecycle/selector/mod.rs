@@ -38,12 +38,12 @@ pub use subnet::SubnetBucket;
 pub struct SignalSet(u8);
 
 impl SignalSet {
+    /// Pipeline should fetch per-peer on-chain safe balance and populate `StakeView`.
+    pub const STAKE: Self = Self(0b0001);
+
     pub const fn empty() -> Self {
         Self(0)
     }
-
-    /// Pipeline should fetch per-peer on-chain safe balance and populate `StakeView`.
-    pub const STAKE: Self = Self(0b0001);
 
     pub fn contains(self, other: Self) -> bool {
         (self.0 & other.0) == other.0

@@ -247,11 +247,11 @@ pub struct SelectorWeights {
     pub stake: f64,
     /// Weight of the anonymity (bucket diversity) axis.
     pub anonymity: f64,
-    /// Inner weight for probe success rate within the trust axis.  Default: 0.40.
+    /// Inner weight for probe success rate within the trust axis.  Default: 0.50.
     pub trust_probe: f64,
     /// Inner weight for ACK rate within the trust axis.  Default: 0.35.
     pub trust_ack: f64,
-    /// Inner weight for ticket activity within the trust axis.  Default: 0.25.
+    /// Inner weight for ticket activity within the trust axis.  Default: 0.15.
     pub trust_ticket: f64,
 }
 
@@ -262,9 +262,9 @@ impl SelectorWeights {
             trust,
             stake,
             anonymity,
-            trust_probe: 0.40,
+            trust_probe: 0.50,
             trust_ack: 0.35,
-            trust_ticket: 0.25,
+            trust_ticket: 0.15,
         }
     }
 }
@@ -331,6 +331,50 @@ impl MultiObjectiveSelectorConfig {
             k_floor: 2,
             hysteresis_gap: 0.40,
         }
+    }
+
+    /// Returns an error message if the inner trust weights do not approximately sum to 1.0.
+    /// Intended for use by `Custom` profile validation.
+    pub fn validate_trust_weights(&self) -> Result<(), String> {
+        let sum = self.weights.trust_probe + self.weights.trust_ack + self.weights.trust_ticket;
+        if (sum - 1.0).abs() > 0.01 {
+            Err(format!(
+                "trust inner weights must sum to ~1.0 (got {:.4}): probe={}, ack={}, ticket={}",
+                sum, self.weights.trust_probe, self.weights.trust_ack, self.weights.trust_ticket
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn all_named_profiles_have_valid_trust_weights() {
+        for cfg in [
+            MultiObjectiveSelectorConfig::low_latency(),
+            MultiObjectiveSelectorConfig::balanced(),
+            MultiObjectiveSelectorConfig::dispersed(),
+            MultiObjectiveSelectorConfig::economical(),
+        ] {
+            assert!(
+                cfg.validate_trust_weights().is_ok(),
+                "profile has invalid trust weights: {:?}",
+                cfg.validate_trust_weights()
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_trust_weights_are_caught() {
+        let mut cfg = MultiObjectiveSelectorConfig::low_latency();
+        cfg.weights.trust_probe = 0.9;
+        cfg.weights.trust_ack = 0.9;
+        cfg.weights.trust_ticket = 0.9; // sum = 2.7
+        assert!(cfg.validate_trust_weights().is_err());
     }
 }
 

@@ -36,18 +36,8 @@ impl MultiObjectiveSelector {
         Self { cfg }
     }
 
-    fn latency_score(candidate: &OpenCandidate) -> f64 {
-        match LatencyBucket::from_latency(candidate.edge_info.average_latency) {
-            LatencyBucket::VeryFast => 1.0,
-            LatencyBucket::Fast => 0.75,
-            LatencyBucket::Medium => 0.50,
-            LatencyBucket::Slow => 0.25,
-            LatencyBucket::VerySlow => 0.0,
-        }
-    }
-
-    fn latency_score_from_close(candidate: &CloseCandidate) -> f64 {
-        match LatencyBucket::from_latency(candidate.edge_info.average_latency) {
+    fn latency_score(average_latency: Option<std::time::Duration>) -> f64 {
+        match LatencyBucket::from_latency(average_latency) {
             LatencyBucket::VeryFast => 1.0,
             LatencyBucket::Fast => 0.75,
             LatencyBucket::Medium => 0.50,
@@ -76,7 +66,7 @@ impl MultiObjectiveSelector {
         cfg: &MultiObjectiveSelectorConfig,
     ) -> f64 {
         let w = &cfg.weights;
-        let lat = Self::latency_score(candidate);
+        let lat = Self::latency_score(candidate.edge_info.average_latency);
         let trust = Self::trust_score_open(candidate, cfg);
         let stake = ctx.stake_view.score(&candidate.addr);
         let utility = w.latency * lat + w.trust * trust + w.stake * stake;
@@ -94,7 +84,7 @@ impl MultiObjectiveSelector {
         cfg: &MultiObjectiveSelectorConfig,
     ) -> f64 {
         let w = &cfg.weights;
-        let lat = Self::latency_score_from_close(candidate);
+        let lat = Self::latency_score(candidate.edge_info.average_latency);
         let trust = Self::trust_score_close(candidate, cfg);
         let stake = ctx.stake_view.score(&candidate.channel.destination);
         let utility = w.latency * lat + w.trust * trust + w.stake * stake;
@@ -113,7 +103,7 @@ impl Selector for MultiObjectiveSelector {
         if self.cfg.weights.stake > 0.0 {
             SignalSet::STAKE
         } else {
-            SignalSet::empty()
+            SignalSet::default()
         }
     }
 
@@ -352,7 +342,7 @@ mod tests {
         let mut cfg = MultiObjectiveSelectorConfig::low_latency();
         cfg.weights.stake = 0.0;
         let sel = mk_selector(cfg);
-        assert_eq!(sel.required_signals(), SignalSet::empty());
+        assert_eq!(sel.required_signals(), SignalSet::default());
     }
 
     #[tokio::test]
@@ -369,14 +359,16 @@ mod tests {
             open_candidates: &[fast.clone(), slow.clone()],
             close_candidates: &[],
             start_epoch_elapsed: Duration::from_secs(600),
-            bucket_view: BucketView::empty(),
+            bucket_view: BucketView::default(),
             stake_view: StakeView::empty(),
         };
 
         let opens = sel.select_opens(&ctx).await;
-        assert_eq!(opens.len(), 2);
         // LowLatency weights latency heavily: fast peer should rank first
-        assert_eq!(opens[0].0, fast.addr);
+        assert_eq!(
+            opens.iter().map(|(a, _)| *a).collect::<Vec<_>>(),
+            vec![fast.addr, slow.addr]
+        );
     }
 
     #[tokio::test]
@@ -396,7 +388,7 @@ mod tests {
             open_candidates: &candidates,
             close_candidates: &[],
             start_epoch_elapsed: Duration::from_secs(600),
-            bucket_view: BucketView::empty(),
+            bucket_view: BucketView::default(),
             stake_view: StakeView::empty(),
         };
 
@@ -419,7 +411,7 @@ mod tests {
             open_candidates: &candidates,
             close_candidates: &[],
             start_epoch_elapsed: Duration::from_secs(600),
-            bucket_view: BucketView::empty(),
+            bucket_view: BucketView::default(),
             stake_view: StakeView::empty(),
         };
 
@@ -431,9 +423,11 @@ mod tests {
     async fn anonymity_penalty_discourages_crowded_cell() {
         // Two candidates in different subnets, same latency/trust.
         // Bucket view already has 3 channels in subnet 1's cell — subnet 2 should rank first.
-        use crate::channel_lifecycle::selector::bucket::{BucketCell, LatencyBucket};
-        use hopr_api::types::internal::prelude::ChannelId;
         use std::collections::HashMap;
+
+        use hopr_api::types::internal::prelude::ChannelId;
+
+        use crate::channel_lifecycle::selector::bucket::{BucketCell, LatencyBucket};
 
         let addr1 = addr(10);
         let addr2 = addr(20);
@@ -474,8 +468,9 @@ mod tests {
     /// its final_score is lower than a candidate in an already-populated cell.
     #[tokio::test]
     async fn fill_k_forces_underrepresented_cell_first() {
-        use hopr_api::types::internal::prelude::ChannelId;
         use std::collections::HashMap;
+
+        use hopr_api::types::internal::prelude::ChannelId;
 
         // Two candidates: one in an already-populated cell (subnet 1, count=2),
         // one in an empty cell (subnet 2, count=0).  LowLatency k_floor=2, but
@@ -522,10 +517,12 @@ mod tests {
     /// close veto: sole occupant of a cell must NOT be returned as a close target.
     #[tokio::test]
     async fn k_floor_veto_blocks_sole_occupant_close() {
-        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelId, ChannelStatus};
-        use hopr_api::types::primitive::prelude::HoprBalance;
-        use std::collections::HashMap;
-        use std::time::Duration;
+        use std::{collections::HashMap, time::Duration};
+
+        use hopr_api::types::{
+            internal::prelude::{ChannelEntry, ChannelId, ChannelStatus},
+            primitive::prelude::HoprBalance,
+        };
 
         let dest = addr(5);
 
@@ -584,10 +581,12 @@ mod tests {
     /// even when they are the sole occupant of their bucket cell.
     #[tokio::test]
     async fn balance_drained_channel_bypasses_k_floor_veto() {
-        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelId, ChannelStatus};
-        use hopr_api::types::primitive::prelude::HoprBalance;
-        use std::collections::HashMap;
-        use std::time::Duration;
+        use std::{collections::HashMap, time::Duration};
+
+        use hopr_api::types::{
+            internal::prelude::{ChannelEntry, ChannelId, ChannelStatus},
+            primitive::prelude::HoprBalance,
+        };
 
         let dest = addr(5);
 
@@ -663,7 +662,7 @@ mod tests {
             open_candidates: &candidates,
             close_candidates: &[],
             start_epoch_elapsed: Duration::from_secs(600),
-            bucket_view: BucketView::empty(),
+            bucket_view: BucketView::default(),
             stake_view: StakeView::empty(),
         };
 
@@ -675,9 +674,12 @@ mod tests {
     /// be closed under Economical (gap=0.40, open_threshold=0.5, adjusted_close=0.10).
     #[tokio::test]
     async fn hysteresis_vetos_close_in_dead_zone() {
-        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelStatus};
-        use hopr_api::types::primitive::prelude::HoprBalance;
         use std::collections::HashMap;
+
+        use hopr_api::types::{
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::HoprBalance,
+        };
 
         let dest = addr(7);
         let ch = ChannelEntry::builder()
@@ -747,8 +749,10 @@ mod tests {
     /// Without hysteresis (gap=0), the normal close threshold applies.
     #[tokio::test]
     async fn zero_hysteresis_uses_config_threshold() {
-        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelStatus};
-        use hopr_api::types::primitive::prelude::HoprBalance;
+        use hopr_api::types::{
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::HoprBalance,
+        };
 
         let dest = addr(8);
         let ch = ChannelEntry::builder()
@@ -786,7 +790,7 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[candidate],
             start_epoch_elapsed: Duration::from_secs(600),
-            bucket_view: BucketView::empty(),
+            bucket_view: BucketView::default(),
             stake_view: StakeView::empty(),
         };
 
@@ -794,6 +798,81 @@ mod tests {
         assert!(
             !closes.is_empty(),
             "with zero hysteresis, low-quality channel must be closed"
+        );
+    }
+
+    /// Channels that were opened but have not accumulated any graph observations yet
+    /// (no probing data) must not be closed by the multi-objective selector.
+    /// This guards against the selector killing freshly-opened channels before
+    /// they have had a chance to accumulate measurements.
+    #[tokio::test]
+    async fn new_channel_without_measurements_is_not_closed() {
+        use std::{collections::HashMap, time::Duration};
+
+        use hopr_api::types::{
+            internal::prelude::{ChannelEntry, ChannelStatus},
+            primitive::prelude::HoprBalance,
+        };
+
+        let dest = addr(99);
+        let ch = ChannelEntry::builder()
+            .between(addr(0), dest)
+            .balance(HoprBalance::new_base(100))
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+
+        // Channel has no probing data: last_update == Duration::ZERO, no latency, no edge_score.
+        let candidate = crate::channel_lifecycle::selector::CloseCandidate {
+            channel: ch.clone(),
+            offchain_key: Some(offchain_key(99)),
+            edge_info: PeerEdgeInfo {
+                edge_score: None,
+                last_update: Duration::ZERO, // no observations recorded
+                average_latency: None,
+                probe_success_rate: 0.0,
+                ack_rate: None,
+            },
+            ticket_score: 0.0,
+        };
+
+        // Put the channel in its own cell so k-floor is not the reason for the veto.
+        let cell = BucketCell(LatencyBucket::VerySlow, SubnetBucket::V4Prefix([99, 0, 0]));
+        let mut bucket_cells: HashMap<_, _> = HashMap::new();
+        // Add 3 other channels in the same cell so k-floor (k=2) is satisfied.
+        for i in 0u8..3 {
+            bucket_cells.insert(
+                hopr_api::types::internal::prelude::ChannelId::create(&[&[i]]),
+                cell.clone(),
+            );
+        }
+        bucket_cells.insert(*ch.get_id(), cell);
+        let bucket_view = BucketView::new(bucket_cells);
+
+        let mut mo_cfg = MultiObjectiveSelectorConfig::low_latency();
+        mo_cfg.hysteresis_gap = 0.0; // remove hysteresis so only the no-data guard saves it
+        mo_cfg.close_per_tick = 4;
+        let sel = mk_selector(mo_cfg);
+
+        let mut lc_cfg = ChannelLifecycleConfig::default();
+        lc_cfg.closure.close_below_quality_score = 1.0; // would close any channel with data
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view,
+            stake_view: StakeView::empty(),
+        };
+
+        let closes = sel.select_closes(&ctx).await;
+        assert!(
+            closes.is_empty(),
+            "channel with no graph observations must not be closed — it hasn't been measured yet"
         );
     }
 }

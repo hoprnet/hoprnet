@@ -585,10 +585,11 @@ where
                 if self.cfg.eligibility.blocklist.contains(&chain_addr) {
                     return None;
                 }
-                if self.cfg.eligibility.require_currently_connected && !self.node.network_view().is_connected(&peer_id)
-                {
-                    return None;
-                }
+                // Every peer_id in this loop came from `connected_peers()`, so it is
+                // connected by construction; a separate `is_connected` check is always true
+                // and can be skipped. Note: `require_currently_connected = false` has no
+                // observable effect with the current iteration source — a follow-up can widen
+                // the source to `peer_addr_map` if that use-case is needed.
 
                 let edge_info = self.peer_edge_info(&offchain_key);
                 let ticket_delta = self.peer_ticket_activity.get(&chain_addr).map(|v| *v).unwrap_or(0);
@@ -878,10 +879,11 @@ where
     fn emit_bucket_metrics(&self, bucket_view: &BucketView, close_candidates: &[CloseCandidate]) {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
+            use std::collections::HashSet;
+
             use super::{
                 METRIC_BUCKET_COUNT, METRIC_EFFECTIVE_BUCKETS, METRIC_LATENCY_VARIANCE_MS, METRIC_SUBNET_COUNT,
             };
-            use std::collections::HashSet;
 
             METRIC_EFFECTIVE_BUCKETS.set(bucket_view.effective_buckets());
 
@@ -2013,7 +2015,7 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[candidate],
             start_epoch_elapsed: Duration::ZERO,
-            bucket_view: selector::BucketView::empty(),
+            bucket_view: selector::BucketView::default(),
             stake_view: selector::StakeView::empty(),
         };
 
@@ -2064,7 +2066,7 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[no_data],
             start_epoch_elapsed: Duration::ZERO,
-            bucket_view: selector::BucketView::empty(),
+            bucket_view: selector::BucketView::default(),
             stake_view: selector::StakeView::empty(),
         };
         assert!(
@@ -2089,7 +2091,7 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[with_data],
             start_epoch_elapsed: Duration::from_secs(10), // strategy running 10s > last_update 1s
-            bucket_view: selector::BucketView::empty(),
+            bucket_view: selector::BucketView::default(),
             stake_view: selector::StakeView::empty(),
         };
         let closes = selector::DefaultSelector.select_closes(&ctx_with_data).await;

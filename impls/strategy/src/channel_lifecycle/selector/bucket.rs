@@ -42,6 +42,7 @@ pub struct BucketCell(pub LatencyBucket, pub SubnetBucket);
 
 /// Snapshot of the (latency, subnet) cells for all currently-open channels.
 /// Computed once per tick and passed into `SelectorContext`.
+#[derive(Default)]
 pub struct BucketView {
     cells: HashMap<ChannelId, BucketCell>,
 }
@@ -49,10 +50,6 @@ pub struct BucketView {
 impl BucketView {
     pub fn new(cells: HashMap<ChannelId, BucketCell>) -> Self {
         Self { cells }
-    }
-
-    pub fn empty() -> Self {
-        Self { cells: HashMap::new() }
     }
 
     pub fn cell_for(&self, id: &ChannelId) -> Option<&BucketCell> {
@@ -121,7 +118,7 @@ mod tests {
 
     #[test]
     fn empty_view() {
-        let v = BucketView::empty();
+        let v = BucketView::default();
         assert_eq!(v.shannon_entropy(), 0.0);
         assert!((v.effective_buckets() - 1.0).abs() < 1e-9, "2^0 = 1");
         assert_eq!(v.distinct_cell_count(), 0);
