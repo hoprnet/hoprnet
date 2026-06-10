@@ -20,9 +20,10 @@ pub use reader::HoprBlockchainReader;
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
     pub use blokli_client::{
-        BlokliClient, BlokliClientConfig,
+        BlokliClient, BlokliClientConfig, BlokliDnsOverride,
         api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient, types},
     };
+    pub use blokli_client::exports::Url;
 }
 
 #[doc(hidden)]
