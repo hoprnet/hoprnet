@@ -7,10 +7,9 @@ use super::errors::Result;
 /// The `cost` is a multiplicative product of per-edge quality scores in
 /// `(0.0, 1.0]` — higher means better quality.
 ///
-/// Each aggregate field is `Option<T>`: `None` indicates that at least one edge
-/// along the path lacked the underlying probe data, making the aggregate undefined.
-/// Callers that use these fields for pruning must treat `None` as "unknown" and
-/// preserve such paths rather than discarding them.
+/// Aggregate fields are `Option<T>`: `None` means at least one edge along the path
+/// lacked the underlying probe data. Latency-measured paths are preferred during
+/// pruning; paths with `None` latency fill remaining slots up to the anonymity floor.
 #[derive(Debug, Clone)]
 pub struct PathWithMetrics {
     /// The path nodes (excluding source): `[intermediates..., dest]`.
