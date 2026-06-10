@@ -38,7 +38,7 @@ where
                 .or_else(|| obs.intermediate_qos().and_then(|m| m.average_latency()))
         });
         total_latency_ms = match (total_latency_ms, edge_lat) {
-            (Some(acc), Some(lat)) => Some(acc.saturating_add(lat.as_millis() as u32)),
+            (Some(acc), Some(lat)) => Some(acc.saturating_add(lat.as_millis().min(u32::MAX as u128) as u32)),
             _ => None,
         };
 
@@ -83,7 +83,7 @@ where
 /// - Drops from the high-latency tail until the total count equals `floor`, or until no populated candidates remain.
 /// - If still over the floor with no populated candidates left, drops unpopulated candidates from the input-order tail.
 pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize) -> Vec<PathWithMetrics> {
-    if candidates.len() <= floor {
+    if floor == 0 || candidates.len() <= floor {
         return candidates;
     }
 
