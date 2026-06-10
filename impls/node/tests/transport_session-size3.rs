@@ -10,7 +10,7 @@ use hopr_lib::{
         transport::{SessionCapabilities, SessionManagerError, SessionTarget, TransportSessionError},
     },
 };
-use hopr_reference::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
+use hopr_node::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

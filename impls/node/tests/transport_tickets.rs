@@ -7,7 +7,7 @@ use hopr_api::{
     chain::ChainValues,
     node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
-use hopr_reference::{
+use hopr_node::{
     hopr_lib::{
         api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
         errors::HoprLibError,

@@ -92,8 +92,17 @@ hopr-transport = { workspace = true }
 [dev-dependencies]
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 insta = { workspace = true }
+opentelemetry-prometheus-text-exporter = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+  "testing",
+] }
+rstest = { workspace = true }
 serde-saphyr = { workspace = true }
 tokio = { workspace = true }
+
+hopr-api = { workspace = true, features = ["types-random", "types-telemetry"] }
 
 
 [package.metadata.cargo-machete]

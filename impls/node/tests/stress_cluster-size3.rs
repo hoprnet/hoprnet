@@ -4,7 +4,7 @@
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::api::types::primitive::prelude::HoprBalance;
-use hopr_reference::testing::{
+use hopr_node::testing::{
     fixtures::{TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture},
     hopr::ChannelGuard,
 };
