@@ -249,17 +249,16 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let peer_id = next_hop.to_peerid_str();
             UNACK_INSERTIONS.increment();
             UNACK_TICKETS.increment(1.0);
-            UNACK_TICKETS_PER_PEER.increment(
-                &[if *PER_PEER_ENABLED {
-                    peer_id.as_str()
-                } else {
-                    "redacted"
-                }],
-                1.0,
-            );
+            // Only render the (base58) peer id string when per-peer metrics are actually enabled;
+            // otherwise this would allocate a String on every forwarded packet just to discard it
+            // in favour of the "redacted" label.
+            if *PER_PEER_ENABLED {
+                UNACK_TICKETS_PER_PEER.increment(&[next_hop.to_peerid_str().as_str()], 1.0);
+            } else {
+                UNACK_TICKETS_PER_PEER.increment(&["redacted"], 1.0);
+            }
         }
 
         Ok(())
