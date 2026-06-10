@@ -25,7 +25,7 @@ use super::{
 struct PathCostWithMetrics {
     cost: f64,
     total_latency_ms: Option<u32>,
-    min_probe_rate: Option<f64>,
+    min_probe_success_rate: Option<f64>,
     min_ack_rate: Option<f64>,
     capacity_floor: Option<u128>,
 }
@@ -48,7 +48,7 @@ impl PathCostWithMetrics {
             path,
             cost: self.cost,
             total_latency_ms: self.total_latency_ms,
-            min_probe_success_rate: self.min_probe_rate,
+            min_probe_success_rate: self.min_probe_success_rate,
             min_ack_rate: self.min_ack_rate,
             capacity_floor: self.capacity_floor,
         }
@@ -84,7 +84,7 @@ where
         PathCostWithMetrics {
             cost: self.inner.initial_value(),
             total_latency_ms: Some(0),
-            min_probe_rate: None,
+            min_probe_success_rate: None,
             min_ack_rate: None,
             capacity_floor: None,
         }
@@ -94,7 +94,7 @@ where
         self.inner.min_value().map(|c| PathCostWithMetrics {
             cost: c,
             total_latency_ms: None,
-            min_probe_rate: None,
+            min_probe_success_rate: None,
             min_ack_rate: None,
             capacity_floor: None,
         })
@@ -122,7 +122,7 @@ where
                 .into_iter()
                 .chain(observed.intermediate_qos().map(|m| m.average_probe_rate()))
                 .reduce(f64::min);
-            let min_probe_rate = opt_min(prev.min_probe_rate, edge_probe);
+            let min_probe_success_rate = opt_min(prev.min_probe_success_rate, edge_probe);
 
             let edge_ack = observed.immediate_qos().and_then(|m| m.ack_rate());
             let min_ack_rate = opt_min(prev.min_ack_rate, edge_ack);
@@ -133,7 +133,7 @@ where
             PathCostWithMetrics {
                 cost,
                 total_latency_ms,
-                min_probe_rate,
+                min_probe_success_rate,
                 min_ack_rate,
                 capacity_floor,
             }
@@ -288,7 +288,6 @@ where
                 let mut candidate = path;
                 candidate.push(*dest);
 
-                // Skip paths already found by Phase 1 (compare path component only).
                 if existing.iter().any(|pwm| pwm.path == candidate) {
                     return None;
                 }
@@ -468,10 +467,6 @@ mod tests {
         });
     }
 
-    fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        mark_edge_full(graph, src, dst);
-    }
-
     // Helper: build a bidirectional 2-hop graph: me ↔ hop ↔ dest.
     fn two_hop_graph() -> (OffchainPublicKey, OffchainPublicKey, OffchainPublicKey, ChannelGraph) {
         let me = pubkey(&SECRET_0);
@@ -484,12 +479,12 @@ mod tests {
         graph.add_edge(&me, &hop).unwrap();
         graph.add_edge(&hop, &dest).unwrap();
         mark_edge_full(&graph, &me, &hop);
-        mark_edge_last(&graph, &hop, &dest);
+        mark_edge_full(&graph, &hop, &dest);
         // Reverse: dest → hop → me
         graph.add_edge(&dest, &hop).unwrap();
         graph.add_edge(&hop, &me).unwrap();
         mark_edge_full(&graph, &dest, &hop);
-        mark_edge_last(&graph, &hop, &me);
+        mark_edge_full(&graph, &hop, &me);
         (me, hop, dest, graph)
     }
 
@@ -557,14 +552,14 @@ mod tests {
         graph.add_edge(&b, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
         mark_edge_full(&graph, &a, &b);
-        mark_edge_last(&graph, &b, &dest);
+        mark_edge_full(&graph, &b, &dest);
         // Reverse: dest → B → A → me
         graph.add_edge(&dest, &b).unwrap();
         graph.add_edge(&b, &a).unwrap();
         graph.add_edge(&a, &me).unwrap();
         mark_edge_full(&graph, &dest, &b);
         mark_edge_full(&graph, &b, &a);
-        mark_edge_last(&graph, &a, &me);
+        mark_edge_full(&graph, &a, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 
@@ -629,8 +624,8 @@ mod tests {
         graph.add_edge(&b, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
         mark_edge_full(&graph, &me, &b);
-        mark_edge_last(&graph, &a, &dest);
-        mark_edge_last(&graph, &b, &dest);
+        mark_edge_full(&graph, &a, &dest);
+        mark_edge_full(&graph, &b, &dest);
         // Reverse: dest → a → me,  dest → b → me
         graph.add_edge(&dest, &a).unwrap();
         graph.add_edge(&dest, &b).unwrap();
@@ -638,8 +633,8 @@ mod tests {
         graph.add_edge(&b, &me).unwrap();
         mark_edge_full(&graph, &dest, &a);
         mark_edge_full(&graph, &dest, &b);
-        mark_edge_last(&graph, &a, &me);
-        mark_edge_last(&graph, &b, &me);
+        mark_edge_full(&graph, &a, &me);
+        mark_edge_full(&graph, &b, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 
@@ -723,7 +718,7 @@ mod tests {
         graph.add_edge(&dest, &relay).unwrap();
         graph.add_edge(&relay, &me).unwrap();
         mark_edge_full(&graph, &dest, &relay);
-        mark_edge_last(&graph, &relay, &me);
+        mark_edge_full(&graph, &relay, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 
@@ -769,7 +764,7 @@ mod tests {
         mark_edge_full(&graph, &me, &a);
         mark_edge_full(&graph, &a, &b);
         mark_edge_full(&graph, &b, &c);
-        mark_edge_last(&graph, &c, &dest);
+        mark_edge_full(&graph, &c, &dest);
         // Reverse: dest → c → b → a → me
         graph.add_edge(&dest, &c).unwrap();
         graph.add_edge(&c, &b).unwrap();
@@ -778,7 +773,7 @@ mod tests {
         mark_edge_full(&graph, &dest, &c);
         mark_edge_full(&graph, &c, &b);
         mark_edge_full(&graph, &b, &a);
-        mark_edge_last(&graph, &a, &me);
+        mark_edge_full(&graph, &a, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 
@@ -827,7 +822,7 @@ mod tests {
         graph.add_edge(&dest, &relay).unwrap();
         graph.add_edge(&relay, &me).unwrap();
         mark_edge_full(&graph, &dest, &relay);
-        mark_edge_last(&graph, &relay, &me);
+        mark_edge_full(&graph, &relay, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 
@@ -863,7 +858,7 @@ mod tests {
         graph.add_edge(&dest, &relay).unwrap();
         graph.add_edge(&relay, &me).unwrap();
         mark_edge_full(&graph, &dest, &relay);
-        mark_edge_last(&graph, &relay, &me);
+        mark_edge_full(&graph, &relay, &me);
 
         let selector = test_selector(me, graph, MAX_PATHS);
 

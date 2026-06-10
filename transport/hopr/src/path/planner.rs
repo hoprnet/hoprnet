@@ -575,9 +575,7 @@ mod tests {
         });
     }
 
-    fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        mark_edge_full(graph, src, dst);
-    }
+
 
     fn small_config() -> PathPlannerConfig {
         PathPlannerConfig {
@@ -650,7 +648,7 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
         let selector = HoprGraphPathSelector::new(
@@ -781,7 +779,7 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
         let selector = HoprGraphPathSelector::new(
@@ -834,7 +832,7 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
         let selector = HoprGraphPathSelector::new(
