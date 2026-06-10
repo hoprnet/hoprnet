@@ -104,11 +104,11 @@ impl Validate for AcknowledgementPipelineConfig {
 pub struct PacketPipelineConfig {
     /// Maximum concurrency when processing outgoing packets.
     ///
-    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
+    /// `None` or `Some(0)` both fall back to the default (twice the CPU/crypto thread pool size).
     pub output_concurrency: Option<usize>,
     /// Maximum concurrency when processing incoming packets.
     ///
-    /// `None` or `Some(0)` both fall back to the default (available parallelism * 8).
+    /// `None` or `Some(0)` both fall back to the default (twice the CPU/crypto thread pool size).
     pub input_concurrency: Option<usize>,
     /// Configuration of the packet acknowledgement processing
     #[validate(nested)]

@@ -724,14 +724,19 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
+    // Default maximum concurrency (if not set or zero) is twice the size of the CPU (crypto)
+    // thread pool that packet encode/decode is dispatched to.
+    //
+    // Packet encode/decode is offloaded to the shared Rayon pool, so that pool's size - not the
+    // raw core count - is the real service rate for crypto. Allowing far more tasks in flight
+    // than the pool can service (the previous default was 8x the core count, i.e. ~16x the
+    // pool, which is itself ~half the cores) only builds up queue-wait latency without adding
+    // throughput. Sizing the default to a small multiple of the actual pool keeps the pool
+    // saturated and overlaps the async (channel/ticket) stages, while letting backpressure
+    // engage before a deep queue forms. Tying it to the live pool size means an operator who
+    // raises the pool (HOPRD_NUM_CPU_THREADS) gets proportionally more in-flight concurrency.
     // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
-    let avail_concurrency = std::thread::available_parallelism()
-        .ok()
-        .map(|n| n.get())
-        .unwrap_or(1)
-        .max(1)
-        * 8;
+    let avail_concurrency = (hopr_utils::parallelize::cpu::rayon::current_num_threads() * 2).max(1);
 
     let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
     let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
