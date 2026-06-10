@@ -425,6 +425,18 @@ impl<S> Clone for SessionManager<S> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
+/// Derives the effective Session capabilities for a given [`target`](SessionTarget).
+///
+/// Datagram (UDP) targets get [`Capability::NoDelay`] added automatically so the egress segmenter
+/// flushes each datagram immediately instead of holding a partial frame. All other target types
+/// keep the requested capabilities unchanged.
+fn capabilities_for_target(target: &SessionTarget, requested: crate::Capabilities) -> crate::Capabilities {
+    match target {
+        SessionTarget::UdpStream(_) => requested | Capability::NoDelay,
+        SessionTarget::TcpStream(_) | SessionTarget::ExitNode(_) => requested,
+    }
+}
+
 impl<S> SessionManager<S>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
@@ -613,12 +625,20 @@ where
         &self,
         destination: Address,
         target: SessionTarget,
-        cfg: SessionClientConfig,
+        mut cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
         if self.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
+
+        // Datagram (UDP) targets carry self-contained datagrams, so the egress segmenter must not
+        // hold a partial frame waiting to be filled - a small datagram would otherwise sit buffered
+        // until the next full frame or an explicit flush. Derive `NoDelay` (immediate flush)
+        // automatically for UDP targets so datagram sessions get low-latency egress without the
+        // caller having to set it explicitly. The capability is propagated to the Exit via the Start
+        // protocol below, so both ends agree; read-side ordering is unaffected.
+        cfg.capabilities = capabilities_for_target(&target, cfg.capabilities);
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
@@ -1531,6 +1551,34 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    #[test]
+    fn capabilities_for_target_derives_nodelay_only_for_udp() {
+        let requested: Capabilities = Capability::Segmentation | Capability::NoRateControl;
+        let udp = SessionTarget::UdpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap()));
+        let tcp = SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap()));
+        let exit = SessionTarget::ExitNode(1);
+
+        // UDP targets get NoDelay added on top of the requested capabilities.
+        let udp_caps = capabilities_for_target(&udp, requested);
+        assert!(udp_caps.contains(Capability::NoDelay), "UDP target must derive NoDelay");
+        assert!(
+            udp_caps.contains(Capability::Segmentation),
+            "requested capabilities are preserved"
+        );
+        assert!(
+            udp_caps.contains(Capability::NoRateControl),
+            "requested capabilities are preserved"
+        );
+
+        // Non-datagram targets are left exactly as requested (no NoDelay auto-derivation).
+        assert_eq!(capabilities_for_target(&tcp, requested), requested);
+        assert_eq!(capabilities_for_target(&exit, requested), requested);
+
+        // Already-present NoDelay is idempotent.
+        let with_nodelay = requested | Capability::NoDelay;
+        assert_eq!(capabilities_for_target(&udp, with_nodelay), with_nodelay);
+    }
 
     /// Create a test tag allocator with a large partition.
     fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
