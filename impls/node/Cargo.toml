@@ -84,12 +84,6 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-node = { workspace = true, features = ["testing"] }
-hopr-api = { workspace = true, features = ["types-random", "types-telemetry"] }
-opentelemetry_sdk = { workspace = true, features = [
-  "metrics",
-  "experimental_metrics_custom_reader",
-  "testing",
-] }
-opentelemetry-prometheus-text-exporter = { workspace = true }
+hopr-api = { workspace = true, features = ["types-random"] }
 
-hopr-lib = { workspace = true, features = ["telemetry"] }
+hopr-lib = { workspace = true }

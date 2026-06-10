@@ -3661,8 +3661,6 @@ dependencies = [
  "hopr-ticket-manager",
  "hopr-transport-p2p",
  "lazy_static",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
  "rand 0.10.1",
  "rstest",
  "serial_test",

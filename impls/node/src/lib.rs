@@ -9,26 +9,18 @@ pub mod testing;
 
 use std::sync::Arc;
 
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_lib;
-/// Re-export the canonical channel graph type for downstream crates.
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_network_graph::SharedChannelGraph;
 use hopr_ticket_manager::{
     HoprTicketManager, RedbStore, RedbTicketQueue,
     ticket_factory_from_chain, ticket_manager_from_chain,
 };
-/// Re-export the canonical network type for downstream crates.
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_p2p::HoprNetwork;
 #[cfg(feature = "runtime-tokio")]
 use {
     futures::StreamExt,
     hopr_chain_connector::api::HoprChainApi,
     hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
     hopr_lib::{Hopr, config::HoprLibConfig},
-    hopr_network_graph::ChannelGraph,
-    hopr_transport_p2p::{HoprLibp2pNetworkBuilder, PeerDiscovery},
+    hopr_network_graph::{ChannelGraph, SharedChannelGraph},
+    hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery},
     validator::Validate,
 };
 
@@ -54,11 +46,6 @@ pub type EdgeHopr<
     Graph = SharedChannelGraph,
     Net = HoprNetwork,
 > = Hopr<Chain, Graph, Net, ()>;
-
-/// Re-export so downstream crates (e.g. `edge-client`) do not need a direct
-/// `hopr-chain-connector` dependency.
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_chain_connector;
 
 // ---------------------------------------------------------------------------
 // Private helpers

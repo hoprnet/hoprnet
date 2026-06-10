@@ -7,16 +7,14 @@ use hopr_api::{
     chain::ChainValues,
     node::{HasChainApi, HasTicketManagement, IncentiveChannelOperations, IncentiveRedeemOperations},
 };
-use hopr_node::{
-    hopr_lib::{
-        api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
-        errors::HoprLibError,
-    },
-    testing::{
-        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
-        hopr::ChannelGuard,
-        wait_until,
-    },
+use hopr_lib::{
+    api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
+    errors::HoprLibError,
+};
+use hopr_node::testing::{
+    fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
+    hopr::ChannelGuard,
+    wait_until,
 };
 use rstest::*;
 use serial_test::serial;
