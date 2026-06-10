@@ -294,15 +294,14 @@ mod tests {
         ticket_price: HoprBalance,
         win_probability: WinningProbability,
     ) {
-        process_chain_events(
+        let _ = run_with_peer_discovery(
+            events,
             chain,
             graph,
-            futures::stream::iter(events),
             own_chain_addr,
             own_packet_key,
-            Arc::new(RwLock::new(ticket_price)),
-            Arc::new(RwLock::new(win_probability)),
-            None,
+            ticket_price,
+            win_probability,
         )
         .await;
     }

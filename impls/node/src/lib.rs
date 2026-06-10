@@ -67,6 +67,76 @@ fn validate_probe_cfg(
     Ok(())
 }
 
+/// Return type of [`make_builder`]: a builder with all subsystems wired up,
+/// ready for the edge or full terminal build call.
+#[cfg(feature = "runtime-tokio")]
+type FullyConfiguredBuilder<Chain> = hopr_lib::builder::HoprBuilderConfigured<
+    Chain,
+    hopr_network_graph::SharedChannelGraph,
+    hopr_transport_p2p::HoprNetwork,
+    hopr_ct_full_network::FullNetworkDiscovery<hopr_network_graph::SharedChannelGraph>,
+>;
+
+/// Wires all topology subsystems (peer-discovery bridge, graph, network, cover-traffic)
+/// and returns a fully configured builder.
+///
+/// Both [`build_edge_with_chain`] and [`build_full_with_chain`] call this to avoid
+/// duplicating the wiring code; they differ only in how they seed tickets and which
+/// terminal build method they invoke.
+#[cfg(feature = "runtime-tokio")]
+fn make_builder<Chain>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    prober_cfg: hopr_ct_full_network::ProberConfig,
+    chain_connector: Chain,
+) -> FullyConfiguredBuilder<Chain>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
+    let path_cfg = config.protocol.path_planner;
+    let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
+        *packet_key.public(),
+        path_cfg.edge_penalty,
+        path_cfg.min_ack_rate,
+    ));
+    let graph_for_ct = graph.clone();
+    let safe_address = config.safe_module.safe_address;
+    let module_address = config.safe_module.module_address;
+
+    hopr_lib::builder::HoprBuilder
+        .with_identity(chain_key, packet_key)
+        .with_config(config)
+        .with_safe_module(&safe_address, &module_address)
+        .with_chain_api(move |_ctx| chain_connector)
+        .with_peer_discovery_tx(peer_discovery_tx)
+        .with_graph(move |_ctx| graph)
+        .with_network(move |ctx| {
+            Box::pin(async move {
+                let multiaddresses = vec![
+                    (&ctx.cfg.host)
+                        .try_into()
+                        .expect("host config must be a valid multiaddress"),
+                ];
+                let nb = HoprLibp2pNetworkBuilder::new(
+                    peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
+                );
+                nb.build(
+                    &ctx.packet_key,
+                    multiaddresses,
+                    "/hopr/mix/1.1.0",
+                    ctx.cfg.protocol.transport.prefer_local_addresses,
+                )
+                .await
+                .expect("network must be constructible")
+            })
+        })
+        .with_cover_traffic(move |ctx| {
+            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
+        })
+}
+
 // ---------------------------------------------------------------------------
 // Level-2 flexible builders (bring your own chain connector)
 // ---------------------------------------------------------------------------
@@ -106,48 +176,13 @@ where
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
 
-    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
-    let prober_cfg = probe_cfg.unwrap_or_default();
-    let path_cfg = config.protocol.path_planner;
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
-        *packet_key.public(),
-        path_cfg.edge_penalty,
-        path_cfg.min_ack_rate,
-    ));
-    let graph_for_ct = graph.clone();
-    let safe_address = config.safe_module.safe_address;
-    let module_address = config.safe_module.module_address;
-
-    let builder = hopr_lib::builder::HoprBuilder
-        .with_identity(chain_key, packet_key)
-        .with_config(config)
-        .with_safe_module(&safe_address, &module_address)
-        .with_chain_api(move |_ctx| chain_connector)
-        .with_peer_discovery_tx(peer_discovery_tx)
-        .with_graph(move |_ctx| graph)
-        .with_network(move |ctx| {
-            Box::pin(async move {
-                let multiaddresses = vec![
-                    (&ctx.cfg.host)
-                        .try_into()
-                        .expect("host config must be a valid multiaddress"),
-                ];
-                let nb = HoprLibp2pNetworkBuilder::new(
-                    peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
-                );
-                nb.build(
-                    &ctx.packet_key,
-                    multiaddresses,
-                    "/hopr/mix/1.1.0",
-                    ctx.cfg.protocol.transport.prefer_local_addresses,
-                )
-                .await
-                .expect("network must be constructible")
-            })
-        })
-        .with_cover_traffic(move |ctx| {
-            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
-        });
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    );
 
     #[cfg(feature = "session-server")]
     let node = builder.with_session_server(server).build_edge(ticket_factory).await?;
@@ -188,48 +223,13 @@ where
         .await
         .map_err(|e| anyhow::anyhow!("failed to seed ticket manager: {e}"))?;
 
-    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
-    let prober_cfg = probe_cfg.unwrap_or_default();
-    let path_cfg = config.protocol.path_planner;
-    let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
-        *packet_key.public(),
-        path_cfg.edge_penalty,
-        path_cfg.min_ack_rate,
-    ));
-    let graph_for_ct = graph.clone();
-    let safe_address = config.safe_module.safe_address;
-    let module_address = config.safe_module.module_address;
-
-    let builder = hopr_lib::builder::HoprBuilder
-        .with_identity(chain_key, packet_key)
-        .with_config(config)
-        .with_safe_module(&safe_address, &module_address)
-        .with_chain_api(move |_ctx| chain_connector)
-        .with_peer_discovery_tx(peer_discovery_tx)
-        .with_graph(move |_ctx| graph)
-        .with_network(move |ctx| {
-            Box::pin(async move {
-                let multiaddresses = vec![
-                    (&ctx.cfg.host)
-                        .try_into()
-                        .expect("host config must be a valid multiaddress"),
-                ];
-                let nb = HoprLibp2pNetworkBuilder::new(
-                    peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
-                );
-                nb.build(
-                    &ctx.packet_key,
-                    multiaddresses,
-                    "/hopr/mix/1.1.0",
-                    ctx.cfg.protocol.transport.prefer_local_addresses,
-                )
-                .await
-                .expect("network must be constructible")
-            })
-        })
-        .with_cover_traffic(move |ctx| {
-            hopr_ct_full_network::FullNetworkDiscovery::new(*ctx.packet_key.public(), prober_cfg, graph_for_ct)
-        });
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    );
 
     #[cfg(feature = "session-server")]
     let node = builder
