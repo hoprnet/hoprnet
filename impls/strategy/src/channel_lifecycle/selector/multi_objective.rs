@@ -206,7 +206,7 @@ impl Selector for MultiObjectiveSelector {
         let k = self.cfg.k_floor;
         let limit = self.cfg.open_per_tick.min(ctx.deficit);
 
-        // Score all candidates by utility (without anonymity penalty) for fill-k ordering.
+        // Score all candidates by final score (utility − anonymity penalty) for fill-k ordering.
         let mut all_scored: Vec<(&OpenCandidate, f64)> = ctx
             .open_candidates
             .iter()

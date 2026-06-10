@@ -825,16 +825,17 @@ where
         };
 
         // Fetch balances concurrently (≤ 8 in-flight, 500 ms timeout per peer).
-        let fetch_timeout = std::time::Duration::from_millis(500);
+        let fetch_timeout = futures_time::time::Duration::from_millis(500);
         let raw_scores: HashMap<Address, f64> = futures::stream::iter(addresses)
             .map(|addr| {
                 let safe_addr = safe_map.get(&addr).copied();
                 let chain = chain.clone();
                 async move {
+                    use futures_time::future::FutureExt as _;
                     let Some(safe_addr) = safe_addr else {
                         return (addr, 0.0_f64);
                     };
-                    let result = tokio::time::timeout(fetch_timeout, chain.balance::<WxHOPR, _>(safe_addr)).await;
+                    let result = chain.balance::<WxHOPR, _>(safe_addr).timeout(fetch_timeout).await;
                     let amount = match result {
                         Ok(Ok(bal)) => bal.amount().low_u128() as f64,
                         Ok(Err(e)) => {
@@ -907,6 +908,8 @@ where
                 let mean = latencies_ms.iter().sum::<f64>() / n;
                 let variance = latencies_ms.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
                 METRIC_LATENCY_VARIANCE_MS.set(variance);
+            } else {
+                METRIC_LATENCY_VARIANCE_MS.set(0.0);
             }
 
             // Distinct subnet count.
@@ -929,10 +932,16 @@ where
             use super::METRIC_SCORE_AXIS;
 
             let Some(mo_cfg) = self.cfg.selector.multi_objective_config() else {
+                for axis in &["latency", "trust", "stake", "anon_penalty"] {
+                    METRIC_SCORE_AXIS.set(&[axis], 0.0);
+                }
                 return;
             };
 
             if ctx.open_candidates.is_empty() {
+                for axis in &["latency", "trust", "stake", "anon_penalty"] {
+                    METRIC_SCORE_AXIS.set(&[axis], 0.0);
+                }
                 return;
             }
 
