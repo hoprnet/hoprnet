@@ -13,6 +13,8 @@
 //! `(latency, subnet)` cell already is among open channels — penalising dense
 //! cells on open (avoid clustering) and favouring them on close (prune first).
 
+use std::collections::{HashMap, HashSet};
+
 use async_trait::async_trait;
 use hopr_api::types::{crypto::prelude::OffchainPublicKey, internal::prelude::ChannelId, primitive::prelude::Address};
 use tracing::debug;
@@ -21,6 +23,7 @@ use super::{
     CloseCandidate, OpenCandidate, Selector, SelectorContext, SignalSet,
     bucket::{BucketCell, LatencyBucket},
     default::DefaultSelector,
+    subnet::SubnetBucket,
 };
 use crate::channel_lifecycle::config::MultiObjectiveSelectorConfig;
 
@@ -113,10 +116,31 @@ impl Selector for MultiObjectiveSelector {
     }
 
     async fn select_closes(&self, ctx: &SelectorContext<'_>) -> Vec<ChannelId> {
+        let k = self.cfg.k_floor;
+
         let mut scored: Vec<(&CloseCandidate, f64)> = ctx
             .close_candidates
             .iter()
             .filter(|c| DefaultSelector::should_close(c, ctx.cfg, ctx.start_epoch_elapsed))
+            .filter(|c| {
+                // K-floor veto: refuse to close the sole occupant of any known cell.
+                // Unknown-subnet channels are never vetoed by this guard.
+                if let Some(cell) = ctx.bucket_view.cell_for(c.channel.get_id()) {
+                    if matches!(cell.1, SubnetBucket::Unknown) {
+                        return true;
+                    }
+                    let count = ctx.bucket_view.cell_count(cell);
+                    if count <= 1 {
+                        debug!(
+                            dest = %c.channel.destination,
+                            cell = ?cell,
+                            "channel-lifecycle: k-floor veto — sole occupant of bucket cell"
+                        );
+                        return false;
+                    }
+                }
+                true
+            })
             .map(|c| {
                 let score = Self::final_score_close(c, ctx, &self.cfg);
                 (c, score)
@@ -126,48 +150,126 @@ impl Selector for MultiObjectiveSelector {
         // Sort ascending: lowest score = highest close priority
         scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let result: Vec<ChannelId> = scored
-            .iter()
-            .take(self.cfg.close_per_tick)
-            .map(|(c, score)| {
-                debug!(
-                    dest = %c.channel.destination,
-                    score,
-                    "channel-lifecycle: multi-objective close candidate"
-                );
-                *c.channel.get_id()
-            })
-            .collect();
+        // Simulate closes and enforce k-floor: if closing a channel would leave its cell
+        // with zero occupants (among the channels NOT yet scheduled for close), veto it.
+        let mut simulated_counts: HashMap<BucketCell, usize> = HashMap::new();
+        for c in ctx.close_candidates.iter() {
+            if let Some(cell) = ctx.bucket_view.cell_for(c.channel.get_id()) {
+                *simulated_counts.entry(cell.clone()).or_insert(0) += 1;
+            }
+        }
 
+        let mut result = Vec::new();
+        for (c, score) in &scored {
+            if result.len() >= self.cfg.close_per_tick {
+                break;
+            }
+            let id = c.channel.get_id();
+            if let Some(cell) = ctx
+                .bucket_view
+                .cell_for(id)
+                .filter(|cell| !matches!(cell.1, SubnetBucket::Unknown))
+            {
+                let remaining = simulated_counts.get(cell).copied().unwrap_or(0);
+                if remaining <= k {
+                    // This cell is at or below floor; closing would breach it.
+                    continue;
+                }
+                *simulated_counts.entry(cell.clone()).or_insert(1) -= 1;
+            }
+            debug!(
+                dest = %c.channel.destination,
+                score,
+                "channel-lifecycle: multi-objective close candidate"
+            );
+            result.push(*id);
+        }
         result
     }
 
     async fn select_opens(&self, ctx: &SelectorContext<'_>) -> Vec<(Address, OffchainPublicKey)> {
-        let mut scored: Vec<(&OpenCandidate, f64)> = ctx
+        let k = self.cfg.k_floor;
+        let limit = self.cfg.open_per_tick.min(ctx.deficit);
+
+        // Score all candidates by utility (without anonymity penalty) for fill-k ordering.
+        let mut all_scored: Vec<(&OpenCandidate, f64)> = ctx
             .open_candidates
             .iter()
-            .map(|c| {
-                let score = Self::final_score_open(c, ctx, &self.cfg);
-                (c, score)
-            })
+            .map(|c| (c, Self::final_score_open(c, ctx, &self.cfg)))
             .collect();
+        all_scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        // Sort descending: highest score = highest open priority
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut result: Vec<(Address, OffchainPublicKey)> = Vec::new();
+        let mut picked: HashSet<Address> = HashSet::new();
 
-        let take = self.cfg.open_per_tick.min(ctx.deficit);
-        scored
-            .iter()
-            .take(take)
-            .map(|(c, score)| {
-                debug!(
-                    addr = %c.addr,
-                    score,
-                    "channel-lifecycle: multi-objective open candidate"
+        // Stage 1 — Fill-k sweep: for each (latency, subnet) cell with count < k_floor,
+        // force-pick the highest-utility candidate that would land in that cell.
+        // Unknown-subnet candidates are excluded from the floor enforcement.
+        if k > 0 {
+            // Track cells we've already attempted to fill this sweep to avoid double-filling.
+            let mut attempted_cells: HashSet<BucketCell> = HashSet::new();
+            // Simulate how many times each cell will be filled as we pick.
+            let mut fill_counts: HashMap<BucketCell, usize> = HashMap::new();
+
+            for (c, _score) in &all_scored {
+                if result.len() >= limit {
+                    break;
+                }
+                if matches!(c.subnet, SubnetBucket::Unknown) {
+                    continue;
+                }
+                let cell = BucketCell(
+                    LatencyBucket::from_latency(c.edge_info.average_latency),
+                    c.subnet.clone(),
                 );
-                (c.addr, c.offchain_key)
-            })
-            .collect()
+                if attempted_cells.contains(&cell) {
+                    continue;
+                }
+                attempted_cells.insert(cell.clone());
+
+                let existing = ctx.bucket_view.cell_count(&cell);
+                let already_filling = fill_counts.get(&cell).copied().unwrap_or(0);
+                if existing + already_filling < k {
+                    // Pick the first (highest-utility) candidate in this underrepresented cell.
+                    if let Some((candidate, score)) = all_scored.iter().find(|(c2, _)| {
+                        !picked.contains(&c2.addr)
+                            && BucketCell(
+                                LatencyBucket::from_latency(c2.edge_info.average_latency),
+                                c2.subnet.clone(),
+                            ) == cell
+                    }) {
+                        debug!(
+                            addr = %candidate.addr,
+                            score,
+                            cell = ?cell,
+                            "channel-lifecycle: fill-k sweep open"
+                        );
+                        picked.insert(candidate.addr);
+                        *fill_counts.entry(cell).or_insert(0) += 1;
+                        result.push((candidate.addr, candidate.offchain_key));
+                    }
+                }
+            }
+        }
+
+        // Stage 2 — Utility ranking: fill remaining slots from highest final_score desc.
+        for (c, score) in &all_scored {
+            if result.len() >= limit {
+                break;
+            }
+            if picked.contains(&c.addr) {
+                continue;
+            }
+            debug!(
+                addr = %c.addr,
+                score,
+                "channel-lifecycle: multi-objective open candidate"
+            );
+            picked.insert(c.addr);
+            result.push((c.addr, c.offchain_key));
+        }
+
+        result
     }
 }
 
@@ -349,5 +451,117 @@ mod tests {
         assert_eq!(opens.len(), 2);
         // Dispersed profile has high w_anon — empty-bucket peer should rank first
         assert_eq!(opens[0].0, addr2);
+    }
+
+    // ── PR4: k-floor tests ───────────────────────────────────────────────────
+
+    /// fill-k sweep: candidate in an underrepresented cell gets picked even when
+    /// its final_score is lower than a candidate in an already-populated cell.
+    #[tokio::test]
+    async fn fill_k_forces_underrepresented_cell_first() {
+        use hopr_api::types::internal::prelude::ChannelId;
+        use std::collections::HashMap;
+
+        // Two candidates: one in an already-populated cell (subnet 1, count=2),
+        // one in an empty cell (subnet 2, count=0).  LowLatency k_floor=2, but
+        // cell 1 already has 2 → floor satisfied; cell 2 has 0 → needs filling.
+        // Even though the subnet-1 candidate has higher latency-utility, the sweep
+        // should pick the subnet-2 candidate first.
+
+        // Build bucket_view with 2 channels in cell (Fast, subnet 1)
+        let cell_1 = BucketCell(LatencyBucket::Fast, SubnetBucket::V4Prefix([1, 0, 0]));
+        let existing_cells: HashMap<ChannelId, BucketCell> =
+            (0u8..2).map(|i| (ChannelId::create(&[&[i]]), cell_1.clone())).collect();
+        let bucket_view = BucketView::new(existing_cells);
+
+        // Candidate A: subnet 1 (already 2 in bucket → at k_floor)
+        // Candidate B: subnet 2 (0 in bucket → below k_floor)
+        let a = mk_candidate(addr(1), offchain_key(1), Some(50), 0.95, 0.9, 1); // high utility, cell at floor
+        let b = mk_candidate(addr(2), offchain_key(2), Some(50), 0.3, 0.1, 2); // low utility, cell below floor
+
+        let mut cfg = MultiObjectiveSelectorConfig::low_latency(); // k_floor=2
+        cfg.open_per_tick = 2;
+        let sel = mk_selector(cfg);
+        let lc_cfg = ChannelLifecycleConfig::default();
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 2,
+            open_candidates: &[a.clone(), b.clone()],
+            close_candidates: &[],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view,
+            stake_view: StakeView::empty(),
+        };
+
+        let opens = sel.select_opens(&ctx).await;
+        assert_eq!(opens.len(), 2);
+        // Fill-k sweep must pick b first (its cell is below k_floor)
+        assert_eq!(
+            opens[0].0,
+            addr(2),
+            "fill-k should pick the underrepresented cell first"
+        );
+    }
+
+    /// close veto: sole occupant of a cell must NOT be returned as a close target.
+    #[tokio::test]
+    async fn k_floor_veto_blocks_sole_occupant_close() {
+        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelId, ChannelStatus};
+        use hopr_api::types::primitive::prelude::HoprBalance;
+        use std::collections::HashMap;
+        use std::time::Duration;
+
+        let dest = addr(5);
+
+        // Build the channel first so we can get the correct channel ID.
+        let ch = ChannelEntry::builder()
+            .between(addr(0), dest)
+            .balance(HoprBalance::new_base(1))
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+
+        // Populate bucket_view with the channel's actual ID.
+        let unique_cell = BucketCell(LatencyBucket::Fast, SubnetBucket::V4Prefix([5, 0, 0]));
+        let mut bucket_cells: HashMap<ChannelId, BucketCell> = HashMap::new();
+        bucket_cells.insert(*ch.get_id(), unique_cell);
+        let bucket_view = BucketView::new(bucket_cells);
+
+        // Make the channel look like it should_close: balance drained
+        let candidate = crate::channel_lifecycle::selector::CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(5)),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.0),
+                last_update: Duration::from_secs(9999),
+                average_latency: Some(Duration::from_millis(50)),
+                probe_success_rate: 0.0,
+                ack_rate: Some(0.0),
+            },
+            ticket_score: 0.0,
+        };
+
+        let mut mo_cfg = MultiObjectiveSelectorConfig::dispersed(); // k_floor=4
+        mo_cfg.close_per_tick = 4;
+        let sel = mk_selector(mo_cfg);
+
+        let mut lc_cfg = ChannelLifecycleConfig::default();
+        lc_cfg.closure.close_below_quality_score = 1.0; // force should_close=true for the candidate
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view,
+            stake_view: StakeView::empty(),
+        };
+
+        let closes = sel.select_closes(&ctx).await;
+        assert!(closes.is_empty(), "sole-occupant channel must not be closed");
     }
 }

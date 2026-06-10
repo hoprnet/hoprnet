@@ -278,6 +278,10 @@ pub struct MultiObjectiveSelectorConfig {
     pub open_per_tick: usize,
     /// Maximum number of closes initiated per strategy tick.
     pub close_per_tick: usize,
+    /// Minimum number of distinct `(latency, subnet)` cells that must be populated among open
+    /// channels.  The open pass fills underrepresented cells first; the close pass vetoes closing
+    /// the sole occupant of any cell.  `Unknown` subnet peers are excluded from the floor.
+    pub k_floor: usize,
 }
 
 impl MultiObjectiveSelectorConfig {
@@ -286,6 +290,7 @@ impl MultiObjectiveSelectorConfig {
             weights: SelectorWeights::new(0.70, 0.20, 0.05, 0.05),
             open_per_tick: 4,
             close_per_tick: 4,
+            k_floor: 2,
         }
     }
 
@@ -294,6 +299,7 @@ impl MultiObjectiveSelectorConfig {
             weights: SelectorWeights::new(0.35, 0.30, 0.15, 0.20),
             open_per_tick: 2,
             close_per_tick: 2,
+            k_floor: 3,
         }
     }
 
@@ -302,6 +308,7 @@ impl MultiObjectiveSelectorConfig {
             weights: SelectorWeights::new(0.20, 0.20, 0.10, 0.50),
             open_per_tick: 2,
             close_per_tick: 2,
+            k_floor: 4,
         }
     }
 
@@ -310,6 +317,7 @@ impl MultiObjectiveSelectorConfig {
             weights: SelectorWeights::new(0.30, 0.30, 0.30, 0.10),
             open_per_tick: 1,
             close_per_tick: 1,
+            k_floor: 2,
         }
     }
 }
