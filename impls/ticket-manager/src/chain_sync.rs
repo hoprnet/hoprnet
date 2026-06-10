@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use hopr_api::chain::{ChannelSelector, ChainReadChannelOperations};
+use hopr_api::chain::{ChainReadChannelOperations, ChannelSelector};
 
 use crate::{HoprTicketFactory, HoprTicketManager, RedbStore, RedbTicketQueue, TicketManagerError};
 
@@ -64,8 +64,7 @@ where
         .stream_channels(ChannelSelector::default().with_source(me))
         .map_err(|e| TicketManagerError::Other(anyhow::anyhow!("failed to stream outgoing channels: {e}")))?;
 
-    let (incoming, outgoing): (Vec<_>, Vec<_>) =
-        futures::join!(incoming_stream.collect(), outgoing_stream.collect());
+    let (incoming, outgoing): (Vec<_>, Vec<_>) = futures::join!(incoming_stream.collect(), outgoing_stream.collect());
 
     manager.sync_from_incoming_channels(&incoming)?;
     factory.sync_from_outgoing_channels(&outgoing)?;
