@@ -62,6 +62,7 @@ pub use config::*;
 
 mod events;
 mod pipeline;
+pub mod selector;
 mod strategy;
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
@@ -75,6 +76,7 @@ use hopr_api::{
     },
 };
 use parking_lot::Mutex;
+use selector::Selector;
 pub use strategy::ChannelLifecycleStrategy;
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -125,6 +127,11 @@ struct PeerAddrCache {
 struct ChannelLifecycleStrategyInner<N> {
     cfg: ChannelLifecycleConfig,
     node: Arc<N>,
+    /// Pluggable selection policy.  Decides which peers to open channels with
+    /// and which open channels to retire.  Pipeline invariants (population
+    /// floor, concurrent-action caps, safe-balance budget) are enforced by the
+    /// pipeline regardless of the selector's choices.
+    selector: Arc<dyn Selector>,
     /// Destination addresses for channels currently being opened.
     open_in_flight: Arc<DashSet<Address>>,
     /// Channel IDs with an in-flight funding transaction.

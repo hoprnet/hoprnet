@@ -27,7 +27,10 @@ use hopr_api::{
 };
 use tracing::{debug, warn};
 
-use super::{ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache};
+use super::{
+    ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache,
+    selector::{CloseCandidate, OpenCandidate, PeerEdgeInfo, SelectorContext},
+};
 use crate::errors::StrategyError;
 
 /// TTL for the cached peer-id → (offchain key, chain address) map.  On-chain
@@ -110,42 +113,20 @@ where
             + self.finalize_in_flight.len()
     }
 
-    /// Composite quality score for a peer, blending the graph edge score with
-    /// a normalised ticket-activity signal.
-    ///
-    /// `max_activity` is the maximum ticket-activity value across all peers,
-    /// computed once per tick to avoid O(N×M) iteration.  Callers must floor
-    /// it at `1` so the division below cannot produce NaN.
-    fn peer_score_for(&self, peer_offchain: &OffchainPublicKey, dest_addr: &Address, max_activity: u64) -> f64 {
+    /// Fetches pre-computed graph edge information for `peer_offchain`.
+    /// Returns `None` edge_score when no edge record exists.
+    fn peer_edge_info(&self, peer_offchain: &OffchainPublicKey) -> PeerEdgeInfo {
         let my_key = self.node.graph().identity();
-        let edge_score = self
-            .node
-            .graph()
-            .edge(my_key, peer_offchain)
-            .map(|e| e.score())
-            .unwrap_or(0.0);
-
-        let ticket_delta = self.peer_ticket_activity.get(dest_addr).map(|v| *v).unwrap_or(0);
-        let ticket_score = (ticket_delta as f64) / (max_activity.max(1) as f64);
-
-        self.cfg.eligibility.peer_quality_weight * edge_score
-            + self.cfg.eligibility.ticket_activity_weight * ticket_score
-    }
-
-    /// Returns `true` when the graph has at least one observation for the edge
-    /// `me → peer` (i.e. `last_update > Duration::ZERO`).
-    ///
-    /// `EdgeObservableRead::last_update()` is `Duration::ZERO` for edges that
-    /// have never received any `EdgeWeightType` record.  Any record —
-    /// `Immediate`, `Intermediate`, `Connected`, `Capacity`, or
-    /// `ImmediateProtocolConformance` — counts as "probing established."
-    fn has_probing_data(&self, peer_offchain: &OffchainPublicKey) -> bool {
-        let my_key = self.node.graph().identity();
-        self.node
-            .graph()
-            .edge(my_key, peer_offchain)
-            .map(|e| e.last_update() > Duration::ZERO)
-            .unwrap_or(false)
+        match self.node.graph().edge(my_key, peer_offchain) {
+            Some(e) => PeerEdgeInfo {
+                edge_score: Some(e.score()),
+                last_update: e.last_update(),
+            },
+            None => PeerEdgeInfo {
+                edge_score: None,
+                last_update: Duration::ZERO,
+            },
+        }
     }
 
     /// Returns `true` if the channel should be proactively funded before the
@@ -477,7 +458,7 @@ where
         );
 
         // Computed once here so close and open passes don't each iterate all
-        // activity.  Floored at 1 to keep `peer_score_for` from dividing by 0.
+        // activity.  Floored at 1 so ticket-score division cannot produce NaN.
         let max_activity: u64 = self
             .peer_ticket_activity
             .iter()
@@ -524,77 +505,46 @@ where
             );
         }
 
-        // ── 3. Close pass ─────────────────────────────────────────────────────
-        if self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period {
-            let mut close_count = self.close_in_flight.len();
-            debug!(
-                in_flight = close_count,
-                open = open_count,
-                min = self.cfg.population.min_open_channels,
-                "channel-lifecycle: close pass"
-            );
+        // ── Selector context ─────────────────────────────────────────────────
+        // Build pre-processed data for the pluggable selector.  Eligibility
+        // hard-gates (allowlist / blocklist / cooldown / in-flight / connected)
+        // are applied here so every selector inherits them.  The selector only
+        // ranks and filters further by its own policy.
 
-            for ch in &open_channels {
-                if close_count >= self.cfg.closure.close_max_concurrent {
-                    break;
+        let close_candidates: Vec<CloseCandidate> = open_channels
+            .iter()
+            .map(|ch| {
+                let offchain_key = addr_to_key.get(&ch.destination).copied();
+                let edge_info = offchain_key
+                    .as_ref()
+                    .map(|pk| self.peer_edge_info(pk))
+                    .unwrap_or(PeerEdgeInfo {
+                        edge_score: None,
+                        last_update: Duration::ZERO,
+                    });
+                let ticket_score = self
+                    .peer_ticket_activity
+                    .get(&ch.destination)
+                    .map(|v| *v as f64)
+                    .unwrap_or(0.0)
+                    / (max_activity as f64);
+                CloseCandidate {
+                    channel: **ch,
+                    offchain_key,
+                    edge_info,
+                    ticket_score,
                 }
-                if self.close_in_flight.contains(ch.get_id()) || self.fund_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                let remaining_open = open_count.saturating_sub(close_count);
-                if remaining_open <= self.cfg.population.min_open_channels {
-                    break;
-                }
+            })
+            .collect();
 
-                if self.should_close(ch, &addr_to_key, max_activity) && self.try_close_channel(ch) {
-                    close_count += 1;
-                }
-            }
-        }
-
-        // ── 4. Finalize pass ──────────────────────────────────────────────────
-        if self.cfg.finalizer.enabled {
-            let overdue = self.closure_notice_period().await + self.cfg.finalizer.max_closure_overdue;
-            let mut finalize_count = self.finalize_in_flight.len();
-
-            for ch in &all_channels {
-                if finalize_count >= self.cfg.finalizer.finalize_max_concurrent {
-                    break;
-                }
-                if self.finalize_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                if let ChannelStatus::PendingToClose(closure_time) = ch.status {
-                    let elapsed = closure_time.elapsed().unwrap_or(Duration::ZERO);
-                    if elapsed >= overdue && self.try_finalize_channel(ch) {
-                        finalize_count += 1;
-                    }
-                }
-            }
-        }
-
-        // ── 5. Open pass ──────────────────────────────────────────────────────
-        let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
-        debug!(
-            deficit,
-            open = open_count,
-            target = self.cfg.population.target_open_channels,
-            "channel-lifecycle: open pass"
-        );
-
-        if deficit == 0 {
-            return Ok(());
-        }
-
-        if self.cfg.funding.stop_when_unfunded && safe_remaining < self.cfg.funding.initial_balance {
-            debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
-            return Ok(());
-        }
+        // Index for the close pass: ChannelId → entry (selector returns IDs).
+        let channel_by_id: HashMap<ChannelId, &ChannelEntry> =
+            open_channels.iter().map(|ch| (*ch.get_id(), *ch)).collect();
 
         let existing_dests: HashSet<Address> = all_channels.iter().map(|c| c.destination).collect();
         let connected = self.node.network_view().connected_peers();
 
-        let mut candidates: Vec<(Address, OffchainPublicKey, f64)> = connected
+        let open_candidates: Vec<OpenCandidate> = connected
             .into_iter()
             .filter_map(|peer_id| {
                 let &(offchain_key, chain_addr) = peer_addr_map.get(&peer_id)?;
@@ -631,98 +581,123 @@ where
                     return None;
                 }
 
-                let score = self.peer_score_for(&offchain_key, &chain_addr, max_activity);
-                if score < self.cfg.eligibility.min_peer_quality_score {
+                let edge_info = self.peer_edge_info(&offchain_key);
+                let ticket_delta = self.peer_ticket_activity.get(&chain_addr).map(|v| *v).unwrap_or(0);
+                let ticket_score = (ticket_delta as f64) / (max_activity as f64);
+
+                // Composite-score eligibility gate — same formula as today's
+                // `DefaultSelector`, kept here so the threshold acts as a hard
+                // filter that all selectors inherit.
+                let composite = self.cfg.eligibility.peer_quality_weight * edge_info.edge_score.unwrap_or(0.0)
+                    + self.cfg.eligibility.ticket_activity_weight * ticket_score;
+                if composite < self.cfg.eligibility.min_peer_quality_score {
                     return None;
                 }
 
-                Some((chain_addr, offchain_key, score))
+                Some(OpenCandidate {
+                    addr: chain_addr,
+                    offchain_key,
+                    edge_info,
+                    ticket_score,
+                })
             })
             .collect();
 
-        candidates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
-        candidates.truncate(deficit);
+        let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
+
+        let selector_ctx = SelectorContext {
+            cfg: &self.cfg,
+            deficit,
+            open_candidates: &open_candidates,
+            close_candidates: &close_candidates,
+            start_epoch_elapsed: self.start_epoch.elapsed(),
+        };
+
+        let closes_ranked = self.selector.select_closes(&selector_ctx).await;
+        let opens_ranked = self.selector.select_opens(&selector_ctx).await;
+
+        // ── 3. Close pass ─────────────────────────────────────────────────────
+        if self.start_epoch.elapsed() >= self.cfg.restart.startup_close_grace_period {
+            let mut close_count = self.close_in_flight.len();
+            debug!(
+                in_flight = close_count,
+                open = open_count,
+                min = self.cfg.population.min_open_channels,
+                "channel-lifecycle: close pass"
+            );
+
+            for channel_id in &closes_ranked {
+                if close_count >= self.cfg.closure.close_max_concurrent {
+                    break;
+                }
+                let remaining_open = open_count.saturating_sub(close_count);
+                if remaining_open <= self.cfg.population.min_open_channels {
+                    break;
+                }
+                if let Some(ch) = channel_by_id.get(channel_id) {
+                    if self.close_in_flight.contains(ch.get_id()) || self.fund_in_flight.contains(ch.get_id()) {
+                        continue;
+                    }
+                    if self.try_close_channel(ch) {
+                        close_count += 1;
+                    }
+                }
+            }
+        }
+
+        // ── 4. Finalize pass ──────────────────────────────────────────────────
+        if self.cfg.finalizer.enabled {
+            let overdue = self.closure_notice_period().await + self.cfg.finalizer.max_closure_overdue;
+            let mut finalize_count = self.finalize_in_flight.len();
+
+            for ch in &all_channels {
+                if finalize_count >= self.cfg.finalizer.finalize_max_concurrent {
+                    break;
+                }
+                if self.finalize_in_flight.contains(ch.get_id()) {
+                    continue;
+                }
+                if let ChannelStatus::PendingToClose(closure_time) = ch.status {
+                    let elapsed = closure_time.elapsed().unwrap_or(Duration::ZERO);
+                    if elapsed >= overdue && self.try_finalize_channel(ch) {
+                        finalize_count += 1;
+                    }
+                }
+            }
+        }
+
+        // ── 5. Open pass ──────────────────────────────────────────────────────
         debug!(
-            candidates = candidates.len(),
+            deficit,
+            open = open_count,
+            target = self.cfg.population.target_open_channels,
+            "channel-lifecycle: open pass"
+        );
+
+        if deficit == 0 {
+            return Ok(());
+        }
+
+        if self.cfg.funding.stop_when_unfunded && safe_remaining < self.cfg.funding.initial_balance {
+            debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
+            return Ok(());
+        }
+
+        debug!(
+            candidates = opens_ranked.len(),
             deficit, "channel-lifecycle: open pass candidates"
         );
 
-        for (addr, ..) in candidates {
+        for (addr, _) in opens_ranked.iter().take(deficit) {
             if safe_remaining < self.cfg.funding.initial_balance {
                 break;
             }
-            if let Some(committed) = self.try_open_channel(addr, self.cfg.funding.initial_balance) {
+            if let Some(committed) = self.try_open_channel(*addr, self.cfg.funding.initial_balance) {
                 safe_remaining -= committed;
             }
         }
 
         Ok(())
-    }
-
-    fn should_close(
-        &self,
-        ch: &ChannelEntry,
-        addr_to_key: &HashMap<Address, OffchainPublicKey>,
-        max_activity: u64,
-    ) -> bool {
-        if ch.balance <= self.cfg.closure.close_when_drained_below {
-            debug!(
-                dest = %ch.destination,
-                balance = %ch.balance,
-                threshold = %self.cfg.closure.close_when_drained_below,
-                reason = "balance_drained",
-                "channel-lifecycle: close candidate"
-            );
-            return true;
-        }
-
-        let dest = ch.destination;
-        if let Some(pk) = addr_to_key.get(&dest) {
-            // Gate: skip all graph-derived close reasons until the strategy has
-            // received at least one observation for this peer.  Without any
-            // graph data `peer_score_for` returns 0.0, which would immediately
-            // retire every unprobed channel — including channels that were
-            // opened before this strategy instance started.
-            if !self.has_probing_data(pk) {
-                tracing::trace!(%dest, "channel-lifecycle: skipping close evaluation — no graph observations yet");
-                return false;
-            }
-
-            let score = self.peer_score_for(pk, &dest, max_activity);
-            if score < self.cfg.closure.close_below_quality_score {
-                debug!(
-                    %dest,
-                    score,
-                    threshold = self.cfg.closure.close_below_quality_score,
-                    reason = "low_quality_score",
-                    "channel-lifecycle: close candidate"
-                );
-                return true;
-            }
-
-            let my_key = self.node.graph().identity();
-            if let Some(edge) = self.node.graph().edge(my_key, pk) {
-                let last_update = edge.last_update();
-                let stale = last_update > self.cfg.closure.close_when_peer_unseen_for;
-                // Treat "edge updated within strategy lifetime" as "peer
-                // observed since start"; this differs from — and complements —
-                // the outer `startup_close_grace_period` time-based guard.
-                let observed_since_start = last_update < self.start_epoch.elapsed();
-                let guard_passed = !self.cfg.eligibility.require_observed_since_start || observed_since_start;
-                if stale && guard_passed {
-                    debug!(
-                        %dest,
-                        last_update_secs = last_update.as_secs(),
-                        unseen_threshold_secs = self.cfg.closure.close_when_peer_unseen_for.as_secs(),
-                        reason = "peer_stale",
-                        "channel-lifecycle: close candidate"
-                    );
-                    return true;
-                }
-            }
-        }
-
-        false
     }
 
     /// Return the cached peer-id → (offchain key, chain address) map,
@@ -1323,6 +1298,7 @@ mod tests {
             ChannelLifecycleStrategyInner {
                 cfg,
                 node: Arc::new(()),
+                selector: Arc::new(selector::DefaultSelector),
                 open_in_flight: Arc::new(DashSet::new()),
                 fund_in_flight: Arc::new(DashSet::new()),
                 close_in_flight: Arc::new(DashSet::new()),
@@ -1447,6 +1423,7 @@ mod tests {
             let old = ChannelLifecycleStrategyInner {
                 cfg: ChannelLifecycleConfig::default(),
                 node: Arc::new(ChainNode::new(Arc::clone(&connector))),
+                selector: Arc::new(selector::DefaultSelector),
                 open_in_flight: Arc::new(DashSet::new()),
                 fund_in_flight: Arc::new(DashSet::new()),
                 close_in_flight: Arc::new(DashSet::new()),
@@ -1468,6 +1445,7 @@ mod tests {
         let fresh = ChannelLifecycleStrategyInner {
             cfg: ChannelLifecycleConfig::default(),
             node: Arc::new(ChainNode::new(Arc::clone(&connector))),
+            selector: Arc::new(selector::DefaultSelector),
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),
@@ -1538,6 +1516,7 @@ mod tests {
         ChannelLifecycleStrategyInner {
             cfg,
             node: Arc::new(ChainNode::with_graph(connector, graph)),
+            selector: Arc::new(selector::DefaultSelector),
             open_in_flight: Arc::new(dashmap::DashSet::new()),
             fund_in_flight: Arc::new(dashmap::DashSet::new()),
             close_in_flight: Arc::new(dashmap::DashSet::new()),
@@ -1753,15 +1732,14 @@ mod tests {
         Ok(())
     }
 
-    /// Gate returns `false` for a peer with no graph observations.
+    /// Gate returns empty list for a peer with no graph observations.
     ///
-    /// Verifies that `should_close` defers all graph-derived close reasons
-    /// when `edge.last_update() == Duration::ZERO` for the destination peer.
+    /// Verifies that the default selector defers all graph-derived close reasons
+    /// when `edge_info.last_update == Duration::ZERO` for the destination peer.
     #[tokio::test]
     async fn should_close_returns_false_for_peer_without_probing_data() -> anyhow::Result<()> {
-        use std::collections::HashMap;
+        use selector::{CloseCandidate, PeerEdgeInfo, Selector as _, SelectorContext};
 
-        // Compute Alice's offchain key using the same derivation BlokliTestStateBuilder uses.
         let alice_pk = {
             use hopr_api::types::crypto::keypairs::Keypair as _;
             let pseudo = hopr_api::types::crypto::types::Hash::create(&[(*ALICE).as_ref()]);
@@ -1769,28 +1747,6 @@ mod tests {
                 .expect("alice offchain key")
                 .public()
         };
-
-        let blokli_sim = BlokliTestStateBuilder::default()
-            .with_generated_accounts(
-                &[&*ALICE, &*BOB],
-                false,
-                XDaiBalance::new_base(1),
-                HoprBalance::new_base(1000),
-            )
-            .with_channels([])
-            .build_dynamic_client([1; Address::SIZE].into());
-        let mut connector =
-            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
-                .await?;
-        connector.connect().await?;
-        let connector = Arc::new(connector);
-
-        // Empty graph — no edge observations for (my_key → alice_pk).
-        let inner = fresh_inner_with_chain_and_graph(
-            ChannelLifecycleConfig::default(),
-            Arc::clone(&connector),
-            Arc::new(StubGraph::default()),
-        );
 
         let ch = ChannelEntry::builder()
             .between(*BOB, *ALICE)
@@ -1800,22 +1756,40 @@ mod tests {
             .epoch(0)
             .build()?;
 
-        let addr_to_key = HashMap::from([(*ALICE, alice_pk)]);
+        // No graph observations → last_update = ZERO.
+        let candidate = CloseCandidate {
+            channel: ch,
+            offchain_key: Some(alice_pk),
+            edge_info: PeerEdgeInfo {
+                edge_score: None,
+                last_update: Duration::ZERO,
+            },
+            ticket_score: 0.0,
+        };
 
+        let ctx = SelectorContext {
+            cfg: &ChannelLifecycleConfig::default(),
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::ZERO,
+        };
+
+        let closes = selector::DefaultSelector.select_closes(&ctx).await;
         assert!(
-            !inner.should_close(&ch, &addr_to_key, 1),
-            "should_close must return false for a peer with no graph observations"
+            closes.is_empty(),
+            "select_closes must return empty for a peer with no graph observations"
         );
         Ok(())
     }
 
-    /// Gate lifts after the first graph observation: `should_close` fires.
+    /// Gate lifts after the first graph observation: the default selector closes the channel.
     ///
-    /// Inserts an edge with `last_update > Duration::ZERO` and `score = 0.0`
-    /// (below `close_below_quality_score = 0.3`) and confirms the close fires.
+    /// Supplies a `CloseCandidate` with `last_update > Duration::ZERO` and `score = 0.0`
+    /// (below `close_below_quality_score = 0.3`) and confirms the channel ID is returned.
     #[tokio::test]
     async fn should_close_returns_true_once_probing_data_arrives() -> anyhow::Result<()> {
-        use std::collections::HashMap;
+        use selector::{CloseCandidate, PeerEdgeInfo, Selector as _, SelectorContext};
 
         let alice_pk = {
             use hopr_api::types::crypto::keypairs::Keypair as _;
@@ -1824,35 +1798,6 @@ mod tests {
                 .expect("alice offchain key")
                 .public()
         };
-        // The graph identity key (mirrors StubGraph::identity()).
-        let my_key = {
-            use hopr_api::types::crypto::keypairs::Keypair as _;
-            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
-                .expect("my key")
-                .public()
-        };
-
-        let blokli_sim = BlokliTestStateBuilder::default()
-            .with_generated_accounts(
-                &[&*ALICE, &*BOB],
-                false,
-                XDaiBalance::new_base(1),
-                HoprBalance::new_base(1000),
-            )
-            .with_channels([])
-            .build_dynamic_client([1; Address::SIZE].into());
-        let mut connector =
-            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
-                .await?;
-        connector.connect().await?;
-        let connector = Arc::new(connector);
-
-        let graph = Arc::new(StubGraph::default());
-        let inner = fresh_inner_with_chain_and_graph(
-            ChannelLifecycleConfig::default(),
-            Arc::clone(&connector),
-            Arc::clone(&graph),
-        );
 
         let ch = ChannelEntry::builder()
             .between(*BOB, *ALICE)
@@ -1862,28 +1807,52 @@ mod tests {
             .epoch(0)
             .build()?;
 
-        let addr_to_key = HashMap::from([(*ALICE, alice_pk)]);
+        let cfg = ChannelLifecycleConfig::default();
 
-        // No observations yet — gate returns false.
-        assert!(
-            !inner.should_close(&ch, &addr_to_key, 1),
-            "should_close must return false before probing data arrives"
-        );
-
-        // Insert an edge with last_update > 0 and score below the close threshold.
-        graph.insert_edge(
-            my_key,
-            alice_pk,
-            StubEdge {
-                last_update: Duration::from_secs(1),
-                score: 0.0, // below close_below_quality_score = 0.3
+        // No observations yet — gate must return false.
+        let no_data = CloseCandidate {
+            channel: ch,
+            offchain_key: Some(alice_pk),
+            edge_info: PeerEdgeInfo {
+                edge_score: None,
+                last_update: Duration::ZERO,
             },
+            ticket_score: 0.0,
+        };
+        let ctx_no_data = SelectorContext {
+            cfg: &cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[no_data],
+            start_epoch_elapsed: Duration::ZERO,
+        };
+        assert!(
+            selector::DefaultSelector.select_closes(&ctx_no_data).await.is_empty(),
+            "select_closes must return empty before probing data arrives"
         );
 
-        // Gate is now lifted; score 0.0 < 0.3 triggers low_quality_score.
-        assert!(
-            inner.should_close(&ch, &addr_to_key, 1),
-            "should_close must return true once probing data arrives with low score"
+        // Edge with last_update > 0 and score below the close threshold.
+        let with_data = CloseCandidate {
+            channel: ch,
+            offchain_key: Some(alice_pk),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.0), // below close_below_quality_score = 0.3
+                last_update: Duration::from_secs(1),
+            },
+            ticket_score: 0.0,
+        };
+        let ctx_with_data = SelectorContext {
+            cfg: &cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[with_data],
+            start_epoch_elapsed: Duration::from_secs(10), // strategy running 10s > last_update 1s
+        };
+        let closes = selector::DefaultSelector.select_closes(&ctx_with_data).await;
+        assert_eq!(
+            closes,
+            vec![*ch.get_id()],
+            "select_closes must return the channel ID once probing data arrives with low score"
         );
         Ok(())
     }

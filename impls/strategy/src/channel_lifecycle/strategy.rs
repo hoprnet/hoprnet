@@ -18,9 +18,8 @@ use hopr_api::{
         ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView,
     },
 };
-use tracing::info;
 
-use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
+use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner, selector::DefaultSelector};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Builder for [`ChannelLifecycleStrategy`].
@@ -62,6 +61,7 @@ impl ChannelLifecycleStrategy {
         Box::new(ChannelLifecycleStrategyInner {
             cfg: self.cfg,
             node,
+            selector: Arc::new(DefaultSelector),
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),
