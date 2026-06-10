@@ -127,6 +127,7 @@ impl HoprBuilderWithIdentity {
             graph_factory: None,
             network_factory: None,
             ct_factory: None,
+            peer_discovery_tx: None,
         }
     }
 }
@@ -149,6 +150,8 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     graph_factory: Option<Factory<Graph>>,
     network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
     ct_factory: Option<Factory<Ct>>,
+    peer_discovery_tx:
+        Option<futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
@@ -157,6 +160,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         self.safe_and_module = Some((*safe, *module));
         self
     }
+
 
     /// Sets the chain API factory.
     pub fn with_chain_api<NewChain>(
@@ -170,6 +174,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -185,6 +190,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: Some(Box::new(f)),
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -203,6 +209,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: Some(Box::new(f)),
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -218,7 +225,21 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: Some(Box::new(f)),
+            peer_discovery_tx: self.peer_discovery_tx,
         }
+    }
+
+    /// Wires the peer-discovery bridge so on-chain [`ChainEvent::Announcement`]s are
+    /// forwarded to the p2p network layer.
+    ///
+    /// Pass the corresponding receiver to the network factory via [`with_network`] so the
+    /// network can dial newly announced peers.
+    pub fn with_peer_discovery_tx(
+        mut self,
+        tx: futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
+    ) -> Self {
+        self.peer_discovery_tx = Some(tx);
+        self
     }
 
     /// Attaches a session server for handling incoming sessions.
@@ -347,6 +368,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
+    let peer_discovery_tx = configured.peer_discovery_tx;
     let ctx = configured.ctx;
     ctx.cfg.validate()?;
 
@@ -600,6 +622,7 @@ where
             own_packet_key,
             ticket_price,
             win_probability,
+            peer_discovery_tx,
         )
         .inspect(|_| {
             tracing::warn!(
