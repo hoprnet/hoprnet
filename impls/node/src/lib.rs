@@ -17,7 +17,7 @@ use {
     futures::StreamExt,
     hopr_chain_connector::api::HoprChainApi,
     hopr_lib::builder::{ChainKeypair, Keypair, OffchainKeypair},
-    hopr_lib::{Hopr, config::HoprLibConfig},
+    hopr_lib::{Hopr, config::HoprLibConfig, errors::HoprLibError},
     hopr_network_graph::{ChannelGraph, SharedChannelGraph},
     hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery},
     validator::Validate,
@@ -94,7 +94,6 @@ fn make_builder<Chain>(
 where
     Chain: HoprChainApi + Clone + Send + Sync + 'static,
 {
-    let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(2048);
     let path_cfg = config.protocol.path_planner;
     let graph: SharedChannelGraph = Arc::new(ChannelGraph::with_edge_params(
         *packet_key.public(),
@@ -110,14 +109,16 @@ where
         .with_config(config)
         .with_safe_module(&safe_address, &module_address)
         .with_chain_api(move |_ctx| chain_connector)
-        .with_peer_discovery_tx(peer_discovery_tx)
         .with_graph(move |_ctx| graph)
         .with_network(move |ctx| {
             Box::pin(async move {
+                let peer_discovery_rx = ctx
+                    .take_peer_discovery_rx()
+                    .ok_or(HoprLibError::BuilderError("peer_discovery_rx already taken"))?;
                 let multiaddresses = vec![
                     (&ctx.cfg.host)
                         .try_into()
-                        .expect("host config must be a valid multiaddress"),
+                        .map_err(HoprLibError::TransportError)?,
                 ];
                 let nb = HoprLibp2pNetworkBuilder::new(
                     peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
@@ -129,7 +130,7 @@ where
                     ctx.cfg.protocol.transport.prefer_local_addresses,
                 )
                 .await
-                .expect("network must be constructible")
+                .map_err(|e| HoprLibError::GeneralError(e.to_string()))
             })
         })
         .with_cover_traffic(move |ctx| {
