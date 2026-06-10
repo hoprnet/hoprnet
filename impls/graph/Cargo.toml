@@ -16,7 +16,7 @@ crate-type = ["rlib"]
 [features]
 default = ["petgraph"]
 all-benchmarks = []
-petgraph = ["dep:petgraph", "dep:indexmap"]
+petgraph = ["dep:petgraph", "dep:indexmap", "dep:rand"]
 graph-api = ["petgraph"]
 
 [dependencies]
@@ -26,6 +26,7 @@ futures = { workspace = true }
 indexmap = { workspace = true, optional = true, features = ["rayon"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, optional = true, features = ["rayon"] }
+rand = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

@@ -12,6 +12,7 @@ use petgraph::{
     Direction::Outgoing,
     visit::{EdgeRef, IntoEdgeReferences, IntoEdgesDirected, NodeCount},
 };
+use rand::seq::SliceRandom;
 
 /// Calculate all simple paths from a source node to any of several target nodes.
 ///
@@ -122,8 +123,10 @@ where
     // list of visited nodes
     let mut visited: IndexSet<G::NodeId, S> = IndexSet::from_iter(Some(from));
     // list of edges from currently exploring path nodes,
-    // last elem is list of edges of last visited node
-    let mut stack = vec![graph.edges_directed(from, Outgoing)];
+    // last elem is a shuffled vec of edges of last visited node
+    let mut initial: Vec<_> = graph.edges_directed(from, Outgoing).collect();
+    initial.shuffle(&mut rand::rng());
+    let mut stack = vec![initial.into_iter()];
     // accumulated cost at each depth level, parallel to visited
     let mut costs: Vec<C> = vec![initial_cost];
 
@@ -163,7 +166,9 @@ where
                 // Expand the search only if within max length and unexplored target nodes remain
                 if (current_nodes < (max_nodes - 1)) && to.iter().any(|n| *n != child && !visited.contains(n)) {
                     visited.insert(child);
-                    stack.push(graph.edges_directed(child, Outgoing));
+                    let mut child_edges: Vec<_> = graph.edges_directed(child, Outgoing).collect();
+                    child_edges.shuffle(&mut rand::rng());
+                    stack.push(child_edges.into_iter());
                     costs.push(new_cost);
                 }
 

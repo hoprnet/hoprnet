@@ -2,16 +2,33 @@ use hopr_api::OffchainPublicKey;
 
 use super::errors::Result;
 
-/// A candidate path paired with its accumulated traversal cost.
+/// A candidate path paired with its accumulated traversal cost and per-path quality metrics.
 ///
-/// The cost is a multiplicative product of per-edge quality scores in
+/// The `cost` is a multiplicative product of per-edge quality scores in
 /// `(0.0, 1.0]` — higher means better quality.
+///
+/// Each aggregate field is `Option<T>`: `None` indicates that at least one edge
+/// along the path lacked the underlying probe data, making the aggregate undefined.
+/// Callers that use these fields for pruning must treat `None` as "unknown" and
+/// preserve such paths rather than discarding them.
 #[derive(Debug, Clone)]
-pub struct PathWithCost {
+pub struct PathWithMetrics {
     /// The path nodes (excluding source): `[intermediates..., dest]`.
     pub path: Vec<OffchainPublicKey>,
     /// Accumulated traversal cost.
     pub cost: f64,
+    /// Sum of per-edge EMA latencies in milliseconds.
+    /// `None` if any edge along the path has no measured latency.
+    pub total_latency_ms: Option<u32>,
+    /// Worst per-edge immediate-probe success rate along the path.
+    /// `None` if no edge has immediate-probe data.
+    pub min_probe_success_rate: Option<f64>,
+    /// Worst per-edge acknowledgment rate along the path.
+    /// `None` if no edge has sent any messages yet.
+    pub min_ack_rate: Option<f64>,
+    /// Smallest known channel capacity along the path.
+    /// `None` if no edge carries channel-capacity data.
+    pub capacity_floor: Option<u128>,
 }
 
 /// Selects multi-hop paths through the network.
@@ -31,14 +48,15 @@ pub struct PathWithCost {
 pub trait PathSelector {
     /// Return **all** candidate paths from `src` to `dest` using `hops` relays.
     ///
-    /// Each returned [`PathWithCost`] contains a path `Vec<OffchainPublicKey>`
+    /// Each returned [`PathWithMetrics`] contains a path `Vec<OffchainPublicKey>`
     /// of length `hops + 1` (`[intermediates..., dest]`; `src` excluded) paired
-    /// with its accumulated traversal cost.
+    /// with its accumulated traversal cost and optional per-path quality aggregates.
     ///
     /// Every returned path must be cycle-free (see trait-level docs).
     ///
     /// Returns `Err` when no paths can be found.
-    fn select_path(&self, src: OffchainPublicKey, dest: OffchainPublicKey, hops: usize) -> Result<Vec<PathWithCost>>;
+    fn select_path(&self, src: OffchainPublicKey, dest: OffchainPublicKey, hops: usize)
+    -> Result<Vec<PathWithMetrics>>;
 }
 
 /// A selector that can run a background path-cache refresh loop.
