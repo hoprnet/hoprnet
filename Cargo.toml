@@ -49,13 +49,13 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.0.1"
-blokli-client = "0.29.0"
+blokli-client = "0.29.1"
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.3.1", features = ["serde"] }
 bytes = "1.11.1"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
-chrono = { version = "0.4.44", default-features = false, features = [
+chrono = { version = "0.4.45", default-features = false, features = [
   "std",
   "clock",
 ] }
