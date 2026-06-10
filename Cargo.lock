@@ -3748,7 +3748,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-reference"
-version = "4.2.2"
+version = "4.2.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3761,6 +3761,7 @@ dependencies = [
  "hopr-lib",
  "hopr-network-graph",
  "hopr-reference",
+ "hopr-session-server-forwarder",
  "hopr-ticket-manager",
  "hopr-transport-p2p",
  "lazy_static",
@@ -3768,14 +3769,27 @@ dependencies = [
  "opentelemetry_sdk",
  "rand 0.10.1",
  "rstest",
- "serde",
- "serde_with",
  "serial_test",
- "smart-default",
  "test-log",
  "tokio",
- "tokio-retry",
  "tokio-util",
+ "tracing",
+ "validator",
+]
+
+[[package]]
+name = "hopr-session-server-forwarder"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "hopr-api",
+ "hopr-lib",
+ "lazy_static",
+ "serde",
+ "serde_with",
+ "smart-default",
+ "tokio",
+ "tokio-retry",
  "tracing",
  "validator",
 ]

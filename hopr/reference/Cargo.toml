@@ -1,6 +1,6 @@
 [package]
 name = "hopr-reference"
-version = "4.2.2"
+version = "4.2.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
 rust-version.workspace = true
@@ -24,14 +24,11 @@ runtime-tokio = [
   "hopr-chain-connector/runtime-tokio",
 ]
 session-server = [
-  "dep:async-trait",
-  "dep:serde",
-  "dep:serde_with",
-  "dep:smart-default",
   "dep:tokio",
-  "dep:tokio-retry",
   "dep:validator",
   "hopr-lib/session-server",
+  "dep:hopr-session-server-forwarder",
+  "hopr-session-server-forwarder/runtime-tokio",
 ]
 session-client = ["hopr-lib/session-client"]
 explicit-path = ["session-client", "hopr-lib/explicit-path"]
@@ -52,6 +49,7 @@ telemetry = [
   "hopr-lib/telemetry",
   "hopr-api/types-telemetry",
   "dep:lazy_static",
+  "hopr-session-server-forwarder?/telemetry",
 ]
 
 [dependencies]
@@ -63,17 +61,14 @@ hex-literal = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
-smart-default = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-serde_with = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
-tokio-retry = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true, optional = true }
 
 hopr-api = { workspace = true }
 hopr-lib = { workspace = true, features = ["utils_parallel"] }
+hopr-session-server-forwarder = { workspace = true, optional = true }
 # impls
 hopr-chain-connector = { workspace = true }
 hopr-ct-full-network = { workspace = true }
