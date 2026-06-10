@@ -48,7 +48,7 @@ pub(super) async fn process_chain_events<C, G>(
                 if let Some(ref mut tx) = peer_discovery_tx {
                     let peer_id: PeerId = account.public_key.into();
                     if let Err(e) = tx.try_send((peer_id, account.get_multiaddrs().to_vec())) {
-                        tracing::warn!(%e, "peer-discovery channel full or closed; announcement dropped");
+                        tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
                     }
                 }
             }
@@ -328,7 +328,6 @@ mod tests {
             Some(tx),
         )
         .await;
-        rx.close();
         rx.collect().await
     }
 

@@ -61,4 +61,3 @@ name = "ticket_manager_bench"
 harness = false
 
 [lib]
-doctest = false

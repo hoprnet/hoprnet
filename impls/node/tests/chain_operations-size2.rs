@@ -6,7 +6,7 @@ use hopr_lib::api::{
         primitive::prelude::{HoprBalance, WxHOPR, XDai, XDaiBalance},
     },
 };
-use hopr_node::testing::fixtures::{
+use hopr_node_assembly::testing::fixtures::{
     ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
     INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, size_2_cluster_fixture as cluster,
 };

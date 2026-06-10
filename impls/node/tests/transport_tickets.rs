@@ -11,7 +11,7 @@ use hopr_lib::{
     api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
     errors::HoprLibError,
 };
-use hopr_node::testing::{
+use hopr_node_assembly::testing::{
     fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
     hopr::ChannelGuard,
     wait_until,

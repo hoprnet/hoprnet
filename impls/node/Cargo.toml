@@ -1,5 +1,5 @@
 [package]
-name = "hopr-node"
+name = "hopr-node-assembly"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -83,7 +83,7 @@ serial_test = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
-hopr-node = { workspace = true, features = ["testing"] }
+hopr-node-assembly = { workspace = true, features = ["testing"] }
 hopr-api = { workspace = true, features = ["types-random"] }
 
 hopr-lib = { workspace = true }

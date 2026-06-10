@@ -3643,7 +3643,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-node"
+name = "hopr-node-assembly"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3656,7 +3656,7 @@ dependencies = [
  "hopr-ct-full-network",
  "hopr-lib",
  "hopr-network-graph",
- "hopr-node",
+ "hopr-node-assembly",
  "hopr-session-server-forwarder",
  "hopr-ticket-manager",
  "hopr-transport-p2p",

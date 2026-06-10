@@ -9,7 +9,7 @@ use hopr_lib::api::{
         primitive::prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
     },
 };
-use hopr_node::testing::{
+use hopr_node_assembly::testing::{
     fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, chain_propagation_delay, size_3_cluster_fixture as cluster},
     hopr::ChannelGuard,
 };

@@ -10,7 +10,7 @@ use hopr_lib::api::{
     node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
     types::primitive::prelude::Address,
 };
-use hopr_node::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
+use hopr_node_assembly::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
