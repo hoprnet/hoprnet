@@ -41,9 +41,9 @@ pub type SharedTicketManager = Arc<HoprTicketManager<RedbStore, RedbTicketQueue>
 
 /// Client-side Blokli options used by the convenience builders in this crate.
 ///
-/// Keep using the hostname-based Blokli URL when setting [`dns_override`]. The
-/// override pins the hostname to a fixed IP address while preserving the
-/// original host for HTTP `Host` headers and TLS SNI.
+/// Keep using the hostname-based Blokli URL when setting
+/// [`BlokliClientOptions::dns_override`]. The override pins the hostname to a
+/// fixed IP address while preserving the original host for HTTP `Host` headers and TLS SNI.
 #[cfg(feature = "runtime-tokio")]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BlokliClientOptions {
