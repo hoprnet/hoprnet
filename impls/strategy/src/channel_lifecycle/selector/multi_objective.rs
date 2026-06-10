@@ -38,18 +38,20 @@ impl MultiObjectiveSelector {
 
     fn latency_score(candidate: &OpenCandidate) -> f64 {
         match LatencyBucket::from_latency(candidate.edge_info.average_latency) {
-            LatencyBucket::Fast => 1.0,
-            LatencyBucket::Medium => 0.75,
-            LatencyBucket::Slow => 0.5,
+            LatencyBucket::VeryFast => 1.0,
+            LatencyBucket::Fast => 0.75,
+            LatencyBucket::Medium => 0.50,
+            LatencyBucket::Slow => 0.25,
             LatencyBucket::VerySlow => 0.0,
         }
     }
 
     fn latency_score_from_close(candidate: &CloseCandidate) -> f64 {
         match LatencyBucket::from_latency(candidate.edge_info.average_latency) {
-            LatencyBucket::Fast => 1.0,
-            LatencyBucket::Medium => 0.75,
-            LatencyBucket::Slow => 0.5,
+            LatencyBucket::VeryFast => 1.0,
+            LatencyBucket::Fast => 0.75,
+            LatencyBucket::Medium => 0.50,
+            LatencyBucket::Slow => 0.25,
             LatencyBucket::VerySlow => 0.0,
         }
     }
@@ -436,8 +438,8 @@ mod tests {
         let addr1 = addr(10);
         let addr2 = addr(20);
 
-        let c1 = mk_candidate(addr1, offchain_key(10), Some(50), 0.8, 0.5, 1); // crowded bucket
-        let c2 = mk_candidate(addr2, offchain_key(20), Some(50), 0.8, 0.5, 2); // empty bucket
+        let c1 = mk_candidate(addr1, offchain_key(10), Some(60), 0.8, 0.5, 1); // crowded bucket
+        let c2 = mk_candidate(addr2, offchain_key(20), Some(60), 0.8, 0.5, 2); // empty bucket
 
         let crowded_cell = BucketCell(LatencyBucket::Fast, SubnetBucket::V4Prefix([1, 0, 0]));
         let cells: HashMap<ChannelId, BucketCell> = (0u8..3)
@@ -489,8 +491,8 @@ mod tests {
 
         // Candidate A: subnet 1 (already 2 in bucket → at k_floor)
         // Candidate B: subnet 2 (0 in bucket → below k_floor)
-        let a = mk_candidate(addr(1), offchain_key(1), Some(50), 0.95, 0.9, 1); // high utility, cell at floor
-        let b = mk_candidate(addr(2), offchain_key(2), Some(50), 0.3, 0.1, 2); // low utility, cell below floor
+        let a = mk_candidate(addr(1), offchain_key(1), Some(60), 0.95, 0.9, 1); // high utility, cell at floor
+        let b = mk_candidate(addr(2), offchain_key(2), Some(60), 0.3, 0.1, 2); // low utility, cell below floor
 
         let mut cfg = MultiObjectiveSelectorConfig::low_latency(); // k_floor=2
         cfg.open_per_tick = 2;

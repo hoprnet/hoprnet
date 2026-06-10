@@ -9,10 +9,12 @@ use hopr_api::types::internal::prelude::ChannelId;
 
 use super::subnet::SubnetBucket;
 
-/// Four RTT latency tiers.  Mirrors the threshold values used in the graph weight module.
+/// Five RTT latency tiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LatencyBucket {
-    /// ≤ 75 ms
+    /// ≤ 50 ms
+    VeryFast,
+    /// 51–75 ms
     Fast,
     /// 76–125 ms
     Medium,
@@ -25,6 +27,7 @@ pub enum LatencyBucket {
 impl LatencyBucket {
     pub fn from_latency(d: Option<Duration>) -> Self {
         match d.map(|d| d.as_millis()) {
+            Some(ms) if ms <= 50 => Self::VeryFast,
             Some(ms) if ms <= 75 => Self::Fast,
             Some(ms) if ms <= 125 => Self::Medium,
             Some(ms) if ms <= 200 => Self::Slow,
@@ -163,6 +166,14 @@ mod tests {
     fn latency_bucket_thresholds() {
         assert_eq!(
             LatencyBucket::from_latency(Some(Duration::from_millis(0))),
+            LatencyBucket::VeryFast
+        );
+        assert_eq!(
+            LatencyBucket::from_latency(Some(Duration::from_millis(50))),
+            LatencyBucket::VeryFast
+        );
+        assert_eq!(
+            LatencyBucket::from_latency(Some(Duration::from_millis(51))),
             LatencyBucket::Fast
         );
         assert_eq!(

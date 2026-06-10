@@ -944,9 +944,10 @@ where
 
             for c in ctx.open_candidates {
                 let lat = match LatencyBucket::from_latency(c.edge_info.average_latency) {
-                    LatencyBucket::Fast => 1.0,
-                    LatencyBucket::Medium => 0.75,
-                    LatencyBucket::Slow => 0.5,
+                    LatencyBucket::VeryFast => 1.0,
+                    LatencyBucket::Fast => 0.75,
+                    LatencyBucket::Medium => 0.50,
+                    LatencyBucket::Slow => 0.25,
                     LatencyBucket::VerySlow => 0.0,
                 };
                 let w = &mo_cfg.weights;
