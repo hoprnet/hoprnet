@@ -3,7 +3,7 @@
 use validator::{Validate, ValidationError, ValidationErrors};
 
 fn default_ack_buffer_interval() -> std::time::Duration {
-    std::time::Duration::from_millis(200)
+    std::time::Duration::from_millis(50)
 }
 
 fn default_ack_grouping_capacity() -> usize {
@@ -24,7 +24,12 @@ fn default_ack_out_buffer_size() -> usize {
 pub struct AcknowledgementPipelineConfig {
     /// Interval for which to wait to buffer acknowledgements before sending them out.
     ///
-    /// Default is 200 ms.
+    /// Acts as the upper bound on how long an acknowledgement is held for batching; smaller
+    /// values reduce acknowledgement round-trip latency (which gates ticket resolution and the
+    /// SURB reply path) at the cost of less batching efficiency. The acknowledgement path does
+    /// not carry mixnet cover traffic, so this is not anonymity-sensitive.
+    ///
+    /// Default is 50 ms.
     #[default(default_ack_buffer_interval())]
     #[cfg_attr(
         feature = "serde",

@@ -450,7 +450,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
         .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
         .filter(|acks| futures::future::ready(!acks.is_empty()))
         // Group by sender, reusing the same HashMap across buffer cycles so we don't
-        // re-allocate its bucket storage every `cfg.ack_buffer_interval` (default 200ms).
+        // re-allocate its bucket storage every `cfg.ack_buffer_interval` (default 50ms).
         //
         // The halfbrown map uses a Vec backing for a small number of distinct senders
         // (<32) and transitions to hashbrown otherwise — calling `drain()` keeps the
