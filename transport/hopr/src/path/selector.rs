@@ -38,7 +38,7 @@ where
                 .or_else(|| obs.intermediate_qos().and_then(|m| m.average_latency()))
         });
         total_latency_ms = match (total_latency_ms, edge_lat) {
-            (Some(acc), Some(lat)) => Some(acc.saturating_add(lat.as_millis().min(u32::MAX as u128) as u32)),
+            (Some(acc), Some(lat)) => Some(((acc as u128 + lat.as_millis()).min(u32::MAX as u128)) as u32),
             _ => None,
         };
 
