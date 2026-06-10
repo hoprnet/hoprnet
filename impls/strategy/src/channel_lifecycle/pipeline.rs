@@ -603,11 +603,19 @@ where
                     return None;
                 }
 
+                let subnet = self
+                    .node
+                    .network_view()
+                    .multiaddress_of(&peer_id)
+                    .map(|addrs| SubnetBucket::from_multiaddrs(&addrs))
+                    .unwrap_or(SubnetBucket::Unknown);
+
                 Some(OpenCandidate {
                     addr: chain_addr,
                     offchain_key,
                     edge_info,
                     ticket_score,
+                    subnet,
                 })
             })
             .collect();
@@ -632,6 +640,7 @@ where
             })
             .collect();
         let bucket_view = BucketView::new(bucket_cells);
+        self.emit_bucket_metrics(&bucket_view, &close_candidates);
 
         // On-chain stake scores — only fetched when the active selector requests STAKE.
         let stake_view = if self.selector.required_signals().contains(SignalSet::STAKE) {
@@ -650,6 +659,7 @@ where
             stake_view,
         };
 
+        self.emit_score_axis_metrics(&selector_ctx);
         let closes_ranked = self.selector.select_closes(&selector_ctx).await;
         let opens_ranked = self.selector.select_opens(&selector_ctx).await;
 
@@ -860,6 +870,107 @@ where
             .collect();
 
         StakeView::from_scores(scores)
+    }
+
+    /// Emit bucket-diversity metrics after each tick snapshot.
+    #[allow(unused_variables)]
+    fn emit_bucket_metrics(&self, bucket_view: &BucketView, close_candidates: &[CloseCandidate]) {
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            use super::{
+                METRIC_BUCKET_COUNT, METRIC_EFFECTIVE_BUCKETS, METRIC_LATENCY_VARIANCE_MS, METRIC_SUBNET_COUNT,
+            };
+            use std::collections::HashSet;
+
+            METRIC_EFFECTIVE_BUCKETS.set(bucket_view.effective_buckets());
+
+            // Per-cell counts.
+            let mut seen_cells = HashSet::new();
+            for c in close_candidates {
+                if let Some(cell) = bucket_view
+                    .cell_for(c.channel.get_id())
+                    .filter(|c| seen_cells.insert((*c).clone()))
+                {
+                    let label = format!("{:?}_{:?}", cell.0, cell.1);
+                    METRIC_BUCKET_COUNT.set(&[label.as_str()], bucket_view.cell_count(cell) as f64);
+                }
+            }
+
+            // Latency variance (ms) across all open channels.
+            let latencies_ms: Vec<f64> = close_candidates
+                .iter()
+                .filter_map(|c| c.edge_info.average_latency)
+                .map(|d| d.as_secs_f64() * 1000.0)
+                .collect();
+            if !latencies_ms.is_empty() {
+                let n = latencies_ms.len() as f64;
+                let mean = latencies_ms.iter().sum::<f64>() / n;
+                let variance = latencies_ms.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n;
+                METRIC_LATENCY_VARIANCE_MS.set(variance);
+            }
+
+            // Distinct subnet count.
+            let subnets: HashSet<String> = close_candidates
+                .iter()
+                .filter_map(|c| bucket_view.cell_for(c.channel.get_id()))
+                .filter(|cell| !matches!(cell.1, SubnetBucket::Unknown))
+                .map(|cell| format!("{:?}", cell.1))
+                .collect();
+            METRIC_SUBNET_COUNT.set(subnets.len() as f64);
+        }
+    }
+
+    /// Emit per-axis score averages across open candidates, but only when the
+    /// multi-objective selector is active.
+    #[allow(unused_variables)]
+    fn emit_score_axis_metrics(&self, ctx: &SelectorContext<'_>) {
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            use super::METRIC_SCORE_AXIS;
+
+            let Some(mo_cfg) = self.cfg.selector.multi_objective_config() else {
+                return;
+            };
+
+            if ctx.open_candidates.is_empty() {
+                return;
+            }
+
+            let n = ctx.open_candidates.len() as f64;
+            let mut sum_lat = 0.0_f64;
+            let mut sum_trust = 0.0_f64;
+            let mut sum_stake = 0.0_f64;
+            let mut sum_anon = 0.0_f64;
+
+            for c in ctx.open_candidates {
+                let lat = match LatencyBucket::from_latency(c.edge_info.average_latency) {
+                    LatencyBucket::Fast => 1.0,
+                    LatencyBucket::Medium => 0.75,
+                    LatencyBucket::Slow => 0.5,
+                    LatencyBucket::VerySlow => 0.0,
+                };
+                let w = &mo_cfg.weights;
+                let trust = w.trust_probe * c.edge_info.probe_success_rate
+                    + w.trust_ack * c.edge_info.ack_rate.unwrap_or(0.0)
+                    + w.trust_ticket * c.ticket_score;
+                let stake = ctx.stake_view.score(&c.addr);
+                let cell = BucketCell(
+                    LatencyBucket::from_latency(c.edge_info.average_latency),
+                    c.subnet.clone(),
+                );
+                let anon_penalty = ctx.bucket_view.bucket_coverage(&cell);
+
+                sum_lat += lat;
+                sum_trust += trust;
+                sum_stake += stake;
+                sum_anon += anon_penalty;
+            }
+
+            METRIC_SCORE_AXIS.set(&["latency"], sum_lat / n);
+            METRIC_SCORE_AXIS.set(&["trust"], sum_trust / n);
+            METRIC_SCORE_AXIS.set(&["stake"], sum_stake / n);
+            METRIC_SCORE_AXIS.set(&["anon_penalty"], sum_anon / n);
+        }
     }
 }
 
