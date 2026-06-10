@@ -172,6 +172,29 @@ pub mod cpu {
             pub fn set_queue_limit(limit: usize) {
                 QUEUE_LIMIT.set(limit as f64);
             }
+
+            /// Monotonic-clock timer used for the queue-wait and execution-time histograms.
+            ///
+            /// Reads `Instant::now()` because telemetry is enabled in this build.
+            #[derive(Clone, Copy)]
+            pub struct Timer(std::time::Instant);
+
+            impl Timer {
+                #[inline]
+                pub fn start() -> Self {
+                    Self(std::time::Instant::now())
+                }
+
+                #[inline]
+                pub fn elapsed_secs(&self) -> f64 {
+                    self.0.elapsed().as_secs_f64()
+                }
+
+                #[inline]
+                pub fn elapsed_millis(&self) -> u64 {
+                    self.0.elapsed().as_millis() as u64
+                }
+            }
         }
 
         #[cfg(any(not(all(feature = "parallelize", feature = "telemetry")), test))]
@@ -196,6 +219,31 @@ pub mod cpu {
             pub fn outstanding_dec() {}
             #[inline]
             pub fn set_queue_limit(_: usize) {}
+
+            /// No-op timer used when telemetry is compiled out.
+            ///
+            /// Carries no state and never reads the clock, so the per-task `Instant::now()`
+            /// cost on the dispatch hot path is not paid when metrics are absent. The
+            /// `elapsed_*` accessors return zero (used only by debug-level diagnostics).
+            #[derive(Clone, Copy)]
+            pub struct Timer;
+
+            impl Timer {
+                #[inline]
+                pub fn start() -> Self {
+                    Self
+                }
+
+                #[inline]
+                pub fn elapsed_secs(&self) -> f64 {
+                    0.0
+                }
+
+                #[inline]
+                pub fn elapsed_millis(&self) -> u64 {
+                    0
+                }
+            }
         }
     }
 
@@ -252,7 +300,10 @@ pub mod cpu {
         ///
         /// Returns `Ok(())` if no limit or slot acquired, `Err(QueueFull)` if at limit.
         pub fn try_acquire_slot() -> Result<Self, SpawnError> {
-            let prev = OUTSTANDING.fetch_add(1, Ordering::AcqRel);
+            // Relaxed: this is an advisory depth counter; no other memory is published or
+            // acquired through it, and the limit check below is inherently racy under
+            // concurrency. Relaxed avoids the unnecessary barriers on the dispatch hot path.
+            let prev = OUTSTANDING.fetch_add(1, Ordering::Relaxed);
             metrics::outstanding_inc();
             let guard = Self;
 
@@ -270,7 +321,7 @@ pub mod cpu {
     impl Drop for SlotGuard {
         #[inline]
         fn drop(&mut self) {
-            let prev = OUTSTANDING.fetch_sub(1, Ordering::AcqRel);
+            let prev = OUTSTANDING.fetch_sub(1, Ordering::Relaxed);
             debug_assert!(prev > 0, "outstanding task count underflow");
             metrics::outstanding_dec();
         }
@@ -327,7 +378,9 @@ pub mod cpu {
         let guard = SlotGuard::try_acquire_slot()?;
 
         let (tx, rx) = oneshot::channel();
-        let submitted_at = std::time::Instant::now();
+        // Zero-cost when telemetry is compiled out (see `metrics::Timer`), so the dispatch
+        // hot path does not pay an `Instant::now()` per offloaded task in that build.
+        let submitted_at = metrics::Timer::start();
 
         metrics::submitted();
 
@@ -338,25 +391,24 @@ pub mod cpu {
 
             if tx.is_canceled() {
                 tracing::debug!(
-                    queue_wait_ms = submitted_at.elapsed().as_millis() as u64,
+                    queue_wait_ms = submitted_at.elapsed_millis(),
                     "skipping cancelled task (receiver dropped before execution)"
                 );
                 metrics::cancelled();
                 return;
             }
 
-            let wait_duration = submitted_at.elapsed();
-            metrics::observe_queue_wait(wait_duration.as_secs_f64());
+            metrics::observe_queue_wait(submitted_at.elapsed_secs());
 
-            let execution_start = std::time::Instant::now();
+            let execution_start = metrics::Timer::start();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
-            metrics::observe_execution(operation, execution_start.elapsed().as_secs_f64());
+            metrics::observe_execution(operation, execution_start.elapsed_secs());
 
             match tx.send(result) {
                 Ok(()) => metrics::completed(),
                 Err(_) => {
                     tracing::debug!(
-                        queue_wait_ms = wait_duration.as_millis() as u64,
+                        queue_wait_ms = submitted_at.elapsed_millis(),
                         "receiver dropped during execution, result discarded"
                     );
                     metrics::orphaned();
