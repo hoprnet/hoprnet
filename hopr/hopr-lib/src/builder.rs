@@ -150,8 +150,7 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     graph_factory: Option<Factory<Graph>>,
     network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
     ct_factory: Option<Factory<Ct>>,
-    peer_discovery_tx:
-        Option<futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>,
+    peer_discovery_tx: Option<futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
@@ -160,7 +159,6 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         self.safe_and_module = Some((*safe, *module));
         self
     }
-
 
     /// Sets the chain API factory.
     pub fn with_chain_api<NewChain>(
@@ -232,7 +230,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     /// Wires the peer-discovery bridge so on-chain [`ChainEvent::Announcement`]s are
     /// forwarded to the p2p network layer.
     ///
-    /// Pass the corresponding receiver to the network factory via [`with_network`] so the
+    /// Pass the corresponding receiver to the network factory via [`Self::with_network`] so the
     /// network can dial newly announced peers.
     pub fn with_peer_discovery_tx(
         mut self,

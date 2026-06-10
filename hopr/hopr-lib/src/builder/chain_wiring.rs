@@ -360,13 +360,13 @@ mod tests {
 
     #[tokio::test]
     async fn announcement_should_forward_to_peer_discovery_when_tx_is_set() -> anyhow::Result<()> {
-        use hopr_api::types::internal::prelude::AccountType;
         use std::str::FromStr;
+
+        use hopr_api::types::internal::prelude::AccountType;
 
         let (offchain, chain) = make_keypairs();
         let addr = chain.public().to_address();
-        let multiaddr = hopr_api::Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000")
-            .context("parse multiaddr")?;
+        let multiaddr = hopr_api::Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000").context("parse multiaddr")?;
         let entry = AccountEntry {
             entry_type: AccountType::Announced(vec![multiaddr.clone()]),
             ..account(*offchain.public(), addr)
@@ -392,7 +392,11 @@ mod tests {
             "peer id must match the announced account's public key"
         );
         assert_eq!(addrs, &vec![multiaddr], "multiaddrs must be forwarded unchanged");
-        assert_eq!(graph.nodes(), vec![*offchain.public()], "graph must also record the node");
+        assert_eq!(
+            graph.nodes(),
+            vec![*offchain.public()],
+            "graph must also record the node"
+        );
         Ok(())
     }
 
