@@ -24,10 +24,10 @@ fn default_ack_out_buffer_size() -> usize {
 pub struct AcknowledgementPipelineConfig {
     /// Interval for which to wait to buffer acknowledgements before sending them out.
     ///
-    /// Acts as the upper bound on how long an acknowledgement is held for batching; smaller
-    /// values reduce acknowledgement round-trip latency (which gates ticket resolution and the
-    /// SURB reply path) at the cost of less batching efficiency. The acknowledgement path does
-    /// not carry mixnet cover traffic, so this is not anonymity-sensitive.
+    /// **Superseded:** the outgoing acknowledgement pipeline now batches adaptively, flushing as
+    /// soon as the upstream goes idle (instead of waiting a fixed window), so this interval no
+    /// longer delays acknowledgements. The field is retained for configuration compatibility and
+    /// still bounds its own valid range (>= 10 ms).
     ///
     /// Default is 50 ms.
     #[default(default_ack_buffer_interval())]

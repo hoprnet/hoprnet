@@ -7,7 +7,7 @@ pub use builder::{PacketPipelineBuilder, Unset};
 use bytes::Bytes;
 pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
-use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
+use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
     PeerId,
     node::TicketEvent,
@@ -34,6 +34,10 @@ const DEFAULT_ACK_OUTPUT_CONCURRENCY: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
+/// Upper bound on how many acknowledgements the outgoing ack pipeline accumulates before it is
+/// forced to yield a batch. Under normal traffic the batch is flushed as soon as the input
+/// drains (goes idle), so this only caps the worst case under sustained, never-idle load.
+const ACK_BATCH_MAX: usize = 1024;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -447,10 +451,17 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key));
             (destination, ack)
         })
-        .buffer(futures_time::time::Duration::from(cfg.ack_buffer_interval))
+        // Adaptive batching: `ready_chunks` keeps collecting acknowledgements while the upstream
+        // has items immediately available (so bursts are still amortised into a single batch),
+        // but yields as soon as the upstream drains - i.e. it flushes on idle instead of waiting
+        // a fixed time window. This removes the per-hop acknowledgement latency the previous fixed
+        // `buffer(ack_buffer_interval)` window added, without over-fragmenting under load (an idle
+        // upstream means there is nothing to batch with anyway). `ACK_BATCH_MAX` only bounds the
+        // worst case under sustained, never-idle load.
+        .ready_chunks(ACK_BATCH_MAX)
         .filter(|acks| futures::future::ready(!acks.is_empty()))
-        // Group by sender, reusing the same HashMap across buffer cycles so we don't
-        // re-allocate its bucket storage every `cfg.ack_buffer_interval` (default 50ms).
+        // Group by sender, reusing the same HashMap across batches so we don't re-allocate its
+        // bucket storage on every flush.
         //
         // The halfbrown map uses a Vec backing for a small number of distinct senders
         // (<32) and transitions to hashbrown otherwise — calling `drain()` keeps the
