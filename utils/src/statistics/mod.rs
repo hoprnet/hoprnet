@@ -12,4 +12,3 @@ pub mod weighted;
 
 #[cfg(feature = "statistics-types-weighted")]
 pub use weighted::WeightedCollection;
-

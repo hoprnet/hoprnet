@@ -19,8 +19,9 @@ pub struct PathWithMetrics {
     /// Sum of per-edge EMA latencies in milliseconds.
     /// `None` if any edge along the path has no measured latency.
     pub total_latency_ms: Option<u32>,
-    /// Worst per-edge immediate-probe success rate along the path.
-    /// `None` if no edge has immediate-probe data.
+    /// Worst per-edge probe success rate along the path, taken as the minimum of
+    /// the available immediate (1-hop) and intermediate (multi-hop) probe rates per edge.
+    /// `None` if no edge has any probe data.
     pub min_probe_success_rate: Option<f64>,
     /// Worst per-edge acknowledgment rate along the path.
     /// `None` if no edge has sent any messages yet.

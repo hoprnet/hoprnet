@@ -1,9 +1,13 @@
+use std::{cmp::Ordering, sync::Arc};
+
 use hopr_api::{
     OffchainPublicKey,
     graph::{
-        NetworkGraphTraverse, NetworkGraphView, ValueFn,
-        function::EdgeValueFn,
-        traits::{EdgeImmediateProtocolObservable, EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable},
+        NetworkGraphTraverse, NetworkGraphView,
+        function::{BasicValueFn, EdgeValueFn},
+        traits::{
+            EdgeImmediateProtocolObservable, EdgeLinkObservable, EdgeObservableRead, EdgeProtocolObservable, ValueFn,
+        },
     },
     types::internal::errors::PathError,
 };
@@ -13,63 +17,120 @@ use super::{
     traits::{PathSelector, PathWithMetrics},
 };
 
-/// Walk every edge in `[src → path[0] → path[1] → … → path[last]]` and aggregate
-/// per-edge quality data into path-level optional metrics.
-fn aggregate_metrics<G>(graph: &G, src: &OffchainPublicKey, path: &[OffchainPublicKey], cost: f64) -> PathWithMetrics
+/// Accumulated path cost and quality aggregates, folded edge-by-edge during DFS.
+///
+/// `PartialOrd` / `PartialEq` compare only the `cost` field so the DFS
+/// pruning threshold (`min_cost`) operates on the same scalar as before.
+#[derive(Clone, Debug)]
+struct PathCostWithMetrics {
+    cost: f64,
+    total_latency_ms: Option<u32>,
+    min_probe_rate: Option<f64>,
+    min_ack_rate: Option<f64>,
+    capacity_floor: Option<u128>,
+}
+
+impl PartialOrd for PathCostWithMetrics {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cost.partial_cmp(&other.cost)
+    }
+}
+
+impl PartialEq for PathCostWithMetrics {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost == other.cost
+    }
+}
+
+/// Wraps an `EdgeValueFn<f64, W>` as a `ValueFn` whose `Value` type carries
+/// both the cost and per-path quality aggregates.
+///
+/// All cost semantics are delegated to the inner `EdgeValueFn`; the wrapper
+/// only adds the aggregate fold on the same `&Weight` reference already
+/// available during DFS, so no extra graph lookups are needed.
+struct MetricsValueFn<W: EdgeObservableRead> {
+    inner: EdgeValueFn<f64, W>,
+}
+
+impl<W> ValueFn for MetricsValueFn<W>
 where
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
+    W: EdgeObservableRead + Send + 'static,
 {
-    let mut total_latency_ms: Option<u32> = Some(0);
-    let mut min_probe_rate: Option<f64> = None;
-    let mut min_ack_rate: Option<f64> = None;
-    let mut capacity_floor: Option<u128> = None;
+    type Value = PathCostWithMetrics;
+    type Weight = W;
 
-    let nodes: Vec<OffchainPublicKey> = std::iter::once(*src).chain(path.iter().copied()).collect();
-    for edge_pair in nodes.windows(2) {
-        let a = &edge_pair[0];
-        let b = &edge_pair[1];
-
-        let obs_opt = graph.edge(a, b);
-
-        // Latency: propagate None if any edge is unprobed.
-        let edge_lat = obs_opt.as_ref().and_then(|obs| {
-            obs.immediate_qos()
-                .and_then(|m| m.average_latency())
-                .or_else(|| obs.intermediate_qos().and_then(|m| m.average_latency()))
-        });
-        total_latency_ms = match (total_latency_ms, edge_lat) {
-            (Some(acc), Some(lat)) => Some(((acc as u128 + lat.as_millis()).min(u32::MAX as u128)) as u32),
-            _ => None,
-        };
-
-        if let Some(obs) = obs_opt.as_ref() {
-            // Probe success rate: minimum over edges that have data.
-            if let Some(imm) = obs.immediate_qos() {
-                let r = imm.average_probe_rate();
-                min_probe_rate = Some(min_probe_rate.map_or(r, |prev: f64| prev.min(r)));
-            }
-            // Ack rate: minimum over edges that have sent messages.
-            if let Some(imm) = obs.immediate_qos()
-                && let Some(rate) = imm.ack_rate()
-            {
-                min_ack_rate = Some(min_ack_rate.map_or(rate, |prev: f64| prev.min(rate)));
-            }
-            // Capacity: minimum over edges that carry channel-capacity data.
-            if let Some(inter) = obs.intermediate_qos()
-                && let Some(cap) = inter.capacity()
-            {
-                capacity_floor = Some(capacity_floor.map_or(cap, |prev: u128| prev.min(cap)));
-            }
+    fn initial_value(&self) -> Self::Value {
+        PathCostWithMetrics {
+            cost: self.inner.initial_value(),
+            total_latency_ms: Some(0),
+            min_probe_rate: None,
+            min_ack_rate: None,
+            capacity_floor: None,
         }
     }
 
-    PathWithMetrics {
-        path: path.to_vec(),
-        cost,
-        total_latency_ms,
-        min_probe_success_rate: min_probe_rate,
-        min_ack_rate,
-        capacity_floor,
+    fn min_value(&self) -> Option<Self::Value> {
+        self.inner.min_value().map(|c| PathCostWithMetrics {
+            cost: c,
+            total_latency_ms: None,
+            min_probe_rate: None,
+            min_ack_rate: None,
+            capacity_floor: None,
+        })
+    }
+
+    fn into_value_fn(self) -> BasicValueFn<Self::Value, Self::Weight> {
+        let inner = self.inner.into_value_fn();
+        Arc::new(move |prev: PathCostWithMetrics, observed: &W, idx: usize| {
+            let cost = inner(prev.cost, observed, idx);
+
+            let edge_lat = observed
+                .immediate_qos()
+                .and_then(|m| m.average_latency())
+                .or_else(|| observed.intermediate_qos().and_then(|m| m.average_latency()));
+            let total_latency_ms = match (prev.total_latency_ms, edge_lat) {
+                (Some(acc), Some(lat)) => Some(((acc as u128 + lat.as_millis()).min(u32::MAX as u128)) as u32),
+                _ => None,
+            };
+
+            // Combine immediate + intermediate probe rates: take the minimum of whichever are present.
+            let edge_probe = observed
+                .immediate_qos()
+                .map(|m| m.average_probe_rate())
+                .into_iter()
+                .chain(observed.intermediate_qos().map(|m| m.average_probe_rate()))
+                .reduce(f64::min);
+            let min_probe_rate = match (prev.min_probe_rate, edge_probe) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (None, Some(b)) => Some(b),
+                (Some(a), None) => Some(a),
+                _ => None,
+            };
+
+            let edge_ack = observed.immediate_qos().and_then(|m| m.ack_rate());
+            let min_ack_rate = match (prev.min_ack_rate, edge_ack) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (None, Some(b)) => Some(b),
+                (Some(a), None) => Some(a),
+                _ => None,
+            };
+
+            let edge_cap = observed.intermediate_qos().and_then(|m| m.capacity());
+            let capacity_floor = match (prev.capacity_floor, edge_cap) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (None, Some(b)) => Some(b),
+                (Some(a), None) => Some(a),
+                _ => None,
+            };
+
+            PathCostWithMetrics {
+                cost,
+                total_latency_ms,
+                min_probe_rate,
+                min_ack_rate,
+                capacity_floor,
+            }
+        })
     }
 }
 
@@ -79,32 +140,15 @@ where
 /// Behaviour:
 /// - If `candidates.len() <= floor`, returns all candidates unchanged (`min(found_count, floor)` semantics — the floor
 ///   is never a minimum to fabricate).
-/// - Sorts candidates with a known `total_latency_ms` ascending.
-/// - Drops from the high-latency tail until the total count equals `floor`, or until no populated candidates remain.
-/// - If still over the floor with no populated candidates left, drops unpopulated candidates from the input-order tail.
-pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize) -> Vec<PathWithMetrics> {
+/// - Sorts candidates ascending by `total_latency_ms`, with unpopulated paths (`None`) ordered last.
+/// - Truncates to `floor`, keeping the lowest-latency measured paths first.
+pub fn prune_for_consistency(mut candidates: Vec<PathWithMetrics>, floor: usize) -> Vec<PathWithMetrics> {
     if floor == 0 || candidates.len() <= floor {
         return candidates;
     }
-
-    let (mut populated, unpopulated): (Vec<_>, Vec<_>) =
-        candidates.into_iter().partition(|p| p.total_latency_ms.is_some());
-
-    // Sort populated ascending by latency (lowest first → drop from the end).
-    populated.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
-
-    // Prefer measured paths: keep as many populated paths as fit within the floor,
-    // then fill the remaining slots with unpopulated paths.  This ensures that
-    // latency-measured candidates are never discarded when unprobed paths alone
-    // would satisfy the floor.
-    let target_populated = populated.len().min(floor);
-    populated.truncate(target_populated);
-    let remaining = floor - target_populated;
-
-    let mut result = populated;
-    result.extend(unpopulated.into_iter().take(remaining));
-
-    result
+    candidates.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
+    candidates.truncate(floor);
+    candidates
 }
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
@@ -113,35 +157,39 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize) -> 
 /// `take` caps the number of candidate paths returned.
 /// The graph crate returns only the intermediate nodes (both `src` and `dest` stripped);
 /// this function re-appends `dest` so callers receive `([intermediates..., dest], cost)`.
-fn compute_paths<G, C>(
+fn compute_paths<G, W>(
     graph: &G,
     src: &OffchainPublicKey,
     dest: &OffchainPublicKey,
     length: std::num::NonZeroUsize,
     take: usize,
-    cost_fn: C,
+    value_fn: MetricsValueFn<W>,
 ) -> Vec<PathWithMetrics>
 where
-    G: NetworkGraphTraverse<NodeId = OffchainPublicKey> + NetworkGraphView<NodeId = OffchainPublicKey>,
-    <G as NetworkGraphTraverse>::Observed: EdgeObservableRead + Send + 'static,
-    C: ValueFn<Weight = <G as NetworkGraphTraverse>::Observed, Value = f64>,
+    G: NetworkGraphTraverse<NodeId = OffchainPublicKey, Observed = W>,
+    W: EdgeObservableRead + Send + 'static,
 {
-    let raw = graph.simple_paths(src, dest, length.get(), Some(take), cost_fn);
+    let raw = graph.simple_paths(src, dest, length.get(), Some(take), value_fn);
 
     raw.into_iter()
-        .filter_map(|(path, _, cost)| {
-            tracing::trace!(?path, ?cost, "evaluating candidate path");
-            if cost > 0.0 {
-                // The graph crate returns only intermediates (src and dest already stripped).
-                // Re-append dest so callers receive [intermediates..., dest].
+        .filter_map(|(path, _, metrics)| {
+            tracing::trace!(?path, cost = metrics.cost, "evaluating candidate path");
+            if metrics.cost > 0.0 {
                 let mut path = path;
                 path.push(*dest);
-                Some(aggregate_metrics(graph, src, &path, cost))
+                Some(PathWithMetrics {
+                    path,
+                    cost: metrics.cost,
+                    total_latency_ms: metrics.total_latency_ms,
+                    min_probe_success_rate: metrics.min_probe_rate,
+                    min_ack_rate: metrics.min_ack_rate,
+                    capacity_floor: metrics.capacity_floor,
+                })
             } else {
                 None
             }
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 /// A lightweight graph-backed path selector.
@@ -218,16 +266,16 @@ where
         take: usize,
         existing: &[PathWithMetrics],
     ) -> Vec<PathWithMetrics> {
-        let raw = self.graph.simple_paths_from(
-            src,
-            shorter_length.get(),
-            Some(take),
-            EdgeValueFn::forward_without_self_loopback(self.edge_penalty, self.min_ack_rate),
-        );
+        let value_fn = MetricsValueFn {
+            inner: EdgeValueFn::forward_without_self_loopback(self.edge_penalty, self.min_ack_rate),
+        };
+        let raw = self
+            .graph
+            .simple_paths_from(src, shorter_length.get(), Some(take), value_fn);
 
         raw.into_iter()
-            .filter_map(|(path, _, cost)| {
-                if cost <= 0.0 {
+            .filter_map(|(path, _, metrics)| {
+                if metrics.cost <= 0.0 {
                     return None;
                 }
 
@@ -245,8 +293,15 @@ where
                     return None;
                 }
 
-                tracing::trace!(?candidate, ?cost, "extended forward path candidate");
-                Some(aggregate_metrics(&self.graph, src, &candidate, cost))
+                tracing::trace!(?candidate, cost = metrics.cost, "extended forward path candidate");
+                Some(PathWithMetrics {
+                    path: candidate,
+                    cost: metrics.cost,
+                    total_latency_ms: metrics.total_latency_ms,
+                    min_probe_success_rate: metrics.min_probe_rate,
+                    min_ack_rate: metrics.min_ack_rate,
+                    capacity_floor: metrics.capacity_floor,
+                })
             })
             .take(take)
             .collect()
@@ -295,7 +350,9 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate),
+                MetricsValueFn {
+                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate),
+                },
             );
             tracing::debug!(
                 direction,
@@ -328,7 +385,9 @@ where
                 &dest,
                 length,
                 self.max_paths,
-                EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate),
+                MetricsValueFn {
+                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate),
+                },
             );
             tracing::debug!(direction, count = found.len(), "[return] candidates");
             found
@@ -938,6 +997,7 @@ mod tests {
     #[tokio::test]
     async fn path_metrics_aggregate_latency_correctly() -> anyhow::Result<()> {
         // 3-hop path: me → A (30ms) → B (40ms) → dest (50ms)
+        // Total latency accumulated during DFS should be ~120ms.
         let me = pubkey(&SECRET_0);
         let a = pubkey(&SECRET_1);
         let b = pubkey(&SECRET_2);
@@ -962,12 +1022,16 @@ mod tests {
             make_edge(&b, &dest, 50);
         }
 
-        // Build the path [a, b, dest] (src=me excluded per selector convention).
-        let path = vec![a, b, dest];
-        let metrics = aggregate_metrics(&graph, &me, &path, 1.0);
+        // Edges only in the forward direction (me → a → b → dest)
+        graph.add_edge(&me, &a).unwrap();
+        graph.add_edge(&a, &b).unwrap();
+        graph.add_edge(&b, &dest).unwrap();
 
-        // EMA with factor 3 converges slowly; just verify it's in the expected range.
-        let total = metrics.total_latency_ms.expect("latency must be Some");
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let paths = selector.select_path(me, dest, 2).context("forward 2-hop path")?;
+        assert!(!paths.is_empty());
+
+        let total = paths[0].total_latency_ms.expect("latency must be Some");
         assert!(
             total >= 100 && total <= 130,
             "expected ~120ms total latency, got {total}ms"
@@ -994,39 +1058,22 @@ mod tests {
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
             obs.record(EdgeWeightType::Capacity(Some(200)));
         });
+        graph.add_edge(&me, &hop).unwrap();
+        graph.add_edge(&hop, &dest).unwrap();
 
-        let path = vec![hop, dest];
-        let metrics = aggregate_metrics(&graph, &me, &path, 1.0);
+        let selector = test_selector(me, graph, MAX_PATHS);
+        let paths = selector.select_path(me, dest, 1).context("1-hop path")?;
+        assert!(!paths.is_empty());
         assert_eq!(
-            metrics.capacity_floor,
+            paths[0].capacity_floor,
             Some(200),
             "floor must be the smaller of 500 and 200"
         );
         Ok(())
     }
 
-    #[tokio::test]
-    async fn path_metrics_capacity_floor_is_none_when_missing() -> anyhow::Result<()> {
-        let me = pubkey(&SECRET_0);
-        let hop = pubkey(&SECRET_1);
-        let dest = pubkey(&SECRET_2);
-        let graph = ChannelGraph::new(me);
-        graph.add_node(hop);
-        graph.add_node(dest);
-
-        // Only immediate probes, no capacity data.
-        graph.upsert_edge(&me, &hop, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
-        });
-        graph.upsert_edge(&hop, &dest, |obs| {
-            obs.record(EdgeWeightType::Connected(true));
-            obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
-        });
-
-        let path = vec![hop, dest];
-        let metrics = aggregate_metrics(&graph, &me, &path, 1.0);
-        assert_eq!(metrics.capacity_floor, None);
-        Ok(())
-    }
+    // NOTE: a test for capacity_floor=None is omitted intentionally.
+    // The forward cost function requires intermediate capacity on all non-last edges, so
+    // every path the selector returns has capacity data on at least one edge, making
+    // capacity_floor always Some for reachable paths.
 }
