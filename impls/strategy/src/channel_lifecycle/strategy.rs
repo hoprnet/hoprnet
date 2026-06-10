@@ -19,7 +19,10 @@ use hopr_api::{
     },
 };
 
-use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner, selector::DefaultSelector};
+use super::{
+    ChannelLifecycleConfig, ChannelLifecycleStrategyInner,
+    selector::{DefaultSelector, MultiObjectiveSelector},
+};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Builder for [`ChannelLifecycleStrategy`].
@@ -58,10 +61,15 @@ impl ChannelLifecycleStrategy {
             + Sync
             + 'static,
     {
+        let selector: Arc<dyn super::selector::Selector> = match self.cfg.selector.multi_objective_config() {
+            Some(mo_cfg) => Arc::new(MultiObjectiveSelector::new(mo_cfg)),
+            None => Arc::new(DefaultSelector),
+        };
+
         Box::new(ChannelLifecycleStrategyInner {
             cfg: self.cfg,
             node,
-            selector: Arc::new(DefaultSelector),
+            selector,
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),

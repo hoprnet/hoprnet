@@ -21,11 +21,13 @@ use crate::channel_lifecycle::ChannelLifecycleConfig;
 
 mod bucket;
 mod default;
+mod multi_objective;
 mod stake;
 mod subnet;
 
 pub use bucket::{BucketCell, BucketView, LatencyBucket};
 pub use default::DefaultSelector;
+pub use multi_objective::MultiObjectiveSelector;
 pub use stake::StakeView;
 pub use subnet::SubnetBucket;
 
@@ -98,6 +100,9 @@ pub struct OpenCandidate {
     pub edge_info: PeerEdgeInfo,
     /// Normalised ticket-activity signal: `peer_ticket_count / max_activity` in `[0, 1]`.
     pub ticket_score: f64,
+    /// Subnet bucket derived from the peer's multiaddresses.
+    /// Used by the multi-objective selector for anonymity bucket placement.
+    pub subnet: SubnetBucket,
 }
 
 /// An open channel being offered to the selector as a potential close target.
