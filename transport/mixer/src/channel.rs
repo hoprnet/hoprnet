@@ -2,17 +2,17 @@ use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     future::poll_fn,
+    pin::Pin,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
-    time::Duration,
 };
 
-use futures::{FutureExt, Stream, StreamExt};
-use futures_timer::Delay;
+use futures::{Stream, StreamExt};
 use parking_lot::Mutex;
+use tokio::time::Sleep;
 use tracing::trace;
 
 use crate::{config::MixerConfig, data::DelayedData};
@@ -186,7 +186,13 @@ pub enum ReceiverError {
 /// the buffer while the receiver is parked on the timer.
 pub struct Receiver<T> {
     channel: TrackedChannel<T>,
-    timer: Delay,
+    /// Release-deadline timer, lazily created on first use so that constructing a channel does
+    /// not require an active runtime. Backed by tokio's in-runtime timer wheel rather than an
+    /// out-of-runtime timer thread, so waking at the release deadline does not incur a
+    /// cross-thread unpark - this tightens release-time accuracy. It only governs *when* the
+    /// receiver wakes to inspect the heap; the per-item random delay and release ordering
+    /// (the mixing guarantee) are computed entirely by the sender and are unchanged.
+    timer: Option<Pin<Box<Sleep>>>,
 }
 
 impl<T> Stream for Receiver<T> {
@@ -249,9 +255,13 @@ impl<T> Stream for Receiver<T> {
 
         // Phase 2: poll the timer WITHOUT holding the mutex so senders can keep pushing.
         let this = self.get_mut();
+        let deadline = tokio::time::Instant::now() + sleep_for;
         trace!("resetting the timer");
-        this.timer.reset(sleep_for);
-        futures::ready!(this.timer.poll_unpin(cx));
+        let timer = this
+            .timer
+            .get_or_insert_with(|| Box::pin(tokio::time::sleep_until(deadline)));
+        timer.as_mut().reset(deadline);
+        futures::ready!(timer.as_mut().poll(cx));
 
         // Phase 3: timer fired. Re-take the lock. Because there is only one receiver,
         // the item at the top is still present; senders can only have added more.
@@ -308,15 +318,14 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
         Sender {
             channel: channel.clone(),
         },
-        Receiver {
-            channel,
-            timer: Delay::new(Duration::from_secs(0)),
-        },
+        Receiver { channel, timer: None },
     )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use futures::{SinkExt, StreamExt};
     use tokio::time::timeout;
 
@@ -552,7 +561,7 @@ mod tests {
 
         // Give the receiver a moment to enter the timer branch (it will have locked,
         // seen the not-yet-due item, stored the waker, unlocked, and started polling
-        // the Delay).
+        // the release timer).
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // The crucial assertion: this `send()` must return promptly — not block for

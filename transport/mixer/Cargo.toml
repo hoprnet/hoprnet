@@ -27,6 +27,7 @@ parking_lot = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 tracing = { workspace = true }
 
 hopr-types = { workspace = true, features = ["random"] }
@@ -40,7 +41,6 @@ futures = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 rstest = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
-tokio = { workspace = true, features = ["time"] }
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 
