@@ -377,10 +377,13 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 /// Enum carry information about the packet based on whether it is destined for the current node (`FinalNode`)
 /// or if the packet is supposed to be only relayed (`RelayNode`).
 pub enum ForwardedHeader<H: SphinxHeaderSpec> {
-    /// The packet is supposed to be relayed
+    /// The packet is supposed to be relayed.
+    ///
+    /// The forward transformation is applied **in place** to the `header` slice passed to
+    /// [`forward_header`]: after the call, `header[0..RoutingInfo::SIZE]` already holds the
+    /// next hop's routing information (transformed routing followed by its authentication tag),
+    /// so the caller can reuse the same buffer instead of allocating a new header.
     Relayed {
-        /// Transformed header
-        next_header: RoutingInfo<H>,
         /// Position of the relay in the path
         path_pos: u8,
         /// Public key of the next node
@@ -442,18 +445,21 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("next_node"))?;
 
-        let mut next_header = RoutingInfo::<H>::default();
-
-        // Authentication tag
-        next_header.mac_mut().copy_from_slice(
-            &header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE],
-        );
+        // Offsets of the next hop's authentication tag within the current (decrypted) header.
+        let mac_start = HeaderPrefix::SIZE + H::KEY_ID_SIZE.get();
+        let mac_end = mac_start + H::TAG_SIZE;
 
         // Optional additional relayer data
-        let additional_info = (&header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE
-            ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE])
+        let additional_info = (&header[mac_end..mac_end + H::RELAYER_DATA_SIZE])
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
+
+        // Relocate the next hop's authentication tag into the header's MAC slot
+        // (`[HEADER_LEN..RoutingInfo::SIZE]`) in place. This must happen before the left shift
+        // below, which overwrites the region the tag currently occupies. The source range
+        // (within the first `ROUTING_INFO_LEN` bytes) and the destination MAC slot are disjoint
+        // on the relay path, so an in-place `copy_within` is safe.
+        header.copy_within(mac_start..mac_end, H::HEADER_LEN);
 
         // Shift the entire header to the left to discard the data we just read
         header.copy_within(H::ROUTING_INFO_LEN..H::HEADER_LEN, 0);
@@ -463,10 +469,9 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         prg.seek(H::HEADER_LEN);
         prg.apply_keystream(&mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
-        next_header.routing_mut().copy_from_slice(&header[0..H::HEADER_LEN]);
-
+        // After the operations above, `header[0..RoutingInfo::SIZE]` holds the next hop's
+        // routing information followed by its authentication tag, ready to be reused as-is.
         Ok(ForwardedHeader::Relayed {
-            next_header,
             path_pos: prefix.path_position(),
             next_node,
             additional_info,
@@ -567,12 +572,9 @@ pub(crate) mod tests {
 
             match fwd {
                 ForwardedHeader::Relayed {
-                    next_header,
-                    next_node,
-                    path_pos,
-                    ..
+                    next_node, path_pos, ..
                 } => {
-                    rinfo = next_header;
+                    // `rinfo.0` was transformed in place into the next hop's header.
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,

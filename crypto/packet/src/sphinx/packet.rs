@@ -440,30 +440,47 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
             node_keypair.public().into(),
         )?;
 
-        // Forward the packet header
+        // Forward the packet header in place. After this call, the routing region of
+        // `self.packet` already holds the next hop's routing information (see `forward_header`).
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
 
-        // Perform initial decryption over the payload
-        let decrypted = self.payload_mut();
-        let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.inverse(decrypted.into());
+        // Perform initial decryption over the payload in place.
+        {
+            let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
+            prp.inverse(self.payload_mut().into());
+        }
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
-                next_header,
                 path_pos,
                 next_node,
                 additional_info,
-            } => ForwardedMetaPacket::Relayed {
-                packet: Self::new_from_parts(alpha, next_header, decrypted),
-                packet_tag: derive_packet_tag(&secret)?,
-                derived_secret: secret,
-                next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
-                    SphinxError::PacketDecodingError(format!("couldn't map id to public key: {}", next_node.to_hex()))
-                })?,
-                path_pos,
-                additional_info,
-            },
+            } => {
+                // The header has been transformed in place by `forward_header` and the payload
+                // decrypted in place above, so `self.packet` already contains the next hop's
+                // routing information and payload. Only the Alpha value needs to be overwritten
+                // with the one produced by the forward transformation; the buffer is then reused
+                // as-is, avoiding a full-packet reallocation and copy on every relayed hop.
+                let alpha_len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
+                self.packet[..alpha_len].copy_from_slice(&alpha);
+
+                ForwardedMetaPacket::Relayed {
+                    next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
+                        SphinxError::PacketDecodingError(format!(
+                            "couldn't map id to public key: {}",
+                            next_node.to_hex()
+                        ))
+                    })?,
+                    packet: MetaPacket {
+                        packet: self.packet,
+                        _d: PhantomData,
+                    },
+                    packet_tag: derive_packet_tag(&secret)?,
+                    derived_secret: secret,
+                    path_pos,
+                    additional_info,
+                }
+            }
             ForwardedHeader::Final {
                 receiver_data,
                 is_reply,
@@ -478,6 +495,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                             receiver_data.to_hex()
                         ))
                     })?;
+
+                    let decrypted = self.payload_mut();
 
                     // Encrypt the packet payload using the derived shared secrets
                     // to reverse the decryption done by individual hops
