@@ -10,8 +10,7 @@ pub mod testing;
 use std::sync::Arc;
 
 use hopr_ticket_manager::{
-    HoprTicketManager, RedbStore, RedbTicketQueue,
-    ticket_factory_from_chain, ticket_manager_from_chain,
+    HoprTicketManager, RedbStore, RedbTicketQueue, ticket_factory_from_chain, ticket_manager_from_chain,
 };
 #[cfg(feature = "runtime-tokio")]
 use {
@@ -134,8 +133,7 @@ where
                         .expect("host config must be a valid multiaddress"),
                 ];
                 let nb = HoprLibp2pNetworkBuilder::new(
-                    peer_discovery_rx
-                        .map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
+                    peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
                 );
                 nb.build(
                     &ctx.packet_key,
@@ -217,8 +215,7 @@ where
                         .expect("host config must be a valid multiaddress"),
                 ];
                 let nb = HoprLibp2pNetworkBuilder::new(
-                    peer_discovery_rx
-                        .map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
+                    peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
                 );
                 nb.build(
                     &ctx.packet_key,
