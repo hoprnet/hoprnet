@@ -42,7 +42,9 @@ validator = { workspace = true }
 hopr-api = { workspace = true, features = ["node", "serde"] }
 hopr-utils = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
+multiaddr = { workspace = true }
 parking_lot = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true }

@@ -96,6 +96,10 @@ impl DefaultSelector {
 
 #[async_trait]
 impl Selector for DefaultSelector {
+    fn required_signals(&self) -> super::SignalSet {
+        super::SignalSet::empty()
+    }
+
     async fn select_closes(&self, ctx: &SelectorContext<'_>) -> Vec<ChannelId> {
         ctx.close_candidates
             .iter()
@@ -114,5 +118,15 @@ impl Selector for DefaultSelector {
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         scored.into_iter().map(|(c, _)| (c.addr, c.offchain_key)).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_selector_requires_no_signals() {
+        assert_eq!(DefaultSelector.required_signals(), super::super::SignalSet::empty());
     }
 }

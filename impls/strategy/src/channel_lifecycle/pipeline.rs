@@ -16,20 +16,25 @@ use hopr_api::{
         AccountSelector, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
         ChainWriteChannelOperations, ChannelSelector, SafeSelector,
     },
-    graph::{EdgeObservableRead as _, NetworkGraphView as _},
+    graph::{
+        EdgeImmediateProtocolObservable as _, EdgeLinkObservable as _, EdgeObservableRead as _, NetworkGraphView as _,
+    },
     network::NetworkView as _,
     node::{ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView},
     types::{
         crypto::prelude::OffchainPublicKey,
         internal::prelude::{ChannelEntry, ChannelId, ChannelStatus},
-        primitive::prelude::{Address, HoprBalance},
+        primitive::prelude::{Address, HoprBalance, WxHOPR},
     },
 };
 use tracing::{debug, warn};
 
 use super::{
     ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache,
-    selector::{CloseCandidate, OpenCandidate, PeerEdgeInfo, SelectorContext},
+    selector::{
+        BucketCell, BucketView, CloseCandidate, LatencyBucket, OpenCandidate, PeerEdgeInfo, SelectorContext, SignalSet,
+        StakeView, SubnetBucket,
+    },
 };
 use crate::errors::StrategyError;
 
@@ -114,18 +119,25 @@ where
     }
 
     /// Fetches pre-computed graph edge information for `peer_offchain`.
-    /// Returns `None` edge_score when no edge record exists.
+    /// Returns default (zero) values when no edge record exists.
     fn peer_edge_info(&self, peer_offchain: &OffchainPublicKey) -> PeerEdgeInfo {
         let my_key = self.node.graph().identity();
         match self.node.graph().edge(my_key, peer_offchain) {
-            Some(e) => PeerEdgeInfo {
-                edge_score: Some(e.score()),
-                last_update: e.last_update(),
-            },
-            None => PeerEdgeInfo {
-                edge_score: None,
-                last_update: Duration::ZERO,
-            },
+            Some(e) => {
+                let (average_latency, probe_success_rate, ack_rate) = if let Some(qos) = e.immediate_qos() {
+                    (qos.average_latency(), qos.average_probe_rate(), qos.ack_rate())
+                } else {
+                    (None, 0.0, None)
+                };
+                PeerEdgeInfo {
+                    edge_score: Some(e.score()),
+                    last_update: e.last_update(),
+                    average_latency,
+                    probe_success_rate,
+                    ack_rate,
+                }
+            }
+            None => PeerEdgeInfo::default(),
         }
     }
 
@@ -518,10 +530,7 @@ where
                 let edge_info = offchain_key
                     .as_ref()
                     .map(|pk| self.peer_edge_info(pk))
-                    .unwrap_or(PeerEdgeInfo {
-                        edge_score: None,
-                        last_update: Duration::ZERO,
-                    });
+                    .unwrap_or_default();
                 let ticket_score = self
                     .peer_ticket_activity
                     .get(&ch.destination)
@@ -605,12 +614,40 @@ where
 
         let deficit = self.cfg.population.target_open_channels.saturating_sub(open_count);
 
+        // Build addr → PeerId index for multiaddr lookups.
+        let addr_to_peer_id: HashMap<Address, PeerId> = peer_addr_map
+            .iter()
+            .map(|(peer_id, (_, addr))| (*addr, *peer_id))
+            .collect();
+
+        // (latency, subnet) cells for all open channels — always computed, cheap.
+        let bucket_cells: HashMap<ChannelId, BucketCell> = close_candidates
+            .iter()
+            .filter_map(|c| {
+                let peer_id = addr_to_peer_id.get(&c.channel.destination)?;
+                let addrs = self.node.network_view().multiaddress_of(peer_id).unwrap_or_default();
+                let subnet = SubnetBucket::from_multiaddrs(&addrs);
+                let lat = LatencyBucket::from_latency(c.edge_info.average_latency);
+                Some((*c.channel.get_id(), BucketCell(lat, subnet)))
+            })
+            .collect();
+        let bucket_view = BucketView::new(bucket_cells);
+
+        // On-chain stake scores — only fetched when the active selector requests STAKE.
+        let stake_view = if self.selector.required_signals().contains(SignalSet::STAKE) {
+            self.fetch_stake_view(chain, &close_candidates, &open_candidates).await
+        } else {
+            StakeView::empty()
+        };
+
         let selector_ctx = SelectorContext {
             cfg: &self.cfg,
             deficit,
             open_candidates: &open_candidates,
             close_candidates: &close_candidates,
             start_epoch_elapsed: self.start_epoch.elapsed(),
+            bucket_view,
+            stake_view,
         };
 
         let closes_ranked = self.selector.select_closes(&selector_ctx).await;
@@ -738,6 +775,91 @@ where
         });
 
         Ok(map)
+    }
+
+    /// Fetches on-chain safe balances for all candidate peers and returns
+    /// normalized scores in [0, 1].  Called only when the active selector
+    /// requests the `STAKE` signal.
+    ///
+    /// Peers whose safe address cannot be resolved score `0.0`.
+    /// Balance fetches that time out also score `0.0`.
+    async fn fetch_stake_view(
+        &self,
+        chain: &N::ChainApi,
+        close_candidates: &[CloseCandidate],
+        open_candidates: &[OpenCandidate],
+    ) -> StakeView {
+        // Collect all unique chain addresses we need scores for.
+        let addresses: HashSet<Address> = close_candidates
+            .iter()
+            .map(|c| c.channel.destination)
+            .chain(open_candidates.iter().map(|c| c.addr))
+            .collect();
+
+        if addresses.is_empty() {
+            return StakeView::empty();
+        }
+
+        // Stream all accounts to build chain_addr → safe_address mapping.
+        let safe_map: HashMap<Address, Address> = {
+            let Ok(mut stream) = chain.stream_accounts(AccountSelector::default()) else {
+                return StakeView::empty();
+            };
+            let mut m = HashMap::new();
+            while let Some(account) = stream.next().await {
+                if let Some(safe_addr) = account.safe_address {
+                    m.insert(account.chain_addr, safe_addr);
+                }
+            }
+            m
+        };
+
+        // Fetch balances concurrently (≤ 8 in-flight, 500 ms timeout per peer).
+        let fetch_timeout = std::time::Duration::from_millis(500);
+        let raw_scores: HashMap<Address, f64> = futures::stream::iter(addresses)
+            .map(|addr| {
+                let safe_addr = safe_map.get(&addr).copied();
+                let chain = chain.clone();
+                async move {
+                    let Some(safe_addr) = safe_addr else {
+                        return (addr, 0.0_f64);
+                    };
+                    let result = tokio::time::timeout(fetch_timeout, chain.balance::<WxHOPR, _>(safe_addr)).await;
+                    let amount = match result {
+                        Ok(Ok(bal)) => bal.amount().low_u128() as f64,
+                        Ok(Err(e)) => {
+                            tracing::trace!(%addr, %e, "channel-lifecycle: stake fetch error");
+                            0.0
+                        }
+                        Err(_) => {
+                            tracing::trace!(%addr, "channel-lifecycle: stake fetch timeout");
+                            0.0
+                        }
+                    };
+                    (addr, amount)
+                }
+            })
+            .buffer_unordered(8)
+            .collect()
+            .await;
+
+        // Normalize via log1p scale, using the max observed value.
+        let max_amount = raw_scores.values().cloned().fold(0.0_f64, f64::max);
+        let normalizer = if max_amount > 0.0 {
+            max_amount
+        } else {
+            return StakeView::empty();
+        };
+
+        let scores = raw_scores
+            .into_iter()
+            .map(|(addr, amount)| {
+                let score = (amount.ln_1p() / normalizer.ln_1p()).min(1.0);
+                (addr, score)
+            })
+            .collect();
+
+        StakeView::from_scores(scores)
     }
 }
 
@@ -1760,10 +1882,7 @@ mod tests {
         let candidate = CloseCandidate {
             channel: ch,
             offchain_key: Some(alice_pk),
-            edge_info: PeerEdgeInfo {
-                edge_score: None,
-                last_update: Duration::ZERO,
-            },
+            edge_info: PeerEdgeInfo::default(),
             ticket_score: 0.0,
         };
 
@@ -1773,6 +1892,8 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[candidate],
             start_epoch_elapsed: Duration::ZERO,
+            bucket_view: selector::BucketView::empty(),
+            stake_view: selector::StakeView::empty(),
         };
 
         let closes = selector::DefaultSelector.select_closes(&ctx).await;
@@ -1813,10 +1934,7 @@ mod tests {
         let no_data = CloseCandidate {
             channel: ch,
             offchain_key: Some(alice_pk),
-            edge_info: PeerEdgeInfo {
-                edge_score: None,
-                last_update: Duration::ZERO,
-            },
+            edge_info: PeerEdgeInfo::default(),
             ticket_score: 0.0,
         };
         let ctx_no_data = SelectorContext {
@@ -1825,6 +1943,8 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[no_data],
             start_epoch_elapsed: Duration::ZERO,
+            bucket_view: selector::BucketView::empty(),
+            stake_view: selector::StakeView::empty(),
         };
         assert!(
             selector::DefaultSelector.select_closes(&ctx_no_data).await.is_empty(),
@@ -1838,6 +1958,7 @@ mod tests {
             edge_info: PeerEdgeInfo {
                 edge_score: Some(0.0), // below close_below_quality_score = 0.3
                 last_update: Duration::from_secs(1),
+                ..Default::default()
             },
             ticket_score: 0.0,
         };
@@ -1847,6 +1968,8 @@ mod tests {
             open_candidates: &[],
             close_candidates: &[with_data],
             start_epoch_elapsed: Duration::from_secs(10), // strategy running 10s > last_update 1s
+            bucket_view: selector::BucketView::empty(),
+            stake_view: selector::StakeView::empty(),
         };
         let closes = selector::DefaultSelector.select_closes(&ctx_with_data).await;
         assert_eq!(
