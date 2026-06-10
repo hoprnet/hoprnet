@@ -282,6 +282,14 @@ pub struct MultiObjectiveSelectorConfig {
     /// channels.  The open pass fills underrepresented cells first; the close pass vetoes closing
     /// the sole occupant of any cell.  `Unknown` subnet peers are excluded from the floor.
     pub k_floor: usize,
+    /// Hysteresis gap between the open quality threshold
+    /// (`eligibility.min_peer_quality_score`) and the effective close quality
+    /// threshold.  The close threshold used by this selector is
+    /// `max(0, min_peer_quality_score − hysteresis_gap)`, which is
+    /// typically lower than `closure.close_below_quality_score`.  A wider gap
+    /// suppresses churn — once open, a channel stays open until quality is
+    /// substantially worse than the open bar.
+    pub hysteresis_gap: f64,
 }
 
 impl MultiObjectiveSelectorConfig {
@@ -291,6 +299,7 @@ impl MultiObjectiveSelectorConfig {
             open_per_tick: 4,
             close_per_tick: 4,
             k_floor: 2,
+            hysteresis_gap: 0.10,
         }
     }
 
@@ -300,6 +309,7 @@ impl MultiObjectiveSelectorConfig {
             open_per_tick: 2,
             close_per_tick: 2,
             k_floor: 3,
+            hysteresis_gap: 0.20,
         }
     }
 
@@ -309,6 +319,7 @@ impl MultiObjectiveSelectorConfig {
             open_per_tick: 2,
             close_per_tick: 2,
             k_floor: 4,
+            hysteresis_gap: 0.20,
         }
     }
 
@@ -318,6 +329,7 @@ impl MultiObjectiveSelectorConfig {
             open_per_tick: 1,
             close_per_tick: 1,
             k_floor: 2,
+            hysteresis_gap: 0.40,
         }
     }
 }

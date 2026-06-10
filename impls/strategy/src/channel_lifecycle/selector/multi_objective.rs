@@ -118,10 +118,15 @@ impl Selector for MultiObjectiveSelector {
     async fn select_closes(&self, ctx: &SelectorContext<'_>) -> Vec<ChannelId> {
         let k = self.cfg.k_floor;
 
+        // Hysteresis: effective close quality threshold is lower than the open threshold by gap.
+        let effective_quality_threshold =
+            (ctx.cfg.eligibility.min_peer_quality_score - self.cfg.hysteresis_gap).max(0.0);
+        let quality_override = Some(effective_quality_threshold);
+
         let mut scored: Vec<(&CloseCandidate, f64)> = ctx
             .close_candidates
             .iter()
-            .filter(|c| DefaultSelector::should_close(c, ctx.cfg, ctx.start_epoch_elapsed))
+            .filter(|c| DefaultSelector::should_close(c, ctx.cfg, ctx.start_epoch_elapsed, quality_override))
             .filter(|c| {
                 // K-floor veto: refuse to close the sole occupant of any known cell.
                 // Unknown-subnet channels are never vetoed by this guard.
@@ -563,5 +568,159 @@ mod tests {
 
         let closes = sel.select_closes(&ctx).await;
         assert!(closes.is_empty(), "sole-occupant channel must not be closed");
+    }
+
+    // ── PR5: monetary throttle + hysteresis tests ────────────────────────────
+
+    /// open_per_tick=1 dispatches exactly one open even when many candidates qualify.
+    #[tokio::test]
+    async fn open_per_tick_is_per_tick_rate_limit() {
+        let mut cfg = MultiObjectiveSelectorConfig::economical();
+        cfg.open_per_tick = 1;
+        let sel = mk_selector(cfg);
+        let lc_cfg = ChannelLifecycleConfig::default();
+
+        let candidates: Vec<OpenCandidate> = (0u8..8)
+            .map(|i| mk_candidate(addr(i), offchain_key(i), Some(50), 0.9, 0.9, i))
+            .collect();
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 8,
+            open_candidates: &candidates,
+            close_candidates: &[],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view: BucketView::empty(),
+            stake_view: StakeView::empty(),
+        };
+
+        let opens = sel.select_opens(&ctx).await;
+        assert_eq!(opens.len(), 1, "open_per_tick rate limit must cap output to 1");
+    }
+
+    /// Hysteresis: a channel with quality score in the dead zone [adjusted, close_below) must NOT
+    /// be closed under Economical (gap=0.40, open_threshold=0.5, adjusted_close=0.10).
+    #[tokio::test]
+    async fn hysteresis_vetos_close_in_dead_zone() {
+        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelStatus};
+        use hopr_api::types::primitive::prelude::HoprBalance;
+        use std::collections::HashMap;
+
+        let dest = addr(7);
+        let ch = ChannelEntry::builder()
+            .between(addr(0), dest)
+            .balance(HoprBalance::new_base(5))
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+
+        // Put channel in a 3-occupant cell so k-floor doesn't veto
+        let cell = BucketCell(LatencyBucket::Fast, SubnetBucket::V4Prefix([7, 0, 0]));
+        let bucket_cells: HashMap<_, _> = (0u8..3)
+            .map(|i| {
+                (
+                    hopr_api::types::internal::prelude::ChannelId::create(&[&[i]]),
+                    cell.clone(),
+                )
+            })
+            .collect();
+        // Override with the actual channel's ID
+        let mut bucket_cells = bucket_cells;
+        bucket_cells.insert(*ch.get_id(), cell.clone());
+        let bucket_view = BucketView::new(bucket_cells);
+
+        // Quality score = 0.35 — within default close_below_quality_score (0.3 < 0.35)
+        // But with Economical hysteresis: adjusted threshold = 0.5 - 0.4 = 0.1 < 0.35
+        // So the channel should NOT be closed.
+        let candidate = crate::channel_lifecycle::selector::CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(7)),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.35), // above default close threshold 0.3 and above hysteresis threshold 0.1
+                last_update: Duration::from_secs(60),
+                average_latency: Some(Duration::from_millis(50)),
+                probe_success_rate: 0.35,
+                ack_rate: Some(0.35),
+            },
+            ticket_score: 0.35,
+        };
+
+        let sel = mk_selector(MultiObjectiveSelectorConfig::economical());
+        let mut lc_cfg = ChannelLifecycleConfig::default();
+        // Set close_below_quality_score high enough so DefaultSelector would normally close
+        lc_cfg.closure.close_below_quality_score = 0.5;
+        // min_peer_quality_score = 0.5, hysteresis_gap = 0.4, adjusted = 0.1
+        // composite_score ≈ 0.6*0.35 + 0.4*0.35 = 0.35, which is > 0.1 → should NOT close
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view,
+            stake_view: StakeView::empty(),
+        };
+
+        let closes = sel.select_closes(&ctx).await;
+        assert!(
+            closes.is_empty(),
+            "hysteresis must suppress quality close in dead zone [adjusted=0.10, threshold=0.50)"
+        );
+    }
+
+    /// Without hysteresis (gap=0), the normal close threshold applies.
+    #[tokio::test]
+    async fn zero_hysteresis_uses_config_threshold() {
+        use hopr_api::types::internal::prelude::{ChannelEntry, ChannelStatus};
+        use hopr_api::types::primitive::prelude::HoprBalance;
+
+        let dest = addr(8);
+        let ch = ChannelEntry::builder()
+            .between(addr(0), dest)
+            .balance(HoprBalance::new_base(5))
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(1)
+            .build()
+            .expect("test channel");
+
+        // Quality score = 0.1 — below close threshold 0.3 → should close
+        let candidate = crate::channel_lifecycle::selector::CloseCandidate {
+            channel: ch,
+            offchain_key: Some(offchain_key(8)),
+            edge_info: PeerEdgeInfo {
+                edge_score: Some(0.1),
+                last_update: Duration::from_secs(60),
+                average_latency: Some(Duration::from_millis(50)),
+                probe_success_rate: 0.1,
+                ack_rate: Some(0.1),
+            },
+            ticket_score: 0.1,
+        };
+
+        let mut cfg = MultiObjectiveSelectorConfig::low_latency();
+        cfg.hysteresis_gap = 0.0;
+        cfg.close_per_tick = 4;
+        let sel = mk_selector(cfg);
+        let lc_cfg = ChannelLifecycleConfig::default(); // close_below_quality_score = 0.3
+
+        let ctx = SelectorContext {
+            cfg: &lc_cfg,
+            deficit: 0,
+            open_candidates: &[],
+            close_candidates: &[candidate],
+            start_epoch_elapsed: Duration::from_secs(600),
+            bucket_view: BucketView::empty(),
+            stake_view: StakeView::empty(),
+        };
+
+        let closes = sel.select_closes(&ctx).await;
+        assert!(
+            !closes.is_empty(),
+            "with zero hysteresis, low-quality channel must be closed"
+        );
     }
 }

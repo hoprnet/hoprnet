@@ -27,10 +27,14 @@ impl DefaultSelector {
     /// Returns `true` when the channel should be closed.
     ///
     /// Mirrors the original `ChannelLifecycleStrategyInner::should_close`.
-    fn should_close(
+    /// `quality_threshold` overrides `cfg.closure.close_below_quality_score`; pass
+    /// `None` to use the config value.  `MultiObjectiveSelector` passes an adjusted
+    /// value to enforce the hysteresis gap.
+    pub(super) fn should_close(
         candidate: &CloseCandidate,
         cfg: &super::super::ChannelLifecycleConfig,
         start_epoch_elapsed: Duration,
+        quality_threshold: Option<f64>,
     ) -> bool {
         let ch = &candidate.channel;
 
@@ -61,11 +65,12 @@ impl DefaultSelector {
         let composite_score = cfg.eligibility.peer_quality_weight * edge_score
             + cfg.eligibility.ticket_activity_weight * candidate.ticket_score;
 
-        if composite_score < cfg.closure.close_below_quality_score {
+        let effective_threshold = quality_threshold.unwrap_or(cfg.closure.close_below_quality_score);
+        if composite_score < effective_threshold {
             debug!(
                 dest = %ch.destination,
                 score = composite_score,
-                threshold = cfg.closure.close_below_quality_score,
+                threshold = effective_threshold,
                 reason = "low_quality_score",
                 "channel-lifecycle: close candidate"
             );
@@ -103,7 +108,7 @@ impl Selector for DefaultSelector {
     async fn select_closes(&self, ctx: &SelectorContext<'_>) -> Vec<ChannelId> {
         ctx.close_candidates
             .iter()
-            .filter(|c| Self::should_close(c, ctx.cfg, ctx.start_epoch_elapsed))
+            .filter(|c| Self::should_close(c, ctx.cfg, ctx.start_epoch_elapsed, None))
             .map(|c| *c.channel.get_id())
             .collect()
     }
