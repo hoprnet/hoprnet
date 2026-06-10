@@ -10,11 +10,7 @@ edition.workspace = true
 
 [features]
 default = ["runtime-tokio"]
-runtime-tokio = [
-  "dep:tokio",
-  "dep:tokio-retry",
-  "hopr-lib/runtime-tokio",
-]
+runtime-tokio = ["dep:tokio", "dep:tokio-retry", "hopr-lib/runtime-tokio"]
 telemetry = [
   "hopr-lib/telemetry",
   "hopr-api/types-telemetry",
