@@ -60,7 +60,6 @@ testing = [
   "dep:hopr-chain-connector",
   "dep:hopr-ct-full-network",
   "dep:hopr-network-graph",
-  "dep:hopr-session-server-forwarder",
   "hopr-chain-connector/testing",
   "hopr-chain-connector/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
@@ -68,7 +67,6 @@ testing = [
   "hopr-network-graph/petgraph",
   "hopr-network-graph/graph-api",
   "hopr-ticket-manager/redb",
-  "hopr-session-server-forwarder/runtime-tokio",
 ] # testing related functionality
 
 [dependencies]
@@ -117,7 +115,6 @@ hopr-transport-p2p = { workspace = true, optional = true }
 hopr-chain-connector = { workspace = true, optional = true }
 hopr-ct-full-network = { workspace = true, optional = true }
 hopr-network-graph = { workspace = true, optional = true }
-hopr-session-server-forwarder = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

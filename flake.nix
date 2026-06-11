@@ -106,7 +106,6 @@
             root = ./.;
             inherit fs;
             extraFiles = [
-              ./impls/node/tests
               (fs.fileFilter (file: file.hasExt "snap") ./.)
             ];
           };
@@ -508,7 +507,6 @@
               "db/entity/src/codegen/*"
               ".github/workflows/build-binaries.yaml"
               "docs/*"
-              "impls/node/tests/snapshots/*"
               "nix/setup-hook-darwin.sh"
               "target/*"
             ];

@@ -3606,7 +3606,6 @@ dependencies = [
  "hopr-ct-full-network",
  "hopr-lib",
  "hopr-network-graph",
- "hopr-session-server-forwarder",
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
