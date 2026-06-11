@@ -17,15 +17,15 @@ mod helpers;
 
 /// Builder module for the [`Hopr`] object.
 pub mod builder;
-/// Testing utilities: cluster fixtures, node wiring helpers, echo server.
-#[cfg(any(feature = "testing", test))]
-pub mod testing;
 /// Configuration-related public types
 pub mod config;
 /// Various public constants.
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
+/// Testing utilities: cluster fixtures, node wiring helpers, echo server.
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
@@ -863,6 +863,7 @@ mod tests {
     }
 
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
         let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());

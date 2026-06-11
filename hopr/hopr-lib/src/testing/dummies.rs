@@ -14,7 +14,7 @@ impl EchoServer {
 }
 
 #[async_trait::async_trait]
-impl crate::api::node::HoprSessionServer for EchoServer {
+impl hopr_api::node::HoprSessionServer for EchoServer {
     type Error = HoprLibError;
     type Session = IncomingSession;
 

@@ -47,7 +47,14 @@ pub(super) async fn process_chain_events<C, G>(
                 graph_updater.record_node(account.public_key);
                 if let Some(ref mut tx) = peer_discovery_tx {
                     let peer_id: PeerId = account.public_key.into();
-                    if let Err(e) = tx.try_send((peer_id, account.get_multiaddrs().to_vec())) {
+                    let multiaddrs = account.get_multiaddrs();
+                    let _span = tracing::info_span!(
+                        "peer_announcement",
+                        peer = %peer_id,
+                        multiaddresses = ?multiaddrs,
+                    )
+                    .entered();
+                    if let Err(e) = tx.try_send((peer_id, multiaddrs.to_vec())) {
                         tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
                     }
                 }
@@ -316,7 +323,7 @@ mod tests {
         win_probability: WinningProbability,
     ) -> Vec<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)> {
         use futures::StreamExt;
-        let (tx, mut rx) = futures::channel::mpsc::channel(64);
+        let (tx, rx) = futures::channel::mpsc::channel(64);
         process_chain_events(
             chain,
             graph,
