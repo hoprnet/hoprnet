@@ -3799,6 +3799,7 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
+ "multiaddr",
  "parking_lot",
  "serde",
  "serde_with",
