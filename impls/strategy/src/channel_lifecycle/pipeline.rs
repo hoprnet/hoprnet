@@ -637,7 +637,7 @@ where
                 let addrs = self.node.network_view().multiaddress_of(peer_id).unwrap_or_default();
                 let subnet = SubnetBucket::from_multiaddrs(&addrs);
                 let lat = LatencyBucket::from_latency(c.edge_info.average_latency);
-                Some((*c.channel.get_id(), BucketCell(lat, subnet)))
+                Some((*c.channel.get_id(), BucketCell { latency: lat, subnet }))
             })
             .collect();
         let bucket_view = BucketView::new(bucket_cells);
@@ -966,10 +966,10 @@ where
                     + w.trust_ack * c.edge_info.ack_rate.unwrap_or(0.0)
                     + w.trust_ticket * c.ticket_score;
                 let stake = ctx.stake_view.score(&c.addr);
-                let cell = BucketCell(
-                    LatencyBucket::from_latency(c.edge_info.average_latency),
-                    c.subnet.clone(),
-                );
+                let cell = BucketCell {
+                    latency: LatencyBucket::from_latency(c.edge_info.average_latency),
+                    subnet: c.subnet.clone(),
+                };
                 let anon_penalty = ctx.bucket_view.bucket_coverage(&cell);
 
                 sum_lat += lat;

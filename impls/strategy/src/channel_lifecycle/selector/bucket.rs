@@ -38,7 +38,10 @@ impl LatencyBucket {
 
 /// A (latency, subnet) grid cell.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BucketCell(pub LatencyBucket, pub SubnetBucket);
+pub struct BucketCell {
+    pub latency: LatencyBucket,
+    pub subnet: SubnetBucket,
+}
 
 /// Snapshot of the (latency, subnet) cells for all currently-open channels.
 /// Computed once per tick and passed into `SelectorContext`.
@@ -111,7 +114,7 @@ mod tests {
     fn view(entries: Vec<(ChannelId, LatencyBucket, SubnetBucket)>) -> BucketView {
         let map = entries
             .into_iter()
-            .map(|(id, lat, sub)| (id, BucketCell(lat, sub)))
+            .map(|(id, lat, sub)| (id, BucketCell { latency: lat, subnet: sub }))
             .collect();
         BucketView::new(map)
     }
@@ -148,8 +151,8 @@ mod tests {
 
     #[test]
     fn bucket_coverage_proportional() {
-        let cell_a = BucketCell(LatencyBucket::Fast, subnet(1));
-        let cell_b = BucketCell(LatencyBucket::Slow, subnet(2));
+        let cell_a = BucketCell { latency: LatencyBucket::Fast, subnet: subnet(1) };
+        let cell_b = BucketCell { latency: LatencyBucket::Slow, subnet: subnet(2) };
         let v = view(vec![
             (ch(1), LatencyBucket::Fast, subnet(1)),
             (ch(2), LatencyBucket::Fast, subnet(1)),
