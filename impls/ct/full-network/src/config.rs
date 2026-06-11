@@ -61,6 +61,24 @@ pub struct ProberConfig {
     pub probe_connected_only: bool,
 }
 
+impl ProberConfig {
+    /// Validates the config, additionally ensuring `self.interval >= probe_timeout`.
+    ///
+    /// Pinging more frequently than the probe timeout would cause probes to overlap;
+    /// this check prevents that misconfiguration.
+    pub fn validate_against_probe_timeout(&self, probe_timeout: std::time::Duration) -> anyhow::Result<()> {
+        self.validate()
+            .map_err(|e| anyhow::anyhow!("invalid ProberConfig: {e}"))?;
+        anyhow::ensure!(
+            self.interval >= probe_timeout,
+            "ProberConfig.interval ({:?}) must be >= probe_timeout ({:?})",
+            self.interval,
+            probe_timeout,
+        );
+        Ok(())
+    }
+}
+
 impl Validate for ProberConfig {
     fn validate(&self) -> Result<(), ValidationErrors> {
         let mut errors = ValidationErrors::new();
@@ -128,6 +146,20 @@ const fn just_true() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interval_less_than_probe_timeout_is_invalid() {
+        let cfg = ProberConfig::default(); // interval = 30s
+        let timeout = std::time::Duration::from_secs(60);
+        assert!(cfg.validate_against_probe_timeout(timeout).is_err());
+    }
+
+    #[test]
+    fn interval_equal_to_probe_timeout_is_valid() {
+        let cfg = ProberConfig::default(); // interval = 30s
+        let timeout = std::time::Duration::from_secs(30);
+        assert!(cfg.validate_against_probe_timeout(timeout).is_ok());
+    }
 
     #[test]
     fn default_config_is_valid() {
