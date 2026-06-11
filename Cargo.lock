@@ -3634,6 +3634,7 @@ dependencies = [
  "insta",
  "parking_lot",
  "petgraph",
+ "rand 0.10.1",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
