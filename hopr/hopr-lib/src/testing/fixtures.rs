@@ -10,9 +10,15 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
+use rand::seq::{IteratorRandom, SliceRandom};
+use rstest::fixture;
+use tokio::time::sleep;
+use tracing::info;
+
 #[cfg(feature = "explicit-path")]
-use hopr_lib::HoprSessionClientExplicitPathConfig;
-use hopr_lib::{
+#[allow(deprecated)]
+use crate::HoprSessionClientExplicitPathConfig;
+use crate::{
     HopRouting, HoprSessionClientConfig,
     api::{
         network::NetworkView,
@@ -30,15 +36,10 @@ use hopr_lib::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{HoprSession, SessionTarget},
     },
-};
-use rand::seq::{IteratorRandom, SliceRandom};
-use rstest::fixture;
-use tokio::time::sleep;
-use tracing::info;
-
-use crate::testing::{
-    dummies::EchoServer,
-    hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
+    testing::{
+        dummies::EchoServer,
+        hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
+    },
 };
 
 /// Estimated time for on-chain state to propagate across all nodes.
@@ -125,11 +126,11 @@ impl ClusterGuard {
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
             let channels: Vec<ChannelEntry> = {
-                use hopr_lib::api::{chain::ChainReadChannelOperations, node::HasChainApi};
+                use crate::api::{chain::ChainReadChannelOperations, node::HasChainApi};
                 match observer
                     .inner()
                     .chain_api()
-                    .stream_channels(hopr_lib::api::chain::ChannelSelector::default())
+                    .stream_channels(crate::api::chain::ChannelSelector::default())
                 {
                     Ok(stream) => stream.collect().await,
                     Err(_) => vec![],
@@ -197,6 +198,7 @@ impl ClusterGuard {
     ///
     /// Channels must already be open before calling this method.
     #[cfg(feature = "explicit-path")]
+    #[allow(deprecated)]
     pub async fn create_session_with_explicit_path(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
@@ -207,8 +209,8 @@ impl ClusterGuard {
         let forward_path = path[1..path.len() - 1]
             .iter()
             .map(|node| {
-                hopr_lib::peer_id_to_offchain_key(&node.peer_id())
-                    .map(hopr_lib::api::types::internal::NodeId::from)
+                crate::peer_id_to_offchain_key(&node.peer_id())
+                    .map(crate::api::types::internal::NodeId::from)
                     .map_err(anyhow::Error::from)
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -571,7 +573,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
 
-                    let instance = crate::build_full_with_chain(
+                    let instance = crate::testing::wiring::build_full_with_chain(
                         &onchain_keys[i],
                         &offchain_keys[i],
                         config,

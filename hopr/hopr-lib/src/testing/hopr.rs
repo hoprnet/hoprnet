@@ -2,7 +2,8 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
-use hopr_lib::{
+
+use crate::{
     api::{
         PeerId,
         node::{HasChainApi, HoprNodeOperations, HoprState, IncentiveChannelOperations},
@@ -13,9 +14,8 @@ use hopr_lib::{
         },
     },
     config::{HoprLibConfig, SessionGlobalConfig},
+    testing::{TestingConnector, TestingHopr},
 };
-
-use crate::testing::{TestingConnector, TestingHopr};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -25,16 +25,16 @@ pub struct NodeSafeConfig {
 
 pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_prob: f64) -> HoprLibConfig {
     HoprLibConfig {
-        host: hopr_lib::config::HostConfig {
-            address: hopr_lib::config::HostType::default(),
+        host: crate::config::HostConfig {
+            address: crate::config::HostType::default(),
             port: host_port,
         },
-        safe_module: hopr_lib::config::SafeModule {
+        safe_module: crate::config::SafeModule {
             safe_address: safe.safe_address,
             module_address: safe.module_address,
         },
-        protocol: hopr_lib::config::HoprProtocolConfig {
-            transport: hopr_lib::config::TransportConfig {
+        protocol: crate::config::HoprProtocolConfig {
+            transport: crate::config::TransportConfig {
                 prefer_local_addresses: true,
                 announce_local_addresses: true,
             },
@@ -42,14 +42,14 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
                 idle_timeout: Duration::from_millis(2500),
                 ..Default::default()
             },
-            probe: hopr_lib::config::ProbeConfig {
+            probe: crate::config::ProbeConfig {
                 timeout: Duration::from_secs(2),
                 max_parallel_probes: 10,
                 recheck_threshold: Duration::from_secs(1),
                 ..Default::default()
             },
-            packet: hopr_lib::config::HoprPacketPipelineConfig {
-                codec: hopr_lib::exports::transport::config::HoprCodecConfig {
+            packet: crate::config::HoprPacketPipelineConfig {
+                codec: crate::exports::transport::config::HoprCodecConfig {
                     outgoing_win_prob: Some(winn_prob.try_into().expect("invalid winning probability")),
                     ..Default::default()
                 },
@@ -234,7 +234,7 @@ impl ChannelGuard {
                         }
                         _ => {}
                     }
-                    Ok::<_, hopr_lib::errors::HoprLibError>(false)
+                    Ok::<_, crate::errors::HoprLibError>(false)
                 },
                 Duration::from_secs(30),
             )
@@ -271,7 +271,7 @@ impl Drop for ChannelGuard {
                                     }
                                     _ => {}
                                 }
-                                Ok::<_, hopr_lib::errors::HoprLibError>(false)
+                                Ok::<_, crate::errors::HoprLibError>(false)
                             },
                             Duration::from_secs(30),
                         )

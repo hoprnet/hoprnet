@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::{StreamExt, pin_mut};
 use hopr_api::{
-    HoprBalance, OffchainPublicKey,
+    HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
     graph::{EdgeCapacityUpdate, MeasurableEdge, NetworkGraphUpdate},
     types::{
@@ -18,7 +18,10 @@ use parking_lot::RwLock;
 ///
 /// Drives the chain-to-graph edge of the topology pipeline: converts incoming on-chain
 /// `ChainEvent`s into [`NetworkGraphUpdate`] calls so the routing graph stays current.
+/// When `peer_discovery_tx` is `Some`, each [`ChainEvent::Announcement`] is also forwarded
+/// to the p2p network layer so it can initiate connections to newly discovered peers.
 /// Runs until the supplied `events` stream terminates.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn process_chain_events<C, G>(
     chain_reader: C,
     graph_updater: G,
@@ -27,6 +30,7 @@ pub(super) async fn process_chain_events<C, G>(
     own_packet_key: OffchainPublicKey,
     ticket_price: Arc<RwLock<HoprBalance>>,
     win_probability: Arc<RwLock<WinningProbability>>,
+    mut peer_discovery_tx: Option<futures::channel::mpsc::Sender<(PeerId, Vec<Multiaddr>)>>,
 ) where
     C: ChainKeyOperations + Clone + Send + Sync + 'static,
     G: NetworkGraphUpdate + Send + Sync + 'static,
@@ -41,6 +45,19 @@ pub(super) async fn process_chain_events<C, G>(
                     "recording graph node for announced account"
                 );
                 graph_updater.record_node(account.public_key);
+                if let Some(ref mut tx) = peer_discovery_tx {
+                    let peer_id: PeerId = account.public_key.into();
+                    let multiaddrs = account.get_multiaddrs();
+                    let _span = tracing::info_span!(
+                        "peer_announcement",
+                        peer = %peer_id,
+                        multiaddresses = ?multiaddrs,
+                    )
+                    .entered();
+                    if let Err(e) = tx.try_send((peer_id, multiaddrs.to_vec())) {
+                        tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
+                    }
+                }
             }
             ChainEvent::ChannelOpened(channel)
             | ChainEvent::ChannelClosureInitiated(channel)
@@ -284,6 +301,29 @@ mod tests {
         ticket_price: HoprBalance,
         win_probability: WinningProbability,
     ) {
+        let _ = run_with_peer_discovery(
+            events,
+            chain,
+            graph,
+            own_chain_addr,
+            own_packet_key,
+            ticket_price,
+            win_probability,
+        )
+        .await;
+    }
+
+    async fn run_with_peer_discovery(
+        events: Vec<ChainEvent>,
+        chain: StubChainKeys,
+        graph: RecordingGraph,
+        own_chain_addr: Address,
+        own_packet_key: OffchainPublicKey,
+        ticket_price: HoprBalance,
+        win_probability: WinningProbability,
+    ) -> Vec<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)> {
+        use futures::StreamExt;
+        let (tx, rx) = futures::channel::mpsc::channel(64);
         process_chain_events(
             chain,
             graph,
@@ -292,8 +332,10 @@ mod tests {
             own_packet_key,
             Arc::new(RwLock::new(ticket_price)),
             Arc::new(RwLock::new(win_probability)),
+            Some(tx),
         )
         .await;
+        rx.collect().await
     }
 
     // ---------------------------------------------------------------------------
@@ -319,6 +361,48 @@ mod tests {
 
         assert_eq!(graph.nodes(), vec![*offchain.public()]);
         assert!(graph.edges().is_empty());
+    }
+
+    #[tokio::test]
+    async fn announcement_should_forward_to_peer_discovery_when_tx_is_set() -> anyhow::Result<()> {
+        use std::str::FromStr;
+
+        use hopr_api::types::internal::prelude::AccountType;
+
+        let (offchain, chain) = make_keypairs();
+        let addr = chain.public().to_address();
+        let multiaddr = hopr_api::Multiaddr::from_str("/ip4/1.2.3.4/tcp/9000").context("parse multiaddr")?;
+        let entry = AccountEntry {
+            entry_type: AccountType::Announced(vec![multiaddr.clone()]),
+            ..account(*offchain.public(), addr)
+        };
+        let graph = RecordingGraph::default();
+
+        let received = run_with_peer_discovery(
+            vec![ChainEvent::Announcement(entry)],
+            StubChainKeys::new([]),
+            graph.clone(),
+            addr,
+            *offchain.public(),
+            HoprBalance::from(10u64),
+            WinningProbability::ALWAYS,
+        )
+        .await;
+
+        assert_eq!(received.len(), 1, "expected exactly one peer-discovery event");
+        let (peer_id, addrs) = &received[0];
+        assert_eq!(
+            *peer_id,
+            hopr_api::PeerId::from(*offchain.public()),
+            "peer id must match the announced account's public key"
+        );
+        assert_eq!(addrs, &vec![multiaddr], "multiaddrs must be forwarded unchanged");
+        assert_eq!(
+            graph.nodes(),
+            vec![*offchain.public()],
+            "graph must also record the node"
+        );
+        Ok(())
     }
 
     #[tokio::test]
