@@ -575,8 +575,6 @@ mod tests {
         });
     }
 
-
-
     fn small_config() -> PathPlannerConfig {
         PathPlannerConfig {
             max_cache_capacity: 100,
