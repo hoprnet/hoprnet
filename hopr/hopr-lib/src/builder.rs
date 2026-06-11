@@ -22,7 +22,7 @@
 //!     .with_config(config)
 //!     .with_chain_api(|_ctx| { /* ... */ todo!() })
 //!     .with_graph(|_ctx| { /* ... */ todo!() })
-//!     .with_network(|_ctx| Box::pin(async { /* ... */ todo!() }))
+//!     .with_network(|_ctx| Box::pin(async { /* ... */ Ok(todo!()) }))
 //!     .with_cover_traffic(|_ctx| { /* ... */ todo!() });
 //! ```
 
@@ -74,6 +74,11 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
+
+type PeerDiscoveryRx =
+    Arc<parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
+
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
 type AsyncFactory<T> = Box<dyn FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = T> + Send>> + Send>;
@@ -87,6 +92,16 @@ pub struct BuildCtx {
     pub packet_key: OffchainKeypair,
     /// Node configuration.
     pub cfg: HoprLibConfig,
+    peer_discovery_rx: PeerDiscoveryRx,
+}
+
+impl BuildCtx {
+    /// Take the peer-discovery receiver. Returns `Some` on the first call, `None` afterwards.
+    pub fn take_peer_discovery_rx(
+        &self,
+    ) -> Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
+        self.peer_discovery_rx.lock().take()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -116,17 +131,20 @@ pub struct HoprBuilderWithIdentity {
 impl HoprBuilderWithIdentity {
     /// Sets the node configuration and produces the configured builder.
     pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
+        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(PEER_DISCOVERY_CHANNEL_CAPACITY);
         HoprBuilderConfigured {
             ctx: BuildCtx {
                 chain_key: self.chain_key,
                 packet_key: self.packet_key,
                 cfg,
+                peer_discovery_rx: Arc::new(parking_lot::Mutex::new(Some(peer_discovery_rx))),
             },
             safe_and_module: None,
             chain_factory: None,
             graph_factory: None,
             network_factory: None,
             ct_factory: None,
+            peer_discovery_tx,
         }
     }
 }
@@ -147,8 +165,9 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     safe_and_module: Option<(Address, Address)>,
     chain_factory: Option<Factory<Chain>>,
     graph_factory: Option<Factory<Graph>>,
-    network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
+    network_factory: Option<AsyncFactory<Result<(Net, BoxedProcessFn), HoprLibError>>>,
     ct_factory: Option<Factory<Ct>>,
+    peer_discovery_tx: futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
@@ -170,6 +189,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -185,16 +205,20 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: Some(Box::new(f)),
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
-    /// Sets the network factory. Must return `(Net, BoxedProcessFn)`.
+    /// Sets the network factory. Must resolve to `Ok((Net, BoxedProcessFn))`.
     ///
     /// The factory receives [`BuildCtx`] by value and returns a boxed future,
     /// allowing async network construction without blocking the executor.
+    /// Failures are propagated as [`HoprLibError`] during the build step.
     pub fn with_network<NewNet>(
         self,
-        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = (NewNet, BoxedProcessFn)> + Send>> + Send + 'static,
+        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = Result<(NewNet, BoxedProcessFn), HoprLibError>> + Send>>
+        + Send
+        + 'static,
     ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
         HoprBuilderConfigured {
             ctx: self.ctx,
@@ -203,6 +227,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: Some(Box::new(f)),
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -218,6 +243,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: Some(Box::new(f)),
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -347,6 +373,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
+    let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
     ctx.cfg.validate()?;
 
@@ -360,7 +387,7 @@ where
         (configured
             .network_factory
             .ok_or(HoprLibError::BuilderError("missing network factory"))?)(ctx.clone())
-        .await;
+        .await?;
     let cover_traffic = (configured
         .ct_factory
         .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);
@@ -600,6 +627,7 @@ where
             own_packet_key,
             ticket_price,
             win_probability,
+            peer_discovery_tx,
         )
         .inspect(|_| {
             tracing::warn!(

@@ -18,8 +18,8 @@ members = [
   "transport/tag-allocator",
   "utils-session",
   # implementations
-  "hopr/reference",
   "impls/connector",
+  "impls/session-server-forwarder",
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
@@ -180,7 +180,7 @@ hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-featu
 hopr-chain-connector = { path = "impls/connector" }
 
 # referential implementations
-hopr-reference = { path = "hopr/reference", default-features = false }
+hopr-session-server-forwarder = { path = "impls/session-server-forwarder", default-features = false }
 hopr-transport-p2p = { path = "impls/transport/p2p", default-features = false }
 hopr-ct-immediate = { path = "impls/ct/immediate", default-features = false }
 hopr-ct-full-network = { path = "impls/ct/full-network", default-features = false }
@@ -229,4 +229,9 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde"]
+ignored = [
+  "oas3",
+  "serde_bytes",
+  "humantime-serde",
+  "hopr-session-server-forwarder",
+]

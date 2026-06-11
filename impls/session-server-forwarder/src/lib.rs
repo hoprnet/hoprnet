@@ -1,15 +1,17 @@
+//! HOPR session server that bridges TCP/UDP sockets from the Session Exit node to a destination.
+
+pub mod config;
+
 use std::net::SocketAddr;
 
-use hopr_lib::{
-    api::types::crypto::prelude::OffchainKeypair,
-    errors::HoprLibError,
-    exports::{
-        network::types::{
-            prelude::ForeignDataMode,
-            udp::{ConnectedUdpStream, UdpStreamParallelism},
-        },
-        transport::{ServiceId, SessionTarget, transfer_session},
+use hopr_api::types::crypto::prelude::OffchainKeypair;
+use hopr_transport_session::{IncomingSession, ServiceId, SessionTarget, transfer_session};
+use hopr_utils::{
+    network_types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
     },
+    parallelize::cpu::spawn_blocking,
 };
 
 use crate::config::SessionIpForwardingConfig;
@@ -31,6 +33,19 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
+
+/// Error type for [`HoprServerIpForwardingReactor`].
+#[derive(Debug, thiserror::Error)]
+pub enum ForwarderError {
+    #[error("{0}")]
+    General(String),
+}
+
+impl ForwarderError {
+    fn general(s: impl std::fmt::Display) -> Self {
+        Self::General(s.to_string())
+    }
+}
 
 /// Implementation of `HoprSessionServer` that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
@@ -62,24 +77,20 @@ impl HoprServerIpForwardingReactor {
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[async_trait::async_trait]
-impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
-    type Error = hopr_lib::errors::HoprLibError;
-    type Session = hopr_lib::exports::transport::IncomingSession;
+impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
+    type Error = ForwarderError;
+    type Session = IncomingSession;
 
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(
-        &self,
-        mut session: hopr_lib::exports::transport::IncomingSession,
-    ) -> Result<(), hopr_lib::errors::HoprLibError> {
+    async fn process(&self, mut session: IncomingSession) -> Result<(), ForwarderError> {
         let session_id = *session.session.id();
         match session.target {
             SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target =
-                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
-                        .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let udp_target = spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
+                    .await
+                    .map_err(|e| ForwarderError::general(format!("failed to spawn unseal task: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
                     session_id = ?session_id,
@@ -93,11 +104,9 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     .clone()
                     .resolve_tokio()
                     .await
-                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("failed to resolve DNS name {udp_target}: {e}")))?
                     .first()
-                    .ok_or(HoprLibError::GeneralError(format!(
-                        "failed to resolve DNS name {udp_target}"
-                    )))?
+                    .ok_or_else(|| ForwarderError::general(format!("failed to resolve DNS name {udp_target}")))?
                     .to_owned();
                 tracing::debug!(
                     ?session_id,
@@ -107,7 +116,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 );
 
                 if !self.all_ips_allowed(&[resolved_udp_target]) {
-                    return Err(HoprLibError::GeneralError(format!(
+                    return Err(ForwarderError::general(format!(
                         "denied target address {resolved_udp_target}"
                     )));
                 }
@@ -125,9 +134,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     )
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
-                        HoprLibError::GeneralError(format!(
-                            "could not bridge the incoming session to {udp_target}: {e}"
-                        ))
+                        ForwarderError::general(format!("could not bridge the incoming session to {udp_target}: {e}"))
                     })?;
 
                 tracing::debug!(
@@ -163,11 +170,10 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
             }
             SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target =
-                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
-                        .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let tcp_target = spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
+                    .await
+                    .map_err(|e| ForwarderError::general(format!("failed to spawn unseal task: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
 
@@ -175,7 +181,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 // and therefore we can pass all of them.
                 let resolved_tcp_targets =
                     tcp_target.clone().resolve_tokio().await.map_err(|e| {
-                        HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
+                        ForwarderError::general(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(
                     ?session_id,
@@ -185,7 +191,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 );
 
                 if !self.all_ips_allowed(&resolved_tcp_targets) {
-                    return Err(HoprLibError::GeneralError(format!(
+                    return Err(ForwarderError::general(format!(
                         "denied target address {resolved_tcp_targets:?}"
                     )));
                 }
@@ -198,11 +204,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 })
                 .await
                 .map_err(|e| {
-                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {tcp_target}: {e}"))
+                    ForwarderError::general(format!("could not bridge the incoming session to {tcp_target}: {e}"))
                 })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
-                    HoprLibError::GeneralError(format!(
+                    ForwarderError::general(format!(
                         "could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
                     ))
                 })?;
@@ -255,7 +261,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 Ok(())
             }
-            SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
+            SessionTarget::ExitNode(_) => Err(ForwarderError::General(
                 "server does not support internal session processing".into(),
             )),
         }
