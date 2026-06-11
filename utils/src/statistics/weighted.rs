@@ -54,9 +54,8 @@ impl<T> WeightedCollection<T> {
     /// and is useful for diagnostics, e.g. logging the selection probability of each
     /// candidate path.
     pub fn probability_of(&self, weight: f64) -> f64 {
-        let w = weight.max(0.0);
-        if self.total_weight > 0.0 && w > 0.0 {
-            w / self.total_weight
+        if self.total_weight > 0.0 && weight > 0.0 {
+            weight / self.total_weight
         } else {
             0.0
         }

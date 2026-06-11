@@ -202,8 +202,8 @@ where
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        let mut path_metrics: Vec<PathWithMetrics> = Vec::new();
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
                         for mut pwc in candidates {
                             let path_nodes = std::mem::take(&mut pwc.path);
                             let node_ids: Vec<NodeId> =
@@ -395,8 +395,8 @@ where
                         && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        let mut path_metrics: Vec<PathWithMetrics> = Vec::new();
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
                         for mut pwc in candidates {
                             let path_nodes = std::mem::take(&mut pwc.path);
                             let node_ids: Vec<NodeId> =
