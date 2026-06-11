@@ -62,7 +62,12 @@ impl ChannelLifecycleStrategy {
             + 'static,
     {
         let selector: Arc<dyn super::selector::Selector> = match self.cfg.selector.multi_objective_config() {
-            Some(mo_cfg) => Arc::new(MultiObjectiveSelector::new(mo_cfg)),
+            Some(mo_cfg) => {
+                mo_cfg
+                    .validate_trust_weights()
+                    .expect("invalid selector config: trust inner weights must sum to ~1.0");
+                Arc::new(MultiObjectiveSelector::new(mo_cfg))
+            }
             None => Arc::new(DefaultSelector),
         };
 
