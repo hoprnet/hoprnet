@@ -435,7 +435,10 @@ mod tests {
         let c1 = mk_candidate(addr1, offchain_key(10), Some(60), 0.8, 0.5, 1); // crowded bucket
         let c2 = mk_candidate(addr2, offchain_key(20), Some(60), 0.8, 0.5, 2); // empty bucket
 
-        let crowded_cell = BucketCell { latency: LatencyBucket::Fast, subnet: SubnetBucket::V4Prefix([1, 0, 0]) };
+        let crowded_cell = BucketCell {
+            latency: LatencyBucket::Fast,
+            subnet: SubnetBucket::V4Prefix([1, 0, 0]),
+        };
         let cells: HashMap<ChannelId, BucketCell> = (0u8..3)
             .map(|i| (ChannelId::create(&[&[i]]), crowded_cell.clone()))
             .collect();
@@ -479,7 +482,10 @@ mod tests {
         // should pick the subnet-2 candidate first.
 
         // Build bucket_view with 2 channels in cell (Fast, subnet 1)
-        let cell_1 = BucketCell { latency: LatencyBucket::Fast, subnet: SubnetBucket::V4Prefix([1, 0, 0]) };
+        let cell_1 = BucketCell {
+            latency: LatencyBucket::Fast,
+            subnet: SubnetBucket::V4Prefix([1, 0, 0]),
+        };
         let existing_cells: HashMap<ChannelId, BucketCell> =
             (0u8..2).map(|i| (ChannelId::create(&[&[i]]), cell_1.clone())).collect();
         let bucket_view = BucketView::new(existing_cells);
@@ -537,7 +543,10 @@ mod tests {
             .expect("test channel");
 
         // Populate bucket_view with the channel's actual ID.
-        let unique_cell = BucketCell { latency: LatencyBucket::Fast, subnet: SubnetBucket::V4Prefix([5, 0, 0]) };
+        let unique_cell = BucketCell {
+            latency: LatencyBucket::Fast,
+            subnet: SubnetBucket::V4Prefix([5, 0, 0]),
+        };
         let mut bucket_cells: HashMap<ChannelId, BucketCell> = HashMap::new();
         bucket_cells.insert(*ch.get_id(), unique_cell);
         let bucket_view = BucketView::new(bucket_cells);
@@ -599,7 +608,10 @@ mod tests {
             .build()
             .expect("test channel");
 
-        let unique_cell = BucketCell { latency: LatencyBucket::Fast, subnet: SubnetBucket::V4Prefix([5, 0, 0]) };
+        let unique_cell = BucketCell {
+            latency: LatencyBucket::Fast,
+            subnet: SubnetBucket::V4Prefix([5, 0, 0]),
+        };
         let mut bucket_cells: HashMap<ChannelId, BucketCell> = HashMap::new();
         bucket_cells.insert(*ch.get_id(), unique_cell);
         let bucket_view = BucketView::new(bucket_cells);
@@ -692,7 +704,10 @@ mod tests {
             .expect("test channel");
 
         // Put channel in a 3-occupant cell so k-floor doesn't veto
-        let cell = BucketCell { latency: LatencyBucket::Fast, subnet: SubnetBucket::V4Prefix([7, 0, 0]) };
+        let cell = BucketCell {
+            latency: LatencyBucket::Fast,
+            subnet: SubnetBucket::V4Prefix([7, 0, 0]),
+        };
         let bucket_cells: HashMap<_, _> = (0u8..3)
             .map(|i| {
                 (
@@ -839,7 +854,10 @@ mod tests {
         };
 
         // Put the channel in its own cell so k-floor is not the reason for the veto.
-        let cell = BucketCell { latency: LatencyBucket::VerySlow, subnet: SubnetBucket::V4Prefix([99, 0, 0]) };
+        let cell = BucketCell {
+            latency: LatencyBucket::VerySlow,
+            subnet: SubnetBucket::V4Prefix([99, 0, 0]),
+        };
         let mut bucket_cells: HashMap<_, _> = HashMap::new();
         // Add 3 other channels in the same cell so k-floor (k=2) is satisfied.
         for i in 0u8..3 {
