@@ -10,21 +10,28 @@ edition.workspace = true
 
 [features]
 default = ["runtime-tokio"]
-runtime-tokio = ["dep:tokio", "dep:tokio-retry", "hopr-lib/runtime-tokio"]
+runtime-tokio = [
+  "dep:tokio",
+  "dep:tokio-retry",
+  "hopr-utils/network-types-runtime-tokio",
+  "hopr-utils/parallelize-runtime-tokio",
+  "hopr-transport-session/runtime-tokio",
+]
 telemetry = [
-  "hopr-lib/telemetry",
   "hopr-api/types-telemetry",
   "dep:lazy_static",
 ]
 
 [dependencies]
 async-trait = { workspace = true }
-hopr-api = { workspace = true }
-hopr-lib = { workspace = true, features = ["session-server", "utils_parallel"] }
+hopr-api = { workspace = true, features = ["node-session-server", "types-keypair"] }
+hopr-transport-session = { workspace = true }
+hopr-utils = { workspace = true, features = ["network-types", "parallelize", "parallelize-rayon"] }
 lazy_static = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
 tracing = { workspace = true }
