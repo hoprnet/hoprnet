@@ -2,7 +2,7 @@ use std::{collections::HashSet, net::SocketAddr, num::NonZeroUsize, time::Durati
 
 use serde_with::serde_as;
 
-/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`](crate::exit::HoprServerIpForwardingReactor))
+/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`](crate::HoprServerIpForwardingReactor))
 /// and the Entry node.
 #[serde_as]
 #[derive(

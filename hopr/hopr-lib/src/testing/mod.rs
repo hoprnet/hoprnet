@@ -12,10 +12,11 @@ use hopr_transport_p2p::HoprNetwork;
 pub mod dummies;
 pub mod fixtures;
 pub mod hopr;
+pub mod wiring;
 
 pub(crate) type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;
 pub(crate) type TestingGraph = SharedChannelGraph;
-pub(crate) type TestingHopr = crate::Hopr<TestingConnector, TestingGraph, HoprNetwork, crate::SharedTicketManager>;
+pub(crate) type TestingHopr = crate::Hopr<TestingConnector, TestingGraph, HoprNetwork, wiring::SharedTicketManager>;
 
 /// Waits until either the given async `predicate` returns true or the `timeout` is reached.
 ///

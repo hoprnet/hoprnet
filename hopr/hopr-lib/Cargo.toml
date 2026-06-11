@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+
 [features]
 capture = ["hopr-transport/capture"]
 default = []
@@ -49,7 +50,23 @@ utils_parallel = [] # utility parallelization functionality
 testing = [
   "session-server",
   "session-client",
-  "dep:tokio",
+  "runtime-tokio",
+  "dep:hex-literal",
+  "dep:rand",
+  "dep:rstest",
+  "dep:tokio-util",
+  "dep:hopr-ticket-manager",
+  "dep:hopr-transport-p2p",
+  "dep:hopr-chain-connector",
+  "dep:hopr-ct-full-network",
+  "dep:hopr-network-graph",
+  "hopr-chain-connector/testing",
+  "hopr-chain-connector/runtime-tokio",
+  "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-p2p/transport-quic",
+  "hopr-network-graph/petgraph",
+  "hopr-network-graph/graph-api",
+  "hopr-ticket-manager/redb",
 ] # testing related functionality
 
 [dependencies]
@@ -74,6 +91,11 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hex-literal = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+rstest = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
+
 hopr-api = { workspace = true, features = [
   "full",
   "types-random",
@@ -88,11 +110,36 @@ hopr-utils = { workspace = true, features = [
 ] }
 hopr-transport = { workspace = true }
 
+hopr-ticket-manager = { workspace = true, optional = true }
+hopr-transport-p2p = { workspace = true, optional = true }
+hopr-chain-connector = { workspace = true, optional = true }
+hopr-ct-full-network = { workspace = true, optional = true }
+hopr-network-graph = { workspace = true, optional = true }
+
 [dev-dependencies]
-hopr-utils = { workspace = true, features = ["runtime-tokio"] }
+anyhow = { workspace = true }
+futures = { workspace = true }
 insta = { workspace = true }
+rand = { workspace = true }
+rstest = { workspace = true }
+serial_test = { workspace = true }
 serde-saphyr = { workspace = true }
+test-log = { workspace = true }
 tokio = { workspace = true }
+opentelemetry-prometheus-text-exporter = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = [
+  "metrics",
+  "experimental_metrics_custom_reader",
+  "testing",
+] }
+
+hopr-api = { workspace = true, features = ["types-random", "types-telemetry"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
+hopr-lib = { workspace = true, features = ["testing"] }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 
 [package.metadata.cargo-machete]
