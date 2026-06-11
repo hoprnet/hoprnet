@@ -42,15 +42,15 @@ impl PartialEq for PathCostWithMetrics {
     }
 }
 
-impl PathCostWithMetrics {
-    fn into_path_with_metrics(self, path: Vec<OffchainPublicKey>) -> PathWithMetrics {
+impl From<(PathCostWithMetrics, Vec<OffchainPublicKey>)> for PathWithMetrics {
+    fn from((metrics, path): (PathCostWithMetrics, Vec<OffchainPublicKey>)) -> Self {
         PathWithMetrics {
             path,
-            cost: self.cost,
-            total_latency_ms: self.total_latency_ms,
-            min_probe_success_rate: self.min_probe_success_rate,
-            min_ack_rate: self.min_ack_rate,
-            capacity_floor: self.capacity_floor,
+            cost: metrics.cost,
+            total_latency_ms: metrics.total_latency_ms,
+            min_probe_success_rate: metrics.min_probe_success_rate,
+            min_ack_rate: metrics.min_ack_rate,
+            capacity_floor: metrics.capacity_floor,
         }
     }
 }
@@ -184,7 +184,7 @@ where
             if metrics.cost > 0.0 {
                 let mut path = path;
                 path.push(*dest);
-                Some(metrics.into_path_with_metrics(path))
+                Some(PathWithMetrics::from((metrics, path)))
             } else {
                 None
             }
@@ -293,7 +293,7 @@ where
                 }
 
                 tracing::trace!(?candidate, cost = metrics.cost, "extended forward path candidate");
-                Some(metrics.into_path_with_metrics(candidate))
+                Some(PathWithMetrics::from((metrics, candidate)))
             })
             .take(take)
             .collect()
