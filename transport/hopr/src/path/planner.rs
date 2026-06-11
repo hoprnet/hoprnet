@@ -19,7 +19,7 @@ use validator::{Validate, ValidationError};
 
 use super::{
     errors::{PathPlannerError, Result},
-    traits::{BackgroundPathCacheRefreshable, PathSelector},
+    traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -203,11 +203,16 @@ where
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for candidate in candidates {
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::new();
+                        for mut pwc in candidates {
+                            let path_nodes = std::mem::take(&mut pwc.path);
                             let node_ids: Vec<NodeId> =
-                                candidate.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, candidate.cost)),
+                                Ok(vp) => {
+                                    valid_paths.push((vp, pwc.cost));
+                                    path_metrics.push(pwc);
+                                }
                                 Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
                             }
                         }
@@ -220,7 +225,22 @@ where
                             )));
                         }
 
-                        Ok(Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)))
+                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                            tracing::debug!(
+                                %destination,
+                                hops = hops_usize,
+                                path = %vp,
+                                cost = pwm.cost,
+                                sampling_probability = weighted.probability_of(*w),
+                                total_latency_ms = ?pwm.total_latency_ms,
+                                min_probe_success_rate = ?pwm.min_probe_success_rate,
+                                min_ack_rate = ?pwm.min_ack_rate,
+                                capacity_floor = ?pwm.capacity_floor,
+                                "weighted candidate path",
+                            );
+                        }
+                        Ok(Arc::new(weighted))
                     })
                     .await
                     .map_err(PathPlannerError::CacheError)?;
@@ -376,11 +396,16 @@ where
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for candidate in candidates {
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::new();
+                        for mut pwc in candidates {
+                            let path_nodes = std::mem::take(&mut pwc.path);
                             let node_ids: Vec<NodeId> =
-                                candidate.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, candidate.cost)),
+                                Ok(vp) => {
+                                    valid_paths.push((vp, pwc.cost));
+                                    path_metrics.push(pwc);
+                                }
                                 Err(e) => {
                                     tracing::debug!(error = %e, "background refresh: path candidate failed validation")
                                 }
@@ -388,12 +413,23 @@ where
                         }
 
                         if !valid_paths.is_empty() {
-                            cache
-                                .insert(
-                                    (src, dest, hops_u32),
-                                    Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
-                                )
-                                .await;
+                            let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                            for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                                tracing::debug!(
+                                    kind = "background-refresh",
+                                    destination = %dest_key,
+                                    hops = hops_usize,
+                                    path = %vp,
+                                    cost = pwm.cost,
+                                    sampling_probability = weighted.probability_of(*w),
+                                    total_latency_ms = ?pwm.total_latency_ms,
+                                    min_probe_success_rate = ?pwm.min_probe_success_rate,
+                                    min_ack_rate = ?pwm.min_ack_rate,
+                                    capacity_floor = ?pwm.capacity_floor,
+                                    "weighted candidate path",
+                                );
+                            }
+                            cache.insert((src, dest, hops_u32), Arc::new(weighted)).await;
                         }
                     }
                 }
