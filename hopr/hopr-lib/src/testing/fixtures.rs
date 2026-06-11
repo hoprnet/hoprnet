@@ -10,6 +10,11 @@ use hopr_chain_connector::{
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
+use rand::seq::{IteratorRandom, SliceRandom};
+use rstest::fixture;
+use tokio::time::sleep;
+use tracing::info;
+
 #[cfg(feature = "explicit-path")]
 #[allow(deprecated)]
 use crate::HoprSessionClientExplicitPathConfig;
@@ -31,15 +36,10 @@ use crate::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{HoprSession, SessionTarget},
     },
-};
-use rand::seq::{IteratorRandom, SliceRandom};
-use rstest::fixture;
-use tokio::time::sleep;
-use tracing::info;
-
-use crate::testing::{
-    dummies::EchoServer,
-    hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
+    testing::{
+        dummies::EchoServer,
+        hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
+    },
 };
 
 /// Estimated time for on-chain state to propagate across all nodes.

@@ -9,8 +9,8 @@ use hopr_lib::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{SessionCapabilities, SessionManagerError, SessionTarget, TransportSessionError},
     },
+    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster},
 };
-use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster};
 use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;

@@ -2,6 +2,7 @@ use std::{fmt::Formatter, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
+
 use crate::{
     api::{
         PeerId,
@@ -13,9 +14,8 @@ use crate::{
         },
     },
     config::{HoprLibConfig, SessionGlobalConfig},
+    testing::{TestingConnector, TestingHopr},
 };
-
-use crate::testing::{TestingConnector, TestingHopr};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {

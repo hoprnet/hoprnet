@@ -137,7 +137,10 @@ opentelemetry_sdk = { workspace = true, features = [
 ] }
 
 hopr-api = { workspace = true, features = ["types-random", "types-telemetry"] }
-hopr-chain-connector = { workspace = true, features = ["testing", "runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hopr-lib = { workspace = true, features = ["testing"] }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 

@@ -134,9 +134,7 @@ impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     )
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
-                        ForwarderError::general(format!(
-                            "could not bridge the incoming session to {udp_target}: {e}"
-                        ))
+                        ForwarderError::general(format!("could not bridge the incoming session to {udp_target}: {e}"))
                     })?;
 
                 tracing::debug!(
@@ -181,11 +179,8 @@ impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 // TCP is able to determine which of the resolved multiple addresses is viable,
                 // and therefore we can pass all of them.
-                let resolved_tcp_targets = tcp_target
-                    .clone()
-                    .resolve_tokio()
-                    .await
-                    .map_err(|e| {
+                let resolved_tcp_targets =
+                    tcp_target.clone().resolve_tokio().await.map_err(|e| {
                         ForwarderError::general(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(
@@ -209,9 +204,7 @@ impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 })
                 .await
                 .map_err(|e| {
-                    ForwarderError::general(format!(
-                        "could not bridge the incoming session to {tcp_target}: {e}"
-                    ))
+                    ForwarderError::general(format!("could not bridge the incoming session to {tcp_target}: {e}"))
                 })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {

@@ -76,9 +76,8 @@ lazy_static::lazy_static! {
 
 const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 
-type PeerDiscoveryRx = Arc<
-    parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>,
->;
+type PeerDiscoveryRx =
+    Arc<parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
 
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
@@ -98,7 +97,9 @@ pub struct BuildCtx {
 
 impl BuildCtx {
     /// Take the peer-discovery receiver. Returns `Some` on the first call, `None` afterwards.
-    pub fn take_peer_discovery_rx(&self) -> Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
+    pub fn take_peer_discovery_rx(
+        &self,
+    ) -> Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
         self.peer_discovery_rx.lock().take()
     }
 }
@@ -130,8 +131,7 @@ pub struct HoprBuilderWithIdentity {
 impl HoprBuilderWithIdentity {
     /// Sets the node configuration and produces the configured builder.
     pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
-        let (peer_discovery_tx, peer_discovery_rx) =
-            futures::channel::mpsc::channel(PEER_DISCOVERY_CHANNEL_CAPACITY);
+        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(PEER_DISCOVERY_CHANNEL_CAPACITY);
         HoprBuilderConfigured {
             ctx: BuildCtx {
                 chain_key: self.chain_key,

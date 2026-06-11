@@ -10,11 +10,11 @@ use hopr_api::{
 use hopr_lib::{
     api::types::primitive::prelude::{HoprBalance, UnitaryFloatOps},
     errors::HoprLibError,
-};
-use hopr_lib::testing::{
-    fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
-    hopr::ChannelGuard,
-    wait_until,
+    testing::{
+        fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
+        hopr::ChannelGuard,
+        wait_until,
+    },
 };
 use rstest::*;
 use serial_test::serial;

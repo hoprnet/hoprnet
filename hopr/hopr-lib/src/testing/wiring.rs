@@ -5,8 +5,11 @@ use std::sync::Arc;
 use futures::StreamExt;
 use hopr_chain_connector::api::HoprChainApi;
 use hopr_network_graph::{ChannelGraph, SharedChannelGraph};
-use hopr_ticket_manager::{HoprTicketManager, RedbStore, RedbTicketQueue, ticket_factory_from_chain, ticket_manager_from_chain};
+use hopr_ticket_manager::{
+    HoprTicketManager, RedbStore, RedbTicketQueue, ticket_factory_from_chain, ticket_manager_from_chain,
+};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
+
 use crate::{
     Hopr,
     builder::{ChainKeypair, HoprBuilder, Keypair, OffchainKeypair},
@@ -67,11 +70,7 @@ where
                 let peer_discovery_rx = ctx
                     .take_peer_discovery_rx()
                     .ok_or(HoprLibError::BuilderError("peer_discovery_rx already taken"))?;
-                let multiaddresses = vec![
-                    (&ctx.cfg.host)
-                        .try_into()
-                        .map_err(HoprLibError::TransportError)?,
-                ];
+                let multiaddresses = vec![(&ctx.cfg.host).try_into().map_err(HoprLibError::TransportError)?];
                 let nb = HoprLibp2pNetworkBuilder::new(
                     peer_discovery_rx.map(|(peer_id, addrs)| PeerDiscovery::Announce(peer_id, addrs)),
                 );
@@ -93,10 +92,8 @@ where
 /// Builds an edge (entry/exit) HOPR node with a custom chain connector.
 pub async fn build_edge_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<
-            Session = hopr_transport::IncomingSession,
-            Error: std::fmt::Display,
-        > + Clone
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
         + Send
         + 'static,
 >(
@@ -134,10 +131,8 @@ where
 /// Builds a full relay HOPR node with a custom chain connector.
 pub async fn build_full_with_chain<
     Chain,
-    Srv: hopr_api::node::HoprSessionServer<
-            Session = hopr_transport::IncomingSession,
-            Error: std::fmt::Display,
-        > + Clone
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
         + Send
         + 'static,
 >(
