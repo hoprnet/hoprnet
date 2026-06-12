@@ -694,9 +694,12 @@ where
                     continue;
                 }
                 if let ChannelStatus::PendingToClose(closure_time) = ch.status {
-                    let elapsed = closure_time.elapsed().unwrap_or(Duration::ZERO);
-                    if elapsed >= overdue && self.try_finalize_channel(ch) {
-                        finalize_count += 1;
+                    // elapsed() is Err when the deadline is still in the future;
+                    // skip rather than treating it as zero (would fire prematurely).
+                    if let Ok(elapsed) = closure_time.elapsed() {
+                        if elapsed >= overdue && self.try_finalize_channel(ch) {
+                            finalize_count += 1;
+                        }
                     }
                 }
             }
