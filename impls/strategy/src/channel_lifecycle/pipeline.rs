@@ -2472,9 +2472,8 @@ mod tests {
             .await;
 
         assert!(
-            !channels
-                .iter()
-                .any(|c| c.destination == *ALICE && matches!(c.status, ChannelStatus::Open | ChannelStatus::PendingToClose(_))),
+            !channels.iter().any(|c| c.destination == *ALICE
+                && matches!(c.status, ChannelStatus::Open | ChannelStatus::PendingToClose(_))),
             "channel must be fully Closed after the grace period; got {channels:?}"
         );
         Ok(())
