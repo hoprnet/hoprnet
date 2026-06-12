@@ -182,6 +182,7 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management: None,
                     always_max_out_surbs: false,
+                    pix_ssa_quota: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))
