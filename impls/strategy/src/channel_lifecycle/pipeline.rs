@@ -98,18 +98,6 @@ where
         }
     }
 
-    /// Returns the on-chain notice period for channel closure, falling back
-    /// to the standard 3-minute default on error.
-    async fn closure_notice_period(&self) -> Duration {
-        match self.node.chain_api().channel_closure_notice_period().await {
-            Ok(d) => d,
-            Err(e) => {
-                warn!(%e, "channel-lifecycle: could not fetch channel_closure_notice_period");
-                Duration::from_secs(3 * 60)
-            }
-        }
-    }
-
     /// Total number of in-flight chain-write operations across all four kinds.
     fn total_in_flight(&self) -> usize {
         self.open_in_flight.len()
@@ -695,7 +683,7 @@ where
 
         // ── 4. Finalize pass ──────────────────────────────────────────────────
         if self.cfg.finalizer.enabled {
-            let overdue = self.closure_notice_period().await + self.cfg.finalizer.max_closure_overdue;
+            let overdue = self.cfg.finalizer.max_closure_overdue;
             let mut finalize_count = self.finalize_in_flight.len();
 
             for ch in &all_channels {
@@ -2288,6 +2276,206 @@ mod tests {
                 .iter()
                 .any(|c| c.destination == *ALICE && matches!(c.status, ChannelStatus::PendingToClose(_))),
             "channel must be PendingToClose after a low-score observation arrives; got {channels:?}"
+        );
+        Ok(())
+    }
+
+    /// Regression test: finalizer must trigger as soon as `closure_time` is past
+    /// by `max_closure_overdue`, with no additional notice-period delay.
+    ///
+    /// Before the fix the pipeline computed
+    /// `overdue = closure_notice_period + max_closure_overdue`, doubling the
+    /// wait because `closure_time` is already the deadline (initiation +
+    /// notice_period).  A channel whose deadline passed 5 seconds ago with
+    /// `max_closure_overdue = 0` would NOT have been finalized under the old
+    /// code (the chain's 2-second grace period would have been added as a
+    /// second wait), but MUST be finalized under the new code.
+    #[tokio::test]
+    async fn finalizer_triggers_immediately_once_overdue_elapsed() -> anyhow::Result<()> {
+        // Channel whose closure deadline has already passed by 5 seconds.
+        let closure_deadline = std::time::SystemTime::now() - Duration::from_secs(5);
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(10_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::PendingToClose(closure_deadline))
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([ch])
+            // Grace period is irrelevant here — the channel starts in PendingToClose.
+            .with_closure_grace_period(Duration::ZERO)
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            finalizer: FinalizerConfig {
+                enabled: true,
+                max_closure_overdue: Duration::ZERO,
+                ..Default::default()
+            },
+            // Disable fund/open passes to isolate the finalizer.
+            funding: FundingConfig {
+                min_safe_balance_required: HoprBalance::new_base(10_000),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let node = Arc::new(ChainNode::new(Arc::clone(&connector)));
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        handle.abort();
+        let _ = handle.await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+
+        assert!(
+            !channels
+                .iter()
+                .any(|c| c.destination == *ALICE && matches!(c.status, ChannelStatus::PendingToClose(_))),
+            "channel whose deadline already passed must not remain PendingToClose; got {channels:?}"
+        );
+        Ok(())
+    }
+
+    /// Full lifecycle: Open → PendingToClose (close pass) → Closed (finalizer pass).
+    ///
+    /// The channel starts `Open` with a low-quality peer; the close pass
+    /// initiates closure (→ `PendingToClose`), and once the emulator's 2-second
+    /// grace period elapses the finalizer pass submits the second `close_channel`
+    /// call (→ `Closed`).
+    #[tokio::test]
+    async fn channel_lifecycle_open_to_pending_to_closed() -> anyhow::Result<()> {
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(125_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                true,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([ch])
+            // Emulator floors at 2 s; we set 0 to get as close to that floor
+            // as possible so the test completes in a few seconds.
+            .with_closure_grace_period(Duration::ZERO)
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            restart: RestartGuardConfig {
+                startup_close_grace_period: Duration::ZERO,
+            },
+            population: PopulationConfig {
+                min_open_channels: 0,
+                ..Default::default()
+            },
+            closure: ClosureConfig {
+                close_below_quality_score: 0.3,
+                ..Default::default()
+            },
+            finalizer: FinalizerConfig {
+                enabled: true,
+                // Accept channels overdue by any amount once the deadline passes.
+                max_closure_overdue: Duration::ZERO,
+                ..Default::default()
+            },
+            funding: FundingConfig {
+                min_safe_balance_required: HoprBalance::new_base(10_000),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let graph = Arc::new(StubGraph::default());
+        let node = Arc::new(ChainNode::with_graph(Arc::clone(&connector), Arc::clone(&graph)));
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
+
+        // First window: no probing data — close must not fire yet.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        let alice_pk = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            let pseudo = hopr_api::types::crypto::types::Hash::create(&[(*ALICE).as_ref()]);
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(pseudo.as_ref())
+                .expect("alice offchain key")
+                .public()
+        };
+        let my_key = {
+            use hopr_api::types::crypto::keypairs::Keypair as _;
+            *hopr_api::types::crypto::prelude::OffchainKeypair::from_secret(&[1u8; 32])
+                .expect("my key")
+                .public()
+        };
+        graph.insert_edge(
+            my_key,
+            alice_pk,
+            StubEdge {
+                last_update: Duration::from_secs(1),
+                score: 0.0,
+            },
+        );
+
+        // Second window: close fires → PendingToClose; wait for the 2-second
+        // emulator grace period to expire, then the finalizer fires → Closed.
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        handle.abort();
+        let _ = handle.await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+
+        assert!(
+            !channels
+                .iter()
+                .any(|c| c.destination == *ALICE && matches!(c.status, ChannelStatus::Open | ChannelStatus::PendingToClose(_))),
+            "channel must be fully Closed after the grace period; got {channels:?}"
         );
         Ok(())
     }
