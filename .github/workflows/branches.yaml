@@ -53,8 +53,8 @@ jobs:
       bencher_project: ${{ github.event.repository.name }}
       # Benchmarks disabled for now — flip these two booleans back to re-enable.
       should_build: false
-      build_command: "nix build -L .#bench-build"
       should_run: false
+      build_command: "nix build -L .#bench-build"
       run_command: "nix run .#bench-run"
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
