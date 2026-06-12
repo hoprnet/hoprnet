@@ -6,10 +6,10 @@ use hopr_api::{
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
+use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
-use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
+use hopr_protocol_pix::ExitAcknowledgementShareProcessor;
 use hopr_utils::runtime::AbortableList;
 
 use super::{
@@ -65,7 +65,7 @@ impl
         NoopTicketProcessor,
         futures::sink::Drain<TicketEvent>,
         NopExitAcknowledgementShareProcessor,
-        futures::sink::Drain<ShareResolution<HoprPixSpec>>,
+        futures::sink::Drain<HoprShareResolution>,
         Unset,
         Unset,
     >
@@ -223,7 +223,7 @@ impl<WIn, WOut, C, D, T, TEvt, A, SEvt, AppOut, AppIn>
     ) -> PacketPipelineBuilder<WIn, WOut, C, D, T, TEvt, A2, SEvt2, AppOut, AppIn>
     where
         A2: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-        SEvt2: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
+        SEvt2: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
         SEvt2::Error: std::error::Error,
     {
         PacketPipelineBuilder {
@@ -253,7 +253,7 @@ where
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
@@ -338,7 +338,7 @@ where
     C: PacketEncoder + Sync + Send + 'static,
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
-    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,

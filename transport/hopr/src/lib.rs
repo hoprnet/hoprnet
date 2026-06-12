@@ -112,6 +112,7 @@ use hopr_api::{
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
+use hopr_crypto_packet::HoprShareResolution;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -745,7 +746,7 @@ where
                         })
                         .merge(
                             ssa_share_resolution_events_rx
-                                .filter_map(|ssa_resolution: ShareResolution<HoprPixSpec>| {
+                                .filter_map(|ssa_resolution: HoprShareResolution| {
                                     futures::future::ready(
                                     match ssa_resolution {
                                         ShareResolution::RecoveredSsa(ssa_recovery_event) => {

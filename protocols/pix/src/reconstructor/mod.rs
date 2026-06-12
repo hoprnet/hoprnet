@@ -76,6 +76,8 @@ pub struct SsaReconstructor<S: PixSpec> {
     cfg: SsaReconstructorConfig,
 }
 
+type MaybeRecoveredSsa<S> = Option<RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>>;
+
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         Self {
@@ -100,7 +102,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         ack: HalfKey,
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
-    ) -> Result<Option<RecoveredSsa<S::Pseudonym, S::AddressPrivateKey>>, PixError<S::Pseudonym>> {
+    ) -> Result<MaybeRecoveredSsa<S>, PixError<S::Pseudonym>> {
         let Some(share) = awaiting_ack_from_peer.remove(&ack_challenge) else {
             tracing::trace!(?ack_challenge, "received ack for unknown share");
             return Ok(None);

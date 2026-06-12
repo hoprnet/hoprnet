@@ -518,6 +518,8 @@ impl<P, A> SsaCommitmentState<P, A> {
 }
 
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
+///
+/// `P` is the pseudonym type, `A` is the private key type for SSA.
 #[derive(Debug, Clone, Copy)]
 pub struct RecoveredSsa<P, A> {
     /// ID of the SSA that was recovered.

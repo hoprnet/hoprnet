@@ -13,7 +13,7 @@ use hopr_api::{
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_crypto_packet::{HoprPixSpec, HoprSurb};
+use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
@@ -562,7 +562,7 @@ where
     S: PixSpec,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
-    SEvt: futures::Sink<ShareResolution<S>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
 {
     ack_incoming
@@ -793,7 +793,7 @@ where
     D: PacketDecoder + Sync + Send + 'static,
     A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
-    SEvt: futures::Sink<ShareResolution<HoprPixSpec>> + Clone + Unpin + Send + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,

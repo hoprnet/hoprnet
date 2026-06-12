@@ -12,6 +12,8 @@ use crate::{
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
 /// an encrypted PIX share.
+///
+/// `P` is the pseudonym type, `A` is the private key type for SSA.
 #[derive(Debug, Clone)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
@@ -44,6 +46,9 @@ impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
         }
     }
 }
+
+/// Type alias for a collection of [`ShareResolution`]s.
+pub type ShareResolutions<S> = Vec<ShareResolution<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>>;
 
 /// Allows reconstruction of SSAs at the Exit node.
 ///
@@ -112,7 +117,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         &self,
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
-    ) -> Result<Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>>, Self::Error>;
+    ) -> Result<ShareResolutions<S>, Self::Error>;
 }
 
 #[auto_impl::auto_impl(&, Arc, Box)]

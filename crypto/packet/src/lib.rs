@@ -118,6 +118,9 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
 /// HOPR-specific encrypted partial SSA share type from the PIX protocol.
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
+/// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
+pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
+
 /// HOPR-specific PIX scalar type.
 ///
 /// This is the normalized form of `hopr_protocol_pix::PixScalar<HoprPixSpec>`
