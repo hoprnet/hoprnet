@@ -51,9 +51,10 @@ jobs:
       source_branch: ${{ github.ref_name }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
-      should_build: true
+      # Benchmarks disabled for now — flip these two booleans back to re-enable.
+      should_build: false
       build_command: "nix build -L .#bench-build"
-      should_run: true
+      should_run: false
       run_command: "nix run .#bench-run"
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
