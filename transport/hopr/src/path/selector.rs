@@ -147,15 +147,39 @@ where
 /// Behaviour:
 /// - If `candidates.len() <= floor`, returns all candidates unchanged (`min(found_count, floor)` semantics — the floor
 ///   is never a minimum to fabricate).
-/// - Sorts candidates ascending by `total_latency_ms`, with unpopulated paths (`None`) ordered last.
-/// - Truncates to `floor`, keeping the lowest-latency measured paths first.
-pub fn prune_for_consistency(mut candidates: Vec<PathWithMetrics>, floor: usize) -> Vec<PathWithMetrics> {
-    if floor == 0 || candidates.len() <= floor {
+/// - Sorts candidates with a known `total_latency_ms` ascending.
+/// - Drops from the high-latency tail until the total count equals `floor`, or until no populated candidates remain.
+/// - If still over the floor with no populated candidates left, drops unpopulated candidates from the input-order tail.
+///
+/// A path is "fully measured" — and therefore preferred over unmeasured alternatives —
+/// when `total_latency_ms` is known AND either `hops == 0` (direct path, no channel
+/// expected) OR `capacity_floor` is also known.  This prevents 0-hop direct paths from
+/// being demoted simply because they carry no channel-capacity data.
+pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hops: usize) -> Vec<PathWithMetrics> {
+    if candidates.len() <= floor {
         return candidates;
     }
-    candidates.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
-    candidates.truncate(floor);
-    candidates
+
+    let fully_measured =
+        |p: &PathWithMetrics| p.total_latency_ms.is_some() && (hops == 0 || p.capacity_floor.is_some());
+
+    let (mut populated, unpopulated): (Vec<_>, Vec<_>) = candidates.into_iter().partition(|p| fully_measured(p));
+
+    // Sort populated ascending by latency (lowest first → drop from the end).
+    populated.sort_by_key(|p| p.total_latency_ms.unwrap_or(u32::MAX));
+
+    // Prefer measured paths: keep as many populated paths as fit within the floor,
+    // then fill the remaining slots with unpopulated paths.  This ensures that
+    // latency-measured candidates are never discarded when unprobed paths alone
+    // would satisfy the floor.
+    let target_populated = populated.len().min(floor);
+    populated.truncate(target_populated);
+    let remaining = floor - target_populated;
+
+    let mut result = populated;
+    result.extend(unpopulated.into_iter().take(remaining));
+
+    result
 }
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
@@ -403,7 +427,7 @@ where
                 dest.to_string(),
             )))
         } else {
-            Ok(prune_for_consistency(paths, self.anonymity_floor))
+            Ok(prune_for_consistency(paths, self.anonymity_floor, hops))
         }
     }
 }
@@ -911,18 +935,31 @@ mod tests {
         }
     }
 
+    fn make_path_with_capacity(latency_ms: Option<u32>, capacity_floor: Option<u128>) -> PathWithMetrics {
+        PathWithMetrics {
+            path: vec![],
+            cost: 1.0,
+            total_latency_ms: latency_ms,
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            capacity_floor,
+        }
+    }
+
     #[test]
     fn prune_keeps_all_when_below_floor() {
         let candidates: Vec<_> = (0..5).map(|i| make_path_with_latency(Some(i * 10))).collect();
-        let result = prune_for_consistency(candidates, 8);
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 5, "below floor: nothing should be dropped");
     }
 
     #[test]
     fn prune_drops_high_latency_first() {
         // 30 paths with strictly increasing latency, floor=8 → keep lowest 8
-        let candidates: Vec<_> = (0..30u32).map(|i| make_path_with_latency(Some(i * 10))).collect();
-        let result = prune_for_consistency(candidates, 8);
+        let candidates: Vec<_> = (0..30u32)
+            .map(|i| make_path_with_capacity(Some(i * 10), Some(1_000_000)))
+            .collect();
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
         for p in &result {
             assert!(p.total_latency_ms.unwrap() < 80, "only the 8 lowest should survive");
@@ -935,12 +972,12 @@ mod tests {
         // total=9 > floor=8: all 3 populated are kept (populated always preferred),
         // then 5 unpopulated fill the remaining slots.
         let mut candidates: Vec<_> = vec![
-            make_path_with_latency(Some(10)),
-            make_path_with_latency(Some(30)),
-            make_path_with_latency(Some(20)),
+            make_path_with_capacity(Some(10), Some(1_000)),
+            make_path_with_capacity(Some(30), Some(1_000)),
+            make_path_with_capacity(Some(20), Some(1_000)),
         ];
         candidates.extend((0..6).map(|_| make_path_with_latency(None)));
-        let result = prune_for_consistency(candidates, 8);
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
         // All 3 populated paths survive; 1 unpopulated is trimmed.
         let populated: Vec<_> = result.iter().filter(|p| p.total_latency_ms.is_some()).collect();
@@ -954,7 +991,7 @@ mod tests {
     fn prune_drops_unpopulated_when_all_populated_exhausted() {
         // 0 populated, 20 unpopulated, floor=8 → keep first 8
         let candidates: Vec<_> = (0..20).map(|_| make_path_with_latency(None)).collect();
-        let result = prune_for_consistency(candidates, 8);
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
     }
 
@@ -963,9 +1000,12 @@ mod tests {
         // Regression: 2 populated + 10 unpopulated, floor=8.
         // Old formula: target_populated = 8.saturating_sub(10) = 0 → both populated dropped.
         // Correct: keep up to 8 populated (only 2 exist), fill 6 remaining with unpopulated.
-        let mut candidates: Vec<_> = vec![make_path_with_latency(Some(10)), make_path_with_latency(Some(20))];
+        let mut candidates: Vec<_> = vec![
+            make_path_with_capacity(Some(10), Some(1_000)),
+            make_path_with_capacity(Some(20), Some(1_000)),
+        ];
         candidates.extend((0..10).map(|_| make_path_with_latency(None)));
-        let result = prune_for_consistency(candidates, 8);
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
         let populated: Vec<_> = result.iter().filter(|p| p.total_latency_ms.is_some()).collect();
         assert_eq!(populated.len(), 2, "both measured paths must survive");
@@ -975,9 +1015,52 @@ mod tests {
 
     #[test]
     fn prune_exact_floor_is_unchanged() {
-        let candidates: Vec<_> = (0..8).map(|i| make_path_with_latency(Some(i * 10))).collect();
-        let result = prune_for_consistency(candidates, 8);
+        let candidates: Vec<_> = (0..8)
+            .map(|i| make_path_with_capacity(Some(i * 10), Some(1_000)))
+            .collect();
+        let result = prune_for_consistency(candidates, 8, 1);
         assert_eq!(result.len(), 8);
+    }
+
+    #[test]
+    fn prune_0_hop_with_measured_latency_and_no_capacity_is_populated() {
+        // 0-hop: capacity_floor = None is expected; path should be treated as "fully measured"
+        // if latency is known.
+        let mut candidates: Vec<_> = vec![
+            make_path_with_capacity(Some(50), None), // 0-hop: no capacity, latency known
+        ];
+        candidates.extend((0..10).map(|_| make_path_with_latency(None)));
+        let result = prune_for_consistency(candidates, 8, 0);
+        assert_eq!(result.len(), 8);
+        // The 0-hop path must be in the populated bucket and survive.
+        let has_0_hop = result.iter().any(|p| p.total_latency_ms == Some(50));
+        assert!(has_0_hop, "0-hop path with measured latency must survive pruning");
+    }
+
+    #[test]
+    fn prune_multi_hop_without_capacity_floor_is_unpopulated() {
+        // A 1-hop path with measured latency but NO capacity is unmeasured (unpopulated).
+        // It should be demoted below paths that have both latency and capacity.
+        let mut candidates: Vec<_> = vec![
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(50), Some(1_000)), // fully measured
+            make_path_with_capacity(Some(40), None),        // missing capacity → unpopulated
+        ];
+        let result = prune_for_consistency(candidates, 8, 1);
+        assert_eq!(result.len(), 8);
+        // The path with missing capacity should not survive when all 8 slots are filled
+        // by fully measured paths.
+        let has_missing_cap = result.iter().any(|p| p.capacity_floor.is_none());
+        assert!(
+            !has_missing_cap,
+            "path without capacity floor must be pruned when fully-measured paths fill the floor"
+        );
     }
 
     // ── path metrics aggregation tests ────────────────────────────────────────
