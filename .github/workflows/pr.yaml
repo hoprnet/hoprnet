@@ -60,13 +60,13 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           disable-sudo: true
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
@@ -103,7 +103,7 @@ jobs:
 
   checks:
     name: Check
-    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@bbd22e57cf954c15f0a6051d59329857809141dd # workflow-checks-v1
+    uses: hoprnet/hopr-workflows/.github/workflows/checks.yaml@d0cffaf9e9209c8eca00e8c74e82ac3f5f3cf7bb # workflow-checks-v2
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       runner_small: depot-ubuntu-24.04
@@ -113,7 +113,7 @@ jobs:
 
   tests:
     name: Test
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@68c55f5bd5bd5a74a92b03f7cd72970f862894d0 # workflow-tests-v4
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@69d61153fe24338ea983dd657496f0bc8b4cd819 # workflow-tests-v5
     with:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       enable_unit_tests: true
@@ -151,7 +151,8 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
-      should_build: true
+      # Benchmarks disabled for now — flip the should_build to true
+      should_build: false
       should_run: false
       build_command: "nix build -L .#bench-build"
       run_command: "nix run .#bench-run"

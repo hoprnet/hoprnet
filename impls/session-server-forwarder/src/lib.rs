@@ -1,22 +1,24 @@
-use std::{net::SocketAddr, num::NonZeroUsize};
+//! HOPR session server that bridges TCP/UDP sockets from the Session Exit node to a destination.
 
-use hopr_lib::{
-    api::types::crypto::prelude::OffchainKeypair,
-    errors::HoprLibError,
-    exports::{
-        network::types::{
-            prelude::ForeignDataMode,
-            udp::{ConnectedUdpStream, UdpStreamParallelism},
-        },
-        transport::{ServiceId, SessionTarget, transfer_session},
+pub mod config;
+
+use std::net::SocketAddr;
+
+use hopr_api::types::crypto::prelude::OffchainKeypair;
+use hopr_transport_session::{IncomingSession, ServiceId, SessionTarget, transfer_session};
+use hopr_utils::{
+    network_types::{
+        prelude::ForeignDataMode,
+        udp::{ConnectedUdpStream, UdpStreamParallelism},
     },
+    parallelize::cpu::spawn_blocking,
 };
 
 use crate::config::SessionIpForwardingConfig;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_TARGETS: hopr_types::telemetry::MultiGauge = hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_ACTIVE_TARGETS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_hoprd_target_connections",
         "Number of currently active HOPR session target connections on this Exit node",
         &["type"]
@@ -31,6 +33,19 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
+
+/// Error type for [`HoprServerIpForwardingReactor`].
+#[derive(Debug, thiserror::Error)]
+pub enum ForwarderError {
+    #[error("{0}")]
+    General(String),
+}
+
+impl ForwarderError {
+    fn general(s: impl std::fmt::Display) -> Self {
+        Self::General(s.to_string())
+    }
+}
 
 /// Implementation of `HoprSessionServer` that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
@@ -62,24 +77,20 @@ impl HoprServerIpForwardingReactor {
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[async_trait::async_trait]
-impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
-    type Error = hopr_lib::errors::HoprLibError;
-    type Session = hopr_lib::exports::transport::IncomingSession;
+impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
+    type Error = ForwarderError;
+    type Session = IncomingSession;
 
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(
-        &self,
-        mut session: hopr_lib::exports::transport::IncomingSession,
-    ) -> Result<(), hopr_lib::errors::HoprLibError> {
+    async fn process(&self, mut session: IncomingSession) -> Result<(), ForwarderError> {
         let session_id = *session.session.id();
         match session.target {
             SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target =
-                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
-                        .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let udp_target = spawn_blocking(move || udp_target.unseal(&kp), "udp_unseal")
+                    .await
+                    .map_err(|e| ForwarderError::general(format!("failed to spawn unseal task: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
                     session_id = ?session_id,
@@ -93,11 +104,9 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     .clone()
                     .resolve_tokio()
                     .await
-                    .map_err(|e| HoprLibError::GeneralError(format!("failed to resolve DNS name {udp_target}: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("failed to resolve DNS name {udp_target}: {e}")))?
                     .first()
-                    .ok_or(HoprLibError::GeneralError(format!(
-                        "failed to resolve DNS name {udp_target}"
-                    )))?
+                    .ok_or_else(|| ForwarderError::general(format!("failed to resolve DNS name {udp_target}")))?
                     .to_owned();
                 tracing::debug!(
                     ?session_id,
@@ -107,7 +116,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 );
 
                 if !self.all_ips_allowed(&[resolved_udp_target]) {
-                    return Err(HoprLibError::GeneralError(format!(
+                    return Err(ForwarderError::general(format!(
                         "denied target address {resolved_udp_target}"
                     )));
                 }
@@ -118,17 +127,14 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
                     .with_receiver_parallelism(
-                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
-                            .ok()
-                            .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                        self.cfg
+                            .udp_rx_parallelism
                             .map(UdpStreamParallelism::Specific)
                             .unwrap_or(UdpStreamParallelism::Auto),
                     )
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
-                        HoprLibError::GeneralError(format!(
-                            "could not bridge the incoming session to {udp_target}: {e}"
-                        ))
+                        ForwarderError::general(format!("could not bridge the incoming session to {udp_target}: {e}"))
                     })?;
 
                 tracing::debug!(
@@ -139,7 +145,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
+                    let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
@@ -164,11 +170,10 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
             }
             SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target =
-                    hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
-                        .await
-                        .map_err(|e| HoprLibError::GeneralError(format!("failed to spawn unseal task: {e}")))?
-                        .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
+                let tcp_target = spawn_blocking(move || tcp_target.unseal(&kp), "tcp_unseal")
+                    .await
+                    .map_err(|e| ForwarderError::general(format!("failed to spawn unseal task: {e}")))?
+                    .map_err(|e| ForwarderError::general(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
 
@@ -176,7 +181,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 // and therefore we can pass all of them.
                 let resolved_tcp_targets =
                     tcp_target.clone().resolve_tokio().await.map_err(|e| {
-                        HoprLibError::GeneralError(format!("failed to resolve DNS name {tcp_target}: {e}"))
+                        ForwarderError::general(format!("failed to resolve DNS name {tcp_target}: {e}"))
                     })?;
                 tracing::debug!(
                     ?session_id,
@@ -186,7 +191,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 );
 
                 if !self.all_ips_allowed(&resolved_tcp_targets) {
-                    return Err(HoprLibError::GeneralError(format!(
+                    return Err(ForwarderError::general(format!(
                         "denied target address {resolved_tcp_targets:?}"
                     )));
                 }
@@ -199,11 +204,11 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 })
                 .await
                 .map_err(|e| {
-                    HoprLibError::GeneralError(format!("could not bridge the incoming session to {tcp_target}: {e}"))
+                    ForwarderError::general(format!("could not bridge the incoming session to {tcp_target}: {e}"))
                 })?;
 
                 tcp_bridge.set_nodelay(true).map_err(|e| {
-                    HoprLibError::GeneralError(format!(
+                    ForwarderError::general(format!(
                         "could not set the TCP_NODELAY option for the bridged session to {tcp_target}: {e}",
                     ))
                 })?;
@@ -216,7 +221,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "telemetry", not(test)))]
-                    let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
+                    let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
@@ -242,7 +247,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
                 #[cfg(all(feature = "telemetry", not(test)))]
-                let _g = hopr_types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
+                let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {
@@ -256,7 +261,7 @@ impl hopr_lib::api::node::HoprSessionServer for HoprServerIpForwardingReactor {
 
                 Ok(())
             }
-            SessionTarget::ExitNode(_) => Err(HoprLibError::GeneralError(
+            SessionTarget::ExitNode(_) => Err(ForwarderError::General(
                 "server does not support internal session processing".into(),
             )),
         }

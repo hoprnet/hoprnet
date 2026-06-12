@@ -62,11 +62,12 @@ pub use config::*;
 
 mod events;
 mod pipeline;
+pub mod selector;
 mod strategy;
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use dashmap::{DashMap, DashSet};
-use hopr_lib::api::{
+use hopr_api::{
     PeerId,
     types::{
         crypto::prelude::OffchainPublicKey,
@@ -75,29 +76,69 @@ use hopr_lib::api::{
     },
 };
 use parking_lot::Mutex;
+use selector::Selector;
 pub use strategy::ChannelLifecycleStrategy;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_CHANNEL_OPENS: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_CHANNEL_OPENS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_opens",
             "Count of initiated channel opens",
         ).unwrap();
-    static ref METRIC_CHANNEL_FUNDS: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_CHANNEL_FUNDS: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_fundings",
             "Count of initiated channel fundings",
         ).unwrap();
-    static ref METRIC_CHANNEL_CLOSES: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_CHANNEL_CLOSES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_closes",
             "Count of initiated channel closures",
         ).unwrap();
-    static ref METRIC_CHANNEL_FINALIZES: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_CHANNEL_FINALIZES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_strategy_channel_lifecycle_finalizations",
             "Count of initiated channel closure finalizations",
+        ).unwrap();
+
+    // ── Diversity / anonymity ─────────────────────────────────────────────────
+    /// Shannon-entropy-based effective number of distinct (latency, subnet) cells.
+    static ref METRIC_EFFECTIVE_BUCKETS: hopr_api::types::telemetry::SimpleGauge =
+        hopr_api::types::telemetry::SimpleGauge::new(
+            "hopr_strategy_channel_lifecycle_effective_buckets",
+            "Effective number of distinct (latency, subnet) bucket cells among open channels (2^H)",
+        ).unwrap();
+
+    /// Per-cell channel count, labelled by the cell description.
+    static ref METRIC_BUCKET_COUNT: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_strategy_channel_lifecycle_bucket_count",
+            "Number of open channels in each (latency, subnet) bucket cell",
+            &["cell"],
+        ).unwrap();
+
+    /// Variance of round-trip times across all open channels, in milliseconds.
+    static ref METRIC_LATENCY_VARIANCE_MS: hopr_api::types::telemetry::SimpleGauge =
+        hopr_api::types::telemetry::SimpleGauge::new(
+            "hopr_strategy_channel_lifecycle_latency_variance_ms",
+            "Variance of round-trip times (ms) across all open channels",
+        ).unwrap();
+
+    /// Number of distinct /24 or /48 subnet prefixes among open channels.
+    static ref METRIC_SUBNET_COUNT: hopr_api::types::telemetry::SimpleGauge =
+        hopr_api::types::telemetry::SimpleGauge::new(
+            "hopr_strategy_channel_lifecycle_subnet_count",
+            "Number of distinct subnet prefixes among open channels",
+        ).unwrap();
+
+    /// Average per-axis score across all open-channel candidates for the last tick.
+    /// Only non-zero when the multi-objective selector is active.
+    static ref METRIC_SCORE_AXIS: hopr_api::types::telemetry::MultiGauge =
+        hopr_api::types::telemetry::MultiGauge::new(
+            "hopr_strategy_channel_lifecycle_score_axis",
+            "Average per-axis score across open candidates in the last strategy tick",
+            &["axis"],
         ).unwrap();
 }
 
@@ -125,6 +166,11 @@ struct PeerAddrCache {
 struct ChannelLifecycleStrategyInner<N> {
     cfg: ChannelLifecycleConfig,
     node: Arc<N>,
+    /// Pluggable selection policy.  Decides which peers to open channels with
+    /// and which open channels to retire.  Pipeline invariants (population
+    /// floor, concurrent-action caps, safe-balance budget) are enforced by the
+    /// pipeline regardless of the selector's choices.
+    selector: Arc<dyn Selector>,
     /// Destination addresses for channels currently being opened.
     open_in_flight: Arc<DashSet<Address>>,
     /// Channel IDs with an in-flight funding transaction.

@@ -9,6 +9,7 @@ ignore = [
   "RUSTSEC-2026-0098", # `rustls-webpki` 0.101.7 pulled transitively by blokli-client -> eventsource-client 0.16.2 -> hyper-rustls 0.24.2; our own `rustls-webpki` bumped to >=0.103.12 in Cargo.lock. Drop once blokli-client upgrades eventsource-client (see https://github.com/hoprnet/blokli/issues/107)
   "RUSTSEC-2026-0118", # `hickory-proto` 0.25.2 pulled by libp2p-dns 0.44.0 -> libp2p 0.56.0; no fix for 0.25.x; cannot remove without a major libp2p bump
   "RUSTSEC-2026-0119", # same root cause as 0118 (different advisory DB version); hickory-proto 0.26.x is fixed via hickory-proto 0.26.1
+  "RUSTSEC-2026-0173", # `proc-macro-error2` unmaintained; pulled by validator_derive -> validator -> hopr-transport-tag-allocator; drop once validator upgrades or is replaced
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

@@ -19,8 +19,8 @@ members = [
   "transport/tag-allocator",
   "utils-session",
   # implementations
-  "hopr/reference",
   "impls/connector",
+  "impls/session-server-forwarder",
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
@@ -39,7 +39,7 @@ atomic_enum = "0.3.0"
 anyhow = "1.0.102"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6" }
-assertables = "9.9.0"
+assertables = "10.1.0"
 async-broadcast = "0.7.2"
 async_channel_io = "0.3.0"
 async-lock = "3.4.2"
@@ -78,10 +78,10 @@ futures = { version = "0.3.32", default-features = false, features = [
 ] }
 futures-concurrency = "7.7.1"
 futures-timer = "3.0.3"
-futures-time = "3.0.1"
-generic-array = "1.3.5"
+futures-time = "3.1.0"
+generic-array = "1.4.1"
 halfbrown = "0.4.0"
-hashbrown = "0.17.0"
+hashbrown = "0.17.1"
 hex = "0.4.3"
 hex-literal = "1.1.0"
 hickory-resolver = { version = "0.26.1", default-features = false, features = [
@@ -106,7 +106,7 @@ moka = { version = "0.12.15", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num-traits = "0.2.19"
-oas3 = "0.21.0"
+oas3 = "0.22.0"
 opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
 opentelemetry_sdk = { version = "0.31.0" }
 temp-env = "0.3.6"
@@ -119,7 +119,7 @@ petgraph = { version = "0.8.3", default-features = false, features = [
   "rayon",
 ] }
 pid = "4.0.0"
-pin-project = "1.1.11"
+pin-project = "1.1.13"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
 rayon = "1.12.0"
@@ -134,8 +134,8 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
-serde_with = { version = "3.18.0", features = ["base64"] }
-serde-saphyr = "0.0.24"
+serde_with = { version = "3.20.0", features = ["base64"] }
+serde-saphyr = "0.0.26"
 serial_test = "3.4.0"
 smart-default = "0.7.1"
 socket2 = "0.6.3"
@@ -145,7 +145,7 @@ tempfile = "3.27.0"
 test-log = { version = "0.2.20", features = ["trace"] }
 thiserror = "2.0.18"
 tikv-jemallocator = "0.6.1"
-tokio = { version = "1.52.1", features = [
+tokio = { version = "1.52.3", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
@@ -189,7 +189,7 @@ hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-featu
 hopr-chain-connector = { path = "impls/connector" }
 
 # referential implementations
-hopr-reference = { path = "hopr/reference", default-features = false }
+hopr-session-server-forwarder = { path = "impls/session-server-forwarder", default-features = false }
 hopr-transport-p2p = { path = "impls/transport/p2p", default-features = false }
 hopr-ct-immediate = { path = "impls/ct/immediate", default-features = false }
 hopr-ct-full-network = { path = "impls/ct/full-network", default-features = false }
@@ -238,4 +238,9 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3", "serde_bytes", "humantime-serde"]
+ignored = [
+  "oas3",
+  "serde_bytes",
+  "humantime-serde",
+  "hopr-session-server-forwarder",
+]

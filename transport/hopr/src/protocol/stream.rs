@@ -17,8 +17,8 @@ use tokio_util::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PER_PEER_SEND_TIMEOUT: hopr_types::telemetry::SimpleCounter =
-        hopr_types::telemetry::SimpleCounter::new(
+    static ref METRIC_PER_PEER_SEND_TIMEOUT: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
             "hopr_egress_per_peer_send_timed_out",
             "Number of packets dropped due to per-peer egress send timeout",
         )
@@ -48,13 +48,17 @@ const MAX_CONCURRENT_PACKETS: usize = 30;
 /// Override with `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES`.
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
 
+type PeerStreamCache<T> = moka::sync::Cache<PeerId, Sender<T>>;
+type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<futures::lock::Mutex<()>>>;
+
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
     stream: S,
-    cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
+    cache: PeerStreamCache<<C as Decoder>::Item>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
+    per_peer_channel_capacity: usize,
 ) -> Sender<<C as Decoder>::Item>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -64,8 +68,9 @@ where
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
     let (stream_rx, stream_tx) = stream.split();
-    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
-    let cache_internal = cache.clone();
+    let (send, recv) = channel::<<C as Decoder>::Item>(per_peer_channel_capacity);
+    let cache_for_write = cache.clone();
+    let cache_for_read = cache.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
@@ -83,6 +88,13 @@ where
             .forward(frame_writer)
             .inspect(move |res| {
                 tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
+            })
+            .then(move |_| {
+                // Make sure we invalidate the peer entry from the cache once the stream ends
+                let peer = peer;
+                async move {
+                    cache_for_write.invalidate(&peer);
+                }
             }),
     );
 
@@ -113,7 +125,7 @@ where
                 // Make sure we invalidate the peer entry from the cache once the stream ends
                 let peer = peer;
                 async move {
-                    cache_internal.invalidate(&peer).await;
+                    cache_for_read.invalidate(&peer);
                 }
             }),
     );
@@ -125,6 +137,7 @@ where
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
+    stream_cfg: crate::config::StreamProtocolConfig,
 ) -> super::errors::Result<(
     Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
@@ -139,12 +152,16 @@ where
     let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
     let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
 
-    let cache_out = moka::future::Cache::builder()
+    let cache_out: PeerStreamCache<<C as Decoder>::Item> = moka::sync::Cache::builder()
         .max_capacity(2000)
         .eviction_listener(|key: Arc<PeerId>, _, cause| {
             tracing::trace!(peer = %key.as_ref(), ?cause, "evicting stream for peer");
         })
         .build();
+
+    // Serialize cache-miss stream opens per peer without holding a Moka initialization
+    // guard across async network I/O.
+    let open_locks: PeerOpenLockCache = moka::sync::Cache::builder().max_capacity(2000).build();
 
     let incoming = control
         .clone()
@@ -175,6 +192,8 @@ where
         .map(std::time::Duration::from_millis)
         .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
 
+    let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
+
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
     // codec, tx_in), and defers the per-field `.clone()` to the cache-miss path that
@@ -200,11 +219,10 @@ where
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
+                    per_peer_channel_capacity,
                 );
 
-                async move {
-                    cache.insert(peer, send).await;
-                }
+                async move { cache.insert(peer, send) }
             })
             .inspect(|_| {
                 tracing::info!(
@@ -220,14 +238,21 @@ where
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
             .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {
                 let cache = cache_out.clone();
+                let open_locks = open_locks.clone();
                 let open_ctx = open_ctx.clone();
 
                 async move {
                     tracing::trace!(%peer, "trying to deliver message to peer");
 
-                    let cache_clone = cache.clone();
-                    let cached: Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
-                        .try_get_with(peer, async move {
+                    let cached = if let Some(cached) = cache.get(&peer) {
+                        Ok(cached)
+                    } else {
+                        let open_lock = open_locks.get_with(peer, || Arc::new(futures::lock::Mutex::new(())));
+                        let _guard = open_lock.lock().await;
+
+                        if let Some(cached) = cache.get(&peer) {
+                            Ok(cached)
+                        } else {
                             tracing::trace!(%peer, "peer is not in cache, opening new stream");
 
                             // Only the cache-miss path needs the stream-open handles.
@@ -245,21 +270,33 @@ where
                                 .open(peer)
                                 .timeout(futures_time::time::Duration::from(global_stream_open_timeout))
                                 .await
-                                .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))?
-                                .map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))?;
+                                .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
+                                .and_then(|stream| {
+                                    stream.map_err(|e| {
+                                        anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
+                                    })
+                                });
 
-                            tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
+                            match stream {
+                                Ok(stream) => {
+                                    tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
 
-                            Ok(build_peer_stream_io(
-                                peer,
-                                stream,
-                                cache_clone,
-                                codec.clone(),
-                                tx_in.clone(),
-                                frame_writer_backpressure_bytes,
-                            ))
-                        })
-                        .await;
+                                    let send = build_peer_stream_io(
+                                        peer,
+                                        stream,
+                                        cache.clone(),
+                                        codec.clone(),
+                                        tx_in.clone(),
+                                        frame_writer_backpressure_bytes,
+                                        per_peer_channel_capacity,
+                                    );
+                                    cache.insert(peer, send.clone());
+                                    Ok(send)
+                                }
+                                Err(error) => Err(error),
+                            }
+                        }
+                    };
 
                     match cached {
                         Ok(cached) => match cached.with_timeout(per_peer_send_timeout).send(msg).await {
@@ -268,11 +305,10 @@ where
                                 #[cfg(all(feature = "telemetry", not(test)))]
                                 METRIC_PER_PEER_SEND_TIMEOUT.increment();
                                 tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
-                                cache.invalidate(&peer).await;
                             }
                             Err(SinkTimeoutError::Inner(error)) => {
                                 tracing::error!(%peer, %error, "error sending message to peer");
-                                cache.invalidate(&peer).await;
+                                cache.invalidate(&peer);
                             }
                         },
                         Err(error) => {
@@ -294,10 +330,70 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        task::{Context as TaskContext, Poll},
+    };
+
     use anyhow::Context;
-    use futures::SinkExt;
+    use async_trait::async_trait;
+    use futures::{SinkExt, Stream};
+    use tokio_util::{bytes::BytesMut, codec::BytesCodec};
 
     use super::*;
+
+    #[derive(Clone, Default, Debug)]
+    struct CountingControl {
+        open_calls: Arc<AtomicUsize>,
+    }
+
+    impl CountingControl {
+        fn open_calls(&self) -> usize {
+            self.open_calls.load(Ordering::Relaxed)
+        }
+    }
+
+    #[derive(Default)]
+    struct StalledWriteIo;
+
+    impl AsyncRead for StalledWriteIo {
+        fn poll_read(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for StalledWriteIo {
+        fn poll_write(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>, _buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Pending
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Pending
+        }
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for CountingControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, StalledWriteIo)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(StalledWriteIo)
+        }
+    }
 
     struct AsyncBinaryStreamChannel {
         read: async_channel_io::ChannelReader,
@@ -371,6 +467,58 @@ mod tests {
         assert_eq!(
             rx.next().await.context("Value must be present")??,
             tokio_util::bytes::BytesMut::from(expected.as_ref())
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
+        let control = CountingControl::default();
+        // Use a small channel so the 1 200 sends overflow it quickly, exercising
+        // the send-timeout/drop path. The timeout fires when trying to push into a
+        // full channel (not based on queued-packet age); on timeout the packet is
+        // dropped as a transport loss, but the cached sender must not be evicted and
+        // the stream must not be reopened.
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 16,
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"x"[..]);
+
+        for _ in 0..1200 {
+            tx_out
+                .send((peer, msg.clone()))
+                .await
+                .context("egress queue should accept test packet")?;
+        }
+
+        // Wait for at least one stream open (first cache miss).
+        let open_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+        while control.open_calls() < 1 && tokio::time::Instant::now() < open_deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        assert!(
+            control.open_calls() >= 1,
+            "stream was never opened — egress task did not process any packet"
+        );
+
+        // Now give it another second to reopen pathologically; it must not.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+        while control.open_calls() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+
+        assert!(
+            control.open_calls() <= 1,
+            "pathological reopen churn detected for same peer under send failures (open_calls={})",
+            control.open_calls()
         );
 
         Ok(())

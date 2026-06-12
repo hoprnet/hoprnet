@@ -607,4 +607,43 @@ mod tests {
         );
         Ok(())
     }
+
+    /// Regression test: all `Sender` clones push into the same shared heap,
+    /// so items from different clones are drained by the single `Receiver`.
+    ///
+    /// Pre-fix (`MixerSink::clone` with per-clone heap): each clone has its own
+    /// `BinaryHeap`; a separate receiver per clone would be required to observe
+    /// all items. With a single receiver the other clone's items are silently lost.
+    ///
+    /// Post-fix (`Sender`/`Receiver` channel): one shared heap, one receiver
+    /// sees every item regardless of which clone pushed it.
+    #[tokio::test]
+    async fn sender_clones_share_heap() -> anyhow::Result<()> {
+        let cfg = MixerConfig {
+            min_delay: Duration::from_millis(50),
+            delay_range: Duration::from_millis(1),
+            ..MixerConfig::default()
+        };
+        let (tx_a, mut rx) = channel::<u32>(cfg);
+        let tx_b = tx_a.clone();
+
+        tx_a.send(1)?;
+        tx_b.send(2)?;
+        drop(tx_a);
+        drop(tx_b);
+
+        // Single receiver must drain both items — proves the heap is shared.
+        let mut got = vec![
+            timeout(MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY, rx.next())
+                .await?
+                .expect("first item"),
+            timeout(MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY, rx.next())
+                .await?
+                .expect("second item"),
+        ];
+        got.sort();
+        assert_eq!(got, vec![1, 2]);
+        assert!(rx.next().await.is_none(), "expected channel closed with no more items");
+        Ok(())
+    }
 }

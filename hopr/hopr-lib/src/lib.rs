@@ -23,6 +23,9 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
+/// Testing utilities: cluster fixtures, node wiring helpers, echo server.
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
@@ -49,6 +52,7 @@ use std::{
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt, pin_mut};
 use futures_concurrency::stream::Merge as _;
 use futures_time::future::FutureExt as FuturesTimeFutureExt;
+pub use hopr_api::types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_api::{
     PeerId,
     chain::*,
@@ -62,12 +66,16 @@ use hopr_api::{
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
 };
+/// Maximum user-data payload per HOPR session frame (bytes).
+///
+/// Use this when sizing buffers or computing how many session frames a given
+/// wxHOPR balance can fund (together with the on-chain ticket price).
+pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
-pub use hopr_types::keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
 use tracing::debug;
@@ -157,28 +165,39 @@ pub struct HoprSessionClientConfig {
     since = "4.0.2-rc.1",
     note = "temporary compatibility API; remove once the explicit path is not needed anymore."
 )]
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HoprSessionClientExplicitPathConfig {
     /// Explicit forward intermediate path.
     pub forward_path: Vec<hopr_api::types::internal::NodeId>,
     /// Explicit return intermediate path.
     pub return_path: Vec<hopr_api::types::internal::NodeId>,
     /// Capabilities offered by the session.
-    #[default(_code = "SessionCapability::Segmentation.into()")]
     pub capabilities: SessionCapabilities,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
-    #[default(None)]
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
-    #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
-    #[default(false)]
     pub always_max_out_surbs: bool,
     /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
     ///
     /// Defaults to `None`.
     pub pix_ssa_quota: Option<(u32, u32)>,
+}
+
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[allow(deprecated)]
+impl Default for HoprSessionClientExplicitPathConfig {
+    fn default() -> Self {
+        Self {
+            forward_path: Vec::default(),
+            return_path: Vec::default(),
+            capabilities: SessionCapability::Segmentation.into(),
+            pseudonym: None,
+            surb_management: Some(SurbBalancerConfig::default()),
+            always_max_out_surbs: false,
+        }
+    }
 }
 
 #[cfg(feature = "session-client")]
@@ -197,6 +216,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[allow(deprecated)]
 impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
@@ -240,8 +260,8 @@ pub(crate) enum HoprLibProcess {
 pub fn prepare_tokio_runtime(
     num_cpu_threads: Option<std::num::NonZeroUsize>,
     num_io_threads: Option<std::num::NonZeroUsize>,
+    thread_stack_size: Option<usize>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
-    use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
     hopr_utils::parallelize::cpu::init_thread_pool(
@@ -268,13 +288,7 @@ pub fn prepare_tokio_runtime(
                 .max(1),
         )
         .thread_name("hoprd")
-        .thread_stack_size(
-            std::env::var("HOPRD_THREAD_STACK_SIZE")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
-                .unwrap_or(10 * 1024 * 1024)
-                .max(2 * 1024 * 1024),
-        )
+        .thread_stack_size(thread_stack_size.unwrap_or(10 * 1024 * 1024).max(2 * 1024 * 1024))
         .build()?)
 }
 
@@ -388,6 +402,7 @@ where
 
     /// Opens a session using explicit intermediate paths for forward and return routing.
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[allow(deprecated)]
     #[deprecated(
         since = "4.0.2-rc.1",
         note = "temporary compatibility API; remove once the explicit path is not needed anymore."
@@ -758,7 +773,7 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
 /// Only available when compiled with the `telemetry` feature.
 #[cfg(feature = "telemetry")]
 pub fn collect_hopr_metrics() -> errors::Result<String> {
-    hopr_types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
+    hopr_api::types::telemetry::gather_all_metrics().map_err(HoprLibError::other)
 }
 
 /// Converts a PeerId to an OffchainPublicKey.
@@ -880,6 +895,7 @@ mod tests {
     }
 
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
         let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());

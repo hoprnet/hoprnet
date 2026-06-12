@@ -9,7 +9,7 @@ use std::{
 use async_trait::async_trait;
 use dashmap::{DashMap, DashSet};
 use futures::StreamExt as _;
-use hopr_lib::api::{
+use hopr_api::{
     chain::{
         ChainEvent, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
         ChainWriteChannelOperations,
@@ -19,7 +19,10 @@ use hopr_lib::api::{
     },
 };
 
-use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
+use super::{
+    ChannelLifecycleConfig, ChannelLifecycleStrategyInner,
+    selector::{DefaultSelector, MultiObjectiveSelector},
+};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Builder for [`ChannelLifecycleStrategy`].
@@ -58,9 +61,20 @@ impl ChannelLifecycleStrategy {
             + Sync
             + 'static,
     {
+        let selector: Arc<dyn super::selector::Selector> = match self.cfg.selector.multi_objective_config() {
+            Some(mo_cfg) => {
+                mo_cfg
+                    .validate_trust_weights()
+                    .expect("invalid selector config: trust inner weights must sum to ~1.0");
+                Arc::new(MultiObjectiveSelector::new(mo_cfg))
+            }
+            None => Arc::new(DefaultSelector),
+        };
+
         Box::new(ChannelLifecycleStrategyInner {
             cfg: self.cfg,
             node,
+            selector,
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),
@@ -101,6 +115,13 @@ where
         + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
+        tracing::info!(
+            target = self.cfg.population.target_open_channels,
+            min = self.cfg.population.min_open_channels,
+            tick_interval_secs = self.cfg.tick_interval.as_secs(),
+            initial_balance = %self.cfg.funding.initial_balance,
+            "channel-lifecycle: strategy started"
+        );
         self.run_pipeline().await;
 
         let me = *self.node.chain_api().me();

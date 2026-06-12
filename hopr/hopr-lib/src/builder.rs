@@ -22,11 +22,13 @@
 //!     .with_config(config)
 //!     .with_chain_api(|_ctx| { /* ... */ todo!() })
 //!     .with_graph(|_ctx| { /* ... */ todo!() })
-//!     .with_network(|_ctx| Box::pin(async { /* ... */ todo!() }))
+//!     .with_network(|_ctx| Box::pin(async { /* ... */ Ok(todo!()) }))
 //!     .with_cover_traffic(|_ctx| { /* ... */ todo!() });
 //! ```
 
-use std::{convert::identity, future::Future, pin::Pin, sync::Arc, time::Duration};
+mod chain_wiring;
+
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::channel};
 pub use hopr_api::types::crypto::{
@@ -36,15 +38,11 @@ pub use hopr_api::types::crypto::{
 use hopr_api::{
     chain::{AnnouncementError, HoprChainApi, SafeRegistrationError, StateSyncOptions},
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
-    graph::{EdgeCapacityUpdate, HoprGraphApi},
+    graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
     node::{AtomicHoprState, HoprState, NodeOnchainIdentity, PixEvent, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
-    types::{
-        chain::chain_events::ChainEvent,
-        internal::prelude::{ChannelDirection, ChannelStatus},
-        primitive::prelude::{Address, UnitaryFloatOps},
-    },
+    types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
@@ -60,21 +58,26 @@ use crate::{
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_PROCESS_START_TIME:  hopr_types::telemetry::SimpleGauge =  hopr_types::telemetry::SimpleGauge::new(
+    static ref METRIC_PROCESS_START_TIME:  hopr_api::types::telemetry::SimpleGauge =  hopr_api::types::telemetry::SimpleGauge::new(
         "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
-    static ref METRIC_HOPR_LIB_VERSION:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_HOPR_LIB_VERSION:  hopr_api::types::telemetry::MultiGauge =  hopr_api::types::telemetry::MultiGauge::new(
         "hopr_lib_version",
         "Executed version of hopr-lib",
         &["version"]
     ).unwrap();
-    static ref METRIC_HOPR_NODE_INFO:  hopr_types::telemetry::MultiGauge =  hopr_types::telemetry::MultiGauge::new(
+    static ref METRIC_HOPR_NODE_INFO:  hopr_api::types::telemetry::MultiGauge =  hopr_api::types::telemetry::MultiGauge::new(
         "hopr_node_addresses",
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
 }
+
+const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
+
+type PeerDiscoveryRx =
+    Arc<parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
 
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
@@ -89,6 +92,16 @@ pub struct BuildCtx {
     pub packet_key: OffchainKeypair,
     /// Node configuration.
     pub cfg: HoprLibConfig,
+    peer_discovery_rx: PeerDiscoveryRx,
+}
+
+impl BuildCtx {
+    /// Take the peer-discovery receiver. Returns `Some` on the first call, `None` afterwards.
+    pub fn take_peer_discovery_rx(
+        &self,
+    ) -> Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
+        self.peer_discovery_rx.lock().take()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -118,17 +131,20 @@ pub struct HoprBuilderWithIdentity {
 impl HoprBuilderWithIdentity {
     /// Sets the node configuration and produces the configured builder.
     pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
+        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(PEER_DISCOVERY_CHANNEL_CAPACITY);
         HoprBuilderConfigured {
             ctx: BuildCtx {
                 chain_key: self.chain_key,
                 packet_key: self.packet_key,
                 cfg,
+                peer_discovery_rx: Arc::new(parking_lot::Mutex::new(Some(peer_discovery_rx))),
             },
             safe_and_module: None,
             chain_factory: None,
             graph_factory: None,
             network_factory: None,
             ct_factory: None,
+            peer_discovery_tx,
         }
     }
 }
@@ -149,8 +165,9 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     safe_and_module: Option<(Address, Address)>,
     chain_factory: Option<Factory<Chain>>,
     graph_factory: Option<Factory<Graph>>,
-    network_factory: Option<AsyncFactory<(Net, BoxedProcessFn)>>,
+    network_factory: Option<AsyncFactory<Result<(Net, BoxedProcessFn), HoprLibError>>>,
     ct_factory: Option<Factory<Ct>>,
+    peer_discovery_tx: futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
@@ -172,6 +189,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -187,16 +205,20 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: Some(Box::new(f)),
             network_factory: self.network_factory,
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
-    /// Sets the network factory. Must return `(Net, BoxedProcessFn)`.
+    /// Sets the network factory. Must resolve to `Ok((Net, BoxedProcessFn))`.
     ///
     /// The factory receives [`BuildCtx`] by value and returns a boxed future,
     /// allowing async network construction without blocking the executor.
+    /// Failures are propagated as [`HoprLibError`] during the build step.
     pub fn with_network<NewNet>(
         self,
-        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = (NewNet, BoxedProcessFn)> + Send>> + Send + 'static,
+        f: impl FnOnce(BuildCtx) -> Pin<Box<dyn Future<Output = Result<(NewNet, BoxedProcessFn), HoprLibError>> + Send>>
+        + Send
+        + 'static,
     ) -> HoprBuilderConfigured<Chain, Graph, NewNet, Ct> {
         HoprBuilderConfigured {
             ctx: self.ctx,
@@ -205,6 +227,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: Some(Box::new(f)),
             ct_factory: self.ct_factory,
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -220,6 +243,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
             graph_factory: self.graph_factory,
             network_factory: self.network_factory,
             ct_factory: Some(Box::new(f)),
+            peer_discovery_tx: self.peer_discovery_tx,
         }
     }
 
@@ -235,20 +259,24 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
         + Send
         + 'static,
     ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
-        let incoming_session_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(256);
+        let incoming_session_capacity = self.ctx.cfg.incoming_session_capacity.max(1);
 
         let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
-        let handle = hopr_utils::spawn_as_abortable!(
+        let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
+            "session_server_for_each_concurrent",
+            module_path!(),
+            file!(),
+            line!(),
+        );
+        let handle = hopr_utils::spawn_as_abortable_named!(
+            "hopr_lib_session_server",
             session_rx
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
-                    async move {
+                    let session_diag = session_diag.clone();
+                    session_diag.wrap(async move {
                         let session_id = *session.session.id();
                         match server.process(session).await {
                             Ok(()) => tracing::debug!(?session_id, "session processed successfully"),
@@ -256,7 +284,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
                                 tracing::error!(?session_id, %error, "session processing failed")
                             }
                         }
-                    }
+                    })
                 })
                 .inspect(|_| tracing::warn!(
                     task = %HoprLibProcess::SessionServer,
@@ -317,6 +345,24 @@ struct PreHopr<Chain, Graph, Net, Ct> {
 // Shared pre_build logic
 // ---------------------------------------------------------------------------
 
+/// Drains a HoprSocket reader, discarding all packets and logging throughput every ~60 seconds.
+/// Runs until the stream ends (sender side dropped).
+async fn drain_incoming_data<S: futures::Stream + Unpin>(mut reader: S) {
+    let mut received: u64 = 0;
+    let mut last_report = std::time::Instant::now();
+    while reader.next().await.is_some() {
+        received += 1;
+        if last_report.elapsed().as_secs() >= 60 {
+            tracing::info!(
+                received,
+                "incoming-data drain: unrelated packets discarded in last ~1 min"
+            );
+            received = 0;
+            last_report = std::time::Instant::now();
+        }
+    }
+}
+
 async fn pre_build_inner<Chain, Graph, Net, Ct>(
     configured: HoprBuilderConfigured<Chain, Graph, Net, Ct>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
@@ -331,6 +377,7 @@ where
     Net: NetworkView + NetworkStreamControl + Send + Sync + Clone + 'static,
     Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
 {
+    let peer_discovery_tx = Some(configured.peer_discovery_tx);
     let ctx = configured.ctx;
     ctx.cfg.validate()?;
 
@@ -344,7 +391,7 @@ where
         (configured
             .network_factory
             .ok_or(HoprLibError::BuilderError("missing network factory"))?)(ctx.clone())
-        .await;
+        .await?;
     let cover_traffic = (configured
         .ct_factory
         .ok_or(HoprLibError::BuilderError("missing cover traffic factory"))?)(&ctx);
@@ -417,9 +464,14 @@ where
         ));
     }
 
+    #[cfg(debug_assertions)]
+    let skip_protocol_checks = ctx.cfg.disable_protocol_checks;
+    #[cfg(not(debug_assertions))]
+    let skip_protocol_checks = false;
+
     let network_min_ticket_price = chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)?;
     let configured_ticket_price = ctx.cfg.protocol.packet.codec.outgoing_ticket_price;
-    if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
+    if !skip_protocol_checks && configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
         return Err(HoprLibError::GeneralError(format!(
             "configured outgoing ticket price < network minimum: {configured_ticket_price:?} < \
              {network_min_ticket_price}"
@@ -431,9 +483,8 @@ where
         .await
         .map_err(HoprLibError::chain)?;
     let configured_win_prob = ctx.cfg.protocol.packet.codec.outgoing_win_prob;
-    if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-        && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-    {
+
+    if !skip_protocol_checks && configured_win_prob.is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt()) {
         return Err(HoprLibError::GeneralError(format!(
             "configured outgoing win probability < network minimum: {configured_win_prob:?} < {network_min_win_prob}"
         )));
@@ -576,109 +627,16 @@ where
                 .unwrap_or_default(),
         ));
 
-        let proc = async move {
-            chain_events
-                .for_each(|chain_event| {
-                    let chain_reader = chain_reader.clone();
-                    let graph_updater = graph_updater.clone();
-                    let ticket_price = ticket_price.clone();
-                    let win_probability = win_probability.clone();
-
-                    async move {
-                        tracing::debug!(event = %chain_event, "processing chain event");
-                        match chain_event {
-                            ChainEvent::Announcement(account) => {
-                                tracing::debug!(
-                                    account = %account.public_key,
-                                    "recording graph node for announced account"
-                                );
-                                graph_updater.record_node(account.public_key);
-                            }
-                            ChainEvent::ChannelOpened(channel)
-                            | ChainEvent::ChannelClosed(channel)
-                            | ChainEvent::ChannelBalanceIncreased(channel, _)
-                            | ChainEvent::ChannelBalanceDecreased(channel, _) => {
-                                let src_addr = channel.source;
-                                let dst_addr = channel.destination;
-                                let keys = hopr_utils::runtime::prelude::spawn_blocking(move || {
-                                    let resolve = |addr: Address| {
-                                        if addr == own_chain_addr {
-                                            return Ok(Some(own_packet_key));
-                                        }
-                                        chain_reader.chain_key_to_packet_key(&addr).map_err(anyhow::Error::from)
-                                    };
-                                    resolve(src_addr).and_then(|src| resolve(dst_addr).map(|dst| src.zip(dst)))
-                                })
-                                .await
-                                .map_err(anyhow::Error::from)
-                                .and_then(identity);
-
-                                match keys {
-                                    Ok(Some((from, to))) => {
-                                        let capacity = if matches!(channel.status, ChannelStatus::Closed) {
-                                            None
-                                        } else if let Ok(ticket_value) =
-                                            ticket_price.read().div_f64(win_probability.read().as_f64())
-                                        {
-                                            Some(
-                                                channel
-                                                    .balance
-                                                    .amount()
-                                                    .checked_div(ticket_value.amount())
-                                                    .map(|v| v.low_u128())
-                                                    .unwrap_or(u128::MAX),
-                                            )
-                                        } else {
-                                            None
-                                        };
-
-                                        tracing::debug!(
-                                            %channel, ?capacity,
-                                            "recording graph edge for channel capacity"
-                                        );
-                                        graph_updater.record_edge(hopr_api::graph::MeasurableEdge::<
-                                            hopr_transport::NeighborTelemetry,
-                                            hopr_transport::PathTelemetry,
-                                        >::Capacity(
-                                            Box::new(EdgeCapacityUpdate {
-                                                capacity,
-                                                src: from,
-                                                dest: to,
-                                            }),
-                                        ));
-                                    }
-                                    Ok(None) => {
-                                        tracing::error!(
-                                            %channel,
-                                            "could not find packet keys for channel endpoints"
-                                        );
-                                    }
-                                    Err(error) => {
-                                        tracing::error!(
-                                            %error, %channel,
-                                            "failed to convert chain keys to packet keys"
-                                        );
-                                    }
-                                }
-                            }
-                            ChainEvent::ChannelClosureInitiated(channel) => {
-                                tracing::debug!(%channel, "channel closure initiated; no graph update");
-                            }
-                            ChainEvent::WinningProbabilityIncreased(prob)
-                            | ChainEvent::WinningProbabilityDecreased(prob) => {
-                                tracing::debug!(%prob, "recording winning probability change");
-                                *win_probability.write() = prob;
-                            }
-                            ChainEvent::TicketPriceChanged(price) => {
-                                tracing::debug!(%price, "recording ticket price change");
-                                *ticket_price.write() = price;
-                            }
-                            _ => {}
-                        }
-                    }
-                })
-                .await;
-        }
+        let proc = chain_wiring::process_chain_events(
+            chain_reader,
+            graph_updater,
+            chain_events,
+            own_chain_addr,
+            own_packet_key,
+            ticket_price,
+            win_probability,
+            peer_discovery_tx,
+        )
         .inspect(|_| {
             tracing::warn!(
                 task = "chain-to-graph event wiring",
@@ -723,7 +681,7 @@ macro_rules! impl_build_methods {
             let pre = pre_build_inner(configured, session_tx, processes).await?;
 
             tracing::info!("starting transport for edge (entry) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_entry(
                     pre.cover_traffic,
@@ -732,6 +690,9 @@ macro_rules! impl_build_methods {
                     ticket_factory,
                 )
                 .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
 
             let mut processes = pre.processes;
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
@@ -784,7 +745,8 @@ macro_rules! impl_build_methods {
             let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
             let tmgr_clone = ticket_manager.clone();
             spawn(
-                tickets_rx_stream
+                hopr_utils::runtime::diagnostics::instrument(
+                    tickets_rx_stream
                     .for_each(move |event| {
                         if let TicketEvent::WinningTicket(ticket) = &event
                             && let Err(error) = tmgr_clone.insert_incoming_ticket(**ticket)
@@ -799,6 +761,11 @@ macro_rules! impl_build_methods {
                     .inspect(|_| {
                         tracing::warn!(task = %HoprLibProcess::TicketEvents, "long-running background task finished")
                     }),
+                    "hopr_lib_ticket_events",
+                    module_path!(),
+                    file!(),
+                    line!(),
+                ),
             );
 
             {
@@ -806,56 +773,61 @@ macro_rules! impl_build_methods {
                 let tmgr_for_neglect = ticket_manager.clone();
                 let events = pre.chain_api.subscribe().map_err(HoprLibError::chain)?;
                 let (neglect_handle, neglect_reg) = hopr_utils::runtime::AbortHandle::new_pair();
-                spawn(
-                    futures::stream::Abortable::new(
-                        events.filter_map(move |event| {
-                            futures::future::ready(match event {
-                                ChainEvent::ChannelClosed(ch) => Some(ch),
-                                _ => None,
-                            })
-                        }),
-                        neglect_reg,
-                    )
-                    .for_each(move |closed_channel| {
-                        let chain = chain_for_neglect.clone();
-                        let tmgr = tmgr_for_neglect.clone();
-                        async move {
-                            match closed_channel.direction(chain.me()) {
-                                Some(ChannelDirection::Incoming) => {
-                                    match tmgr.neglect_tickets(closed_channel.get_id(), None) {
-                                        Ok(neglected) if !neglected.is_empty() => {
-                                            tracing::warn!(
-                                                num_neglected = neglected.len(),
-                                                %closed_channel,
-                                                "tickets on incoming closed channel were neglected"
-                                            );
-                                        }
-                                        Ok(_) => {}
-                                        Err(error) => {
-                                            tracing::error!(
-                                                %error, %closed_channel,
-                                                "failed to neglect tickets on closed channel"
-                                            );
-                                        }
+                let neglect_task = futures::stream::Abortable::new(
+                    events.filter_map(move |event| {
+                        futures::future::ready(match event {
+                            ChainEvent::ChannelClosed(ch) => Some(ch),
+                            _ => None,
+                        })
+                    }),
+                    neglect_reg,
+                )
+                .for_each(move |closed_channel| {
+                    let chain = chain_for_neglect.clone();
+                    let tmgr = tmgr_for_neglect.clone();
+                    async move {
+                        match closed_channel.direction(chain.me()) {
+                            Some(ChannelDirection::Incoming) => {
+                                match tmgr.neglect_tickets(closed_channel.get_id(), None) {
+                                    Ok(neglected) if !neglected.is_empty() => {
+                                        tracing::warn!(
+                                            num_neglected = neglected.len(),
+                                            %closed_channel,
+                                            "tickets on incoming closed channel were neglected"
+                                        );
+                                    }
+                                    Ok(_) => {}
+                                    Err(error) => {
+                                        tracing::error!(
+                                            %error, %closed_channel,
+                                            "failed to neglect tickets on closed channel"
+                                        );
                                     }
                                 }
-                                Some(ChannelDirection::Outgoing) => {}
-                                _ => {}
                             }
+                            Some(ChannelDirection::Outgoing) => {}
+                            _ => {}
                         }
-                    })
-                    .inspect(|_| {
-                        tracing::warn!(
-                            task = %HoprLibProcess::ChannelClosureNeglect,
-                            "channel closure ticket neglect task finished"
-                        )
-                    }),
-                );
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::ChannelClosureNeglect,
+                        "channel closure ticket neglect task finished"
+                    )
+                });
+                spawn(hopr_utils::runtime::diagnostics::instrument(
+                    neglect_task,
+                    "hopr_lib_channel_closure_neglect",
+                    module_path!(),
+                    file!(),
+                    line!(),
+                ));
                 processes.insert(HoprLibProcess::ChannelClosureNeglect, neglect_handle);
             }
 
             tracing::info!("starting transport for full (relay) node");
-            let (_, transport_processes) = pre
+            let (socket, transport_processes) = pre
                 .transport_api
                 .run_relay(
                     pre.cover_traffic,
@@ -867,6 +839,8 @@ macro_rules! impl_build_methods {
                     pre.session_tx,
                 )
                 .await?;
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
             processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
             let hopr = Hopr {

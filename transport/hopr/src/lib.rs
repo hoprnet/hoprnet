@@ -162,6 +162,8 @@ pub enum HoprTransportProcess {
     OutgoingIndexSync,
     #[strum(to_string = "periodic protocol counter flush")]
     CounterFlush,
+    #[strum(to_string = "mixer→wire forwarder")]
+    MixerForwarder,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
@@ -539,9 +541,37 @@ where
 
         let msg_codec = crate::protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
-            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone()).await?;
+            protocol::stream::process_stream_protocol(msg_codec, transport_network.clone(), self.cfg.stream).await?;
 
-        let mixing_channel_tx = hopr_transport_mixer::MixerSink::new(wire_msg_tx, build_mixer_cfg_from_env());
+        // Shared mixing channel: all per-destination clones of `mixing_channel_tx` push into one
+        // heap, so cross-destination packets are mixed together rather than each destination
+        // getting its own independent delay queue. The single forwarder task owns the receiver
+        // (and therefore the heap timer) — no per-clone waker coordination is needed.
+        let mut mixer_cfg = self.cfg.mixer;
+        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
+            .unwrap_or(u64::MAX)
+            .max(1);
+        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
+        processes.insert(
+            HoprTransportProcess::MixerForwarder,
+            hopr_utils::spawn_as_abortable!(async move {
+                mix_rx
+                    .fold(wire_msg_tx, |mut sink, item| async move {
+                        if sink.send(item).await.is_err() {
+                            tracing::error!(
+                                task = %HoprTransportProcess::MixerForwarder,
+                                "wire sink dropped — discarding mixed packet"
+                            );
+                        }
+                        sink
+                    })
+                    .await;
+                tracing::warn!(
+                    task = %HoprTransportProcess::MixerForwarder,
+                    "long-running background task finished"
+                );
+            }),
+        );
 
         // -- path cache background refresh (only when tokio runtime is available)
         #[cfg(feature = "runtime-tokio")]
@@ -883,14 +913,20 @@ where
         // Wire incoming: cover-traffic-filtered stream → probe classify → (session dispatch).
         // This stage must run in a background task, so the pipeline drains even when the
         // caller discards the returned HoprSocket (e.g. edge-node builder).
+        //
+        // The channel uses a resilient for_each rather than .forward() so that a disconnected
+        // receiver (HoprSocket dropped without consuming) logs an error and continues rather
+        // than collapsing the entire ingress pipeline. Callers should use HoprSocket::reader()
+        // and actively drain the stream; see hopr-lib builder for the reference drain.
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
         let smgr = self.smgr.clone();
+        let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            hopr_utils::spawn_as_abortable!(
+            hopr_utils::spawn_as_abortable!(async move {
                 probe_classifier
-                    .filter_stream(unresolved_routing_msg_tx.clone(), rx_from_protocol)
+                    .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
                         let smgr = smgr.clone();
                         async move {
@@ -910,13 +946,22 @@ where
                             }
                         }
                     })
-                    .map(Ok)
-                    .forward(on_incoming_data_tx)
-                    .inspect(|_| tracing::warn!(
-                        task = %HoprTransportProcess::SessionsManagement(0),
-                        "long-running background task finished"
-                    ))
-            ),
+                    .fold(on_incoming_data_tx, |mut tx, data| async move {
+                        if tx.send(data).await.is_err() {
+                            tracing::error!(
+                                task = %HoprTransportProcess::SessionsManagement(0),
+                                "incoming-data channel disconnected — dropping unrelated packet; \
+                                 HoprSocket must be consumed or drained by the caller"
+                            );
+                        }
+                        tx
+                    })
+                    .await;
+                tracing::warn!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "long-running background task finished"
+                );
+            }),
         );
 
         // Populate the OnceLock at the end, making sure everything before didn't fail.
@@ -1110,42 +1155,6 @@ where
             })
             .collect::<Vec<_>>())
     }
-}
-
-fn build_mixer_cfg_from_env() -> MixerConfig {
-    let mixer_cfg = MixerConfig {
-        min_delay: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-        ),
-        delay_range: std::time::Duration::from_millis(
-            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                .map(|v| {
-                    v.trim()
-                        .parse::<u64>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-        ),
-        capacity: {
-            let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .ok()
-                .and_then(|s| s.trim().parse::<usize>().ok())
-                .filter(|&c| c > 0)
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
-            debug!(capacity = capacity, "Setting mixer capacity");
-            capacity
-        },
-        ..MixerConfig::default()
-    };
-    debug!(?mixer_cfg, "Mixer configuration");
-
-    mixer_cfg
 }
 
 // ---------------------------------------------------------------------------

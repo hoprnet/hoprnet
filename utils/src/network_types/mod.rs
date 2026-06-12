@@ -2,7 +2,7 @@
 pub mod errors;
 
 /// Contains UDP socket-related helpers.
-#[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+#[cfg(feature = "network-types-runtime-tokio")]
 pub mod udp;
 
 /// Contains various networking-related types
@@ -21,7 +21,7 @@ pub mod timeout;
 pub mod prelude {
     pub use libp2p_identity::PeerId;
 
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
+    #[cfg(feature = "network-types-runtime-tokio")]
     pub use super::udp::*;
     pub use super::{addr::*, types::*};
 }

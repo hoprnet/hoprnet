@@ -1,8 +1,8 @@
-use std::{collections::HashSet, net::SocketAddr, time::Duration};
+use std::{collections::HashSet, net::SocketAddr, num::NonZeroUsize, time::Duration};
 
 use serde_with::serde_as;
 
-/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`](crate::exit::HoprServerIpForwardingReactor))
+/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`](crate::HoprServerIpForwardingReactor))
 /// and the Entry node.
 #[serde_as]
 #[derive(
@@ -49,6 +49,12 @@ pub struct SessionIpForwardingConfig {
     #[default(default_entry_listen_host())]
     #[serde_as(as = "serde_with::DisplayFromStr")]
     pub default_entry_listen_host: SocketAddr,
+
+    /// Number of parallel UDP receiver tasks per exit session.
+    ///
+    /// `None` (default) lets the implementation choose automatically.
+    #[serde(default)]
+    pub udp_rx_parallelism: Option<NonZeroUsize>,
 }
 
 fn default_target_retry_delay() -> Duration {

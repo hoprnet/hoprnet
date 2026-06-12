@@ -8,6 +8,13 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
+use hopr_api::types::{
+    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+    primitive::{
+        errors::GeneralError,
+        prelude::{BytesRepresentable, ToHex},
+    },
+};
 use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_pix::{SsaId, SsaIndex};
@@ -614,7 +621,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_types::{
+    use hopr_api::types::{
         crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions, primitive::prelude::*,
     };
 
@@ -847,8 +854,8 @@ mod tests {
             None,
         )?;
 
-        let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
-        let bob_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let alice_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
 
         let mut bob_recv = [0u8; DATA_LEN];
         let mut alice_recv = [0u8; DATA_LEN];
@@ -928,8 +935,8 @@ mod tests {
             None,
         )?;
 
-        let alice_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
-        let bob_sent = hopr_types::crypto_random::random_bytes::<DATA_LEN>();
+        let alice_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
 
         let mut bob_recv = [0u8; DATA_LEN];
         let mut alice_recv = [0u8; DATA_LEN];

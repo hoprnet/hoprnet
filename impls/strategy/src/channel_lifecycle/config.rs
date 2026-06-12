@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use hopr_lib::api::types::primitive::prelude::{Address, HoprBalance};
+use hopr_api::types::primitive::prelude::{Address, HoprBalance};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
@@ -236,6 +236,179 @@ pub struct ConcurrencyConfig {
     pub max_concurrent_actions: usize,
 }
 
+/// Per-axis weights for the multi-objective channel selector.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SelectorWeights {
+    /// Weight of the latency axis.
+    pub latency: f64,
+    /// Weight of the combined trust axis (probe success + ACK rate + ticket activity).
+    pub trust: f64,
+    /// Weight of the on-chain stake axis.
+    pub stake: f64,
+    /// Weight of the anonymity (bucket diversity) axis.
+    pub anonymity: f64,
+    /// Inner weight for probe success rate within the trust axis.  Default: 0.50.
+    pub trust_probe: f64,
+    /// Inner weight for ACK rate within the trust axis.  Default: 0.35.
+    pub trust_ack: f64,
+    /// Inner weight for ticket activity within the trust axis.  Default: 0.15.
+    pub trust_ticket: f64,
+}
+
+impl SelectorWeights {
+    pub const fn new(latency: f64, trust: f64, stake: f64, anonymity: f64) -> Self {
+        Self {
+            latency,
+            trust,
+            stake,
+            anonymity,
+            trust_probe: 0.50,
+            trust_ack: 0.35,
+            trust_ticket: 0.15,
+        }
+    }
+}
+
+/// Configuration for the multi-objective channel selector.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MultiObjectiveSelectorConfig {
+    pub weights: SelectorWeights,
+    /// Maximum number of opens initiated per strategy tick.  Selector returns at most this many
+    /// candidates; the pipeline may dispatch fewer due to safe-balance or concurrency limits.
+    pub open_per_tick: usize,
+    /// Maximum number of closes initiated per strategy tick.
+    pub close_per_tick: usize,
+    /// Minimum number of distinct `(latency, subnet)` cells that must be populated among open
+    /// channels.  The open pass fills underrepresented cells first; the close pass vetoes closing
+    /// the sole occupant of any cell.  `Unknown` subnet peers are excluded from the floor.
+    pub k_floor: usize,
+    /// Hysteresis gap between the open quality threshold
+    /// (`eligibility.min_peer_quality_score`) and the effective close quality
+    /// threshold.  The close threshold used by this selector is
+    /// `max(0, min_peer_quality_score − hysteresis_gap)`, which is
+    /// typically lower than `closure.close_below_quality_score`.  A wider gap
+    /// suppresses churn — once open, a channel stays open until quality is
+    /// substantially worse than the open bar.
+    pub hysteresis_gap: f64,
+}
+
+impl MultiObjectiveSelectorConfig {
+    pub fn low_latency() -> Self {
+        Self {
+            weights: SelectorWeights::new(0.70, 0.20, 0.05, 0.05),
+            open_per_tick: 4,
+            close_per_tick: 4,
+            k_floor: 2,
+            hysteresis_gap: 0.10,
+        }
+    }
+
+    pub fn balanced() -> Self {
+        Self {
+            weights: SelectorWeights::new(0.35, 0.30, 0.15, 0.20),
+            open_per_tick: 2,
+            close_per_tick: 2,
+            k_floor: 3,
+            hysteresis_gap: 0.20,
+        }
+    }
+
+    pub fn dispersed() -> Self {
+        Self {
+            weights: SelectorWeights::new(0.20, 0.20, 0.10, 0.50),
+            open_per_tick: 2,
+            close_per_tick: 2,
+            k_floor: 4,
+            hysteresis_gap: 0.20,
+        }
+    }
+
+    pub fn economical() -> Self {
+        Self {
+            weights: SelectorWeights::new(0.30, 0.30, 0.30, 0.10),
+            open_per_tick: 1,
+            close_per_tick: 1,
+            k_floor: 2,
+            hysteresis_gap: 0.40,
+        }
+    }
+
+    /// Returns an error message if the inner trust weights do not approximately sum to 1.0.
+    /// Intended for use by `Custom` profile validation.
+    pub fn validate_trust_weights(&self) -> Result<(), String> {
+        let sum = self.weights.trust_probe + self.weights.trust_ack + self.weights.trust_ticket;
+        if (sum - 1.0).abs() > 0.01 {
+            Err(format!(
+                "trust inner weights must sum to ~1.0 (got {:.4}): probe={}, ack={}, ticket={}",
+                sum, self.weights.trust_probe, self.weights.trust_ack, self.weights.trust_ticket
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn all_named_profiles_have_valid_trust_weights() {
+        for cfg in [
+            MultiObjectiveSelectorConfig::low_latency(),
+            MultiObjectiveSelectorConfig::balanced(),
+            MultiObjectiveSelectorConfig::dispersed(),
+            MultiObjectiveSelectorConfig::economical(),
+        ] {
+            assert!(
+                cfg.validate_trust_weights().is_ok(),
+                "profile has invalid trust weights: {:?}",
+                cfg.validate_trust_weights()
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_trust_weights_are_caught() {
+        let mut cfg = MultiObjectiveSelectorConfig::low_latency();
+        cfg.weights.trust_probe = 0.9;
+        cfg.weights.trust_ack = 0.9;
+        cfg.weights.trust_ticket = 0.9; // sum = 2.7
+        assert!(cfg.validate_trust_weights().is_err());
+    }
+}
+
+/// Selector profile selection for [`ChannelLifecycleConfig`].
+///
+/// Defaults to `Default` (existing `DefaultSelector` behavior, zero behavior change).
+/// Operators opt in to multi-objective selection by choosing a named profile or `Custom`.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectorProfile {
+    /// Original weighted-sum selector.  Zero behavior change from pre-redesign deployments.
+    #[default]
+    Default,
+    LowLatency,
+    Balanced,
+    Dispersed,
+    Economical,
+    Custom(MultiObjectiveSelectorConfig),
+}
+
+impl SelectorProfile {
+    /// Returns the `MultiObjectiveSelectorConfig` for this profile, or `None` for `Default`.
+    pub fn multi_objective_config(&self) -> Option<MultiObjectiveSelectorConfig> {
+        match self {
+            Self::Default => None,
+            Self::LowLatency => Some(MultiObjectiveSelectorConfig::low_latency()),
+            Self::Balanced => Some(MultiObjectiveSelectorConfig::balanced()),
+            Self::Dispersed => Some(MultiObjectiveSelectorConfig::dispersed()),
+            Self::Economical => Some(MultiObjectiveSelectorConfig::economical()),
+            Self::Custom(cfg) => Some(cfg.clone()),
+        }
+    }
+}
+
 /// Top-level configuration for [`ChannelLifecycleStrategy`].
 ///
 /// All fields have sensible defaults; consumers only need to set the fields
@@ -263,6 +436,9 @@ pub struct ChannelLifecycleConfig {
     pub finalizer: FinalizerConfig,
     pub restart: RestartGuardConfig,
     pub concurrency: ConcurrencyConfig,
+    /// Open/close selection policy.  Defaults to the original weighted-sum selector.
+    #[default(SelectorProfile::Default)]
+    pub selector: SelectorProfile,
 }
 
 #[inline]

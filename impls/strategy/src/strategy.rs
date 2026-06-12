@@ -85,7 +85,14 @@ impl Strategy for MultiStrategy {
         let mut join_handles = Vec::new();
         let mut abort_handles: Vec<AbortHandle> = Vec::new();
         for mut s in strategies {
-            let (proc, abort_handle) = abortable(async move { s.run().await });
+            let proc = hopr_utils::runtime::diagnostics::instrument(
+                async move { s.run().await },
+                "multi_strategy_sub_task",
+                module_path!(),
+                file!(),
+                line!(),
+            );
+            let (proc, abort_handle) = abortable(proc);
             join_handles.push(spawn(proc));
             abort_handles.push(abort_handle);
         }

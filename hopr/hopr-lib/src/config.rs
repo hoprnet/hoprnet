@@ -4,8 +4,8 @@ use hopr_api::types::primitive::prelude::*;
 pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
-        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, ProbeConfig, SessionGlobalConfig,
-        TransportConfig, looks_like_domain,
+        HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig, ProbeConfig,
+        SessionGlobalConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};
@@ -40,6 +40,12 @@ pub struct SafeModule {
     )]
     #[default(default_invalid_address())]
     pub module_address: Address,
+}
+
+#[cfg(feature = "session-server")]
+#[inline]
+fn default_incoming_session_capacity() -> usize {
+    256
 }
 
 #[allow(dead_code)]
@@ -88,6 +94,19 @@ pub struct HoprLibConfig {
         serde(default = "default_out_index_sync_period", with = "humantime_serde")
     )]
     pub out_index_sync_period: Duration,
+    /// Capacity of the incoming session channel (number of buffered sessions).
+    ///
+    /// Only relevant when the `session-server` feature is enabled. Default is 256.
+    #[cfg(feature = "session-server")]
+    #[default(default_incoming_session_capacity())]
+    #[cfg_attr(feature = "serde", serde(default = "default_incoming_session_capacity"))]
+    pub incoming_session_capacity: usize,
+    /// Disables win-probability and ticket-price protocol safety checks.
+    ///
+    /// Only available in debug builds. Never set in production.
+    #[cfg(debug_assertions)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub disable_protocol_checks: bool,
 }
 
 const MINIMUM_OUT_SYNC_PERIOD: Duration = Duration::from_secs(1);
@@ -124,6 +143,27 @@ mod tests {
         let yaml = serde_saphyr::to_string(&cfg)?;
         let cfg_after_serde: super::HoprLibConfig = serde_saphyr::from_str(&yaml)?;
         assert_eq!(cfg, cfg_after_serde);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn explicit_mixer_section_round_trips() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        let mut cfg = super::HoprLibConfig::default();
+        cfg.protocol.mixer = super::MixerConfig {
+            min_delay: Duration::from_millis(5),
+            delay_range: Duration::from_millis(50),
+            capacity: 1_000,
+            ..Default::default()
+        };
+        insta::assert_yaml_snapshot!(cfg.protocol.mixer);
+
+        let yaml = serde_saphyr::to_string(&cfg.protocol.mixer)?;
+        let parsed: super::MixerConfig = serde_saphyr::from_str(&yaml)?;
+        assert_eq!(cfg.protocol.mixer, parsed);
 
         Ok(())
     }
