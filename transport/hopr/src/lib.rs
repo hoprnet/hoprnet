@@ -66,7 +66,6 @@ pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, Applica
 use hopr_protocol_hopr::MemorySurbStore;
 pub use hopr_protocol_pix::RecoveredSsa;
 use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
-use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,

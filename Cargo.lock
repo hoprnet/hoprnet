@@ -1119,9 +1119,9 @@ dependencies = [
 
 [[package]]
 name = "assertables"
-version = "9.9.0"
+version = "10.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "627b0b35c347252505ec6c078827dfcecc4e9dcfa931c54c54066f9245ac752b"
+checksum = "b3c16d80246a076246d8b525d9f404543e90fe0818636cd89c249c2a4bee3bb1"
 dependencies = [
  "regex",
  "walkdir",
@@ -3096,9 +3096,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "1.3.5"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaf57c49a95fd1fe24b90b3033bee6dc7e8f1288d51494cb44e627c295e38542"
+checksum = "fb130435a959a8d525e6bca66ff6c40981a300ee96d70e3ef56f046556d614a3"
 dependencies = [
  "rustversion",
  "serde_core",
@@ -3173,6 +3173,16 @@ dependencies = [
  "futures-core",
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "granit-parser"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7e736dfe3881c53a7dce0685eb18202d0d9fe6911782f9870946eb9ee89d778"
+dependencies = [
+ "arraydeque",
+ "smallvec",
 ]
 
 [[package]]
@@ -3271,9 +3281,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -3564,7 +3574,7 @@ dependencies = [
  "curve25519-dalek",
  "elliptic-curve",
  "flagset",
- "generic-array 1.3.5",
+ "generic-array 1.4.2",
  "hex",
  "hex-literal",
  "hopr-protocol-pix",
@@ -3626,7 +3636,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.1"
+version = "4.0.2-rc.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -3637,20 +3647,34 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
+ "hex-literal",
  "hopr-api",
+ "hopr-chain-connector",
+ "hopr-ct-full-network",
+ "hopr-lib",
+ "hopr-network-graph",
+ "hopr-ticket-manager",
  "hopr-transport",
- "hopr-types",
+ "hopr-transport-p2p",
  "hopr-utils",
  "humantime-serde",
+ "insta",
  "lazy_static",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "parking_lot",
+ "rand 0.10.1",
+ "rstest",
  "serde",
  "serde-saphyr",
  "serde_with",
+ "serial_test",
  "smart-default",
  "strum 0.28.0",
+ "test-log",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
  "validator",
 ]
@@ -3691,7 +3715,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.6.0"
+version = "4.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3766,7 +3790,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-protocol-app",
@@ -3814,43 +3838,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-reference"
-version = "4.2.1"
+name = "hopr-session-server-forwarder"
+version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
- "futures",
- "futures-time",
- "hex-literal",
  "hopr-api",
- "hopr-chain-connector",
- "hopr-ct-full-network",
- "hopr-lib",
- "hopr-network-graph",
- "hopr-reference",
- "hopr-ticket-manager",
- "hopr-transport-p2p",
- "hopr-types",
+ "hopr-transport-session",
+ "hopr-utils",
  "lazy_static",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
- "rand 0.10.1",
- "rstest",
  "serde",
  "serde_with",
- "serial_test",
  "smart-default",
- "test-log",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-retry",
- "tokio-util",
  "tracing",
  "validator",
 ]
 
 [[package]]
 name = "hopr-strategy"
-version = "0.19.0"
+version = "0.19.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3862,14 +3870,13 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
- "hopr-lib",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
  "lazy_static",
  "mockall",
  "moka",
+ "multiaddr",
  "parking_lot",
  "serde",
  "serde_with",
@@ -3883,7 +3890,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ticket-manager"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3891,7 +3898,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "futures",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "hopr-api",
  "hopr-chain-connector",
  "hopr-utils",
@@ -3911,7 +3918,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.1"
+version = "0.28.5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3942,7 +3949,6 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-session",
  "hopr-transport-tag-allocator",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -3969,7 +3975,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bytesize",
@@ -3993,7 +3999,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4006,7 +4012,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-transport",
  "hopr-transport-probe",
- "hopr-types",
  "hopr-utils",
  "lazy_static",
  "libp2p",
@@ -4052,7 +4057,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4069,7 +4074,6 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-tag-allocator",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4127,7 +4131,7 @@ dependencies = [
  "digest 0.10.7",
  "ed25519-dalek",
  "float-cmp",
- "generic-array 1.3.5",
+ "generic-array 1.4.2",
  "hex",
  "hex-literal",
  "hopr-bindings",
@@ -4203,7 +4207,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils-session"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4215,7 +4219,6 @@ dependencies = [
  "hopr-api",
  "hopr-lib",
  "hopr-transport",
- "hopr-types",
  "hopr-utils",
  "human-bandwidth",
  "lazy_static",
@@ -4649,7 +4652,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "rayon",
  "serde",
  "serde_core",
@@ -6203,18 +6206,18 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.1.11"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1749c7ed4bcaf4c3d0a3efc28538844fb29bcdd7d2b67b2be7e20ba861ff517"
+checksum = "2466b2336ed02bcdca6b294417127b90ec92038d1d5c4fbeac971a922e0e0924"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.11"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b20ed30f105399776b9c883e68e536ef602a16ae6f596d2c473591d6ad64c6"
+checksum = "c96395f0a926bc13b1c17622aaddda1ecb55d49c8f1bf9777e4d877800a43f8b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7189,17 +7192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "saphyr-parser-bw"
-version = "0.0.611"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67dec0c833db75dc98957956b303fe447ffc5eb13f2325ef4c2350f7f3aa69e3"
-dependencies = [
- "arraydeque",
- "smallvec",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "scc"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7381,18 +7373,18 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.24"
+version = "0.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83ad47c2f14654528a89495f8d0dbc64173176f8512c7c72386cbe81009f661"
+checksum = "dcc7fe48e34d02a97bc8e6253b8b91e5a47fe2c47eaacb5149cefbb69922eaf0"
 dependencies = [
  "ahash",
  "annotate-snippets",
  "base64",
  "encoding_rs_io",
  "getrandom 0.3.4",
+ "granit-parser",
  "nohash-hasher",
  "num-traits",
- "saphyr-parser-bw",
  "serde",
  "smallvec",
  "zmij",
@@ -7476,11 +7468,12 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.18.0"
+version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd5414fad8e6907dbdd5bc441a50ae8d6e26151a03b1de04d89a5576de61d01f"
+checksum = "76a5c54c7310e7b8b9577c286d7e399ddd876c3e12b3ed917a8aabc4b96e9e8c"
 dependencies = [
  "base64",
+ "bs58",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -7495,9 +7488,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.18.0"
+version = "3.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3db8978e608f1fe7357e211969fd9abdcae80bac1ba7a3369bb7eb6b404eb65"
+checksum = "84d57bc0c8b9a17920c178daa6bb924850d54a9c97ab45194bb8c17ad66bb660"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -8137,9 +8130,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.1"
+version = "1.52.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+checksum = "8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe"
 dependencies = [
  "bytes",
  "libc",
@@ -8555,7 +8548,7 @@ dependencies = [
  "crypto-bigint 0.6.1",
  "elliptic-curve",
  "elliptic-curve-tools",
- "generic-array 1.3.5",
+ "generic-array 1.4.2",
  "hex",
  "hybrid-array",
  "num",

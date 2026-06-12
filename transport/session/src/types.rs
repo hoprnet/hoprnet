@@ -11,8 +11,9 @@ use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::{
+        balance::HoprBalance,
         errors::GeneralError,
-        prelude::{BytesRepresentable, ToHex},
+        prelude::{BytesRepresentable, ToHex, Address},
     },
 };
 use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
@@ -23,14 +24,6 @@ use hopr_protocol_session::{
     UnreliableSocket,
 };
 use hopr_protocol_start::StartProtocol;
-use hopr_types::{
-    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
-    primitive::{
-        balance::HoprBalance,
-        errors::GeneralError,
-        prelude::{Address, BytesRepresentable, ToHex},
-    },
-};
 use hopr_utils::network_types::{
     prelude::SealedHost,
     utils::{AsyncWriteSink, DuplexIO},

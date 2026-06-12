@@ -1,4 +1,4 @@
-use hopr_types::crypto::prelude::SimplePseudonym;
+use hopr_api::types::crypto::prelude::SimplePseudonym;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.

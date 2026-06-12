@@ -9,6 +9,7 @@ pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
+    Address,
     PeerId,
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
@@ -20,7 +21,6 @@ use hopr_protocol_pix::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
     ShareResolution, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
-use hopr_types::primitive::prelude::Address;
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
@@ -599,6 +599,31 @@ where
 
     tracing::warn!(
         task = "transport (protocol - pix share acknowledgement)",
+        "long-running background task finished"
+    );
+}
+
+/// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
+///
+/// Used by Entry and Exit nodes — neither processes incoming ticket acknowledgements.
+/// Entry nodes receive acks from relays (they pay for forwarding), Exit nodes keep
+/// the pipeline alive for future PIX use. In both cases the queue must be actively
+/// drained; dropping the receiver causes every inbound ack dispatch to fail with
+/// `SendError(disconnected)`.
+async fn start_drain_incoming_ack_pipeline<AckIn>(ack_incoming: AckIn)
+where
+    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+{
+    ack_incoming
+        .for_each(move |(peer, acks)| {
+            tracing::trace!(%peer, num = acks.len(), "received acknowledgements (drained, not processed)");
+            futures::future::ready(())
+        })
+        .in_current_span()
+        .await;
+
+    tracing::warn!(
+        task = "transport (protocol - ticket acknowledgement drain)",
         "long-running background task finished"
     );
 }

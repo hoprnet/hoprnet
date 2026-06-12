@@ -164,6 +164,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
   "secure",
 ] }
 
+# TODO: use version >= 1.11.0 of hopr-api
 hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/pix" }
 hopr-types = { version = "1.8.2", features = ["use-bindings"] }
 hopr-utils = { path = "utils", default-features = false }
