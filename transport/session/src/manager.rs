@@ -129,6 +129,7 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
+// The Session initiation cache is only present on the Entry (client) side.
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
@@ -492,6 +493,7 @@ impl PixToolbox {
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
 pub struct SessionManager<S> {
+    // Keeps track of Session initiations requests on the Client side.
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
