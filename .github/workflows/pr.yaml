@@ -151,7 +151,8 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref }}
       runner: self-hosted-hoprnet-bigger
       bencher_project: ${{ github.event.repository.name }}
-      should_build: true
+      # Benchmarks disabled for now — flip the should_build to true
+      should_build: false
       should_run: false
       build_command: "nix build -L .#bench-build"
       run_command: "nix run .#bench-run"
