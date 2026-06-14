@@ -9,8 +9,7 @@ pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
-    Address,
-    PeerId,
+    Address, PeerId,
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };

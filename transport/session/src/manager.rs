@@ -1283,16 +1283,8 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (new_session_notifier, mut close_session_notifier) = self
-            .session_notifiers
-            .get()
-            .cloned()
-            .ok_or(SessionManagerError::NotStarted)?;
-
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
-
-        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Verify if the client offered the right parameters for PIX
         let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
@@ -1324,6 +1316,14 @@ where
             METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
             return Ok(());
         };
+
+        let (new_session_notifier, mut close_session_notifier) = self
+            .session_notifiers
+            .get()
+            .cloned()
+            .ok_or(SessionManagerError::NotStarted)?;
+
+        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Allocate a unique tag for this incoming session
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated

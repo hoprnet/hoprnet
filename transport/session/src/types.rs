@@ -13,7 +13,7 @@ use hopr_api::types::{
     primitive::{
         balance::HoprBalance,
         errors::GeneralError,
-        prelude::{BytesRepresentable, ToHex, Address},
+        prelude::{Address, BytesRepresentable, ToHex},
     },
 };
 use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
