@@ -2289,14 +2289,16 @@ mod tests {
     /// Before the fix the pipeline computed
     /// `overdue = closure_notice_period + max_closure_overdue`, doubling the
     /// wait because `closure_time` is already the deadline (initiation +
-    /// notice_period).  A channel whose deadline passed 5 seconds ago with
-    /// `max_closure_overdue = 0` would NOT have been finalized under the old
-    /// code (the chain's 2-second grace period would have been added as a
-    /// second wait), but MUST be finalized under the new code.
+    /// notice_period).  Here the closure deadline just passed 1 second ago
+    /// and the notice period is set to 60 s.  Under the old code:
+    /// `overdue = 60 s + 0 = 60 s`, `elapsed ≈ 1 s < 60 s` → would NOT
+    /// finalize.  Under the new code: `overdue = 0`, `elapsed ≈ 1 s >= 0`
+    /// → finalizes immediately.
     #[tokio::test]
     async fn finalizer_triggers_immediately_once_overdue_elapsed() -> anyhow::Result<()> {
-        // Channel whose closure deadline has already passed by 5 seconds.
-        let closure_deadline = std::time::SystemTime::now() - Duration::from_secs(5);
+        // Deadline passed 1 second ago — past due but well within the 60 s notice
+        // period the old buggy code would have waited.
+        let closure_deadline = std::time::SystemTime::now() - Duration::from_secs(1);
         let ch = ChannelEntry::builder()
             .between(*BOB, *ALICE)
             .amount(10_u32)
@@ -2313,8 +2315,9 @@ mod tests {
                 HoprBalance::new_base(1000),
             )
             .with_channels([ch])
-            // Grace period is irrelevant here — the channel starts in PendingToClose.
-            .with_closure_grace_period(Duration::ZERO)
+            // 60 s notice period: old code would have computed overdue = 60 s,
+            // preventing finalization for a channel only 1 s past its deadline.
+            .with_closure_grace_period(Duration::from_secs(60))
             .build_dynamic_client([1; Address::SIZE].into());
 
         let mut connector =
