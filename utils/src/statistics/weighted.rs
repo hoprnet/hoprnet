@@ -66,7 +66,9 @@ impl<T> WeightedCollection<T> {
             0.0
         }
     }
+}
 
+impl<T> WeightedCollection<T> {
     /// Returns the index of a randomly selected item, weighted by probability
     /// proportional to its weight.
     ///
