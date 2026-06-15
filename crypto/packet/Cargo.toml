@@ -11,7 +11,7 @@ homepage.workspace = true
 categories = ["cryptography", "network-programming"]
 authors.workspace = true
 rust-version.workspace = true
-include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
+include = ["README.md", "src/**/*.rs", "benches/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]

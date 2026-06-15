@@ -1,6 +1,6 @@
 # hopr-lib
 
-HOPR library containing the entire functionality importable without the HOPRd daemon
+HOPR library implementing the HOPR protocol
 
 Part of the [HOPR](https://hoprnet.org/) protocol implementation.
 

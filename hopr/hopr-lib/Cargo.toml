@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
+description = "HOPR library implementing the HOPR protocol"
 version = "4.0.2-rc.4"
 edition.workspace = true
 license.workspace = true
