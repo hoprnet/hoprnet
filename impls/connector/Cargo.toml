@@ -11,12 +11,7 @@ homepage.workspace = true
 categories = ["network-programming"]
 authors.workspace = true
 rust-version.workspace = true
-include = [
-  "README.md",
-  "src/**/*.rs",
-  "Cargo.toml",
-  "LICENSE",
-]
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 runtime-tokio = ["hopr-utils/runtime-tokio"]

@@ -29,11 +29,11 @@ members = [
 
 [workspace.package]
 rust-version = "1.91"
-edition      = "2024"
-authors      = ["HOPR Association <tech@hoprnet.org>"]
-license      = "GPL-3.0-only"
-homepage     = "https://hoprnet.org/"
-repository   = "https://github.com/hoprnet/hoprnet"
+edition = "2024"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+license = "GPL-3.0-only"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
 
 [workspace.metadata.publish]
 order = [
@@ -263,4 +263,6 @@ ignored = [
   "serde_bytes",
   "humantime-serde",
   "hopr-session-server-forwarder",
+  "hopr-strategy",
+  "hopr-utils-session",
 ]
