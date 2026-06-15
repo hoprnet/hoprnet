@@ -37,6 +37,7 @@ network-types = [
   "dep:thiserror",
   "dep:tracing",
   "dep:lazy_static",
+  "hopr-types/crypto",
 ]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-types/serde"]
 network-types-serde = ["network-types", "serde", "libp2p-identity/serde"]
