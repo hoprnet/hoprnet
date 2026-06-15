@@ -156,7 +156,8 @@ where
 /// expected) OR `capacity_floor` is also known.  This prevents 0-hop direct paths from
 /// being demoted simply because they carry no channel-capacity data.
 pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hops: usize) -> Vec<PathWithMetrics> {
-    if candidates.len() <= floor {
+    // floor == 0 means "no pruning" — caller opts out entirely.
+    if floor == 0 || candidates.len() <= floor {
         return candidates;
     }
 
@@ -1061,6 +1062,18 @@ mod tests {
             !has_missing_cap,
             "path without capacity floor must be pruned when fully-measured paths fill the floor"
         );
+    }
+
+    #[test]
+    fn prune_for_consistency_floor_zero_returns_all() {
+        // floor == 0 must be treated as "no pruning" — all candidates survive unchanged.
+        let candidates = vec![
+            make_path_with_capacity(Some(10), Some(1_000)),
+            make_path_with_capacity(Some(20), None),
+            make_path_with_capacity(None, None),
+        ];
+        let result = prune_for_consistency(candidates, 0, 1);
+        assert_eq!(result.len(), 3, "floor=0 must return all candidates");
     }
 
     // ── path metrics aggregation tests ────────────────────────────────────────
