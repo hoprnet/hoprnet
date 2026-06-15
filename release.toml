@@ -1,0 +1,1 @@
+rate-limit = { new-packages = 30, existing-packages = 60 }
