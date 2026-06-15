@@ -82,7 +82,7 @@ where
                 .map(|(path, path_id)| ((path, path_id), cfg.base_priority))
                 .collect();
 
-            let wc = WeightedCollection::from(weighted);
+            let wc = WeightedCollection::new(weighted);
             futures::stream::iter(wc.into_shuffled())
         })
 }
@@ -215,7 +215,7 @@ where
 
                     let peer_count = weighted.len();
                     let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-                    let wc = WeightedCollection::<OffchainPublicKey>::from(weighted);
+                    let wc = WeightedCollection::new(weighted);
                     let probes: Vec<_> = wc
                         .into_shuffled()
                         .into_iter()

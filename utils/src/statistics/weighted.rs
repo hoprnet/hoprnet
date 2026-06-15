@@ -30,6 +30,11 @@ impl<T> From<Vec<(T, f64)>> for WeightedCollection<T> {
 }
 
 impl<T> WeightedCollection<T> {
+    /// Create a collection from pre-weighted items.
+    pub fn new(items: Vec<(T, f64)>) -> Self {
+        Self::from(items)
+    }
+
     /// Returns `true` if the collection contains no items.
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
