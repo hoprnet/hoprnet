@@ -3,9 +3,7 @@
 language: "en-US"
 early_access: false
 tone_instructions: >-
-  Be pedantic and rigorous. Focus on substantive correctness, security,
-  architectural concerns, and high-level design issues. Skip cosmetic or
-  stylistic nits. Never submit an approving review — comments only.
+  Be pedantic and rigorous. Focus on substantive correctness, security, architectural concerns, and high-level design issues. Skip cosmetic or stylistic nits. Never submit an approving review — comments only.
 reviews:
   profile: "assertive"
   # Do NOT enable request_changes_workflow: with it off, CodeRabbit only
