@@ -33,7 +33,7 @@
 //!                         Open ───────────┘   ┌────────────────────┐
 //!                                             │  PendingToClose    │
 //!                                             └─────────┬──────────┘
-//!                                                       │ notice_period + max_closure_overdue
+//!                                                       │ deadline + max_closure_overdue
 //!                                                       │ finalize()
 //!                                                       ▼
 //!                                             ┌────────────────────┐
