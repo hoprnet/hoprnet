@@ -2721,4 +2721,45 @@ mod tests {
 
         Ok(())
     }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_true_when_closing_existing_session() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        // Create a session
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: ByteCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        // Verify session exists
+        assert_eq!(mgr.active_sessions().await.len(), 1);
+
+        // Close the session - should return true
+        let result = mgr.close_session(&pseudonym).await;
+        assert!(result, "closing existing session should return true");
+
+        // Verify session is closed
+        assert_eq!(mgr.active_sessions().await.len(), 0);
+
+        Ok(())
+    }
 }
