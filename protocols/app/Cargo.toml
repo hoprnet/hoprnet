@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-app"
-description = "Contains implementation of Application layer for HOPR protocol as specified in RFC-0014"
+description = "Contains implementation of Application layer for HOPR protocol as specified in RFC-0011"
 version = "1.0.1"
 edition.workspace = true
 license.workspace = true
