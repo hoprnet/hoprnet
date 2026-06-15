@@ -17,19 +17,6 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  build-library:
-    name: Verify publish dry-run
-    if: github.event.pull_request.merged == true
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@d0cffaf9e9209c8eca00e8c74e82ac3f5f3cf7bb # build-library-v3
-    permissions:
-      contents: read
-    with:
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      version_type: pr
-      architecture: x86_64-linux
-      runner: depot-ubuntu-24.04-4
-    secrets:
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   cache_deps:
     name: Cache deps
     if: github.event.pull_request.merged == true
@@ -83,7 +70,6 @@ jobs:
   notify:
     name: Notify failure
     needs:
-      - build-library
       - docs
     if: ${{ always() && github.event.pull_request.merged == true && !success() }}
     runs-on: depot-ubuntu-24.04
