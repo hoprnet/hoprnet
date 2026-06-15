@@ -974,7 +974,7 @@ mod tests {
     #[tokio::test]
     async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
         let session = HoprSession::new(
@@ -1017,7 +1017,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
         let session = HoprSession::new(
@@ -1085,7 +1085,7 @@ mod tests {
     #[test]
     fn find_configurator_should_return_none_when_no_listeners() {
         let handles = ListenerJoinHandles::default();
-        let session_id = SessionId::new(1234u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         assert!(handles.find_configurator(&session_id).is_none());
     }
 
@@ -1095,7 +1095,7 @@ mod tests {
         let listener_id = ListenerId(IpProtocol::TCP, "127.0.0.1:9091".parse().unwrap());
         handles.0.insert(listener_id, stub_stored_entry());
 
-        let session_id = SessionId::new(5678u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         assert!(handles.find_configurator(&session_id).is_none());
     }
 

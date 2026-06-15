@@ -11,6 +11,8 @@ use hopr_api::types::{
     primitive::errors::GeneralError,
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut};
+#[cfg(feature = "telemetry")]
+use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -254,7 +256,7 @@ impl HoprSession {
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    id,
+                    NoopTracker,
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
@@ -264,7 +266,7 @@ impl HoprSession {
                     transport,
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    id,
+                    NoopTracker,
                 )?)
             }
         } else {

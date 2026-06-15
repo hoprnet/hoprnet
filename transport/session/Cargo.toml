@@ -79,6 +79,7 @@ hopr-protocol-session = { workspace = true, features = [
   "serde",
   "runtime-tokio",
   "hashbrown",
+  "telemetry",
 ] }
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }

@@ -9,6 +9,26 @@ use hopr_protocol_session::SessionMessageDiscriminants;
 pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
 use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
+/// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
+/// This is needed to satisfy the orphan rule - we can only implement external traits
+/// for local types, so we create a local wrapper.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct SessionIdWrapper(SessionId);
+
+impl std::ops::Deref for SessionIdWrapper {
+    type Target = SessionId;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<SessionId> for SessionIdWrapper {
+    fn from(id: SessionId) -> Self {
+        Self(id)
+    }
+}
+
 lazy_static::lazy_static! {
     static ref METRIC_SESSION_SNAPSHOT_AT_MS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_snapshot_at_ms",
@@ -229,18 +249,19 @@ type CapabilitySet = flagset::FlagSet<Capability>;
 pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig) {
     let now = now_us();
     let ack_mode = session_ack_mode(cfg.capabilities);
+    let session_id_str = session_id.to_string();
 
-    METRIC_SESSION_LIFETIME_CREATED_AT_MS.set(&[session_id.as_str()], now as f64 / 1_000.0);
-    METRIC_SESSION_LIFETIME_STATE.set(&[session_id.as_str()], SessionLifecycleState::Active as u8 as f64);
-    METRIC_SESSION_ACK_MODE.set(&[session_id.as_str()], ack_mode as u8 as f64);
-    METRIC_SESSION_FRAME_MTU_BYTES.set(&[session_id.as_str()], cfg.frame_mtu as f64);
-    METRIC_SESSION_FRAME_TIMEOUT_MS.set(&[session_id.as_str()], cfg.frame_timeout.as_millis() as f64);
-    METRIC_SESSION_FRAME_FRAME_CAPACITY.set(&[session_id.as_str()], SESSION_SOCKET_CAPACITY as f64);
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
-    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], 0.0);
-    METRIC_SESSION_SURB_TARGET_BUFFER.set(&[session_id.as_str()], 0.0);
-    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], 0.0);
-    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[session_id.as_str()], 0.0);
+    METRIC_SESSION_LIFETIME_CREATED_AT_MS.set(&[&session_id_str], now as f64 / 1_000.0);
+    METRIC_SESSION_LIFETIME_STATE.set(&[&session_id_str], SessionLifecycleState::Active as u8 as f64);
+    METRIC_SESSION_ACK_MODE.set(&[&session_id_str], ack_mode as u8 as f64);
+    METRIC_SESSION_FRAME_MTU_BYTES.set(&[&session_id_str], cfg.frame_mtu as f64);
+    METRIC_SESSION_FRAME_TIMEOUT_MS.set(&[&session_id_str], cfg.frame_timeout.as_millis() as f64);
+    METRIC_SESSION_FRAME_FRAME_CAPACITY.set(&[&session_id_str], SESSION_SOCKET_CAPACITY as f64);
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[&session_id_str], 0.0);
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[&session_id_str], 0.0);
+    METRIC_SESSION_SURB_TARGET_BUFFER.set(&[&session_id_str], 0.0);
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[&session_id_str], 0.0);
+    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[&session_id_str], 0.0);
 
     {
         let mut state = SESSION_RUNTIME.lock();
@@ -251,12 +272,14 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
 }
 
 pub fn remove_session_metrics_state(session_id: &SessionId) {
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id.as_str()], 0.0);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[&session_id_str], 0.0);
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
 pub fn set_session_state(session_id: &SessionId, state: SessionLifecycleState) {
-    METRIC_SESSION_LIFETIME_STATE.set(&[session_id.as_str()], state as u8 as f64);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_LIFETIME_STATE.set(&[&session_id_str], state as u8 as f64);
     touch_session_activity(session_id);
 }
 
@@ -285,8 +308,9 @@ pub fn record_session_read(session_id: &SessionId, bytes: usize) {
     }
 
     touch_session_activity(session_id);
-    METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL.increment_by(&[session_id.as_str()], bytes as u64);
-    METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL.increment_by(&[session_id.as_str()], 1);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL.increment_by(&[&session_id_str], bytes as u64);
+    METRIC_SESSION_TRANSPORT_PACKETS_IN_TOTAL.increment_by(&[&session_id_str], 1);
 }
 
 pub fn record_session_write(session_id: &SessionId, bytes: usize) {
@@ -295,8 +319,9 @@ pub fn record_session_write(session_id: &SessionId, bytes: usize) {
     }
 
     touch_session_activity(session_id);
-    METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL.increment_by(&[session_id.as_str()], bytes as u64);
-    METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL.increment_by(&[session_id.as_str()], 1);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_TRANSPORT_BYTES_OUT_TOTAL.increment_by(&[&session_id_str], bytes as u64);
+    METRIC_SESSION_TRANSPORT_PACKETS_OUT_TOTAL.increment_by(&[&session_id_str], 1);
 }
 
 pub fn set_session_balancer_data(
@@ -316,29 +341,33 @@ pub fn set_session_balancer_data(
         });
     }
 
-    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[session_id.as_str()], 1.0);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_SURB_REFILL_IN_FLIGHT.set(&[&session_id_str], 1.0);
     touch_session_activity(session_id);
 }
 
 pub fn record_session_surb_produced(session_id: &SessionId, by: u64) {
-    METRIC_SESSION_SURB_PRODUCED_TOTAL.increment_by(&[session_id.as_str()], by);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_SURB_PRODUCED_TOTAL.increment_by(&[&session_id_str], by);
     touch_session_activity(session_id);
 }
 
 pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
-    METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[session_id.as_str()], by);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[&session_id_str], by);
     touch_session_activity(session_id);
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {
-    METRIC_SESSION_SNAPSHOT_AT_MS.set(&[session_id.as_str()], now_us as f64 / 1_000.0);
-    METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS.set(&[session_id.as_str()], last_activity_us as f64 / 1_000.0);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_SNAPSHOT_AT_MS.set(&[&session_id_str], now_us as f64 / 1_000.0);
+    METRIC_SESSION_LIFETIME_LAST_ACTIVITY_AT_MS.set(&[&session_id_str], last_activity_us as f64 / 1_000.0);
     METRIC_SESSION_LIFETIME_UPTIME_MS.set(
-        &[session_id.as_str()],
+        &[&session_id_str],
         now_us.saturating_sub(created_at_us) as f64 / 1_000.0,
     );
     METRIC_SESSION_LIFETIME_IDLE_MS.set(
-        &[session_id.as_str()],
+        &[&session_id_str],
         now_us.saturating_sub(last_activity_us) as f64 / 1_000.0,
     );
 }
@@ -363,14 +392,15 @@ fn refresh_surb_gauges(session_id: &SessionId, runtime: &mut SessionRuntimeState
     surb.last_snapshot_total = total;
     surb.last_snapshot_us = now_us;
 
+    let session_id_str = session_id.to_string();
     METRIC_SESSION_SURB_TARGET_BUFFER.set(
-        &[session_id.as_str()],
+        &[&session_id_str],
         surb.state
             .target_surb_buffer_size
             .load(std::sync::atomic::Ordering::Relaxed) as f64,
     );
-    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[session_id.as_str()], total as f64);
-    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[session_id.as_str()], rate_per_sec);
+    METRIC_SESSION_SURB_BUFFER_ESTIMATE.set(&[&session_id_str], total as f64);
+    METRIC_SESSION_SURB_RATE_PER_SEC.set(&[&session_id_str], rate_per_sec);
 }
 
 fn now_us() -> u64 {
@@ -386,7 +416,8 @@ fn increment_frame_assembly_gauge(session_id: &SessionId) {
         .entry(*session_id)
         .or_insert_with(|| SessionRuntimeState::new(now_us()));
     runtime.frames_being_assembled = runtime.frames_being_assembled.saturating_add(1);
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[session_id.as_str()], 1.0);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[&session_id_str], 1.0);
 }
 
 fn decrement_frame_assembly_gauge(session_id: &SessionId) {
@@ -400,58 +431,65 @@ fn decrement_frame_assembly_gauge(session_id: &SessionId) {
     }
 
     runtime.frames_being_assembled -= 1;
-    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[session_id.as_str()], 1.0);
+    let session_id_str = session_id.to_string();
+    METRIC_SESSION_FRAME_BEING_ASSEMBLED.decrement(&[&session_id_str], 1.0);
 }
 
-impl hopr_protocol_session::SessionTelemetryTracker for SessionId {
+impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
     fn frame_emitted(&self) {
-        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[self.as_str()]);
+        let session_id_str = self.to_string();
+        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[&session_id_str]);
     }
 
     fn frame_completed(&self) {
-        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[self.as_str()]);
-        decrement_frame_assembly_gauge(self);
+        let session_id_str = self.to_string();
+        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[&session_id_str]);
+        decrement_frame_assembly_gauge(&*self);
     }
 
     fn frame_discarded(&self) {
-        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[self.as_str()]);
-        decrement_frame_assembly_gauge(self);
+        let session_id_str = self.to_string();
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[&session_id_str]);
+        decrement_frame_assembly_gauge(&*self);
     }
 
     fn incomplete_frame(&self) {
-        increment_frame_assembly_gauge(self);
+        increment_frame_assembly_gauge(&*self);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
+        let session_id_str = self.to_string();
         match msg {
             SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[&session_id_str])
             }
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&session_id_str])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&session_id_str])
             }
         }
     }
 
     fn outgoing_message(&self, msg: SessionMessageDiscriminants) {
+        let session_id_str = self.to_string();
         match msg {
             SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[&session_id_str])
             }
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&session_id_str])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[self.as_str()])
+                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&session_id_str])
             }
         }
     }
 
     fn error(&self) {
-        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[self.as_str()]);
+        let session_id_str = self.to_string();
+        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[&session_id_str]);
     }
 }
 
@@ -464,10 +502,10 @@ mod tests {
 
     #[test]
     fn session_metrics_are_exported_through_hopr_metrics() {
-        let id = SessionId::new(4_u64, HoprPseudonym::random());
+        let id: SessionId = HoprPseudonym::random();
         initialize_session_metrics(id, HoprSessionConfig::default());
         record_session_read(&id, 10);
-        id.frame_completed();
+        SessionIdWrapper::from(id).frame_completed();
 
         let text = hopr_api::types::telemetry::gather_all_metrics().expect("must gather metrics");
         let session_id = id.to_string();
@@ -485,7 +523,7 @@ mod tests {
 
     #[test]
     fn surb_metrics_are_exported_through_hopr_metrics() {
-        let id = SessionId::new(5_u64, HoprPseudonym::random());
+        let id: SessionId = HoprPseudonym::random();
         initialize_session_metrics(id, HoprSessionConfig::default());
         let estimator = AtomicSurbFlowEstimator::default();
         let state = Arc::new(BalancerStateValues::new(Default::default()));
