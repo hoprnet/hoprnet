@@ -141,7 +141,7 @@ mod tests {
 
         let msg = HoprStartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
+            session_id: HoprPseudonym::random(),
         });
 
         assert!(
@@ -162,7 +162,7 @@ mod tests {
         );
 
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
-            session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
+            session_id: HoprPseudonym::random(),
             flags: None.into(),
             additional_data: 0xffffffff,
         });
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn hopr_start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
-            session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
+            session_id: HoprPseudonym::random(),
             flags: None.into(),
             additional_data: 0xffffffff,
         });

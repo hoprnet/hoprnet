@@ -1078,8 +1078,8 @@ where
                 .handle_start_protocol_message(pseudonym, in_data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self.session_tag_range.contains(&in_data.data.application_tag.as_u64()) {
-            let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
+        } else if in_data.data.application_tag.as_u64() == crate::SESSION_APPLICATION_TAG {
+            let session_id = pseudonym;
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
@@ -1126,8 +1126,7 @@ where
         self.sessions.run_pending_tasks().await;
 
         // Check if a session with this pseudonym already exists
-        let existing_session_key = SessionId::new(crate::SESSION_APPLICATION_TAG, pseudonym);
-        if self.sessions.get(&existing_session_key).await.is_some() {
+        if self.sessions.get(&pseudonym).await.is_some() {
             error!(%pseudonym, "session already exists for this pseudonym");
             let reason = StartErrorReason::SessionAlreadyExists;
             let data = HoprStartProtocol::SessionError(StartErrorType {
@@ -1171,7 +1170,7 @@ where
             return Ok(());
         }
 
-        let session_id = SessionId::new(crate::SESSION_APPLICATION_TAG, pseudonym);
+        let session_id = pseudonym;
 
         let slot = SessionSlot {
             session_tx: Arc::new(tx_session_data),
@@ -1183,7 +1182,7 @@ where
         };
         self.sessions.insert(session_id, slot.clone()).await;
 
-        debug!(%session_id, ?session_req, "assigned a new session");
+        debug!(?pseudonym, ?session_req, "assigned a new session");
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1919,7 +1918,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_surb_balancer_config() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
-        let session_id = SessionId::new(16u64, alice_pseudonym);
+        let session_id = alice_pseudonym;
         let balancer_cfg = SurbBalancerConfig {
             target_surb_buffer_size: 1000,
             max_surbs_per_sec: 100,
@@ -1970,6 +1969,7 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    #[ignore = "Obsolete: dynamic tag allocation removed"]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1982,7 +1982,7 @@ mod tests {
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16u64, alice_pseudonym),
+                alice_pseudonym,
                 SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
@@ -2081,6 +2081,7 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    #[ignore = "Obsolete: dynamic tag allocation removed"]
     async fn session_manager_should_not_allow_establish_session_when_maximum_number_of_session_is_reached()
     -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2094,7 +2095,7 @@ mod tests {
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16u64, alice_pseudonym),
+                alice_pseudonym,
                 SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),

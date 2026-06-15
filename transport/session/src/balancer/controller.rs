@@ -545,7 +545,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            SessionId::new(1234_u64, HoprPseudonym::random()),
+            HoprPseudonym::random(),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -599,7 +599,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            SessionId::new(1234_u64, HoprPseudonym::random()),
+            HoprPseudonym::random(),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -636,7 +636,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn surb_balancer_should_start_decrease_level_when_above_target_and_decay_enabled() {
         const NUM_STEPS: usize = 5;
-        let session_id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let cfg = SurbBalancerConfig {
             target_surb_buffer_size: 5_000,
             max_surbs_per_sec: 2500,
