@@ -49,7 +49,6 @@ order = [
   "hopr-transport-probe",
   "hopr-transport-session",
   "hopr-network-graph",
-  "hopr-ct-immediate",
   "hopr-ct-full-network",
   "hopr-chain-connector",
   "hopr-transport-p2p",
