@@ -50,15 +50,16 @@ impl<T> WeightedCollection<T> {
         self.items.iter()
     }
 
+    /// Returns the sum of positive weights in this collection.
+    pub fn total_weight(&self) -> f64 {
+        self.total_weight
+    }
+
     /// Returns the sampling probability that an entry carrying `weight` would
     /// receive in this collection — i.e. `weight.max(0.0) / total_positive_weight`.
     ///
     /// Returns `0.0` if `weight <= 0.0` or if the collection holds no positive-weight
     /// entries (empty or fully non-positive collection).
-    ///
-    /// This mirrors the math used by [`pick_index`](Self::pick_index) at sample time
-    /// and is useful for diagnostics, e.g. logging the selection probability of each
-    /// candidate path.
     pub fn probability_of(&self, weight: f64) -> f64 {
         if self.total_weight > 0.0 && weight > 0.0 {
             weight / self.total_weight
