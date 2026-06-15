@@ -1,13 +1,23 @@
 [package]
 name = "hopr-protocol-hopr"
+description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
 version = "4.6.1"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "protocol", "routing", "mixnet"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming", "cryptography"]
+authors.workspace = true
 rust-version.workspace = true
-authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [features]
 default = ["rayon"]

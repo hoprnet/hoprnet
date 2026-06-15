@@ -1,13 +1,17 @@
 [package]
 name = "hopr-lib"
+description = "HOPR library implementing the HOPR protocol"
 version = "4.0.2-rc.4"
-authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "mixnet", "libp2p", "privacy"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming", "cryptography"]
+authors.workspace = true
 rust-version.workspace = true
-description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]

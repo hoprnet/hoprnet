@@ -161,6 +161,19 @@ jobs:
       ZULIP_API_KEY: ${{ secrets.ZULIP_API_KEY }}
       ZULIP_EMAIL: ${{ secrets.ZULIP_EMAIL }}
 
+  build-library:
+    name: Verify publish dry-run
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@d0cffaf9e9209c8eca00e8c74e82ac3f5f3cf7bb # build-library-v3
+    permissions:
+      contents: read
+    with:
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+      version_type: pr
+      architecture: x86_64-linux
+      runner: depot-ubuntu-24.04-4
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
   docs:
     name: Docs
     runs-on: depot-ubuntu-24.04-4

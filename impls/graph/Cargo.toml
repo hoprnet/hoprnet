@@ -1,14 +1,23 @@
 [package]
 name = "hopr-network-graph"
+description = "Implementation of the HOPR network graph"
 version = "0.3.0"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Implementation of the HOPR network graph."
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "graph", "routing"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming", "algorithms"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]

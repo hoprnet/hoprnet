@@ -1,13 +1,24 @@
 [package]
 name = "hopr-protocol-session"
+description = "Contains implementation of Session protocol according to HOPR RFC-0008"
 version = "1.1.1"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "protocol", "session"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming", "asynchronous"]
+authors.workspace = true
 rust-version.workspace = true
-authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains implementation of Session protocol according to HOPR RFC-0007"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "examples/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [features]
 default = ["hashbrown"]
