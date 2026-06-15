@@ -11,7 +11,13 @@ homepage.workspace = true
 categories = ["network-programming"]
 authors.workspace = true
 rust-version.workspace = true
-include = ["README.md", "src/**/*.rs", "benches/**/*.rs", "Cargo.toml", "LICENSE"]
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [features]
 default = ["redb", "cli"]
