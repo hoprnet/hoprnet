@@ -288,7 +288,7 @@ where
                             )));
                         }
 
-                        let weighted = hopr_utils::statistics::WeightedCollection::from(valid_paths);
+                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
                         for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
                             tracing::debug!(
                                 %destination,
@@ -479,7 +479,7 @@ where
                         }
 
                         if !valid_paths.is_empty() {
-                            let weighted = hopr_utils::statistics::WeightedCollection::from(valid_paths);
+                            let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
                             for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
                                 tracing::debug!(
                                     kind = "background-refresh",
