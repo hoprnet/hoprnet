@@ -352,6 +352,7 @@ where
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
+                    maximum_sessions: session_tag_allocator.capacity().max(1) as usize,
                 },
                 session_tag_allocator,
             )),

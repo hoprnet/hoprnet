@@ -1,5 +1,4 @@
 use std::{
-    ops::Range,
     pin::Pin,
     sync::{Arc, OnceLock},
     time::Duration,
@@ -27,7 +26,7 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
 };
-use hopr_transport_tag_allocator::{AllocatedTag, TagAllocator};
+use hopr_transport_tag_allocator::TagAllocator;
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
@@ -143,10 +142,6 @@ struct SessionSlot {
     // SURB flow updates happening outside of Session protocol
     // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
-    // Holds the allocated tag so it is returned to the pool when the session is evicted.
-    // `None` for outgoing sessions where the tag was assigned by the remote peer.
-    #[allow(dead_code, reason = "kept alive for Drop-based tag deallocation")]
-    allocated_tag: Option<Arc<AllocatedTag>>,
 }
 
 /// Indicates the result of processing a message.
@@ -244,6 +239,12 @@ pub struct SessionManagerConfig {
     /// Default is true.
     #[default(true)]
     pub surb_target_notify: bool,
+
+    /// Maximum number of concurrent sessions allowed.
+    ///
+    /// Default is 10_000.
+    #[default(10_000)]
+    pub maximum_sessions: usize,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -400,11 +401,6 @@ pub struct SessionManager<S> {
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
-    tag_allocator: Arc<dyn TagAllocator + Send + Sync>,
-    /// Tag value range for sessions, derived from the [`TagAllocator`].
-    session_tag_range: Range<u64>,
-    /// Maximum number of concurrent sessions, derived from the [`TagAllocator`] capacity.
-    maximum_sessions: usize,
     cfg: SessionManagerConfig,
 }
 
@@ -416,9 +412,6 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
-            tag_allocator: self.tag_allocator.clone(),
-            session_tag_range: self.session_tag_range.clone(),
-            maximum_sessions: self.maximum_sessions,
         }
     }
 }
@@ -432,14 +425,8 @@ where
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
     /// for allocating session tags on the Exit (incoming) side.
-    pub fn new(mut cfg: SessionManagerConfig, tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
-        let session_tag_range = tag_allocator.tag_range();
-        let maximum_sessions = tag_allocator.capacity().max(1) as usize;
-
-        debug_assert!(
-            session_tag_range.start >= ReservedTag::range().end,
-            "session tag range must not overlap with reserved tags"
-        );
+    pub fn new(mut cfg: SessionManagerConfig, _tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
+        let maximum_sessions = cfg.maximum_sessions;
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
             .map(|p| p.max(MIN_SURB_BUFFER_NOTIFICATION_PERIOD));
@@ -476,9 +463,6 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
-            tag_allocator,
-            session_tag_range,
-            maximum_sessions,
             cfg,
         }
     }
@@ -505,7 +489,7 @@ where
             Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
         let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -616,7 +600,7 @@ where
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
-        if self.maximum_sessions <= self.sessions.entry_count() as usize {
+        if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
 
@@ -798,7 +782,6 @@ where
                             abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                             surb_mgmt: surb_mgmt.clone(),
                             surb_estimator: surb_estimator.clone(),
-                            allocated_tag: None,
                         },
                     )
                     .await?;
@@ -876,7 +859,6 @@ where
                             abort_handles: Default::default(),
                             surb_mgmt: Default::default(),      // Disabled SURB management
                             surb_estimator: Default::default(), // No SURB estimator needed
-                            allocated_tag: None,
                         },
                     )
                     .await?;
@@ -1122,33 +1104,10 @@ where
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Use constant application tag for all sessions
-        // Check if session already exists for this pseudonym
         self.sessions.run_pending_tasks().await;
 
-        // Check if a session with this pseudonym already exists
-        if self.sessions.get(&pseudonym).await.is_some() {
-            error!(%pseudonym, "session already exists for this pseudonym");
-            let reason = StartErrorReason::SessionAlreadyExists;
-            let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
-                reason,
-            });
-            msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!("timeout sending session error message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(%error, "failed to send session error message");
-                    SessionManagerError::other(error)
-                })?;
-            return Ok(());
-        }
-
-        if self.sessions.entry_count() as usize >= self.maximum_sessions {
+        // Check max sessions limit before atomic insert
+        if self.sessions.entry_count() as usize >= self.cfg.maximum_sessions {
             error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
@@ -1178,9 +1137,45 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Default::default(),
             surb_estimator: Default::default(),
-            allocated_tag: None,
         };
-        self.sessions.insert(session_id, slot.clone()).await;
+
+        // Use atomic entry API to prevent race condition (TOCTOU)
+        // Only one concurrent request can successfully insert for a given pseudonym
+        if let moka::ops::compute::CompResult::Inserted(_) = self
+            .sessions
+            .entry(session_id)
+            .and_compute_with(|entry| {
+                futures::future::ready(if entry.is_none() {
+                    moka::ops::compute::Op::Put(slot.clone())
+                } else {
+                    moka::ops::compute::Op::Nop
+                })
+            })
+            .await
+        {
+            // Inserted successfully - continue with session setup
+        } else {
+            // Session already exists for this pseudonym
+            error!(%pseudonym, "session already exists for this pseudonym");
+            let reason = StartErrorReason::SessionAlreadyExists;
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                challenge: session_req.challenge,
+                reason,
+            });
+            msg_sender
+                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+                .map_err(|_| {
+                    error!("timeout sending session error message");
+                    TransportSessionError::Timeout
+                })?
+                .map_err(|error| {
+                    error!(%error, "failed to send session error message");
+                    SessionManagerError::other(error)
+                })?;
+            return Ok(());
+        }
 
         debug!(?pseudonym, ?session_req, "assigned a new session");
 
@@ -1540,7 +1535,7 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
+    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
     /// Create a test tag allocator with a large partition.
     fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
@@ -1941,7 +1936,6 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
-                    allocated_tag: None,
                 },
             )
             .await;
@@ -2446,6 +2440,284 @@ mod tests {
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_reject_duplicate_session_for_same_pseudonym() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let bob_mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        // Start the manager (required for handling incoming sessions)
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        // Spawn a task to receive new session notifications
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {
+                // Just drain the channel
+            }
+        });
+        bob_mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let pseudonym = HoprPseudonym::random();
+
+        // First session initiation - should succeed
+        let result = bob_mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        assert!(result.is_ok(), "first session initiation should succeed");
+
+        // Verify one session exists
+        let active = bob_mgr.active_sessions().await;
+        assert_eq!(active.len(), 1, "should have exactly one active session");
+
+        // Second session initiation with same pseudonym - should be handled gracefully
+        // (returns Ok but sends SessionError to the requester)
+        let result = bob_mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        // The second initiation returns Ok but handles the duplicate by sending SessionError
+        assert!(
+            result.is_ok(),
+            "second session initiation should return Ok (error is handled internally)"
+        );
+
+        // Verify still only one session exists
+        let active = bob_mgr.active_sessions().await;
+        assert_eq!(active.len(), 1, "should still have exactly one active session");
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_error_when_pinging_non_existent_session() -> anyhow::Result<()> {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let fake_session_id = HoprPseudonym::random();
+        let result = mgr.ping_session(&fake_session_id).await;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::NonExistingSession)
+        ));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_false_when_closing_non_existent_session() -> anyhow::Result<()> {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let fake_session_id = HoprPseudonym::random();
+        let result = mgr.close_session(&fake_session_id).await;
+
+        assert!(!result, "closing non-existent session should return false");
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_error_when_updating_surb_config_for_non_existent_session()
+    -> anyhow::Result<()> {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let fake_session_id = HoprPseudonym::random();
+        let result = mgr
+            .update_surb_balancer_config(&fake_session_id, SurbBalancerConfig::default())
+            .await;
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_error_when_getting_surb_config_for_non_existent_session()
+    -> anyhow::Result<()> {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let fake_session_id = HoprPseudonym::random();
+        let result = mgr.get_surb_balancer_config(&fake_session_id).await;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::NonExistingSession)
+        ));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_error_when_getting_surb_estimates_for_non_existent_session()
+    -> anyhow::Result<()> {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        let fake_session_id = HoprPseudonym::random();
+        let result = mgr.get_surb_level_estimates(&fake_session_id).await;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::NonExistingSession)
+        ));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_reject_new_session_when_max_sessions_reached() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        // Create manager with max 1 session
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 1,
+            ..Default::default()
+        };
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(cfg, test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        // First session - should succeed
+        let pseudonym1 = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym1,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: ByteCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        // Verify one session exists
+        assert_eq!(mgr.active_sessions().await.len(), 1);
+
+        // Second session - should fail with TooManySessions
+        let pseudonym2 = HoprPseudonym::random();
+        let _result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym2,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        // The error is handled internally (sends SessionError), so result is Ok
+        // But we can verify no new session was added
+        assert_eq!(mgr.active_sessions().await.len(), 1);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_return_unknown_data_error_when_dispatching_to_unknown_session() -> anyhow::Result<()>
+    {
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default(), test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        // Send data with session application tag but no session exists
+        let pseudonym = HoprPseudonym::random();
+        let result = mgr
+            .dispatch_message(
+                pseudonym,
+                ApplicationDataIn {
+                    data: ApplicationData::new(crate::SESSION_APPLICATION_TAG, b"test data")?,
+                    packet_info: Default::default(),
+                },
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
 
         Ok(())
     }
