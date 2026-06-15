@@ -74,9 +74,7 @@ use hopr_transport_probe::{
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
-use hopr_transport_session::{
-    AgreedSsaQuota, DispatchResult, HoprSessionOutPixEvent, PixToolbox, SessionManager, SessionManagerConfig,
-};
+use hopr_transport_session::{AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager, SessionManagerConfig};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
@@ -749,6 +747,7 @@ where
             pix_toolbox = Some(pix_tools);
 
             let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = channel(1024);
+            let smgr = self.smgr.clone();
             processes.insert(
                 HoprTransportProcess::PixEvents,
                 hopr_utils::spawn_as_abortable!(
@@ -775,27 +774,32 @@ where
                         })
                         .merge(
                             ssa_share_resolution_events_rx
-                                .filter_map(|ssa_resolution: HoprShareResolution| {
-                                    futures::future::ready(
-                                    match ssa_resolution {
-                                        ShareResolution::RecoveredSsa(ssa_recovery_event) => {
-                                            // TODO: feed this back to the SessionManager to ensure new Exit commitment is made
-                                            Some(PixEvent::PrivateKeyRecovered(
-                                                (
-                                                    *ssa_recovery_event.ssa_id.pseudonym(),
-                                                    ssa_recovery_event.ssa_id.ssa_index(),
-                                                ),
-                                                ssa_recovery_event.ssa,
-                                            ))
+                                .filter_map(move |ssa_resolution: HoprShareResolution| {
+                                    let smgr = smgr.clone();
+                                    async move {
+                                        match ssa_resolution {
+                                            ShareResolution::RecoveredSsa(ssa_recovery_event) => {
+                                                if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id)).await {
+                                                    tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
+                                                }
+                                                Some(PixEvent::PrivateKeyRecovered(
+                                                    (
+                                                        *ssa_recovery_event.ssa_id.pseudonym(),
+                                                        ssa_recovery_event.ssa_id.ssa_index(),
+                                                    ),
+                                                    ssa_recovery_event.ssa,
+                                                ))
+                                            }
+                                            ShareResolution::InvalidShare(peer, ssa_id) => {
+                                                error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");        
+                                                if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id)).await {
+                                                    tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
+                                                }
+                                                None
+                                            }
                                         }
-                                        ShareResolution::InvalidShare(peer, pseudonym, ssa_index) => {
-                                            // TODO: feed this back to the SessionManager to ensure the Session is terminated
-                                            error!(%peer, %pseudonym, ssa_index, "RP peer sent acknowledgement indicating invalid PIX share from Entry");
-                                            None
-                                        }
-                                    })
-
-                                })
+                                    }
+                            })
                         )
                         .map(Ok)
                         .forward(ssa_events.sink_map_err(HoprTransportError::other))

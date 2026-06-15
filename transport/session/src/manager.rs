@@ -59,6 +59,7 @@ use crate::{
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
+use crate::types::HoprSessionInPixEvent;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -1100,6 +1101,18 @@ where
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
+    }
+
+    /// Dispatches [`HoprSessionInPixEvent`] that notifies the `SessionManager` about PIX protocol
+    /// state update.
+    ///
+    /// Such an event can affect existing Sessions that use the PIX protocol.
+    pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
+        let Some(_slot) = self.sessions.iter().find(|(id, _)| id.pseudonym() == event.pseudonym()).map(|(_, session)| session) else {
+            return Err(SessionManagerError::NonExistingSession.into());
+        };
+
+        todo!()
     }
 
     /// Returns [`SessionIds`](SessionId) of all currently active sessions.

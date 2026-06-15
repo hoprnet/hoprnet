@@ -19,14 +19,14 @@ pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),
     /// An invalid share was encountered.
-    InvalidShare(Box<OffchainPublicKey>, P, SsaIndex),
+    InvalidShare(Box<OffchainPublicKey>, SsaId<P>),
 }
 
 impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::RecoveredSsa(a), Self::RecoveredSsa(b)) => a == b,
-            (Self::InvalidShare(k1, p1, s1), Self::InvalidShare(k2, p2, s2)) => k1 == k2 && p1 == p2 && s1 == s2,
+            (Self::InvalidShare(k1, id1), Self::InvalidShare(k2, id2)) => k1 == k2 && id1 == id2,
             _ => false,
         }
     }
@@ -38,10 +38,9 @@ impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
             Self::RecoveredSsa(recovered) => recovered.hash(state),
-            Self::InvalidShare(k, p, b) => {
+            Self::InvalidShare(k, id) => {
                 k.hash(state);
-                p.hash(state);
-                b.hash(state);
+                id.hash(state);
             }
         }
     }

@@ -115,6 +115,16 @@ pub enum HoprSessionInPixEvent {
     UnverifiableShare(SsaId<HoprPseudonym>),
 }
 
+impl HoprSessionInPixEvent {
+    /// Extracts the pseudonym of the SSA that might map to an existing Session.
+    pub fn pseudonym(&self) -> &HoprPseudonym {
+        match self {
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+        }
+    }
+}
+
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///
 /// The calculation is based on the formula: ⌈8n × log_10(2)⌉
