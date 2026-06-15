@@ -339,6 +339,7 @@
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               cargo-insta
               cargo-nextest

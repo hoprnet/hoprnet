@@ -1,14 +1,22 @@
 [package]
 name = "hopr-strategy"
-version = "0.19.2"
-authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
+version = "0.19.2"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "strategy", "channels"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]

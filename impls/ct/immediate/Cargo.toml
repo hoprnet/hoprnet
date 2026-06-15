@@ -1,14 +1,22 @@
 [package]
 name = "hopr-ct-immediate"
+description = "Basic implementation of the CT Telemetry functionality as specified in the HOPR RFCs describing the 0-hop probing"
 version = "0.2.1"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Basic implementation of the CT Telemetry functionality as specified in the HOPR RFCs describing the 0-hop probing."
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "cover-traffic"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]

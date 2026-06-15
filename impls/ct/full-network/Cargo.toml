@@ -1,14 +1,22 @@
 [package]
 name = "hopr-ct-full-network"
+description = "Full implementation of the Telemetry functionality as specified in the HOPR RFCs along with optional noise (cover traffic) generation"
 version = "0.3.0"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Full implementation of the Telemetry functionality as specified in the HOPR RFCs along with optional noise (cover traffic) generation."
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "cover-traffic", "mixnet"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]

@@ -19,8 +19,23 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  build-library:
+    name: Build & Publish Library
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@f9c38b2031adbbd4d264eb9c7126631e4bf4a40c # build-library-v3 (pending hoprnet/hopr-workflows#83)
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      source_branch: ${{ github.ref_name }}
+      version_type: release
+      architecture: x86_64-linux
+      runner: depot-ubuntu-24.04-4
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
   release:
     name: Close release
+    needs:
+      - build-library
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
