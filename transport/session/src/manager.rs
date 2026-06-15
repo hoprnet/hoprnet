@@ -2762,4 +2762,272 @@ mod tests {
 
         Ok(())
     }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_update_buffer_level_on_keep_alive_with_balancer_state_flag() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let session_id = alice_pseudonym;
+        let initial_buffer_level = 100u64;
+        let new_buffer_level = 200u64;
+
+        let balancer_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
+            Default::default(),
+            test_tag_allocator(),
+        );
+
+        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        let peer_address: Address = (&ChainKeypair::random()).into();
+        alice_mgr
+            .sessions
+            .insert(
+                session_id,
+                SessionSlot {
+                    session_tx: Arc::new(dummy_tx),
+                    routing_opts: DestinationRouting::Forward {
+                        destination: Box::new(peer_address.into()),
+                        pseudonym: Some(alice_pseudonym),
+                        forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+                        return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN)
+                            .into(),
+                    },
+                    abort_handles: Default::default(),
+                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
+                    surb_estimator: Default::default(),
+                },
+            )
+            .await;
+
+        // Set initial buffer level
+        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        session_slot
+            .surb_mgmt
+            .buffer_level
+            .store(initial_buffer_level, Ordering::Relaxed);
+        drop(session_slot);
+
+        // Verify initial buffer level
+        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        assert_eq!(session_slot.surb_mgmt.buffer_level(), initial_buffer_level);
+        drop(session_slot);
+
+        // Create keep-alive message with BalancerState flag
+        let ka = KeepAliveMessage::<SessionId> {
+            session_id,
+            flags: KeepAliveFlag::BalancerState.into(),
+            additional_data: new_buffer_level,
+        };
+        let app_data: ApplicationData = HoprStartProtocol::KeepAlive(ka).try_into()?;
+        let app_data_in = ApplicationDataIn {
+            data: app_data,
+            packet_info: Default::default(),
+        };
+
+        // Dispatch the keep-alive message
+        alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
+
+        // Verify buffer level was updated
+        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        assert_eq!(
+            session_slot.surb_mgmt.buffer_level(),
+            new_buffer_level,
+            "buffer level should be updated via keep-alive with BalancerState flag"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_update_target_on_keep_alive_with_balancer_target_flag() -> anyhow::Result<()> {
+        use std::sync::atomic::Ordering;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let session_id = alice_pseudonym;
+        let initial_target = 1000u64;
+        let new_target = 2000u64;
+
+        let balancer_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: initial_target,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
+            Default::default(),
+            test_tag_allocator(),
+        );
+
+        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        alice_mgr
+            .sessions
+            .insert(
+                session_id,
+                SessionSlot {
+                    session_tx: Arc::new(dummy_tx),
+                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                    abort_handles: Default::default(),
+                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
+                    surb_estimator: Default::default(),
+                },
+            )
+            .await;
+
+        // Verify initial target
+        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        assert_eq!(
+            session_slot.surb_mgmt.controller_bounds().target() as u64,
+            initial_target,
+            "initial target should be set"
+        );
+        drop(session_slot);
+
+        // Create keep-alive message with BalancerTarget flag
+        let ka = KeepAliveMessage::<SessionId> {
+            session_id,
+            flags: KeepAliveFlag::BalancerTarget.into(),
+            additional_data: new_target,
+        };
+        let app_data: ApplicationData = HoprStartProtocol::KeepAlive(ka).try_into()?;
+        let app_data_in = ApplicationDataIn {
+            data: app_data,
+            packet_info: Default::default(),
+        };
+
+        // Dispatch the keep-alive message
+        alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
+
+        // Verify target was updated
+        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        assert_eq!(
+            session_slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed),
+            new_target,
+            "target buffer size should be updated via keep-alive with BalancerTarget flag"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_evict_idle_session_and_call_close_callback() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 1,
+            idle_timeout: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(cfg, test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        // Create first session
+        let pseudonym1 = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym1,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: ByteCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        // Verify first session exists
+        assert_eq!(mgr.active_sessions().await.len(), 1);
+
+        // Wait for the session to expire (idle_timeout = 100ms)
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        mgr.sessions.run_pending_tasks().await;
+
+        // Verify session was evicted (cache should be empty now)
+        assert_eq!(
+            mgr.active_sessions().await.len(),
+            0,
+            "idle session should be evicted after timeout"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_reject_new_session_when_max_sessions_reached_no_eviction() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        // Create manager with max 1 session
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 1,
+            idle_timeout: Duration::from_secs(3600), // Long timeout so eviction doesn't happen
+            ..Default::default()
+        };
+        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(cfg, test_tag_allocator());
+
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+
+        // Create first session
+        let pseudonym1 = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym1,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: ByteCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        // Verify first session exists
+        assert_eq!(mgr.active_sessions().await.len(), 1);
+
+        // Try to create second session - should be rejected (not evicted)
+        let pseudonym2 = HoprPseudonym::random();
+        let _result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym2,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+
+        // Should still have exactly 1 session (the first one)
+        assert_eq!(
+            mgr.active_sessions().await.len(),
+            1,
+            "should still have exactly one session - second session should be rejected"
+        );
+
+        // The active session should be the first one (second was rejected)
+        assert!(
+            mgr.active_sessions().await.contains(&pseudonym1),
+            "the first session should still be active"
+        );
+
+        Ok(())
+    }
 }
