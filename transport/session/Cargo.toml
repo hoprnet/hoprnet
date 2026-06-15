@@ -35,7 +35,6 @@ allocator-jemalloc = [
 
 [dependencies]
 anyhow = { workspace = true }
-arrayvec = { workspace = true }
 async-trait = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
