@@ -1,4 +1,8 @@
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use hopr_api::{
     chain::ChainValues,
@@ -47,4 +51,28 @@ pub(crate) async fn wait_for_funds<R: ChainValues>(
         "failed to fund the node within {} seconds",
         max_delay.as_secs()
     )))
+}
+
+#[derive(Clone)]
+pub struct BroadcastSenderSink<T>(pub async_broadcast::Sender<T>);
+
+impl<T: Clone> futures::Sink<T> for BroadcastSenderSink<T> {
+    type Error = async_broadcast::TrySendError<T>;
+
+    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.0.try_broadcast(item).map(|_| ())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.0.close();
+        Poll::Ready(Ok(()))
+    }
 }

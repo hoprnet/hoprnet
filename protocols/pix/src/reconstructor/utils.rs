@@ -1,0 +1,230 @@
+use vsss_rs::{
+    ReadableShareSet,
+    elliptic_curve::group::{Group, GroupEncoding},
+};
+
+use crate::{
+    CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
+    PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
+};
+
+/// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
+pub struct SsaBuilder<S: PixSpec> {
+    pub full_commitment: PixGroup<S>,
+    num_polys: usize,
+    builder: PixScalar<S>,
+}
+
+impl<S: PixSpec> SsaBuilder<S> {
+    pub fn new(full_commitment: PixGroup<S>, exit_secret_scalar: PixScalar<S>, num_polys: usize) -> Self {
+        Self {
+            full_commitment,
+            builder: exit_secret_scalar,
+            num_polys,
+        }
+    }
+
+    pub fn add_recovered_ssa_part(
+        &mut self,
+        sub_secret: PixScalar<S>,
+    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
+        if let Some(n) = self.num_polys.checked_sub(1) {
+            self.num_polys = n;
+            self.builder += sub_secret;
+            if n > 0 {
+                // SSA private scalar is not yet complete
+                return Ok(None);
+            }
+        }
+
+        if self.full_commitment == (PixGroup::<S>::generator() * self.builder) {
+            Ok(Some(self.builder))
+        } else {
+            Err(errors::PixError::InvalidSsa)
+        }
+    }
+}
+
+/// Verifies shares and reconstructs a single SSA part from them.
+pub struct SsaPartBuilder<S: PixSpec> {
+    pub verifier: PartialSsaShareVerifier<S>,
+    shares: Vec<CompletedShare<S>>,
+}
+
+impl<S: PixSpec> SsaPartBuilder<S> {
+    pub fn new(verifier: PartialSsaShareVerifier<S>) -> Self {
+        Self {
+            verifier,
+            shares: Vec::new(),
+        }
+    }
+
+    pub fn add_share(
+        &mut self,
+        msg: PixScalar<S>,
+        share: PartialSsaShare<S>,
+    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
+        let share = into_completed_share(msg, &share)?;
+
+        self.verifier.verify_completed_share(&share)?;
+        self.shares.push(share);
+
+        if self.shares.len() >= self.verifier.min_shares() {
+            Ok(Some(self.shares.combine()?.0))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+type CommittedPolynomial<S> = std::collections::HashMap<CoefficientIndex, PixGroupRepr<S>>;
+
+/// Result of building an SSA commitment.
+pub enum CommitmentResult<S: PixSpec> {
+    /// Not enough commitments have been received yet.
+    NotEnoughCommitments,
+    /// There are enough commitments to build at least the SSA commitment.
+    SsaCommitmentDone(PixGroup<S>),
+    /// There are enough commitments to build at least the SSA commitment, but not all coefficients are committed yet.
+    StillIncomplete(PixGroup<S>),
+    /// All coefficients have been committed.
+    Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>),
+}
+
+/// Builds [`CommittedSsa`] from the incoming client polynomial coefficient commitments of
+/// SSA-part polynomials for a specific Session Stealth Address (SSA).
+pub struct SsaCommitmentBuilder<S: PixSpec> {
+    id: SsaId<S::Pseudonym>,
+    poly_threshold: usize,
+    num_polys: usize,
+    committed_polynomials: std::collections::HashMap<PolynomialIndex, CommittedPolynomial<S>>,
+    complete: bool,
+    exit_commitment_secret: PixScalar<S>,
+    exit_commitment_public: PixGroup<S>,
+    full_ssa_commitment: Option<PixGroup<S>>,
+}
+
+impl<S: PixSpec> SsaCommitmentBuilder<S> {
+    pub fn new(
+        id: SsaId<S::Pseudonym>,
+        poly_threshold: usize,
+        num_polys: usize,
+        exit_commitment_secret: PixScalar<S>,
+        exit_commitment_public: PixGroup<S>,
+    ) -> Self {
+        Self {
+            id,
+            poly_threshold,
+            num_polys,
+            exit_commitment_secret,
+            exit_commitment_public,
+            committed_polynomials: std::collections::HashMap::new(),
+            complete: false,
+            full_ssa_commitment: None,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.committed_polynomials.is_empty()
+    }
+
+    pub fn add_transposed(
+        &mut self,
+        coeff_index: CoefficientIndex,
+        polynomial_coeff_commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
+    ) -> errors::Result<CommitmentResult<S>, S::Pseudonym> {
+        // Cannot add more commitments if we already have all
+        if self.complete {
+            return Err(errors::PixError::DuplicateCommitment);
+        }
+
+        if coeff_index >= self.poly_threshold as CoefficientIndex {
+            return Err(errors::PixError::InvalidInput);
+        }
+
+        for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
+            if polynomial_index >= self.num_polys as PolynomialIndex {
+                return Err(errors::PixError::InvalidInput);
+            }
+
+            let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
+            polynomial.entry(coeff_index).or_insert(polynomial_coeff_commitment);
+        }
+
+        tracing::trace!(
+            id = %self.id,
+            "SSA commitment is {:.2}% complete",
+            self.committed_polynomials.values().map(|p| p.len()).sum::<usize>() as f64 * 100.0 / (self.num_polys * self.poly_threshold) as f64
+        );
+
+        // Check if we already have all the committed polynomials and all coefficient commitments in them
+        self.complete = self.committed_polynomials.len() == self.num_polys
+            && self
+                .committed_polynomials
+                .values()
+                .all(|committed_poly| committed_poly.len() == self.poly_threshold);
+
+        let all_constant_terms_committed = self.committed_polynomials.len() == self.num_polys
+            && self
+                .committed_polynomials
+                .values()
+                .all(|committed_poly| committed_poly.get(&0).is_some());
+
+        if self.complete {
+            tracing::debug!("SSA is fully committed");
+
+            let complete_ssa_verifier = self
+                .committed_polynomials
+                .drain()
+                .map(|(polynomial_index, mut polynomial)| {
+                    PartialSsaShareVerifier::from_serializable_commitments(
+                        SsaPolynomialId::new(self.id, polynomial_index),
+                        (0..self.poly_threshold as CoefficientIndex)
+                            .map(|coeff_idx| {
+                                polynomial
+                                    .remove(&coeff_idx)
+                                    .expect("polynomial coeffs must be already present")
+                            })
+                            .collect(),
+                    )
+                })
+                .map(|v| v.map(SsaPartBuilder::new))
+                .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
+
+            // Full client SSA commitment is the sum of all constant term commitments on all polynomials
+            let client_ssa_commitment: PixGroup<S> =
+                complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
+            tracing::debug!(id = %self.id, commitment = hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
+
+            Ok(CommitmentResult::Completed(
+                SsaBuilder::new(
+                    client_ssa_commitment + self.exit_commitment_public,
+                    self.exit_commitment_secret,
+                    self.num_polys,
+                ),
+                complete_ssa_verifier,
+            ))
+        } else if self.full_ssa_commitment.is_none() && all_constant_terms_committed {
+            // Check if we already have at least all the constant term commitments on all polynomials.
+            tracing::debug!("SSA commitment is complete");
+
+            let client_ssa_commitment = self
+                .committed_polynomials
+                .values()
+                .map(|p| p.get(&0).expect("constant term must be present"))
+                .map(|const_term: &PixGroupRepr<S>| {
+                    Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(const_term))
+                        .ok_or(errors::PixError::InvalidInput)
+                })
+                .sum::<errors::Result<PixGroup<S>, S::Pseudonym>>()?;
+
+            let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
+            self.full_ssa_commitment = Some(full_ssa_commitment);
+            Ok(CommitmentResult::SsaCommitmentDone(full_ssa_commitment))
+        } else if let Some(ssa_committed) = self.full_ssa_commitment.as_ref() {
+            Ok(CommitmentResult::StillIncomplete(*ssa_committed))
+        } else {
+            Ok(CommitmentResult::NotEnoughCommitments)
+        }
+    }
+}

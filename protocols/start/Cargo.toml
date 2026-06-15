@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-start"
-version = "1.1.0"
+version = "1.2.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["HOPR Association <tech@hoprnet.org>"]
@@ -19,7 +19,10 @@ thiserror = { workspace = true }
 
 hopr-protocol-app = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-protocol-pix = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+generic-array = "0.14"
 hopr-crypto-packet = { workspace = true }
+hopr-types = { workspace = true, features = ["crypto"] }

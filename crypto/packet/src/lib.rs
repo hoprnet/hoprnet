@@ -17,7 +17,11 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 pub mod sphinx;
-use hopr_types::{internal::prelude::*, primitive::prelude::*};
+use hopr_types::{
+    crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
+    internal::prelude::*,
+    primitive::prelude::*,
+};
 use sphinx::prelude::*;
 
 /// Lists all errors in this crate.
@@ -40,11 +44,12 @@ pub mod prelude {
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{PacketSignal, PacketSignals},
+        types::{HoprPixGroupElement, PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
     };
 }
 
+use hopr_protocol_pix::{PixGroup, PixScalar};
 use hopr_types::internal::routing;
 pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
@@ -64,7 +69,7 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type PacketReceiverData = routing::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = por::SurbReceiverInfo;
+    type SurbReceiverData = types::SurbReceiverInfo;
     type UH = hopr_types::crypto::primitives::Poly1305;
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
@@ -87,6 +92,57 @@ pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
 pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; // minus padding byte
+
+/// Current specification of the PIX protocol in HOPR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HoprPixSpec;
+
+impl hopr_protocol_pix::PixSpec for HoprPixSpec {
+    type AddressPrivateKey = ChainKeypair;
+    type Cipher = hopr_types::crypto::primitives::ChaCha20;
+    type Curve = k256::Secp256k1;
+    type DepositAddress = Address;
+    type Digest = hopr_types::crypto::primitives::Blake3;
+    type Pseudonym = SimplePseudonym;
+
+    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
+        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
+    }
+
+    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
+        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
+    }
+}
+
+/// HOPR-specific encrypted partial SSA share type from the PIX protocol.
+pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
+
+/// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
+pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
+
+/// HOPR-specific PIX scalar type.
+///
+/// This is the normalized form of `hopr_protocol_pix::PixScalar<HoprPixSpec>`
+/// (i.e. `<<HoprPixSpec as PixSpec>::Curve as CurveArithmetic>::Scalar`),
+/// re-exported here so downstream crates can name it without depending on
+/// `k256` directly.
+///
+/// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
+/// itself as another generic argument.
+pub type HoprPixScalar = k256::Scalar;
+
+/// HOPR-specific PIX group element representation type.
+///
+/// This is the normalized (concrete) form of `hopr_protocol_pix::PixGroupRepr<HoprPixSpec>`
+/// (i.e. `<PixGroup<HoprPixSpec> as GroupEncoding>::Repr`), re-exported here as the concrete
+/// `k256::CompressedPoint` type.
+///
+/// Using the concrete type instead of the associated-type projection avoids a Rust coherence
+/// error (E0119): implementing `From`/`TryFrom` for a new-type wrapping the projection conflicts
+/// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
+/// projection is distinct from the wrapper type.
+pub type HoprPixGroupRepr = k256::CompressedPoint;
 
 #[cfg(test)]
 mod tests {
@@ -124,7 +180,7 @@ mod tests {
     #[test]
     fn surb_length() {
         let surb_len = HoprSurb::SIZE;
-        assert_eq!(surb_len, 395);
+        assert_eq!(surb_len, 401);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 

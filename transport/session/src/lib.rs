@@ -19,11 +19,15 @@ pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SA
 use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use hopr_utils::network_types::types::*;
-pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+pub use manager::{
+    DispatchResult, IncomingSessionPixConfig, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
+    SessionManagerConfig,
+};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
-    ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
+    AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionOutPixEvent, IncomingSession,
+    ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
@@ -61,7 +65,13 @@ flagset::flags! {
         /// Disable SURB-based egress rate control.
         ///
         /// This applies only to the recipient of the Session (Exit).
+        ///
+        /// If not set, the lower half of additional data may contain information about the desired SURB buffer size.
         NoRateControl = 0b0001_0000,
+        /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
+        ///
+        /// The upper half of additional data may be used to configure the PIX protocol parameters.
+        UsePIX = 0b0010_0000,
     }
 }
 
@@ -100,6 +110,17 @@ pub struct SessionClientConfig {
     /// Default is `false`.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// PIX parameters for SSAs.
+    ///
+    /// This is a tuple `(polys_per_ssa, shares_per_poly)`.
+    /// When not set, the Session will not advertise any PIX capability and may
+    /// get refused by the Exit (if it requires PIX).
+    ///
+    /// The Exit may also refuse to accept the Session if the given values
+    /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<(u32, u32)>,
 }
 
 #[cfg(test)]

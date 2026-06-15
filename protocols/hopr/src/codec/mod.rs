@@ -71,6 +71,8 @@ mod tests {
         HoprBlockchainSafeConnector,
         testing::{BlokliTestClient, StaticState},
     };
+    use hopr_crypto_packet::HoprPixSpec;
+    use hopr_protocol_pix::SsaShareGenerator;
     use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
     use crate::{
@@ -80,6 +82,7 @@ mod tests {
 
     type TestEncoder = HoprEncoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
+        Arc<SsaShareGenerator<HoprPixSpec>>,
         MemorySurbStore,
         HoprTicketFactory<MemoryStore>,
     >;
@@ -97,6 +100,9 @@ mod tests {
             MemorySurbStore::new(SurbStoreConfig::default()),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
+            Arc::new(hopr_protocol_pix::SsaShareGenerator::new(
+                hopr_protocol_pix::SsaGeneratorConfig::default(),
+            )),
             HoprCodecConfig::default(),
         )
     }
