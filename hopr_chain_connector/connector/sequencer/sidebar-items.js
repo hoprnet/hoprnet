@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["TX_QUEUE_CAPACITY"],"struct":["TransactionSequencer"],"type":["TxRequest"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_SESSION_ID_STR_LEN","SESSION_SOCKET_CAPACITY"],"enum":["ClosureReason","SessionTarget"],"fn":["caps_to_ack_mode","max_decimal_digits_for_n_bytes"],"struct":["ByteCapabilities","HoprSession","HoprSessionConfig","IncomingSession","SessionId"],"trait":["AsyncReadWrite"],"type":["HoprStartProtocol","ServiceId"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MIN_UNACK_TICKET_TIMEOUT"],"fn":["default_max_unack_tickets","default_unack_ticket_timeout","just_true","validate_unack_ticket_timeout"],"struct":["HoprUnacknowledgedTicketProcessor","HoprUnacknowledgedTicketProcessorConfig"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["diagnostics","prelude"],"struct":["AbortHandle","AbortableList"],"trait":["Abortable"]};

@@ -1,0 +1,9 @@
+(function() {
+    const implementors = Object.fromEntries([["hopr_ticket_manager",[["impl&lt;S&gt; TicketManagement for <a class=\"struct\" href=\"hopr_ticket_manager/struct.HoprTicketManager.html\" title=\"struct hopr_ticket_manager::HoprTicketManager\">HoprTicketManager</a>&lt;S, S::<a class=\"associatedtype\" href=\"hopr_ticket_manager/trait.TicketQueueStore.html#associatedtype.Queue\" title=\"type hopr_ticket_manager::TicketQueueStore::Queue\">Queue</a>&gt;<div class=\"where\">where\n    S: <a class=\"trait\" href=\"hopr_ticket_manager/trait.TicketQueueStore.html\" title=\"trait hopr_ticket_manager::TicketQueueStore\">TicketQueueStore</a> + <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Send.html\" title=\"trait core::marker::Send\">Send</a> + <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html\" title=\"trait core::marker::Sync\">Sync</a> + 'static,\n    S::<a class=\"associatedtype\" href=\"hopr_ticket_manager/trait.TicketQueueStore.html#associatedtype.Queue\" title=\"type hopr_ticket_manager::TicketQueueStore::Queue\">Queue</a>: <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Send.html\" title=\"trait core::marker::Send\">Send</a> + <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html\" title=\"trait core::marker::Sync\">Sync</a> + 'static,</div>",0]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":59,"fragment_lengths":[1352]}

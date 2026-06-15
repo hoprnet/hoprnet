@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["channel_by_id_async"]};

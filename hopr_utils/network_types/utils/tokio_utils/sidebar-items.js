@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TransferState"],"fn":["copy_duplex","copy_duplex_abortable","transfer_one_direction"],"struct":["CopyBuffer"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["HASH_KEY_PRG","HASH_KEY_TAG","SPHINX_HEADER_VERSION"],"enum":["ForwardedHeader"],"fn":["forward_header"],"struct":["HeaderPrefix","RoutingInfo"],"trait":["SphinxHeaderSpec"]};
