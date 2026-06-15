@@ -1121,254 +1121,19 @@ where
 
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
-        // Allocate a unique tag for this incoming session
-        self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
-        let allocated_tag = if self.maximum_sessions > self.sessions.entry_count() as usize {
-            self.tag_allocator.allocate()
-        } else {
-            error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
-            None
-        };
+        // Use constant application tag for all sessions
+        // Check if session already exists for this pseudonym
+        self.sessions.run_pending_tasks().await;
 
-        if let Some(allocated_tag) = allocated_tag {
-            let session_id = SessionId::new(allocated_tag.value(), pseudonym);
-            let allocated_tag = Arc::new(allocated_tag);
-
-            let slot = SessionSlot {
-                session_tx: Arc::new(tx_session_data),
-                routing_opts: reply_routing.clone(),
-                abort_handles: Default::default(),
-                surb_mgmt: Default::default(),
-                surb_estimator: Default::default(),
-                allocated_tag: Some(allocated_tag),
-            };
-            self.sessions.insert(session_id, slot.clone()).await;
-
-            debug!(%session_id, ?session_req, "assigned a new session");
-
-            let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
-                if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
-                    error!(%session_id, %error, %reason, "failed to notify session closure");
-                }
-            });
-
-            let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
-                // Because of SURB scarcity, control the egress rate of incoming sessions
-                let egress_rate_control =
-                    RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
-
-                // The Session request carries a "hint" as additional data telling what
-                // the Session initiator has configured as its target buffer size in the Balancer.
-                let target_surb_buffer_size = if session_req.additional_data > 0 {
-                    (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
-                } else {
-                    self.cfg.initial_return_session_egress_rate as u64
-                        * self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs()
-                };
-
-                let surb_estimator_clone = slot.surb_estimator.clone();
-                let session = HoprSession::new(
-                    session_id,
-                    reply_routing.clone(),
-                    HoprSessionConfig {
-                        capabilities: session_req.capabilities.into(),
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                    (
-                        // Sent packets = SURB consumption estimate
-                        msg_sender
-                            .clone()
-                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                                // Each outgoing packet consumes one SURB
-                                surb_estimator_clone
-                                    .consumed
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
-                                futures::future::ok::<_, S::Error>((routing, data))
-                            })
-                            .rate_limit_with_controller(&egress_rate_control)
-                            .buffer((2 * target_surb_buffer_size) as usize),
-                        // Received packets = SURB retrieval estimate
-                        rx_session_data.inspect(move |data| {
-                            let produced = data.num_surbs_with_msg() as u64;
-                            // Count the number of SURBs delivered with each incoming packet
-                            surb_estimator_clone
-                                .produced
-                                .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_produced(&session_id, produced);
-                        }),
-                    ),
-                    Some(closure_notifier),
-                )?;
-
-                // The SURB balancer will start intervening by rate-limiting the
-                // egress of the Session, once the estimated number of SURBs drops below
-                // the target defined here. Otherwise, the maximum egress is allowed.
-                let balancer_config = SurbBalancerConfig {
-                    target_surb_buffer_size,
-                    // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
-                    max_surbs_per_sec: target_surb_buffer_size / self.cfg.minimum_surb_buffer_duration.as_secs(),
-                    // No SURB decay at the Exit, since we know almost exactly how many SURBs
-                    // were received
-                    surb_decay: None,
-                };
-
-                slot.surb_mgmt.update(&balancer_config);
-
-                // Spawn the SURB balancer only once we know we have registered the
-                // abort handle with the pre-allocated Session slot
-                debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
-                let balancer = SurbBalancer::new(
-                    session_id,
-                    SimpleBalancerController::default(),
-                    slot.surb_estimator.clone(),
-                    SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
-                    slot.surb_mgmt.clone(),
-                );
-
-                // Assign the SURB balancer and abort handles to the already allocated Session slot
-                let (_, balancer_abort_handle) = balancer.start_control_loop(self.cfg.balancer_sampling_interval);
-                slot.abort_handles
-                    .lock()
-                    .insert(SessionTasks::Balancer, balancer_abort_handle);
-
-                // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
-                if let Some(period) = self.cfg.surb_balance_notify_period {
-                    let surb_estimator_clone = slot.surb_estimator.clone();
-                    let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
-                        session_id,
-                        // Sent Keep-Alive packets also contribute to SURB consumption
-                        msg_sender
-                            .clone()
-                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                                // Each sent keepalive consumes 1 SURB
-                                surb_estimator_clone
-                                    .consumed
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
-                                futures::future::ok::<_, S::Error>((routing, data))
-                            }),
-                        slot.routing_opts.clone(),
-                        SurbNotificationMode::Level(slot.surb_estimator.clone()),
-                        slot.surb_mgmt.clone(),
-                    );
-
-                    // Start keepalive stream towards the Entry with a predefined period
-                    hopr_utils::runtime::prelude::spawn(async move {
-                        // Delay the stream execution by one period
-                        hopr_utils::runtime::prelude::sleep(period).await;
-                        ka_controller.set_rate_per_unit(1, period);
-                    });
-
-                    slot.abort_handles
-                        .lock()
-                        .insert(SessionTasks::KeepAlive, ka_abort_handle);
-
-                    debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
-                }
-
-                session
-            } else {
-                HoprSession::new(
-                    session_id,
-                    reply_routing.clone(),
-                    HoprSessionConfig {
-                        capabilities: session_req.capabilities.into(),
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                    (msg_sender.clone(), rx_session_data),
-                    Some(closure_notifier),
-                )?
-            };
-
-            // Extract useful information about the session from the Start protocol message
-            let incoming_session = IncomingSession {
-                session,
-                target: session_req.target,
-            };
-
-            // Notify that a new incoming session has been created. Lock the sink and send
-            // directly into it, so no extra forwarding task between channels is needed.
-            match async {
-                let mut guard = new_session_notifier.lock().await;
-                guard.send(incoming_session).await
-            }
-            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-            .await
-            {
-                Err(_) => {
-                    error!(%session_id, "timeout to notify about new incoming session");
-                    return Err(TransportSessionError::Timeout);
-                }
-                Ok(Err(error)) => {
-                    error!(%session_id, %error, "failed to notify about new incoming session");
-                    return Err(SessionManagerError::other(error).into());
-                }
-                _ => {}
-            };
-
-            trace!(?session_id, "session notification sent");
-
-            // Notify the sender that the session has been established.
-            // Set our peer ID in the session ID sent back to them.
-            let data = HoprStartProtocol::SessionEstablished(StartEstablished {
-                orig_challenge: session_req.challenge,
-                session_id,
-            });
-
-            msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!(%session_id, "timeout sending session establishment message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(%session_id, %error, "failed to send session establishment message");
-                    SessionManagerError::other(error)
-                })?;
-
-            #[cfg(feature = "telemetry")]
-            {
-                initialize_session_metrics(
-                    session_id,
-                    HoprSessionConfig {
-                        capabilities: session_req.capabilities.0,
-                        frame_mtu: self.cfg.frame_mtu,
-                        frame_timeout: self.cfg.max_frame_timeout,
-                    },
-                );
-                set_session_state(&session_id, SessionLifecycleState::Active);
-                set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
-            }
-
-            info!(%session_id, "new session established");
-
-            #[cfg(all(feature = "telemetry", not(test)))]
-            {
-                METRIC_NUM_ESTABLISHED_SESSIONS.increment();
-                METRIC_ACTIVE_SESSIONS.increment(1.0);
-            }
-        } else {
-            error!(%pseudonym,"failed to reserve a new session slot");
-
-            // Notify the sender that the session could not be established
-            let reason = StartErrorReason::NoSlotsAvailable;
+        // Check if a session with this pseudonym already exists
+        let existing_session_key = SessionId::new(crate::SESSION_APPLICATION_TAG, pseudonym);
+        if self.sessions.get(&existing_session_key).await.is_some() {
+            error!(%pseudonym, "session already exists for this pseudonym");
+            let reason = StartErrorReason::SessionAlreadyExists;
             let data = HoprStartProtocol::SessionError(StartErrorType {
                 challenge: session_req.challenge,
                 reason,
             });
-
             msg_sender
                 .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
                 .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
@@ -1381,11 +1146,257 @@ where
                     error!(%error, "failed to send session error message");
                     SessionManagerError::other(error)
                 })?;
+            return Ok(());
+        }
 
-            trace!(%pseudonym, "session establishment failure message sent");
+        if self.sessions.entry_count() as usize >= self.maximum_sessions {
+            error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
+            let reason = StartErrorReason::NoSlotsAvailable;
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                challenge: session_req.challenge,
+                reason,
+            });
+            msg_sender
+                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+                .map_err(|_| {
+                    error!("timeout sending session error message");
+                    TransportSessionError::Timeout
+                })?
+                .map_err(|error| {
+                    error!(%error, "failed to send session error message");
+                    SessionManagerError::other(error)
+                })?;
+            return Ok(());
+        }
 
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
+        let session_id = SessionId::new(crate::SESSION_APPLICATION_TAG, pseudonym);
+
+        let slot = SessionSlot {
+            session_tx: Arc::new(tx_session_data),
+            routing_opts: reply_routing.clone(),
+            abort_handles: Default::default(),
+            surb_mgmt: Default::default(),
+            surb_estimator: Default::default(),
+            allocated_tag: None,
+        };
+        self.sessions.insert(session_id, slot.clone()).await;
+
+        debug!(%session_id, ?session_req, "assigned a new session");
+
+        let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
+            if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
+                error!(%session_id, %error, %reason, "failed to notify session closure");
+            }
+        });
+
+        let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
+            // Because of SURB scarcity, control the egress rate of incoming sessions
+            let egress_rate_control =
+                RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
+
+            // The Session request carries a "hint" as additional data telling what
+            // the Session initiator has configured as its target buffer size in the Balancer.
+            let target_surb_buffer_size = if session_req.additional_data > 0 {
+                (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+            } else {
+                self.cfg.initial_return_session_egress_rate as u64
+                    * self
+                        .cfg
+                        .minimum_surb_buffer_duration
+                        .max(MIN_SURB_BUFFER_DURATION)
+                        .as_secs()
+            };
+
+            let surb_estimator_clone = slot.surb_estimator.clone();
+            let session = HoprSession::new(
+                session_id,
+                reply_routing.clone(),
+                HoprSessionConfig {
+                    capabilities: session_req.capabilities.into(),
+                    frame_mtu: self.cfg.frame_mtu,
+                    frame_timeout: self.cfg.max_frame_timeout,
+                },
+                (
+                    // Sent packets = SURB consumption estimate
+                    msg_sender
+                        .clone()
+                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            // Each outgoing packet consumes one SURB
+                            surb_estimator_clone
+                                .consumed
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        })
+                        .rate_limit_with_controller(&egress_rate_control)
+                        .buffer((2 * target_surb_buffer_size) as usize),
+                    // Received packets = SURB retrieval estimate
+                    rx_session_data.inspect(move |data| {
+                        let produced = data.num_surbs_with_msg() as u64;
+                        // Count the number of SURBs delivered with each incoming packet
+                        surb_estimator_clone
+                            .produced
+                            .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
+                        #[cfg(feature = "telemetry")]
+                        crate::telemetry::record_session_surb_produced(&session_id, produced);
+                    }),
+                ),
+                Some(closure_notifier),
+            )?;
+
+            // The SURB balancer will start intervening by rate-limiting the
+            // egress of the Session, once the estimated number of SURBs drops below
+            // the target defined here. Otherwise, the maximum egress is allowed.
+            let balancer_config = SurbBalancerConfig {
+                target_surb_buffer_size,
+                // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
+                max_surbs_per_sec: target_surb_buffer_size / self.cfg.minimum_surb_buffer_duration.as_secs(),
+                // No SURB decay at the Exit, since we know almost exactly how many SURBs
+                // were received
+                surb_decay: None,
+            };
+
+            slot.surb_mgmt.update(&balancer_config);
+
+            // Spawn the SURB balancer only once we know we have registered the
+            // abort handle with the pre-allocated Session slot
+            debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
+            let balancer = SurbBalancer::new(
+                session_id,
+                SimpleBalancerController::default(),
+                slot.surb_estimator.clone(),
+                SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
+                slot.surb_mgmt.clone(),
+            );
+
+            // Assign the SURB balancer and abort handles to the already allocated Session slot
+            let (_, balancer_abort_handle) = balancer.start_control_loop(self.cfg.balancer_sampling_interval);
+            slot.abort_handles
+                .lock()
+                .insert(SessionTasks::Balancer, balancer_abort_handle);
+
+            // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
+            if let Some(period) = self.cfg.surb_balance_notify_period {
+                let surb_estimator_clone = slot.surb_estimator.clone();
+                let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
+                    session_id,
+                    // Sent Keep-Alive packets also contribute to SURB consumption
+                    msg_sender
+                        .clone()
+                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            // Each sent keepalive consumes 1 SURB
+                            surb_estimator_clone
+                                .consumed
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(feature = "telemetry")]
+                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        }),
+                    slot.routing_opts.clone(),
+                    SurbNotificationMode::Level(slot.surb_estimator.clone()),
+                    slot.surb_mgmt.clone(),
+                );
+
+                // Start keepalive stream towards the Entry with a predefined period
+                hopr_utils::runtime::prelude::spawn(async move {
+                    // Delay the stream execution by one period
+                    hopr_utils::runtime::prelude::sleep(period).await;
+                    ka_controller.set_rate_per_unit(1, period);
+                });
+
+                slot.abort_handles
+                    .lock()
+                    .insert(SessionTasks::KeepAlive, ka_abort_handle);
+
+                debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
+            }
+
+            session
+        } else {
+            HoprSession::new(
+                session_id,
+                reply_routing.clone(),
+                HoprSessionConfig {
+                    capabilities: session_req.capabilities.into(),
+                    frame_mtu: self.cfg.frame_mtu,
+                    frame_timeout: self.cfg.max_frame_timeout,
+                },
+                (msg_sender.clone(), rx_session_data),
+                Some(closure_notifier),
+            )?
+        };
+
+        // Extract useful information about the session from the Start protocol message
+        let incoming_session = IncomingSession {
+            session,
+            target: session_req.target,
+        };
+
+        // Notify that a new incoming session has been created. Lock the sink and send
+        // directly into it, so no extra forwarding task between channels is needed.
+        match async {
+            let mut guard = new_session_notifier.lock().await;
+            guard.send(incoming_session).await
+        }
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await
+        {
+            Err(_) => {
+                error!(%session_id, "timeout to notify about new incoming session");
+                return Err(TransportSessionError::Timeout);
+            }
+            Ok(Err(error)) => {
+                error!(%session_id, %error, "failed to notify about new incoming session");
+                return Err(SessionManagerError::other(error).into());
+            }
+            _ => {}
+        };
+
+        trace!(?session_id, "session notification sent");
+
+        // Notify the sender that the session has been established.
+        // Set our peer ID in the session ID sent back to them.
+        let data = HoprStartProtocol::SessionEstablished(StartEstablished {
+            orig_challenge: session_req.challenge,
+            session_id,
+        });
+
+        msg_sender
+            .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+            .await
+            .map_err(|_| {
+                error!(%session_id, "timeout sending session establishment message");
+                TransportSessionError::Timeout
+            })?
+            .map_err(|error| {
+                error!(%session_id, %error, "failed to send session establishment message");
+                SessionManagerError::other(error)
+            })?;
+
+        #[cfg(feature = "telemetry")]
+        {
+            initialize_session_metrics(
+                session_id,
+                HoprSessionConfig {
+                    capabilities: session_req.capabilities.0,
+                    frame_mtu: self.cfg.frame_mtu,
+                    frame_timeout: self.cfg.max_frame_timeout,
+                },
+            );
+            set_session_state(&session_id, SessionLifecycleState::Active);
+            set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
+        }
+
+        info!(%session_id, "new session established");
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        {
+            METRIC_NUM_ESTABLISHED_SESSIONS.increment();
+            METRIC_ACTIVE_SESSIONS.increment(1.0);
         }
 
         Ok(())

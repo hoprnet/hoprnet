@@ -24,6 +24,7 @@ pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, Sess
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
+    SESSION_APPLICATION_TAG,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

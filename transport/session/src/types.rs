@@ -88,6 +88,10 @@ const fn max_decimal_digits_for_n_bytes(n: usize) -> usize {
 // Enough to fit HoprPseudonym in hex (with 0x prefix), delimiter and tag number
 const MAX_SESSION_ID_STR_LEN: usize = 2 + 2 * HoprPseudonym::SIZE + 1 + max_decimal_digits_for_n_bytes(Tag::SIZE);
 
+/// Constant application tag used for all sessions.
+/// Previously tags were dynamically allocated per session.
+pub const SESSION_APPLICATION_TAG: u64 = 1024;
+
 /// Unique ID of a specific Session in a certain direction.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
