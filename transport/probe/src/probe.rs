@@ -1060,7 +1060,7 @@ mod tests {
                 Self::ImmediateNeighbor { store } => {
                     let peers: Vec<OffchainPublicKey> =
                         store.get_peers.write().unwrap().pop_front().unwrap_or_default();
-                    Box::pin(
+                    Box::pin(futures::StreamExt::chain(
                         futures::stream::iter(peers.into_iter().map(|peer| {
                             ProbeRouting::Neighbor(DestinationRouting::Forward {
                                 destination: Box::new(peer.into()),
@@ -1068,9 +1068,9 @@ mod tests {
                                 forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
                                 return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
                             })
-                        }))
-                        .chain(futures::stream::pending()),
-                    )
+                        })),
+                        futures::stream::pending(),
+                    ))
                 }
                 Self::OneShotLoopback { routing, path_id } => {
                     let probe = hopr_api::ct::ProbeRouting::Looping((routing.clone(), *path_id));

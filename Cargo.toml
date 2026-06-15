@@ -210,7 +210,6 @@ hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 # referential implementations
 hopr-session-server-forwarder = { version = "0.1.0", path = "impls/session-server-forwarder", default-features = false }
 hopr-transport-p2p = { version = "0.9.1", path = "impls/transport/p2p", default-features = false }
-hopr-ct-immediate = { version = "0.2.1", path = "impls/ct/immediate", default-features = false }
 hopr-ct-full-network = { version = "0.3.0", path = "impls/ct/full-network", default-features = false }
 hopr-network-graph = { version = "0.3.0", path = "impls/graph", default-features = false }
 

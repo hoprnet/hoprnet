@@ -62,9 +62,6 @@ statistics-types-serde = ["statistics-types", "dep:serde"]
 statistics-types-moving = ["statistics-types"]
 statistics-types-weighted = ["statistics-types", "dep:rand"]
 
-# testing module (from hopr-test-stubs) — only for test code
-testing = ["dep:async-trait", "dep:bimap", "dep:thiserror", "dep:hopr-api"]
-
 # platform module (from hopr-platform)
 platform = ["dep:thiserror"]
 platform-trace-timing = ["platform", "dep:tracing"]
@@ -101,8 +98,6 @@ rayon = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 # testing
-async-trait = { workspace = true, optional = true }
-bimap = { workspace = true, optional = true }
 
 # platform + parallelize (shared)
 thiserror = { workspace = true, optional = true }
@@ -114,8 +109,6 @@ lazy_static = { workspace = true, optional = true }
 # network-types-serde + telemetry
 hopr-types = { workspace = true, optional = true }
 
-# testing
-hopr-api = { workspace = true, optional = true, features = ["chain"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = { workspace = true, optional = true }
