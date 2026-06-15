@@ -60,8 +60,6 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
-    #[error("session already exists for this pseudonym")]
-    SessionAlreadyExists,
     #[error(transparent)]
     Other(anyhow::Error),
 }

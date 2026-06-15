@@ -35,8 +35,6 @@ pub enum StartErrorReason {
     NoSlotsAvailable = 1,
     /// Recipient is busy.
     Busy = 2,
-    /// Session already exists for this pseudonym.
-    SessionAlreadyExists = 3,
 }
 
 /// Error message in the Start protocol.

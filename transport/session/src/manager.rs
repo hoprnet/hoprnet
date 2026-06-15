@@ -1155,9 +1155,9 @@ where
         {
             // Inserted successfully - continue with session setup
         } else {
-            // Session already exists for this pseudonym
-            error!(%pseudonym, "session already exists for this pseudonym");
-            let reason = StartErrorReason::SessionAlreadyExists;
+            // No slots available for this pseudonym
+            error!(%pseudonym, "no slots available for this pseudonym");
+            let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
                 challenge: session_req.challenge,
                 reason,
