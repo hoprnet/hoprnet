@@ -52,7 +52,6 @@ tokio = { workspace = true }
 
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
-hopr-ct-immediate = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

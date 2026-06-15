@@ -461,7 +461,6 @@ mod tests {
         },
         types::crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     };
-    use hopr_ct_immediate::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
     use super::*;
@@ -654,13 +653,7 @@ mod tests {
             .continuously_scan(
                 from_probing_to_network_tx.clone(),
                 manual_probe_rx,
-                ImmediateNeighborProber::new(
-                    ProberConfig {
-                        interval: cfg.interval,
-                        recheck_threshold: cfg.recheck_threshold,
-                    },
-                    store.clone(),
-                ),
+                TestProbeStrategy::ImmediateNeighbor { store: store.clone() },
                 store,
             )
             .await;
@@ -1051,6 +1044,9 @@ mod tests {
     #[derive(Clone)]
     enum TestProbeStrategy {
         ManualNeighbor,
+        ImmediateNeighbor {
+            store: PeerStore,
+        },
         OneShotLoopback {
             routing: DestinationRouting,
             path_id: hopr_api::types::internal::routing::PathId,
@@ -1061,6 +1057,21 @@ mod tests {
         fn build(&self) -> futures::stream::BoxStream<'static, hopr_api::ct::ProbeRouting> {
             match self {
                 Self::ManualNeighbor => Box::pin(futures::stream::pending()),
+                Self::ImmediateNeighbor { store } => {
+                    let peers: Vec<OffchainPublicKey> =
+                        store.get_peers.write().unwrap().pop_front().unwrap_or_default();
+                    Box::pin(
+                        futures::stream::iter(peers.into_iter().map(|peer| {
+                            ProbeRouting::Neighbor(DestinationRouting::Forward {
+                                destination: Box::new(peer.into()),
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                                return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                            })
+                        }))
+                        .chain(futures::stream::pending()),
+                    )
+                }
                 Self::OneShotLoopback { routing, path_id } => {
                     let probe = hopr_api::ct::ProbeRouting::Looping((routing.clone(), *path_id));
                     Box::pin(futures::StreamExt::chain(
