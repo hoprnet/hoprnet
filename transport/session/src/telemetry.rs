@@ -460,7 +460,7 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
     }
 
     fn incomplete_frame(&self) {
-        increment_frame_assembly_gauge(&self.0);
+        decrement_frame_assembly_gauge(&self.0);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
