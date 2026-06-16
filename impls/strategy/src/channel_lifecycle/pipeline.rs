@@ -885,7 +885,7 @@ where
                     .cell_for(c.channel.get_id())
                     .filter(|c| seen_cells.insert((*c).clone()))
                 {
-                    let label = format!("{:?}_{:?}", cell.0, cell.1);
+                    let label = format!("{:?}_{:?}", cell.latency, cell.subnet);
                     METRIC_BUCKET_COUNT.set(&[label.as_str()], bucket_view.cell_count(cell) as f64);
                 }
             }
@@ -909,8 +909,8 @@ where
             let subnets: HashSet<String> = close_candidates
                 .iter()
                 .filter_map(|c| bucket_view.cell_for(c.channel.get_id()))
-                .filter(|cell| !matches!(cell.1, SubnetBucket::Unknown))
-                .map(|cell| format!("{:?}", cell.1))
+                .filter(|cell| !matches!(cell.subnet, SubnetBucket::Unknown))
+                .map(|cell| format!("{:?}", cell.subnet))
                 .collect();
             METRIC_SUBNET_COUNT.set(subnets.len() as f64);
         }

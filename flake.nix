@@ -166,7 +166,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -177,7 +177,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -188,7 +188,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--test '*' -- --test-threads=1";
@@ -199,7 +199,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --test '*' -j 1
                     runHook postCheck
                   '';
                 });
@@ -210,7 +210,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -221,7 +221,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -233,7 +233,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runCoverage = true;
                     prependPackageName = false;
                     cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
@@ -246,7 +246,7 @@
                     runHook preBuild
                     cargo llvm-cov nextest --lcov --output-path $out --lib \
                       ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
-                      --workspace -F allocator-jemalloc
+                      --workspace -F allocator-jemalloc -F testing
                     runHook postBuild
                   '';
                 });
@@ -350,6 +350,7 @@
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               cargo-insta
               cargo-nextest

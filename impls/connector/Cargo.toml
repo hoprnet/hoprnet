@@ -1,14 +1,17 @@
 [package]
 name = "hopr-chain-connector"
 version = "0.21.0"
-edition.workspace = true
-rust-version.workspace = true
-authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implementation of HOPR Chain APIs using Blokli client"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "chain", "ethereum"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 runtime-tokio = ["hopr-utils/runtime-tokio"]
