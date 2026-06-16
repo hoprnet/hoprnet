@@ -97,7 +97,6 @@ hopr-protocol-session = { workspace = true, features = [
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
-serde_cbor_2 = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
