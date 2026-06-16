@@ -287,7 +287,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
                     tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
-                    res.insert(ShareResolution::InvalidShare(peer.into(), SsaId::new(pseudonym, ssa_index)));
+                    res.insert(ShareResolution::InvalidShare(
+                        peer.into(),
+                        SsaId::new(pseudonym, ssa_index),
+                    ));
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
