@@ -513,7 +513,7 @@ mod tests {
         let mut set = HashSet::new();
         set.insert(id1);
         assert!(set.contains(&id2));
-        assert!(!set.contains(&id3), "same pseudonym should match");
+        assert!(!set.contains(&id3), "different pseudonym should not be in the set");
     }
 
     // --- Existing tests ---
