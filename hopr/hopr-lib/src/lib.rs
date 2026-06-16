@@ -23,6 +23,9 @@ pub mod config;
 pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
+/// Testing utilities: cluster fixtures, node wiring helpers, echo server.
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
@@ -158,24 +161,35 @@ pub struct HoprSessionClientConfig {
     since = "4.0.2-rc.1",
     note = "temporary compatibility API; remove once the explicit path is not needed anymore."
 )]
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HoprSessionClientExplicitPathConfig {
     /// Explicit forward intermediate path.
     pub forward_path: Vec<hopr_api::types::internal::NodeId>,
     /// Explicit return intermediate path.
     pub return_path: Vec<hopr_api::types::internal::NodeId>,
     /// Capabilities offered by the session.
-    #[default(_code = "SessionCapability::Segmentation.into()")]
     pub capabilities: SessionCapabilities,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
-    #[default(None)]
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
-    #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
-    #[default(false)]
     pub always_max_out_surbs: bool,
+}
+
+#[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[allow(deprecated)]
+impl Default for HoprSessionClientExplicitPathConfig {
+    fn default() -> Self {
+        Self {
+            forward_path: Vec::default(),
+            return_path: Vec::default(),
+            capabilities: SessionCapability::Segmentation.into(),
+            pseudonym: None,
+            surb_management: Some(SurbBalancerConfig::default()),
+            always_max_out_surbs: false,
+        }
+    }
 }
 
 #[cfg(feature = "session-client")]
@@ -193,6 +207,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+#[allow(deprecated)]
 impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionClientConfig {
     type Error = hopr_api::types::primitive::errors::GeneralError;
 
@@ -372,6 +387,7 @@ where
 
     /// Opens a session using explicit intermediate paths for forward and return routing.
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[allow(deprecated)]
     #[deprecated(
         since = "4.0.2-rc.1",
         note = "temporary compatibility API; remove once the explicit path is not needed anymore."
@@ -847,6 +863,7 @@ mod tests {
     }
 
     #[cfg(all(feature = "session-client", feature = "explicit-path"))]
+    #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
         let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());

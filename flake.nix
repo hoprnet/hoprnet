@@ -106,7 +106,6 @@
             root = ./.;
             inherit fs;
             extraFiles = [
-              ./hopr/reference/tests
               (fs.fileFilter (file: file.hasExt "snap") ./.)
             ];
           };
@@ -167,7 +166,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -178,7 +177,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -189,7 +188,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--test '*' -- --test-threads=1";
@@ -200,7 +199,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --test '*' -j 1
                     runHook postCheck
                   '';
                 });
@@ -211,7 +210,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -222,7 +221,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -234,7 +233,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runCoverage = true;
                     prependPackageName = false;
                     cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
@@ -247,7 +246,7 @@
                     runHook preBuild
                     cargo llvm-cov nextest --lcov --output-path $out --lib \
                       ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
-                      --workspace -F allocator-jemalloc
+                      --workspace -F allocator-jemalloc -F testing
                     runHook postBuild
                   '';
                 });
@@ -326,6 +325,17 @@
                 pass_filenames = true;
                 language = "system";
               };
+              renovate-config-validator = {
+                enable = true;
+                name = "Renovate config validator";
+                entry = "${pkgs.writeShellScript "validate-renovate" ''
+                  if [ -n "''${NIX_BUILD_TOP:-}" ]; then exit 0; fi
+                  ${pkgs.nodejs}/bin/npx --yes --package renovate -- renovate-config-validator "$@"
+                ''}";
+                files = "renovate\\.json$";
+                language = "system";
+                pass_filenames = true;
+              };
             };
             excludes = [ ".gcloudignore" ];
           };
@@ -340,6 +350,7 @@
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               cargo-insta
               cargo-nextest
@@ -508,7 +519,6 @@
               "db/entity/src/codegen/*"
               ".github/workflows/build-binaries.yaml"
               "docs/*"
-              "hopr/reference/tests/snapshots/*"
               "nix/setup-hook-darwin.sh"
               "target/*"
             ];

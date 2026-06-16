@@ -1,0 +1,50 @@
+[package]
+name = "hopr-session-server-forwarder"
+description = "HOPR session server that bridges TCP/UDP sockets from the Session Exit node to a destination"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "session", "server"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
+
+[features]
+default = ["runtime-tokio"]
+runtime-tokio = [
+  "dep:tokio",
+  "dep:tokio-retry",
+  "hopr-utils/network-types-runtime-tokio",
+  "hopr-utils/parallelize-runtime-tokio",
+  "hopr-transport-session/runtime-tokio",
+]
+telemetry = ["hopr-api/types-telemetry", "dep:lazy_static"]
+
+[dependencies]
+async-trait = { workspace = true }
+hopr-api = { workspace = true, features = [
+  "node-session-server",
+  "types-keypair",
+] }
+hopr-transport-session = { workspace = true }
+hopr-utils = { workspace = true, features = [
+  "network-types",
+  "parallelize",
+  "parallelize-rayon",
+] }
+lazy_static = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-retry = { workspace = true, optional = true }
+tracing = { workspace = true }
+validator = { workspace = true }
+
+[lib]
+doctest = false

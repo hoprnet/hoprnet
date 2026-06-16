@@ -77,12 +77,13 @@ where
 
             let count = paths.len();
             tracing::debug!(edge_count = edge_count.get(), count, "loopback path candidates");
-            let weighted: Vec<_> = paths
+            let weighted: Vec<((Vec<OffchainPublicKey>, PathId), f64)> = paths
                 .into_iter()
                 .map(|(path, path_id)| ((path, path_id), cfg.base_priority))
                 .collect();
 
-            futures::stream::iter(WeightedCollection::new(weighted).into_shuffled())
+            let wc = WeightedCollection::new(weighted);
+            futures::stream::iter(wc.into_shuffled())
         })
 }
 
@@ -214,7 +215,8 @@ where
 
                     let peer_count = weighted.len();
                     let zero_hop = RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"));
-                    let probes: Vec<_> = WeightedCollection::new(weighted)
+                    let wc = WeightedCollection::new(weighted);
+                    let probes: Vec<_> = wc
                         .into_shuffled()
                         .into_iter()
                         .map(|peer| {

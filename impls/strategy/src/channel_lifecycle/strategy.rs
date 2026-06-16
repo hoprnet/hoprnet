@@ -18,9 +18,11 @@ use hopr_api::{
         ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView,
     },
 };
-use tracing::info;
 
-use super::{ChannelLifecycleConfig, ChannelLifecycleStrategyInner};
+use super::{
+    ChannelLifecycleConfig, ChannelLifecycleStrategyInner,
+    selector::{DefaultSelector, MultiObjectiveSelector},
+};
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Builder for [`ChannelLifecycleStrategy`].
@@ -59,9 +61,20 @@ impl ChannelLifecycleStrategy {
             + Sync
             + 'static,
     {
+        let selector: Arc<dyn super::selector::Selector> = match self.cfg.selector.multi_objective_config() {
+            Some(mo_cfg) => {
+                mo_cfg
+                    .validate_trust_weights()
+                    .expect("invalid selector config: trust inner weights must sum to ~1.0");
+                Arc::new(MultiObjectiveSelector::new(mo_cfg))
+            }
+            None => Arc::new(DefaultSelector),
+        };
+
         Box::new(ChannelLifecycleStrategyInner {
             cfg: self.cfg,
             node,
+            selector,
             open_in_flight: Arc::new(DashSet::new()),
             fund_in_flight: Arc::new(DashSet::new()),
             close_in_flight: Arc::new(DashSet::new()),

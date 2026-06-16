@@ -294,6 +294,7 @@ where
             planner_config.max_cached_paths,
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
+            planner_config.min_paths_anonymity_floor,
         );
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;

@@ -3600,20 +3600,33 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
+ "hex-literal",
  "hopr-api",
+ "hopr-chain-connector",
+ "hopr-ct-full-network",
+ "hopr-network-graph",
+ "hopr-ticket-manager",
  "hopr-transport",
+ "hopr-transport-p2p",
  "hopr-utils",
  "humantime-serde",
  "insta",
  "lazy_static",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "parking_lot",
+ "rand 0.10.1",
+ "rstest",
  "serde",
  "serde-saphyr",
  "serde_with",
+ "serial_test",
  "smart-default",
  "strum 0.28.0",
+ "test-log",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
  "validator",
 ]
@@ -3634,6 +3647,8 @@ dependencies = [
  "insta",
  "parking_lot",
  "petgraph",
+ "rand 0.10.1",
+ "smallvec",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -3747,35 +3762,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-reference"
-version = "4.2.2"
+name = "hopr-session-server-forwarder"
+version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
- "futures",
- "futures-time",
- "hex-literal",
  "hopr-api",
- "hopr-chain-connector",
- "hopr-ct-full-network",
- "hopr-lib",
- "hopr-network-graph",
- "hopr-reference",
- "hopr-ticket-manager",
- "hopr-transport-p2p",
+ "hopr-transport-session",
+ "hopr-utils",
  "lazy_static",
- "opentelemetry-prometheus-text-exporter",
- "opentelemetry_sdk",
- "rand 0.10.1",
- "rstest",
  "serde",
  "serde_with",
- "serial_test",
  "smart-default",
- "test-log",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-retry",
- "tokio-util",
  "tracing",
  "validator",
 ]
@@ -3800,6 +3800,7 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
+ "multiaddr",
  "parking_lot",
  "serde",
  "serde_with",
@@ -3813,7 +3814,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-ticket-manager"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3841,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.5"
+version = "0.29.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3904,7 +3905,6 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-transport-mixer",
  "hopr-types",
  "humantime-serde",
  "insta",
@@ -3957,7 +3957,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-ct-immediate",
  "hopr-protocol-app",
  "hopr-transport-tag-allocator",
  "hopr-utils",
@@ -4094,14 +4093,11 @@ dependencies = [
  "arrayvec",
  "assertables",
  "async-lock",
- "async-trait",
  "auto_impl",
- "bimap",
  "flume",
  "futures",
  "futures-time",
  "hickory-resolver 0.26.1",
- "hopr-api",
  "hopr-types",
  "indexmap 2.14.0",
  "lazy_static",

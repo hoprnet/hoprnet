@@ -1,12 +1,23 @@
 [package]
 name = "hopr-ticket-manager"
 description = "Manages outgoing ticket indices and incoming redeemable tickets"
-version = "0.4.0"
-license = "GPL-3.0-only"
-publish = false
-rust-version.workspace = true
-authors.workspace = true
+version = "0.5.0"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "tickets", "payment"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [features]
 default = ["redb", "cli"]
@@ -59,3 +70,5 @@ required-features = ["redb", "cli"]
 [[bench]]
 name = "ticket_manager_bench"
 harness = false
+
+[lib]

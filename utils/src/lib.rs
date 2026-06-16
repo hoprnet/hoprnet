@@ -9,8 +9,5 @@ pub mod parallelize;
 #[cfg(feature = "statistics-types")]
 pub mod statistics;
 
-#[cfg(feature = "testing")]
-pub mod testing;
-
 #[cfg(feature = "platform")]
 pub mod platform;
