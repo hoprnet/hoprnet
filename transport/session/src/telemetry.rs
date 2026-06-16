@@ -12,9 +12,14 @@ use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPA
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
 /// for local types, so we create a local wrapper.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+///
+/// # Performance Optimization
+/// The label string is cached to avoid repeated `to_string()` allocations in hot
+/// telemetry paths (called per segment/frame). This trades a `Copy` impl for
+/// slightly more memory but eliminates allocations in the hot path.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[allow(dead_code)]
-struct SessionIdWrapper(SessionId);
+struct SessionIdWrapper(SessionId, String);
 
 impl std::ops::Deref for SessionIdWrapper {
     type Target = SessionId;
@@ -26,7 +31,7 @@ impl std::ops::Deref for SessionIdWrapper {
 
 impl From<SessionId> for SessionIdWrapper {
     fn from(id: SessionId) -> Self {
-        Self(id)
+        Self(id, id.to_string())
     }
 }
 
@@ -441,59 +446,49 @@ fn decrement_frame_assembly_gauge(session_id: &SessionId) {
 
 impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
     fn frame_emitted(&self) {
-        let session_id_str = self.to_string();
-        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[&session_id_str]);
+        METRIC_SESSION_FRAME_EMITTED_TOTAL.increment(&[&self.1]);
     }
 
     fn frame_completed(&self) {
-        let session_id_str = self.to_string();
-        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[&session_id_str]);
-        decrement_frame_assembly_gauge(self);
+        METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[&self.1]);
+        decrement_frame_assembly_gauge(&self.0);
     }
 
     fn frame_discarded(&self) {
-        let session_id_str = self.to_string();
-        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[&session_id_str]);
-        decrement_frame_assembly_gauge(self);
+        METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[&self.1]);
+        decrement_frame_assembly_gauge(&self.0);
     }
 
     fn incomplete_frame(&self) {
-        increment_frame_assembly_gauge(self);
+        increment_frame_assembly_gauge(&self.0);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {
-        let session_id_str = self.to_string();
         match msg {
-            SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[&session_id_str])
-            }
+            SessionMessageDiscriminants::Segment => METRIC_SESSION_ACK_INCOMING_SEGMENTS_TOTAL.increment(&[&self.1]),
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&session_id_str])
+                METRIC_SESSION_ACK_INCOMING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&self.1])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&session_id_str])
+                METRIC_SESSION_ACK_INCOMING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&self.1])
             }
         }
     }
 
     fn outgoing_message(&self, msg: SessionMessageDiscriminants) {
-        let session_id_str = self.to_string();
         match msg {
-            SessionMessageDiscriminants::Segment => {
-                METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[&session_id_str])
-            }
+            SessionMessageDiscriminants::Segment => METRIC_SESSION_ACK_OUTGOING_SEGMENTS_TOTAL.increment(&[&self.1]),
             SessionMessageDiscriminants::Request => {
-                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&session_id_str])
+                METRIC_SESSION_ACK_OUTGOING_RETRANSMISSION_REQUESTS_TOTAL.increment(&[&self.1])
             }
             SessionMessageDiscriminants::Acknowledge => {
-                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&session_id_str])
+                METRIC_SESSION_ACK_OUTGOING_ACKNOWLEDGED_FRAMES_TOTAL.increment(&[&self.1])
             }
         }
     }
 
     fn error(&self) {
-        let session_id_str = self.to_string();
-        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[&session_id_str]);
+        METRIC_SESSION_LIFETIME_PIPELINE_ERRORS_TOTAL.increment(&[&self.1]);
     }
 }
 
