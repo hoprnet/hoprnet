@@ -12,7 +12,7 @@ publish = false
 
 [features]
 runtime-tokio = ["hopr-utils/runtime-tokio"]
-testing = ["dep:hex", "blokli-client/testing"]
+testing = ["dep:const-hex", "blokli-client/testing"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -25,7 +25,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
-hex = { workspace = true, optional = true }
+const-hex = { workspace = true, optional = true }
 moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
@@ -48,7 +48,7 @@ hopr-utils = { workspace = true }
 
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
-hex = { workspace = true }
+const-hex = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hex-literal = { workspace = true }
 insta = { workspace = true }

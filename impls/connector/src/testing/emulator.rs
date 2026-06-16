@@ -67,17 +67,17 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
         match &action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
-                if let Some(safe) = state.deployed_safes.get_mut(&hex::encode(safe_address)) {
-                    if safe.registered_nodes.contains(&hex::encode(sender)) {
+                if let Some(safe) = state.deployed_safes.get_mut(&const_hex::encode(safe_address)) {
+                    if safe.registered_nodes.contains(&const_hex::encode(sender)) {
                         return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                             "node {sender} already registered at safe address {safe_address}"
                         ))
                         .into());
                     }
-                    safe.registered_nodes.push(hex::encode(sender));
+                    safe.registered_nodes.push(const_hex::encode(sender));
 
                     if let Some(account) = state.get_account_mut(&sender.into()) {
-                        account.safe_address = Some(hex::encode(safe_address));
+                        account.safe_address = Some(const_hex::encode(safe_address));
                         tracing::debug!(%sender, %safe_address, "registered safe address to account");
                     }
                 } else {
@@ -92,7 +92,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 multiaddress,
             } => {
                 if let Some(account) = state.get_account_mut(&sender.into()) {
-                    account.packet_key = hex::encode(packet_key);
+                    account.packet_key = const_hex::encode(packet_key);
                     if let Some(multiaddress) = multiaddress.clone() {
                         if !multiaddress.is_empty() {
                             account.multi_addresses.push(multiaddress.to_string());
@@ -109,10 +109,10 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     state.accounts.insert(
                         next_key_id,
                         blokli_client::api::types::Account {
-                            chain_key: hex::encode(sender),
+                            chain_key: const_hex::encode(sender),
                             keyid: next_key_id as i32,
                             multi_addresses: multiaddress.iter().map(|a| a.to_string()).collect(),
-                            packet_key: hex::encode(packet_key),
+                            packet_key: const_hex::encode(packet_key),
                             safe_address: state
                                 .get_safe_by_owner(&sender.into())
                                 .first()
@@ -123,7 +123,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 }
             }
             ParsedHoprChainAction::WithdrawNative(destination, amount) => {
-                let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
+                let balance = state.native_balances.get_mut(&const_hex::encode(sender)).ok_or(
                     blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "missing native balance for {sender}"
                     )),
@@ -144,7 +144,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
 
-                match state.native_balances.entry(hex::encode(destination)) {
+                match state.native_balances.entry(const_hex::encode(destination)) {
                     Entry::Occupied(mut dst_balance) => {
                         let new_balance = dst_balance.get().balance.0.parse::<XDaiBalance>().map_err(|_| {
                             blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
@@ -166,7 +166,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 }
             }
             ParsedHoprChainAction::WithdrawToken(destination, amount) => {
-                let balance = state.token_balances.get_mut(&hex::encode(sender)).ok_or(
+                let balance = state.token_balances.get_mut(&const_hex::encode(sender)).ok_or(
                     blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "missing token balance for {sender}"
                     )),
@@ -187,7 +187,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
 
-                match state.token_balances.entry(hex::encode(destination)) {
+                match state.token_balances.entry(const_hex::encode(destination)) {
                     Entry::Occupied(mut dst_balance) => {
                         let new_balance = dst_balance.get().balance.0.parse::<HoprBalance>().map_err(|_| {
                             blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
@@ -300,11 +300,11 @@ impl BlokliTestStateMutator for FullStateEmulator {
                 } else {
                     let new_id = generate_channel_id(&sender, dst_addr);
                     state.channels.insert(
-                        hex::encode(new_id),
+                        const_hex::encode(new_id),
                         blokli_client::api::types::Channel {
                             balance: blokli_client::api::types::TokenValueString(stake.to_string()),
                             closure_time: None,
-                            concrete_channel_id: hex::encode(new_id),
+                            concrete_channel_id: const_hex::encode(new_id),
                             destination: destination.keyid,
                             epoch: 1,
                             source: source.keyid,
@@ -477,9 +477,9 @@ impl BlokliTestStateMutator for FullStateEmulator {
             }
         }
 
-        *state.tx_counts.entry(hex::encode(sender)).or_default() += 1;
+        *state.tx_counts.entry(const_hex::encode(sender)).or_default() += 1;
 
-        let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
+        let balance = state.native_balances.get_mut(&const_hex::encode(sender)).ok_or(
             blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing native balance for {sender}")),
         )?;
 

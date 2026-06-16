@@ -44,7 +44,7 @@ hopr-types = { workspace = true, features = ["crypto", "random", "primitive"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 postcard = { workspace = true }
-hex = { workspace = true }
+const-hex = { workspace = true }
 parameterized = { workspace = true }
 subtle = { workspace = true }
 

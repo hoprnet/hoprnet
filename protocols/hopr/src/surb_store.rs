@@ -251,7 +251,7 @@ impl SurbStore for MemorySurbStore {
                         if cause != RemovalCause::Explicit {
                             tracing::warn!(
                                 pseudonym = %sender_id.pseudonym(),
-                                surb_id = hex::encode(id.as_slice()),
+                                surb_id = const_hex::encode(id.as_slice()),
                                 ?cause,
                                 "evicting reply opener for sender id"
                             );

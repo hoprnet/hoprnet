@@ -30,7 +30,7 @@ auto_impl = { workspace = true }
 bytes = { workspace = true }
 cfg_eval = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
-hex = { workspace = true }
+const-hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }

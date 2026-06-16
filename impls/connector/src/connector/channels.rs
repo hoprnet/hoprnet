@@ -477,7 +477,7 @@ mod tests {
         // Replace the closure time value to make the snapshot deterministic
         snapshot
             .channels
-            .get_mut(&hex::encode(channel_1.get_id()))
+            .get_mut(&const_hex::encode(channel_1.get_id()))
             .unwrap()
             .closure_time = Some(blokli_client::api::types::DateTime("dummy".into()));
 
