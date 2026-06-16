@@ -1,13 +1,17 @@
 [package]
 name = "hopr-transport-tag-allocator"
-version = "0.1.1"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-edition.workspace = true
-rust-version.workspace = true
 description = "Partitioned tag allocator for session and telemetry components"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+version = "0.1.1"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "transport", "allocator"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]

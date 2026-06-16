@@ -1,13 +1,17 @@
 [package]
 name = "hopr-transport-probe"
-version = "0.6.0"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-edition.workspace = true
-rust-version.workspace = true
 description = "Probing mechanism of the discovered network topology"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+version = "0.6.0"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "transport", "probing"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
@@ -48,7 +52,6 @@ tokio = { workspace = true }
 
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }
-hopr-ct-immediate = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

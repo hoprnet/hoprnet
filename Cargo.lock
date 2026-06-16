@@ -3604,7 +3604,6 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-ct-full-network",
- "hopr-lib",
  "hopr-network-graph",
  "hopr-ticket-manager",
  "hopr-transport",
@@ -3843,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.28.5"
+version = "0.29.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3906,7 +3905,6 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-transport-mixer",
  "hopr-types",
  "humantime-serde",
  "insta",
@@ -3959,7 +3957,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-crypto-packet",
- "hopr-ct-immediate",
  "hopr-protocol-app",
  "hopr-transport-tag-allocator",
  "hopr-utils",
@@ -4096,14 +4093,11 @@ dependencies = [
  "arrayvec",
  "assertables",
  "async-lock",
- "async-trait",
  "auto_impl",
- "bimap",
  "flume",
  "futures",
  "futures-time",
  "hickory-resolver 0.26.1",
- "hopr-api",
  "hopr-types",
  "indexmap 2.14.0",
  "lazy_static",

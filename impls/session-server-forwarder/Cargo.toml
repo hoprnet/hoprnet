@@ -2,11 +2,16 @@
 name = "hopr-session-server-forwarder"
 description = "HOPR session server that bridges TCP/UDP sockets from the Session Exit node to a destination"
 version = "0.1.0"
-license = "GPL-3.0-only"
-publish = false
-rust-version.workspace = true
-authors.workspace = true
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "session", "server"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 default = ["runtime-tokio"]
