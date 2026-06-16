@@ -13,6 +13,7 @@ use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPA
 /// This is needed to satisfy the orphan rule - we can only implement external traits
 /// for local types, so we create a local wrapper.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[allow(dead_code)]
 struct SessionIdWrapper(SessionId);
 
 impl std::ops::Deref for SessionIdWrapper {
@@ -217,6 +218,7 @@ struct SessionSurbRuntimeState {
 struct SessionRuntimeState {
     created_at_us: u64,
     last_activity_us: u64,
+    #[allow(dead_code)]
     frames_being_assembled: u64,
     surb: Option<SessionSurbRuntimeState>,
 }
@@ -410,6 +412,7 @@ fn now_us() -> u64 {
         .as_micros() as u64
 }
 
+#[allow(dead_code)]
 fn increment_frame_assembly_gauge(session_id: &SessionId) {
     let mut state = SESSION_RUNTIME.lock();
     let runtime = state
@@ -420,6 +423,7 @@ fn increment_frame_assembly_gauge(session_id: &SessionId) {
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.increment(&[&session_id_str], 1.0);
 }
 
+#[allow(dead_code)]
 fn decrement_frame_assembly_gauge(session_id: &SessionId) {
     let mut state = SESSION_RUNTIME.lock();
     let Some(runtime) = state.get_mut(session_id) else {
@@ -444,17 +448,17 @@ impl hopr_protocol_session::SessionTelemetryTracker for SessionIdWrapper {
     fn frame_completed(&self) {
         let session_id_str = self.to_string();
         METRIC_SESSION_FRAME_COMPLETED_TOTAL.increment(&[&session_id_str]);
-        decrement_frame_assembly_gauge(&*self);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn frame_discarded(&self) {
         let session_id_str = self.to_string();
         METRIC_SESSION_FRAME_DISCARDED_TOTAL.increment(&[&session_id_str]);
-        decrement_frame_assembly_gauge(&*self);
+        decrement_frame_assembly_gauge(self);
     }
 
     fn incomplete_frame(&self) {
-        increment_frame_assembly_gauge(&*self);
+        increment_frame_assembly_gauge(self);
     }
 
     fn incoming_message(&self, msg: SessionMessageDiscriminants) {

@@ -23,7 +23,7 @@ include = [
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["telemetry"]
 all-benchmarks = []
 runtime-tokio = [
   "hopr-utils/network-types-runtime-tokio",
@@ -70,7 +70,11 @@ hopr-utils = { workspace = true, features = [
 ] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
-hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
+hopr-protocol-session = { workspace = true, features = [
+  "serde",
+  "hashbrown",
+  "telemetry",
+] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 

@@ -26,7 +26,6 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
     StartInitiation,
 };
-use hopr_transport_tag_allocator::TagAllocator;
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
@@ -423,9 +422,8 @@ where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
-    /// Creates a new instance given the [`config`](SessionManagerConfig) and a [`TagAllocator`]
-    /// for allocating session tags on the Exit (incoming) side.
-    pub fn new(mut cfg: SessionManagerConfig, _tag_allocator: Arc<dyn TagAllocator + Send + Sync>) -> Self {
+    /// Creates a new instance given the [`config`](SessionManagerConfig).
+    pub fn new(mut cfg: SessionManagerConfig) -> Self {
         let maximum_sessions = cfg.maximum_sessions;
         cfg.surb_balance_notify_period = cfg
             .surb_balance_notify_period
@@ -1531,6 +1529,7 @@ mod tests {
         primitive::prelude::Address,
     };
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
+    use hopr_transport_tag_allocator::TagAllocator;
     use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 
@@ -1608,8 +1607,8 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
-        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1791,8 +1790,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
-        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let alice_mgr = SessionManager::new(cfg);
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1920,10 +1919,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
-            Default::default(),
-            test_tag_allocator(),
-        );
+        let alice_mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -1967,7 +1964,7 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let alice_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2062,8 +2059,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(cfg, test_tag_allocator());
-        let bob_mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let alice_mgr = SessionManager::new(cfg);
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -2109,7 +2106,7 @@ mod tests {
     #[cfg(feature = "telemetry")]
     #[test_log::test(tokio::test)]
     async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
-        let mgr = SessionManager::new(Default::default(), test_tag_allocator());
+        let mgr = SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2146,8 +2143,8 @@ mod tests {
             surb_balance_notify_period: Some(Duration::from_millis(500)),
             ..Default::default()
         };
-        let alice_mgr = SessionManager::new(Default::default(), test_tag_allocator());
-        let bob_mgr = SessionManager::new(bob_cfg.clone(), test_tag_allocator());
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(bob_cfg.clone());
 
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();
@@ -2449,7 +2446,7 @@ mod tests {
         use hopr_utils::network_types::prelude::SealedHost;
 
         let bob_mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         // Start the manager (required for handling incoming sessions)
         let transport = MockMsgSender::new();
@@ -2514,7 +2511,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_pinging_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2539,7 +2536,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_false_when_closing_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2561,7 +2558,7 @@ mod tests {
     async fn session_manager_should_return_error_when_updating_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2585,7 +2582,7 @@ mod tests {
     async fn session_manager_should_return_error_when_getting_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2611,7 +2608,7 @@ mod tests {
     async fn session_manager_should_return_error_when_getting_surb_estimates_for_non_existent_session()
     -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2643,7 +2640,7 @@ mod tests {
             ..Default::default()
         };
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(cfg, test_tag_allocator());
+            SessionManager::new(cfg);
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2694,7 +2691,7 @@ mod tests {
     async fn session_manager_should_return_unknown_data_error_when_dispatching_to_unknown_session() -> anyhow::Result<()>
     {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2727,7 +2724,7 @@ mod tests {
         use hopr_utils::network_types::prelude::SealedHost;
 
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default(), test_tag_allocator());
+            SessionManager::new(Default::default());
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2778,10 +2775,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
-            Default::default(),
-            test_tag_allocator(),
-        );
+        let alice_mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         let peer_address: Address = (&ChainKeypair::random()).into();
@@ -2859,10 +2854,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(
-            Default::default(),
-            test_tag_allocator(),
-        );
+        let alice_mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -2924,7 +2917,7 @@ mod tests {
             ..Default::default()
         };
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(cfg, test_tag_allocator());
+            SessionManager::new(cfg);
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2975,7 +2968,7 @@ mod tests {
             ..Default::default()
         };
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(cfg, test_tag_allocator());
+            SessionManager::new(cfg);
 
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
