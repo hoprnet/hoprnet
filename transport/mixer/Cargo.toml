@@ -1,13 +1,23 @@
 [package]
 name = "hopr-transport-mixer"
-version = "0.4.1"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-edition.workspace = true
-rust-version.workspace = true
 description = "Mixer functionality responsible for mixing and delaying packets with a channel-like interface"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+version = "0.4.1"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "transport", "mixer"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming", "asynchronous"]
+authors.workspace = true
+rust-version.workspace = true
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]
@@ -34,7 +44,6 @@ hopr-types = { workspace = true, features = ["random"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 bytesize = { workspace = true }
-hopr-transport-mixer = { path = ".", features = ["serde"] }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }

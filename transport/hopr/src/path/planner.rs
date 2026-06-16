@@ -288,7 +288,8 @@ where
                             )));
                         }
 
-                        let weighted = hopr_utils::statistics::WeightedCollection::from(valid_paths);
+                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                        let total_wt = weighted.total_weight();
                         for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
                             tracing::debug!(
                                 %destination,
@@ -296,7 +297,7 @@ where
                                 path = %vp,
                                 cost = pwm.cost,
                                 composite_weight = w,
-                                sampling_probability = weighted.probability_of(*w),
+                                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
                                 total_latency_ms = ?pwm.total_latency_ms,
                                 min_probe_success_rate = ?pwm.min_probe_success_rate,
                                 min_ack_rate = ?pwm.min_ack_rate,
@@ -479,7 +480,8 @@ where
                         }
 
                         if !valid_paths.is_empty() {
-                            let weighted = hopr_utils::statistics::WeightedCollection::from(valid_paths);
+                            let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                            let total_wt = weighted.total_weight();
                             for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
                                 tracing::debug!(
                                     kind = "background-refresh",
@@ -488,7 +490,7 @@ where
                                     path = %vp,
                                     cost = pwm.cost,
                                     composite_weight = w,
-                                    sampling_probability = weighted.probability_of(*w),
+                                    sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
                                     total_latency_ms = ?pwm.total_latency_ms,
                                     min_probe_success_rate = ?pwm.min_probe_success_rate,
                                     min_ack_rate = ?pwm.min_ack_rate,

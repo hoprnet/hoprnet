@@ -1,13 +1,17 @@
 [package]
 name = "hopr-utils"
-version = "0.1.0"
-authors = ["HOPR Association <tech@hoprnet.org>"]
-edition.workspace = true
-rust-version.workspace = true
 description = "Shared utility crates for HOPR: async runtime, network types, parallelisation, statistics, platform, and testing helpers"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "async", "utilities"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["asynchronous", "network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
@@ -33,6 +37,7 @@ network-types = [
   "dep:thiserror",
   "dep:tracing",
   "dep:lazy_static",
+  "hopr-types/crypto",
 ]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-types/serde"]
 network-types-serde = ["network-types", "serde", "libp2p-identity/serde"]
@@ -57,9 +62,6 @@ statistics-types = []
 statistics-types-serde = ["statistics-types", "dep:serde"]
 statistics-types-moving = ["statistics-types"]
 statistics-types-weighted = ["statistics-types", "dep:rand"]
-
-# testing module (from hopr-test-stubs) — only for test code
-testing = ["dep:async-trait", "dep:bimap", "dep:thiserror", "dep:hopr-api"]
 
 # platform module (from hopr-platform)
 platform = ["dep:thiserror"]
@@ -97,8 +99,6 @@ rayon = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 # testing
-async-trait = { workspace = true, optional = true }
-bimap = { workspace = true, optional = true }
 
 # platform + parallelize (shared)
 thiserror = { workspace = true, optional = true }
@@ -110,8 +110,6 @@ lazy_static = { workspace = true, optional = true }
 # network-types-serde + telemetry
 hopr-types = { workspace = true, optional = true }
 
-# testing
-hopr-api = { workspace = true, optional = true, features = ["chain"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = { workspace = true, optional = true }

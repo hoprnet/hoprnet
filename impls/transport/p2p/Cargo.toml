@@ -1,12 +1,17 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.9.1"
-authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "rust-libp2p based p2p transport implementation"
+version = "0.9.1"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "transport", "libp2p", "p2p"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-license = "GPL-3.0-only"
-publish = false
+include = ["README.md", "src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]

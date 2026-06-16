@@ -1,13 +1,23 @@
 [package]
 name = "hopr-crypto-packet"
-version = "1.3.1"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
-authors = ["HOPR Association <tech@hoprnet.org>"]
+version = "1.3.1"
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "crypto", "sphinx", "mixnet"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["cryptography", "network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]
