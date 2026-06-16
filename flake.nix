@@ -233,7 +233,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runCoverage = true;
                     prependPackageName = false;
                     cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
@@ -246,7 +246,7 @@
                     runHook preBuild
                     cargo llvm-cov nextest --lcov --output-path $out --lib \
                       ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
-                      --workspace -F allocator-jemalloc
+                      --workspace -F allocator-jemalloc -F testing
                     runHook postBuild
                   '';
                 });
