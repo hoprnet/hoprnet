@@ -39,9 +39,10 @@ jobs:
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Release version
-        uses: hoprnet/hopr-workflows/actions/release-version@4e3c270b51ed1817bc0b0f6996dfc8a7b0e757c1 # release-version-v2
+        uses: hoprnet/hopr-workflows/actions/release-version@fa71078959cf9f892185e8df16551720693a2cd1 # release-version-v2
         with:
           source_branch: ${{ github.ref_name }}
           file: ./hopr/hopr-lib/Cargo.toml
@@ -53,8 +54,7 @@ jobs:
           zulip_email: ${{ secrets.ZULIP_EMAIL }}
           zulip_channel: HOPRd
           zulip_topic: Releases
-          gcp_service_account: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-          github_token: ${{ secrets.GH_RUNNER_TOKEN }}
+          github_app_private_key: ${{ secrets.GH_APP_HOPRNET_BOT_PRIVATE_KEY }}
   build-dappnode:
     name: Build dappNode
     needs:
@@ -62,11 +62,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
     uses: ./.github/workflows/generate-dappnode-pr.yaml
     with:
       source_repo: ${{ github.repository }}
       source_branch: ${{ github.ref_name }}
       network: dufour
-    secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
-      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
