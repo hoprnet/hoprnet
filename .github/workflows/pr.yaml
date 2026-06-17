@@ -18,7 +18,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+  id-token: write # zizmor: ignore[excessive-permissions]
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-pr
