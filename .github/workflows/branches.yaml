@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # zizmor: ignore[excessive-permissions]
 
 concurrency:
   group: branches-${{ github.ref_name }}-${{ github.sha }}
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   coverage:
     name: Coverage
-    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@69d61153fe24338ea983dd657496f0bc8b4cd819 # workflow-tests-v5
+    uses: hoprnet/hopr-workflows/.github/workflows/tests.yaml@798d791de5c5485c3043049781dfd0938539a36a # workflow-tests-v6
     with:
       source_branch: ${{ github.ref_name }}
       enable_unit_tests: false
@@ -38,7 +39,6 @@ jobs:
       runner_integration: depot-ubuntu-24.04-8
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      codecov_token: ${{ secrets.CODECOV_TOKEN }}
   benchmarks:
     name: Benchmarks
     needs: coverage
