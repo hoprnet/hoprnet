@@ -19,6 +19,9 @@ on:
       labels:
         required: true
         type: string
+    secrets:
+      GH_RUNNER_TOKEN:
+        required: true
   workflow_dispatch:
     inputs:
       network:

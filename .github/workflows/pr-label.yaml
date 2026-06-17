@@ -48,7 +48,6 @@ jobs:
       dappnode_repository: ${{ matrix.dappnode_repository }}
       labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
     secrets:
-      GCP_SA_GITHUB_RUNNER: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
       GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
   benchmarks:

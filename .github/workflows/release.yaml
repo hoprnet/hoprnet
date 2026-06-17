@@ -68,3 +68,5 @@ jobs:
       source_repo: ${{ github.repository }}
       source_branch: ${{ github.ref_name }}
       network: dufour
+    secrets:
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
