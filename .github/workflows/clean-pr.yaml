@@ -16,6 +16,7 @@ jobs:
     permissions:
       actions: write
       contents: read
+      id-token: write
     timeout-minutes: 10
     steps:
       - name: Harden Runner
@@ -32,9 +33,8 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@ac3e0b6137b0ba470a30c373aab2ceba9e0879e4 # setup-gcp-v4
         with:
-          google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'true'
           install_sdk: 'true'
 
