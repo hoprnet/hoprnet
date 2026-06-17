@@ -40,10 +40,10 @@ jobs:
 
       - name: Cleanup Github pipeline cache
         run: |
-          cacheKeysForPR=($(gh actions-cache list -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" | cut -f 1 | tr '\n' ' '))
-          for cacheKey in $cacheKeysForPR
+          mapfile -t cacheKeysForPR < <(gh actions-cache list -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" | cut -f 1)
+          for cacheKey in "${cacheKeysForPR[@]}"
           do
-            gh actions-cache delete $cacheKey -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --confirm
+            gh actions-cache delete "$cacheKey" -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --confirm
           done
         env:
           REPO: ${{ github.repository }}
