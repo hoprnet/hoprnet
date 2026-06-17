@@ -411,6 +411,7 @@
               google-cloud-sdk
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               graphviz
               swagger-codegen3
