@@ -190,23 +190,25 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
 hopr-api = "1.12.0"
 hopr-types = { version = "1.9.1", features = ["use-bindings"] }
 hopr-utils = { version = "0.1.0", path = "utils", default-features = false }
+
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { path = "hopr/hopr-lib", default-features = false }
-hopr-protocol-app = { path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { path = "protocols/hopr", default-features = false }
-hopr-protocol-session = { path = "protocols/session", default-features = false }
-hopr-protocol-start = { path = "protocols/start", default-features = false }
-hopr-ticket-manager = { path = "impls/ticket-manager" }
-hopr-transport = { path = "transport/hopr", default-features = false }
-hopr-transport-mixer = { path = "transport/mixer", default-features = false }
-hopr-transport-probe = { path = "transport/probe", default-features = false }
-hopr-transport-session = { path = "transport/session" }
-hopr-transport-tag-allocator = { path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { path = "impls/connector" }
-hopr-strategy = { path = "impls/strategy" }
-hopr-utils-session = { path = "utils-session" }
+hopr-lib = { version = "4.0.2-rc.4", path = "hopr/hopr-lib", default-features = false }
+hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
+hopr-protocol-session = { version = "1.1.1", path = "protocols/session", default-features = false }
+hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
+hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
+hopr-transport = { version = "0.29.0", path = "transport/hopr", default-features = false }
+hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
+hopr-transport-probe = { version = "0.7.0", path = "transport/probe", default-features = false }
+hopr-transport-session = { version = "0.22.1", path = "transport/session", default-features = false }
+hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
+hopr-chain-connector = { version = "0.21.0", path = "impls/connector" }
+hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
+hopr-utils-session = { version = "1.2.1", path = "utils-session" }
+
 
 # referential implementations
 hopr-session-server-forwarder = { version = "0.1.0", path = "impls/session-server-forwarder", default-features = false }
