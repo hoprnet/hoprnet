@@ -45,16 +45,15 @@ pub mod blokli_client {
 ///     dns_override: Some((ip, Some(8545))),
 /// });
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, validator::Validate)]
 pub struct HoprBlokliClientConfig {
-    /// Blokli service URL. The URL is validated at construction time by the caller via
-    /// [`Url::parse`](blokli_client::Url::parse) or `str::parse::<Url>()`.
+    /// Blokli service URL.
     pub url: blokli_client::Url,
-    /// Optional DNS override: `(ip, port)` to pin the Blokli hostname to a fixed address.
+    /// Optional DNS override: an IP address (and optional port) to use instead of resolving
+    /// [`Self::url`]'s host via DNS.
     ///
-    /// When `None` (the default) system DNS is used. When set, the hostname's DNS resolution is
-    /// bypassed and the connection goes directly to `ip:port`, while the original `Host` header
-    /// and TLS SNI are preserved for certificate validation.
+    /// When `None` (the default) system DNS is used. When set, the connection goes directly to
+    /// the given IP, while the original host is kept for the `Host` header and TLS SNI.
     /// `port` defaults to the URL's port when `None`.
     pub dns_override: Option<(std::net::IpAddr, Option<u16>)>,
 }

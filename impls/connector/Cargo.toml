@@ -37,6 +37,7 @@ redb = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+validator = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
