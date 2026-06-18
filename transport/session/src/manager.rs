@@ -1520,7 +1520,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::task::{Context, Poll};
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
     use hopr_api::types::{
@@ -1529,9 +1528,9 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use moka::future::FutureExt;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
+    use moka::future::FutureExt;
     use tokio::time::timeout;
 
     use super::*;
@@ -1553,10 +1552,15 @@ mod tests {
             -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
         }
     }
-    
-    fn mock_packet_planning(sender: MockMsgSender) -> UnboundedSender<(DestinationRouting, ApplicationDataOut)> {
+
+    fn mock_packet_planning(
+        sender: MockMsgSender,
+    ) -> (
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<()>,
+    ) {
         let (tx, rx) = futures::channel::mpsc::unbounded();
-        tokio::task::spawn(async move {
+        let handle = tokio::task::spawn(async move {
             pin_mut!(rx);
             while let Some((routing, data)) = rx.next().await {
                 sender
@@ -1565,7 +1569,7 @@ mod tests {
                     .expect("send message must not fail in mock");
             }
         });
-        tx
+        (tx, handle)
     }
 
     fn msg_type(data: &ApplicationDataOut, expected: StartProtocolDiscriminants) -> bool {
@@ -1684,11 +1688,13 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1755,6 +1761,12 @@ mod tests {
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;
+
+        // Cleanup: close senders and await handles
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await;
+        let _ = bob_handle.await;
 
         Ok(())
     }
@@ -1833,11 +1845,13 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1884,6 +1898,12 @@ mod tests {
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;
+
+        // Cleanup: close senders and await handles
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await;
+        let _ = bob_handle.await;
 
         Ok(())
     }
@@ -2004,7 +2024,8 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
 
         let alice_session = alice_mgr
             .new_session(
@@ -2026,6 +2047,11 @@ mod tests {
         ));
 
         drop(new_session_rx_alice);
+
+        // Cleanup: close sender and await handle
+        alice_sender.close_channel();
+        let _ = alice_handle.await;
+
         Ok(())
     }
 
@@ -2058,11 +2084,13 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?;
+        let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
 
         let result = alice_mgr
             .new_session(
@@ -2090,7 +2118,8 @@ mod tests {
         let transport = MockMsgSender::new();
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let pseudonym = HoprPseudonym::random();
         let result = mgr
@@ -2109,6 +2138,12 @@ mod tests {
 
         let allocated_session_ids = mgr.active_sessions().await;
         assert_eq!(1, allocated_session_ids.len());
+
+        // Cleanup: close senders and await handles
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await;
+        let _ = bob_handle.await;
 
         Ok(())
     }
@@ -2300,11 +2335,13 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -2417,6 +2454,12 @@ mod tests {
             .for_each(|ah| async move { ah.abort() })
             .await;
 
+        // Cleanup: close senders and await handles
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await;
+        let _ = bob_handle.await;
+
         Ok(())
     }
 
@@ -2429,7 +2472,9 @@ mod tests {
 
         // Start the manager (required for handling incoming sessions)
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(2)
+        transport
+            .expect_send_message()
+            .times(2)
             .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2440,7 +2485,8 @@ mod tests {
                 // Just drain the channel
             }
         });
-        bob_mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        bob_mgr.start(sender.clone(), new_session_tx)?;
 
         let pseudonym = HoprPseudonym::random();
 
@@ -2487,6 +2533,10 @@ mod tests {
         let active = bob_mgr.active_sessions().await;
         assert_eq!(active.len(), 1, "should still have exactly one active session");
 
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
+
         Ok(())
     }
 
@@ -2501,7 +2551,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.ping_session(&fake_session_id).await;
@@ -2511,6 +2562,10 @@ mod tests {
             result.unwrap_err(),
             TransportSessionError::Manager(SessionManagerError::NonExistingSession)
         ));
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
@@ -2526,7 +2581,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.close_session(&fake_session_id).await;
@@ -2548,7 +2604,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr
@@ -2556,6 +2613,10 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
@@ -2572,7 +2633,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_balancer_config(&fake_session_id).await;
@@ -2582,6 +2644,10 @@ mod tests {
             result.unwrap_err(),
             TransportSessionError::Manager(SessionManagerError::NonExistingSession)
         ));
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
@@ -2598,7 +2664,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_level_estimates(&fake_session_id).await;
@@ -2608,6 +2675,10 @@ mod tests {
             result.unwrap_err(),
             TransportSessionError::Manager(SessionManagerError::NonExistingSession)
         ));
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
@@ -2625,7 +2696,9 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(2)
+        transport
+            .expect_send_message()
+            .times(2)
             .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2633,7 +2706,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         // First session - should succeed
         let pseudonym1 = HoprPseudonym::random();
@@ -2684,7 +2758,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         // Send data with session application tag but no session exists
         let pseudonym = HoprPseudonym::random();
@@ -2701,6 +2776,10 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
 
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
+
         Ok(())
     }
 
@@ -2712,7 +2791,9 @@ mod tests {
             SessionManager::new(Default::default());
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().once()
+        transport
+            .expect_send_message()
+            .once()
             .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2720,7 +2801,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         // Create a session
         let pseudonym = HoprPseudonym::random();
@@ -2744,6 +2826,10 @@ mod tests {
 
         // Verify session is closed
         assert_eq!(mgr.active_sessions().await.len(), 0);
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
@@ -2908,7 +2994,9 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(1)
+        transport
+            .expect_send_message()
+            .times(1)
             .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -2916,7 +3004,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
@@ -2962,7 +3051,8 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message()
+        transport
+            .expect_send_message()
             .times(2)
             .returning(|_, _| futures::future::ok(()).boxed());
 
@@ -2971,7 +3061,8 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(mock_packet_planning(transport), new_session_tx)?;
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
