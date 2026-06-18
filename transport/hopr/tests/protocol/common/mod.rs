@@ -211,7 +211,7 @@ pub fn random_packet_of_size(payload_size: usize) -> ApplicationData {
 
 pub fn make_routing(path: ValidatedPath) -> ResolvedTransportRouting<HoprSurb> {
     ResolvedTransportRouting::Forward {
-        pseudonym: SimplePseudonym([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
+        pseudonym: SimplePseudonym::from([0xde_u8, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]),
         forward_path: path,
         return_paths: vec![],
     }

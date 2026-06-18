@@ -86,8 +86,8 @@ where
                         tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
                     }
                     Message::Probe(NeighborProbe::Ping(ping)) => {
-                        tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                        tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
+                        tracing::debug!(%pseudonym, nonce = const_hex::encode(ping), "received ping");
+                        tracing::trace!(%pseudonym, nonce = const_hex::encode(ping), "wrapping a pong in the found SURB");
 
                         let message = Message::Probe(NeighborProbe::Pong(ping));
                         if let Ok(data) = message.try_into() {
@@ -101,7 +101,7 @@ where
                         }
                     }
                     Message::Probe(NeighborProbe::Pong(pong)) => {
-                        tracing::debug!(%pseudonym, nonce = hex::encode(pong), "received pong");
+                        tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), "received pong");
                         if let Some((peer, start, replier)) = self
                             .active_neighbor_probes
                             .remove(&(pseudonym, NeighborProbe::Ping(pong)))
@@ -110,7 +110,7 @@ where
                             let latency = current_time().as_unix_timestamp().saturating_sub(start);
 
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
                                 self.network_graph.record_edge::<NeighborTelemetry, PathTelemetry>(
                                     hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(
                                         NeighborTelemetry {
@@ -120,14 +120,14 @@ where
                                     ))),
                                 )
                             } else {
-                                tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
+                                tracing::warn!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                             }
 
                             if let Some(replier) = replier {
                                 replier.notify(Ok(latency));
                             }
                         } else {
-                            tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
+                            tracing::warn!(%pseudonym, nonce = const_hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
                         }
                     }
                 },

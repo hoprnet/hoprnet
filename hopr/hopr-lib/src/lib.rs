@@ -750,9 +750,6 @@ pub fn peer_id_to_offchain_key(peer_id: &PeerId) -> errors::Result<OffchainPubli
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context as _;
-    use hopr_transport::Keypair;
-
     use super::*;
 
     #[test]
@@ -866,6 +863,9 @@ mod tests {
     #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use hopr_transport::Keypair;
+
         let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
         let k2 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
         let k3 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());

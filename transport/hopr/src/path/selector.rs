@@ -1042,7 +1042,7 @@ mod tests {
     fn prune_multi_hop_without_capacity_floor_is_unpopulated() {
         // A 1-hop path with measured latency but NO capacity is unmeasured (unpopulated).
         // It should be demoted below paths that have both latency and capacity.
-        let mut candidates: Vec<_> = vec![
+        let candidates: Vec<_> = vec![
             make_path_with_capacity(Some(50), Some(1_000)), // fully measured
             make_path_with_capacity(Some(50), Some(1_000)), // fully measured
             make_path_with_capacity(Some(50), Some(1_000)), // fully measured
