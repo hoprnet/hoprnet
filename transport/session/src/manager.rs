@@ -1520,6 +1520,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::task::{Context, Poll};
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
     use hopr_api::types::{
@@ -1528,6 +1529,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use moka::future::FutureExt;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
@@ -1551,7 +1553,7 @@ mod tests {
             -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
         }
     }
-
+    
     fn mock_packet_planning(sender: MockMsgSender) -> UnboundedSender<(DestinationRouting, ApplicationDataOut)> {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         tokio::task::spawn(async move {
@@ -2427,7 +2429,8 @@ mod tests {
 
         // Start the manager (required for handling incoming sessions)
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(2);
+        transport.expect_send_message().times(2)
+            .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         // Spawn a task to receive new session notifications
@@ -2622,7 +2625,8 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(2);
+        transport.expect_send_message().times(2)
+            .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
@@ -2708,7 +2712,8 @@ mod tests {
             SessionManager::new(Default::default());
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().once();
+        transport.expect_send_message().once()
+            .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
@@ -2903,7 +2908,8 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(1);
+        transport.expect_send_message().times(1)
+            .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
@@ -2956,7 +2962,9 @@ mod tests {
             SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
-        transport.expect_send_message().times(2);
+        transport.expect_send_message()
+            .times(2)
+            .returning(|_, _| futures::future::ok(()).boxed());
 
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
