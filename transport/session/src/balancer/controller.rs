@@ -227,9 +227,9 @@ where
     ) -> Self {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let sid = session_id.to_string();
-            METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
+            let sid: &str = session_id.as_ref();
+            METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], 0.0);
+            METRIC_CONTROL_OUTPUT.set(&[sid], 0.0);
         }
 
         controller.set_target_and_limit(state.controller_bounds());
@@ -316,12 +316,12 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let sid = self.session_id.to_string();
-            METRIC_CURRENT_BUFFER.set(&[&sid], current as f64);
-            METRIC_CURRENT_TARGET.set(&[&sid], self.controller.bounds().target() as f64);
-            METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], output as f64);
-            METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
+            let sid: &str = self.session_id.as_ref();
+            METRIC_CURRENT_BUFFER.set(&[sid], current as f64);
+            METRIC_CURRENT_TARGET.set(&[sid], self.controller.bounds().target() as f64);
+            METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], error as f64);
+            METRIC_CONTROL_OUTPUT.set(&[sid], output as f64);
+            METRIC_SURB_RATE.set(&[sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
         current

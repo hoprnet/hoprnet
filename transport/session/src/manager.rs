@@ -1536,28 +1536,6 @@ mod tests {
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
-    /// Create a test tag allocator with a large partition.
-    fn test_tag_allocator() -> Arc<dyn TagAllocator + Send + Sync> {
-        test_tag_allocator_with_session_capacity(10000)
-    }
-
-    /// Create a test tag allocator with a specific session partition capacity.
-    fn test_tag_allocator_with_session_capacity(session_capacity: u64) -> Arc<dyn TagAllocator + Send + Sync> {
-        hopr_transport_tag_allocator::create_allocators(
-            ReservedTag::range().end..u16::MAX as u64 + 1,
-            [
-                (hopr_transport_tag_allocator::Usage::Session, session_capacity),
-                (hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry, 10000),
-                (hopr_transport_tag_allocator::Usage::ProvingTelemetry, 10000),
-            ],
-        )
-        .expect("test allocator creation must not fail")
-        .into_iter()
-        .find(|(u, _)| matches!(u, hopr_transport_tag_allocator::Usage::Session))
-        .expect("session allocator must exist")
-        .1
-    }
-
     #[async_trait::async_trait]
     trait SendMsg {
         async fn send_message(

@@ -3447,9 +3447,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.10.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e33fb0c32d216e93e58a050edea339bc8ed5bd8fe844bf893b849fc402824412"
+checksum = "2a6e98ff52f636edc8e3d76844831dfd53cd92146488cc721c0f7bb837fd8052"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -3486,7 +3486,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3494,11 +3494,11 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "blokli-client",
+ "const-hex",
  "dashmap",
  "futures",
  "futures-concurrency",
  "futures-time",
- "hex",
  "hex-literal",
  "hopr-api",
  "hopr-utils",
@@ -3520,16 +3520,16 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "1.3.1"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "bimap",
+ "const-hex",
  "criterion",
  "curve25519-dalek",
  "elliptic-curve",
  "flagset",
  "generic-array 1.4.3",
- "hex",
  "hex-literal",
  "hopr-types",
  "hopr-utils",
@@ -3669,7 +3669,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "4.6.1"
+version = "4.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3677,8 +3677,8 @@ dependencies = [
  "bloomfilter",
  "bytes",
  "cfg_eval",
+ "const-hex",
  "criterion",
- "hex",
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
@@ -3947,13 +3947,13 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "const-hex",
  "futures",
  "futures-concurrency",
- "hex",
  "hex-literal",
  "hopr-api",
  "hopr-crypto-packet",
@@ -4030,9 +4030,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c80eeed436e90282f16d00dd1af6b73d72a58f66016c04a9fcc3de0328e063"
+checksum = "1d621ab243808540504b0a1e215743d45283e3133e7a4be44d2dd4cb31587a87"
 dependencies = [
  "aes",
  "anyhow",

@@ -23,7 +23,7 @@ include = [
 crate-type = ["rlib"]
 
 [features]
-default = ["telemetry"]
+default = []
 all-benchmarks = []
 runtime-tokio = [
   "hopr-utils/network-types-runtime-tokio",
