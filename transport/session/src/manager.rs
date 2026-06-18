@@ -2426,7 +2426,9 @@ mod tests {
             SessionManager::new(Default::default());
 
         // Start the manager (required for handling incoming sessions)
-        let transport = MockMsgSender::new();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().times(2);
+
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         // Spawn a task to receive new session notifications
         let _notifications = tokio::spawn(async move {
@@ -2619,7 +2621,9 @@ mod tests {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(cfg);
 
-        let transport = MockMsgSender::new();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().times(2);
+
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
@@ -2703,7 +2707,9 @@ mod tests {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(Default::default());
 
-        let transport = MockMsgSender::new();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().once();
+
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
@@ -2896,7 +2902,9 @@ mod tests {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(cfg);
 
-        let transport = MockMsgSender::new();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().times(1);
+
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
@@ -2947,7 +2955,9 @@ mod tests {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(cfg);
 
-        let transport = MockMsgSender::new();
+        let mut transport = MockMsgSender::new();
+        transport.expect_send_message().times(2);
+
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         let _notifications = tokio::spawn(async move {
             pin_mut!(new_session_rx);
