@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 use hopr_chain_connector::{
-    Address, BlockchainConnectorConfig, HoprBlockchainSafeConnector, api::HoprChainApi,
+    Address, BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    api::HoprChainApi,
     blokli_client::{BlokliClient, BlokliClientConfig, BlokliDnsOverride},
     create_trustful_hopr_blokli_connector,
 };
@@ -203,7 +204,9 @@ async fn create_blokli_connector(
                 .unwrap_or_else(|| BlockchainConnectorConfig::default().tx_timeout_multiplier),
         },
         BlokliClient::new(
-            blokli_url.parse::<hopr_chain_connector::blokli_client::Url>().map_err(anyhow::Error::from)?,
+            blokli_url
+                .parse::<hopr_chain_connector::blokli_client::Url>()
+                .map_err(anyhow::Error::from)?,
             BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(30),
                 stream_reconnect_timeout: std::time::Duration::from_secs(30),

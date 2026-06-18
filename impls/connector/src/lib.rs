@@ -22,8 +22,8 @@ pub mod blokli_client {
     pub use blokli_client::{
         BlokliClient, BlokliClientConfig, BlokliDnsOverride,
         api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient, types},
+        exports::Url,
     };
-    pub use blokli_client::exports::Url;
 }
 
 #[doc(hidden)]
