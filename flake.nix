@@ -328,13 +328,28 @@
               renovate-config-validator = {
                 enable = true;
                 name = "Renovate config validator";
-                entry = "${pkgs.writeShellScript "validate-renovate" ''
-                  if [ -n "''${NIX_BUILD_TOP:-}" ]; then exit 0; fi
-                  ${pkgs.nodejs}/bin/npx --yes --package renovate -- renovate-config-validator "$@"
-                ''}";
+                entry = "${pkgs.renovate}/bin/renovate-config-validator";
                 files = "renovate\\.json$";
                 language = "system";
                 pass_filenames = true;
+              };
+              actionlint.enable = true;
+              pinact = {
+                enable = true;
+                name = "pinact";
+                description = "Check GitHub Action refs are SHA-pinned and resolvable";
+                entry = "${pkgs.writeShellScript "pinact-check" ''
+                  token="''${GITHUB_TOKEN:-$(${pkgs.gh}/bin/gh auth token 2>/dev/null || true)}"
+                  if [ -z "$token" ]; then
+                    echo "pinact: skipping — no GITHUB_TOKEN and gh not authenticated" >&2
+                    exit 0
+                  fi
+                  export GITHUB_TOKEN="$token"
+                  exec ${pkgs.pinact}/bin/pinact run --check
+                ''}";
+                files = "^\\.github/workflows/.*\\.ya?ml$";
+                language = "system";
+                pass_filenames = false;
               };
             };
             excludes = [ ".gcloudignore" ];
@@ -347,6 +362,7 @@
             treefmtWrapper = config.treefmt.build.wrapper;
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
+              gh
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
@@ -361,6 +377,7 @@
               graphviz
             ];
             shellHook = ''
+              export GITHUB_TOKEN="''${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
               ${pre-commit-check.shellHook}
             '';
           };
@@ -399,6 +416,7 @@
               google-cloud-sdk
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               graphviz
               swagger-codegen3
