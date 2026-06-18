@@ -1529,7 +1529,6 @@ mod tests {
         primitive::prelude::Address,
     };
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
-    use hopr_transport_tag_allocator::TagAllocator;
     use hopr_utils::network_types::prelude::SealedHost;
     use tokio::time::timeout;
 

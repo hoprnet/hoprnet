@@ -943,7 +943,7 @@ mod tests {
             },
             primitive::prelude::Address,
         },
-        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, SessionId},
+        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession},
     };
     use hopr_transport::session::HoprSessionConfig;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};

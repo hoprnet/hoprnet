@@ -13,7 +13,7 @@ use hopr_lib::{
         network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
         transport::{
             ApplicationDataIn, ApplicationDataOut,
-            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session},
+            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session},
         },
     },
 };

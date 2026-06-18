@@ -3991,7 +3991,6 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-tag-allocator",
  "hopr-utils",
  "humantime-serde",
  "insta",
