@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-sphinx"
-version = "0.12.1"
+version = "0.13.0"
 description = "Implements Sphinx packet format for the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
@@ -44,7 +44,7 @@ hopr-types = { workspace = true, features = ["crypto", "random", "primitive"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 postcard = { workspace = true }
-hex = { workspace = true }
+const-hex = { workspace = true }
 parameterized = { workspace = true }
 subtle = { workspace = true }
 
