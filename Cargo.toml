@@ -209,7 +209,6 @@ hopr-chain-connector = { version = "0.21.0", path = "impls/connector" }
 hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
-
 # referential implementations
 hopr-session-server-forwarder = { version = "0.1.0", path = "impls/session-server-forwarder", default-features = false }
 hopr-transport-p2p = { version = "0.9.1", path = "impls/transport/p2p", default-features = false }

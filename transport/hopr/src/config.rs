@@ -321,7 +321,7 @@ const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
-const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 1000;
+const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
 
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION

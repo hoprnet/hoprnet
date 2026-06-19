@@ -12,11 +12,6 @@ use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPA
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
 /// for local types, so we create a local wrapper.
-///
-/// # Performance Optimization
-/// The label string is obtained via `AsRef<str>`, which returns a reference to the
-/// hex representation cached inside the [`SessionId`] itself. This avoids repeated
-/// `to_string()` allocations in hot telemetry paths (called per segment/frame).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[allow(dead_code)]
 struct SessionIdWrapper(SessionId);
