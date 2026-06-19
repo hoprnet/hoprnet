@@ -2743,6 +2743,10 @@ mod tests {
         // But we can verify no new session was added
         assert_eq!(mgr.active_sessions().await.len(), 1);
 
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
+
         Ok(())
     }
 
@@ -3106,6 +3110,10 @@ mod tests {
             mgr.active_sessions().await.contains(&pseudonym1),
             "the first session should still be active"
         );
+
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
