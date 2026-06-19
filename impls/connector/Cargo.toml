@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.21.0"
+version = "0.21.1"
 description = "Implementation of HOPR Chain APIs using Blokli client"
 edition.workspace = true
 license.workspace = true
@@ -37,6 +37,7 @@ redb = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+validator = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
