@@ -57,7 +57,7 @@ impl LivenessRegistry {
     /// next poll. A subsequent [`Self::get_or_create_connected`] call mints a fresh `true` flag.
     pub(crate) fn remove(&self, peer: &PeerId) {
         if let Some((_, flag)) = self.0.remove(peer) {
-            flag.store(false, Ordering::Relaxed);
+            flag.store(false, Ordering::Release);
         }
     }
 }
@@ -89,7 +89,7 @@ impl<S> LivenessStream<S> {
 impl<S: AsyncRead> AsyncRead for LivenessStream<S> {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         let this = self.project();
-        if !this.alive.load(Ordering::Relaxed) {
+        if !this.alive.load(Ordering::Acquire) {
             return Poll::Ready(Err(Self::dead_error()));
         }
         this.inner.poll_read(cx, buf)
@@ -99,7 +99,7 @@ impl<S: AsyncRead> AsyncRead for LivenessStream<S> {
 impl<S: AsyncWrite> AsyncWrite for LivenessStream<S> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         let this = self.project();
-        if !this.alive.load(Ordering::Relaxed) {
+        if !this.alive.load(Ordering::Acquire) {
             return Poll::Ready(Err(Self::dead_error()));
         }
         this.inner.poll_write(cx, buf)
@@ -107,7 +107,7 @@ impl<S: AsyncWrite> AsyncWrite for LivenessStream<S> {
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let this = self.project();
-        if !this.alive.load(Ordering::Relaxed) {
+        if !this.alive.load(Ordering::Acquire) {
             return Poll::Ready(Err(Self::dead_error()));
         }
         this.inner.poll_flush(cx)
@@ -115,7 +115,7 @@ impl<S: AsyncWrite> AsyncWrite for LivenessStream<S> {
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let this = self.project();
-        if !this.alive.load(Ordering::Relaxed) {
+        if !this.alive.load(Ordering::Acquire) {
             return Poll::Ready(Err(Self::dead_error()));
         }
         this.inner.poll_close(cx)
@@ -216,6 +216,23 @@ mod tests {
         alive.store(false, Ordering::Relaxed);
 
         let result = stream.flush().await;
+
+        assert!(
+            matches!(result, Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted),
+            "expected ConnectionAborted, got {result:?}"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn liveness_stream_should_error_on_close_when_flag_cleared() -> anyhow::Result<()> {
+        let (raw_write, _raw_read) = in_memory_pipe();
+        let alive = Arc::new(AtomicBool::new(true));
+        let mut stream = LivenessStream::new(raw_write, alive.clone());
+
+        alive.store(false, Ordering::Relaxed);
+
+        let result = stream.close().await;
 
         assert!(
             matches!(result, Err(ref e) if e.kind() == io::ErrorKind::ConnectionAborted),

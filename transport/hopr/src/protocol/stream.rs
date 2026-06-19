@@ -524,20 +524,24 @@ mod tests {
 
     impl AsyncRead for FlaggedStream {
         fn poll_read(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            // Store the waker BEFORE checking the flag: if kill() races between the
+            // check and the store, it would consume a None waker and the task would
+            // park forever. Storing first guarantees kill() always finds a waker to wake.
+            *self.signal.read_waker.lock().expect("lock ok") = Some(cx.waker().clone());
             if self.signal.dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
-            *self.signal.read_waker.lock().expect("lock ok") = Some(cx.waker().clone());
             Poll::Pending
         }
     }
 
     impl AsyncWrite for FlaggedStream {
         fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            // Store the waker BEFORE checking the flag (same reasoning as poll_read).
+            *self.signal.write_waker.lock().expect("lock ok") = Some(cx.waker().clone());
             if self.signal.dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
-            *self.signal.write_waker.lock().expect("lock ok") = Some(cx.waker().clone());
             Poll::Pending
         }
 
@@ -691,12 +695,15 @@ mod tests {
         // Kill the stream; the writer's forward-future will error on next poll.
         signal.kill();
 
-        // Drain the per-peer channel so the writer unparks and observes the error.
-        for i in 0..32 {
+        // Keep sending until the writer task observes the stream error and reopens,
+        // capped at the per-peer channel capacity to bound the loop.
+        let mut drained = 0usize;
+        while control.open_calls() < 2 && drained < 128 {
             tx_out
                 .send((peer, msg.clone()))
                 .await
-                .with_context(|| format!("drain send {i} into egress queue should succeed"))?;
+                .with_context(|| format!("drain send {drained} into egress queue should succeed"))?;
+            drained += 1;
         }
 
         assert!(

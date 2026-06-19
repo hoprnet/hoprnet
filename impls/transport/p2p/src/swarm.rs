@@ -243,6 +243,16 @@ impl HoprLibp2pNetworkBuilder {
         let network_inner = network.clone();
         let mut swarm = swarm;
         let process = async move {
+            // Shared teardown for both ConnectionClosed and OutgoingConnectionError: remove
+            // from the tracker and liveness registry and broadcast the disconnection event.
+            let disconnect_peer = |peer_id: libp2p::PeerId| {
+                tracker.remove(&peer_id);
+                liveness.remove(&peer_id);
+                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                }
+            };
+
             while let Some(event) = swarm.next().await {
                 match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
@@ -330,11 +340,7 @@ impl HoprLibp2pNetworkBuilder {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
                         if num_established == 0 {
-                            tracker.remove(&peer_id);
-                            liveness.remove(&peer_id);
-                            if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
-                                error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
-                            }
+                            disconnect_peer(peer_id);
                         }
 
                         print_network_info(swarm.network_info(), "connection closed");
@@ -373,11 +379,7 @@ impl HoprLibp2pNetworkBuilder {
                                 if let Err(error) = store.remove(&peer_id) {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
-                                tracker.remove(&peer_id);
-                                liveness.remove(&peer_id);
-                                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
-                                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
-                                }
+                                disconnect_peer(peer_id);
                             }
 
                         #[cfg(all(feature = "telemetry", not(test)))]
