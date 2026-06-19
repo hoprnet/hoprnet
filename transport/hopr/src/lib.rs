@@ -311,8 +311,6 @@ where
                 hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
             }
         }
-        let _session_tag_allocator =
-            session_tag_allocator.ok_or_else(|| HoprTransportError::Api("session tag allocator missing".into()))?;
         let session_telemetry_tag_allocator = session_telemetry_tag_allocator
             .ok_or_else(|| HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
         let probing_tag_allocator =
@@ -351,7 +349,7 @@ where
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
-                maximum_sessions: 10000,
+                maximum_sessions: cfg.session.maximum_managed_sessions,
             })),
             chain_api: resolver,
             session_telemetry_tag_allocator,

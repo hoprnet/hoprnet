@@ -1,4 +1,5 @@
 use std::{
+    convert::Into,
     fmt::{Debug, Formatter},
     pin::Pin,
     task::{Context, Poll},
@@ -10,7 +11,7 @@ use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::errors::GeneralError,
 };
-use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut};
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -69,7 +70,7 @@ pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabil
 
 /// Constant application tag used for all sessions.
 /// Previously tags were dynamically allocated per session.
-pub const SESSION_APPLICATION_TAG: u64 = 1024;
+pub const SESSION_APPLICATION_TAG: Tag = Tag::Reserved(ReservedTag::Session as u64);
 
 /// Unique ID of a specific Session.
 ///

@@ -44,7 +44,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
-    types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
+    types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG},
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
@@ -1085,7 +1085,7 @@ where
                 .handle_start_protocol_message(pseudonym, in_data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if in_data.data.application_tag.as_u64() == crate::SESSION_APPLICATION_TAG {
+        } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
             let session_id = pseudonym;
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {
@@ -2756,7 +2756,7 @@ mod tests {
             .dispatch_message(
                 pseudonym,
                 ApplicationDataIn {
-                    data: ApplicationData::new(crate::SESSION_APPLICATION_TAG, b"test data")?,
+                    data: ApplicationData::new(SESSION_APPLICATION_TAG, b"test data")?,
                     packet_info: Default::default(),
                 },
             )
