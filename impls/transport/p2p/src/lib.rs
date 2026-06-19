@@ -137,14 +137,14 @@ impl NetworkStreamControl for HoprNetwork {
         let liveness = self.liveness.clone();
         self.control.accept(self.protocol).map(|stream| {
             stream.map(move |(peer, inner)| {
-                let flag = liveness.add(&peer);
+                let flag = liveness.get_or_create_connected(&peer);
                 (peer, LivenessStream::new(inner, flag))
             })
         })
     }
 
     async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
-        let flag = self.liveness.add(&peer);
+        let flag = self.liveness.get_or_create_connected(&peer);
         self.control
             .open_stream(peer, self.protocol)
             .await

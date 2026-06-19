@@ -38,7 +38,7 @@ pub(crate) struct LivenessRegistry(Arc<DashMap<PeerId, Arc<AtomicBool>>>);
 impl LivenessRegistry {
     /// Registers `peer` and returns its liveness flag, creating a fresh `true`
     /// flag if none exists. Call this when opening or accepting a stream.
-    pub(crate) fn add(&self, peer: &PeerId) -> Arc<AtomicBool> {
+    pub(crate) fn get_or_create_connected(&self, peer: &PeerId) -> Arc<AtomicBool> {
         self.0
             .entry(*peer)
             .or_insert_with(|| Arc::new(AtomicBool::new(true)))
@@ -54,7 +54,7 @@ impl LivenessRegistry {
     /// Removes `peer` from the registry and sets its flag to `false`.
     ///
     /// Any [`LivenessStream`] still holding the old `Arc` will error on its
-    /// next poll. A subsequent [`Self::add`] call mints a fresh `true` flag.
+    /// next poll. A subsequent [`Self::get_or_create_connected`] call mints a fresh `true` flag.
     pub(crate) fn remove(&self, peer: &PeerId) {
         if let Some((_, flag)) = self.0.remove(peer) {
             flag.store(false, Ordering::Relaxed);
@@ -229,23 +229,23 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn add_should_create_alive_flag_for_new_peer() {
+    fn get_or_create_connected_should_create_alive_flag_for_new_peer() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag = registry.add(&peer);
+        let flag = registry.get_or_create_connected(&peer);
 
         assert!(flag.load(Ordering::Relaxed), "new flag must be alive");
         assert!(registry.0.contains_key(&peer));
     }
 
     #[test]
-    fn add_should_return_same_flag_for_same_peer() {
+    fn get_or_create_connected_should_return_same_flag_for_same_peer() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag1 = registry.add(&peer);
-        let flag2 = registry.add(&peer);
+        let flag1 = registry.get_or_create_connected(&peer);
+        let flag2 = registry.get_or_create_connected(&peer);
 
         assert!(Arc::ptr_eq(&flag1, &flag2), "should return the same Arc");
     }
@@ -259,14 +259,14 @@ mod tests {
     }
 
     #[test]
-    fn get_should_return_flag_after_add() {
+    fn get_should_return_flag_after_get_or_create_connected() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let added = registry.add(&peer);
-        let got = registry.get(&peer).expect("flag must exist after add");
+        let get_or_create_connecteded = registry.get_or_create_connected(&peer);
+        let got = registry.get(&peer).expect("flag must exist after get_or_create_connected");
 
-        assert!(Arc::ptr_eq(&added, &got), "get must return the same Arc as add");
+        assert!(Arc::ptr_eq(&get_or_create_connecteded, &got), "get must return the same Arc as get_or_create_connected");
     }
 
     #[test]
@@ -274,7 +274,7 @@ mod tests {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        registry.add(&peer);
+        registry.get_or_create_connected(&peer);
         registry.remove(&peer);
 
         assert!(registry.get(&peer).is_none());
@@ -285,7 +285,7 @@ mod tests {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag = registry.add(&peer);
+        let flag = registry.get_or_create_connected(&peer);
         assert!(flag.load(Ordering::Relaxed));
 
         registry.remove(&peer);
@@ -303,14 +303,14 @@ mod tests {
     }
 
     #[test]
-    fn subsequent_add_after_remove_should_return_fresh_alive_flag() {
+    fn subsequent_get_or_create_connected_after_remove_should_return_fresh_alive_flag() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let old_flag = registry.add(&peer);
+        let old_flag = registry.get_or_create_connected(&peer);
         registry.remove(&peer);
 
-        let new_flag = registry.add(&peer);
+        let new_flag = registry.get_or_create_connected(&peer);
 
         assert!(!old_flag.load(Ordering::Relaxed), "old flag must be dead");
         assert!(new_flag.load(Ordering::Relaxed), "new flag must be alive");
