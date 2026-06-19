@@ -1,8 +1,10 @@
+mod bench_stubs;
 #[path = "../tests/protocol/common/mod.rs"]
 mod common;
 
 use std::{str::FromStr, time::Duration};
 
+use bench_stubs::{StubChainApi, StubPathResolver};
 use bytes::Bytes;
 use common::{PEERS, PEERS_CHAIN, random_packets_of_count};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
@@ -28,7 +30,6 @@ use hopr_protocol_hopr::{
 use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_utils::testing::{StubChainApi, StubPathResolver};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 30;

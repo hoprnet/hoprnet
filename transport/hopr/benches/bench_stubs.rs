@@ -1,3 +1,6 @@
+// Chain-API test stubs for benchmarks.
+// Moved here from hopr-utils/src/testing/mod.rs to avoid a publish-time
+// circular dep: hopr-utils (testing) → hopr-api → hopr-utils.
 use std::sync::Arc;
 
 use bimap::BiMap;
@@ -23,9 +26,6 @@ pub struct StubError;
 // StubKeyIdMapper
 // ---------------------------------------------------------------------------
 
-/// Bidirectional mapping between [`HoprKeyIdent`] and [`OffchainPublicKey`].
-///
-/// Extracted from the test helper in `transport/path/src/planner.rs`.
 #[derive(Clone)]
 pub struct StubKeyIdMapper {
     map: Arc<BiMap<OffchainPublicKey, HoprKeyIdent>>,
@@ -45,10 +45,6 @@ impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for StubKeyIdMapper {
 // StubChainApi
 // ---------------------------------------------------------------------------
 
-/// Lightweight in-memory stub implementing the chain-API traits needed by
-/// `HoprEncoder` / `HoprDecoder` / `HoprTicketProcessor`.
-///
-/// All lookups are simple BiMap or Vec scans — no async I/O, no database.
 #[derive(Clone)]
 pub struct StubChainApi {
     me: Address,
@@ -59,7 +55,6 @@ pub struct StubChainApi {
     win_prob: WinningProbability,
 }
 
-/// Builder for [`StubChainApi`].
 pub struct StubChainApiBuilder {
     me: Option<Address>,
     key_addr_map: BiMap<OffchainPublicKey, Address>,
@@ -85,13 +80,11 @@ impl Default for StubChainApiBuilder {
 }
 
 impl StubChainApiBuilder {
-    /// Sets the "self" address of this stub node.
     pub fn me(mut self, addr: Address) -> Self {
         self.me = Some(addr);
         self
     }
 
-    /// Registers a single peer (offchain key ↔ chain address + key-id mapping).
     pub fn peer(mut self, offchain: &OffchainPublicKey, chain_addr: Address) -> Self {
         self.key_addr_map.insert(*offchain, chain_addr);
         self.key_id_map.insert(*offchain, self.next_key_id.into());
@@ -99,28 +92,21 @@ impl StubChainApiBuilder {
         self
     }
 
-    /// Adds a channel entry.
     pub fn channel(mut self, entry: ChannelEntry) -> Self {
         self.channels.push(entry);
         self
     }
 
-    /// Sets the default outgoing ticket price.
     pub fn ticket_price(mut self, price: HoprBalance) -> Self {
         self.ticket_price = price;
         self
     }
 
-    /// Sets the default winning probability.
     pub fn win_prob(mut self, prob: WinningProbability) -> Self {
         self.win_prob = prob;
         self
     }
 
-    /// Finalizes the builder into a [`StubChainApi`].
-    ///
-    /// # Panics
-    /// Panics if `me` was not set.
     pub fn build(self) -> StubChainApi {
         StubChainApi {
             me: self.me.expect("me address must be set"),
@@ -136,23 +122,18 @@ impl StubChainApiBuilder {
 }
 
 impl StubChainApi {
-    /// Returns a new [`StubChainApiBuilder`].
     pub fn builder() -> StubChainApiBuilder {
         StubChainApiBuilder::default()
     }
 
-    /// Returns the key-address mapping.
     pub fn key_addr_map(&self) -> &BiMap<OffchainPublicKey, Address> {
         &self.key_addr_map
     }
 
-    /// Returns the registered channels.
     pub fn channels(&self) -> &[ChannelEntry] {
         &self.channels
     }
 }
-
-// -- ChainKeyOperations -----------------------------------------------------
 
 impl ChainKeyOperations for StubChainApi {
     type Error = StubError;
@@ -170,8 +151,6 @@ impl ChainKeyOperations for StubChainApi {
         &self.id_mapper
     }
 }
-
-// -- ChainReadChannelOperations ---------------------------------------------
 
 impl ChainReadChannelOperations for StubChainApi {
     type Error = StubError;
@@ -207,8 +186,6 @@ impl ChainReadTicketOperations for StubChainApi {
         Ok((self.win_prob, self.ticket_price))
     }
 }
-
-// -- ChainValues ------------------------------------------------------------
 
 #[async_trait::async_trait]
 impl ChainValues for StubChainApi {
@@ -266,15 +243,12 @@ impl ChainValues for StubChainApi {
 // StubPathResolver
 // ---------------------------------------------------------------------------
 
-/// Minimal stub for [`PathAddressResolver`], using the same BiMap lookups
-/// as the `MockPathResolver` in `transport/protocol/tests/common/mod.rs`.
 pub struct StubPathResolver {
     key_addr_map: BiMap<OffchainPublicKey, Address>,
     channels: Vec<ChannelEntry>,
 }
 
 impl StubPathResolver {
-    /// Creates a new resolver sharing key/channel data with the given [`StubChainApi`].
     pub fn from_chain_api(api: &StubChainApi) -> Self {
         Self {
             key_addr_map: api.key_addr_map().clone(),

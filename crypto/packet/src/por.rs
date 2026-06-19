@@ -64,8 +64,8 @@ impl std::fmt::Debug for ProofOfRelayValues {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("ProofOfRelayValues")
             .field(&self.chain_length())
-            .field(&hex::encode(&self.0[1..1 + HalfKeyChallenge::SIZE]))
-            .field(&hex::encode(&self.0[1 + HalfKeyChallenge::SIZE..]))
+            .field(&const_hex::encode(&self.0[1..1 + HalfKeyChallenge::SIZE]))
+            .field(&const_hex::encode(&self.0[1 + HalfKeyChallenge::SIZE..]))
             .finish()
     }
 }
@@ -119,8 +119,8 @@ impl ProofOfRelayString {
 impl std::fmt::Debug for ProofOfRelayString {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("ProofOfRelayString")
-            .field(&hex::encode(&self.0[0..EthereumChallenge::SIZE]))
-            .field(&hex::encode(&self.0[EthereumChallenge::SIZE..]))
+            .field(&const_hex::encode(&self.0[0..EthereumChallenge::SIZE]))
+            .field(&const_hex::encode(&self.0[EthereumChallenge::SIZE..]))
             .finish()
     }
 }

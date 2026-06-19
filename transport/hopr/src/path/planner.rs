@@ -19,7 +19,7 @@ use validator::{Validate, ValidationError};
 
 use super::{
     errors::{PathPlannerError, Result},
-    traits::{BackgroundPathCacheRefreshable, PathSelector},
+    traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics},
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -46,7 +46,7 @@ pub struct PathPlannerConfig {
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
-    #[default = 8]
+    #[default = 50]
     pub max_cached_paths: usize,
     /// Penalty multiplier for edges lacking probe-based quality observations.
     /// Applied during path cost evaluation to down-weight unprobed edges.
@@ -60,6 +60,22 @@ pub struct PathPlannerConfig {
     #[default = 0.1]
     #[validate(custom(function = "validate_unit_interval"))]
     pub min_ack_rate: f64,
+    /// Candidate count below which no latency-based pruning occurs.
+    ///
+    /// When fewer paths than this value are found, the selector returns all of them
+    /// unchanged (`min(found_count, floor)` semantics — the floor is never a minimum
+    /// to fabricate).  Set to 0 to disable pruning entirely.
+    #[default = 8]
+    pub min_paths_anonymity_floor: usize,
+    /// Total path latency at which the latency factor in the composite weight equals 0.5.
+    /// Higher values make the weight less sensitive to latency differences.
+    #[default(Duration::from_millis(100))]
+    pub latency_halflife: Duration,
+    /// Reference channel balance used to scale the capacity factor in the composite weight.
+    /// `capacity_factor` saturates at 1.0 near this value.
+    /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
+    #[default = 10_000_000]
+    pub capacity_reference: u128,
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
@@ -68,6 +84,54 @@ fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError
     } else {
         Err(ValidationError::new("value must be finite and in 0.0..=1.0"))
     }
+}
+
+/// Parameters that shape how per-path aggregates modulate the `WeightedCollection` weight.
+#[derive(Debug, Clone, Copy)]
+struct WeightingParams {
+    latency_halflife: Duration,
+    capacity_reference: u128,
+}
+
+/// Continuous, monotonically decreasing latency factor, bounded in (0, 1].
+///
+/// Returns 1.0 for zero latency and 0.5 when `latency == halflife`.
+fn latency_factor(latency: Duration, halflife: Duration) -> f64 {
+    let ms = latency.as_millis() as f64;
+    let h = halflife.as_millis().max(1) as f64;
+    1.0 / (1.0 + ms / h)
+}
+
+/// Continuous, monotonically increasing capacity factor, bounded in (0.05, 1.0].
+///
+/// Uses a log scale because channel balances span many orders of magnitude.
+/// Saturates at 1.0 near `reference`.
+fn capacity_factor(c: u128, reference: u128) -> f64 {
+    let log = (c as f64).max(1.0).log10();
+    let ref_log = (reference as f64).max(10.0).log10();
+    (log / ref_log).clamp(0.05, 1.0)
+}
+
+/// Composite selection weight for a candidate path.
+///
+/// Refines `pwc.cost` (the `EdgeValueFn` output) with latency and capacity factors
+/// derived from the per-path aggregates.  Factors are neutral (1.0) when the
+/// corresponding aggregate is unavailable to avoid penalising unprobed paths.
+/// For 0-hop routes (`hops == 0`) the capacity factor is always 1.0 — direct
+/// `me -> dest` packets use no payment channel, so `capacity_floor = None` is expected.
+fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams) -> f64 {
+    let lat = pwc
+        .total_latency_ms
+        .map(|ms| latency_factor(Duration::from_millis(ms as u64), params.latency_halflife))
+        .unwrap_or(1.0);
+    let cap = if hops == 0 {
+        1.0
+    } else {
+        pwc.capacity_floor
+            .map(|c| capacity_factor(c, params.capacity_reference))
+            .unwrap_or(1.0)
+    };
+    pwc.cost * lat * cap
 }
 
 /// Cache key for the path planner: `(source, destination, hops)`.
@@ -98,6 +162,7 @@ pub struct PathPlanner<Surb, R, S> {
     selector: Arc<S>,
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
+    weighting: WeightingParams,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -122,6 +187,10 @@ where
             selector: Arc::new(selector),
             cache,
             refresh_period: config.refresh_period,
+            weighting: WeightingParams {
+                latency_halflife: config.latency_halflife,
+                capacity_reference: config.capacity_reference,
+            },
         }
     }
 
@@ -187,6 +256,7 @@ where
 
                 let resolver = self.resolver.clone();
                 let selector = self.selector.clone();
+                let weighting = self.weighting;
 
                 let paths = self
                     .cache
@@ -195,11 +265,17 @@ where
                         let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
 
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for pwc in candidates {
-                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+                        for mut pwc in candidates {
+                            let path_nodes = std::mem::take(&mut pwc.path);
+                            let node_ids: Vec<NodeId> =
+                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Ok(vp) => {
+                                    valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
+                                    path_metrics.push(pwc);
+                                }
                                 Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
                             }
                         }
@@ -212,7 +288,24 @@ where
                             )));
                         }
 
-                        Ok(Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)))
+                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                        let total_wt = weighted.total_weight();
+                        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                            tracing::debug!(
+                                %destination,
+                                hops = hops_usize,
+                                path = %vp,
+                                cost = pwm.cost,
+                                composite_weight = w,
+                                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                                total_latency_ms = ?pwm.total_latency_ms,
+                                min_probe_success_rate = ?pwm.min_probe_success_rate,
+                                min_ack_rate = ?pwm.min_ack_rate,
+                                capacity_floor = ?pwm.capacity_floor,
+                                "weighted candidate path",
+                            );
+                        }
+                        Ok(Arc::new(weighted))
                     })
                     .await
                     .map_err(PathPlannerError::CacheError)?;
@@ -326,6 +419,7 @@ where
         let resolver = self.resolver.clone();
         let selector = self.selector.clone();
         let refresh_period = self.refresh_period;
+        let weighting = self.weighting;
 
         // run at a non-zero interval
         futures_time::stream::interval(futures_time::time::Duration::from_millis(
@@ -335,6 +429,7 @@ where
             let cache = cache.clone();
             let resolver = resolver.clone();
             let selector = selector.clone();
+            let weighting = weighting;
 
             async move {
                 for (key, _) in cache.iter() {
@@ -367,11 +462,17 @@ where
                         && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
                     {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::new();
-                        for pwc in candidates {
-                            let node_ids: Vec<NodeId> = pwc.path.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+                        for mut pwc in candidates {
+                            let path_nodes = std::mem::take(&mut pwc.path);
+                            let node_ids: Vec<NodeId> =
+                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
                             match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => valid_paths.push((vp, pwc.cost)),
+                                Ok(vp) => {
+                                    valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
+                                    path_metrics.push(pwc);
+                                }
                                 Err(e) => {
                                     tracing::debug!(error = %e, "background refresh: path candidate failed validation")
                                 }
@@ -379,12 +480,25 @@ where
                         }
 
                         if !valid_paths.is_empty() {
-                            cache
-                                .insert(
-                                    (src, dest, hops_u32),
-                                    Arc::new(hopr_utils::statistics::WeightedCollection::new(valid_paths)),
-                                )
-                                .await;
+                            let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                            let total_wt = weighted.total_weight();
+                            for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                                tracing::debug!(
+                                    kind = "background-refresh",
+                                    destination = %dest_key,
+                                    hops = hops_usize,
+                                    path = %vp,
+                                    cost = pwm.cost,
+                                    composite_weight = w,
+                                    sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                                    total_latency_ms = ?pwm.total_latency_ms,
+                                    min_probe_success_rate = ?pwm.min_probe_success_rate,
+                                    min_ack_rate = ?pwm.min_ack_rate,
+                                    capacity_floor = ?pwm.capacity_floor,
+                                    "weighted candidate path",
+                                );
+                            }
+                            cache.insert((src, dest, hops_u32), Arc::new(weighted)).await;
                         }
                     }
                 }
@@ -566,10 +680,6 @@ mod tests {
         });
     }
 
-    fn mark_edge_last(graph: &ChannelGraph, src: &OffchainPublicKey, dst: &OffchainPublicKey) {
-        mark_edge_full(graph, src, dst);
-    }
-
     fn small_config() -> PathPlannerConfig {
         PathPlannerConfig {
             max_cache_capacity: 100,
@@ -590,7 +700,14 @@ mod tests {
         // Build empty graph (no edges) — selector would fail if called.
         let graph = ChannelGraph::new(me);
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(dest, dest_addr())]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
@@ -634,10 +751,17 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -677,7 +801,14 @@ mod tests {
         // Empty graph — selector would fail; explicit path should not use it.
         let graph = ChannelGraph::new(me);
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
 
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
@@ -712,7 +843,14 @@ mod tests {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
@@ -744,10 +882,17 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -790,10 +935,17 @@ mod tests {
         graph.add_edge(&me, &a).unwrap();
         graph.add_edge(&a, &dest).unwrap();
         mark_edge_full(&graph, &me, &a);
-        mark_edge_last(&graph, &a, &dest);
+        mark_edge_full(&graph, &a, &dest);
 
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
         let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
             .with_open_channel(me_addr(), a_addr())
             .with_open_channel(a_addr(), dest_addr());
@@ -829,12 +981,110 @@ mod tests {
         let me = pubkey(&SECRET_ME);
         let graph = ChannelGraph::new(me);
         let cfg = small_config();
-        let selector = HoprGraphPathSelector::new(me, graph, cfg.max_cached_paths, cfg.edge_penalty, cfg.min_ack_rate);
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
         let chain_api = TestChainApi::new(me, me_addr(), vec![]);
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
 
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
         // Just ensure it compiles and produces a future.
         let _future = planner.run_background_refresh();
+    }
+
+    // ── composite weight helpers ──────────────────────────────────────────────
+
+    fn default_weighting() -> WeightingParams {
+        WeightingParams {
+            latency_halflife: Duration::from_millis(100),
+            capacity_reference: 10_000_000,
+        }
+    }
+
+    fn make_pwm(cost: f64, latency_ms: Option<u32>, capacity_floor: Option<u128>) -> PathWithMetrics {
+        PathWithMetrics {
+            path: vec![],
+            cost,
+            total_latency_ms: latency_ms,
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            capacity_floor,
+        }
+    }
+
+    #[test]
+    fn latency_factor_is_monotonic_decreasing() {
+        let halflife = Duration::from_millis(100);
+        let f0 = latency_factor(Duration::ZERO, halflife);
+        let f100 = latency_factor(Duration::from_millis(100), halflife);
+        let f200 = latency_factor(Duration::from_millis(200), halflife);
+        assert!(
+            f0 > f100 && f100 > f200,
+            "must be strictly decreasing: {f0} > {f100} > {f200}"
+        );
+        assert!(
+            (f100 - 0.5).abs() < 1e-9,
+            "at halflife factor should be 0.5, got {f100}"
+        );
+        assert!(f0 <= 1.0, "factor must never exceed 1.0, got {f0}");
+    }
+
+    #[test]
+    fn capacity_factor_is_monotonic_increasing() {
+        let reference = 10_000_000u128;
+        let f_low = capacity_factor(100, reference);
+        let f_mid = capacity_factor(1_000_000, reference);
+        let f_ref = capacity_factor(reference, reference);
+        assert!(
+            f_low < f_mid && f_mid <= f_ref,
+            "must be non-decreasing: {f_low} < {f_mid} <= {f_ref}"
+        );
+        assert!(f_ref <= 1.0, "factor must not exceed 1.0 at reference, got {f_ref}");
+        assert!(f_low >= 0.05, "minimum clamp is 0.05, got {f_low}");
+    }
+
+    #[test]
+    fn composite_weight_for_0_hop_skips_capacity_factor() {
+        let params = default_weighting();
+        let pwm = make_pwm(0.6, Some(100), None);
+        let w = composite_weight(&pwm, 0, params);
+        let expected = 0.6 * latency_factor(Duration::from_millis(100), params.latency_halflife);
+        assert!(
+            (w - expected).abs() < 1e-9,
+            "0-hop weight should ignore capacity: {w} != {expected}"
+        );
+        assert!(w > 0.0, "0-hop weight must be positive");
+    }
+
+    #[test]
+    fn composite_weight_with_all_aggregates_is_below_cost() {
+        let params = default_weighting();
+        let pwm = make_pwm(0.8, Some(150), Some(5_000_000));
+        let w = composite_weight(&pwm, 1, params);
+        assert!(
+            w < pwm.cost,
+            "composite must be below raw cost when factors < 1.0: {w} >= {}",
+            pwm.cost
+        );
+        assert!(w > 0.0, "composite weight must be positive");
+    }
+
+    #[test]
+    fn composite_weight_missing_capacity_on_multi_hop_neutral() {
+        let params = default_weighting();
+        let pwm_with = make_pwm(0.7, Some(80), Some(8_000_000));
+        let pwm_without = make_pwm(0.7, Some(80), None);
+        let w_with = composite_weight(&pwm_with, 2, params);
+        let w_without = composite_weight(&pwm_without, 2, params);
+        // Missing capacity is neutral (1.0), so without-capacity weight equals cost * lat only.
+        let expected_without = 0.7 * latency_factor(Duration::from_millis(80), params.latency_halflife);
+        assert!((w_without - expected_without).abs() < 1e-9);
+        // With capacity the factor adds further reduction (capacity_factor < 1.0 here).
+        assert!(w_with <= w_without, "known capacity should not increase the weight");
     }
 }

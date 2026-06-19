@@ -305,6 +305,7 @@ where
             planner_config.max_cached_paths,
             planner_config.edge_penalty,
             planner_config.min_ack_rate,
+            planner_config.min_paths_anonymity_floor,
         );
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
@@ -321,8 +322,6 @@ where
                 hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
             }
         }
-        let session_tag_allocator =
-            session_tag_allocator.ok_or_else(|| HoprTransportError::Api("session tag allocator missing".into()))?;
         let session_telemetry_tag_allocator = session_telemetry_tag_allocator
             .ok_or_else(|| HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
         let probing_tag_allocator =
@@ -362,9 +361,9 @@ where
                     maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                     surb_balance_notify_period: None,
                     surb_target_notify: true,
+                    maximum_sessions: cfg.session.maximum_managed_sessions,
                     pix_config: Default::default(),
                 },
-                session_tag_allocator,
             )),
             chain_api: resolver,
             session_telemetry_tag_allocator,
@@ -794,7 +793,7 @@ where
                                                 ))
                                             }
                                             ShareResolution::InvalidShare(peer, ssa_id) => {
-                                                error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");        
+                                                error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
                                                 if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id)).await {
                                                     tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
                                                 }

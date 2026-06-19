@@ -16,6 +16,9 @@ pub enum ReservedTag {
     /// Commands associated with session start protocol regarding session initiation.
     SessionStart = 1,
 
+    /// Reserved tag for the Session protocol.
+    Session = 2,
+
     /// Undefined catch all.
     Undefined = 15,
 }

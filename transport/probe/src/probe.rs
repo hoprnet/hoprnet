@@ -86,8 +86,8 @@ where
                         tracing::warn!(%pseudonym, "received telemetry on reserved ping tag, ignoring");
                     }
                     Message::Probe(NeighborProbe::Ping(ping)) => {
-                        tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                        tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
+                        tracing::debug!(%pseudonym, nonce = const_hex::encode(ping), "received ping");
+                        tracing::trace!(%pseudonym, nonce = const_hex::encode(ping), "wrapping a pong in the found SURB");
 
                         let message = Message::Probe(NeighborProbe::Pong(ping));
                         if let Ok(data) = message.try_into() {
@@ -101,7 +101,7 @@ where
                         }
                     }
                     Message::Probe(NeighborProbe::Pong(pong)) => {
-                        tracing::debug!(%pseudonym, nonce = hex::encode(pong), "received pong");
+                        tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), "received pong");
                         if let Some((peer, start, replier)) = self
                             .active_neighbor_probes
                             .remove(&(pseudonym, NeighborProbe::Ping(pong)))
@@ -110,7 +110,7 @@ where
                             let latency = current_time().as_unix_timestamp().saturating_sub(start);
 
                             if let NodeId::Offchain(opk) = peer.as_ref() {
-                                tracing::debug!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                tracing::debug!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
                                 self.network_graph.record_edge::<NeighborTelemetry, PathTelemetry>(
                                     hopr_api::graph::MeasurableEdge::Probe(Ok(EdgeTransportTelemetry::Neighbor(
                                         NeighborTelemetry {
@@ -120,14 +120,14 @@ where
                                     ))),
                                 )
                             } else {
-                                tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
+                                tracing::warn!(%pseudonym, nonce = const_hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                             }
 
                             if let Some(replier) = replier {
                                 replier.notify(Ok(latency));
                             }
                         } else {
-                            tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
+                            tracing::warn!(%pseudonym, nonce = const_hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
                         }
                     }
                 },
@@ -461,7 +461,6 @@ mod tests {
         },
         types::crypto::keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     };
-    use hopr_ct_immediate::{ImmediateNeighborProber, ProberConfig};
     use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
     use super::*;
@@ -654,13 +653,7 @@ mod tests {
             .continuously_scan(
                 from_probing_to_network_tx.clone(),
                 manual_probe_rx,
-                ImmediateNeighborProber::new(
-                    ProberConfig {
-                        interval: cfg.interval,
-                        recheck_threshold: cfg.recheck_threshold,
-                    },
-                    store.clone(),
-                ),
+                TestProbeStrategy::ImmediateNeighbor { store: store.clone() },
                 store,
             )
             .await;
@@ -1051,6 +1044,9 @@ mod tests {
     #[derive(Clone)]
     enum TestProbeStrategy {
         ManualNeighbor,
+        ImmediateNeighbor {
+            store: PeerStore,
+        },
         OneShotLoopback {
             routing: DestinationRouting,
             path_id: hopr_api::types::internal::routing::PathId,
@@ -1061,6 +1057,21 @@ mod tests {
         fn build(&self) -> futures::stream::BoxStream<'static, hopr_api::ct::ProbeRouting> {
             match self {
                 Self::ManualNeighbor => Box::pin(futures::stream::pending()),
+                Self::ImmediateNeighbor { store } => {
+                    let peers: Vec<OffchainPublicKey> =
+                        store.get_peers.write().unwrap().pop_front().unwrap_or_default();
+                    Box::pin(futures::StreamExt::chain(
+                        futures::stream::iter(peers.into_iter().map(|peer| {
+                            ProbeRouting::Neighbor(DestinationRouting::Forward {
+                                destination: Box::new(peer.into()),
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                                return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                            })
+                        })),
+                        futures::stream::pending(),
+                    ))
+                }
                 Self::OneShotLoopback { routing, path_id } => {
                     let probe = hopr_api::ct::ProbeRouting::Looping((routing.clone(), *path_id));
                     Box::pin(futures::StreamExt::chain(

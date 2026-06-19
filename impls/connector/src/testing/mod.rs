@@ -44,7 +44,7 @@ impl BlokliTestStateBuilder {
     pub fn with_channels<I: IntoIterator<Item = ChannelEntry>>(mut self, channels: I) -> Self {
         self.0.channels.extend(channels.into_iter().map(|channel| {
             (
-                hex::encode(channel.get_id()),
+                const_hex::encode(channel.get_id()),
                 blokli_client::api::types::Channel {
                     balance: blokli_client::api::types::TokenValueString(channel.balance.to_string()),
                     closure_time: if let ChannelStatus::PendingToClose(time) = channel.status {
@@ -54,12 +54,12 @@ impl BlokliTestStateBuilder {
                     } else {
                         None
                     },
-                    concrete_channel_id: hex::encode(channel.get_id()),
+                    concrete_channel_id: const_hex::encode(channel.get_id()),
                     source: self
                         .0
                         .accounts
                         .values()
-                        .find(|a| a.chain_key == hex::encode(channel.source))
+                        .find(|a| a.chain_key == const_hex::encode(channel.source))
                         .map(|a| a.keyid)
                         .unwrap_or_else(|| panic!("missing dst account {}", channel.source)),
                     epoch: channel.channel_epoch as i32,
@@ -67,7 +67,7 @@ impl BlokliTestStateBuilder {
                         .0
                         .accounts
                         .values()
-                        .find(|a| a.chain_key == hex::encode(channel.destination))
+                        .find(|a| a.chain_key == const_hex::encode(channel.destination))
                         .map(|a| a.keyid)
                         .unwrap_or_else(|| panic!("missing dst account {}", channel.destination)),
                     status: match channel.status {
@@ -93,20 +93,20 @@ impl BlokliTestStateBuilder {
                 Entry::Occupied(_) => panic!("duplicate key id for account {}", account.chain_addr),
                 Entry::Vacant(v) => {
                     v.insert(blokli_client::api::types::Account {
-                        chain_key: hex::encode(account.chain_addr),
+                        chain_key: const_hex::encode(account.chain_addr),
                         keyid: u32::from(account.key_id) as i32,
                         multi_addresses: account.get_multiaddrs().iter().map(|a| a.to_string()).collect(),
-                        packet_key: hex::encode(account.public_key),
-                        safe_address: account.safe_address.map(hex::encode),
+                        packet_key: const_hex::encode(account.public_key),
+                        safe_address: account.safe_address.map(const_hex::encode),
                     });
-                    if let Some(safe_addr) = account.safe_address.as_ref().map(hex::encode) {
+                    if let Some(safe_addr) = account.safe_address.as_ref().map(const_hex::encode) {
                         self.0.deployed_safes.insert(
                             safe_addr.clone(),
                             blokli_client::api::types::Safe {
                                 address: safe_addr,
-                                chain_key: hex::encode(account.chain_addr),
-                                owners: [hex::encode(account.chain_addr)].to_vec(),
-                                module_address: hex::encode(
+                                chain_key: const_hex::encode(account.chain_addr),
+                                owners: [const_hex::encode(account.chain_addr)].to_vec(),
+                                module_address: const_hex::encode(
                                     &Hash::create(&[account.chain_addr.as_ref()]).as_ref()[0..Address::SIZE],
                                 ),
                                 registered_nodes: vec![],
@@ -115,20 +115,20 @@ impl BlokliTestStateBuilder {
                         );
                     }
                     self.0.token_balances.insert(
-                        hex::encode(account.chain_addr),
+                        const_hex::encode(account.chain_addr),
                         blokli_client::api::types::HoprBalance {
                             __typename: "HoprBalance".to_string(),
                             balance: blokli_client::api::types::TokenValueString(HoprBalance::zero().to_string()),
                         },
                     );
                     self.0.native_balances.insert(
-                        hex::encode(account.chain_addr),
+                        const_hex::encode(account.chain_addr),
                         blokli_client::api::types::NativeBalance {
                             __typename: "NativeBalance".to_string(),
                             balance: blokli_client::api::types::TokenValueString(native_balance.to_string()),
                         },
                     );
-                    if let Some(addr) = account.safe_address.as_ref().map(hex::encode) {
+                    if let Some(addr) = account.safe_address.as_ref().map(const_hex::encode) {
                         self.0.token_balances.insert(
                             addr.clone(),
                             blokli_client::api::types::HoprBalance {
@@ -163,13 +163,13 @@ impl BlokliTestStateBuilder {
     pub fn with_deployed_safes<I: IntoIterator<Item = DeployedSafe>>(mut self, safes: I) -> Self {
         self.0.deployed_safes.extend(safes.into_iter().map(|safe| {
             (
-                hex::encode(safe.address),
+                const_hex::encode(safe.address),
                 blokli_client::api::types::Safe {
-                    address: hex::encode(safe.address),
-                    chain_key: hex::encode(safe.deployer),
-                    owners: safe.owners.into_iter().map(hex::encode).collect(),
-                    module_address: hex::encode(safe.module),
-                    registered_nodes: safe.registered_nodes.into_iter().map(hex::encode).collect(),
+                    address: const_hex::encode(safe.address),
+                    chain_key: const_hex::encode(safe.deployer),
+                    owners: safe.owners.into_iter().map(const_hex::encode).collect(),
+                    module_address: const_hex::encode(safe.module),
+                    registered_nodes: safe.registered_nodes.into_iter().map(const_hex::encode).collect(),
                     threshold: Some("1".to_string()),
                 },
             )
@@ -224,7 +224,7 @@ impl BlokliTestStateBuilder {
                 .native_balances
                 .extend(balances.into_iter().map(|(addr, balance)| {
                     (
-                        hex::encode(addr),
+                        const_hex::encode(addr),
                         blokli_client::api::types::NativeBalance {
                             __typename: "NativeBalance".into(),
                             balance: blokli_client::api::types::TokenValueString(balance.to_string()),
@@ -236,7 +236,7 @@ impl BlokliTestStateBuilder {
                 .token_balances
                 .extend(balances.into_iter().map(|(addr, balance)| {
                     (
-                        hex::encode(addr),
+                        const_hex::encode(addr),
                         blokli_client::api::types::HoprBalance {
                             __typename: "HoprBalance".into(),
                             balance: blokli_client::api::types::TokenValueString(balance.to_string()),
@@ -257,7 +257,7 @@ impl BlokliTestStateBuilder {
             .safe_allowances
             .extend(balances.into_iter().map(|(addr, allowance)| {
                 (
-                    hex::encode(addr),
+                    const_hex::encode(addr),
                     blokli_client::api::types::SafeHoprAllowance {
                         __typename: "SafeAllowance".into(),
                         allowance: blokli_client::api::types::TokenValueString(allowance.to_string()),

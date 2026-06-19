@@ -357,17 +357,19 @@ const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
-const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
+const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: usize = 3;
 
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
+const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
+
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
 }
 
-fn default_session_establish_max_retries() -> u32 {
+fn default_session_establish_max_retries() -> usize {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
 
@@ -381,6 +383,10 @@ fn default_session_establish_retry_delay() -> Duration {
 
 fn default_session_balancer_sampling() -> Duration {
     DEFAULT_SESSION_BALANCER_SAMPLING
+}
+
+fn default_max_managed_sessions() -> usize {
+    DEFAULT_MAXIMUM_MANAGED_SESSIONS
 }
 
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -426,6 +432,14 @@ pub struct SessionGlobalConfig {
     )]
     pub idle_timeout: Duration,
 
+    /// Maximum number of Sessions that can be managed by the Session manager.
+    ///
+    /// Default is 1000, minimum is 2, maximum is 100 000.
+    #[validate(range(min = 2, max = 100_000))]
+    #[default(default_max_managed_sessions())]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]
+    pub maximum_managed_sessions: usize,
+
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.
     ///
@@ -433,7 +447,7 @@ pub struct SessionGlobalConfig {
     #[validate(range(min = 0, max = 20))]
     #[default(default_session_establish_max_retries())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_establish_max_retries"))]
-    pub establish_max_retries: u32,
+    pub establish_max_retries: usize,
 
     /// Delay between Session establishment retries.
     ///

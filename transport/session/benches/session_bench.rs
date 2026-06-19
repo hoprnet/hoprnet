@@ -10,7 +10,7 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -32,7 +32,7 @@ pub async fn alice_send_data(
     let (_bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
     let dst: Address = (&ChainKeypair::random()).into();
-    let id = SessionId::new(1234_u64, HoprPseudonym::random());
+    let id = HoprPseudonym::random();
     let cfg = HoprSessionConfig {
         capabilities: caps.into(),
         ..Default::default()
@@ -68,7 +68,7 @@ pub async fn bob_receive_data(
     caps: impl Into<Capabilities> + std::fmt::Debug,
 ) -> Vec<u8> {
     let (bob_tx, _alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
-    let id = SessionId::new(1234_u64, HoprPseudonym::random());
+    let id = HoprPseudonym::random();
     let cfg = HoprSessionConfig {
         capabilities: caps.into(),
         ..Default::default()
@@ -76,7 +76,7 @@ pub async fn bob_receive_data(
 
     let mut bob_session = HoprSession::new(
         id,
-        DestinationRouting::Return(id.pseudonym().into()),
+        DestinationRouting::Return(id.into()),
         cfg,
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,

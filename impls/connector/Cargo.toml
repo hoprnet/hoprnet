@@ -1,18 +1,21 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.20.0"
-edition.workspace = true
-rust-version.workspace = true
-authors = ["HOPR Association <tech@hoprnet.org>"]
+version = "0.21.1"
 description = "Implementation of HOPR Chain APIs using Blokli client"
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
-publish = false
+edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "chain", "ethereum"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["network-programming"]
+authors.workspace = true
+rust-version.workspace = true
+include = ["README.md", "src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 runtime-tokio = ["hopr-utils/runtime-tokio"]
-testing = ["dep:hex", "blokli-client/testing"]
+testing = ["dep:const-hex", "blokli-client/testing"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -25,7 +28,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
-hex = { workspace = true, optional = true }
+const-hex = { workspace = true, optional = true }
 moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
@@ -34,6 +37,7 @@ redb = { workspace = true }
 serde_json = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+validator = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
@@ -48,7 +52,7 @@ hopr-utils = { workspace = true }
 
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
-hex = { workspace = true }
+const-hex = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 hex-literal = { workspace = true }
 insta = { workspace = true }

@@ -2,12 +2,26 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
 early_access: false
+tone_instructions: >-
+  Be pedantic and rigorous. Focus on substantive correctness, security, architectural concerns, and high-level design issues. Skip cosmetic or stylistic nits. Never submit an approving review — comments only.
 reviews:
-  profile: "chill"
+  profile: "assertive"
+  # Do NOT enable request_changes_workflow: with it off, CodeRabbit only
+  # submits COMMENT reviews — never APPROVED or REQUEST_CHANGES.
   request_changes_workflow: false
   high_level_summary: false
+  review_status: false
+  commit_status: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  assess_linked_issues: true
   poem: false
-  review_status: true
   collapse_walkthrough: true
   path_filters:
     - "!vendor/**"

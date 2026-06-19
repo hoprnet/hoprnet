@@ -16,6 +16,7 @@ jobs:
     permissions:
       actions: write
       contents: read
+      id-token: write
     timeout-minutes: 10
     steps:
       - name: Harden Runner
@@ -32,18 +33,17 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@ac3e0b6137b0ba470a30c373aab2ceba9e0879e4 # setup-gcp-v4
         with:
-          google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'true'
           install_sdk: 'true'
 
       - name: Cleanup Github pipeline cache
         run: |
-          cacheKeysForPR=($(gh actions-cache list -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" | cut -f 1 | tr '\n' ' '))
-          for cacheKey in $cacheKeysForPR
+          mapfile -t cacheKeysForPR < <(gh actions-cache list -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --json key --jq '.[].key')
+          for cacheKey in "${cacheKeysForPR[@]}"
           do
-            gh actions-cache delete $cacheKey -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --confirm
+            gh actions-cache delete "$cacheKey" -R "${REPO}" -B "refs/pull/${PR_NUMBER}/merge" --confirm
           done
         env:
           REPO: ${{ github.repository }}

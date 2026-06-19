@@ -12,7 +12,7 @@ use rand::RngExt;
 /// ```rust
 /// use hopr_utils::statistics::WeightedCollection;
 ///
-/// let wc = WeightedCollection::new(vec![("rare", 0.1), ("common", 10.0)]);
+/// let wc = WeightedCollection::from(vec![("rare", 0.1), ("common", 10.0)]);
 /// let picked = wc.pick_one().expect("non-empty collection");
 /// assert!(picked == "rare" || picked == "common");
 /// ```
@@ -22,11 +22,17 @@ pub struct WeightedCollection<T> {
     total_weight: f64,
 }
 
-impl<T> WeightedCollection<T> {
-    /// Create a new weighted collection from items paired with their weights.
-    pub fn new(items: Vec<(T, f64)>) -> Self {
+impl<T> From<Vec<(T, f64)>> for WeightedCollection<T> {
+    fn from(items: Vec<(T, f64)>) -> Self {
         let total_weight: f64 = items.iter().map(|(_, w)| w.max(0.0)).sum();
         Self { items, total_weight }
+    }
+}
+
+impl<T> WeightedCollection<T> {
+    /// Create a collection from pre-weighted items.
+    pub fn new(items: Vec<(T, f64)>) -> Self {
+        Self::from(items)
     }
 
     /// Returns `true` if the collection contains no items.
@@ -44,6 +50,26 @@ impl<T> WeightedCollection<T> {
         self.items.iter()
     }
 
+    /// Returns the sum of positive weights in this collection.
+    pub fn total_weight(&self) -> f64 {
+        self.total_weight
+    }
+
+    /// Returns the sampling probability that an entry carrying `weight` would
+    /// receive in this collection — i.e. `weight.max(0.0) / total_positive_weight`.
+    ///
+    /// Returns `0.0` if `weight <= 0.0` or if the collection holds no positive-weight
+    /// entries (empty or fully non-positive collection).
+    pub fn probability_of(&self, weight: f64) -> f64 {
+        if self.total_weight > 0.0 && weight > 0.0 {
+            weight / self.total_weight
+        } else {
+            0.0
+        }
+    }
+}
+
+impl<T> WeightedCollection<T> {
     /// Returns the index of a randomly selected item, weighted by probability
     /// proportional to its weight.
     ///
@@ -123,27 +149,27 @@ mod tests {
 
     #[test]
     fn pick_one_returns_none_for_empty_collection() {
-        let wc: WeightedCollection<&str> = WeightedCollection::new(vec![]);
+        let wc: WeightedCollection<&str> = WeightedCollection::from(vec![]);
         assert!(wc.pick_one().is_none());
     }
 
     #[test]
     fn pick_one_returns_sole_item_with_positive_weight() {
-        let wc = WeightedCollection::new(vec![("only", 1.0)]);
+        let wc = WeightedCollection::from(vec![("only", 1.0)]);
         assert_eq!(wc.pick_one(), Some("only"));
     }
 
     #[test]
     fn pick_one_returns_none_for_sole_item_with_non_positive_weight() {
-        let wc = WeightedCollection::new(vec![("only", 0.0)]);
+        let wc = WeightedCollection::from(vec![("only", 0.0)]);
         assert!(wc.pick_one().is_none());
-        let wc = WeightedCollection::new(vec![("only", -1.0)]);
+        let wc = WeightedCollection::from(vec![("only", -1.0)]);
         assert!(wc.pick_one().is_none());
     }
 
     #[test]
     fn pick_one_favors_higher_weight() {
-        let wc = WeightedCollection::new(vec![("low", 0.01), ("high", 100.0)]);
+        let wc = WeightedCollection::from(vec![("low", 0.01), ("high", 100.0)]);
         let mut high_count = 0;
         let trials = 1000;
         for _ in 0..trials {
@@ -159,13 +185,13 @@ mod tests {
 
     #[test]
     fn pick_one_returns_none_for_all_non_positive_weights() {
-        let wc = WeightedCollection::new(vec![("a", 0.0), ("b", -1.0)]);
+        let wc = WeightedCollection::from(vec![("a", 0.0), ("b", -1.0)]);
         assert!(wc.pick_one().is_none());
     }
 
     #[test]
     fn pick_index_returns_valid_index() {
-        let wc = WeightedCollection::new(vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
+        let wc = WeightedCollection::from(vec![("a", 1.0), ("b", 2.0), ("c", 3.0)]);
         for _ in 0..100 {
             let idx = wc.pick_index().expect("should pick an index");
             assert!(idx < 3);
@@ -174,14 +200,14 @@ mod tests {
 
     #[test]
     fn pick_index_returns_none_for_non_positive_weights() {
-        let wc = WeightedCollection::new(vec![("a", 0.0), ("b", -5.0)]);
+        let wc = WeightedCollection::from(vec![("a", 0.0), ("b", -5.0)]);
         assert!(wc.pick_index().is_none());
     }
 
     #[test]
     fn shuffled_preserves_all_items() {
         let items: Vec<(u32, f64)> = (0..10).map(|i| (i, (i as f64 + 1.0) * 0.1)).collect();
-        let shuffled = WeightedCollection::new(items).into_shuffled();
+        let shuffled = WeightedCollection::from(items).into_shuffled();
         assert_eq!(shuffled.len(), 10);
         let mut sorted = shuffled.clone();
         sorted.sort();
@@ -194,7 +220,7 @@ mod tests {
         let mut high_first_count = 0;
         let trials = 1000;
         for _ in 0..trials {
-            let shuffled = WeightedCollection::new(items.clone()).into_shuffled();
+            let shuffled = WeightedCollection::from(items.clone()).into_shuffled();
             if shuffled[0] == "high" {
                 high_first_count += 1;
             }
@@ -207,7 +233,7 @@ mod tests {
 
     #[test]
     fn shuffled_empty_collection_returns_empty() {
-        let wc: WeightedCollection<&str> = WeightedCollection::new(vec![]);
+        let wc: WeightedCollection<&str> = WeightedCollection::from(vec![]);
         assert!(wc.into_shuffled().is_empty());
     }
 }

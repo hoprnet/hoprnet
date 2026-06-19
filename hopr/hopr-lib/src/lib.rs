@@ -384,7 +384,7 @@ where
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
-            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
+            .with_max_times(self.cfg.protocol.session.establish_max_retries)
             .with_delay(self.cfg.protocol.session.establish_retry_timeout)
             .with_jitter();
 
@@ -898,6 +898,9 @@ mod tests {
     #[allow(deprecated)]
     #[test]
     fn explicit_path_config_converts_into_intermediate_path_routing_options() -> anyhow::Result<()> {
+        use anyhow::Context as _;
+        use hopr_transport::Keypair;
+
         let k1 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
         let k2 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());
         let k3 = hopr_api::types::internal::NodeId::from(*OffchainKeypair::random().public());

@@ -2,12 +2,22 @@
 name = "hopr-crypto-packet"
 version = "1.4.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
-authors = ["HOPR Association <tech@hoprnet.org>"]
 edition.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["hopr", "crypto", "sphinx", "mixnet"]
+repository.workspace = true
+homepage.workspace = true
+categories = ["cryptography", "network-programming"]
+authors.workspace = true
 rust-version.workspace = true
-homepage = "https://hoprnet.org/"
-repository = "https://github.com/hoprnet/hoprnet"
-license = "GPL-3.0-only"
+include = [
+  "README.md",
+  "src/**/*.rs",
+  "benches/**/*.rs",
+  "Cargo.toml",
+  "LICENSE",
+]
 
 [lib]
 crate-type = ["rlib"]
@@ -39,8 +49,8 @@ allocator-jemalloc = [
 ] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
+const-hex = { workspace = true }
 flagset = { workspace = true }
-hex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }

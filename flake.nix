@@ -166,7 +166,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -177,7 +177,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -188,7 +188,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--test '*' -- --test-threads=1";
@@ -199,7 +199,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc --test '*' -j 1
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --test '*' -j 1
                     runHook postCheck
                   '';
                 });
@@ -210,7 +210,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc";
+                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
                     runTests = true;
                     prependPackageName = false;
                     cargoTestExtraArgs = "--lib";
@@ -221,7 +221,7 @@
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc --lib
+                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -233,7 +233,7 @@
                   libraryBuildArgs
                   // {
                     src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc";
+                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
                     runCoverage = true;
                     prependPackageName = false;
                     cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
@@ -246,7 +246,7 @@
                     runHook preBuild
                     cargo llvm-cov nextest --lcov --output-path $out --lib \
                       ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
-                      --workspace -F allocator-jemalloc
+                      --workspace -F allocator-jemalloc -F testing
                     runHook postBuild
                   '';
                 });
@@ -325,6 +325,32 @@
                 pass_filenames = true;
                 language = "system";
               };
+              renovate-config-validator = {
+                enable = true;
+                name = "Renovate config validator";
+                entry = "${pkgs.renovate}/bin/renovate-config-validator";
+                files = "renovate\\.json$";
+                language = "system";
+                pass_filenames = true;
+              };
+              actionlint.enable = true;
+              pinact = {
+                enable = true;
+                name = "pinact";
+                description = "Check GitHub Action refs are SHA-pinned and resolvable";
+                entry = "${pkgs.writeShellScript "pinact-check" ''
+                  token="''${GITHUB_TOKEN:-$(${pkgs.gh}/bin/gh auth token 2>/dev/null || true)}"
+                  if [ -z "$token" ]; then
+                    echo "pinact: skipping — no GITHUB_TOKEN and gh not authenticated" >&2
+                    exit 0
+                  fi
+                  export GITHUB_TOKEN="$token"
+                  exec ${pkgs.pinact}/bin/pinact run --check
+                ''}";
+                files = "^\\.github/workflows/.*\\.ya?ml$";
+                language = "system";
+                pass_filenames = false;
+              };
             };
             excludes = [ ".gcloudignore" ];
           };
@@ -336,9 +362,11 @@
             treefmtWrapper = config.treefmt.build.wrapper;
             treefmtPrograms = pkgs.lib.attrValues config.treefmt.build.programs;
             extraPackages = with pkgs; [
+              gh
               sqlite
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               cargo-insta
               cargo-nextest
@@ -349,6 +377,7 @@
               graphviz
             ];
             shellHook = ''
+              export GITHUB_TOKEN="''${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
               ${pre-commit-check.shellHook}
             '';
           };
@@ -387,6 +416,7 @@
               google-cloud-sdk
               pkgs-unstable.cargo-audit
               cargo-machete
+              cargo-release
               cargo-shear
               graphviz
               swagger-codegen3
