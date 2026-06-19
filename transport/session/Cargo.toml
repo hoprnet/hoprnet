@@ -45,7 +45,6 @@ allocator-jemalloc = [
 
 [dependencies]
 anyhow = { workspace = true }
-arrayvec = { workspace = true }
 async-trait = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
@@ -73,7 +72,6 @@ hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
-hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -93,7 +91,6 @@ hopr-protocol-session = { workspace = true, features = [
 insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
-serde_cbor_2 = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 

@@ -190,6 +190,7 @@ mimalloc = { version = "0.1.50", default-features = false, features = [
 hopr-api = "1.12.0"
 hopr-types = { version = "1.9.1", features = ["use-bindings"] }
 hopr-utils = { version = "0.1.0", path = "utils", default-features = false }
+
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }

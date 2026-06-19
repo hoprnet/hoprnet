@@ -227,9 +227,9 @@ where
     ) -> Self {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let sid = session_id.to_string();
-            METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
+            let sid: &str = session_id.as_ref();
+            METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], 0.0);
+            METRIC_CONTROL_OUTPUT.set(&[sid], 0.0);
         }
 
         controller.set_target_and_limit(state.controller_bounds());
@@ -316,12 +316,12 @@ where
 
         #[cfg(all(feature = "telemetry", not(test)))]
         {
-            let sid = self.session_id.to_string();
-            METRIC_CURRENT_BUFFER.set(&[&sid], current as f64);
-            METRIC_CURRENT_TARGET.set(&[&sid], self.controller.bounds().target() as f64);
-            METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], output as f64);
-            METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
+            let sid: &str = self.session_id.as_ref();
+            METRIC_CURRENT_BUFFER.set(&[sid], current as f64);
+            METRIC_CURRENT_TARGET.set(&[sid], self.controller.bounds().target() as f64);
+            METRIC_TARGET_ERROR_ESTIMATE.set(&[sid], error as f64);
+            METRIC_CONTROL_OUTPUT.set(&[sid], output as f64);
+            METRIC_SURB_RATE.set(&[sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
         current
@@ -545,7 +545,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            SessionId::new(1234_u64, HoprPseudonym::random()),
+            HoprPseudonym::random(),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -599,7 +599,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            SessionId::new(1234_u64, HoprPseudonym::random()),
+            HoprPseudonym::random(),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -636,7 +636,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn surb_balancer_should_start_decrease_level_when_above_target_and_decay_enabled() {
         const NUM_STEPS: usize = 5;
-        let session_id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let cfg = SurbBalancerConfig {
             target_surb_buffer_size: 5_000,
             max_surbs_per_sec: 2500,
