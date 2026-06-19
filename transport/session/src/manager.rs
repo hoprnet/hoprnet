@@ -271,6 +271,7 @@ type SessionNotifiers = (
 /// Such transport must also be `Clone`, since it will be cloned into all the created [`HoprSession`] objects.
 ///
 /// ## SURB balancing
+///
 /// The manager also can take care of automatic [SURB balancing](SurbBalancerConfig) per Session.
 ///
 /// With each packet sent from the session initiator over to the receiving party, zero to 2 SURBs might be delivered.
@@ -283,6 +284,7 @@ type SessionNotifiers = (
 /// *local SURB balancing* and *remote SURB balancing*.
 ///
 /// ### Local SURB balancing
+///
 /// Local SURB balancing is performed on the sessions that were initiated by another party (and are
 /// therefore incoming to us).
 /// The local SURB balancing mechanism continuously evaluates the rate of SURB consumption and retrieval,
@@ -296,6 +298,7 @@ type SessionNotifiers = (
 /// flag during Session initiation.
 ///
 /// ### Remote SURB balancing
+///
 /// Remote SURB balancing is performed by the Session initiator. The SURB balancer estimates the number of SURBs
 /// delivered to the other party, and also the number of SURBs consumed by seeing the amount of traffic received
 /// in replies.
@@ -309,11 +312,13 @@ type SessionNotifiers = (
 /// This mechanism is configurable via the `surb_management` field in [`SessionClientConfig`].
 ///
 /// ### Possible scenarios
+///
 /// There are 4 different scenarios of local vs. remote SURB balancing configuration, but
 /// an equilibrium (= matching the SURB production and consumption) is most likely to be reached
 /// only when both are configured (the ideal case below):
 ///
 /// #### 1. Ideal local and remote SURB balancing
+///
 /// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`, `max_surb_buffer_duration` and
 ///    `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
 /// 2. The Session initiator (Entry) sets the [`target_surb_buffer_size`](SurbBalancerConfig) which matches the
@@ -329,6 +334,7 @@ type SessionNotifiers = (
 /// and the whole system will be in equilibrium during the Session's lifetime (under ideal network conditions).
 ///
 /// #### 2. Remote SURB balancing only
+///
 /// 1. The Session initiator (Entry) *DOES* set the [`Capability::NoRateControl`] capability flag when opening Session.
 /// 2. The Session initiator (Entry) sets `max_surbs_per_sec` and `target_surb_buffer_size` values in
 ///    [`SurbBalancerConfig`]
@@ -341,6 +347,7 @@ type SessionNotifiers = (
 /// when the `SurbBalancer` at the Entry can react fast enough to Exit's demand.
 ///
 /// #### 3. Local SURB balancing only
+///
 /// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`, `max_surb_buffer_duration` and
 ///    `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
 /// 2. The Session initiator (Entry) does *NOT* set the [`Capability::NoRateControl`] capability flag when opening
@@ -357,6 +364,7 @@ type SessionNotifiers = (
 /// If Exit's egress reaches low values due to SURB scarcity, the upper layer protocols over Session might break.
 ///
 /// #### 4. No SURB balancing on each side
+///
 /// 1. The Session initiator (Entry) *DOES* set the [`Capability::NoRateControl`] capability flag when opening Session.
 /// 2. The Session initiator (Entry) does *NOT* set the [`SurbBalancerConfig`] at all when opening Session.
 ///
@@ -369,6 +377,7 @@ type SessionNotifiers = (
 /// at the Exit's egress.
 ///
 /// ### SURB decay
+///
 /// In a hypothetical scenario of a non-zero packet loss, the Session initiator (Entry) might send a
 /// certain number of SURBs to the Session recipient (Exit), but only a portion of it is actually delivered.
 /// The Entry has no way of knowing that and assumes that everything has been delivered.
@@ -385,6 +394,7 @@ type SessionNotifiers = (
 /// This behavior can be controlled via the `surb_decay` field of [`SurbBalancerConfig`].
 ///
 /// ### SURB balance and target notification
+///
 /// The Session recipient (Exit) can notify the Session initiator (Entry) periodically about its estimated
 /// number of SURBs for the Session. This can help the Entry to adjust its approximation of that level so
 /// that its Local SURB balancer can better intervene.
@@ -416,6 +426,34 @@ impl<S> Clone for SessionManager<S> {
 }
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
+
+async fn send_via_msg_sender<S, D>(
+    msg_sender: &mut S,
+    routing: DestinationRouting,
+    data: D,
+    error_context: &'static str,
+) -> crate::errors::Result<()>
+where
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    D: TryInto<ApplicationData>,
+    D::Error: std::error::Error + Send + Sync + 'static,
+{
+    let app_data: ApplicationData = data.try_into().map_err(SessionManagerError::other)?;
+    msg_sender
+        .send((routing, ApplicationDataOut::with_no_packet_info(app_data)))
+        .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+        .await
+        .map_err(|_| {
+            error!("timeout sending {error_context}");
+            TransportSessionError::Timeout
+        })?
+        .map_err(|error| {
+            error!(%error, "failed to send {error_context}");
+            SessionManagerError::other(error)
+        })?;
+    Ok(())
+}
 
 impl<S> SessionManager<S>
 where
@@ -652,18 +690,14 @@ where
 
         // Send the Session initiation message
         info!(challenge, %pseudonym, %destination, "new session request");
-        msg_sender
-            .send((
-                forward_routing.clone(),
-                ApplicationDataOut::with_no_packet_info(start_session_msg.try_into()?),
-            ))
-            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-            .await
-            .map_err(|_| {
-                error!(challenge, %pseudonym, %destination, "timeout sending session request message");
-                TransportSessionError::Timeout
-            })?
-            .map_err(TransportSessionError::packet_sending)?;
+        send_via_msg_sender(
+            &mut msg_sender,
+            forward_routing.clone(),
+            start_session_msg,
+            "session request message",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
 
         // The timeout is given by the number of hops requested
         let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
@@ -936,22 +970,15 @@ where
     pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id).await {
             trace!(session_id = ?id, "pinging manually session");
-            Ok(self
-                .msg_sender
-                .get()
-                .cloned()
-                .ok_or(SessionManagerError::NotStarted)?
-                .send((
-                    session_data.routing_opts.clone(),
-                    ApplicationDataOut::with_no_packet_info(HoprStartProtocol::KeepAlive((*id).into()).try_into()?),
-                ))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!("timeout sending session ping message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(TransportSessionError::packet_sending)?)
+            let msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+            send_via_msg_sender(
+                &mut msg_sender.clone(),
+                session_data.routing_opts.clone(),
+                HoprStartProtocol::KeepAlive((*id).into()),
+                "session ping message",
+            )
+            .await
+            .map_err(TransportSessionError::packet_sending)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
@@ -1112,18 +1139,7 @@ where
                 challenge: session_req.challenge,
                 reason,
             });
-            msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!("timeout sending session error message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(%error, "failed to send session error message");
-                    SessionManagerError::other(error)
-                })?;
+            send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
             return Ok(());
         }
 
@@ -1160,18 +1176,7 @@ where
                 challenge: session_req.challenge,
                 reason,
             });
-            msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!("timeout sending session error message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(%error, "failed to send session error message");
-                    SessionManagerError::other(error)
-                })?;
+            send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
             return Ok(());
         }
 
@@ -1356,18 +1361,13 @@ where
             session_id,
         });
 
-        msg_sender
-            .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-            .await
-            .map_err(|_| {
-                error!(%session_id, "timeout sending session establishment message");
-                TransportSessionError::Timeout
-            })?
-            .map_err(|error| {
-                error!(%session_id, %error, "failed to send session establishment message");
-                SessionManagerError::other(error)
-            })?;
+        send_via_msg_sender(
+            &mut msg_sender,
+            reply_routing.clone(),
+            data,
+            "session establishment message",
+        )
+        .await?;
 
         #[cfg(feature = "telemetry")]
         {
