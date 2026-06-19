@@ -194,7 +194,7 @@ mod tests {
         let key = pt.extract_key("test", &salt);
         assert_eq!(
             "08112a22609819a4c698d6c92f404628ca925f3d731d53594126ffdf19ef6fa9",
-            hex::encode(key)
+            const_hex::encode(key)
         );
     }
 
@@ -210,7 +210,7 @@ mod tests {
 
         assert_eq!(
             "08112a22609819a4c698d6c92f404628ca925f3d731d53594126ffdf19ef6fa9",
-            hex::encode(key)
+            const_hex::encode(key)
         );
     }
 
