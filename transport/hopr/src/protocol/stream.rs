@@ -333,10 +333,10 @@ mod tests {
     use std::{
         pin::Pin,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicUsize, Ordering},
         },
-        task::{Context as TaskContext, Poll},
+        task::{Context as TaskContext, Poll, Waker},
     };
 
     use anyhow::Context;
@@ -467,6 +467,239 @@ mod tests {
         assert_eq!(
             rx.next().await.context("Value must be present")??,
             tokio_util::bytes::BytesMut::from(expected.as_ref())
+        );
+
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------------------
+    // FlaggedStream — models a LivenessStream whose connection has been killed.
+    //
+    // While alive the stream stalls on every poll (like a half-open connection).
+    // When `DeadSignal::kill()` is called, the stored waker is woken and the
+    // next poll returns `Err(io::ErrorKind::ConnectionAborted)`, exactly as
+    // `LivenessStream` behaves when the swarm clears the liveness flag.
+    // ---------------------------------------------------------------------------
+
+    struct DeadSignal {
+        dead: std::sync::atomic::AtomicBool,
+        read_waker: Mutex<Option<Waker>>,
+        write_waker: Mutex<Option<Waker>>,
+    }
+
+    impl std::fmt::Debug for DeadSignal {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("DeadSignal")
+                .field("dead", &self.dead.load(Ordering::Relaxed))
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl DeadSignal {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                dead: std::sync::atomic::AtomicBool::new(false),
+                read_waker: Mutex::new(None),
+                write_waker: Mutex::new(None),
+            })
+        }
+
+        /// Simulate a libp2p connection close: set the dead flag and re-wake
+        /// any parked reader/writer tasks so they observe the error on their
+        /// next poll.
+        fn kill(self: &Arc<Self>) {
+            self.dead.store(true, Ordering::Release);
+            if let Some(w) = self.read_waker.lock().expect("lock ok").take() {
+                w.wake();
+            }
+            if let Some(w) = self.write_waker.lock().expect("lock ok").take() {
+                w.wake();
+            }
+        }
+    }
+
+    struct FlaggedStream {
+        signal: Arc<DeadSignal>,
+    }
+
+    impl AsyncRead for FlaggedStream {
+        fn poll_read(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            if self.signal.dead.load(Ordering::Acquire) {
+                return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
+            }
+            *self.signal.read_waker.lock().expect("lock ok") = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for FlaggedStream {
+        fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            if self.signal.dead.load(Ordering::Acquire) {
+                return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
+            }
+            *self.signal.write_waker.lock().expect("lock ok") = Some(cx.waker().clone());
+            Poll::Pending
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    /// A `NetworkStreamControl` that hands out `FlaggedStream`s from `open()`.
+    ///
+    /// Each `open()` call appends the new stream's `DeadSignal` to `signals`
+    /// so the test can kill individual streams.
+    #[derive(Clone, Debug, Default)]
+    struct ScriptedControl {
+        open_calls: Arc<AtomicUsize>,
+        signals: Arc<Mutex<Vec<Arc<DeadSignal>>>>,
+    }
+
+    impl ScriptedControl {
+        fn open_calls(&self) -> usize {
+            self.open_calls.load(Ordering::Relaxed)
+        }
+
+        /// Returns the `DeadSignal` for the `index`-th stream that was opened.
+        fn signal(&self, index: usize) -> Option<Arc<DeadSignal>> {
+            self.signals.lock().expect("lock ok").get(index).cloned()
+        }
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for ScriptedControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, FlaggedStream)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            let signal = DeadSignal::new();
+            self.signals.lock().expect("lock ok").push(signal.clone());
+            Ok::<_, std::io::Error>(FlaggedStream { signal })
+        }
+    }
+
+    /// Waits up to `secs` seconds for `condition()` to return `true`, polling
+    /// every 25 ms. Returns `true` if the condition was met.
+    async fn wait_for(secs: u64, condition: impl Fn() -> bool) -> bool {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(secs);
+        while !condition() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+        condition()
+    }
+
+    // ---------------------------------------------------------------------------
+    // New tests: connection-death recovery
+    // ---------------------------------------------------------------------------
+
+    /// Verifies that a stream error on the **read path** invalidates the cache
+    /// so the next egress send re-opens a fresh stream.
+    ///
+    /// This is the core regression scenario: a previously healthy stream is
+    /// killed (simulating what `LivenessStream` does on `ConnectionClosed`).
+    /// The reader task detects the `ConnectionAborted` error and invalidates
+    /// the cache. The next outgoing packet causes a cache miss and a new stream
+    /// is opened.
+    #[tokio::test]
+    async fn dead_stream_should_be_detected_on_read_path_and_allow_next_send_to_reopen() -> anyhow::Result<()> {
+        let control = ScriptedControl::default();
+
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 64,
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"probe"[..]);
+
+        // First send: triggers a cache miss → open() #1 is called, stream cached.
+        tx_out
+            .send((peer, msg.clone()))
+            .await
+            .context("first send should succeed")?;
+
+        // Wait for the stream to be opened.
+        assert!(
+            wait_for(2, || control.open_calls() >= 1).await,
+            "stream was never opened"
+        );
+        let signal = control.signal(0).context("signal for stream #1 must exist")?;
+
+        // Kill the stream: simulates a libp2p ConnectionClosed event clearing the
+        // liveness flag. The stored read waker is woken so the parked reader task
+        // observes ConnectionAborted and calls cache.invalidate(peer).
+        signal.kill();
+
+        // Wait for the reader task to detect the error and invalidate the cache,
+        // then send a second packet that causes a new cache miss → open() #2.
+        tx_out
+            .send((peer, msg.clone()))
+            .await
+            .context("second send into egress queue should succeed")?;
+
+        assert!(
+            wait_for(2, || control.open_calls() >= 2).await,
+            "stream was not reopened after connection kill (open_calls={})",
+            control.open_calls()
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that killing a stream while the **writer** is active also leads
+    /// to cache invalidation and reopen.
+    ///
+    /// Sends enough packets to keep the egress task busy writing, then kills
+    /// the stream. The writer forward-future ends on the `ConnectionAborted`
+    /// error and invalidates the cache, causing the next send to reopen.
+    #[tokio::test]
+    async fn dead_stream_should_be_detected_on_write_path_and_allow_next_send_to_reopen() -> anyhow::Result<()> {
+        let control = ScriptedControl::default();
+
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 128,
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"payload"[..]);
+
+        // Open a stream for the peer.
+        tx_out.send((peer, msg.clone())).await.context("initial send")?;
+        assert!(wait_for(2, || control.open_calls() >= 1).await, "stream not opened");
+
+        let signal = control.signal(0).context("signal #1 must exist")?;
+
+        // Kill the stream; the writer's forward-future will error on next poll.
+        signal.kill();
+
+        // Drain the per-peer channel so the writer unparks and observes the error.
+        for _ in 0..32 {
+            let _ = tx_out.send((peer, msg.clone())).await;
+        }
+
+        assert!(
+            wait_for(3, || control.open_calls() >= 2).await,
+            "stream was not reopened after writer kill (open_calls={})",
+            control.open_calls()
         );
 
         Ok(())

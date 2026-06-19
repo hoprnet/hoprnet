@@ -3,12 +3,11 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
 use hopr_utils::network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
-    identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
@@ -223,6 +222,7 @@ impl HoprLibp2pNetworkBuilder {
         let swarm = swarm.swarm;
         let store = crate::peer_store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
+        let liveness: crate::liveness::LivenessRegistry = Default::default();
 
         let (notifier, event_rx) = async_broadcast::broadcast(1000);
 
@@ -232,6 +232,7 @@ impl HoprLibp2pNetworkBuilder {
             control: swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),
             event_rx: event_rx.deactivate(),
+            liveness: liveness.clone(),
         };
 
         #[cfg(all(feature = "telemetry", not(test)))]
@@ -241,6 +242,17 @@ impl HoprLibp2pNetworkBuilder {
             while let Some(event) = swarm.next().await {
                 match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Ping(event)) => {
+                        match event.result {
+                            Ok(rtt) => {
+                                trace!(peer = %event.peer, rtt_ms = rtt.as_millis(), "ping succeeded");
+                            }
+                            Err(failure) => {
+                                warn!(peer = %event.peer, ?failure, "ping failed, closing connection");
+                                swarm.close_connection(event.connection);
+                            }
+                        }
+                    }
                     SwarmEvent::Behaviour(
                         HoprNetworkBehaviorEvent::Autonat(event)
                     ) => {
@@ -326,6 +338,7 @@ impl HoprLibp2pNetworkBuilder {
 
                         if num_established == 0 {
                             tracker.remove(&peer_id);
+                            crate::liveness::mark_peer_disconnected(&liveness, &peer_id);
                             if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
                                 error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
                             }
@@ -368,6 +381,7 @@ impl HoprLibp2pNetworkBuilder {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
                                 tracker.remove(&peer_id);
+                                crate::liveness::mark_peer_disconnected(&liveness, &peer_id);
                                 if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
                                     error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
                                 }
