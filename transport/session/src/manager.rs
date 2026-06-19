@@ -2139,11 +2139,9 @@ mod tests {
         let allocated_session_ids = mgr.active_sessions().await;
         assert_eq!(1, allocated_session_ids.len());
 
-        // Cleanup: close senders and await handles
-        alice_sender.close_channel();
-        bob_sender.close_channel();
-        let _ = alice_handle.await;
-        let _ = bob_handle.await;
+        // Cleanup: close sender and await handle
+        sender.close_channel();
+        let _ = _handle.await;
 
         Ok(())
     }
