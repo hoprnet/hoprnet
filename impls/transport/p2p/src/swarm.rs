@@ -2,15 +2,14 @@
 use std::num::NonZeroU8;
 use std::sync::Arc;
 
+use dashmap::DashSet;
 #[cfg(feature = "runtime-tokio")]
 use futures::stream::BoxStream;
-#[cfg(feature = "runtime-tokio")]
-use libp2p::identity::PublicKey;
-
-use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
 use hopr_utils::network_types::prelude::is_public_address;
+#[cfg(feature = "runtime-tokio")]
+use libp2p::identity::PublicKey;
 use libp2p::{
     autonat,
     swarm::{NetworkInfo, SwarmEvent},

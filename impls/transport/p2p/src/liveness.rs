@@ -264,9 +264,14 @@ mod tests {
         let peer = PeerId::random();
 
         let get_or_create_connecteded = registry.get_or_create_connected(&peer);
-        let got = registry.get(&peer).expect("flag must exist after get_or_create_connected");
+        let got = registry
+            .get(&peer)
+            .expect("flag must exist after get_or_create_connected");
 
-        assert!(Arc::ptr_eq(&get_or_create_connecteded, &got), "get must return the same Arc as get_or_create_connected");
+        assert!(
+            Arc::ptr_eq(&get_or_create_connecteded, &got),
+            "get must return the same Arc as get_or_create_connected"
+        );
     }
 
     #[test]
