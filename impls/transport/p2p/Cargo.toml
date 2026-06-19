@@ -34,7 +34,6 @@ libp2p = { workspace = true, features = [
   "autonat",
   "dns",
   "identify",
-  "ping",
   "tcp",
   "yamux",
 ] }

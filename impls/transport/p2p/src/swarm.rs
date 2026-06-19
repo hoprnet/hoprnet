@@ -242,17 +242,6 @@ impl HoprLibp2pNetworkBuilder {
             while let Some(event) = swarm.next().await {
                 match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Ping(event)) => {
-                        match event.result {
-                            Ok(rtt) => {
-                                trace!(peer = %event.peer, rtt_ms = rtt.as_millis(), "ping succeeded");
-                            }
-                            Err(failure) => {
-                                warn!(peer = %event.peer, ?failure, "ping failed, closing connection");
-                                swarm.close_connection(event.connection);
-                            }
-                        }
-                    }
                     SwarmEvent::Behaviour(
                         HoprNetworkBehaviorEvent::Autonat(event)
                     ) => {

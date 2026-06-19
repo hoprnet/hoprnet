@@ -20,7 +20,6 @@ pub struct HoprNetworkBehavior {
     pub(crate) streams: libp2p_stream::Behaviour,
     identify: libp2p::identify::Behaviour,
     autonat: libp2p::autonat::Behaviour,
-    ping: libp2p::ping::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -36,18 +35,6 @@ impl HoprNetworkBehavior {
     {
         let my_peer_id = libp2p::PeerId::from_public_key(&me);
 
-        let ping_interval = std::env::var("HOPR_INTERNAL_LIBP2P_PING_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .map(std::time::Duration::from_secs)
-            .unwrap_or(crate::constants::HOPR_PING_INTERVAL);
-
-        let ping_timeout = std::env::var("HOPR_INTERNAL_LIBP2P_PING_TIMEOUT_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .map(std::time::Duration::from_secs)
-            .unwrap_or(crate::constants::HOPR_PING_TIMEOUT);
-
         Self {
             streams: libp2p_stream::Behaviour::new(),
             discovery: discovery::Behaviour::new(my_peer_id, external_discovery_events),
@@ -56,11 +43,6 @@ impl HoprNetworkBehavior {
                 me,
             )),
             autonat: libp2p::autonat::Behaviour::new(my_peer_id, Default::default()),
-            ping: libp2p::ping::Behaviour::new(
-                libp2p::ping::Config::new()
-                    .with_interval(ping_interval)
-                    .with_timeout(ping_timeout),
-            ),
         }
     }
 }
@@ -74,7 +56,6 @@ pub enum HoprNetworkBehaviorEvent {
     Discovery(()),
     Identify(Box<libp2p::identify::Event>),
     Autonat(libp2p::autonat::Event),
-    Ping(libp2p::ping::Event),
 }
 
 impl From<()> for HoprNetworkBehaviorEvent {
@@ -92,11 +73,5 @@ impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
 impl From<libp2p::autonat::Event> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p::autonat::Event) -> Self {
         Self::Autonat(event)
-    }
-}
-
-impl From<libp2p::ping::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::ping::Event) -> Self {
-        Self::Ping(event)
     }
 }
