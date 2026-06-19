@@ -1,8 +1,7 @@
 use std::{
-    fmt::{Debug, Display, Formatter},
-    hash::{Hash, Hasher},
+    convert::Into,
+    fmt::{Debug, Formatter},
     pin::Pin,
-    str::FromStr,
     task::{Context, Poll},
     time::Duration,
 };
@@ -10,12 +9,11 @@ use std::{
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
-    primitive::{
-        errors::GeneralError,
-        prelude::{BytesRepresentable, ToHex},
-    },
+    primitive::errors::GeneralError,
 };
-use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
+#[cfg(feature = "telemetry")]
+use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -70,192 +68,15 @@ impl AsRef<Capabilities> for ByteCapabilities {
 /// Start protocol instantiation for HOPR.
 pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
 
-/// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
+/// Constant application tag used for all sessions.
+/// Previously tags were dynamically allocated per session.
+pub const SESSION_APPLICATION_TAG: Tag = Tag::Reserved(ReservedTag::Session as u64);
+
+/// Unique ID of a specific Session.
 ///
-/// The calculation is based on the formula: ⌈8n × log_10(2)⌉
-/// where n is the number of bytes.
-const fn max_decimal_digits_for_n_bytes(n: usize) -> usize {
-    // log_10(2) = 0.301029995664 multiplied by 1 000 000 to work with integers in a const function
-    const LOG10_2_SCALED: u64 = 301030;
-    const SCALE: u64 = 1_000_000;
-
-    // 8n * log_10(2) scaled
-    let scaled = 8 * n as u64 * LOG10_2_SCALED;
-
-    scaled.div_ceil(SCALE) as usize
-}
-
-// Enough to fit HoprPseudonym in hex (with 0x prefix), delimiter and tag number
-const MAX_SESSION_ID_STR_LEN: usize = 2 + 2 * HoprPseudonym::SIZE + 1 + max_decimal_digits_for_n_bytes(Tag::SIZE);
-
-/// Unique ID of a specific Session in a certain direction.
-///
-/// Simple wrapper around the maximum range of the port like session unique identifier.
-/// It is a simple combination of an application tag for the Session and
-/// a [`HoprPseudonym`].
-#[derive(Clone, Copy)]
-pub struct SessionId {
-    tag: Tag,
-    pseudonym: HoprPseudonym,
-    // Since this SessionId is commonly represented as a string,
-    // we cache its string representation here.
-    // Also, by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
-    // This representation is possibly truncated to MAX_SESSION_ID_STR_LEN.
-    // This member is always computed and is therefore not serialized.
-    cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>,
-}
-
-impl SessionId {
-    const DELIMITER: char = ':';
-
-    pub fn new<T: Into<Tag>>(tag: T, pseudonym: HoprPseudonym) -> Self {
-        let tag = tag.into();
-        let mut cached = format!("{pseudonym}{}{tag}", Self::DELIMITER);
-        cached.truncate(MAX_SESSION_ID_STR_LEN);
-
-        Self {
-            tag,
-            pseudonym,
-            cached: cached.parse().expect("cannot fail due to truncation"),
-        }
-    }
-
-    pub fn tag(&self) -> Tag {
-        self.tag
-    }
-
-    pub fn pseudonym(&self) -> &HoprPseudonym {
-        &self.pseudonym
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.cached
-    }
-}
-
-impl FromStr for SessionId {
-    type Err = TransportSessionError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.split_once(Self::DELIMITER)
-            .ok_or(TransportSessionError::InvalidSessionId)
-            .and_then(
-                |(pseudonym, tag)| match (HoprPseudonym::from_hex(pseudonym), Tag::from_str(tag)) {
-                    (Ok(p), Ok(t)) => Ok(Self::new(t, p)),
-                    _ => Err(TransportSessionError::InvalidSessionId),
-                },
-            )
-    }
-}
-
-impl serde::Serialize for SessionId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("SessionId", 2)?;
-        state.serialize_field("tag", &self.tag)?;
-        state.serialize_field("pseudonym", &self.pseudonym)?;
-        state.end()
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for SessionId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de;
-
-        #[derive(serde::Deserialize)]
-        #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field {
-            Tag,
-            Pseudonym,
-        }
-
-        struct SessionIdVisitor;
-
-        impl<'de> de::Visitor<'de> for SessionIdVisitor {
-            type Value = SessionId;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("struct SessionId")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<SessionId, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                Ok(SessionId::new(
-                    seq.next_element::<Tag>()?
-                        .ok_or_else(|| de::Error::invalid_length(0, &self))?,
-                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
-                ))
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<SessionId, V::Error>
-            where
-                V: de::MapAccess<'de>,
-            {
-                let mut tag: Option<Tag> = None;
-                let mut pseudonym: Option<HoprPseudonym> = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Tag => {
-                            if tag.is_some() {
-                                return Err(de::Error::duplicate_field("tag"));
-                            }
-                            tag = Some(map.next_value()?);
-                        }
-                        Field::Pseudonym => {
-                            if pseudonym.is_some() {
-                                return Err(de::Error::duplicate_field("pseudonym"));
-                            }
-                            pseudonym = Some(map.next_value()?);
-                        }
-                    }
-                }
-
-                Ok(SessionId::new(
-                    tag.ok_or_else(|| de::Error::missing_field("tag"))?,
-                    pseudonym.ok_or_else(|| de::Error::missing_field("pseudonym"))?,
-                ))
-            }
-        }
-
-        const FIELDS: &[&str] = &["tag", "pseudonym"];
-        deserializer.deserialize_struct("SessionId", FIELDS, SessionIdVisitor)
-    }
-}
-
-impl Display for SessionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl Debug for SessionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl PartialEq for SessionId {
-    fn eq(&self, other: &Self) -> bool {
-        self.tag == other.tag && self.pseudonym == other.pseudonym
-    }
-}
-
-impl Eq for SessionId {}
-
-impl Hash for SessionId {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.tag.hash(state);
-        self.pseudonym.hash(state);
-    }
-}
+/// Now a simple type alias for HoprPseudonym since we use a constant
+/// application tag for all sessions instead of dynamically allocating tags.
+pub type SessionId = HoprPseudonym;
 
 pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
@@ -383,7 +204,7 @@ impl HoprSession {
                     // The Session protocol does not set any packet info on outgoing packets.
                     // However, the SessionManager on top usually overrides this.
                     futures::future::ready(
-                        ApplicationData::new(id.tag(), buf.into_vec())
+                        ApplicationData::new(SESSION_APPLICATION_TAG, buf.into_vec())
                             .map(|data| (routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
                             .map_err(std::io::Error::other),
                     )
@@ -436,7 +257,7 @@ impl HoprSession {
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    id,
+                    NoopTracker,
                 )?)
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
@@ -446,7 +267,7 @@ impl HoprSession {
                     transport,
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
-                    id,
+                    NoopTracker,
                 )?)
             }
         } else {
@@ -677,26 +498,8 @@ mod tests {
     // --- SessionId edge cases ---
 
     #[test]
-    fn session_id_from_str_rejects_missing_delimiter() {
-        assert!(SessionId::from_str("nodelmiter").is_err());
-    }
-
-    #[test]
-    fn session_id_from_str_rejects_invalid_pseudonym() {
-        assert!(SessionId::from_str("notahexvalue:1234").is_err());
-    }
-
-    #[test]
-    fn session_id_from_str_should_reject_invalid_tag() {
-        let pseudonym = HoprPseudonym::random();
-        let hex = pseudonym.to_hex();
-        let bad = format!("{hex}:not_a_number");
-        assert!(SessionId::from_str(&bad).is_err());
-    }
-
-    #[test]
     fn session_id_display_and_debug_should_be_identical() {
-        let id = SessionId::new(42_u64, HoprPseudonym::random());
+        let id = HoprPseudonym::random();
         assert_eq!(format!("{id}"), format!("{id:?}"));
     }
 
@@ -704,65 +507,22 @@ mod tests {
     fn session_id_hash_eq_consistency() {
         use std::collections::HashSet;
         let pseudonym = HoprPseudonym::random();
-        let id1 = SessionId::new(1234_u64, pseudonym);
-        let id2 = SessionId::new(1234_u64, pseudonym);
-        let id3 = SessionId::new(5678_u64, pseudonym);
-        let id4 = SessionId::new(1234_u64, HoprPseudonym::random());
+        let id1: SessionId = pseudonym;
+        let id2: SessionId = pseudonym;
+        let id3: SessionId = HoprPseudonym::random();
 
         let mut set = HashSet::new();
         set.insert(id1);
         assert!(set.contains(&id2));
-        assert!(!set.contains(&id3));
-        assert!(!set.contains(&id4), "same id but different pseudonym should not match");
+        assert!(!set.contains(&id3), "different pseudonym should not be in the set");
     }
 
     // --- Existing tests ---
 
-    #[test]
-    fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
-        let id = SessionId::new(1234_u64, HoprPseudonym::random());
-        assert_eq!(id.as_str(), id.to_string());
-        assert_eq!(id, SessionId::from_str(id.as_str())?);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_max_decimal_digits_for_n_bytes() {
-        assert_eq!(3, max_decimal_digits_for_n_bytes(size_of::<u8>()));
-        assert_eq!(5, max_decimal_digits_for_n_bytes(size_of::<u16>()));
-        assert_eq!(10, max_decimal_digits_for_n_bytes(size_of::<u32>()));
-        assert_eq!(20, max_decimal_digits_for_n_bytes(size_of::<u64>()));
-    }
-
-    #[test]
-    fn standard_session_id_must_fit_within_limit() {
-        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(Tag::MAX));
-        assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
-    }
-
-    #[test]
-    fn session_id_should_serialize_and_deserialize_correctly() -> anyhow::Result<()> {
-        let pseudonym = HoprPseudonym::random();
-        let tag: Tag = 1234u64.into();
-
-        let session_id_1 = SessionId::new(tag, pseudonym);
-        let data = serde_cbor_2::to_vec(&session_id_1)?;
-        let session_id_2: SessionId = serde_cbor_2::from_slice(&data)?;
-
-        assert_eq!(tag, session_id_2.tag());
-        assert_eq!(pseudonym, *session_id_2.pseudonym());
-
-        assert_eq!(session_id_1.as_str(), session_id_2.as_str());
-        assert_eq!(session_id_1, session_id_2);
-
-        Ok(())
-    }
-
     #[test_log::test(tokio::test)]
     async fn test_session_bidirectional_flow_without_segmentation() -> anyhow::Result<()> {
         let dst: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let id: SessionId = HoprPseudonym::random();
         const DATA_LEN: usize = 5000;
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -786,7 +546,7 @@ mod tests {
 
         let mut bob_session = HoprSession::new(
             id,
-            DestinationRouting::Return(id.pseudonym().into()),
+            DestinationRouting::Return(id.into()),
             Default::default(),
             (
                 bob_tx,
@@ -837,7 +597,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn test_session_bidirectional_flow_with_segmentation() -> anyhow::Result<()> {
         let dst: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let id: SessionId = HoprPseudonym::random();
         const DATA_LEN: usize = 5000;
 
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
@@ -864,7 +624,7 @@ mod tests {
 
         let mut bob_session = HoprSession::new(
             id,
-            DestinationRouting::Return(id.pseudonym().into()),
+            DestinationRouting::Return(id.into()),
             HoprSessionConfig {
                 capabilities: Capability::Segmentation.into(),
                 ..Default::default()

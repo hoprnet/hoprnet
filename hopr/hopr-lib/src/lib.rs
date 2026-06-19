@@ -369,7 +369,7 @@ where
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
-            .with_max_times(self.cfg.protocol.session.establish_max_retries as usize)
+            .with_max_times(self.cfg.protocol.session.establish_max_retries)
             .with_delay(self.cfg.protocol.session.establish_retry_timeout)
             .with_jitter();
 

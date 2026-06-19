@@ -4006,7 +4006,6 @@ name = "hopr-transport-session"
 version = "0.22.1"
 dependencies = [
  "anyhow",
- "arrayvec",
  "async-trait",
  "criterion",
  "flagset",
@@ -4017,7 +4016,6 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-tag-allocator",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4030,7 +4028,6 @@ dependencies = [
  "pin-project",
  "rand 0.10.1",
  "serde",
- "serde_cbor_2",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",
