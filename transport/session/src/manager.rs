@@ -427,6 +427,29 @@ impl<S> Clone for SessionManager<S> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
+fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
+    HoprSessionConfig {
+        capabilities,
+        frame_mtu: cfg.frame_mtu,
+        frame_timeout: cfg.max_frame_timeout,
+    }
+}
+
+#[cfg(feature = "telemetry")]
+fn initialize_session_telemetry(
+    session_id: SessionId,
+    cfg: &SessionManagerConfig,
+    capabilities: Capabilities,
+    surb_estimator: Option<&AtomicSurbFlowEstimator>,
+    surb_mgmt: Option<&Arc<BalancerStateValues>>,
+) {
+    initialize_session_metrics(session_id, session_config(cfg, capabilities));
+    set_session_state(&session_id, SessionLifecycleState::Active);
+    if let (Some(estimator), Some(mgmt)) = (surb_estimator, surb_mgmt) {
+        set_session_balancer_data(&session_id, estimator.clone(), mgmt.clone());
+    }
+}
+
 async fn send_via_msg_sender<S, D>(
     msg_sender: &mut S,
     routing: DestinationRouting,
@@ -845,11 +868,7 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        HoprSessionConfig {
-                            capabilities: cfg.capabilities,
-                            frame_mtu: self.cfg.frame_mtu,
-                            frame_timeout: self.cfg.max_frame_timeout,
-                        },
+                        session_config(&self.cfg, cfg.capabilities),
                         (
                             reduced_surb_scoring_sender,
                             rx.inspect(move |_| {
@@ -866,18 +885,13 @@ where
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    {
-                        initialize_session_metrics(
-                            session_id,
-                            HoprSessionConfig {
-                                capabilities: cfg.capabilities,
-                                frame_mtu: self.cfg.frame_mtu,
-                                frame_timeout: self.cfg.max_frame_timeout,
-                            },
-                        );
-                        set_session_state(&session_id, SessionLifecycleState::Active);
-                        set_session_balancer_data(&session_id, surb_estimator.clone(), surb_mgmt.clone());
-                    }
+                    initialize_session_telemetry(
+                        session_id,
+                        &self.cfg,
+                        cfg.capabilities,
+                        Some(&surb_estimator),
+                        Some(&surb_mgmt),
+                    );
 
                     Ok(session)
                 } else {
@@ -914,27 +928,13 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        HoprSessionConfig {
-                            capabilities: cfg.capabilities,
-                            frame_mtu: self.cfg.frame_mtu,
-                            frame_timeout: self.cfg.max_frame_timeout,
-                        },
+                        session_config(&self.cfg, cfg.capabilities),
                         (reduced_surb_sender, rx),
                         Some(notifier),
                     )?;
 
                     #[cfg(feature = "telemetry")]
-                    {
-                        initialize_session_metrics(
-                            session_id,
-                            HoprSessionConfig {
-                                capabilities: cfg.capabilities,
-                                frame_mtu: self.cfg.frame_mtu,
-                                frame_timeout: self.cfg.max_frame_timeout,
-                            },
-                        );
-                        set_session_state(&session_id, SessionLifecycleState::Active);
-                    }
+                    initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None);
 
                     Ok(session)
                 }
@@ -1210,11 +1210,7 @@ where
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
-                HoprSessionConfig {
-                    capabilities: session_req.capabilities.into(),
-                    frame_mtu: self.cfg.frame_mtu,
-                    frame_timeout: self.cfg.max_frame_timeout,
-                },
+                session_config(&self.cfg, session_req.capabilities.into()),
                 (
                     // Sent packets = SURB consumption estimate
                     msg_sender
@@ -1316,11 +1312,7 @@ where
             HoprSession::new(
                 session_id,
                 reply_routing.clone(),
-                HoprSessionConfig {
-                    capabilities: session_req.capabilities.into(),
-                    frame_mtu: self.cfg.frame_mtu,
-                    frame_timeout: self.cfg.max_frame_timeout,
-                },
+                session_config(&self.cfg, session_req.capabilities.into()),
                 (msg_sender.clone(), rx_session_data),
                 Some(closure_notifier),
             )?
@@ -1370,18 +1362,13 @@ where
         .await?;
 
         #[cfg(feature = "telemetry")]
-        {
-            initialize_session_metrics(
-                session_id,
-                HoprSessionConfig {
-                    capabilities: session_req.capabilities.0,
-                    frame_mtu: self.cfg.frame_mtu,
-                    frame_timeout: self.cfg.max_frame_timeout,
-                },
-            );
-            set_session_state(&session_id, SessionLifecycleState::Active);
-            set_session_balancer_data(&session_id, slot.surb_estimator.clone(), slot.surb_mgmt.clone());
-        }
+        initialize_session_telemetry(
+            session_id,
+            &self.cfg,
+            session_req.capabilities.0,
+            Some(&slot.surb_estimator),
+            Some(&slot.surb_mgmt),
+        );
 
         info!(%session_id, "new session established");
 
