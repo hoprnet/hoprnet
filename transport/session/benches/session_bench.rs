@@ -10,7 +10,7 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig};
 
 // Avoid musl's default allocator due to degraded performance
 //

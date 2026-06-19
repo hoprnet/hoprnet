@@ -23,6 +23,7 @@ struct SessionIdWrapper(SessionId);
 
 impl SessionIdWrapper {
     /// Returns the session label as a `&str` without allocating.
+    #[allow(unused)]
     fn label(&self) -> &str {
         self.0.as_ref()
     }

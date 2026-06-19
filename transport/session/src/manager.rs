@@ -147,7 +147,7 @@ struct SessionSlot {
 /// session setup is explicitly [committed](SessionSlotGuard::commit).
 ///
 /// Establishing a session involves several fallible steps *after* the slot has
-/// been inserted into the sessions cache (constructing the [`HoprSession`],
+/// been inserted into the Session cache (constructing the [`HoprSession`],
 /// notifying about the new session, sending the establishment message, ...).
 /// If any of these steps fails, the already inserted slot would otherwise linger
 /// in the cache until idle eviction, blocking the pseudonym (and counting towards
@@ -156,14 +156,14 @@ struct SessionSlot {
 /// Dropping this guard without committing removes the slot and tears down the
 /// partially initialized session. Since Moka's removal is asynchronous and Rust
 /// has no asynchronous `Drop`, the cleanup is performed on a spawned task.
-struct SessionSlotGuard {
-    sessions: moka::future::Cache<SessionId, SessionSlot>,
+struct SessionSlotGuard<'a> {
+    sessions: &'a moka::future::Cache<SessionId, SessionSlot>,
     session_id: SessionId,
     committed: bool,
 }
 
-impl SessionSlotGuard {
-    fn new(sessions: moka::future::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
+impl<'a> SessionSlotGuard<'a> {
+    fn new(sessions: &'a moka::future::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
         Self {
             sessions,
             session_id,
@@ -178,23 +178,21 @@ impl SessionSlotGuard {
     }
 }
 
-impl Drop for SessionSlotGuard {
+impl Drop for SessionSlotGuard<'_> {
     fn drop(&mut self) {
-        if self.committed {
-            return;
+        if !self.committed {
+            // The session setup failed after the slot was inserted: remove it so it does
+            // not block the pseudonym until idle eviction. Moka removal is async, so the
+            // cleanup runs on a spawned task.
+            let sessions = self.sessions.clone();
+            let session_id = self.session_id;
+            warn!(%session_id, "rolling back partially established session slot after setup failure");
+            hopr_utils::runtime::prelude::spawn(async move {
+                if let Some(slot) = sessions.remove(&session_id).await {
+                    close_session(session_id, slot, ClosureReason::Eviction);
+                }
+            });
         }
-
-        // The session setup failed after the slot was inserted: remove it so it does
-        // not block the pseudonym until idle eviction. Moka removal is async, so the
-        // cleanup runs on a spawned task.
-        let sessions = self.sessions.clone();
-        let session_id = self.session_id;
-        warn!(%session_id, "rolling back partially established session slot after setup failure");
-        hopr_utils::runtime::prelude::spawn(async move {
-            if let Some(slot) = sessions.remove(&session_id).await {
-                close_session(session_id, slot, ClosureReason::Eviction);
-            }
-        });
     }
 }
 
@@ -672,8 +670,30 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
-        // We currently do not support loopback Sessions on ourselves.
+    /// Atomically allocates a new [`SessionSlot`] for `session_id` and returns an RAII
+    /// [`SessionSlotGuard`] for it.
+    ///
+    /// Establishing a session involves several fallible steps *after* the slot has been
+    /// inserted. The returned guard rolls the slot back - tearing the partially
+    /// established session down via [`close_session`] - unless it is
+    /// [committed](SessionSlotGuard::commit).
+    ///
+    /// The active-sessions gauge is incremented here, atomically with the insertion and
+    /// the guard creation, precisely so that it is always paired with the guard's
+    /// rollback decrement (performed through [`close_session`]). This keeps the gauge
+    /// accurate: it is never decremented for a slot that was not counted in the first
+    /// place, and every counted slot is decremented exactly once when it leaves the cache.
+    ///
+    /// Returns `None` if a slot for `session_id` already exists; in that case nothing is
+    /// inserted, the gauge is left untouched, and no guard is produced. The atomic `entry`
+    /// API guarantees that only one concurrent caller can claim the slot for a given
+    /// pseudonym (avoiding a TOCTOU race), which also rules out loopback sessions onto
+    /// ourselves.
+    async fn allocate_session_slot<'a>(
+        &'a self,
+        session_id: SessionId,
+        slot: SessionSlot,
+    ) -> Option<SessionSlotGuard<'a>> {
         if let moka::ops::compute::CompResult::Inserted(_) = self
             .sessions
             .entry(session_id)
@@ -686,17 +706,14 @@ where
             })
             .await
         {
+            // Count the freshly inserted slot. The returned guard is the only thing that
+            // can undo this insertion (via `close_session`), so the gauge stays balanced.
             #[cfg(all(feature = "telemetry", not(test)))]
-            {
-                METRIC_NUM_INITIATED_SESSIONS.increment();
-                METRIC_ACTIVE_SESSIONS.increment(1.0);
-            }
+            METRIC_ACTIVE_SESSIONS.increment(1.0);
 
-            Ok(())
+            Some(SessionSlotGuard::new(&self.sessions, session_id))
         } else {
-            // Session already exists; it means it is most likely a loopback attempt
-            error!(%session_id, "session already exists - loopback attempt");
-            Err(SessionManagerError::Loopback.into())
+            None
         }
     }
 
@@ -883,21 +900,28 @@ where
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionTasks::Balancer, balancer_abort_handle);
 
-                    // If the insertion fails prematurely, it will also kill all the abort handles
-                    self.insert_session_slot(
-                        session_id,
-                        SessionSlot {
-                            session_tx: Arc::new(tx),
-                            routing_opts: forward_routing.clone(),
-                            abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
-                            surb_mgmt: surb_mgmt.clone(),
-                            surb_estimator: surb_estimator.clone(),
-                        },
-                    )
-                    .await?;
+                    // Insert the slot and obtain a guard that rolls it back (also tearing
+                    // down the abort handles) if any subsequent setup step fails.
+                    let mut slot_guard = self
+                        .allocate_session_slot(
+                            session_id,
+                            SessionSlot {
+                                session_tx: Arc::new(tx),
+                                routing_opts: forward_routing.clone(),
+                                abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
+                                surb_mgmt: surb_mgmt.clone(),
+                                surb_estimator: surb_estimator.clone(),
+                            },
+                        )
+                        .await
+                        .ok_or_else(|| {
+                            // Session already exists; it means it is most likely a loopback attempt
+                            error!(%session_id, "session already exists - loopback attempt");
+                            SessionManagerError::Loopback
+                        })?;
 
-                    // Roll back the inserted slot if any subsequent setup step fails.
-                    let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -956,20 +980,28 @@ where
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
 
-                    self.insert_session_slot(
-                        session_id,
-                        SessionSlot {
-                            session_tx: Arc::new(tx),
-                            routing_opts: forward_routing.clone(),
-                            abort_handles: Default::default(),
-                            surb_mgmt: Default::default(),      // Disabled SURB management
-                            surb_estimator: Default::default(), // No SURB estimator needed
-                        },
-                    )
-                    .await?;
+                    // Insert the slot and obtain a guard that rolls it back if any
+                    // subsequent setup step fails.
+                    let mut slot_guard = self
+                        .allocate_session_slot(
+                            session_id,
+                            SessionSlot {
+                                session_tx: Arc::new(tx),
+                                routing_opts: forward_routing.clone(),
+                                abort_handles: Default::default(),
+                                surb_mgmt: Default::default(), // Disabled SURB management
+                                surb_estimator: Default::default(), // No SURB estimator needed
+                            },
+                        )
+                        .await
+                        .ok_or_else(|| {
+                            // Session already exists; it means it is most likely a loopback attempt
+                            error!(%session_id, "session already exists - loopback attempt");
+                            SessionManagerError::Loopback
+                        })?;
 
-                    // Roll back the inserted slot if any subsequent setup step fails.
-                    let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -1216,22 +1248,11 @@ where
             surb_estimator: Default::default(),
         };
 
-        // Use atomic entry API to prevent race condition (TOCTOU)
-        // Only one concurrent request can successfully insert for a given pseudonym
-        if let moka::ops::compute::CompResult::Inserted(_) = self
-            .sessions
-            .entry(session_id)
-            .and_compute_with(|entry| {
-                futures::future::ready(if entry.is_none() {
-                    moka::ops::compute::Op::Put(slot.clone())
-                } else {
-                    moka::ops::compute::Op::Nop
-                })
-            })
-            .await
-        {
-            // Inserted successfully - continue with session setup
-        } else {
+        // Insert the slot and obtain a guard. Any failure from here on rolls the slot
+        // back, otherwise it would block this pseudonym until idle eviction. The atomic
+        // insert (inside the helper) also prevents a TOCTOU race, so only one concurrent
+        // request can claim the slot for a given pseudonym.
+        let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()).await else {
             // No slots available for this pseudonym
             error!(%pseudonym, "no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
@@ -1241,14 +1262,7 @@ where
             });
             send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
             return Ok(());
-        }
-
-        // The slot has been inserted into the cache; any failure from here on must
-        // roll it back, otherwise it would block this pseudonym until idle eviction.
-        let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_ACTIVE_SESSIONS.increment(1.0);
+        };
 
         debug!(?pseudonym, ?session_req, "assigned a new session");
 
