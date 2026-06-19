@@ -143,6 +143,61 @@ struct SessionSlot {
     surb_estimator: AtomicSurbFlowEstimator,
 }
 
+/// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
+/// session setup is explicitly [committed](SessionSlotGuard::commit).
+///
+/// Establishing a session involves several fallible steps *after* the slot has
+/// been inserted into the sessions cache (constructing the [`HoprSession`],
+/// notifying about the new session, sending the establishment message, ...).
+/// If any of these steps fails, the already inserted slot would otherwise linger
+/// in the cache until idle eviction, blocking the pseudonym (and counting towards
+/// `maximum_sessions`) in the meantime.
+///
+/// Dropping this guard without committing removes the slot and tears down the
+/// partially initialized session. Since Moka's removal is asynchronous and Rust
+/// has no asynchronous `Drop`, the cleanup is performed on a spawned task.
+struct SessionSlotGuard {
+    sessions: moka::future::Cache<SessionId, SessionSlot>,
+    session_id: SessionId,
+    committed: bool,
+}
+
+impl SessionSlotGuard {
+    fn new(sessions: moka::future::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
+        Self {
+            sessions,
+            session_id,
+            committed: false,
+        }
+    }
+
+    /// Marks the session as successfully established, preventing the slot from
+    /// being rolled back when this guard is dropped.
+    fn commit(&mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for SessionSlotGuard {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+
+        // The session setup failed after the slot was inserted: remove it so it does
+        // not block the pseudonym until idle eviction. Moka removal is async, so the
+        // cleanup runs on a spawned task.
+        let sessions = self.sessions.clone();
+        let session_id = self.session_id;
+        warn!(%session_id, "rolling back partially established session slot after setup failure");
+        hopr_utils::runtime::prelude::spawn(async move {
+            if let Some(slot) = sessions.remove(&session_id).await {
+                close_session(session_id, slot, ClosureReason::Eviction);
+            }
+        });
+    }
+}
+
 /// Indicates the result of processing a message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DispatchResult {
@@ -439,7 +494,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
 fn initialize_session_telemetry(
     session_id: SessionId,
     cfg: &SessionManagerConfig,
-    capabilities: Capabilities,
+    capabilities: crate::Capabilities,
     surb_estimator: Option<&AtomicSurbFlowEstimator>,
     surb_mgmt: Option<&Arc<BalancerStateValues>>,
 ) {
@@ -841,6 +896,9 @@ where
                     )
                     .await?;
 
+                    // Roll back the inserted slot if any subsequent setup step fails.
+                    let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
+
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
                     match level_stream
@@ -893,6 +951,7 @@ where
                         Some(&surb_mgmt),
                     );
 
+                    slot_guard.commit();
                     Ok(session)
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
@@ -908,6 +967,9 @@ where
                         },
                     )
                     .await?;
+
+                    // Roll back the inserted slot if any subsequent setup step fails.
+                    let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
@@ -936,6 +998,7 @@ where
                     #[cfg(feature = "telemetry")]
                     initialize_session_telemetry(session_id, &self.cfg, cfg.capabilities, None, None);
 
+                    slot_guard.commit();
                     Ok(session)
                 }
             }
@@ -1180,6 +1243,13 @@ where
             return Ok(());
         }
 
+        // The slot has been inserted into the cache; any failure from here on must
+        // roll it back, otherwise it would block this pseudonym until idle eviction.
+        let mut slot_guard = SessionSlotGuard::new(self.sessions.clone(), session_id);
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_ACTIVE_SESSIONS.increment(1.0);
+
         debug!(?pseudonym, ?session_req, "assigned a new session");
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
@@ -1373,11 +1443,9 @@ where
         info!(%session_id, "new session established");
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        {
-            METRIC_NUM_ESTABLISHED_SESSIONS.increment();
-            METRIC_ACTIVE_SESSIONS.increment(1.0);
-        }
+        METRIC_NUM_ESTABLISHED_SESSIONS.increment();
 
+        slot_guard.commit();
         Ok(())
     }
 
@@ -1569,6 +1637,22 @@ mod tests {
         HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
             .map(msg)
             .unwrap_or(false)
+    }
+
+    /// Waits (bounded) until the manager reports no active sessions.
+    ///
+    /// The session-slot rollback runs on a spawned task, so its effect is observed
+    /// asynchronously; this polls [`SessionManager::active_sessions`] until it drains.
+    async fn wait_for_no_active_sessions(
+        mgr: &SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+    ) -> bool {
+        for _ in 0..50 {
+            if mgr.active_sessions().await.is_empty() {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        mgr.active_sessions().await.is_empty()
     }
 
     #[test_log::test(tokio::test)]
@@ -2123,12 +2207,60 @@ mod tests {
 
         assert!(result.is_err());
 
-        let allocated_session_ids = mgr.active_sessions().await;
-        assert_eq!(1, allocated_session_ids.len());
+        // The slot inserted before the failure must be rolled back, so it neither
+        // counts towards `maximum_sessions` nor registers any telemetry.
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "the partially established session slot was not rolled back"
+        );
 
         // Cleanup: close sender and await handle
         sender.close_channel();
         let _ = _handle.await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_roll_back_slot_when_incoming_session_setup_fails() -> anyhow::Result<()> {
+        let mgr = SessionManager::new(Default::default());
+
+        // Drop the receiver so that notifying about the new incoming session fails
+        // *after* the session slot has already been inserted into the cache.
+        let transport = MockMsgSender::new();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        drop(new_session_rx);
+        let (sender, handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
+
+        let pseudonym = HoprPseudonym::random();
+
+        // The setup fails after the slot is inserted (notifying about the new
+        // incoming session errors out because the receiver is gone), so the slot
+        // must be rolled back instead of lingering until idle eviction.
+        let result = mgr
+            .handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await;
+        assert!(result.is_err());
+
+        // An empty active-session set proves the slot was removed and, since
+        // sessions are keyed by pseudonym, that the pseudonym is free again.
+        assert!(
+            wait_for_no_active_sessions(&mgr).await,
+            "the partially established session slot was not rolled back"
+        );
+
+        // Cleanup
+        sender.close_channel();
+        let _ = handle.await;
 
         Ok(())
     }
