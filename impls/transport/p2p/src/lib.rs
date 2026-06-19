@@ -47,7 +47,7 @@ pub use hopr_api::network::Health;
 use hopr_api::network::{NetworkView, traits::NetworkStreamControl};
 use libp2p::{Multiaddr, PeerId};
 
-use crate::liveness::{LivenessRegistry, LivenessStream, peer_liveness};
+use crate::liveness::{LivenessRegistry, LivenessStream};
 
 mod utils;
 
@@ -137,14 +137,14 @@ impl NetworkStreamControl for HoprNetwork {
         let liveness = self.liveness.clone();
         self.control.accept(self.protocol).map(|stream| {
             stream.map(move |(peer, inner)| {
-                let flag = peer_liveness(&liveness, &peer);
+                let flag = liveness.peer_liveness(&peer);
                 (peer, LivenessStream::new(inner, flag))
             })
         })
     }
 
     async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
-        let flag = peer_liveness(&self.liveness, &peer);
+        let flag = self.liveness.peer_liveness(&peer);
         self.control
             .open_stream(peer, self.protocol)
             .await

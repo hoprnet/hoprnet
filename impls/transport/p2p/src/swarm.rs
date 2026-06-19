@@ -327,7 +327,7 @@ impl HoprLibp2pNetworkBuilder {
 
                         if num_established == 0 {
                             tracker.remove(&peer_id);
-                            crate::liveness::mark_peer_disconnected(&liveness, &peer_id);
+                            liveness.mark_peer_disconnected(&peer_id);
                             if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
                                 error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
                             }
@@ -370,7 +370,7 @@ impl HoprLibp2pNetworkBuilder {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
                                 tracker.remove(&peer_id);
-                                crate::liveness::mark_peer_disconnected(&liveness, &peer_id);
+                                liveness.mark_peer_disconnected(&peer_id);
                                 if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
                                     error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
                                 }
