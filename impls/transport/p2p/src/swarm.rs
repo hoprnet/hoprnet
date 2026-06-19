@@ -2,6 +2,11 @@
 use std::num::NonZeroU8;
 use std::sync::Arc;
 
+#[cfg(feature = "runtime-tokio")]
+use futures::stream::BoxStream;
+#[cfg(feature = "runtime-tokio")]
+use libp2p::identity::PublicKey;
+
 use dashmap::DashSet;
 use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
