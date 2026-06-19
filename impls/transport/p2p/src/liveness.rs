@@ -29,26 +29,33 @@ use pin_project::pin_project;
 ///
 /// A clone of this registry is held by both [`crate::HoprNetwork`] and the
 /// swarm event-loop closure. When libp2p reports a peer fully disconnected,
-/// the loop calls [`LivenessRegistry::mark_disconnected`], which removes
-/// the entry and clears the flag. Any [`LivenessStream`] that already cloned
-/// the old `Arc<AtomicBool>` will see `false` on its next poll.
+/// the loop calls [`LivenessRegistry::remove`], which clears the flag and
+/// removes the entry. Any [`LivenessStream`] that already cloned the old
+/// `Arc<AtomicBool>` will see `false` on its next poll.
 #[derive(Clone, Default)]
 pub(crate) struct LivenessRegistry(Arc<DashMap<PeerId, Arc<AtomicBool>>>);
 
 impl LivenessRegistry {
-    /// Returns the liveness flag for `peer`, creating a fresh `true` flag if none exists.
-    pub(crate) fn liveness(&self, peer: &PeerId) -> Arc<AtomicBool> {
+    /// Registers `peer` and returns its liveness flag, creating a fresh `true`
+    /// flag if none exists. Call this when opening or accepting a stream.
+    pub(crate) fn add(&self, peer: &PeerId) -> Arc<AtomicBool> {
         self.0
             .entry(*peer)
             .or_insert_with(|| Arc::new(AtomicBool::new(true)))
             .clone()
     }
 
-    /// Marks a peer as disconnected: sets its flag to `false` and removes the registry entry.
+    /// Returns the current liveness flag for `peer`, or `None` if the peer is
+    /// not registered. Does not create an entry.
+    pub(crate) fn get(&self, peer: &PeerId) -> Option<Arc<AtomicBool>> {
+        self.0.get(peer).map(|r| r.clone())
+    }
+
+    /// Removes `peer` from the registry and sets its flag to `false`.
     ///
-    /// A subsequent `open()` call mints a fresh `true` flag via [`Self::liveness`].
-    /// Any [`LivenessStream`] that still holds the old `Arc` will error on its next poll.
-    pub(crate) fn mark_disconnected(&self, peer: &PeerId) {
+    /// Any [`LivenessStream`] still holding the old `Arc` will error on its
+    /// next poll. A subsequent [`Self::add`] call mints a fresh `true` flag.
+    pub(crate) fn remove(&self, peer: &PeerId) {
         if let Some((_, flag)) = self.0.remove(peer) {
             flag.store(false, Ordering::Relaxed);
         }
@@ -222,58 +229,88 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     #[test]
-    fn liveness_should_create_alive_flag_for_new_peer() {
+    fn add_should_create_alive_flag_for_new_peer() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag = registry.liveness(&peer);
+        let flag = registry.add(&peer);
 
         assert!(flag.load(Ordering::Relaxed), "new flag must be alive");
         assert!(registry.0.contains_key(&peer));
     }
 
     #[test]
-    fn liveness_should_return_same_flag_for_same_peer() {
+    fn add_should_return_same_flag_for_same_peer() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag1 = registry.liveness(&peer);
-        let flag2 = registry.liveness(&peer);
+        let flag1 = registry.add(&peer);
+        let flag2 = registry.add(&peer);
 
         assert!(Arc::ptr_eq(&flag1, &flag2), "should return the same Arc");
     }
 
     #[test]
-    fn mark_disconnected_should_clear_flag_and_remove_entry() {
+    fn get_should_return_none_for_unregistered_peer() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let flag = registry.liveness(&peer);
+        assert!(registry.get(&peer).is_none());
+    }
+
+    #[test]
+    fn get_should_return_flag_after_add() {
+        let registry = LivenessRegistry::default();
+        let peer = PeerId::random();
+
+        let added = registry.add(&peer);
+        let got = registry.get(&peer).expect("flag must exist after add");
+
+        assert!(Arc::ptr_eq(&added, &got), "get must return the same Arc as add");
+    }
+
+    #[test]
+    fn get_should_return_none_after_remove() {
+        let registry = LivenessRegistry::default();
+        let peer = PeerId::random();
+
+        registry.add(&peer);
+        registry.remove(&peer);
+
+        assert!(registry.get(&peer).is_none());
+    }
+
+    #[test]
+    fn remove_should_clear_flag_and_remove_entry() {
+        let registry = LivenessRegistry::default();
+        let peer = PeerId::random();
+
+        let flag = registry.add(&peer);
         assert!(flag.load(Ordering::Relaxed));
 
-        registry.mark_disconnected(&peer);
+        registry.remove(&peer);
 
-        assert!(!flag.load(Ordering::Relaxed), "flag must be cleared after disconnect");
+        assert!(!flag.load(Ordering::Relaxed), "flag must be cleared after remove");
         assert!(!registry.0.contains_key(&peer));
     }
 
     #[test]
-    fn mark_disconnected_should_be_safe_when_peer_not_in_registry() {
+    fn remove_should_be_safe_when_peer_not_in_registry() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        registry.mark_disconnected(&peer);
+        registry.remove(&peer);
     }
 
     #[test]
-    fn subsequent_liveness_after_disconnect_should_return_fresh_alive_flag() {
+    fn subsequent_add_after_remove_should_return_fresh_alive_flag() {
         let registry = LivenessRegistry::default();
         let peer = PeerId::random();
 
-        let old_flag = registry.liveness(&peer);
-        registry.mark_disconnected(&peer);
+        let old_flag = registry.add(&peer);
+        registry.remove(&peer);
 
-        let new_flag = registry.liveness(&peer);
+        let new_flag = registry.add(&peer);
 
         assert!(!old_flag.load(Ordering::Relaxed), "old flag must be dead");
         assert!(new_flag.load(Ordering::Relaxed), "new flag must be alive");

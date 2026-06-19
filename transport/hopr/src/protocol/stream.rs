@@ -692,8 +692,11 @@ mod tests {
         signal.kill();
 
         // Drain the per-peer channel so the writer unparks and observes the error.
-        for _ in 0..32 {
-            let _ = tx_out.send((peer, msg.clone())).await;
+        for i in 0..32 {
+            tx_out
+                .send((peer, msg.clone()))
+                .await
+                .with_context(|| format!("drain send {i} into egress queue should succeed"))?;
         }
 
         assert!(
