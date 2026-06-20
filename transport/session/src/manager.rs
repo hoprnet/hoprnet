@@ -115,6 +115,9 @@ const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 /// Minimum timeout until an unfinished frame is discarded.
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
+/// Timeout when sending Start protocol messages to the sink
+const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
+
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
@@ -308,6 +311,11 @@ type SessionNotifiers = (
     Sender<(SessionId, ClosureReason)>,
 );
 
+// Sink for processing Start protocol messages.
+// Must be within Mutex, as cloning to go around `try_send` mutability causes
+// the channel to never go out of capacity.
+type StartProtocolMsgSink = Arc<parking_lot::Mutex<Option<Sender<(HoprPseudonym, HoprStartProtocol)>>>>;
+
 /// Manages lifecycles of Sessions.
 ///
 /// Once the manager is [started](SessionManager::start), the [`SessionManager::dispatch_message`]
@@ -461,7 +469,7 @@ type SessionNotifiers = (
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
-    start_protocol_tx: Arc<OnceLock<Sender<(HoprPseudonym, HoprStartProtocol)>>>,
+    start_protocol_tx: StartProtocolMsgSink,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -479,8 +487,6 @@ impl<S> Clone for SessionManager<S> {
         }
     }
 }
-
-const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
 fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
     HoprSessionConfig {
@@ -577,7 +583,7 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
-            start_protocol_tx: Arc::new(OnceLock::new()),
+            start_protocol_tx: Arc::new(parking_lot::Mutex::new(None)),
             cfg,
         }
     }
@@ -610,9 +616,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let (start_protocol_tx, start_protocol_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
-        self.start_protocol_tx
-            .set(start_protocol_tx)
-            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        let _ = self.start_protocol_tx.lock().insert(start_protocol_tx);
 
         let myself = self.clone();
         let closure_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -846,7 +850,7 @@ where
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                let (tx, rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
+                let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
                 let notifier = self
                     .session_notifiers
                     .get()
@@ -941,7 +945,7 @@ where
                         .allocate_session_slot(
                             session_id,
                             SessionSlot {
-                                session_tx: Arc::new(tx),
+                                session_tx: Arc::new(session_tx),
                                 routing_opts: forward_routing.clone(),
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: surb_mgmt.clone(),
@@ -988,7 +992,7 @@ where
                         session_config(&self.cfg, cfg.capabilities),
                         (
                             reduced_surb_scoring_sender,
-                            rx.inspect(move |_| {
+                            session_rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 // The received packets always consume a single SURB.
                                 surb_estimator_for_rx
@@ -1021,7 +1025,7 @@ where
                         .allocate_session_slot(
                             session_id,
                             SessionSlot {
-                                session_tx: Arc::new(tx),
+                                session_tx: Arc::new(session_tx),
                                 routing_opts: forward_routing.clone(),
                                 abort_handles: Default::default(),
                                 surb_mgmt: Default::default(), // Disabled SURB management
@@ -1058,7 +1062,7 @@ where
                         session_id,
                         forward_routing,
                         session_config(&self.cfg, cfg.capabilities),
-                        (reduced_surb_sender, rx),
+                        (reduced_surb_sender, session_rx),
                         Some(notifier),
                     )?;
 
@@ -1209,11 +1213,11 @@ where
         in_data: ApplicationDataIn,
     ) -> crate::errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
-            // This is a Start protocol message, so we handle it
+            // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
-            let protocol_msg = HoprStartProtocol::try_from(in_data.data)?;
-            if let Some(mut tx) = self.start_protocol_tx.get().cloned() {
-                if let Err(error) = tx.try_send((pseudonym, protocol_msg)) {
+            if let Some(start_protocol_tx) = self.start_protocol_tx.lock().as_mut() {
+                if let Err(error) = start_protocol_tx.try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
+                {
                     error!(%error, "failed to send Start protocol message to processing task");
                 }
             } else {
@@ -1224,7 +1228,7 @@ where
             let session_id = pseudonym;
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {
-                trace!(?session_id, "received data for a registered session");
+                trace!(%session_id, "received data for a registered session");
 
                 Ok(session_slot
                     .session_tx
@@ -1261,7 +1265,7 @@ where
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
 
-        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
+        let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks().await;
@@ -1281,7 +1285,7 @@ where
         let session_id = pseudonym;
 
         let slot = SessionSlot {
-            session_tx: Arc::new(tx_session_data),
+            session_tx: Arc::new(session_tx),
             routing_opts: reply_routing.clone(),
             abort_handles: Default::default(),
             surb_mgmt: Default::default(),
@@ -1351,7 +1355,7 @@ where
                         .rate_limit_with_controller(&egress_rate_control)
                         .buffer((2 * target_surb_buffer_size) as usize),
                     // Received packets = SURB retrieval estimate
-                    rx_session_data.inspect(move |data| {
+                    session_rx.inspect(move |data| {
                         let produced = data.num_surbs_with_msg() as u64;
                         // Count the number of SURBs delivered with each incoming packet
                         surb_estimator_clone
@@ -1437,7 +1441,7 @@ where
                 session_id,
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
-                (msg_sender.clone(), rx_session_data),
+                (msg_sender.clone(), session_rx),
                 Some(closure_notifier),
             )?
         };
