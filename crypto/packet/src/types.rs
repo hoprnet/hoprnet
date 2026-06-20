@@ -292,7 +292,7 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
 
 impl std::fmt::Display for HoprPixGroupElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.0))
+        write!(f, "{}", const_hex::encode(self.0))
     }
 }
 

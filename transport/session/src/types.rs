@@ -1,17 +1,22 @@
 use std::{
     convert::Into,
-    fmt::{Debug, Formatter},
+    fmt::Debug,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_api::types::{
-    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
-    primitive::errors::GeneralError,
+use hopr_api::{
+    Address, HoprBalance,
+    types::{
+        internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+        primitive::errors::GeneralError,
+    },
 };
+use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
+use hopr_protocol_pix::{SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -30,6 +35,12 @@ use crate::{Capabilities, Capability, errors::TransportSessionError};
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HoprSessionCapabilities(pub Capabilities);
+
+impl HoprSessionCapabilities {
+    pub fn empty() -> Self {
+        Self(Capabilities::empty())
+    }
+}
 
 impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
@@ -442,9 +453,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_api::types::{
-        crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions, primitive::prelude::*,
-    };
+    use hopr_api::types::{crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions};
 
     use super::*;
 

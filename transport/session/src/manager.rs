@@ -52,8 +52,8 @@ use crate::{
     },
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
-        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, SsaQuota,
-        pix_params_to_quota,
+        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
+        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -179,7 +179,7 @@ impl SessionSsaState {
 }
 
 impl std::fmt::Debug for SessionSsaState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SessionSsaState")
             .field(
                 "current_index",
@@ -290,7 +290,7 @@ pub struct IncomingSessionPixConfig {
     ///
     /// Default is 128 MB to 512 MB (inclusive).
     #[default(_code = "(134217728..=536870912)")]
-    pub quota_range: RangeInclusive<u64>,
+    pub quota_range: std::ops::RangeInclusive<u64>,
     /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
     ///
     /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
@@ -1255,7 +1255,7 @@ where
                 pix_toolbox
                     .share_processor
                     .new_exit_commitment(
-                        SsaId::new(*session_id.pseudonym(), ssa_index),
+                        SsaId::new(session_id, ssa_index),
                         polys_per_ssa as usize,
                         shares_per_poly as usize,
                     )
@@ -1399,12 +1399,11 @@ where
     ///
     /// Such an event can affect existing Sessions that use the PIX protocol.
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
-        // TODO: this needs SessionId = HoprPseudonym to be effective
         let Some((session_id, slot)) = self
             .sessions
-            .iter()
-            .find(|(id, _)| id.pseudonym() == event.pseudonym())
-            .map(|(id, session)| (*id, session))
+            .get(event.pseudonym())
+            .await
+            .map(|session| (*event.pseudonym(), session))
         else {
             return Err(SessionManagerError::NonExistingSession.into());
         };
@@ -1634,8 +1633,8 @@ where
             // the Session initiator has configured as its target buffer size in the Balancer.
             let target_surb_buffer_size = if session_req.additional_data > 0 {
                 session_req
-                        .additional_data
-                        .min(self.cfg.maximum_surb_buffer_size as u64)
+                    .additional_data
+                    .min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
                 self.cfg.initial_return_session_egress_rate as u64
                     * self
@@ -1825,9 +1824,7 @@ where
                     client_polys_per_ssa as u32,
                     client_shares_per_ssa as u32,
                 ))
-                .map_err(|_| {
-                    SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized"))
-                })?;
+                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
             // TODO: if this fails, should we terminate the session immediately?
             self.request_next_ssa(session_id, slot).await?;
@@ -1972,7 +1969,7 @@ where
 
         let session_id = msg.session_id;
 
-        if &pseudonym != session_id.pseudonym() {
+        if pseudonym != session_id {
             error!(%pseudonym, %msg.session_id, "received SSA client commitment for a different session");
             return Err(SessionManagerError::NonExistingSession.into());
         }
@@ -2060,7 +2057,7 @@ where
             return Err(SessionManagerError::UnsupportedMessage.into());
         };
 
-        if &pseudonym != msg.session_id.pseudonym() {
+        if pseudonym != msg.session_id {
             error!(%pseudonym, %msg.session_id, "received SSA server commitment for a different session");
             return Err(SessionManagerError::NonExistingSession.into());
         }
@@ -2831,7 +2828,7 @@ mod tests {
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
         let (sender, handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let pseudonym = HoprPseudonym::random();
 
@@ -2844,7 +2841,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3203,7 +3200,7 @@ mod tests {
             }
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        bob_mgr.start(sender.clone(), new_session_tx)?;
+        bob_mgr.start(sender.clone(), new_session_tx, None)?;
 
         let pseudonym = HoprPseudonym::random();
 
@@ -3214,7 +3211,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3234,7 +3231,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3269,7 +3266,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.ping_session(&fake_session_id).await;
@@ -3299,7 +3296,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.close_session(&fake_session_id).await;
@@ -3322,7 +3319,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr
@@ -3351,7 +3348,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_balancer_config(&fake_session_id).await;
@@ -3382,7 +3379,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_level_estimates(&fake_session_id).await;
@@ -3424,7 +3421,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         // First session - should succeed
         let pseudonym1 = HoprPseudonym::random();
@@ -3433,7 +3430,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3450,7 +3447,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3480,7 +3477,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         // Send data with session application tag but no session exists
         let pseudonym = HoprPseudonym::random();
@@ -3523,7 +3520,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         // Create a session
         let pseudonym = HoprPseudonym::random();
@@ -3532,7 +3529,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3591,6 +3588,7 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
+                    current_ssa_state: Default::default(),
                 },
             )
             .await;
@@ -3663,6 +3661,7 @@ mod tests {
                     abort_handles: Default::default(),
                     surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                     surb_estimator: Default::default(),
+                    current_ssa_state: Default::default(),
                 },
             )
             .await;
@@ -3726,7 +3725,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
@@ -3735,7 +3734,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3783,7 +3782,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
@@ -3792,7 +3791,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3809,7 +3808,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )

@@ -194,7 +194,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             // Full client SSA commitment is the sum of all constant term commitments on all polynomials
             let client_ssa_commitment: PixGroup<S> =
                 complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
-            tracing::debug!(id = %self.id, commitment = hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
+            tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
 
             Ok(CommitmentResult::Completed(
                 SsaBuilder::new(
