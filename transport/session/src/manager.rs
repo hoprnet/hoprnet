@@ -670,11 +670,12 @@ where
                 .await;
         });
 
-        let myself_sp = self.clone();
+        // Begin processing of Start protocol messages
+        let myself = self.clone();
         let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
             "session_start_protocol_processor",
             start_protocol_rx.for_each_concurrent(None, move |(pseudonym, protocol_msg)| {
-                let myself = myself_sp.clone();
+                let myself = myself.clone();
                 async move {
                     let result = match protocol_msg {
                         HoprStartProtocol::StartSession(session_req) => {
@@ -689,8 +690,8 @@ where
                         HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
                     };
 
-                    if let Err(e) = result {
-                        error!(%e, "failed to process Start protocol message");
+                    if let Err(error) = result {
+                        error!(%error, "failed to process Start protocol message");
                     }
                 }
             })
