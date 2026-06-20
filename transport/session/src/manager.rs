@@ -41,23 +41,15 @@ use crate::telemetry::{
     self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
-use crate::{
-    AgreedSsaQuota, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig,
-    SessionId, SessionTarget, SurbBalancerConfig,
-    balancer::{
-        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-        SurbControllerWithCorrection,
-        pid::{PidBalancerController, PidControllerGains},
-        simple::SimpleBalancerController,
-    },
-    errors::{self, SessionManagerError, TransportSessionError},
-    types::{
-        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
-    },
-    utils,
-    utils::{SurbNotificationMode, insert_into_next_slot},
-};
+use crate::{AgreedSsaQuota, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, balancer::{
+    AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
+    SurbControllerWithCorrection,
+    pid::{PidBalancerController, PidControllerGains},
+    simple::SimpleBalancerController,
+}, errors::{self, SessionManagerError, TransportSessionError}, types::{
+    ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
+    SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+}, utils, utils::{SurbNotificationMode, insert_into_next_slot}, Capabilities};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -613,7 +605,7 @@ impl<S> Clone for SessionManager<S> {
 
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
+fn session_config(cfg: &SessionManagerConfig, capabilities: Capabilities) -> HoprSessionConfig {
     HoprSessionConfig {
         capabilities,
         frame_mtu: cfg.frame_mtu,
@@ -625,7 +617,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
 fn initialize_session_telemetry(
     session_id: SessionId,
     cfg: &SessionManagerConfig,
-    capabilities: crate::Capabilities,
+    capabilities: Capabilities,
     surb_estimator: Option<&AtomicSurbFlowEstimator>,
     surb_mgmt: Option<&Arc<BalancerStateValues>>,
 ) {
@@ -1420,7 +1412,9 @@ where
                 let num_errors = state.increment_errors();
                 trace!(%session_id, num_errors, "encountered unverifiable share in session with pix");
 
-                // The PIX shares can come from different polynomials, so
+                // The PIX shares can come from different polynomials, so we can only
+                // see the total number of unverifiable shares and make the Session closure
+                // decision based on that.
                 if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(&session_id).await {
                     error!(%session_id, "closed session due to too many unverifiable shares");
                 }
@@ -1466,6 +1460,7 @@ where
             }
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
+            // This is traffic that belongs to one of the Sessions
             let session_id = pseudonym;
 
             return if let Some(session_slot) = self.sessions.get(&session_id).await {
@@ -1486,12 +1481,15 @@ where
         Ok(DispatchResult::Unrelated(in_data))
     }
 
+    /// Checks the PIX parameters offered by the Entry during the Session Initiation.
+    ///
+    /// Returns the validated parameters, or `None` if the offered parameters were rejected.
     fn check_pix_params(
         &self,
         req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
     ) -> Option<(usize, usize)> {
         if req.capabilities.0.contains(Capability::UsePIX) {
-            // Client offered PIX, validate parameters
+            // Client offered PIX, so validate the offered parameters
             let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u32;
             let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u32;
 
