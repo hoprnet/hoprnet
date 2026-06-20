@@ -688,6 +688,7 @@ macro_rules! impl_build_methods {
                     pre.network,
                     pre.network_process,
                     ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                 )
                 .await?;
 

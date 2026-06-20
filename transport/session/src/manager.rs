@@ -41,15 +41,23 @@ use crate::telemetry::{
     self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
-use crate::{AgreedSsaQuota, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, balancer::{
-    AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
-    SurbControllerWithCorrection,
-    pid::{PidBalancerController, PidControllerGains},
-    simple::SimpleBalancerController,
-}, errors::{self, SessionManagerError, TransportSessionError}, types::{
-    ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-    SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
-}, utils, utils::{SurbNotificationMode, insert_into_next_slot}, Capabilities};
+use crate::{
+    AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
+    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    balancer::{
+        AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
+        SurbControllerWithCorrection,
+        pid::{PidBalancerController, PidControllerGains},
+        simple::SimpleBalancerController,
+    },
+    errors::{self, SessionManagerError, TransportSessionError},
+    types::{
+        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
+        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+    },
+    utils,
+    utils::{SurbNotificationMode, insert_into_next_slot},
+};
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -1231,7 +1239,7 @@ where
 
     async fn request_next_ssa(&self, session_id: SessionId, slot: SessionSlot) -> errors::Result<()> {
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-        let msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
         let current_ssa_state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
             "cannot request new ssa on a session without pix state"
@@ -1270,22 +1278,14 @@ where
             [(ssa_index, exit_commitment)],
         ));
 
-        msg_sender
-            .clone()
-            .send((
-                slot.routing_opts.clone(),
-                ApplicationDataOut::with_no_packet_info(data.try_into()?),
-            ))
-            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-            .await
-            .map_err(|_| {
-                error!(%session_id, "timeout sending session establishment message");
-                TransportSessionError::Timeout
-            })?
-            .map_err(|error| {
-                error!(%session_id, %error, "failed to send session establishment message");
-                SessionManagerError::other(error)
-            })?;
+        send_via_msg_sender(
+            &mut msg_sender,
+            slot.routing_opts.clone(),
+            data,
+            "session SSA commitment request message",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
 
         // Set up a kill switch on the Session that has to be removed
         // once the deposit to the SSA has been made.
@@ -1391,19 +1391,16 @@ where
     ///
     /// Such an event can affect existing Sessions that use the PIX protocol.
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
-        let Some((session_id, slot)) = self
-            .sessions
-            .get(event.pseudonym())
-            .await
-            .map(|session| (*event.pseudonym(), session))
-        else {
+        let session_id = event.pseudonym();
+        let Some(slot) = self.sessions.get(event.pseudonym()).await else {
+            error!(%session_id, "trying to dispatch pix event on a non-existing session");
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
         match event {
             // When an SSA is recovered, we need to issue a new SSA server request
             HoprSessionInPixEvent::SsaRecovered(_) => {
-                self.request_next_ssa(session_id, slot).await?;
+                self.request_next_ssa(*session_id, slot).await?;
             }
             HoprSessionInPixEvent::UnverifiableShare(_) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
@@ -1984,6 +1981,7 @@ where
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
         // Insert the newly received coefficients into the SSA Reconstructor
+        // TODO: rayon spawn blocking?
         let ssa_client_commitment_state = pix_toolbox
             .share_processor
             .insert_coefficient_commitments(

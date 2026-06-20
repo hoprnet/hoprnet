@@ -429,7 +429,7 @@ where
         network: Net,
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
-        exit_ack_share: PixEvt,
+        pix_events: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
         HoprSocket<
@@ -452,7 +452,7 @@ where
             network_process,
             futures::sink::drain(),
             ticket_factory,
-            Some(exit_ack_share),
+            pix_events,
             Some(on_incoming_session),
         )
         .await
@@ -463,12 +463,13 @@ where
     /// Entry nodes do not process tickets, do not start the incoming acknowledgement
     /// pipeline, and do not accept incoming sessions — therefore, they require neither a
     /// `ticket_events` sink nor an `on_incoming_session` channel.
-    pub async fn run_entry<TFact, Ct>(
+    pub async fn run_entry<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
+        pix_events: Option<PixEvt>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -479,15 +480,17 @@ where
     where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
+        PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+        PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
-        self.run_inner::<_, _, _, futures::sink::Drain<PixEvent>>(
+        self.run_inner(
             protocol::NodeType::Entry,
             cover_traffic,
             network,
             network_process,
             futures::sink::drain(),
             ticket_factory,
-            None,
+            pix_events,
             None,
         )
         .await
