@@ -199,26 +199,24 @@ impl HoprSessionConfigurator {
     /// Returns an error if the Session is closed, the Session manager is gone.
     ///
     /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
-    pub async fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
+    pub fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self
             .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .get_surb_balancer_config(&self.id)
-            .await?)
+            .get_surb_balancer_config(&self.id)?)
     }
 
     /// Updates the configuration of the SURB balancer.
     ///
     /// Returns an error if the Session is closed, the Session manager is gone, or the
     /// Session has been created without a SURB balancer.
-    pub async fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
+    pub fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
         Ok(self
             .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .update_surb_balancer_config(&self.id, config)
-            .await?)
+            .update_surb_balancer_config(&self.id, config)?)
     }
 
     /// Explicitly closes the underlying Session in the [`SessionManager`].
@@ -227,9 +225,9 @@ impl HoprSessionConfigurator {
     /// already gone (or the manager is dropped). Frees the per-session state
     /// (frame reassembly buffers, control channels, …) immediately rather than
     /// waiting for the manager's idle-timeout eviction.
-    pub async fn close(&self) -> bool {
+    pub fn close(&self) -> bool {
         match self.smgr.upgrade() {
-            Some(smgr) => smgr.close_session(&self.id).await,
+            Some(smgr) => smgr.close_session(&self.id),
             None => false,
         }
     }
@@ -299,12 +297,11 @@ where
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
-        let mut session_tag_allocator = None;
         let mut session_telemetry_tag_allocator = None;
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
-                hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                hopr_transport_tag_allocator::Usage::Session => {}
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
                     session_telemetry_tag_allocator = Some(alloc)
                 }

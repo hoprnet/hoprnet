@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::anyhow;
 use futures::{
-    FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    Sink, SinkExt, StreamExt, TryStreamExt,
     channel::mpsc::{Sender, UnboundedSender},
     future::AbortHandle,
     pin_mut,
@@ -160,13 +160,13 @@ struct SessionSlot {
 /// partially initialized session. Since Moka's removal is asynchronous and Rust
 /// has no asynchronous `Drop`, the cleanup is performed on a spawned task.
 struct SessionSlotGuard<'a> {
-    sessions: &'a moka::future::Cache<SessionId, SessionSlot>,
+    sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
     session_id: SessionId,
     committed: bool,
 }
 
 impl<'a> SessionSlotGuard<'a> {
-    fn new(sessions: &'a moka::future::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
+    fn new(sessions: &'a moka::sync::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
         Self {
             sessions,
             session_id,
@@ -185,16 +185,12 @@ impl Drop for SessionSlotGuard<'_> {
     fn drop(&mut self) {
         if !self.committed {
             // The session setup failed after the slot was inserted: remove it so it does
-            // not block the pseudonym until idle eviction. Moka removal is async, so the
-            // cleanup runs on a spawned task.
-            let sessions = self.sessions.clone();
+            // not block the pseudonym until idle eviction.
             let session_id = self.session_id;
             warn!(%session_id, "rolling back partially established session slot after setup failure");
-            hopr_utils::runtime::prelude::spawn(async move {
-                if let Some(slot) = sessions.remove(&session_id).await {
-                    close_session(session_id, slot, ClosureReason::Eviction);
-                }
-            });
+            if let Some(slot) = self.sessions.remove(&session_id) {
+                close_session(session_id, slot, ClosureReason::Eviction);
+            }
         }
     }
 }
@@ -470,7 +466,7 @@ pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     start_protocol_tx: StartProtocolMsgSink,
-    sessions: moka::future::Cache<SessionId, SessionSlot>,
+    sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -571,7 +567,7 @@ where
                     ),
                 )
                 .build(),
-            sessions: moka::future::Cache::builder()
+            sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .eviction_listener(|session_id: Arc<SessionId>, entry, reason| match &reason {
@@ -634,7 +630,7 @@ where
                     // These notifications come from the Sessions themselves once
                     // an empty read is encountered, which means the closure was done by the
                     // other party.
-                    if let Some(session_data) = myself.sessions.remove(&session_id).await {
+                    if let Some(session_data) = myself.sessions.remove(&session_id) {
                         close_session(session_id, session_data, closure_reason);
                     } else {
                         // Do not treat this as an error
@@ -663,13 +659,10 @@ where
             .mul_f64(jitter)
                 / 2;
             futures_time::stream::interval(timeout.into())
-                .for_each(|_| {
+                .for_each(|_| async {
                     trace!("executing session cache evictions");
-                    futures::future::join(
-                        myself.sessions.run_pending_tasks(),
-                        myself.session_initiations.run_pending_tasks(),
-                    )
-                    .map(|_| ())
+                    myself.sessions.run_pending_tasks();
+                    myself.session_initiations.run_pending_tasks().await;
                 })
                 .await;
         });
@@ -733,18 +726,13 @@ where
         session_id: SessionId,
         slot: SessionSlot,
     ) -> Option<SessionSlotGuard<'a>> {
-        if let moka::ops::compute::CompResult::Inserted(_) = self
-            .sessions
-            .entry(session_id)
-            .and_compute_with(|entry| {
-                futures::future::ready(if entry.is_none() {
-                    moka::ops::compute::Op::Put(slot)
-                } else {
-                    moka::ops::compute::Op::Nop
-                })
-            })
-            .await
-        {
+        if let moka::ops::compute::CompResult::Inserted(_) = self.sessions.entry(session_id).and_compute_with(|entry| {
+            if entry.is_none() {
+                moka::ops::compute::Op::Put(slot)
+            } else {
+                moka::ops::compute::Op::Nop
+            }
+        }) {
             // Count the freshly inserted slot. The returned guard is the only thing that
             // can undo this insertion (via `close_session`), so the gauge stays balanced.
             #[cfg(all(feature = "telemetry", not(test)))]
@@ -769,7 +757,7 @@ where
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
-        self.sessions.run_pending_tasks().await;
+        self.sessions.run_pending_tasks();
         if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
@@ -1102,7 +1090,7 @@ where
     ///
     /// This currently "fires & forgets" and does not expect nor await any "pong" response.
     pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
-        if let Some(session_data) = self.sessions.get(id).await {
+        if let Some(session_data) = self.sessions.get(id) {
             trace!(session_id = ?id, "pinging manually session");
             let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
             send_via_msg_sender(
@@ -1119,8 +1107,8 @@ where
     }
 
     /// Returns [`SessionIds`](SessionId) of all currently active sessions.
-    pub async fn active_sessions(&self) -> Vec<SessionId> {
-        self.sessions.run_pending_tasks().await;
+    pub fn active_sessions(&self) -> Vec<SessionId> {
+        self.sessions.run_pending_tasks();
         self.sessions.iter().map(|(k, _)| *k).collect()
     }
 
@@ -1133,8 +1121,8 @@ where
     /// This avoids waiting for the idle timeout (`time_to_idle`) or the LRU
     /// capacity bound to evict the entry, which is the desired behaviour when
     /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
-    pub async fn close_session(&self, id: &SessionId) -> bool {
-        if let Some(slot) = self.sessions.remove(id).await {
+    pub fn close_session(&self, id: &SessionId) -> bool {
+        if let Some(slot) = self.sessions.remove(id) {
             close_session(*id, slot, ClosureReason::Eviction);
             true
         } else {
@@ -1146,15 +1134,10 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
-    pub async fn update_surb_balancer_config(
-        &self,
-        id: &SessionId,
-        config: SurbBalancerConfig,
-    ) -> crate::errors::Result<()> {
+    pub fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> crate::errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
-            .await
             .ok_or(SessionManagerError::NonExistingSession)?
             .surb_mgmt;
 
@@ -1170,8 +1153,8 @@ where
     /// Retrieves the configuration of SURB balancing for the given Session.
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub async fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
-        match self.sessions.get(id).await {
+    pub fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
+        match self.sessions.get(id) {
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
                 .map(|d| d.as_config())),
@@ -1185,8 +1168,8 @@ where
     /// For an incoming Session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub async fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
-        match self.sessions.get(id).await {
+    pub fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
+        match self.sessions.get(id) {
             Some(session) => Ok((
                 session
                     .surb_estimator
@@ -1227,7 +1210,7 @@ where
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
             let session_id = pseudonym;
 
-            return if let Some(session_slot) = self.sessions.get(&session_id).await {
+            return if let Some(session_slot) = self.sessions.get(&session_id) {
                 trace!(%session_id, "received data for a registered session");
 
                 Ok(session_slot
@@ -1268,7 +1251,7 @@ where
         let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Use constant application tag for all sessions
-        self.sessions.run_pending_tasks().await;
+        self.sessions.run_pending_tasks();
 
         // Check max sessions limit before atomic insert
         if self.sessions.entry_count() as usize >= self.cfg.maximum_sessions {
@@ -1572,7 +1555,7 @@ where
         msg: KeepAliveMessage<SessionId>,
     ) -> crate::errors::Result<()> {
         let session_id = msg.session_id;
-        if let Some(session_slot) = self.sessions.get(&session_id).await {
+        if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
             match &session_slot.routing_opts {
                 // Session is outgoing - keep-alive was received from the Exit
@@ -1710,12 +1693,12 @@ mod tests {
         mgr: &SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
     ) -> bool {
         for _ in 0..50 {
-            if mgr.active_sessions().await.is_empty() {
+            if mgr.active_sessions().is_empty() {
                 return true;
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        mgr.active_sessions().await.is_empty()
+        mgr.active_sessions().is_empty()
     }
 
     #[test_log::test(tokio::test)]
@@ -1864,21 +1847,19 @@ mod tests {
         );
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
-        assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions().await);
-        assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id()).await?);
+        assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
+        assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id())?);
         assert!(
             alice_mgr
                 .update_surb_balancer_config(alice_session.id(), SurbBalancerConfig::default())
-                .await
                 .is_err()
         );
 
-        assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions().await);
-        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id()).await?);
+        assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
+        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id())?);
         assert!(
             bob_mgr
                 .update_surb_balancer_config(bob_session.session.id(), SurbBalancerConfig::default())
-                .await
                 .is_err()
         );
 
@@ -2056,23 +2037,19 @@ mod tests {
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
-        alice_mgr
-            .sessions
-            .insert(
-                session_id,
-                SessionSlot {
-                    session_tx: Arc::new(dummy_tx),
-                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
-                    abort_handles: Default::default(),
-                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
-                    surb_estimator: Default::default(),
-                },
-            )
-            .await;
+        alice_mgr.sessions.insert(
+            session_id,
+            SessionSlot {
+                session_tx: Arc::new(dummy_tx),
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                abort_handles: Default::default(),
+                surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
+                surb_estimator: Default::default(),
+            },
+        );
 
         let actual_cfg = alice_mgr
-            .get_surb_balancer_config(&session_id)
-            .await?
+            .get_surb_balancer_config(&session_id)?
             .ok_or(anyhow!("session must have a surb balancer config"))?;
         assert_eq!(actual_cfg, balancer_cfg);
 
@@ -2081,11 +2058,10 @@ mod tests {
             max_surbs_per_sec: 200,
             ..Default::default()
         };
-        alice_mgr.update_surb_balancer_config(&session_id, new_cfg).await?;
+        alice_mgr.update_surb_balancer_config(&session_id, new_cfg)?;
 
         let actual_cfg = alice_mgr
-            .get_surb_balancer_config(&session_id)
-            .await?
+            .get_surb_balancer_config(&session_id)?
             .ok_or(anyhow!("session must have a surb balancer config"))?;
         assert_eq!(actual_cfg, new_cfg);
 
@@ -2557,12 +2533,11 @@ mod tests {
 
         assert_eq!(
             Some(balancer_cfg),
-            alice_mgr.get_surb_balancer_config(alice_session.id()).await?
+            alice_mgr.get_surb_balancer_config(alice_session.id())?
         );
 
         let remote_cfg = bob_mgr
-            .get_surb_balancer_config(bob_session.session.id())
-            .await?
+            .get_surb_balancer_config(bob_session.session.id())?
             .ok_or(anyhow!("no remote config at bob"))?;
         assert_eq!(remote_cfg.target_surb_buffer_size, balancer_cfg.target_surb_buffer_size);
         assert_eq!(
@@ -2584,17 +2559,14 @@ mod tests {
         };
 
         // Update to a higher target
-        alice_mgr
-            .update_surb_balancer_config(alice_session.id(), new_balancer_cfg)
-            .await?;
+        alice_mgr.update_surb_balancer_config(alice_session.id(), new_balancer_cfg)?;
 
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
         // Bob should know about the updated target
         let remote_cfg = bob_mgr
-            .get_surb_balancer_config(bob_session.session.id())
-            .await?
+            .get_surb_balancer_config(bob_session.session.id())?
             .ok_or(anyhow!("no remote config at bob"))?;
         assert_eq!(
             remote_cfg.target_surb_buffer_size,
@@ -2605,8 +2577,8 @@ mod tests {
             new_balancer_cfg.target_surb_buffer_size / bob_cfg.minimum_surb_buffer_duration.as_secs()
         );
 
-        let (alice_surb_sent, alice_surb_used) = alice_mgr.get_surb_level_estimates(alice_session.id()).await?;
-        let (bob_surb_recv, bob_surb_used) = bob_mgr.get_surb_level_estimates(bob_session.session.id()).await?;
+        let (alice_surb_sent, alice_surb_used) = alice_mgr.get_surb_level_estimates(alice_session.id())?;
+        let (bob_surb_recv, bob_surb_used) = bob_mgr.get_surb_level_estimates(bob_session.session.id())?;
 
         alice_session.close().await?;
 
@@ -2686,7 +2658,7 @@ mod tests {
         assert!(result.is_ok(), "first session initiation should succeed");
 
         // Verify one session exists
-        let active = bob_mgr.active_sessions().await;
+        let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should have exactly one active session");
 
         // Second session initiation with same pseudonym - should be handled gracefully
@@ -2710,7 +2682,7 @@ mod tests {
         );
 
         // Verify still only one session exists
-        let active = bob_mgr.active_sessions().await;
+        let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should still have exactly one active session");
 
         // Cleanup: close sender and await handle
@@ -2765,7 +2737,7 @@ mod tests {
         mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
-        let result = mgr.close_session(&fake_session_id).await;
+        let result = mgr.close_session(&fake_session_id);
 
         assert!(!result, "closing non-existent session should return false");
 
@@ -2788,9 +2760,7 @@ mod tests {
         mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
-        let result = mgr
-            .update_surb_balancer_config(&fake_session_id, SurbBalancerConfig::default())
-            .await;
+        let result = mgr.update_surb_balancer_config(&fake_session_id, SurbBalancerConfig::default());
 
         assert!(result.is_err());
 
@@ -2817,7 +2787,7 @@ mod tests {
         mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
-        let result = mgr.get_surb_balancer_config(&fake_session_id).await;
+        let result = mgr.get_surb_balancer_config(&fake_session_id);
 
         assert!(result.is_err());
         assert!(matches!(
@@ -2848,7 +2818,7 @@ mod tests {
         mgr.start(sender.clone(), new_session_tx)?;
 
         let fake_session_id = HoprPseudonym::random();
-        let result = mgr.get_surb_level_estimates(&fake_session_id).await;
+        let result = mgr.get_surb_level_estimates(&fake_session_id);
 
         assert!(result.is_err());
         assert!(matches!(
@@ -2903,7 +2873,7 @@ mod tests {
         .await?;
 
         // Verify one session exists
-        assert_eq!(mgr.active_sessions().await.len(), 1);
+        assert_eq!(mgr.active_sessions().len(), 1);
 
         // Second session - should fail with TooManySessions
         let pseudonym2 = HoprPseudonym::random();
@@ -2921,7 +2891,7 @@ mod tests {
 
         // The error is handled internally (sends SessionError), so result is Ok
         // But we can verify no new session was added
-        assert_eq!(mgr.active_sessions().await.len(), 1);
+        assert_eq!(mgr.active_sessions().len(), 1);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -3002,14 +2972,14 @@ mod tests {
         .await?;
 
         // Verify session exists
-        assert_eq!(mgr.active_sessions().await.len(), 1);
+        assert_eq!(mgr.active_sessions().len(), 1);
 
         // Close the session - should return true
-        let result = mgr.close_session(&pseudonym).await;
+        let result = mgr.close_session(&pseudonym);
         assert!(result, "closing existing session should return true");
 
         // Verify session is closed
-        assert_eq!(mgr.active_sessions().await.len(), 0);
+        assert_eq!(mgr.active_sessions().len(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -3042,28 +3012,24 @@ mod tests {
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         let peer_address: Address = (&ChainKeypair::random()).into();
-        alice_mgr
-            .sessions
-            .insert(
-                session_id,
-                SessionSlot {
-                    session_tx: Arc::new(dummy_tx),
-                    routing_opts: DestinationRouting::Forward {
-                        destination: Box::new(peer_address.into()),
-                        pseudonym: Some(alice_pseudonym),
-                        forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
-                        return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN)
-                            .into(),
-                    },
-                    abort_handles: Default::default(),
-                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
-                    surb_estimator: Default::default(),
+        alice_mgr.sessions.insert(
+            session_id,
+            SessionSlot {
+                session_tx: Arc::new(dummy_tx),
+                routing_opts: DestinationRouting::Forward {
+                    destination: Box::new(peer_address.into()),
+                    pseudonym: Some(alice_pseudonym),
+                    forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+                    return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
                 },
-            )
-            .await;
+                abort_handles: Default::default(),
+                surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
+                surb_estimator: Default::default(),
+            },
+        );
 
         // Set initial buffer level
-        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         session_slot
             .surb_mgmt
             .buffer_level
@@ -3071,7 +3037,7 @@ mod tests {
         drop(session_slot);
 
         // Verify initial buffer level
-        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         assert_eq!(session_slot.surb_mgmt.buffer_level(), initial_buffer_level);
         drop(session_slot);
 
@@ -3094,7 +3060,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Verify buffer level was updated
-        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         assert_eq!(
             session_slot.surb_mgmt.buffer_level(),
             new_buffer_level,
@@ -3127,22 +3093,19 @@ mod tests {
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
-        alice_mgr
-            .sessions
-            .insert(
-                session_id,
-                SessionSlot {
-                    session_tx: Arc::new(dummy_tx),
-                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
-                    abort_handles: Default::default(),
-                    surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
-                    surb_estimator: Default::default(),
-                },
-            )
-            .await;
+        alice_mgr.sessions.insert(
+            session_id,
+            SessionSlot {
+                session_tx: Arc::new(dummy_tx),
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                abort_handles: Default::default(),
+                surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
+                surb_estimator: Default::default(),
+            },
+        );
 
         // Verify initial target
-        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         assert_eq!(
             session_slot.surb_mgmt.controller_bounds().target() as u64,
             initial_target,
@@ -3169,7 +3132,7 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Verify target was updated
-        let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
+        let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         assert_eq!(
             session_slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed),
             new_target,
@@ -3219,15 +3182,15 @@ mod tests {
         .await?;
 
         // Verify first session exists
-        assert_eq!(mgr.active_sessions().await.len(), 1);
+        assert_eq!(mgr.active_sessions().len(), 1);
 
         // Wait for the session to expire (idle_timeout = 100ms)
         tokio::time::sleep(Duration::from_millis(200)).await;
-        mgr.sessions.run_pending_tasks().await;
+        mgr.sessions.run_pending_tasks();
 
         // Verify session was evicted (cache should be empty now)
         assert_eq!(
-            mgr.active_sessions().await.len(),
+            mgr.active_sessions().len(),
             0,
             "idle session should be evicted after timeout"
         );
@@ -3276,7 +3239,7 @@ mod tests {
         .await?;
 
         // Verify first session exists
-        assert_eq!(mgr.active_sessions().await.len(), 1);
+        assert_eq!(mgr.active_sessions().len(), 1);
 
         // Try to create second session - should be rejected (not evicted)
         let pseudonym2 = HoprPseudonym::random();
@@ -3294,14 +3257,14 @@ mod tests {
 
         // Should still have exactly 1 session (the first one)
         assert_eq!(
-            mgr.active_sessions().await.len(),
+            mgr.active_sessions().len(),
             1,
             "should still have exactly one session - second session should be rejected"
         );
 
         // The active session should be the first one (second was rejected)
         assert!(
-            mgr.active_sessions().await.contains(&pseudonym1),
+            mgr.active_sessions().contains(&pseudonym1),
             "the first session should still be active"
         );
 
