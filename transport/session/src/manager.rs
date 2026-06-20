@@ -1104,9 +1104,9 @@ where
     pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id).await {
             trace!(session_id = ?id, "pinging manually session");
-            let msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+            let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
             send_via_msg_sender(
-                &mut msg_sender.clone(),
+                &mut msg_sender,
                 session_data.routing_opts.clone(),
                 HoprStartProtocol::KeepAlive((*id).into()),
                 "session ping message",
