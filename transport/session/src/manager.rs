@@ -461,6 +461,7 @@ type SessionNotifiers = (
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
+    start_protocol_tx: Arc<OnceLock<Sender<(HoprPseudonym, HoprStartProtocol)>>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -471,6 +472,7 @@ impl<S> Clone for SessionManager<S> {
         Self {
             session_initiations: self.session_initiations.clone(),
             session_notifiers: self.session_notifiers.clone(),
+            start_protocol_tx: self.start_protocol_tx.clone(),
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
@@ -575,6 +577,7 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
+            start_protocol_tx: Arc::new(OnceLock::new()),
             cfg,
         }
     }
@@ -604,6 +607,11 @@ where
         let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+
+        let (start_protocol_tx, start_protocol_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        self.start_protocol_tx
+            .set(start_protocol_tx)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
@@ -662,7 +670,33 @@ where
                 .await;
         });
 
-        Ok(vec![ah_closure_notifications, ah_session_expiration])
+        let myself_sp = self.clone();
+        let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
+            "session_start_protocol_processor",
+            start_protocol_rx.for_each_concurrent(None, move |(pseudonym, protocol_msg)| {
+                let myself = myself_sp.clone();
+                async move {
+                    let result = match protocol_msg {
+                        HoprStartProtocol::StartSession(session_req) => {
+                            myself.handle_incoming_session_initiation(pseudonym, session_req).await
+                        }
+                        HoprStartProtocol::SessionEstablished(est) => {
+                            myself.handle_session_established(pseudonym, est).await
+                        }
+                        HoprStartProtocol::SessionError(error_type) => {
+                            myself.handle_session_error(pseudonym, error_type).await
+                        }
+                        HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
+                    };
+
+                    if let Err(e) = result {
+                        error!(%e, "failed to process Start protocol message");
+                    }
+                }
+            })
+        );
+
+        Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
     }
 
     /// Check if [`start`](SessionManager::start) has been called and the instance is running.
@@ -1176,19 +1210,13 @@ where
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
             trace!("dispatching Start protocol message");
-            match HoprStartProtocol::try_from(in_data.data)? {
-                HoprStartProtocol::StartSession(session_req) => {
-                    self.handle_incoming_session_initiation(pseudonym, session_req).await?;
+            let protocol_msg = HoprStartProtocol::try_from(in_data.data)?;
+            if let Some(mut tx) = self.start_protocol_tx.get().cloned() {
+                if let Err(error) = tx.try_send((pseudonym, protocol_msg)) {
+                    error!(%error, "failed to send Start protocol message to processing task");
                 }
-                HoprStartProtocol::SessionEstablished(est) => {
-                    self.handle_session_established(pseudonym, est).await?;
-                }
-                HoprStartProtocol::SessionError(error_type) => {
-                    self.handle_session_error(pseudonym, error_type).await?;
-                }
-                HoprStartProtocol::KeepAlive(msg) => {
-                    self.handle_keep_alive(pseudonym, msg).await?;
-                }
+            } else {
+                error!("start protocol message received before SessionManager is fully started");
             }
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
@@ -3003,6 +3031,10 @@ mod tests {
         let alice_mgr =
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _) = futures::channel::mpsc::unbounded();
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         let peer_address: Address = (&ChainKeypair::random()).into();
         alice_mgr
@@ -3053,6 +3085,9 @@ mod tests {
         // Dispatch the keep-alive message
         alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
 
+        // Yield to allow the background task to process the message
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
         // Verify buffer level was updated
         let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
         assert_eq!(
@@ -3081,6 +3116,10 @@ mod tests {
 
         let alice_mgr =
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
+        let (mock_sender, _) = futures::channel::mpsc::unbounded();
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -3120,6 +3159,9 @@ mod tests {
 
         // Dispatch the keep-alive message
         alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
+
+        // Yield to allow the background task to process the message
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Verify target was updated
         let session_slot = alice_mgr.sessions.get(&session_id).await.unwrap();
