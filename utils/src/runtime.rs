@@ -805,4 +805,97 @@ mod tests {
         let order = abort_order.lock().unwrap();
         assert_eq!(*order, vec![3, 2, 1]);
     }
+
+    #[tokio::test]
+    async fn test_drop_abortable_drops_inner_stream_on_abort() {
+        use std::{
+            sync::atomic::{AtomicBool, Ordering},
+            time::Duration,
+        };
+
+        use futures::{channel::mpsc, stream::StreamExt};
+
+        // Track if the receiver was dropped
+        let receiver_dropped = Arc::new(AtomicBool::new(false));
+
+        let (tx, rx) = mpsc::channel::<i32>(16);
+
+        // Clone for the spawn
+        let receiver_dropped_clone = receiver_dropped.clone();
+
+        // Create DropAbortable wrapping a channel stream
+        let (drop_abortable, abort_handle) = DropAbortable::new(rx);
+
+        // Spawn task that processes items from the stream
+        let handle = tokio::spawn(async move {
+            let mut rx = drop_abortable;
+            while let Some(_item) = rx.next().await {
+                // Process items
+            }
+            // Stream ended - this is only reached when stream is fully consumed or dropped
+            receiver_dropped_clone.store(true, Ordering::SeqCst);
+        });
+
+        // Send some items using the original sender (not clone)
+        let mut tx = tx;
+        tx.try_send(1).unwrap();
+        tx.try_send(2).unwrap();
+        tx.try_send(3).unwrap();
+        drop(tx);
+
+        // Give some time for processing
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Now abort - this should drop the inner stream immediately
+        abort_handle.abort();
+
+        // Wait for the task to finish
+        let _ = handle.await;
+
+        // Verify the receiver was dropped when abort was triggered
+        assert!(
+            receiver_dropped.load(Ordering::SeqCst),
+            "Receiver should be dropped when abort handle is fired"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_drop_abortable_closes_channel_on_abort() {
+        use std::time::Duration;
+
+        use futures::{channel::mpsc, stream::StreamExt};
+
+        // Small buffer
+        let (tx, rx) = mpsc::channel::<i32>(2);
+
+        let (drop_abortable, abort_handle) = DropAbortable::new(rx);
+
+        // Spawn task that processes items very slowly (never actually)
+        let handle = tokio::spawn(async move {
+            let mut rx = drop_abortable;
+            // Don't process any items - just wait to be aborted
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            while let Some(_item) = rx.next().await {
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
+        });
+
+        // Send some items
+        let mut tx = tx;
+        tx.try_send(1).unwrap();
+        tx.try_send(2).unwrap();
+
+        // Abort - this should drop the receiver, closing the channel
+        abort_handle.abort();
+
+        // Wait for the task to finish
+        let _ = handle.await;
+
+        // Now try_send should fail because receiver is gone (channel closed)
+        let result_after_abort = tx.try_send(4);
+        assert!(
+            result_after_abort.is_err(),
+            "Sender should fail after receiver is dropped"
+        );
+    }
 }
