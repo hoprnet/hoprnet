@@ -51,6 +51,63 @@ const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
 type PeerStreamCache<T> = moka::sync::Cache<PeerId, Sender<T>>;
 type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<futures::lock::Mutex<()>>>;
 
+/// Monotonic id handed to each per-peer stream io so logs can distinguish successive
+/// streams to the same peer (the cache is keyed by `PeerId`, so a re-opened stream reuses
+/// the key but gets a fresh `stream_seq`).
+static STREAM_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Thin `AsyncWrite` wrapper that logs every wire-level write and flush for the return
+/// direction, so we can tell whether the exit's reply bytes actually reach the libp2p
+/// stream (vs. being queued and silently dropped). Tagged with the peer and `stream_seq`.
+struct LoggingWrite<W> {
+    inner: W,
+    peer: PeerId,
+    stream_seq: u64,
+    written: u64,
+}
+
+impl<W: AsyncWrite + Unpin> AsyncWrite for LoggingWrite<W> {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let res = std::pin::Pin::new(&mut self.inner).poll_write(cx, buf);
+        match &res {
+            std::task::Poll::Ready(Ok(n)) => {
+                self.written += *n as u64;
+                tracing::debug!(peer = %self.peer, stream_seq = self.stream_seq, bytes = *n, total = self.written, "wire write to peer stream");
+            }
+            std::task::Poll::Ready(Err(e)) => {
+                tracing::debug!(peer = %self.peer, stream_seq = self.stream_seq, error = %e, "wire write to peer stream FAILED");
+            }
+            std::task::Poll::Pending => {
+                tracing::debug!(peer = %self.peer, stream_seq = self.stream_seq, want = buf.len(), "wire write to peer stream pending (backpressure)");
+            }
+        }
+        res
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let res = std::pin::Pin::new(&mut self.inner).poll_flush(cx);
+        if let std::task::Poll::Ready(r) = &res {
+            tracing::debug!(peer = %self.peer, stream_seq = self.stream_seq, total = self.written, ok = r.is_ok(), "wire flush of peer stream");
+        }
+        res
+    }
+
+    fn poll_close(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        tracing::debug!(peer = %self.peer, stream_seq = self.stream_seq, total = self.written, "wire close of peer stream");
+        std::pin::Pin::new(&mut self.inner).poll_close(cx)
+    }
+}
+
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
     stream: S,
@@ -67,11 +124,18 @@ where
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
 {
+    let stream_seq = STREAM_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let (stream_rx, stream_tx) = stream.split();
     let (send, recv) = channel::<<C as Decoder>::Item>(per_peer_channel_capacity);
     let cache_for_write = cache.clone();
     let cache_for_read = cache.clone();
 
+    let stream_tx = LoggingWrite {
+        inner: stream_tx,
+        peer,
+        stream_seq,
+        written: 0,
+    };
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
     // `set_backpressure_boundary` is a *byte* threshold on `FramedWrite`'s internal
@@ -83,17 +147,18 @@ where
 
     // Send all outgoing data to the peer
     hopr_utils::runtime::prelude::spawn(
-        recv.inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
+        recv.inspect(move |_| tracing::trace!(%peer, stream_seq, "writing message to peer stream"))
             .map(Ok)
             .forward(frame_writer)
             .inspect(move |res| {
-                tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
+                tracing::debug!(%peer, stream_seq, ?res, component = "stream", "writing stream with peer finished");
             })
             .then(move |_| {
                 // Make sure we invalidate the peer entry from the cache once the stream ends
                 let peer = peer;
                 async move {
                     cache_for_write.invalidate(&peer);
+                    tracing::debug!(%peer, stream_seq, component = "stream", "writer task ended, invalidated per-peer egress cache (reactive)");
                 }
             }),
     );
@@ -116,9 +181,9 @@ where
             .map(Ok)
             .forward(ingress_from_peers)
             .inspect(move |res| match res {
-                Ok(_) => tracing::debug!(%peer, component = "stream", "incoming stream done reading"),
+                Ok(_) => tracing::debug!(%peer, stream_seq, component = "stream", "incoming stream done reading"),
                 Err(error) => {
-                    tracing::error!(%peer, %error, component = "stream", "incoming stream failed on reading")
+                    tracing::error!(%peer, stream_seq, %error, component = "stream", "incoming stream failed on reading")
                 }
             })
             .then(move |_| {
@@ -126,11 +191,12 @@ where
                 let peer = peer;
                 async move {
                     cache_for_read.invalidate(&peer);
+                    tracing::debug!(%peer, stream_seq, component = "stream", "reader task ended, invalidated per-peer egress cache (reactive)");
                 }
             }),
     );
 
-    tracing::trace!(%peer, "created new io for peer");
+    tracing::debug!(%peer, stream_seq, "created new per-peer stream io (reader + writer tasks spawned)");
     send
 }
 
@@ -155,7 +221,7 @@ where
     let cache_out: PeerStreamCache<<C as Decoder>::Item> = moka::sync::Cache::builder()
         .max_capacity(2000)
         .eviction_listener(|key: Arc<PeerId>, _, cause| {
-            tracing::trace!(peer = %key.as_ref(), ?cause, "evicting stream for peer");
+            tracing::debug!(peer = %key.as_ref(), ?cause, "evicting cached egress stream for peer");
         })
         .build();
 
@@ -222,7 +288,10 @@ where
                     per_peer_channel_capacity,
                 );
 
-                async move { cache.insert(peer, send) }
+                async move {
+                    tracing::debug!(%peer, "caching egress send-half from incoming stream");
+                    cache.insert(peer, send)
+                }
             })
             .inspect(|_| {
                 tracing::info!(
@@ -253,7 +322,7 @@ where
                         if let Some(cached) = cache.get(&peer) {
                             Ok(cached)
                         } else {
-                            tracing::trace!(%peer, "peer is not in cache, opening new stream");
+                            tracing::debug!(%peer, "egress cache miss, opening new outgoing stream");
 
                             // Only the cache-miss path needs the stream-open handles.
                             // Clone them out of the shared `open_ctx` once here rather
@@ -279,7 +348,7 @@ where
 
                             match stream {
                                 Ok(stream) => {
-                                    tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
+                                    tracing::debug!(%peer, "opened outgoing peer-to-peer stream, caching send-half");
 
                                     let send = build_peer_stream_io(
                                         peer,
@@ -309,6 +378,7 @@ where
                             Err(SinkTimeoutError::Inner(error)) => {
                                 tracing::error!(%peer, %error, "error sending message to peer");
                                 cache.invalidate(&peer);
+                                tracing::debug!(%peer, "invalidated per-peer egress cache after send error");
                             }
                         },
                         Err(error) => {

@@ -340,7 +340,10 @@ impl HoprLibp2pNetworkBuilder {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
                         if num_established == 0 {
+                            debug!(%peer_id, %connection_id, transport="libp2p", "last connection to peer closed, removing from tracker and broadcasting PeerDisconnected");
                             disconnect_peer(peer_id);
+                        } else {
+                            debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed but peer still has live connections, keeping tracker entry");
                         }
 
                         print_network_info(swarm.network_info(), "connection closed");
