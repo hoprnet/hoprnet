@@ -206,9 +206,12 @@ impl SurbStore for MemorySurbStore {
     #[tracing::instrument(skip_all, level = "trace", fields(?matcher), ret)]
     fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
         let pseudonym = matcher.pseudonym();
-        let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym)?;
+        let Some(surbs_for_pseudonym) = self.surbs_per_pseudonym.get(&pseudonym) else {
+            tracing::debug!(%pseudonym, "surb find: MISS (no ring buffer for pseudonym)");
+            return None;
+        };
 
-        match matcher {
+        let found = match matcher {
             SurbMatcher::Pseudonym(_) => surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
                 sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
                 surb: popped_surb.surb,
@@ -218,25 +221,33 @@ impl SurbStore for MemorySurbStore {
             // and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
             // when there is a single SURB in the RB.
-            SurbMatcher::Exact(id) => {
-                surbs_for_pseudonym
-                    .pop_one_if_has_id(&id.surb_id())
-                    .map(|popped_surb| FoundSurb {
-                        sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                        surb: popped_surb.surb,
-                        remaining: popped_surb.remaining, // = likely 0
-                    })
-            }
+            SurbMatcher::Exact(id) => surbs_for_pseudonym
+                .pop_one_if_has_id(&id.surb_id())
+                .map(|popped_surb| FoundSurb {
+                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                    surb: popped_surb.surb,
+                    remaining: popped_surb.remaining, // = likely 0
+                }),
+        };
+
+        match &found {
+            Some(f) => tracing::debug!(%pseudonym, remaining = f.remaining, "surb find: HIT"),
+            None => tracing::debug!(%pseudonym, "surb find: MISS (ring buffer empty or id mismatch)"),
         }
+        found
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym, num_surbs = surbs.len()))]
     fn insert_surbs(&self, pseudonym: HoprPseudonym, surbs: Vec<(HoprSurbId, HoprSurb)>) -> usize {
-        self.surbs_per_pseudonym
+        let inserted = surbs.len();
+        let total = self
+            .surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
             .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY)))
             .value()
-            .push(surbs)
+            .push(surbs);
+        tracing::debug!(%pseudonym, inserted, total_in_buffer = total, "surb insert");
+        total
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
