@@ -841,13 +841,15 @@ mod tests {
         tx.try_send(1).unwrap();
         tx.try_send(2).unwrap();
         tx.try_send(3).unwrap();
-        drop(tx);
 
         // Give some time for processing
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Now abort - this should drop the inner stream immediately
         abort_handle.abort();
+
+        // Drop tx after abort to ensure we're testing abort-triggered behavior
+        drop(tx);
 
         // Wait for the task to finish
         let _ = handle.await;
@@ -892,10 +894,8 @@ mod tests {
         let _ = handle.await;
 
         // Now try_send should fail because receiver is gone (channel closed)
-        let result_after_abort = tx.try_send(4);
-        assert!(
-            result_after_abort.is_err(),
-            "Sender should fail after receiver is dropped"
-        );
+        // Must fail specifically due to disconnection, not fullness
+        let err = tx.try_send(4).expect_err("expected channel closure after abort");
+        assert!(err.is_disconnected(), "expected disconnected sender after abort");
     }
 }
