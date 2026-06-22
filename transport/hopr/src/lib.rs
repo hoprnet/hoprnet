@@ -303,7 +303,7 @@ where
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
-                hopr_transport_tag_allocator::Usage::Session => {}
+                hopr_transport_tag_allocator::Usage::Session => {} // TODO: cleanup of Session tag allocators needed (#8199)
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
                     session_telemetry_tag_allocator = Some(alloc)
                 }
