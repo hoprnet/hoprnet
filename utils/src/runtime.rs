@@ -373,6 +373,38 @@ macro_rules! spawn_as_abortable_named {
     }};
 }
 
+/// Wrapper around [`futures::stream::Abortable`] that also automatically drops the inner stream when the abort handle
+/// is fired.
+pub struct DropAbortable<St> {
+    inner: Option<futures::stream::Abortable<St>>,
+}
+
+impl<St> DropAbortable<St> {
+    pub fn new(stream: St, reg: futures::stream::AbortRegistration) -> Self {
+        Self {
+            inner: Some(futures::stream::Abortable::new(stream, reg)),
+        }
+    }
+}
+
+impl<St: futures::Stream + Unpin> futures::Stream for DropAbortable<St> {
+    type Item = St::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<St::Item>> {
+        let this = self.get_mut();
+        let Some(inner) = this.inner.as_mut() else {
+            return Poll::Ready(None);
+        };
+        match Pin::new(inner).poll_next(cx) {
+            Poll::Ready(None) => {
+                this.inner = None; // drops Abortable -> drops the receiver NOW
+                Poll::Ready(None)
+            }
+            other => other,
+        }
+    }
+}
+
 /// Abstraction over tasks that can be aborted (such as join or abort handles).
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait Abortable {
