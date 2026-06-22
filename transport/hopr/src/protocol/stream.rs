@@ -48,7 +48,10 @@ const MAX_CONCURRENT_PACKETS: usize = 30;
 /// Override with `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES`.
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
 
-type PeerStreamCache<T> = moka::sync::Cache<PeerId, Sender<T>>;
+// Value is `(stream_seq, Sender)`: the monotonic id lets reactive invalidation
+// remove an entry only if it still belongs to the stream whose task is ending,
+// so a dead/older stream cannot evict a freshly re-opened healthy one.
+type PeerStreamCache<T> = moka::sync::Cache<PeerId, (u64, Sender<T>)>;
 type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<futures::lock::Mutex<()>>>;
 
 /// Monotonic id handed to each per-peer stream io so logs can distinguish successive
@@ -116,7 +119,7 @@ fn build_peer_stream_io<S, C>(
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
     per_peer_channel_capacity: usize,
-) -> Sender<<C as Decoder>::Item>
+) -> (u64, Sender<<C as Decoder>::Item>)
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -154,11 +157,16 @@ where
                 tracing::debug!(%peer, stream_seq, ?res, component = "stream", "writing stream with peer finished");
             })
             .then(move |_| {
-                // Make sure we invalidate the peer entry from the cache once the stream ends
+                // Invalidate the peer entry only if it still belongs to THIS stream, so a
+                // dead/older stream's task ending cannot evict a newer re-opened stream.
                 let peer = peer;
                 async move {
-                    cache_for_write.invalidate(&peer);
-                    tracing::debug!(%peer, stream_seq, component = "stream", "writer task ended, invalidated per-peer egress cache (reactive)");
+                    if cache_for_write.get(&peer).is_some_and(|(seq, _)| seq == stream_seq) {
+                        cache_for_write.invalidate(&peer);
+                        tracing::debug!(%peer, stream_seq, component = "stream", "writer task ended, invalidated own per-peer egress cache (reactive)");
+                    } else {
+                        tracing::debug!(%peer, stream_seq, component = "stream", "writer task ended, cache already replaced by newer stream, not invalidating");
+                    }
                 }
             }),
     );
@@ -187,17 +195,21 @@ where
                 }
             })
             .then(move |_| {
-                // Make sure we invalidate the peer entry from the cache once the stream ends
+                // Invalidate the peer entry only if it still belongs to THIS stream (see writer task).
                 let peer = peer;
                 async move {
-                    cache_for_read.invalidate(&peer);
-                    tracing::debug!(%peer, stream_seq, component = "stream", "reader task ended, invalidated per-peer egress cache (reactive)");
+                    if cache_for_read.get(&peer).is_some_and(|(seq, _)| seq == stream_seq) {
+                        cache_for_read.invalidate(&peer);
+                        tracing::debug!(%peer, stream_seq, component = "stream", "reader task ended, invalidated own per-peer egress cache (reactive)");
+                    } else {
+                        tracing::debug!(%peer, stream_seq, component = "stream", "reader task ended, cache already replaced by newer stream, not invalidating");
+                    }
                 }
             }),
     );
 
     tracing::debug!(%peer, stream_seq, "created new per-peer stream io (reader + writer tasks spawned)");
-    send
+    (stream_seq, send)
 }
 
 pub async fn process_stream_protocol<C, V>(
@@ -278,7 +290,7 @@ where
 
                 tracing::debug!(%peer, "received incoming peer-to-peer stream");
                 let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
-                let send = build_peer_stream_io(
+                let (stream_seq, send) = build_peer_stream_io(
                     peer,
                     stream,
                     cache.clone(),
@@ -289,8 +301,8 @@ where
                 );
 
                 async move {
-                    tracing::debug!(%peer, "caching egress send-half from incoming stream");
-                    cache.insert(peer, send)
+                    tracing::debug!(%peer, stream_seq, "caching egress send-half from incoming stream");
+                    cache.insert(peer, (stream_seq, send))
                 }
             })
             .inspect(|_| {
@@ -350,7 +362,7 @@ where
                                 Ok(stream) => {
                                     tracing::debug!(%peer, "opened outgoing peer-to-peer stream, caching send-half");
 
-                                    let send = build_peer_stream_io(
+                                    let (stream_seq, send) = build_peer_stream_io(
                                         peer,
                                         stream,
                                         cache.clone(),
@@ -359,8 +371,8 @@ where
                                         frame_writer_backpressure_bytes,
                                         per_peer_channel_capacity,
                                     );
-                                    cache.insert(peer, send.clone());
-                                    Ok(send)
+                                    cache.insert(peer, (stream_seq, send.clone()));
+                                    Ok((stream_seq, send))
                                 }
                                 Err(error) => Err(error),
                             }
@@ -368,7 +380,7 @@ where
                     };
 
                     match cached {
-                        Ok(cached) => match cached.with_timeout(per_peer_send_timeout).send(msg).await {
+                        Ok((stream_seq, sender)) => match sender.with_timeout(per_peer_send_timeout).send(msg).await {
                             Ok(()) => tracing::trace!(%peer, "message sent to peer"),
                             Err(SinkTimeoutError::Timeout) => {
                                 #[cfg(all(feature = "telemetry", not(test)))]
@@ -377,8 +389,11 @@ where
                             }
                             Err(SinkTimeoutError::Inner(error)) => {
                                 tracing::error!(%peer, %error, "error sending message to peer");
-                                cache.invalidate(&peer);
-                                tracing::debug!(%peer, "invalidated per-peer egress cache after send error");
+                                // Only evict if the cached entry is still this stream's.
+                                if cache.get(&peer).is_some_and(|(seq, _)| seq == stream_seq) {
+                                    cache.invalidate(&peer);
+                                    tracing::debug!(%peer, stream_seq, "invalidated own per-peer egress cache after send error");
+                                }
                             }
                         },
                         Err(error) => {
