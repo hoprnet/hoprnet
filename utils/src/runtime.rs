@@ -375,12 +375,28 @@ macro_rules! spawn_as_abortable_named {
 
 /// Wrapper around [`futures::stream::Abortable`] that also automatically drops the inner stream when the abort handle
 /// is fired.
+///
+/// This is mostly useful to make MPSC channels close the channel when the AbortHandle is fired.
+/// If plain `futures::stream::Abortable` is used, the inner stream will not be dropped when the `AbortHandle` is fired,
+/// and therefore the senders can still send items, but the aborted receivers cannot process them.
+///
+/// For unbounded channels, this may cause the channels to keep memory growing indefinitely.
+/// For bounded channels, the senders will continue sending data until the channel is full and the senders will then
+/// become stuck indefinitely.
+///
+/// For streams that do not have active senders and only produce items when polled, this wrapper is not needed and
+/// the standard ` futures::stream::Abortable ` will work just fine.
 pub struct DropAbortable<St> {
     inner: Option<futures::stream::Abortable<St>>,
 }
 
 impl<St> DropAbortable<St> {
-    pub fn new(stream: St, reg: futures::stream::AbortRegistration) -> Self {
+    pub fn new(stream: St) -> (Self, AbortHandle) {
+        let (abort_handle, reg) = futures::stream::AbortHandle::new_pair();
+        (Self::new_with_registration(stream, reg), abort_handle)
+    }
+
+    pub fn new_with_registration(stream: St, reg: futures::stream::AbortRegistration) -> Self {
         Self {
             inner: Some(futures::stream::Abortable::new(stream, reg)),
         }

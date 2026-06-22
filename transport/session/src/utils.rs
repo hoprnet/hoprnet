@@ -145,6 +145,7 @@ where
     // The stream is suspended until the caller sets a rate via the Controller
     let controller = RateController::new(0, Duration::from_secs(1));
 
+    // DropAbortable not needed because the stream only generates items when polled
     let (ka_stream, abort_handle) = futures::stream::abortable(
         futures::stream::repeat_with(move || match &notification_mode {
             SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {

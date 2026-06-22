@@ -299,12 +299,11 @@ where
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
-        let mut session_tag_allocator = None;
         let mut session_telemetry_tag_allocator = None;
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
-                hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                hopr_transport_tag_allocator::Usage::Session => {}
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
                     session_telemetry_tag_allocator = Some(alloc)
                 }

@@ -479,6 +479,8 @@ where
         F: Fn(&ChainEvent) -> bool + Send + Sync + 'static,
     {
         debug!(%context, "registering wait for on-chain event");
+
+        // DropAbortable not needed because the stream only generates items when polled
         let (event_stream, handle) = futures::stream::abortable(
             self.chain_api
                 .subscribe()?
