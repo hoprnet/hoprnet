@@ -120,7 +120,7 @@ const SESSION_FORWARD_CAPACITY: usize = 10000;
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
 type SessionInitiationCache =
-    moka::future::Cache<StartChallenge, flume::Sender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+    moka::sync::Cache<StartChallenge, flume::Sender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
 /// Handles to streams and tasks spawned by the Session.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -561,7 +561,7 @@ where
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
-            session_initiations: moka::future::Cache::builder()
+            session_initiations: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_live(
                     2 * initiation_timeout_max_one_way(
@@ -667,7 +667,7 @@ where
                 .for_each(|_| async {
                     trace!("executing session cache evictions");
                     myself.sessions.run_pending_tasks();
-                    myself.session_initiations.run_pending_tasks().await;
+                    myself.session_initiations.run_pending_tasks();
                 })
                 .await;
         });
@@ -782,7 +782,6 @@ where
             },
             |_| tx_initiation_done,
         )
-        .await
         .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
@@ -1506,7 +1505,7 @@ where
         );
         let challenge = est.orig_challenge;
         let session_id = est.session_id;
-        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
+        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
                 error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
@@ -1526,7 +1525,7 @@ where
         );
         // Currently, we do not distinguish between individual error types
         // and just discard the initiation attempt and pass on the error.
-        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
+        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge) {
             if let Err(error) = tx_est.try_send(Err(error_type)) {
                 error!(%error, ?error_type, "could not send session error message");
                 return Err(SessionManagerError::other(error).into());
