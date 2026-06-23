@@ -7,9 +7,7 @@ use std::{
 use anyhow::anyhow;
 use futures::{
     Sink, SinkExt, StreamExt, TryStreamExt,
-    //channel::mpsc::{Sender, UnboundedSender},
     future::AbortHandle,
-    pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
@@ -75,8 +73,9 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+#[tracing::instrument(level = "debug", skip(session_data))]
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
-    debug!(?session_id, ?reason, "closing session");
+    debug!("closing session");
 
     #[cfg(feature = "telemetry")]
     {
@@ -86,8 +85,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
-        //session_data.session_tx.close_channel();
-        trace!(?session_id, "data tx channel closed on session");
+        debug!("data tx channel closed on session");
     }
 
     // Terminate any additional tasks spawned by the Session
@@ -127,20 +125,25 @@ const SESSION_FORWARD_CAPACITY: usize = 10000;
 type SessionInitiationCache =
     moka::future::Cache<StartChallenge, flume::Sender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
+/// Handles to streams and tasks spawned by the Session.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
-enum SessionTasks {
+enum SessionHandles {
+    /// Handle to the stream that facilitates ingress of data from the HOPR network into the Session.
+    Ingress,
+    /// Handle to the process that sends keep-alive messages to the Session recipient (Exit).
     KeepAlive,
+    /// Handle to the process that monitors and balances SURBs.
     Balancer,
 }
 
 #[derive(Clone)]
 struct SessionSlot {
-    // Sender needs to be put in Arc, so that no clones are made by `moka`.
-    // This makes sure that the entire channel closes once the one and only sender is closed.
-    session_tx: Arc<flume::Sender<ApplicationDataIn>>,
+    // Sender does not need to be in Arc, because the receiver part is always
+    // wrapped inside DropAbortable wrapper, with abort handle added to `abort_handles`.
+    session_tx: flume::Sender<ApplicationDataIn>,
     routing_opts: DestinationRouting,
     // Additional tasks spawned by the Session.
-    abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
+    abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionHandles>>>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     // Set on both Entry and Exit sides.
     surb_mgmt: Arc<BalancerStateValues>,
@@ -846,6 +849,11 @@ where
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
                 let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+                let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
+
+                let mut abort_handles = AbortableList::default();
+                abort_handles.insert(SessionHandles::Ingress, session_rx_ah);
+
                 let notifier = self
                     .session_notifiers
                     .get()
@@ -900,7 +908,6 @@ where
                         },
                     );
 
-                    let mut abort_handles = AbortableList::default();
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit
@@ -915,7 +922,7 @@ where
                         },
                         surb_mgmt.clone(),
                     );
-                    abort_handles.insert(SessionTasks::KeepAlive, ka_abort_handle);
+                    abort_handles.insert(SessionHandles::KeepAlive, ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
@@ -932,7 +939,7 @@ where
 
                     let (level_stream, balancer_abort_handle) =
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
-                    abort_handles.insert(SessionTasks::Balancer, balancer_abort_handle);
+                    abort_handles.insert(SessionHandles::Balancer, balancer_abort_handle);
 
                     // Insert the slot and obtain a guard that rolls it back (also tearing
                     // down the abort handles) if any subsequent setup step fails.
@@ -940,7 +947,7 @@ where
                         .allocate_session_slot(
                             session_id,
                             SessionSlot {
-                                session_tx: Arc::new(session_tx),
+                                session_tx,
                                 routing_opts: forward_routing.clone(),
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: surb_mgmt.clone(),
@@ -1020,9 +1027,9 @@ where
                         .allocate_session_slot(
                             session_id,
                             SessionSlot {
-                                session_tx: Arc::new(session_tx),
+                                session_tx,
                                 routing_opts: forward_routing.clone(),
-                                abort_handles: Default::default(),
+                                abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: Default::default(), // Disabled SURB management
                                 surb_estimator: Default::default(), // No SURB estimator needed
                             },
@@ -1249,7 +1256,7 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (new_session_notifier, mut close_session_notifier) = self
+        let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
@@ -1257,8 +1264,6 @@ where
 
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
-
-        let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
@@ -1277,13 +1282,17 @@ where
 
         let session_id = pseudonym;
 
+        let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
+
         let slot = SessionSlot {
-            session_tx: Arc::new(session_tx),
+            session_tx,
             routing_opts: reply_routing.clone(),
             abort_handles: Default::default(),
             surb_mgmt: Default::default(),
             surb_estimator: Default::default(),
         };
+        slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
         // Insert the slot and obtain a guard. Any failure from here on rolls the slot
         // back, otherwise it would block this pseudonym until idle eviction. The atomic
@@ -1390,7 +1399,7 @@ where
             let (_, balancer_abort_handle) = balancer.start_control_loop(self.cfg.balancer_sampling_interval);
             slot.abort_handles
                 .lock()
-                .insert(SessionTasks::Balancer, balancer_abort_handle);
+                .insert(SessionHandles::Balancer, balancer_abort_handle);
 
             // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
             if let Some(period) = self.cfg.surb_balance_notify_period {
@@ -1423,7 +1432,7 @@ where
 
                 slot.abort_handles
                     .lock()
-                    .insert(SessionTasks::KeepAlive, ka_abort_handle);
+                    .insert(SessionHandles::KeepAlive, ka_abort_handle);
 
                 debug!(%session_id, ?period, "started SURB level-notifying keep-alive stream");
             }
@@ -1632,7 +1641,7 @@ where
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, future::BoxFuture};
+    use futures::{AsyncWriteExt, future::BoxFuture, pin_mut};
     use futures::channel::mpsc::UnboundedSender;
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -2051,7 +2060,7 @@ mod tests {
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {
-                session_tx: Arc::new(dummy_tx),
+                session_tx: dummy_tx,
                 routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
@@ -3026,7 +3035,7 @@ mod tests {
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {
-                session_tx: Arc::new(dummy_tx),
+                session_tx: dummy_tx,
                 routing_opts: DestinationRouting::Forward {
                     destination: Box::new(peer_address.into()),
                     pseudonym: Some(alice_pseudonym),
@@ -3107,7 +3116,7 @@ mod tests {
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {
-                session_tx: Arc::new(dummy_tx),
+                session_tx: dummy_tx,
                 routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
