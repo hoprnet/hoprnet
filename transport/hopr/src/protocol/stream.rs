@@ -512,7 +512,11 @@ mod tests {
         /// `ConnectionAborted` on the next poll). Wakes the read-side task only.
         fn kill_read(self: &Arc<Self>) {
             self.read_dead.store(true, Ordering::Release);
-            if let Some(w) = self.read_waker.lock().take() {
+            // Extract the waker in a separate statement so the MutexGuard drops
+            // before wake() runs — parking_lot mutexes are non-reentrant and wakers
+            // may invoke arbitrary executor code.
+            let waker = self.read_waker.lock().take();
+            if let Some(w) = waker {
                 w.wake();
             }
         }
@@ -520,7 +524,8 @@ mod tests {
         /// Simulate a dead write-half. Wakes the write-side task only.
         fn kill_write(self: &Arc<Self>) {
             self.write_dead.store(true, Ordering::Release);
-            if let Some(w) = self.write_waker.lock().take() {
+            let waker = self.write_waker.lock().take();
+            if let Some(w) = waker {
                 w.wake();
             }
         }
