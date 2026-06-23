@@ -3612,7 +3612,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.4"
+version = "4.0.2-rc.5"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -3902,6 +3902,7 @@ dependencies = [
  "libp2p",
  "moka",
  "multiaddr",
+ "parking_lot",
  "pcap-file",
  "proc-macro-regex",
  "rstest",
@@ -3944,11 +3945,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.9.1"
+version = "0.9.3"
 dependencies = [
  "anyhow",
  "async-broadcast",
  "async-trait",
+ "async_channel_io",
  "backon",
  "bytes",
  "dashmap",
@@ -3963,6 +3965,7 @@ dependencies = [
  "libp2p-stream",
  "more-asserts",
  "multiaddr",
+ "pin-project",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
