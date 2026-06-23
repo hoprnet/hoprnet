@@ -804,7 +804,7 @@ where
                     .filter_map(move |(pseudonym, data)| {
                         let smgr = smgr.clone();
                         async move {
-                            match smgr.dispatch_message(pseudonym, data).await {
+                            match smgr.dispatch_message(pseudonym, data) {
                                 Ok(DispatchResult::Processed) => {
                                     tracing::trace!("message dispatch completed");
                                     None

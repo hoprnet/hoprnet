@@ -676,9 +676,9 @@ where
         let myself = self.clone();
         let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
             "session_start_protocol_processor",
-            start_protocol_rx
-                .into_stream()
-                .for_each_concurrent(Some(self.cfg.maximum_sessions + 10), move |(pseudonym, protocol_msg)| {
+            start_protocol_rx.into_stream().for_each_concurrent(
+                Some(self.cfg.maximum_sessions + 10),
+                move |(pseudonym, protocol_msg)| {
                     let myself = myself.clone();
                     async move {
                         let result = match protocol_msg {
@@ -696,7 +696,8 @@ where
                             error!(%error, "failed to process Start protocol message");
                         }
                     }
-                })
+                }
+            )
         );
 
         Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
@@ -1203,7 +1204,7 @@ where
     /// the Session protocol or Start protocol messages.
     ///
     /// If the data are not recognized, they are returned as [`DispatchResult::Unrelated`].
-    pub async fn dispatch_message(
+    pub fn dispatch_message(
         &self,
         pseudonym: HoprPseudonym,
         in_data: ApplicationDataIn,
@@ -1732,7 +1733,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -1752,15 +1753,13 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        .await?;
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
                     Ok(())
                 })
             });
@@ -1792,7 +1791,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -1920,7 +1919,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -1939,15 +1938,13 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        .await?;
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
                     Ok(())
                 })
             });
@@ -2096,7 +2093,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2115,15 +2112,13 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        .await?;
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
                     Ok(())
                 })
             });
@@ -2337,7 +2332,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2355,15 +2350,13 @@ mod tests {
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
-                    alice_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        .await?;
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
                     Ok(())
                 })
             });
@@ -2392,7 +2385,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2420,7 +2413,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2446,7 +2439,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2478,7 +2471,7 @@ mod tests {
                                 packet_info: Default::default(),
                             },
                         )
-                        .await?;
+                        ?;
                     Ok(())
                 })
             });
@@ -2913,15 +2906,13 @@ mod tests {
 
         // Send data with session application tag but no session exists
         let pseudonym = HoprPseudonym::random();
-        let result = mgr
-            .dispatch_message(
-                pseudonym,
-                ApplicationDataIn {
-                    data: ApplicationData::new(SESSION_APPLICATION_TAG, b"test data")?,
-                    packet_info: Default::default(),
-                },
-            )
-            .await;
+        let result = mgr.dispatch_message(
+            pseudonym,
+            ApplicationDataIn {
+                data: ApplicationData::new(SESSION_APPLICATION_TAG, b"test data")?,
+                packet_info: Default::default(),
+            },
+        );
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
@@ -3050,7 +3041,7 @@ mod tests {
         };
 
         // Dispatch the keep-alive message
-        alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
+        alice_mgr.dispatch_message(alice_pseudonym, app_data_in)?;
 
         // Yield to allow the background task to process the message
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -3122,7 +3113,7 @@ mod tests {
         };
 
         // Dispatch the keep-alive message
-        alice_mgr.dispatch_message(alice_pseudonym, app_data_in).await?;
+        alice_mgr.dispatch_message(alice_pseudonym, app_data_in)?;
 
         // Yield to allow the background task to process the message
         tokio::time::sleep(Duration::from_millis(20)).await;
