@@ -1617,7 +1617,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use futures::{AsyncWriteExt, channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},

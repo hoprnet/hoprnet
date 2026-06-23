@@ -86,9 +86,8 @@ where
     let mut next = initial;
     loop {
         let value_fn = value_fn.clone();
-        let insertion_result: std::result::Result<moka::ops::compute::CompResult<K, V>, std::convert::Infallible> = cache
-            .entry(next)
-            .and_try_compute_with(move |e| {
+        let insertion_result: std::result::Result<moka::ops::compute::CompResult<K, V>, std::convert::Infallible> =
+            cache.entry(next).and_try_compute_with(move |e| {
                 if e.is_none() {
                     let f = value_fn
                         .lock()
