@@ -4007,6 +4007,7 @@ dependencies = [
  "async-trait",
  "criterion",
  "flagset",
+ "flume",
  "futures",
  "futures-time",
  "hopr-api",

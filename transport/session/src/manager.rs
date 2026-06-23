@@ -7,7 +7,7 @@ use std::{
 use anyhow::anyhow;
 use futures::{
     Sink, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::{Sender, UnboundedSender},
+    //channel::mpsc::{Sender, UnboundedSender},
     future::AbortHandle,
     pin_mut,
 };
@@ -86,7 +86,7 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     if reason != ClosureReason::EmptyRead {
         // Closing the data sender will also cause it to close from the read side
-        session_data.session_tx.close_channel();
+        //session_data.session_tx.close_channel();
         trace!(?session_id, "data tx channel closed on session");
     }
 
@@ -118,11 +118,14 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
+/// How many packets can be buffered if the HoprSession socket is not fast enough.
+const SESSION_FORWARD_CAPACITY: usize = 10000;
+
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
 type SessionInitiationCache =
-    moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+    moka::future::Cache<StartChallenge, flume::Sender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 enum SessionTasks {
@@ -134,7 +137,7 @@ enum SessionTasks {
 struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
-    session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
+    session_tx: Arc<flume::Sender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
     // Additional tasks spawned by the Session.
     abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionTasks>>>,
@@ -304,13 +307,13 @@ type IncomingSessionSink = Pin<Box<dyn Sink<IncomingSession, Error = SessionMana
 
 type SessionNotifiers = (
     Arc<hopr_utils::runtime::prelude::Mutex<IncomingSessionSink>>,
-    Sender<(SessionId, ClosureReason)>,
+    flume::Sender<(SessionId, ClosureReason)>,
 );
 
 // Sink for processing Start protocol messages.
 // Must be within Mutex, as cloning to go around `try_send` mutability causes
 // the channel to never go out of capacity.
-type StartProtocolMsgSink = Arc<parking_lot::Mutex<Option<Sender<(HoprPseudonym, HoprStartProtocol)>>>>;
+type StartProtocolMsgSink = Arc<parking_lot::Mutex<Option<flume::Sender<(HoprPseudonym, HoprStartProtocol)>>>>;
 
 /// Manages lifecycles of Sessions.
 ///
@@ -606,12 +609,12 @@ where
             Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
         let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) = flume::bounded(self.cfg.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (start_protocol_tx, start_protocol_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        let (start_protocol_tx, start_protocol_rx) = flume::bounded(self.cfg.maximum_sessions + 10);
         let _ = self.start_protocol_tx.lock().insert(start_protocol_tx);
 
         let myself = self.clone();
@@ -623,25 +626,27 @@ where
         );
         let ah_closure_notifications = hopr_utils::spawn_as_abortable_named!(
             "session_close_notifications",
-            session_close_rx.for_each_concurrent(None, move |(session_id, closure_reason)| {
-                let myself = myself.clone();
-                let closure_diag = closure_diag.clone();
-                closure_diag.wrap(async move {
-                    // These notifications come from the Sessions themselves once
-                    // an empty read is encountered, which means the closure was done by the
-                    // other party.
-                    if let Some(session_data) = myself.sessions.remove(&session_id) {
-                        close_session(session_id, session_data, closure_reason);
-                    } else {
-                        // Do not treat this as an error
-                        debug!(
-                            ?session_id,
-                            ?closure_reason,
-                            "could not find session id to close, maybe the session is already closed"
-                        );
-                    }
+            session_close_rx
+                .into_stream()
+                .for_each_concurrent(None, move |(session_id, closure_reason)| {
+                    let myself = myself.clone();
+                    let closure_diag = closure_diag.clone();
+                    closure_diag.wrap(async move {
+                        // These notifications come from the Sessions themselves once
+                        // an empty read is encountered, which means the closure was done by the
+                        // other party.
+                        if let Some(session_data) = myself.sessions.remove(&session_id) {
+                            close_session(session_id, session_data, closure_reason);
+                        } else {
+                            // Do not treat this as an error
+                            debug!(
+                                ?session_id,
+                                ?closure_reason,
+                                "could not find session id to close, maybe the session is already closed"
+                            );
+                        }
+                    })
                 })
-            },)
         );
 
         // This is necessary to evict expired entries from the caches if
@@ -671,27 +676,29 @@ where
         let myself = self.clone();
         let ah_start_protocol = hopr_utils::spawn_as_abortable_named!(
             "session_start_protocol_processor",
-            start_protocol_rx.for_each_concurrent(None, move |(pseudonym, protocol_msg)| {
-                let myself = myself.clone();
-                async move {
-                    let result = match protocol_msg {
-                        HoprStartProtocol::StartSession(session_req) => {
-                            myself.handle_incoming_session_initiation(pseudonym, session_req).await
-                        }
-                        HoprStartProtocol::SessionEstablished(est) => {
-                            myself.handle_session_established(pseudonym, est).await
-                        }
-                        HoprStartProtocol::SessionError(error_type) => {
-                            myself.handle_session_error(pseudonym, error_type).await
-                        }
-                        HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
-                    };
+            start_protocol_rx
+                .into_stream()
+                .for_each_concurrent(None, move |(pseudonym, protocol_msg)| {
+                    let myself = myself.clone();
+                    async move {
+                        let result = match protocol_msg {
+                            HoprStartProtocol::StartSession(session_req) => {
+                                myself.handle_incoming_session_initiation(pseudonym, session_req).await
+                            }
+                            HoprStartProtocol::SessionEstablished(est) => {
+                                myself.handle_session_established(pseudonym, est).await
+                            }
+                            HoprStartProtocol::SessionError(error_type) => {
+                                myself.handle_session_error(pseudonym, error_type).await
+                            }
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
+                        };
 
-                    if let Err(error) = result {
-                        error!(%error, "failed to process Start protocol message");
+                        if let Err(error) = result {
+                            error!(%error, "failed to process Start protocol message");
+                        }
                     }
-                }
-            })
+                })
         );
 
         Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
@@ -764,7 +771,7 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
+        let (tx_initiation_done, rx_initiation_done) = flume::bounded(1);
         let (challenge, _) = insert_into_next_slot(
             &self.session_initiations,
             |ch| {
@@ -829,21 +836,21 @@ where
         .into();
 
         // Await session establishment response from the Exit node or timeout
-        pin_mut!(rx_initiation_done);
+        //pin_mut!(rx_initiation_done);
 
         trace!(challenge, "awaiting session establishment");
-        match rx_initiation_done.try_next().timeout(initiation_timeout).await {
+        match rx_initiation_done.into_stream().try_next().timeout(initiation_timeout).await {
             Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
+                let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
                 let notifier = self
                     .session_notifiers
                     .get()
                     .map(|(_, notifier)| {
-                        let mut notifier = notifier.clone();
+                        let notifier = notifier.clone();
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
                                 .try_send((session_id, reason))
@@ -1215,9 +1222,12 @@ where
 
                 Ok(session_slot
                     .session_tx
-                    .unbounded_send(in_data)
+                    .try_send(in_data)
                     .map(|_| DispatchResult::Processed)
-                    .map_err(SessionManagerError::other)?)
+                    .map_err(|error| {
+                        error!(%session_id, %error, "failed to dispatch session data");
+                        SessionManagerError::other(error)
+                    })?)
             } else {
                 error!(%session_id, "received data from an unestablished session");
                 Err(TransportSessionError::UnknownData)
@@ -1248,7 +1258,7 @@ where
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
 
-        let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
+        let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
@@ -1502,7 +1512,7 @@ where
         let challenge = est.orig_challenge;
         let session_id = est.session_id;
         if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge).await {
-            if let Err(error) = tx_est.unbounded_send(Ok(est)) {
+            if let Err(error) = tx_est.try_send(Ok(est)) {
                 error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
             }
@@ -1526,7 +1536,7 @@ where
         // Currently, we do not distinguish between individual error types
         // and just discard the initiation attempt and pass on the error.
         if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge).await {
-            if let Err(error) = tx_est.unbounded_send(Err(error_type)) {
+            if let Err(error) = tx_est.try_send(Err(error_type)) {
                 error!(%error, ?error_type, "could not send session error message");
                 return Err(SessionManagerError::other(error).into());
             }
@@ -1623,6 +1633,7 @@ where
 mod tests {
     use anyhow::anyhow;
     use futures::{AsyncWriteExt, future::BoxFuture};
+    use futures::channel::mpsc::UnboundedSender;
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
@@ -2036,7 +2047,7 @@ mod tests {
         let alice_mgr =
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
-        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        let (dummy_tx, _) = flume::unbounded();
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {
@@ -3010,7 +3021,7 @@ mod tests {
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
 
-        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        let (dummy_tx, _) = flume::unbounded();
         let peer_address: Address = (&ChainKeypair::random()).into();
         alice_mgr.sessions.insert(
             session_id,
@@ -3092,7 +3103,7 @@ mod tests {
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
 
-        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        let (dummy_tx, _) = flume::unbounded();
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {

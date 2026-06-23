@@ -47,6 +47,7 @@ allocator-jemalloc = [
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
+flume = { workspace = true }
 futures = { workspace = true }
 humantime-serde = { workspace = true }
 futures-time = { workspace = true }
