@@ -1617,7 +1617,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use anyhow::anyhow;
+    use anyhow::{anyhow, Context};
     use futures::{AsyncWriteExt, channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
@@ -3042,8 +3042,19 @@ mod tests {
         // Dispatch the keep-alive message
         alice_mgr.dispatch_message(alice_pseudonym, app_data_in)?;
 
-        // Yield to allow the background task to process the message
-        tokio::time::sleep(Duration::from_millis(20)).await;
+        // Poll until the background task has processed the keep-alive
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let Some(slot) = alice_mgr.sessions.get(&session_id) {
+                    if slot.surb_mgmt.buffer_level() == new_buffer_level {
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("keep-alive BalancerState update timed out")?;
 
         // Verify buffer level was updated
         let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
@@ -3114,8 +3125,19 @@ mod tests {
         // Dispatch the keep-alive message
         alice_mgr.dispatch_message(alice_pseudonym, app_data_in)?;
 
-        // Yield to allow the background task to process the message
-        tokio::time::sleep(Duration::from_millis(20)).await;
+        // Poll until the background task has processed the keep-alive
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let Some(slot) = alice_mgr.sessions.get(&session_id) {
+                    if slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed) == new_target {
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("keep-alive BalancerTarget update timed out")?;
 
         // Verify target was updated
         let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
