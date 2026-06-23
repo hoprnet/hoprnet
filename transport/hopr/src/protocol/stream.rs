@@ -483,7 +483,8 @@ mod tests {
     // ---------------------------------------------------------------------------
 
     struct DeadSignal {
-        dead: std::sync::atomic::AtomicBool,
+        read_dead: std::sync::atomic::AtomicBool,
+        write_dead: std::sync::atomic::AtomicBool,
         read_waker: Mutex<Option<Waker>>,
         write_waker: Mutex<Option<Waker>>,
     }
@@ -491,7 +492,8 @@ mod tests {
     impl std::fmt::Debug for DeadSignal {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("DeadSignal")
-                .field("dead", &self.dead.load(Ordering::Relaxed))
+                .field("read_dead", &self.read_dead.load(Ordering::Relaxed))
+                .field("write_dead", &self.write_dead.load(Ordering::Relaxed))
                 .finish_non_exhaustive()
         }
     }
@@ -499,20 +501,25 @@ mod tests {
     impl DeadSignal {
         fn new() -> Arc<Self> {
             Arc::new(Self {
-                dead: std::sync::atomic::AtomicBool::new(false),
+                read_dead: std::sync::atomic::AtomicBool::new(false),
+                write_dead: std::sync::atomic::AtomicBool::new(false),
                 read_waker: Mutex::new(None),
                 write_waker: Mutex::new(None),
             })
         }
 
-        /// Simulate a libp2p connection close: set the dead flag and re-wake
-        /// any parked reader/writer tasks so they observe the error on their
-        /// next poll.
-        fn kill(self: &Arc<Self>) {
-            self.dead.store(true, Ordering::Release);
+        /// Simulate a dead read-half (e.g. NAT drop makes the peer's reader observe
+        /// `ConnectionAborted` on the next poll). Wakes the read-side task only.
+        fn kill_read(self: &Arc<Self>) {
+            self.read_dead.store(true, Ordering::Release);
             if let Some(w) = self.read_waker.lock().take() {
                 w.wake();
             }
+        }
+
+        /// Simulate a dead write-half. Wakes the write-side task only.
+        fn kill_write(self: &Arc<Self>) {
+            self.write_dead.store(true, Ordering::Release);
             if let Some(w) = self.write_waker.lock().take() {
                 w.wake();
             }
@@ -529,7 +536,7 @@ mod tests {
             // check and the store, it would consume a None waker and the task would
             // park forever. Storing first guarantees kill() always finds a waker to wake.
             *self.signal.read_waker.lock() = Some(cx.waker().clone());
-            if self.signal.dead.load(Ordering::Acquire) {
+            if self.signal.read_dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
             Poll::Pending
@@ -540,7 +547,7 @@ mod tests {
         fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &[u8]) -> Poll<std::io::Result<usize>> {
             // Store the waker BEFORE checking the flag (same reasoning as poll_read).
             *self.signal.write_waker.lock() = Some(cx.waker().clone());
-            if self.signal.dead.load(Ordering::Acquire) {
+            if self.signal.write_dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
             Poll::Pending
@@ -586,9 +593,12 @@ mod tests {
         }
 
         async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
-            self.open_calls.fetch_add(1, Ordering::Relaxed);
             let signal = DeadSignal::new();
+            // Publish the signal before bumping open_calls: tests wait for open_calls
+            // to reach a threshold and then immediately fetch the signal, so the signal
+            // must be visible before the counter is incremented.
             self.signals.lock().push(signal.clone());
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
             Ok::<_, std::io::Error>(FlaggedStream { signal })
         }
     }
@@ -644,10 +654,10 @@ mod tests {
         );
         let signal = control.signal(0).context("signal for stream #1 must exist")?;
 
-        // Kill the stream: simulates a libp2p ConnectionClosed event clearing the
+        // Kill the read half: simulates a libp2p ConnectionClosed event clearing the
         // liveness flag. The stored read waker is woken so the parked reader task
         // observes ConnectionAborted and calls cache.invalidate(peer).
-        signal.kill();
+        signal.kill_read();
 
         // Wait for the reader task to detect the error and invalidate the cache,
         // then send a second packet that causes a new cache miss → open() #2.
@@ -693,8 +703,8 @@ mod tests {
 
         let signal = control.signal(0).context("signal #1 must exist")?;
 
-        // Kill the stream; the writer's forward-future will error on next poll.
-        signal.kill();
+        // Kill the write half; the writer's forward-future will error on next poll.
+        signal.kill_write();
 
         // Keep sending until the writer task observes the stream error and reopens,
         // capped at the per-peer channel capacity to bound the loop.
