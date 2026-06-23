@@ -678,7 +678,7 @@ where
             "session_start_protocol_processor",
             start_protocol_rx
                 .into_stream()
-                .for_each_concurrent(None, move |(pseudonym, protocol_msg)| {
+                .for_each_concurrent(Some(self.cfg.maximum_sessions + 10), move |(pseudonym, protocol_msg)| {
                     let myself = myself.clone();
                     async move {
                         let result = match protocol_msg {
@@ -732,7 +732,7 @@ where
         slot: SessionSlot,
     ) -> Option<SessionSlotGuard<'a>> {
         if let moka::ops::compute::CompResult::Inserted(_) = self.sessions.entry(session_id).and_compute_with(|entry| {
-            if entry.is_none() {
+            if entry.is_none() && self.sessions.entry_count() < self.cfg.maximum_sessions as u64 {
                 moka::ops::compute::Op::Put(slot)
             } else {
                 moka::ops::compute::Op::Nop
@@ -1212,12 +1212,14 @@ where
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
-                if let Err(error) = start_protocol_tx.try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
-                {
-                    error!(%error, "failed to send Start protocol message to processing task");
-                }
+                start_protocol_tx
+                    .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
+                    .map_err(|error| {
+                        error!(%error, "failed to send Start protocol message to processing task");
+                        SessionManagerError::other(error)
+                    })?;
             } else {
-                error!("start protocol message received before SessionManager is fully started");
+                return Err(SessionManagerError::NotStarted.into());
             }
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
@@ -1266,18 +1268,6 @@ where
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
-
-        // Check max sessions limit before atomic insert
-        if self.sessions.entry_count() as usize >= self.cfg.maximum_sessions {
-            error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
-            let reason = StartErrorReason::NoSlotsAvailable;
-            let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
-                reason,
-            });
-            send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
-            return Ok(());
-        }
 
         let session_id = pseudonym;
 
