@@ -343,6 +343,8 @@ where
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
 
         // Start an interval stream at which the balancer will sample and perform updates
+
+        // DropAbortable not needed because the stream only generates items when polled
         let sampling_stream = futures::stream::Abortable::new(
             futures_time::stream::interval(sampling_interval.max(MIN_BALANCER_SAMPLING_INTERVAL).into()),
             abort_reg,
