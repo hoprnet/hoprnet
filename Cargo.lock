@@ -3902,6 +3902,7 @@ dependencies = [
  "libp2p",
  "moka",
  "multiaddr",
+ "parking_lot",
  "pcap-file",
  "proc-macro-regex",
  "rstest",

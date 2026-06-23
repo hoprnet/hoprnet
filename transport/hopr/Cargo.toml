@@ -106,6 +106,7 @@ hopr-transport-tag-allocator = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+parking_lot = { workspace = true }
 async-trait = { workspace = true }
 bimap = { workspace = true }
 bytesize = { workspace = true }

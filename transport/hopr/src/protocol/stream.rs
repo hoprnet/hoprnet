@@ -333,7 +333,7 @@ mod tests {
     use std::{
         pin::Pin,
         sync::{
-            Arc, Mutex,
+            Arc,
             atomic::{AtomicUsize, Ordering},
         },
         task::{Context as TaskContext, Poll, Waker},
@@ -342,6 +342,7 @@ mod tests {
     use anyhow::Context;
     use async_trait::async_trait;
     use futures::{SinkExt, Stream};
+    use parking_lot::Mutex;
     use tokio_util::{bytes::BytesMut, codec::BytesCodec};
 
     use super::*;
@@ -509,10 +510,10 @@ mod tests {
         /// next poll.
         fn kill(self: &Arc<Self>) {
             self.dead.store(true, Ordering::Release);
-            if let Some(w) = self.read_waker.lock().expect("lock ok").take() {
+            if let Some(w) = self.read_waker.lock().take() {
                 w.wake();
             }
-            if let Some(w) = self.write_waker.lock().expect("lock ok").take() {
+            if let Some(w) = self.write_waker.lock().take() {
                 w.wake();
             }
         }
@@ -527,7 +528,7 @@ mod tests {
             // Store the waker BEFORE checking the flag: if kill() races between the
             // check and the store, it would consume a None waker and the task would
             // park forever. Storing first guarantees kill() always finds a waker to wake.
-            *self.signal.read_waker.lock().expect("lock ok") = Some(cx.waker().clone());
+            *self.signal.read_waker.lock() = Some(cx.waker().clone());
             if self.signal.dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
@@ -538,7 +539,7 @@ mod tests {
     impl AsyncWrite for FlaggedStream {
         fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, _buf: &[u8]) -> Poll<std::io::Result<usize>> {
             // Store the waker BEFORE checking the flag (same reasoning as poll_read).
-            *self.signal.write_waker.lock().expect("lock ok") = Some(cx.waker().clone());
+            *self.signal.write_waker.lock() = Some(cx.waker().clone());
             if self.signal.dead.load(Ordering::Acquire) {
                 return Poll::Ready(Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)));
             }
@@ -571,7 +572,7 @@ mod tests {
 
         /// Returns the `DeadSignal` for the `index`-th stream that was opened.
         fn signal(&self, index: usize) -> Option<Arc<DeadSignal>> {
-            self.signals.lock().expect("lock ok").get(index).cloned()
+            self.signals.lock().get(index).cloned()
         }
     }
 
@@ -587,7 +588,7 @@ mod tests {
         async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
             self.open_calls.fetch_add(1, Ordering::Relaxed);
             let signal = DeadSignal::new();
-            self.signals.lock().expect("lock ok").push(signal.clone());
+            self.signals.lock().push(signal.clone());
             Ok::<_, std::io::Error>(FlaggedStream { signal })
         }
     }

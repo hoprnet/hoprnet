@@ -47,6 +47,7 @@ impl LivenessRegistry {
 
     /// Returns the current liveness flag for `peer`, or `None` if the peer is
     /// not registered. Does not create an entry.
+    #[allow(dead_code)]
     pub(crate) fn get(&self, peer: &PeerId) -> Option<Arc<AtomicBool>> {
         self.0.get(peer).map(|r| r.clone())
     }

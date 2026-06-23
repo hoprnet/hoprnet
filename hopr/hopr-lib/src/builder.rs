@@ -730,7 +730,10 @@ macro_rules! impl_build_methods {
 
             tracing::info!("starting ticket events processor");
             let (tickets_tx, tickets_rx) = channel(8192);
-            let (tickets_rx_stream, tickets_handle) = futures::stream::abortable(tickets_rx);
+
+            // Need to use DropAbortable, so that the receiver is dropped when aborted and no new items can be sent by the senders.
+            let (tickets_rx_stream, tickets_handle) = hopr_utils::runtime::DropAbortable::new(tickets_rx);
+
             processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
             let new_ticket_tx = pre.ticket_event_subscribers.0.clone();
             let tmgr_clone = ticket_manager.clone();
