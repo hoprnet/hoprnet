@@ -237,13 +237,28 @@ where
                         // to a detached task so this concurrency slot is freed immediately.
                         // A flood of opens to dead peers can no longer head-of-line block
                         // cached-peer sends.
-                        //
-                        // Note: multiple spawned tasks for the same peer will queue on the
-                        // per-peer open_lock; after the first succeeds, subsequent tasks find
-                        // the cache populated (double-check) and skip the open.
                         hopr_utils::runtime::prelude::spawn(async move {
                             let open_lock = open_locks.get_with(peer, || Arc::new(futures::lock::Mutex::new(())));
-                            let _guard = open_lock.lock().await;
+
+                            // Non-blocking acquire: if another task is already opening this
+                            // peer's stream, either deliver from cache (if that open already
+                            // succeeded) or drop this packet. Queuing behind a failing open
+                            // would otherwise cause O(n) serial timeout attempts for n
+                            // packets addressed to a dead peer.
+                            let _guard = match open_lock.try_lock() {
+                                Some(guard) => guard,
+                                None => {
+                                    if let Some(sender) = cache.get(&peer) {
+                                        deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
+                                    } else {
+                                        tracing::debug!(
+                                            %peer,
+                                            "stream open already in progress, dropping packet"
+                                        );
+                                    }
+                                    return;
+                                }
+                            };
 
                             let sender = if let Some(cached) = cache.get(&peer) {
                                 Ok(cached)
