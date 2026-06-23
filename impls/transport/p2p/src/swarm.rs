@@ -3,18 +3,17 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
 use hopr_utils::network_types::prelude::is_public_address;
 use libp2p::{
     autonat,
-    identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
@@ -52,9 +51,9 @@ impl InactiveNetwork {
     #[cfg(feature = "runtime-tokio")]
     pub async fn build(
         me: libp2p::identity::Keypair,
-        external_discovery_events: BoxStream<'static, PeerDiscovery>,
+        external_discovery_events: futures::stream::BoxStream<'static, PeerDiscovery>,
     ) -> Result<Self> {
-        let me_public: PublicKey = me.public();
+        let me_public: libp2p::identity::PublicKey = me.public();
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
             .with_tokio()
@@ -91,7 +90,7 @@ impl InactiveNetwork {
                             let v = std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
                                 .ok()
                                 .and_then(|v| v.trim().parse::<u8>().ok())
-                                .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT);
+                                .unwrap_or(crate::constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT);
                             v.max(1)
                         })
                         .expect("clamped to >= 1, will never fail"),
@@ -99,13 +98,13 @@ impl InactiveNetwork {
                     .with_max_negotiating_inbound_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
+                            .unwrap_or(crate::constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
                     )
                     .with_idle_connection_timeout(
                         std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
                             .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
                             .map(std::time::Duration::from_secs)
-                            .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
+                            .unwrap_or(crate::constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
                     )
                 })
                 .build(),
