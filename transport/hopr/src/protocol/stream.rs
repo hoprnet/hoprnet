@@ -316,7 +316,7 @@ where
     // terminated when the rx_in is dropped
     let _egress_process = hopr_utils::runtime::prelude::spawn(
         rx_out
-            .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
+            .inspect(|(peer, _)| tracing::debug!(%peer, "egress-trace: rx_out yielded packet into per-peer egress"))
             .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {
                 let cache = cache_out.clone();
                 let open_locks = open_locks.clone();

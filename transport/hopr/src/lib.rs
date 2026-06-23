@@ -521,8 +521,9 @@ where
             HoprTransportProcess::MixerForwarder,
             hopr_utils::spawn_as_abortable!(async move {
                 mix_rx
-                    .fold(wire_msg_tx, |mut sink, item| async move {
-                        if sink.send(item).await.is_err() {
+                    .fold(wire_msg_tx, |mut sink, (peer, payload)| async move {
+                        tracing::debug!(%peer, "egress-trace: mixer forwarder releasing packet to wire sink");
+                        if sink.send((peer, payload)).await.is_err() {
                             tracing::error!(
                                 task = %HoprTransportProcess::MixerForwarder,
                                 "wire sink dropped — discarding mixed packet"
