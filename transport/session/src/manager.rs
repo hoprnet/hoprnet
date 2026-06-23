@@ -5,10 +5,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use futures::{
-    Sink, SinkExt, StreamExt, TryStreamExt,
-    future::AbortHandle,
-};
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -314,9 +311,9 @@ type SessionNotifiers = (
 );
 
 // Sink for processing Start protocol messages.
-// Must be within Mutex, as cloning to go around `try_send` mutability causes
-// the channel to never go out of capacity.
-type StartProtocolMsgSink = Arc<parking_lot::Mutex<Option<flume::Sender<(HoprPseudonym, HoprStartProtocol)>>>>;
+// Must be within Arc to be shared across SessionManager clones.
+// The inner OnceLock is set once in `start()` and read in `dispatch_message`.
+type StartProtocolMsgSink = Arc<OnceLock<flume::Sender<(HoprPseudonym, HoprStartProtocol)>>>;
 
 /// Manages lifecycles of Sessions.
 ///
@@ -585,7 +582,7 @@ where
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
-            start_protocol_tx: Arc::new(parking_lot::Mutex::new(None)),
+            start_protocol_tx: Arc::new(OnceLock::new()),
             cfg,
         }
     }
@@ -618,7 +615,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let (start_protocol_tx, start_protocol_rx) = flume::bounded(self.cfg.maximum_sessions + 10);
-        let _ = self.start_protocol_tx.lock().insert(start_protocol_tx);
+        let _ = self.start_protocol_tx.set(start_protocol_tx);
 
         let myself = self.clone();
         let closure_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -688,13 +685,11 @@ where
                             HoprStartProtocol::StartSession(session_req) => {
                                 myself.handle_incoming_session_initiation(pseudonym, session_req).await
                             }
-                            HoprStartProtocol::SessionEstablished(est) => {
-                                myself.handle_session_established(pseudonym, est).await
-                            }
+                            HoprStartProtocol::SessionEstablished(est) => myself.handle_session_established(est).await,
                             HoprStartProtocol::SessionError(error_type) => {
-                                myself.handle_session_error(pseudonym, error_type).await
+                                myself.handle_session_error(error_type).await
                             }
-                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(pseudonym, msg).await,
+                            HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
                         };
 
                         if let Err(error) = result {
@@ -839,10 +834,14 @@ where
         .into();
 
         // Await session establishment response from the Exit node or timeout
-        //pin_mut!(rx_initiation_done);
 
         trace!(challenge, "awaiting session establishment");
-        match rx_initiation_done.into_stream().try_next().timeout(initiation_timeout).await {
+        match rx_initiation_done
+            .into_stream()
+            .try_next()
+            .timeout(initiation_timeout)
+            .await
+        {
             Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
@@ -1212,7 +1211,7 @@ where
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
-            if let Some(start_protocol_tx) = self.start_protocol_tx.lock().as_mut() {
+            if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
                 if let Err(error) = start_protocol_tx.try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
                 {
                     error!(%error, "failed to send Start protocol message to processing task");
@@ -1509,11 +1508,7 @@ where
         Ok(())
     }
 
-    async fn handle_session_established(
-        &self,
-        _pseudonym: HoprPseudonym,
-        est: StartEstablished<SessionId>,
-    ) -> crate::errors::Result<()> {
+    async fn handle_session_established(&self, est: StartEstablished<SessionId>) -> crate::errors::Result<()> {
         trace!(
             session_id = ?est.session_id,
             "received session establishment confirmation"
@@ -1532,11 +1527,7 @@ where
         Ok(())
     }
 
-    async fn handle_session_error(
-        &self,
-        _pseudonym: HoprPseudonym,
-        error_type: StartErrorType,
-    ) -> crate::errors::Result<()> {
+    async fn handle_session_error(&self, error_type: StartErrorType) -> crate::errors::Result<()> {
         trace!(
             challenge = error_type.challenge,
             error = ?error_type.reason,
@@ -1568,11 +1559,7 @@ where
         Ok(())
     }
 
-    async fn handle_keep_alive(
-        &self,
-        _pseudonym: HoprPseudonym,
-        msg: KeepAliveMessage<SessionId>,
-    ) -> crate::errors::Result<()> {
+    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> crate::errors::Result<()> {
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -1641,8 +1628,7 @@ where
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, future::BoxFuture, pin_mut};
-    use futures::channel::mpsc::UnboundedSender;
+    use futures::{AsyncWriteExt, channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
