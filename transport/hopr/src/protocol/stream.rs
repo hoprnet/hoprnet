@@ -27,7 +27,7 @@ lazy_static::lazy_static! {
 }
 
 type PeerStreamCache<T> = moka::sync::Cache<PeerId, Sender<T>>;
-type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<futures::lock::Mutex<()>>>;
+type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<async_lock::Mutex<()>>>;
 
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
@@ -241,97 +241,104 @@ where
                         // for the brief per_peer_send_timeout window.
                         deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
                     } else {
-                        // Cache miss: offload the stream open (up to stream_open_timeout)
-                        // to a detached task so this concurrency slot is freed immediately.
-                        // A flood of opens to dead peers can no longer head-of-line block
-                        // cached-peer sends.
+                        // Cache miss: check the per-peer open lock *before* deciding
+                        // whether to spawn or wait.
                         //
-                        // Acquire a semaphore permit before spawning to bound the total
-                        // number of in-flight open tasks. On contention the packet is
-                        // dropped (logged at debug) rather than spawning unboundedly.
-                        let permit = match open_semaphore.try_acquire_arc() {
-                            Some(p) => p,
-                            None => {
-                                tracing::debug!(%peer, "stream-open concurrency limit reached, dropping packet");
-                                return;
-                            }
-                        };
-                        hopr_utils::runtime::prelude::spawn(async move {
-                            let _permit = permit; // released when task completes
-                            let open_lock = open_locks.get_with(peer, || Arc::new(futures::lock::Mutex::new(())));
+                        // - Opener  (try_lock succeeds): detach the stream open to a
+                        //   spawned task so this concurrency slot is freed immediately.
+                        //   A flood to many *distinct* dead peers can no longer
+                        //   head-of-line block cached-peer sends.
+                        //
+                        // - Waiter  (try_lock fails, open already in progress): wait
+                        //   inline on the lock — this blocks one concurrency slot but
+                        //   ensures the packet is not dropped when the peer is healthy.
+                        //   Bounded by stream_open_timeout so dead peers cannot park
+                        //   a slot indefinitely.
+                        let open_lock = open_locks.get_with(peer, || Arc::new(async_lock::Mutex::new(())));
 
-                            // Non-blocking acquire: if another task is already opening this
-                            // peer's stream, either deliver from cache (if that open already
-                            // succeeded) or drop this packet. Queuing behind a failing open
-                            // would otherwise cause O(n) serial timeout attempts for n
-                            // packets addressed to a dead peer.
-                            let _guard = match open_lock.try_lock() {
-                                Some(guard) => guard,
-                                None => {
-                                    if let Some(sender) = cache.get(&peer) {
-                                        deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
+                        match open_lock.try_lock_arc() {
+                            Some(guard) => {
+                                // Opener path: acquire a semaphore permit to bound the
+                                // total number of concurrent in-flight open tasks, then
+                                // detach. If all permits are taken the packet is dropped.
+                                let permit = match open_semaphore.try_acquire_arc() {
+                                    Some(p) => p,
+                                    None => {
+                                        tracing::debug!(%peer, "stream-open concurrency limit reached, dropping packet");
+                                        return;
+                                    }
+                                };
+                                hopr_utils::runtime::prelude::spawn(async move {
+                                    let _permit = permit; // released when task completes
+                                    let _guard = guard;   // released when task completes
+
+                                    let sender = if let Some(cached) = cache.get(&peer) {
+                                        Ok(cached)
                                     } else {
-                                        tracing::debug!(
-                                            %peer,
-                                            "stream open already in progress, dropping packet"
-                                        );
+                                        tracing::trace!(%peer, "peer is not in cache, opening new stream");
+
+                                        // Only the cache-miss path needs the stream-open handles.
+                                        // Clone them out of the shared `open_ctx` once here rather
+                                        // than on every outgoing message.
+                                        let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
+
+                                        // A timeout is mandatory: a permanently-unreachable peer must
+                                        // not park the per-peer open lock (and therefore the dedup queue)
+                                        // indefinitely.
+                                        use futures_time::future::FutureExt as TimeExt;
+                                        let stream = control
+                                            .clone()
+                                            .open(peer)
+                                            .timeout(futures_time::time::Duration::from(stream_open_timeout))
+                                            .await
+                                            .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
+                                            .and_then(|stream| {
+                                                stream.map_err(|e| {
+                                                    anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
+                                                })
+                                            });
+
+                                        match stream {
+                                            Ok(stream) => {
+                                                tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
+                                                let send = build_peer_stream_io(
+                                                    peer,
+                                                    stream,
+                                                    cache.clone(),
+                                                    codec.clone(),
+                                                    tx_in.clone(),
+                                                    frame_writer_backpressure_bytes,
+                                                    per_peer_channel_capacity,
+                                                );
+                                                cache.insert(peer, send.clone());
+                                                Ok(send)
+                                            }
+                                            Err(error) => Err(error),
+                                        }
+                                    };
+
+                                    match sender {
+                                        Ok(sender) => deliver(peer, sender, msg, per_peer_send_timeout, cache).await,
+                                        Err(error) => {
+                                            tracing::debug!(%peer, %error, "failed to open a stream to peer")
+                                        }
                                     }
-                                    return;
-                                }
-                            };
-
-                            let sender = if let Some(cached) = cache.get(&peer) {
-                                Ok(cached)
-                            } else {
-                                tracing::trace!(%peer, "peer is not in cache, opening new stream");
-
-                                // Only the cache-miss path needs the stream-open handles.
-                                // Clone them out of the shared `open_ctx` once here rather
-                                // than on every outgoing message.
-                                let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
-
-                                // A timeout is mandatory: a permanently-unreachable peer must
-                                // not park the per-peer open lock (and therefore the dedup queue)
-                                // indefinitely.
+                                });
+                            }
+                            None => {
+                                // Waiter path: an open for this peer is already in flight.
+                                // Block this concurrency slot until the opener releases the
+                                // lock (success or timeout), then deliver from cache.
                                 use futures_time::future::FutureExt as TimeExt;
-                                let stream = control
-                                    .clone()
-                                    .open(peer)
-                                    .timeout(futures_time::time::Duration::from(stream_open_timeout))
-                                    .await
-                                    .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
-                                    .and_then(|stream| {
-                                        stream.map_err(|e| {
-                                            anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
-                                        })
-                                    });
-
-                                match stream {
-                                    Ok(stream) => {
-                                        tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
-                                        let send = build_peer_stream_io(
-                                            peer,
-                                            stream,
-                                            cache.clone(),
-                                            codec.clone(),
-                                            tx_in.clone(),
-                                            frame_writer_backpressure_bytes,
-                                            per_peer_channel_capacity,
-                                        );
-                                        cache.insert(peer, send.clone());
-                                        Ok(send)
-                                    }
-                                    Err(error) => Err(error),
-                                }
-                            };
-
-                            match sender {
-                                Ok(sender) => deliver(peer, sender, msg, per_peer_send_timeout, cache).await,
-                                Err(error) => {
-                                    tracing::debug!(%peer, %error, "failed to open a stream to peer")
+                                let timeout = futures_time::time::Duration::from(stream_open_timeout);
+                                let _ = open_lock.lock().timeout(timeout).await;
+                                if let Some(sender) = cache.get(&peer) {
+                                    deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
+                                } else {
+                                    tracing::debug!(%peer, "stream open failed or timed out, dropping packet");
                                 }
                             }
-                        });
+                        }
                     }
                 }
             })
