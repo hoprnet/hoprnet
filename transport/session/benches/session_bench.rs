@@ -9,8 +9,7 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
-use hopr_protocol_app::prelude::ApplicationDataOut;
-use hopr_protocol_app::v1::ApplicationDataIn;
+use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartProtocol};
 use hopr_transport_session::{
     Capabilities, Capability, HoprSession, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG, SessionId,
@@ -31,34 +30,40 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 /// Wrapper that makes a `flume::Sender` implement `futures::Sink`.
 ///
-/// flume's `Sender` does not implement `Sink` directly; only `SendSink` does.
-/// `SendSink` is not `Send`, so it can't satisfy `SessionManager`'s `S: ... + Send`
-/// bound. This wrapper bridges the gap for benchmarking only.
+/// `flume::Sender` does not implement `Sink` directly; only `SendSink` does.
+/// `SendSink` owns the sender and is `Send`, but it is not publicly constructible
+/// from outside the `flume` crate, and its lifetime parameter makes it
+/// inexpressible as a return type here.  This thin zero-cost wrapper bridges the
+/// gap for benchmarking only.
 #[cfg(feature = "benchmark")]
 #[derive(Clone)]
-pub struct FlumeSink<T>(flume::Sender<T>);
+pub struct FlumeSink<T>(pub flume::Sender<T>);
 
 #[cfg(feature = "benchmark")]
 impl<T: Send + 'static> futures::Sink<T> for FlumeSink<T> {
     type Error = flume::SendError<T>;
+
     fn poll_ready(
         self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
+        _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         std::task::Poll::Ready(Ok(()))
     }
+
     fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         self.get_mut().0.send(item)
     }
+
     fn poll_flush(
         self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
+        _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         std::task::Poll::Ready(Ok(()))
     }
+
     fn poll_close(
         self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
+        _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         std::task::Poll::Ready(Ok(()))
     }
@@ -67,7 +72,7 @@ impl<T: Send + 'static> futures::Sink<T> for FlumeSink<T> {
 /// Builds a `SessionManager` for benchmarking without calling `start()`.
 ///
 /// `start()` spawns tokio tasks that require a live runtime context, so we bypass
-/// it entirely and inject the start-protocol sender directly. The session cache
+/// it entirely and inject the start-protocol sender directly.  The session cache
 /// is pre-populated with `num_sessions` entries.
 ///
 /// Returns the manager, session IDs, the start-protocol receiver (keep alive for
