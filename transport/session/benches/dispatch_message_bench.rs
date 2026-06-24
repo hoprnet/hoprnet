@@ -1,5 +1,4 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use futures::StreamExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
@@ -103,6 +102,7 @@ fn make_manager_with_sessions(
 
     let session_ids: Vec<_> = (0..num_sessions).map(|_| HoprPseudonym::random()).collect();
     let session_receivers = sm.insert_session_slot_for_benchmarking_multi(&session_ids);
+    sm.set_active_sessions_for_benchmarking(num_sessions);
     sm.flush_pending_tasks_for_benchmarking();
 
     (sm, session_ids, start_rx, session_receivers)

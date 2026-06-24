@@ -1,6 +1,6 @@
 use std::{
     pin::Pin,
-    sync::{Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
@@ -87,9 +87,6 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
-
-    #[cfg(all(feature = "telemetry", not(test)))]
-    METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
@@ -164,14 +161,20 @@ pub(crate) struct SessionSlot {
 /// has no asynchronous `Drop`, the cleanup is performed on a spawned task.
 struct SessionSlotGuard<'a> {
     sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
+    active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     session_id: SessionId,
     committed: bool,
 }
 
 impl<'a> SessionSlotGuard<'a> {
-    fn new(sessions: &'a moka::sync::Cache<SessionId, SessionSlot>, session_id: SessionId) -> Self {
+    fn new(
+        sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
+        session_id: SessionId,
+        active_sessions: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Self {
         Self {
             sessions,
+            active_sessions,
             session_id,
             committed: false,
         }
@@ -192,6 +195,7 @@ impl Drop for SessionSlotGuard<'_> {
             let session_id = self.session_id;
             warn!(%session_id, "rolling back partially established session slot after setup failure");
             if let Some(slot) = self.sessions.remove(&session_id) {
+                self.active_sessions.fetch_sub(1, Ordering::Relaxed);
                 close_session(session_id, slot, ClosureReason::Eviction);
             }
         }
@@ -469,6 +473,10 @@ pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     start_protocol_tx: StartProtocolMsgSink,
+    /// Authoritative session count for admission control.
+    /// Incremented atomically inside `allocate_session_slot` before the cache insertion,
+    /// and decremented at every removal path (explicit close, eviction, guard rollback).
+    active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -480,6 +488,7 @@ impl<S> Clone for SessionManager<S> {
             session_initiations: self.session_initiations.clone(),
             session_notifiers: self.session_notifiers.clone(),
             start_protocol_tx: self.start_protocol_tx.clone(),
+            active_sessions: self.active_sessions.clone(),
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
@@ -590,6 +599,9 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
+        let active_sessions: Arc<std::sync::atomic::AtomicUsize> = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let active_sessions_for_listener = active_sessions.clone();
+
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
@@ -605,9 +617,10 @@ where
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
-                .eviction_listener(|session_id: Arc<SessionId>, entry, reason| match &reason {
+                .eviction_listener(move |session_id: Arc<SessionId>, entry, reason| match &reason {
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                         trace!(?session_id, ?reason, "session evicted from the cache");
+                        active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
                         close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
                     }
                     _ => {}
@@ -615,6 +628,7 @@ where
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
+            active_sessions,
             cfg,
         }
     }
@@ -668,6 +682,7 @@ where
                         // an empty read is encountered, which means the closure was done by the
                         // other party.
                         if let Some(session_data) = myself.sessions.remove(&session_id) {
+                            myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                             close_session(session_id, session_data, closure_reason);
                         } else {
                             // Do not treat this as an error
@@ -759,22 +774,44 @@ where
     /// API guarantees that only one concurrent caller can claim the slot for a given
     /// pseudonym (avoiding a TOCTOU race), which also rules out loopback sessions onto
     /// ourselves.
+    ///
+    /// Capacity is enforced by an atomic counter incremented *before* the cache insertion,
+    /// making it impossible for two concurrent callers (with different session IDs) to both
+    /// succeed when the cache is already at `maximum_sessions`.
     fn allocate_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> Option<SessionSlotGuard<'_>> {
-        if let moka::ops::compute::CompResult::Inserted(_) = self.sessions.entry(session_id).and_compute_with(|entry| {
-            if entry.is_none() && self.sessions.entry_count() < self.cfg.maximum_sessions as u64 {
-                moka::ops::compute::Op::Put(slot)
-            } else {
-                moka::ops::compute::Op::Nop
-            }
-        }) {
-            // Count the freshly inserted slot. The returned guard is the only thing that
-            // can undo this insertion (via `close_session`), so the gauge stays balanced.
-            #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_ACTIVE_SESSIONS.increment(1.0);
+        // Try to claim a session slot before touching the cache. `fetch_update` atomically
+        // increments only if the value is strictly below the limit, preventing two concurrent
+        // callers from both succeeding when already at capacity.
+        let counter = &self.active_sessions;
+        let did_reserve = counter
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                (n < self.cfg.maximum_sessions).then_some(n + 1)
+            })
+            .is_ok();
 
-            Some(SessionSlotGuard::new(&self.sessions, session_id))
-        } else {
-            None
+        if !did_reserve {
+            return None;
+        }
+
+        let result =
+            self.sessions
+                .entry(session_id)
+                .and_compute_with(|entry: Option<moka::Entry<SessionId, SessionSlot>>| {
+                    if entry.is_none() {
+                        moka::ops::compute::Op::Put(slot)
+                    } else {
+                        // Duplicate key — release the reservation so the counter stays accurate.
+                        counter.fetch_sub(1, Ordering::Relaxed);
+                        moka::ops::compute::Op::Nop
+                    }
+                });
+
+        match result {
+            moka::ops::compute::CompResult::Inserted(_) => {
+                // take_guard borrows self, so the guard stores the counter clone separately.
+                Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
+            }
+            _ => None,
         }
     }
 
@@ -792,7 +829,7 @@ where
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks();
-        if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
+        if self.cfg.maximum_sessions <= self.active_sessions.load(Ordering::Relaxed) {
             return Err(SessionManagerError::TooManySessions.into());
         }
 
@@ -1170,6 +1207,7 @@ where
     /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
     pub fn close_session(&self, id: &SessionId) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
+            self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             close_session(*id, slot, ClosureReason::Eviction);
             true
         } else {
@@ -1690,6 +1728,16 @@ where
     #[cfg(feature = "benchmark")]
     pub fn set_start_protocol_tx_for_benchmarking(&self, tx: flume::Sender<(HoprPseudonym, HoprStartProtocol)>) {
         let _ = (*self.start_protocol_tx).set(tx);
+    }
+
+    /// Sets the session counter to `count` without inserting entries.
+    /// For benchmarking only — needed because `insert_session_slot_for_benchmarking_multi`
+    /// bypasses `allocate_session_slot` (which would normally increment the counter).
+    ///
+    /// **For benchmarking only — do not call in production code.**
+    #[cfg(feature = "benchmark")]
+    pub fn set_active_sessions_for_benchmarking(&self, count: usize) {
+        self.active_sessions.store(count, Ordering::Relaxed);
     }
 
     /// Triggers Moka background task processing so that eviction listeners run.
