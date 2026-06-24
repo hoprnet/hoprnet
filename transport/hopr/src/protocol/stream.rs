@@ -266,7 +266,9 @@ where
                                     .await
                                     .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
                                     .and_then(|s| {
-                                        s.map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))
+                                        s.map_err(|e| {
+                                            anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
+                                        })
                                     });
 
                                 open_count2.fetch_sub(1, Ordering::Relaxed);
@@ -296,7 +298,9 @@ where
                         } else {
                             open_count2.fetch_sub(1, Ordering::Relaxed);
                             tracing::debug!(%peer, "stream-open concurrency limit reached; dropping buffered packets");
-                            hopr_utils::runtime::prelude::spawn(async move { cache2.invalidate(&peer); });
+                            hopr_utils::runtime::prelude::spawn(async move {
+                                cache2.invalidate(&peer);
+                            });
                         }
 
                         PeerSink { tx, rx }
