@@ -19,9 +19,55 @@ use crate::{errors::HoprTransportError, protocol::PacketPipelineConfig};
 const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 
 const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
+const DEFAULT_MAX_CONCURRENT_PACKETS: usize = 50;
+const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
+const DEFAULT_PER_PEER_SEND_TIMEOUT: Duration = Duration::from_millis(50);
+const DEFAULT_MAX_CONCURRENT_STREAM_OPENS: usize = 50;
+
+/// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
+pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
+/// Minimum accepted value for [`StreamProtocolConfig::per_peer_send_timeout`].
+pub const MIN_PER_PEER_SEND_TIMEOUT: Duration = Duration::from_millis(1);
 
 fn default_per_peer_channel_capacity() -> usize {
     DEFAULT_PER_PEER_CHANNEL_CAPACITY
+}
+
+fn default_max_concurrent_packets() -> usize {
+    DEFAULT_MAX_CONCURRENT_PACKETS
+}
+
+fn default_stream_open_timeout() -> Duration {
+    DEFAULT_STREAM_OPEN_TIMEOUT
+}
+
+fn default_frame_writer_backpressure_bytes() -> usize {
+    DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+}
+
+fn default_per_peer_send_timeout() -> Duration {
+    DEFAULT_PER_PEER_SEND_TIMEOUT
+}
+
+fn default_max_concurrent_stream_opens() -> usize {
+    DEFAULT_MAX_CONCURRENT_STREAM_OPENS
+}
+
+fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
+    if MIN_STREAM_OPEN_TIMEOUT <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("stream open timeout must be at least 1 ms"))
+    }
+}
+
+fn validate_per_peer_send_timeout(value: &Duration) -> Result<(), ValidationError> {
+    if MIN_PER_PEER_SEND_TIMEOUT <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("per-peer send timeout must be at least 1 ms"))
+    }
 }
 
 /// Configuration of the per-peer egress stream layer.
@@ -45,6 +91,79 @@ pub struct StreamProtocolConfig {
     #[default(default_per_peer_channel_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_per_peer_channel_capacity"))]
     pub per_peer_channel_capacity: usize,
+
+    /// Maximum number of outgoing packets processed concurrently by the egress drain.
+    ///
+    /// Cache hits hold a slot only for the brief inline send (bounded by
+    /// `per_peer_send_timeout`). Cache misses are offloaded to a separate
+    /// bounded open stage (see `max_concurrent_stream_opens`) and do **not**
+    /// consume a drain slot. A larger value increases throughput under
+    /// mixed fast/slow peer traffic.
+    ///
+    /// Defaults to 50.
+    #[validate(range(min = 1))]
+    #[default(default_max_concurrent_packets())]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_concurrent_packets"))]
+    pub max_concurrent_packets: usize,
+
+    /// Timeout for the `NetworkStreamControl::open` call when opening a new
+    /// outgoing stream to a peer.
+    ///
+    /// A timeout is mandatory: without it a permanently-unreachable peer would park
+    /// the per-peer open lock indefinitely. When the open attempt fails or times out,
+    /// the packet is dropped and a debug-level log entry is emitted. Packets may also
+    /// be dropped if the open-concurrency limit (`max_concurrent_stream_opens`) is
+    /// reached or if another open for the same peer is already in progress.
+    ///
+    /// Must be at least 1 ms. Defaults to 2 seconds.
+    #[validate(custom(function = "validate_stream_open_timeout"))]
+    #[default(default_stream_open_timeout())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_stream_open_timeout", with = "humantime_serde")
+    )]
+    pub stream_open_timeout: Duration,
+
+    /// Pending-write-buffer byte threshold on the framed writer before a flush is forced.
+    ///
+    /// A value of `1` flushes on every encoded frame (one syscall per message).
+    /// Larger values coalesce adjacent small frames into a single write on busy relays
+    /// at the cost of marginally higher latency under low load.
+    ///
+    /// Defaults to 4 096 bytes (~4 typical HOPR packets).
+    #[validate(range(min = 1))]
+    #[default(default_frame_writer_backpressure_bytes())]
+    #[cfg_attr(feature = "serde", serde(default = "default_frame_writer_backpressure_bytes"))]
+    pub frame_writer_backpressure_bytes: usize,
+
+    /// Timeout for sending a single message into the per-peer mpsc buffer.
+    ///
+    /// When the per-peer channel stays full for longer than this, the packet is dropped
+    /// as an intentional transport loss. This prevents a single slow or backlogged peer
+    /// from blocking the egress pipeline indefinitely.
+    ///
+    /// Must be at least 1 ms. Defaults to 50 milliseconds.
+    #[validate(custom(function = "validate_per_peer_send_timeout"))]
+    #[default(default_per_peer_send_timeout())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_per_peer_send_timeout", with = "humantime_serde")
+    )]
+    pub per_peer_send_timeout: Duration,
+
+    /// Maximum number of cache-miss stream-open tasks that may be in flight concurrently.
+    ///
+    /// Each spawned open task holds one permit until the open attempt completes or fails.
+    /// When this limit is reached, additional cache-miss packets are dropped (logged at
+    /// debug level) rather than spawning more tasks. This caps memory and socket usage
+    /// under a flood to many distinct unreachable peers.
+    ///
+    /// Defaults to 50 (matches the former implicit bound: opens previously occupied up
+    /// to `max_concurrent_packets` drain slots).
+    #[validate(range(min = 1))]
+    #[default(default_max_concurrent_stream_opens())]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_concurrent_stream_opens"))]
+    pub max_concurrent_stream_opens: usize,
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -649,9 +768,17 @@ mod tests {
     }
 
     #[test]
-    fn stream_protocol_config_default_has_expected_capacity() {
+    fn stream_protocol_config_default_has_expected_values() {
         let cfg = StreamProtocolConfig::default();
         assert_eq!(cfg.per_peer_channel_capacity, DEFAULT_PER_PEER_CHANNEL_CAPACITY);
+        assert_eq!(cfg.max_concurrent_packets, DEFAULT_MAX_CONCURRENT_PACKETS);
+        assert_eq!(cfg.stream_open_timeout, DEFAULT_STREAM_OPEN_TIMEOUT);
+        assert_eq!(
+            cfg.frame_writer_backpressure_bytes,
+            DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+        );
+        assert_eq!(cfg.per_peer_send_timeout, DEFAULT_PER_PEER_SEND_TIMEOUT);
+        assert_eq!(cfg.max_concurrent_stream_opens, DEFAULT_MAX_CONCURRENT_STREAM_OPENS);
         cfg.validate().expect("default StreamProtocolConfig must be valid");
     }
 
@@ -659,6 +786,52 @@ mod tests {
     fn stream_protocol_config_zero_capacity_is_rejected() {
         let cfg = StreamProtocolConfig {
             per_peer_channel_capacity: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_concurrent_packets_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            max_concurrent_packets: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_backpressure_bytes_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            frame_writer_backpressure_bytes: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_stream_open_timeout_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            stream_open_timeout: Duration::ZERO,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_per_peer_send_timeout_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            per_peer_send_timeout: Duration::ZERO,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_concurrent_stream_opens_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            max_concurrent_stream_opens: 0,
+            ..Default::default()
         };
         assert!(cfg.validate().is_err());
     }

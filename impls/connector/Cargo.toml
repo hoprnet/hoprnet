@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-connector"
-version = "0.21.1"
+version = "0.21.2"
 description = "Implementation of HOPR Chain APIs using Blokli client"
 edition.workspace = true
 license.workspace = true

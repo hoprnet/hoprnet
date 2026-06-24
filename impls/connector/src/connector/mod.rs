@@ -291,17 +291,27 @@ where
                     hopr_utils::runtime::prelude::spawn_blocking(move || {
                         mapper.key_to_id.insert(account.public_key, Some(account.key_id));
                         mapper.id_to_key.insert(account.key_id, Some(account.public_key));
+                        chain_to_packet.insert(account.chain_addr, Some(account.public_key));
+                        packet_to_chain.insert(account.public_key, Some(account.chain_addr));
                         graph.write().add_node(account.key_id);
-                        mapper.backend.insert_account(account.clone()).map(|old| (account, old))
-                    })
-                    .map_err(ConnectorError::backend)
-                    .and_then(move |res| {
-                        if let Ok((upserted_account, _)) = &res {
-                            // Rather update the cached entry than invalidating it
-                            chain_to_packet.insert(upserted_account.chain_addr, Some(upserted_account.public_key));
-                            packet_to_chain.insert(upserted_account.public_key, Some(upserted_account.chain_addr));
+                        let old = mapper
+                            .backend
+                            .insert_account(account.clone())
+                            .map_err(ConnectorError::backend)?;
+                        if let Some(old_account) = &old {
+                            if old_account.chain_addr != account.chain_addr {
+                                chain_to_packet.invalidate(&old_account.chain_addr);
+                            }
+                            if old_account.public_key != account.public_key {
+                                packet_to_chain.invalidate(&old_account.public_key);
+                            }
                         }
-                        futures::future::ready(res.map(SubscribedEventType::Account).map_err(ConnectorError::backend))
+                        Ok::<_, ConnectorError>((account, old))
+                    })
+                    .map(|result| {
+                        result
+                            .map_err(ConnectorError::backend)?
+                            .map(SubscribedEventType::Account)
                     })
                 })
                 .fuse();
