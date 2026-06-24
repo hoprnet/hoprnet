@@ -69,6 +69,7 @@ pub(crate) fn insert_into_next_slot<F, K, U, V>(
     cache: &moka::sync::Cache<K, V>,
     mut generator: F,
     value_fn: U,
+    max_capacity: Option<u64>,
 ) -> Option<(K, V)>
 where
     F: FnMut(Option<K>) -> K,
@@ -77,6 +78,12 @@ where
     V: Clone + Send + Sync + 'static,
 {
     cache.run_pending_tasks();
+
+    // Reject when the cache is already at capacity to avoid Moka evicting an
+    // existing entry before we can insert the new one.
+    if let Some(max) = max_capacity && cache.entry_count() >= max {
+        return None;
+    }
 
     // Wrap the FnOnce so we can "consume" it exactly once,
     // but only when we actually insert into a free slot.
@@ -230,6 +237,7 @@ mod tests {
                 &cache,
                 |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0),
                 |k| format!("foo_{k}"),
+                Some(10u64),
             )
             .ok_or(anyhow!("should insert"))?;
             assert_eq!(k, i);
@@ -241,11 +249,36 @@ mod tests {
             insert_into_next_slot(
                 &cache,
                 |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0),
-                |_| "foo".to_string()
+                |_| "foo".to_string(),
+                Some(10u64),
             )
             .is_none(),
             "must not find slot when full"
         );
+
+        // A cache with capacity 1 must reject a second distinct key.
+        let unit_cache = moka::sync::Cache::new(1);
+        let (k0, v0) = insert_into_next_slot(
+            &unit_cache,
+            |prev| prev.map(|v| v + 1).unwrap_or(0),
+            |k| k,
+            Some(1u64),
+        )
+        .ok_or(anyhow!("first insertion must succeed"))?;
+        assert_eq!(k0, 0);
+
+        assert!(
+            insert_into_next_slot(
+                &unit_cache,
+                |prev| prev.map(|v| v + 1).unwrap_or(0),
+                |k| k,
+                Some(1u64),
+            )
+            .is_none(),
+            "second distinct key must be rejected when cache capacity is 1"
+        );
+        // The first entry must still be present (not evicted).
+        assert_eq!(Some(v0), unit_cache.get(&k0));
 
         Ok(())
     }

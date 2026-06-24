@@ -813,6 +813,7 @@ where
                 }
             },
             |_| tx_initiation_done,
+            Some(self.cfg.maximum_sessions as u64),
         )
         .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
@@ -1106,10 +1107,13 @@ where
                     Ok(session)
                 }
             }
-            Ok(Ok(None)) => Err(SessionManagerError::other(anyhow!(
-                "internal error: sender has been closed without completing the session establishment"
-            ))
-            .into()),
+            Ok(Ok(None)) => {
+                self.session_initiations.remove(&challenge);
+                Err(SessionManagerError::other(anyhow!(
+                    "internal error: sender has been closed without completing the session establishment"
+                ))
+                .into())
+            }
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
                 error!(
@@ -1126,6 +1130,7 @@ where
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
 
+                self.session_initiations.remove(&challenge);
                 Err(TransportSessionError::Timeout)
             }
         }
@@ -2967,15 +2972,16 @@ mod tests {
         });
 
         // Give new_session time to insert the challenge into session_initiations.
-        tokio::time::sleep(Duration::from_millis(50)).await;
-
-        // Read the challenge that new_session inserted so we can reply with the matching ID.
-        let challenge = mgr
-            .session_initiations
-            .iter()
-            .next()
-            .map(|(ch, _)| *ch)
-            .context("new_session did not insert a challenge into session_initiations")?;
+        let challenge = tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let Some((ch, _)) = mgr.session_initiations.iter().next() {
+                    break *ch;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("new_session did not insert a challenge into session_initiations")?;
 
         // Inject the SessionError with the matching challenge before SessionEstablished arrives.
         let error_type = StartErrorType {
