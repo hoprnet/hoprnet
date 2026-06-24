@@ -104,6 +104,11 @@ name = "session_bench"
 harness = false
 required-features = ["benchmark"]
 
+[[bench]]
+name = "dispatch_message_bench"
+harness = false
+required-features = ["benchmark"]
+
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true, optional = true }
