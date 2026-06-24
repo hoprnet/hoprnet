@@ -3865,10 +3865,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.29.1"
+version = "0.30.0"
 dependencies = [
  "ahash",
  "anyhow",
+ "async-lock",
  "async-trait",
  "async_channel_io",
  "bimap",

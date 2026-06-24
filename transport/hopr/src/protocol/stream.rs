@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use async_lock::Semaphore;
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
@@ -25,31 +26,8 @@ lazy_static::lazy_static! {
         .unwrap();
 }
 
-// TODO: see if these constants should be configurable instead
-
-/// Global timeout for the `BidirectionalStreamControl::open` operation.
-const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
-
-/// Timeout for sending a single message into the per-peer mpsc buffer.
-/// If the buffer stays full for longer than this, the message is dropped.
-const DEFAULT_PER_PEER_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
-const MAX_CONCURRENT_PACKETS: usize = 30;
-
-/// Default pending-write-buffer byte threshold on the framed writer before a flush is
-/// forced. **This value is in bytes, not in messages** — that is how
-/// `tokio_util::codec::FramedWrite::set_backpressure_boundary` is defined.
-///
-/// The previous value of `1` byte forced a flush syscall on every message (the buffer
-/// exceeds one byte the moment a frame is encoded), making a relay forwarding N packets
-/// issue N individual writes rather than coalescing adjacent small frames. `4096` bytes
-/// is a conservative default that lets roughly ~4 HOPR packets (~1 KiB each) batch into
-/// a single write while still flushing quickly under single-packet traffic.
-///
-/// Override with `HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES`.
-const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
-
 type PeerStreamCache<T> = moka::sync::Cache<PeerId, Sender<T>>;
-type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<futures::lock::Mutex<()>>>;
+type PeerOpenLockCache = moka::sync::Cache<PeerId, Arc<async_lock::Mutex<()>>>;
 
 fn build_peer_stream_io<S, C>(
     peer: PeerId,
@@ -134,6 +112,33 @@ where
     send
 }
 
+/// Sends `msg` to `sender`, enforcing a per-send deadline.
+///
+/// On a send error the peer's cache entry is invalidated so the next packet
+/// triggers a fresh stream open.
+async fn deliver<T>(
+    peer: libp2p::PeerId,
+    sender: futures::channel::mpsc::Sender<T>,
+    msg: T,
+    timeout: std::time::Duration,
+    cache: PeerStreamCache<T>,
+) where
+    T: Send + 'static,
+{
+    match sender.with_timeout(timeout).send(msg).await {
+        Ok(()) => tracing::trace!(%peer, "message sent to peer"),
+        Err(SinkTimeoutError::Timeout) => {
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_PER_PEER_SEND_TIMEOUT.increment();
+            tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
+        }
+        Err(SinkTimeoutError::Inner(error)) => {
+            tracing::error!(%peer, %error, "error sending message to peer");
+            cache.invalidate(&peer);
+        }
+    }
+}
+
 pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
@@ -168,31 +173,17 @@ where
         .accept()
         .map_err(|e| super::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
 
-    let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .filter(|&n: &usize| n > 0)
-        .unwrap_or(MAX_CONCURRENT_PACKETS);
-
-    let global_stream_open_timeout = std::env::var("HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .map(std::time::Duration::from_millis)
-        .unwrap_or(GLOBAL_STREAM_OPEN_TIMEOUT);
-
-    let frame_writer_backpressure_bytes = std::env::var("HOPR_TRANSPORT_FRAME_WRITER_BACKPRESSURE_BYTES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .filter(|&n: &usize| n > 0)
-        .unwrap_or(DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES);
-
-    let per_peer_send_timeout = std::env::var("HOPR_TRANSPORT_PER_PEER_SEND_TIMEOUT_MS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .map(std::time::Duration::from_millis)
-        .unwrap_or(DEFAULT_PER_PEER_SEND_TIMEOUT);
-
+    let max_concurrent_packets = stream_cfg.max_concurrent_packets;
+    let stream_open_timeout = stream_cfg.stream_open_timeout;
+    let frame_writer_backpressure_bytes = stream_cfg.frame_writer_backpressure_bytes;
+    let per_peer_send_timeout = stream_cfg.per_peer_send_timeout;
     let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
+    let max_concurrent_stream_opens = stream_cfg.max_concurrent_stream_opens;
+
+    // Semaphore bounding the number of in-flight cache-miss open tasks. Without this,
+    // a flood to many distinct unreachable peers could spawn an unbounded number of
+    // 2 s open tasks, exhausting memory and sockets.
+    let open_semaphore = Arc::new(Semaphore::new(max_concurrent_stream_opens));
 
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
@@ -240,79 +231,113 @@ where
                 let cache = cache_out.clone();
                 let open_locks = open_locks.clone();
                 let open_ctx = open_ctx.clone();
+                let open_semaphore = open_semaphore.clone();
 
                 async move {
                     tracing::trace!(%peer, "trying to deliver message to peer");
 
-                    let cached = if let Some(cached) = cache.get(&peer) {
-                        Ok(cached)
+                    if let Some(sender) = cache.get(&peer) {
+                        // Cache hit: deliver inline. The concurrency slot is held only
+                        // for the brief per_peer_send_timeout window.
+                        deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
                     } else {
-                        let open_lock = open_locks.get_with(peer, || Arc::new(futures::lock::Mutex::new(())));
-                        let _guard = open_lock.lock().await;
+                        // Cache miss: check the per-peer open lock *before* deciding
+                        // whether to spawn or wait.
+                        //
+                        // - Opener  (try_lock succeeds): detach the stream open to a
+                        //   spawned task so this concurrency slot is freed immediately.
+                        //   A flood to many *distinct* dead peers can no longer
+                        //   head-of-line block cached-peer sends.
+                        //
+                        // - Waiter  (try_lock fails, open already in progress): wait
+                        //   inline on the lock — this blocks one concurrency slot but
+                        //   ensures the packet is not dropped when the peer is healthy.
+                        //   Bounded by stream_open_timeout so dead peers cannot park
+                        //   a slot indefinitely.
+                        let open_lock = open_locks.get_with(peer, || Arc::new(async_lock::Mutex::new(())));
 
-                        if let Some(cached) = cache.get(&peer) {
-                            Ok(cached)
-                        } else {
-                            tracing::trace!(%peer, "peer is not in cache, opening new stream");
+                        match open_lock.try_lock_arc() {
+                            Some(guard) => {
+                                // Opener path: acquire a semaphore permit to bound the
+                                // total number of concurrent in-flight open tasks, then
+                                // detach. If all permits are taken the packet is dropped.
+                                let permit = match open_semaphore.try_acquire_arc() {
+                                    Some(p) => p,
+                                    None => {
+                                        tracing::debug!(%peer, "stream-open concurrency limit reached, dropping packet");
+                                        return;
+                                    }
+                                };
+                                hopr_utils::runtime::prelude::spawn(async move {
+                                    let _permit = permit; // released when task completes
+                                    let _guard = guard;   // released when task completes
 
-                            // Only the cache-miss path needs the stream-open handles.
-                            // Clone them out of the shared `open_ctx` once here rather
-                            // than on every outgoing message.
-                            let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
+                                    let sender = if let Some(cached) = cache.get(&peer) {
+                                        Ok(cached)
+                                    } else {
+                                        tracing::trace!(%peer, "peer is not in cache, opening new stream");
 
-                            // There must be a timeout on the `open` operation; otherwise
-                            //  a single impossible ` open ` operation will block the peer ID entry in the
-                            // cache forever, having a direct detrimental effect on the packet
-                            // processing pipeline.
-                            use futures_time::future::FutureExt as TimeExt;
-                            let stream = control
-                                .clone()
-                                .open(peer)
-                                .timeout(futures_time::time::Duration::from(global_stream_open_timeout))
-                                .await
-                                .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
-                                .and_then(|stream| {
-                                    stream.map_err(|e| {
-                                        anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
-                                    })
+                                        // Only the cache-miss path needs the stream-open handles.
+                                        // Clone them out of the shared `open_ctx` once here rather
+                                        // than on every outgoing message.
+                                        let (control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
+
+                                        // A timeout is mandatory: a permanently-unreachable peer must
+                                        // not park the per-peer open lock (and therefore the dedup queue)
+                                        // indefinitely.
+                                        use futures_time::future::FutureExt as TimeExt;
+                                        let stream = control
+                                            .clone()
+                                            .open(peer)
+                                            .timeout(futures_time::time::Duration::from(stream_open_timeout))
+                                            .await
+                                            .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
+                                            .and_then(|stream| {
+                                                stream.map_err(|e| {
+                                                    anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
+                                                })
+                                            });
+
+                                        match stream {
+                                            Ok(stream) => {
+                                                tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
+                                                let send = build_peer_stream_io(
+                                                    peer,
+                                                    stream,
+                                                    cache.clone(),
+                                                    codec.clone(),
+                                                    tx_in.clone(),
+                                                    frame_writer_backpressure_bytes,
+                                                    per_peer_channel_capacity,
+                                                );
+                                                cache.insert(peer, send.clone());
+                                                Ok(send)
+                                            }
+                                            Err(error) => Err(error),
+                                        }
+                                    };
+
+                                    match sender {
+                                        Ok(sender) => deliver(peer, sender, msg, per_peer_send_timeout, cache).await,
+                                        Err(error) => {
+                                            tracing::debug!(%peer, %error, "failed to open a stream to peer")
+                                        }
+                                    }
                                 });
-
-                            match stream {
-                                Ok(stream) => {
-                                    tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
-
-                                    let send = build_peer_stream_io(
-                                        peer,
-                                        stream,
-                                        cache.clone(),
-                                        codec.clone(),
-                                        tx_in.clone(),
-                                        frame_writer_backpressure_bytes,
-                                        per_peer_channel_capacity,
-                                    );
-                                    cache.insert(peer, send.clone());
-                                    Ok(send)
+                            }
+                            None => {
+                                // Waiter path: an open for this peer is already in flight.
+                                // Block this concurrency slot until the opener releases the
+                                // lock (success or timeout), then deliver from cache.
+                                use futures_time::future::FutureExt as TimeExt;
+                                let timeout = futures_time::time::Duration::from(stream_open_timeout);
+                                let _ = open_lock.lock().timeout(timeout).await;
+                                if let Some(sender) = cache.get(&peer) {
+                                    deliver(peer, sender, msg, per_peer_send_timeout, cache).await;
+                                } else {
+                                    tracing::debug!(%peer, "stream open failed or timed out, dropping packet");
                                 }
-                                Err(error) => Err(error),
                             }
-                        }
-                    };
-
-                    match cached {
-                        Ok(cached) => match cached.with_timeout(per_peer_send_timeout).send(msg).await {
-                            Ok(()) => tracing::trace!(%peer, "message sent to peer"),
-                            Err(SinkTimeoutError::Timeout) => {
-                                #[cfg(all(feature = "telemetry", not(test)))]
-                                METRIC_PER_PEER_SEND_TIMEOUT.increment();
-                                tracing::warn!(%peer, "per-peer egress send timed out, dropping packet");
-                            }
-                            Err(SinkTimeoutError::Inner(error)) => {
-                                tracing::error!(%peer, %error, "error sending message to peer");
-                                cache.invalidate(&peer);
-                            }
-                        },
-                        Err(error) => {
-                            tracing::debug!(%peer, %error, "failed to open a stream to peer");
                         }
                     }
                 }
@@ -639,6 +664,7 @@ mod tests {
             control.clone(),
             crate::config::StreamProtocolConfig {
                 per_peer_channel_capacity: 64,
+                ..Default::default()
             },
         )
         .await?;
@@ -695,6 +721,7 @@ mod tests {
             control.clone(),
             crate::config::StreamProtocolConfig {
                 per_peer_channel_capacity: 128,
+                ..Default::default()
             },
         )
         .await?;
@@ -744,6 +771,7 @@ mod tests {
             control.clone(),
             crate::config::StreamProtocolConfig {
                 per_peer_channel_capacity: 16,
+                ..Default::default()
             },
         )
         .await?;
@@ -778,6 +806,119 @@ mod tests {
             control.open_calls() <= 1,
             "pathological reopen churn detected for same peer under send failures (open_calls={})",
             control.open_calls()
+        );
+
+        Ok(())
+    }
+
+    /// A control where the slow peer takes `open_delay` then fails, while all other
+    /// peers open immediately with a working bidirectional channel.
+    #[derive(Clone, Debug)]
+    struct BimodalOpenControl {
+        slow_peer: PeerId,
+        open_delay: std::time::Duration,
+        slow_open_calls: Arc<AtomicUsize>,
+        fast_open_calls: Arc<AtomicUsize>,
+    }
+
+    impl BimodalOpenControl {
+        #[allow(dead_code)]
+        fn slow_open_calls(&self) -> usize {
+            self.slow_open_calls.load(Ordering::Relaxed)
+        }
+
+        fn fast_open_calls(&self) -> usize {
+            self.fast_open_calls.load(Ordering::Relaxed)
+        }
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for BimodalOpenControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, StalledWriteIo)>())
+        }
+
+        async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            if peer == self.slow_peer {
+                self.slow_open_calls.fetch_add(1, Ordering::Relaxed);
+                tokio::time::sleep(self.open_delay).await;
+                return Err::<AsyncBinaryStreamChannel, _>(std::io::Error::other("slow peer cannot connect"));
+            }
+            self.fast_open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(AsyncBinaryStreamChannel::new())
+        }
+    }
+
+    /// Verifies that the egress drain does not head-of-line block cached (fast) peer
+    /// sends behind slow opens to dead peers.
+    ///
+    /// With the old inline-open design, sending `max_concurrent_packets` packets to a
+    /// slow peer would occupy all concurrency slots for the entire `stream_open_timeout`
+    /// window. Any subsequent packet — even to a peer whose open is instant — could not
+    /// start until a slot freed.
+    ///
+    /// With the detached-spawn design, the drain slot is freed immediately after spawning
+    /// the open task, so a fast-peer open starts in parallel with the slow opens.
+    #[tokio::test]
+    async fn egress_should_not_hol_block_fast_peer_behind_slow_opens() -> anyhow::Result<()> {
+        let slow_peer = PeerId::random();
+        let fast_peer = PeerId::random();
+
+        let control = BimodalOpenControl {
+            slow_peer,
+            // open_delay > stream_open_timeout → the pipeline times these opens out
+            open_delay: std::time::Duration::from_millis(5_000),
+            slow_open_calls: Default::default(),
+            fast_open_calls: Default::default(),
+        };
+
+        // max_concurrent_packets = 3: three slow-peer packets would exhaust all slots
+        // under the old inline design.
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                max_concurrent_packets: 3,
+                // Timeout shorter than open_delay so the pipeline gives up on slow_peer
+                // well before our assertion deadline.
+                stream_open_timeout: std::time::Duration::from_millis(2_000),
+                per_peer_send_timeout: std::time::Duration::from_millis(50),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let msg = BytesMut::from(&b"x"[..]);
+
+        // Fill all 3 slots with slow-peer packets. Under the old inline design these
+        // would hold the slots for ~300 ms (the stream_open_timeout).
+        for _ in 0..3 {
+            tx_out
+                .send((slow_peer, msg.clone()))
+                .await
+                .context("egress queue must accept slow-peer packet")?;
+        }
+        // Immediately enqueue a packet to the fast peer.
+        tx_out
+            .send((fast_peer, msg.clone()))
+            .await
+            .context("egress queue must accept fast-peer packet")?;
+
+        // Assert that fast_peer's open was called within 1 s — well before the
+        // 2 s stream_open_timeout would have freed a slot under the old design,
+        // and generous enough to absorb CI scheduler jitter.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1_000);
+        while control.fast_open_calls() < 1 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+
+        assert!(
+            control.fast_open_calls() >= 1,
+            "fast peer's stream open was not called within 150 ms — egress drain is likely head-of-line blocked by \
+             slow-peer opens"
         );
 
         Ok(())
