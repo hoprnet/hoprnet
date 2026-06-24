@@ -1,7 +1,10 @@
 //! Infrastructure supporting converting a collection of `PeerId` split `libp2p_stream` managed
 //! individual peer-to-peer `libp2p::swarm::Stream`s.
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, StreamExt,
@@ -154,6 +157,14 @@ where
         })
         .build();
 
+    // Bounds the number of in-flight stream-open tasks across all distinct peers.
+    // Without this, a flood to many unreachable peers could spawn one 2 s opener
+    // task per peer, exhausting runtime resources. The limit is intentionally small
+    // (50): once a stream is open its write pump runs independently, and the hot
+    // path never blocks the drain regardless of how many opens are in flight.
+    const MAX_CONCURRENT_STREAM_OPENS: usize = 50;
+    let open_task_count = Arc::new(AtomicUsize::new(0));
+
     let incoming = control
         .clone()
         .accept()
@@ -213,7 +224,8 @@ where
     //
     // On cache miss, `get_with` atomically creates the per-peer ring buffer and spawns
     // exactly one opener task. Concurrent misses for the same peer (while the opener is
-    // in flight) share the same buffer without a per-peer lock or semaphore.
+    // in flight) share the same buffer. In-flight opens are bounded by `open_task_count`
+    // (MAX_CONCURRENT_STREAM_OPENS = 50) to prevent resource exhaustion under dead-peer floods.
     let _egress_process = hopr_utils::runtime::prelude::spawn(
         rx_out
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
@@ -228,51 +240,64 @@ where
                     // can capture independent copies without borrowing `cache_out` twice.
                     let cache2 = cache_out.clone();
                     let open_ctx2 = open_ctx.clone();
+                    let open_count2 = open_task_count.clone();
                     cache_out.get_with(peer, move || {
                         let (tx, rx) = flume::bounded::<<C as Decoder>::Item>(per_peer_channel_capacity);
                         let rx_for_pump = rx.clone();
 
                         // Spawn one opener task per peer. `get_with` ensures this init closure
                         // runs at most once per key even under concurrent misses.
-                        hopr_utils::runtime::prelude::spawn(async move {
-                            tracing::trace!(%peer, "peer is not in cache, opening new stream");
-                            use futures_time::future::FutureExt as TimeExt;
-                            let (control, codec, tx_in) = (&open_ctx2.0, &open_ctx2.1, &open_ctx2.2);
+                        //
+                        // Before spawning, acquire a slot from the in-flight counter. If the
+                        // limit is reached the cache entry is immediately invalidated so the
+                        // ring buffer's packets are dropped and the next send retries the open.
+                        if open_count2.fetch_add(1, Ordering::Relaxed) < MAX_CONCURRENT_STREAM_OPENS {
+                            hopr_utils::runtime::prelude::spawn(async move {
+                                tracing::trace!(%peer, "peer is not in cache, opening new stream");
+                                use futures_time::future::FutureExt as TimeExt;
+                                let (control, codec, tx_in) = (&open_ctx2.0, &open_ctx2.1, &open_ctx2.2);
 
-                            // A timeout is mandatory: a permanently-unreachable peer must not
-                            // park the opener task indefinitely.
-                            let stream = control
-                                .clone()
-                                .open(peer)
-                                .timeout(futures_time::time::Duration::from(stream_open_timeout))
-                                .await
-                                .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
-                                .and_then(|s| {
-                                    s.map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))
-                                });
+                                // A timeout is mandatory: a permanently-unreachable peer must not
+                                // park the opener task indefinitely.
+                                let stream = control
+                                    .clone()
+                                    .open(peer)
+                                    .timeout(futures_time::time::Duration::from(stream_open_timeout))
+                                    .await
+                                    .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
+                                    .and_then(|s| {
+                                        s.map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))
+                                    });
 
-                            match stream {
-                                Ok(stream) => {
-                                    tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
-                                    spawn_stream_pumps(
-                                        peer,
-                                        stream,
-                                        rx_for_pump,
-                                        cache2,
-                                        codec.clone(),
-                                        tx_in.clone(),
-                                        frame_writer_backpressure_bytes,
-                                    );
+                                open_count2.fetch_sub(1, Ordering::Relaxed);
+
+                                match stream {
+                                    Ok(stream) => {
+                                        tracing::debug!(%peer, "opening outgoing peer-to-peer stream");
+                                        spawn_stream_pumps(
+                                            peer,
+                                            stream,
+                                            rx_for_pump,
+                                            cache2,
+                                            codec.clone(),
+                                            tx_in.clone(),
+                                            frame_writer_backpressure_bytes,
+                                        );
+                                    }
+                                    Err(error) => {
+                                        tracing::debug!(
+                                            %peer, %error,
+                                            "stream open failed/timed out; dropping buffered packets"
+                                        );
+                                        cache2.invalidate(&peer);
+                                    }
                                 }
-                                Err(error) => {
-                                    tracing::debug!(
-                                        %peer, %error,
-                                        "stream open failed/timed out; dropping buffered packets"
-                                    );
-                                    cache2.invalidate(&peer);
-                                }
-                            }
-                        });
+                            });
+                        } else {
+                            open_count2.fetch_sub(1, Ordering::Relaxed);
+                            tracing::debug!(%peer, "stream-open concurrency limit reached; dropping buffered packets");
+                            hopr_utils::runtime::prelude::spawn(async move { cache2.invalidate(&peer); });
+                        }
 
                         PeerSink { tx, rx }
                     })
