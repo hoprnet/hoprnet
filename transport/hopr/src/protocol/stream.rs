@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use async_lock::Semaphore;
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, SinkExt as _, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
@@ -177,6 +178,12 @@ where
     let frame_writer_backpressure_bytes = stream_cfg.frame_writer_backpressure_bytes;
     let per_peer_send_timeout = stream_cfg.per_peer_send_timeout;
     let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
+    let max_concurrent_stream_opens = stream_cfg.max_concurrent_stream_opens;
+
+    // Semaphore bounding the number of in-flight cache-miss open tasks. Without this,
+    // a flood to many distinct unreachable peers could spawn an unbounded number of
+    // 2 s open tasks, exhausting memory and sockets.
+    let open_semaphore = Arc::new(Semaphore::new(max_concurrent_stream_opens));
 
     // Pack the handles only needed to open a NEW peer stream into a single Arc. This
     // lets us pay one Arc bump per packet at the closure level instead of three (control,
@@ -224,6 +231,7 @@ where
                 let cache = cache_out.clone();
                 let open_locks = open_locks.clone();
                 let open_ctx = open_ctx.clone();
+                let open_semaphore = open_semaphore.clone();
 
                 async move {
                     tracing::trace!(%peer, "trying to deliver message to peer");
@@ -237,7 +245,19 @@ where
                         // to a detached task so this concurrency slot is freed immediately.
                         // A flood of opens to dead peers can no longer head-of-line block
                         // cached-peer sends.
+                        //
+                        // Acquire a semaphore permit before spawning to bound the total
+                        // number of in-flight open tasks. On contention the packet is
+                        // dropped (logged at debug) rather than spawning unboundedly.
+                        let permit = match open_semaphore.try_acquire_arc() {
+                            Some(p) => p,
+                            None => {
+                                tracing::debug!(%peer, "stream-open concurrency limit reached, dropping packet");
+                                return;
+                            }
+                        };
                         hopr_utils::runtime::prelude::spawn(async move {
+                            let _permit = permit; // released when task completes
                             let open_lock = open_locks.get_with(peer, || Arc::new(futures::lock::Mutex::new(())));
 
                             // Non-blocking acquire: if another task is already opening this
@@ -637,6 +657,7 @@ mod tests {
             control.clone(),
             crate::config::StreamProtocolConfig {
                 per_peer_channel_capacity: 64,
+                ..Default::default()
             },
         )
         .await?;
@@ -693,6 +714,7 @@ mod tests {
             control.clone(),
             crate::config::StreamProtocolConfig {
                 per_peer_channel_capacity: 128,
+                ..Default::default()
             },
         )
         .await?;
@@ -793,6 +815,7 @@ mod tests {
     }
 
     impl BimodalOpenControl {
+        #[allow(dead_code)]
         fn slow_open_calls(&self) -> usize {
             self.slow_open_calls.load(Ordering::Relaxed)
         }
@@ -840,7 +863,7 @@ mod tests {
         let control = BimodalOpenControl {
             slow_peer,
             // open_delay > stream_open_timeout → the pipeline times these opens out
-            open_delay: std::time::Duration::from_millis(1_000),
+            open_delay: std::time::Duration::from_millis(5_000),
             slow_open_calls: Default::default(),
             fast_open_calls: Default::default(),
         };
@@ -853,8 +876,8 @@ mod tests {
             crate::config::StreamProtocolConfig {
                 max_concurrent_packets: 3,
                 // Timeout shorter than open_delay so the pipeline gives up on slow_peer
-                // within 300 ms, well before our assertion deadline of 400 ms.
-                stream_open_timeout: std::time::Duration::from_millis(300),
+                // well before our assertion deadline.
+                stream_open_timeout: std::time::Duration::from_millis(2_000),
                 per_peer_send_timeout: std::time::Duration::from_millis(50),
                 ..Default::default()
             },
@@ -877,9 +900,10 @@ mod tests {
             .await
             .context("egress queue must accept fast-peer packet")?;
 
-        // Assert that fast_peer's open was called within 150 ms — well before the
-        // 300 ms stream_open_timeout would have freed a slot under the old design.
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(150);
+        // Assert that fast_peer's open was called within 1 s — well before the
+        // 2 s stream_open_timeout would have freed a slot under the old design,
+        // and generous enough to absorb CI scheduler jitter.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1_000);
         while control.fast_open_calls() < 1 && tokio::time::Instant::now() < deadline {
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
