@@ -2,10 +2,7 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use futures::StreamExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
-    internal::{
-        prelude::HoprPseudonym,
-        routing::DestinationRouting,
-    },
+    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
 };
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartProtocol};

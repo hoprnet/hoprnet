@@ -10,9 +10,7 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{
-    Capabilities, Capability, HoprSession, HoprSessionConfig,
-};
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -160,9 +158,5 @@ pub fn session_segmentation_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    session_raw_benchmark,
-    session_segmentation_benchmark
-);
+criterion_group!(benches, session_raw_benchmark, session_segmentation_benchmark);
 criterion_main!(benches);
