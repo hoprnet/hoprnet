@@ -1690,17 +1690,6 @@ where
         let _ = (*self.start_protocol_tx).set(tx);
     }
 
-    /// Injects a custom message sender sink without going through `start()`.
-    ///
-    /// `flume::Sender` does not implement `Sink` directly; the caller should call
-    /// `tx.into_sink()` first to obtain a `SendSink` and pass that.
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn set_msg_sender_for_benchmarking(&self, sink: S) {
-        let _ = (*self.msg_sender).set(sink);
-    }
-
     /// Triggers Moka background task processing so that eviction listeners run.
     /// For benchmarking only.
     ///
