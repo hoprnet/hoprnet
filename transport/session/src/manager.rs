@@ -759,11 +759,7 @@ where
     /// API guarantees that only one concurrent caller can claim the slot for a given
     /// pseudonym (avoiding a TOCTOU race), which also rules out loopback sessions onto
     /// ourselves.
-    async fn allocate_session_slot<'a>(
-        &'a self,
-        session_id: SessionId,
-        slot: SessionSlot,
-    ) -> Option<SessionSlotGuard<'a>> {
+    fn allocate_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> Option<SessionSlotGuard<'_>> {
         if let moka::ops::compute::CompResult::Inserted(_) = self.sessions.entry(session_id).and_compute_with(|entry| {
             if entry.is_none() && self.sessions.entry_count() < self.cfg.maximum_sessions as u64 {
                 moka::ops::compute::Op::Put(slot)
@@ -989,7 +985,6 @@ where
                                 surb_estimator: surb_estimator.clone(),
                             },
                         )
-                        .await
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
@@ -1069,7 +1064,6 @@ where
                                 surb_estimator: Default::default(), // No SURB estimator needed
                             },
                         )
-                        .await
                         .ok_or_else(|| {
                             // Session already exists; it means it is most likely a loopback attempt
                             error!(%session_id, "session already exists - loopback attempt");
@@ -1327,7 +1321,7 @@ where
         // back, otherwise it would block this pseudonym until idle eviction. The atomic
         // insert (inside the helper) also prevents a TOCTOU race, so only one concurrent
         // request can claim the slot for a given pseudonym.
-        let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()).await else {
+        let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()) else {
             // No slots available for this pseudonym
             error!(%pseudonym, "no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
@@ -2222,7 +2216,6 @@ mod tests {
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
-        assert!(alice_mgr.is_started());
         assert!(alice_mgr.is_started());
 
         let alice_session = alice_mgr

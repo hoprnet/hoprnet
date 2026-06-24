@@ -22,7 +22,7 @@ compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemallocator = tikv_jemallocator::Jemalloc;
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub async fn alice_send_data(
     data: &[u8],

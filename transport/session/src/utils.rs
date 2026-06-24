@@ -95,22 +95,21 @@ where
     let mut next = initial;
     loop {
         let value_fn = value_fn.clone();
-        let insertion_result: std::result::Result<moka::ops::compute::CompResult<K, V>, std::convert::Infallible> =
-            cache.entry(next).and_try_compute_with(move |e| {
-                if e.is_none() {
-                    let f = value_fn
-                        .lock()
-                        .take()
-                        .expect("impossible: value_fn was already consumed");
+        let insertion_result = cache.entry(next).and_compute_with(move |e| {
+            if e.is_none() {
+                let f = value_fn
+                    .lock()
+                    .take()
+                    .expect("impossible: value_fn was already consumed");
 
-                    Ok(moka::ops::compute::Op::Put(f(next)))
-                } else {
-                    Ok(moka::ops::compute::Op::Nop)
-                }
-            });
+                moka::ops::compute::Op::Put(f(next))
+            } else {
+                moka::ops::compute::Op::Nop
+            }
+        });
 
         // If we inserted successfully, break the loop and return the insertion key
-        if let Ok(moka::ops::compute::CompResult::Inserted(val)) = insertion_result {
+        if let moka::ops::compute::CompResult::Inserted(val) = insertion_result {
             return Some((next, val.into_value()));
         }
 
