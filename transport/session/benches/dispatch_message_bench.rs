@@ -114,8 +114,7 @@ fn make_manager_with_sessions(
     std::thread::spawn(move || {
         loop {
             let start_drained = start_rx_clone.try_iter().count();
-            let session_drained: usize =
-                session_receivers_clone.iter().map(|r| r.try_iter().count()).sum();
+            let session_drained: usize = session_receivers_clone.iter().map(|r| r.try_iter().count()).sum();
             if start_drained == 0 && session_drained == 0 {
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
