@@ -802,23 +802,20 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
-                        let smgr = smgr.clone();
-                        async move {
-                            match smgr.dispatch_message(pseudonym, data) {
-                                Ok(DispatchResult::Processed) => {
-                                    tracing::trace!("message dispatch completed");
-                                    None
-                                }
-                                Ok(DispatchResult::Unrelated(data)) => {
-                                    tracing::trace!("unrelated message dispatch completed");
-                                    Some(data)
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "error while dispatching packet in the session manager");
-                                    None
-                                }
+                        futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
+                            Ok(DispatchResult::Processed) => {
+                                tracing::trace!("message dispatch completed");
+                                None
                             }
-                        }
+                            Ok(DispatchResult::Unrelated(data)) => {
+                                tracing::trace!("unrelated message dispatch completed");
+                                Some(data)
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "error while dispatching packet in the session manager");
+                                None
+                            }
+                        })
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {

@@ -81,7 +81,9 @@ where
 
     // Reject when the cache is already at capacity to avoid Moka evicting an
     // existing entry before we can insert the new one.
-    if let Some(max) = max_capacity && cache.entry_count() >= max {
+    if let Some(max) = max_capacity
+        && cache.entry_count() >= max
+    {
         return None;
     }
 
@@ -258,23 +260,12 @@ mod tests {
 
         // A cache with capacity 1 must reject a second distinct key.
         let unit_cache = moka::sync::Cache::new(1);
-        let (k0, v0) = insert_into_next_slot(
-            &unit_cache,
-            |prev| prev.map(|v| v + 1).unwrap_or(0),
-            |k| k,
-            Some(1u64),
-        )
-        .ok_or(anyhow!("first insertion must succeed"))?;
+        let (k0, v0) = insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64))
+            .ok_or(anyhow!("first insertion must succeed"))?;
         assert_eq!(k0, 0);
 
         assert!(
-            insert_into_next_slot(
-                &unit_cache,
-                |prev| prev.map(|v| v + 1).unwrap_or(0),
-                |k| k,
-                Some(1u64),
-            )
-            .is_none(),
+            insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64),).is_none(),
             "second distinct key must be rejected when cache capacity is 1"
         );
         // The first entry must still be present (not evicted).

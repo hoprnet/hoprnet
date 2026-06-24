@@ -857,7 +857,10 @@ where
             "session request message",
         )
         .await
-        .map_err(TransportSessionError::packet_sending)?;
+        .map_err(|error| {
+            self.session_initiations.remove(&challenge);
+            TransportSessionError::packet_sending(error)
+        })?;
 
         // The timeout is given by the number of hops requested
         let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
@@ -3143,6 +3146,114 @@ mod tests {
 
         sender.close_channel();
         let _ = _handle.await;
+        Ok(())
+    }
+
+    /// Verifies that `session_initiations` is cleaned up when `new_session` fails to
+    /// send the StartSession message (e.g. the underlying channel is closed).
+    #[test_log::test(tokio::test)]
+    async fn new_session_removes_challenge_on_send_failure() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        // Create a channel whose receiver is dropped immediately.  When the mock
+        // transport tries to `send` over this channel the call will return an error,
+        // which propagates up through `send_via_msg_sender` as
+        // `TransportSessionError::packet_sending`.
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+        drop(rx);
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(tx, new_session_tx)?;
+        assert!(mgr.is_started());
+
+        // Verify that sending fails because the receiver is gone.
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(result.is_err());
+        // The challenge must have been removed from `session_initiations` even
+        // though the send failed.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations was not cleaned up after send failure"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that `session_initiations` is cleaned up when the session initiation
+    /// times out waiting for a response (neither `SessionEstablished` nor
+    /// `SessionError` arrives).
+    #[test_log::test(tokio::test)]
+    async fn new_session_removes_challenge_on_timeout() -> anyhow::Result<()> {
+        let cfg = SessionManagerConfig {
+            initiation_timeout_base: Duration::from_millis(100),
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::new(cfg);
+        let bob_mgr = SessionManager::new(Default::default());
+
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let mut alice_transport = MockMsgSender::new();
+        let bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message; Bob never responds.
+        alice_transport
+            .expect_send_message()
+            .once()
+            .returning(|_, _| futures::future::ok(()).boxed());
+
+        let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        assert!(alice_mgr.is_started());
+
+        let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
+        assert!(bob_mgr.is_started());
+
+        // Record how many entries are in `session_initiations` before the call.
+        assert_eq!(alice_mgr.session_initiations.entry_count(), 0);
+
+        let result = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: None.into(),
+                    pseudonym: None,
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(matches!(result, Err(TransportSessionError::Timeout)));
+        // The pending challenge must have been removed from `session_initiations`
+        // after the timeout error propagated.
+        assert_eq!(
+            alice_mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations was not cleaned up after timeout"
+        );
+
         Ok(())
     }
 
