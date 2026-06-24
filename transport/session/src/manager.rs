@@ -2126,6 +2126,7 @@ mod tests {
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        assert!(alice_mgr.is_started());
 
         let alice_session = alice_mgr
             .new_session(
