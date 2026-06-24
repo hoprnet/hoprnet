@@ -25,6 +25,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 all-benchmarks = []
+benchmark = []
 runtime-tokio = [
   "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
@@ -101,6 +102,7 @@ ignored = ["serde_with", "humantime-serde"]
 [[bench]]
 name = "session_bench"
 harness = false
+required-features = ["benchmark"]
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
