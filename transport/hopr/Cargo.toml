@@ -55,8 +55,8 @@ serde = [
 [dependencies]
 ahash = { workspace = true }
 anyhow = { workspace = true }
-async-lock = { workspace = true }
 async_channel_io = { workspace = true }
+flume = { workspace = true }
 async-trait = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }

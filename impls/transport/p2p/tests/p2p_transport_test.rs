@@ -134,7 +134,7 @@ use tokio::{
 #[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
-    let (api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (mut api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
 
     let _sjh1 = SelfClosingJoinHandle::new(process1());
     let _sjh2 = SelfClosingJoinHandle::new(process2());
@@ -150,31 +150,53 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     // Wait for node listen_on and announcements
     sleep(std::time::Duration::from_secs(3)).await;
 
+    // Pre-prime: send one packet and wait for it on the receiver side so the
+    // per-peer QUIC stream is established before the bulk send. This ensures the
+    // opening-window ring buffer does not contribute any packet drops to the
+    // throughput measurement.
+    api1.send_msg
+        .send((api2.me, RANDOM_GIBBERISH.clone()))
+        .await
+        .context("priming send failed")?;
+    timeout(std::time::Duration::from_secs(5), api2.recv_msg.next())
+        .await
+        .context("priming receive timed out")?
+        .context("priming receive: channel closed")?;
+
+    // Bulk send: blast all packets into the pre-primed stream. The egress drain
+    // is fully non-blocking (drop-oldest ring), so drops are acceptable — we
+    // assert on achieved goodput rather than exact delivery.
+    let packet_count: usize = 2 * 1024 * 10; // ~10 MB
+    let target_bytes = RANDOM_GIBBERISH.len() * packet_count;
+
     let start = current_time();
 
-    // ~10MB of data
-    let packet_count: usize = 2 * 1024 * 10;
-    for _ in 0..packet_count {
-        api1.send_msg
-            .send((api2.me, RANDOM_GIBBERISH.clone()))
-            .await
-            .context("failed to send message")?;
+    let peer = api2.me;
+    let mut bulk_sender = api1.send_msg.clone();
+    let _sender = SelfClosingJoinHandle::new(async move {
+        for _ in 0..packet_count {
+            if bulk_sender.send((peer, RANDOM_GIBBERISH.clone())).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Receive until the target byte count is seen or the deadline expires.
+    let mut received_bytes = 0usize;
+    while received_bytes < target_bytes {
+        match timeout(std::time::Duration::from_secs(10), api2.recv_msg.next()).await {
+            Ok(Some((_, pkt))) => received_bytes += pkt.len(),
+            _ => break,
+        }
     }
 
-    timeout(
-        std::time::Duration::from_secs(30),
-        api2.recv_msg.take(packet_count).collect::<Vec<_>>(),
-    )
-    .await?;
-
-    let speed_in_mbytes_s =
-        (RANDOM_GIBBERISH.len() * packet_count) as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
+    let speed_in_mbytes_s = received_bytes as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
 
     assert_gt!(
         speed_in_mbytes_s,
         50.0f64,
-        "The measured speed for data transfer is ~{}MB/s, which is less than the expected at least 50MB/s",
-        speed_in_mbytes_s
+        "The measured speed for data transfer is ~{speed_in_mbytes_s:.1}MB/s on {received_bytes} bytes received, \
+         which is less than the expected 50MB/s",
     );
 
     Ok(())

@@ -3869,7 +3869,6 @@ version = "0.30.0"
 dependencies = [
  "ahash",
  "anyhow",
- "async-lock",
  "async-trait",
  "async_channel_io",
  "bimap",
@@ -3878,6 +3877,7 @@ dependencies = [
  "cfg-if",
  "criterion",
  "dashmap",
+ "flume",
  "futures",
  "futures-concurrency",
  "futures-time",
