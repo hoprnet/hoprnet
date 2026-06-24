@@ -30,9 +30,15 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 /// Wrapper that makes a `flume::Sender` implement `futures::Sink`.
+///
+/// flume's `Sender` does not implement `Sink` directly; only `SendSink` does.
+/// `SendSink` is not `Send`, so it can't satisfy `SessionManager`'s `S: ... + Send`
+/// bound. This wrapper bridges the gap for benchmarking only.
+#[cfg(feature = "benchmark")]
 #[derive(Clone)]
-struct FlumeSink<T>(flume::Sender<T>);
+pub struct FlumeSink<T>(flume::Sender<T>);
 
+#[cfg(feature = "benchmark")]
 impl<T: Send + 'static> futures::Sink<T> for FlumeSink<T> {
     type Error = flume::SendError<T>;
     fn poll_ready(
