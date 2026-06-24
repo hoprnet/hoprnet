@@ -1801,11 +1801,13 @@ mod tests {
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
+        assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
+        assert!(bob_mgr.is_started());
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1959,6 +1961,7 @@ mod tests {
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
+        assert!(bob_mgr.is_started());
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -2127,6 +2130,7 @@ mod tests {
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
         assert!(alice_mgr.is_started());
+        assert!(alice_mgr.is_started());
 
         let alice_session = alice_mgr
             .new_session(
@@ -2187,11 +2191,13 @@ mod tests {
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
         alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
         bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
+        assert!(bob_mgr.is_started());
 
         let result = alice_mgr
             .new_session(
@@ -2221,6 +2227,7 @@ mod tests {
         drop(new_session_rx);
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
         let result = mgr
@@ -2262,6 +2269,7 @@ mod tests {
         drop(new_session_rx);
         let (sender, handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
 
@@ -2482,11 +2490,13 @@ mod tests {
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
         ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
+        assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
+        assert!(bob_mgr.is_started());
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -2628,6 +2638,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         bob_mgr.start(sender.clone(), new_session_tx)?;
+        assert!(bob_mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
 
@@ -2694,6 +2705,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.ping_session(&fake_session_id).await;
@@ -2724,6 +2736,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.close_session(&fake_session_id);
@@ -2747,6 +2760,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.update_surb_balancer_config(&fake_session_id, SurbBalancerConfig::default());
@@ -2774,6 +2788,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_balancer_config(&fake_session_id);
@@ -2805,6 +2820,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
         let result = mgr.get_surb_level_estimates(&fake_session_id);
@@ -2847,6 +2863,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Spawn new_session so it is blocked waiting for the session establishment response.
         let mgr_clone = mgr.clone();
@@ -2924,6 +2941,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // First session - should succeed
         let pseudonym1 = HoprPseudonym::random();
@@ -2996,6 +3014,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Fill the cache with two incoming sessions (Exits).
         for i in 0..2 {
@@ -3050,6 +3069,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Send data with session application tag but no session exists
         let pseudonym = HoprPseudonym::random();
@@ -3091,6 +3111,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Create a session
         let pseudonym = HoprPseudonym::random();
@@ -3143,6 +3164,7 @@ mod tests {
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = flume::unbounded();
         let peer_address: Address = (&ChainKeypair::random()).into();
@@ -3236,6 +3258,7 @@ mod tests {
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = flume::unbounded();
         alice_mgr.sessions.insert(
@@ -3323,6 +3346,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
@@ -3380,6 +3404,7 @@ mod tests {
         });
         let (sender, _handle) = mock_packet_planning(transport);
         mgr.start(sender.clone(), new_session_tx)?;
+        assert!(mgr.is_started());
 
         // Create first session
         let pseudonym1 = HoprPseudonym::random();
