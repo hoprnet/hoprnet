@@ -70,6 +70,7 @@ impl<T: Send + 'static> futures::Sink<T> for FlumeSink<T> {
 ///
 /// Returns the manager, session IDs, the start-protocol receiver (keep alive for
 /// the start_tx handle), and the session receivers (keep alive for session_tx).
+/// A background drainer is spawned to prevent unbounded channel accumulation.
 /// Both receivers must be kept alive by the caller for the duration of the
 /// benchmark — dropping them closes the corresponding channel and panics any
 /// subsequent `try_send`.
@@ -104,6 +105,22 @@ fn make_manager_with_sessions(
     let session_receivers = sm.insert_session_slot_for_benchmarking_multi(&session_ids);
     sm.set_active_sessions_for_benchmarking(num_sessions);
     sm.flush_pending_tasks_for_benchmarking();
+
+    // Drain the channels in the background so messages from dispatch_message calls
+    // do not accumulate indefinitely (unbounded queues distort steady-state timing).
+    // Clone before moving into the thread since the originals are returned.
+    let start_rx_clone = start_rx.clone();
+    let session_receivers_clone = session_receivers.clone();
+    std::thread::spawn(move || {
+        loop {
+            let start_drained = start_rx_clone.try_iter().count();
+            let session_drained: usize =
+                session_receivers_clone.iter().map(|r| r.try_iter().count()).sum();
+            if start_drained == 0 && session_drained == 0 {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
+    });
 
     (sm, session_ids, start_rx, session_receivers)
 }
