@@ -75,20 +75,10 @@ fn spawn_stream_pumps<S, C>(
     frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
 
     // Write pump: drain the per-peer ring buffer into the framed stream writer.
-    //
-    // `unfold` drives the flume receiver asynchronously: each iteration awaits
-    // the next item from the ring and yields it to `forward`. The receiver is
-    // owned by the task; the channel closes (recv_async returns Err) when all
-    // senders are dropped, which signals the pump to stop and invalidate the cache.
-    let write_stream = futures::stream::unfold(rx, |rx| async move {
-        match rx.recv_async().await {
-            Ok(item) => Some((item, rx)),
-            Err(_) => None, // all senders dropped; channel closed
-        }
-    });
-
+    // The channel closes (into_stream yields None) when all senders are dropped,
+    // which signals the pump to stop and invalidate the cache.
     hopr_utils::runtime::prelude::spawn(
-        write_stream
+        rx.into_stream()
             .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
             .map(Ok)
             .forward(frame_writer)
@@ -204,7 +194,7 @@ where
                 );
                 cache.insert(peer, PeerSink { tx, rx });
 
-                async move {}
+                futures::future::ready(())
             })
             .inspect(|_| {
                 tracing::info!(
