@@ -2821,6 +2821,83 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies the `HoprStartProtocol::SessionError` match arm (line 689) in the
+    /// `session_start_protocol_processor` task by calling `handle_session_error` directly.
+    ///
+    /// When a `SessionError` message is delivered while a `new_session` call is awaiting,
+    /// `handle_session_error` retrieves the pending challenge from `session_initiations`,
+    /// sends the error down the channel, and `new_session` propagates it as `Rejected`.
+    #[test_log::test(tokio::test)]
+    async fn handle_session_error_propagates_peer_rejection_to_pending_new_session() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // new_session sends StartSession (succeeds), then waits for SessionEstablished.
+        // We inject the error before it arrives.
+        transport
+            .expect_send_message()
+            .returning(|_, _| futures::future::ok(()).boxed());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
+
+        // Spawn new_session so it is blocked waiting for the session establishment response.
+        let mgr_clone = mgr.clone();
+        let peer_address: Address = (&ChainKeypair::random()).into();
+        let handle = tokio::spawn(async move {
+            mgr_clone
+                .new_session(
+                    peer_address,
+                    SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    SessionClientConfig {
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                )
+                .await
+        });
+
+        // Give new_session time to insert the challenge into session_initiations.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Read the challenge that new_session inserted so we can reply with the matching ID.
+        let challenge = mgr
+            .session_initiations
+            .iter()
+            .next()
+            .map(|(ch, _)| *ch)
+            .context("new_session did not insert a challenge into session_initiations")?;
+
+        // Inject the SessionError with the matching challenge before SessionEstablished arrives.
+        let error_type = StartErrorType {
+            challenge,
+            reason: StartErrorReason::NoSlotsAvailable,
+        };
+        mgr.handle_session_error(error_type).await?;
+
+        // new_session must propagate the error as Rejected.
+        let result = handle.await?;
+        match result {
+            Ok(_session) => panic!("expected rejection error, got session"),
+            Err(e) => {
+                assert!(matches!(
+                    e,
+                    TransportSessionError::Rejected(StartErrorReason::NoSlotsAvailable)
+                ));
+            }
+        }
+
+        sender.close_channel();
+        let _ = _handle.await;
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_new_session_when_max_sessions_reached() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -2885,6 +2962,76 @@ mod tests {
         sender.close_channel();
         let _ = _handle.await;
 
+        Ok(())
+    }
+
+    /// Verifies the early `TooManySessions` return at the top of `new_session` (line 767).
+    /// Unlike `session_manager_should_reject_new_session_when_max_sessions_reached`, which fills
+    /// incoming slots and hits the slot-guard path at line 957, this test fills all `maximum_sessions`
+    /// slots so that the `if self.cfg.maximum_sessions <= self.sessions.entry_count()` check fires
+    /// before any message is sent.
+    #[test_log::test(tokio::test)]
+    async fn new_session_returns_too_many_sessions_when_cache_is_full() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 2,
+            idle_timeout: Duration::from_secs(3600),
+            ..Default::default()
+        };
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> = SessionManager::new(cfg);
+
+        let mut transport = MockMsgSender::new();
+        // Two incoming sessions: first sends SessionEstablished, second sends SessionError (no slots).
+        transport
+            .expect_send_message()
+            .times(2)
+            .returning(|_, _| futures::future::ok(()).boxed());
+
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        let (sender, _handle) = mock_packet_planning(transport);
+        mgr.start(sender.clone(), new_session_tx)?;
+
+        // Fill the cache with two incoming sessions (Exits).
+        for i in 0..2 {
+            let pseudonym = HoprPseudonym::random();
+            mgr.handle_incoming_session_initiation(
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE + i as u64,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    additional_data: 0,
+                },
+            )
+            .await?;
+        }
+        assert_eq!(mgr.active_sessions().len(), 2);
+
+        // Third outgoing call hits the early return before sending anything.
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::TooManySessions)
+        ));
+
+        sender.close_channel();
+        let _ = _handle.await;
         Ok(())
     }
 
