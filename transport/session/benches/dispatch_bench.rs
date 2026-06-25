@@ -4,19 +4,23 @@
 //!
 //! ## Benchmark strategy
 //!
-//! `dispatch_message` is sub-microsecond (~300–500ns). Criterion's adaptive sampler would
-//! calculate millions of iterations per sample, overflowing internal bounded tokio channels.
+//! `dispatch_message` is sub-microsecond. Criterion's adaptive sampler would calculate
+//! millions of iterations per sample, overflowing internal bounded tokio channels.
 //!
 //! Solution: each criterion sample is one *batch* of `BATCH_SIZE` calls to `dispatch_message`.
 //! `iter_custom` runs the batch once and returns the batch duration as a `Duration`, so
 //! criterion records one measurement (batch wall-clock time) per sample.  The batch is large
-//! enough to be reliably measurable (tens-to-hundreds of ms) but bounded so internal channels
-//! never permanently overflow.  The internal tokio processing task drains the bounded session
-//! channel continuously at ~3–4M msg/s; a 1M-message batch completes in ~300ms.
+//! enough that each sample takes several seconds — well above criterion's measurement floor.
+//!
+//! `block_on` is used only where the async executor is actually required:
+//! - `dispatch_session_hit`: the session channel is `bounded_blocking_async`; its `try_send` falls back to
+//!   `spawn_blocking` when full, which needs a Tokio context.
+//! - All other paths use `bounded_async` channels or no channels at all, so `block_on` is omitted to avoid unnecessary
+//!   executor overhead in the timed section.
 
 use std::net::SocketAddr;
 
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use futures::StreamExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -44,11 +48,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-/// Number of `dispatch_message` calls per criterion sample.
-///
-/// Large enough that the batch wall-clock time is measurable (tens-to-hundreds of ms).
-const BATCH_SIZE: usize = 1_000_000;
 
 /// Internal tokio channel capacity used in benchmarks.
 ///
@@ -193,22 +192,13 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
     let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
     let id = HoprPseudonym::random();
     let in_data = make_start_protocol_data();
-    let handle = runtime.handle().clone();
 
     let mut group = c.benchmark_group("dispatch_start_protocol");
-    group.warm_up_time(std::time::Duration::from_millis(1));
-    group.sample_size(50);
-    group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+    group.sample_size(100_000);
 
     group.bench_function("single", |b| {
-        b.iter_custom(|_| {
-            let start = std::time::Instant::now();
-            handle.block_on(async {
-                for _ in 0..BATCH_SIZE {
-                    let _ = manager.dispatch_message(id.clone(), in_data.clone()).ok();
-                }
-            });
-            std::hint::black_box(start.elapsed())
+        b.iter(|| {
+            let _ = manager.dispatch_message(id, in_data.clone()).ok();
         });
     });
     group.finish();
@@ -223,6 +213,8 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
 /// Benchmark: dispatching a Session data message where the session exists in the cache.
 ///
 /// Exercises the moka cache lookup + `session_slot.session_tx.try_send()` path.
+/// `block_on` IS required — the session channel is `bounded_blocking_async` and its `try_send`
+/// falls back to `spawn_blocking` when the buffer is full, which needs a Tokio context.
 pub fn dispatch_session_hit(c: &mut Criterion) {
     #[inline]
     fn payload_sizes() -> &'static [usize] {
@@ -234,25 +226,15 @@ pub fn dispatch_session_hit(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("dispatch_session_hit");
-    group.warm_up_time(std::time::Duration::from_millis(1));
-    group.sample_size(50);
-    group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+    group.sample_size(100_000);
 
     for &size in payload_sizes() {
         let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session();
         let in_data = make_session_data(size);
-        let handle = runtime.handle().clone();
 
-        group.throughput(Throughput::Bytes((BATCH_SIZE * size) as u64));
         group.bench_with_input(BenchmarkId::new("cache_hit", size), &size, |b, _| {
-            b.iter_custom(|_| {
-                let start = std::time::Instant::now();
-                handle.block_on(async {
-                    for _ in 0..BATCH_SIZE {
-                        let _ = manager.dispatch_message(session_id.clone(), in_data.clone()).ok();
-                    }
-                });
-                std::hint::black_box(start.elapsed())
+            b.iter(|| {
+                let _ = manager.dispatch_message(session_id, in_data.clone()).ok();
             });
         });
 
@@ -264,30 +246,19 @@ pub fn dispatch_session_hit(c: &mut Criterion) {
 }
 
 /// Benchmark: dispatching a Session data message where the session is NOT in the cache.
-///
-/// Exercises the moka cache lookup + `None` branch.
 pub fn dispatch_session_miss(c: &mut Criterion) {
     let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
     let unknown_session_id = SessionId::random();
     let in_data = make_session_data(1018);
-    let handle = runtime.handle().clone();
 
     let mut group = c.benchmark_group("dispatch_session_miss");
-    group.warm_up_time(std::time::Duration::from_millis(1));
-    group.sample_size(50);
-    group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+    group.sample_size(100_000);
 
     group.bench_function("cache_miss", |b| {
-        b.iter_custom(|_| {
-            let start = std::time::Instant::now();
-            handle.block_on(async {
-                for _ in 0..BATCH_SIZE {
-                    let _ = manager
-                        .dispatch_message(unknown_session_id.clone(), in_data.clone())
-                        .ok();
-                }
-            });
-            std::hint::black_box(start.elapsed())
+        b.iter(|| {
+            let _ = manager
+                .dispatch_message(unknown_session_id.clone(), in_data.clone())
+                .ok();
         });
     });
     group.finish();
@@ -299,27 +270,18 @@ pub fn dispatch_session_miss(c: &mut Criterion) {
 
 /// Benchmark: dispatching a message with a tag that matches neither protocol.
 ///
-/// The shortest path — just a tag comparison and `Ok(DispatchResult::Unrelated(...))`.
+/// The shortest path — just two tag comparisons and `Ok(DispatchResult::Unrelated(...))`.
 pub fn dispatch_unrelated(c: &mut Criterion) {
     let (msg_rx, sn_rx, manager, runtime) = make_manager_without_session();
     let id = HoprPseudonym::random();
     let in_data = make_unrelated_data();
-    let handle = runtime.handle().clone();
 
     let mut group = c.benchmark_group("dispatch_unrelated");
-    group.warm_up_time(std::time::Duration::from_millis(1));
-    group.sample_size(50);
-    group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+    group.sample_size(100_000);
 
     group.bench_function("single", |b| {
-        b.iter_custom(|_| {
-            let start = std::time::Instant::now();
-            handle.block_on(async {
-                for _ in 0..BATCH_SIZE {
-                    let _ = manager.dispatch_message(id.clone(), in_data.clone()).ok();
-                }
-            });
-            std::hint::black_box(start.elapsed())
+        b.iter(|| {
+            let _ = manager.dispatch_message(id.clone(), in_data.clone()).ok();
         });
     });
     group.finish();
