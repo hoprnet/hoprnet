@@ -63,6 +63,11 @@ lazy_static::lazy_static! {
         "Number of HOPR session errors received from an Exit node",
         &["kind"]
     ).unwrap();
+    static ref METRIC_DISPATCHED_MSGS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_session_dispatched_messages",
+        "Number dispatched HOPR session messages and their classification",
+        &["kind"]
+    ).unwrap();
     static ref METRIC_SENT_SESSION_ERRS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_session_sent_error_count",
         "Number of HOPR session errors sent to an Entry node",
@@ -1300,6 +1305,10 @@ where
             } else {
                 return Err(SessionManagerError::NotStarted.into());
             }
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_DISPATCHED_MSGS.increment_by(&[&"processed"], 1);
+
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
             let session_id = pseudonym;
@@ -1310,7 +1319,12 @@ where
                 Ok(session_slot
                     .session_tx
                     .try_send(in_data)
-                    .map(|_| DispatchResult::Processed)
+                    .map(|_| {
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_DISPATCHED_MSGS.increment_by(&[&"processed"], 1);
+
+                        DispatchResult::Processed
+                    })
                     .map_err(|error| {
                         error!(%session_id, %error, "failed to dispatch session data");
                         SessionManagerError::other(error)
@@ -1322,6 +1336,10 @@ where
         }
 
         trace!(tag = %in_data.data.application_tag, "received data not associated with session protocol or any existing session");
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_DISPATCHED_MSGS.increment_by(&[&"unrelated"], 1);
+
         Ok(DispatchResult::Unrelated(in_data))
     }
 
