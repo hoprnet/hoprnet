@@ -87,6 +87,9 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
+
+    #[cfg(all(feature = "telemetry", not(test)))]
+    METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
@@ -184,6 +187,9 @@ impl<'a> SessionSlotGuard<'a> {
     /// being rolled back when this guard is dropped.
     fn commit(&mut self) {
         self.committed = true;
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_ACTIVE_SESSIONS.increment(1.0);
     }
 }
 
@@ -196,6 +202,7 @@ impl Drop for SessionSlotGuard<'_> {
             warn!(%session_id, "rolling back partially established session slot after setup failure");
             if let Some(slot) = self.sessions.remove(&session_id) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
+
                 close_session(session_id, slot, ClosureReason::Eviction);
             }
         }
@@ -784,7 +791,7 @@ where
         // callers from both succeeding when already at capacity.
         let counter = &self.active_sessions;
         let did_reserve = counter
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
                 (n < self.cfg.maximum_sessions).then_some(n + 1)
             })
             .is_ok();
