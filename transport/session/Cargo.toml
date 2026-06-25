@@ -21,6 +21,7 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []
@@ -102,6 +103,11 @@ ignored = ["serde_with", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"
+harness = false
+required-features = ["benchmark"]
+
+[[bench]]
+name = "dispatch_bench"
 harness = false
 required-features = ["benchmark"]
 

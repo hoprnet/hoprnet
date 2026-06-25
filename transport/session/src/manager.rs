@@ -119,7 +119,8 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
 /// How many packets can be buffered if the HoprSession socket is not fast enough.
-const SESSION_FORWARD_CAPACITY: usize = 10000;
+#[allow(dead_code)]
+pub const SESSION_FORWARD_CAPACITY: usize = 10000;
 
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
@@ -317,6 +318,14 @@ pub struct SessionManagerConfig {
     /// Default is 10_000.
     #[default(10_000)]
     pub maximum_sessions: usize,
+
+    /// How many packets can be buffered if the [`HoprSession`] input socket is not fast enough.
+    ///
+    /// Controls the capacity of the internal `crossfire` channel used for each session slot.
+    ///
+    /// Default is 10_000.
+    #[default(10000)]
+    pub session_forward_capacity: usize,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -768,6 +777,7 @@ where
         // increments only if the value is strictly below the limit, preventing two concurrent
         // callers from both succeeding when already at capacity.
         let counter = &self.active_sessions;
+        #[allow(clippy::incompatible_msrv)]
         let did_reserve = counter
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
                 (n < self.cfg.maximum_sessions).then_some(n + 1)
@@ -906,7 +916,7 @@ where
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
                 let (session_tx, session_rx) =
-                    crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+                    crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
                 let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
                 let mut abort_handles = AbortableList::default();
@@ -1321,6 +1331,26 @@ where
         Ok(DispatchResult::Unrelated(in_data))
     }
 
+    /// Pre-populates the sessions cache with a session slot for benchmarking.
+    ///
+    /// Intended for benchmarks that need a session to exist before calling
+    /// [`SessionManager::dispatch_message`].
+    ///
+    /// Requires the `"benchmark"` feature.
+    #[cfg(feature = "benchmark")]
+    pub fn pre_populate_session(&self, session_id: SessionId, routing_opts: DestinationRouting) {
+        let (session_tx, _) =
+            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
+        let slot = SessionSlot {
+            session_tx,
+            routing_opts,
+            abort_handles: Default::default(),
+            surb_mgmt: Arc::new(BalancerStateValues::default()),
+            surb_estimator: Default::default(),
+        };
+        self.sessions.insert(session_id, slot);
+    }
+
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
@@ -1347,7 +1377,7 @@ where
         let session_id = pseudonym;
 
         let (session_tx, session_rx) =
-            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
         let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
         let slot = SessionSlot {
