@@ -2142,6 +2142,7 @@ dependencies = [
  "futures-core",
  "parking_lot",
  "smallvec",
+ "tokio",
 ]
 
 [[package]]
@@ -4030,8 +4031,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "criterion",
+ "crossfire",
  "flagset",
- "flume",
  "futures",
  "futures-time",
  "hopr-api",

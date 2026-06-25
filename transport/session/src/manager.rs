@@ -124,8 +124,10 @@ const SESSION_FORWARD_CAPACITY: usize = 10000;
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
-type SessionInitiationCache =
-    moka::sync::Cache<StartChallenge, flume::Sender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+type SessionInitiationCache = moka::sync::Cache<
+    StartChallenge,
+    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType>>>,
+>;
 
 /// Handles to streams and tasks spawned by the Session.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -142,7 +144,7 @@ enum SessionHandles {
 pub(crate) struct SessionSlot {
     // Sender does not need to be in Arc, because the receiver part is always
     // wrapped inside DropAbortable wrapper, with abort handle added to `abort_handles`.
-    session_tx: flume::Sender<ApplicationDataIn>,
+    session_tx: crossfire::MTx<crossfire::mpsc::Array<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
     // Additional tasks spawned by the Session.
     abort_handles: Arc<parking_lot::Mutex<AbortableList<SessionHandles>>>,
@@ -323,13 +325,13 @@ type IncomingSessionSink = Pin<Box<dyn Sink<IncomingSession, Error = SessionMana
 
 type SessionNotifiers = (
     Arc<hopr_utils::runtime::prelude::Mutex<IncomingSessionSink>>,
-    flume::Sender<(SessionId, ClosureReason)>,
+    crossfire::MTx<crossfire::mpsc::Array<(SessionId, ClosureReason)>>,
 );
 
 // Sink for processing Start protocol messages.
 // Must be within Arc to be shared across SessionManager clones.
 // The inner OnceLock is set once in `start()` and read in `dispatch_message`.
-type StartProtocolMsgSink = Arc<OnceLock<flume::Sender<(HoprPseudonym, HoprStartProtocol)>>>;
+type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol)>>>>;
 
 /// Manages lifecycles of Sessions.
 ///
@@ -667,12 +669,14 @@ where
             Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
         let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
-        let (session_close_tx, session_close_rx) = flume::bounded(self.cfg.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) =
+            crossfire::mpsc::bounded_blocking_async(self.cfg.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (start_protocol_tx, start_protocol_rx) = flume::bounded(self.cfg.maximum_sessions + 10);
+        let (start_protocol_tx, start_protocol_rx) =
+            crossfire::mpsc::bounded_blocking_async(self.cfg.maximum_sessions + 10);
         let _ = self.start_protocol_tx.set(start_protocol_tx);
 
         let myself = self.clone();
@@ -847,7 +851,11 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (tx_initiation_done, rx_initiation_done) = flume::bounded(1);
+        let (tx_initiation_done, rx_initiation_done): (
+            crossfire::MTx<crossfire::mpsc::One<_>>,
+            crossfire::AsyncRx<crossfire::mpsc::One<_>>,
+        ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
+
         let (challenge, _) = insert_into_next_slot(
             &self.session_initiations,
             |ch| {
@@ -928,7 +936,8 @@ where
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+                let (session_tx, session_rx) =
+                    crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
                 let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
                 let mut abort_handles = AbortableList::default();
@@ -1368,7 +1377,8 @@ where
 
         let session_id = pseudonym;
 
-        let (session_tx, session_rx) = flume::bounded::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        let (session_tx, session_rx) =
+            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
         let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
         let slot = SessionSlot {
@@ -2191,7 +2201,7 @@ mod tests {
         let alice_mgr =
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
-        let (dummy_tx, _) = flume::unbounded();
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {
@@ -3434,7 +3444,7 @@ mod tests {
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
         assert!(alice_mgr.is_started());
 
-        let (dummy_tx, _) = flume::unbounded();
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
         let peer_address: Address = (&ChainKeypair::random()).into();
         alice_mgr.sessions.insert(
             session_id,
@@ -3528,7 +3538,7 @@ mod tests {
         let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
         assert!(alice_mgr.is_started());
 
-        let (dummy_tx, _) = flume::unbounded();
+        let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
         alice_mgr.sessions.insert(
             session_id,
             SessionSlot {

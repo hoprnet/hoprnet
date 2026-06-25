@@ -27,6 +27,7 @@ default = []
 all-benchmarks = []
 benchmark = []
 runtime-tokio = [
+  "crossfire/tokio",
   "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
   "dep:tokio",
@@ -47,8 +48,8 @@ allocator-jemalloc = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+crossfire = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
-flume = { workspace = true }
 futures = { workspace = true }
 humantime-serde = { workspace = true }
 futures-time = { workspace = true }
