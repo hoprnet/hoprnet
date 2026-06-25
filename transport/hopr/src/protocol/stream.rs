@@ -53,7 +53,10 @@ struct PeerSink<T: Send + 'static> {
 
 impl<T: Send + 'static> PeerSink<T> {
     fn new(tx: crossfire::MAsyncTx<mpsc::Array<T>>) -> Self {
-        Self { tx, token: Arc::new(()) }
+        Self {
+            tx,
+            token: Arc::new(()),
+        }
     }
 }
 
@@ -104,7 +107,10 @@ fn spawn_stream_pumps<S, C>(
                 tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
             })
             .then(move |_| async move {
-                if cache_for_write.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token_write)) {
+                if cache_for_write
+                    .get(&peer)
+                    .map_or(false, |s| Arc::ptr_eq(&s.token, &token_write))
+                {
                     cache_for_write.invalidate(&peer);
                 }
             }),
@@ -134,7 +140,10 @@ fn spawn_stream_pumps<S, C>(
                 }
             })
             .then(move |_| async move {
-                if cache_for_read.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                if cache_for_read
+                    .get(&peer)
+                    .map_or(false, |s| Arc::ptr_eq(&s.token, &token))
+                {
                     cache_for_read.invalidate(&peer);
                 }
             }),
@@ -262,9 +271,7 @@ where
                                 .await
                                 .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))
                                 .and_then(|s| {
-                                    s.map_err(|e| {
-                                        anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}")
-                                    })
+                                    s.map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))
                                 });
 
                             open_count2.fetch_sub(1, Ordering::Relaxed);
@@ -324,7 +331,10 @@ where
                     // inserted (e.g. from an inbound stream) between our cache.get() above
                     // and this branch.
                     tracing::debug!(%peer, "peer sink disconnected; invalidating cache");
-                    if cache_out.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &sink.token)) {
+                    if cache_out
+                        .get(&peer)
+                        .map_or(false, |s| Arc::ptr_eq(&s.token, &sink.token))
+                    {
                         cache_out.invalidate(&peer);
                     }
                 }

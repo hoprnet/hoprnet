@@ -40,9 +40,6 @@ libp2p = { workspace = true, features = [
 libp2p-stream = { workspace = true }
 multiaddr = { workspace = true }
 quinn-udp = { workspace = true, optional = true }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-quinn-udp = { workspace = true, optional = true, features = ["fast-apple-datapath"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -51,6 +48,11 @@ pin-project = { workspace = true }
 
 hopr-api = { workspace = true, features = ["ct", "network"] }
 hopr-utils = { workspace = true, features = ["network-types"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+quinn-udp = { workspace = true, optional = true, features = [
+  "fast-apple-datapath",
+] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -69,4 +71,7 @@ hopr-transport-probe = { workspace = true }
 hopr-transport = { workspace = true }
 
 [package.metadata.cargo-shear]
+ignored = ["quinn-udp"]
+
+[package.metadata.cargo-machete]
 ignored = ["quinn-udp"]
