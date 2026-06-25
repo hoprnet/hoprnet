@@ -688,9 +688,9 @@ where
         );
         let ah_closure_notifications = hopr_utils::spawn_as_abortable_named!(
             "session_close_notifications",
-            session_close_rx
-                .into_stream()
-                .for_each_concurrent(None, move |(session_id, closure_reason)| {
+            session_close_rx.into_stream().for_each_concurrent(
+                self.cfg.maximum_sessions + 10,
+                move |(session_id, closure_reason)| {
                     let myself = myself.clone();
                     let closure_diag = closure_diag.clone();
                     closure_diag.wrap(async move {
@@ -709,7 +709,8 @@ where
                             );
                         }
                     })
-                })
+                }
+            )
         );
 
         // This is necessary to evict expired entries from the caches if
