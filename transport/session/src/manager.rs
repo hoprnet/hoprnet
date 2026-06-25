@@ -1921,6 +1921,85 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn session_manager_should_close_session_when_hopr_session_is_dropped() -> anyhow::Result<()> {
+        let pseudonym = HoprPseudonym::random();
+        let session_id = SessionId::new(16u64, pseudonym);
+        let routing = DestinationRouting::Return(pseudonym.into());
+
+        let mgr = SessionManager::new(Default::default());
+        let (msg_tx, _) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        let abort_handles = mgr.start(msg_tx.clone(), new_session_tx)?;
+
+        let (session_tx, session_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
+        // Register an active session in the manager first, then create the matching `HoprSession`.
+        // If `HoprSession::drop` does not notify the manager, this entry remains stale forever.
+        mgr.sessions
+            .insert(
+                session_id,
+                SessionSlot {
+                    session_tx: Arc::new(session_tx),
+                    routing_opts: routing.clone(),
+                    abort_handles: Default::default(),
+                    surb_mgmt: Default::default(),
+                    surb_estimator: Default::default(),
+                    #[cfg(feature = "telemetry")]
+                    telemetry: Arc::new(SessionTelemetry::new(session_id, Default::default())),
+                },
+            )
+            .await;
+
+        let (_, mut close_session_notifier) = mgr
+            .session_notifiers
+            .get()
+            .cloned()
+            .ok_or(anyhow!("session manager must be started"))?;
+        let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
+            close_session_notifier
+                .try_send((session_id, reason))
+                .expect("session close notification must be delivered");
+        });
+
+        let session = HoprSession::new(
+            session_id,
+            routing,
+            Default::default(),
+            (msg_tx, session_rx),
+            Some(closure_notifier),
+            #[cfg(feature = "telemetry")]
+            Arc::new(SessionTelemetry::new(session_id, Default::default())),
+        )?;
+
+        // Sanity-check test setup: the manager must report one active session before drop.
+        assert_eq!(vec![session_id], mgr.active_sessions().await);
+
+        // Regression being guarded: dropping `HoprSession` must trigger session closure in manager.
+        // Otherwise stale entries keep consuming session slots and can prevent future sessions.
+        drop(session);
+
+        let close_result = timeout(Duration::from_secs(1), async {
+            loop {
+                if mgr.active_sessions().await.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        if close_result.is_err() {
+            return Err(anyhow!(
+                "dropping HoprSession did not remove the manager session entry in time (stale session leak)"
+            ));
+        }
+
+        futures::stream::iter(abort_handles)
+            .for_each(|ah| async move { ah.abort() })
+            .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
