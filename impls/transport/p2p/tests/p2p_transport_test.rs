@@ -130,7 +130,7 @@ use tokio::{
     time::{Instant, sleep, timeout},
 };
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 16)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
     let (mut api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
