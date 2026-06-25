@@ -187,7 +187,7 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let mut received_bytes = 0usize;
     let mut last_received = start;
     while received_bytes < target_bytes {
-        match timeout(std::time::Duration::from_secs(3), api2.recv_msg.next()).await {
+        match timeout(std::time::Duration::from_secs(2), api2.recv_msg.next()).await {
             Ok(Some((_, pkt))) => {
                 received_bytes += pkt.len();
                 last_received = Instant::now();
