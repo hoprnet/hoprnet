@@ -39,9 +39,22 @@ lazy_static::lazy_static! {
 /// and yields via `yield_now()` so the write pump has a chance to drain items and
 /// free space before the next send attempt, preventing task starvation under high
 /// producer rates.
+///
+/// `token` is a unique identity for this sink instance. Pump and opener tasks that
+/// hold a clone compare it against the current cache entry before calling
+/// `cache.invalidate`, so that a stale task finishing after the sink was replaced
+/// (e.g. by an inbound stream arriving during an outgoing open) does not wipe the
+/// newer entry.
 #[derive(Clone)]
 struct PeerSink<T: Send + 'static> {
     tx: crossfire::MAsyncTx<mpsc::Array<T>>,
+    token: Arc<()>,
+}
+
+impl<T: Send + 'static> PeerSink<T> {
+    fn new(tx: crossfire::MAsyncTx<mpsc::Array<T>>) -> Self {
+        Self { tx, token: Arc::new(()) }
+    }
 }
 
 type PeerStreamCache<T> = moka::sync::Cache<PeerId, PeerSink<T>>;
@@ -50,13 +63,14 @@ type PeerStreamCache<T> = moka::sync::Cache<PeerId, PeerSink<T>>;
 ///
 /// The write pump drains `rx` into the framed stream writer; the read pump
 /// forwards decoded frames to `ingress_from_peers`. Both tasks invalidate
-/// `cache[peer]` when they complete — the dead-stream signal that causes the
-/// next egress send to re-open a fresh stream.
+/// `cache[peer]` when they complete, but only if the cache entry still holds
+/// the same `token` — this prevents a stale task from wiping a newer sink.
 fn spawn_stream_pumps<S, C>(
     peer: PeerId,
     stream: S,
     rx: crossfire::AsyncRx<mpsc::Array<<C as Decoder>::Item>>,
     cache: PeerStreamCache<<C as Decoder>::Item>,
+    token: Arc<()>,
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
@@ -70,6 +84,7 @@ fn spawn_stream_pumps<S, C>(
     let (stream_rx, stream_tx) = stream.split();
     let cache_for_write = cache.clone();
     let cache_for_read = cache.clone();
+    let token_write = token.clone();
 
     let mut frame_writer = FramedWrite::new(stream_tx.compat_write(), codec.clone());
 
@@ -89,7 +104,9 @@ fn spawn_stream_pumps<S, C>(
                 tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
             })
             .then(move |_| async move {
-                cache_for_write.invalidate(&peer);
+                if cache_for_write.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token_write)) {
+                    cache_for_write.invalidate(&peer);
+                }
             }),
     );
 
@@ -117,7 +134,9 @@ fn spawn_stream_pumps<S, C>(
                 }
             })
             .then(move |_| async move {
-                cache_for_read.invalidate(&peer);
+                if cache_for_read.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                    cache_for_read.invalidate(&peer);
+                }
             }),
     );
 
@@ -178,16 +197,19 @@ where
                 let (_control, codec, tx_in) = (&open_ctx.0, &open_ctx.1, &open_ctx.2);
 
                 let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
+                let sink = PeerSink::new(tx);
+                let token = sink.token.clone();
                 spawn_stream_pumps(
                     peer,
                     stream,
                     rx,
                     cache.clone(),
+                    token,
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
                 );
-                cache.insert(peer, PeerSink { tx });
+                cache.insert(peer, sink);
 
                 futures::future::ready(())
             })
@@ -224,6 +246,8 @@ where
                 let open_count2 = open_task_count.clone();
                 cache_out.get_with(peer, move || {
                     let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
+                    let sink = PeerSink::new(tx);
+                    let token = sink.token.clone();
 
                     if open_count2.fetch_add(1, Ordering::Relaxed) < MAX_CONCURRENT_STREAM_OPENS {
                         hopr_utils::runtime::prelude::spawn(async move {
@@ -252,7 +276,8 @@ where
                                         peer,
                                         stream,
                                         rx,
-                                        cache2,
+                                        cache2.clone(),
+                                        token,
                                         codec.clone(),
                                         tx_in.clone(),
                                         frame_writer_backpressure_bytes,
@@ -263,7 +288,9 @@ where
                                         %peer, %error,
                                         "stream open failed/timed out; dropping buffered packets"
                                     );
-                                    cache2.invalidate(&peer);
+                                    if cache2.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                                        cache2.invalidate(&peer);
+                                    }
                                 }
                             }
                         });
@@ -271,11 +298,13 @@ where
                         open_count2.fetch_sub(1, Ordering::Relaxed);
                         tracing::debug!(%peer, "stream-open concurrency limit reached; dropping buffered packets");
                         hopr_utils::runtime::prelude::spawn(async move {
-                            cache2.invalidate(&peer);
+                            if cache2.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                                cache2.invalidate(&peer);
+                            }
                         });
                     }
 
-                    PeerSink { tx }
+                    sink
                 })
             };
 
@@ -291,8 +320,13 @@ where
                 }
                 Err(crossfire::TrySendError::Disconnected(_)) => {
                     // Receiver dropped (write pump died): invalidate and reopen on next send.
+                    // Guard with the token so we don't wipe a replacement sink that was
+                    // inserted (e.g. from an inbound stream) between our cache.get() above
+                    // and this branch.
                     tracing::debug!(%peer, "peer sink disconnected; invalidating cache");
-                    cache_out.invalidate(&peer);
+                    if cache_out.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &sink.token)) {
+                        cache_out.invalidate(&peer);
+                    }
                 }
             }
         }
