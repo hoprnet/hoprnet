@@ -206,5 +206,13 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
          which is less than the expected 50MB/s",
     );
 
+    let drop_rate = (target_bytes - received_bytes.min(target_bytes)) as f64 / target_bytes as f64;
+    assert!(
+        drop_rate < 0.03,
+        "Packet drop rate is {:.1}% ({} bytes lost), expected below 3%",
+        drop_rate * 100.0,
+        target_bytes - received_bytes.min(target_bytes),
+    );
+
     Ok(())
 }
