@@ -145,6 +145,8 @@ pid = "4.0.0"
 pin-project = "1.1.13"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
+crossfire = { version = "3", default-features = false }
+quinn-udp = { version = "0.5.14", default-features = false }
 rayon = "1.12.0"
 rand = { version = "0.10.1", features = ["thread_rng"] }
 rand_distr = "0.6.0"
@@ -200,7 +202,7 @@ hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-featu
 hopr-protocol-session = { version = "1.1.1", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.30.0", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.31.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.7.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.22.1", path = "transport/session", default-features = false }
