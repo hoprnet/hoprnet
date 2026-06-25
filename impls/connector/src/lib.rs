@@ -20,9 +20,71 @@ pub use reader::HoprBlockchainReader;
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
     pub use blokli_client::{
-        BlokliClient, BlokliClientConfig,
+        BlokliClient, BlokliClientConfig, BlokliDnsOverride,
         api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient, types},
+        exports::Url,
     };
+}
+
+/// Configuration for creating a [`blokli_client::BlokliClient`] via [`create_blokli_client`].
+///
+/// The connector applies its own opinionated defaults for timeouts and reconnection behaviour;
+/// only `url` and `dns_override` are caller-controlled.
+///
+/// # Examples
+///
+/// Basic usage — no DNS override:
+/// ```ignore
+/// let client = create_blokli_client(HoprBlokliClientConfig::new(url));
+/// ```
+///
+/// With DNS override (useful when system DNS is unavailable):
+/// ```ignore
+/// let client = create_blokli_client(HoprBlokliClientConfig {
+///     url,
+///     dns_override: Some((ip, Some(8545))),
+/// });
+/// ```
+#[derive(Clone, Debug, validator::Validate)]
+pub struct HoprBlokliClientConfig {
+    /// Blokli service URL.
+    pub url: blokli_client::Url,
+    /// Optional DNS override: an IP address (and optional port) to use instead of resolving
+    /// [`Self::url`]'s host via DNS.
+    ///
+    /// When `None` (the default) system DNS is used. When set, the connection goes directly to
+    /// the given IP, while the original host is kept for the `Host` header and TLS SNI.
+    /// `port` defaults to the URL's port when `None`.
+    pub dns_override: Option<(std::net::IpAddr, Option<u16>)>,
+}
+
+impl HoprBlokliClientConfig {
+    /// Creates a config with the given URL and no DNS override.
+    pub fn new(url: blokli_client::Url) -> Self {
+        Self {
+            url,
+            dns_override: None,
+        }
+    }
+}
+
+/// Creates a [`blokli_client::BlokliClient`] with the connector's opinionated defaults.
+///
+/// Applies a 3 s general timeout and 30 s SSE reconnect timeout. Callers that need DNS
+/// pinning set [`HoprBlokliClientConfig::dns_override`]; all other settings are fixed.
+pub fn create_blokli_client(cfg: HoprBlokliClientConfig) -> blokli_client::BlokliClient {
+    blokli_client::BlokliClient::new(
+        cfg.url,
+        blokli_client::BlokliClientConfig {
+            timeout: std::time::Duration::from_secs(3),
+            stream_reconnect_timeout: std::time::Duration::from_secs(30),
+            auto_compatibility_check: false,
+            dns_override: cfg
+                .dns_override
+                .map(|(ip, port)| ::blokli_client::BlokliDnsOverride { ip, port }),
+            ..Default::default()
+        },
+    )
 }
 
 #[doc(hidden)]

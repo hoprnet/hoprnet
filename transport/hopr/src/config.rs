@@ -19,9 +19,30 @@ use crate::{errors::HoprTransportError, protocol::PacketPipelineConfig};
 const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 
 const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
+const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
+const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
+
+/// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
+pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
 
 fn default_per_peer_channel_capacity() -> usize {
     DEFAULT_PER_PEER_CHANNEL_CAPACITY
+}
+
+fn default_stream_open_timeout() -> Duration {
+    DEFAULT_STREAM_OPEN_TIMEOUT
+}
+
+fn default_frame_writer_backpressure_bytes() -> usize {
+    DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+}
+
+fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
+    if MIN_STREAM_OPEN_TIMEOUT <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("stream open timeout must be at least 1 ms"))
+    }
 }
 
 /// Configuration of the per-peer egress stream layer.
@@ -32,19 +53,56 @@ fn default_per_peer_channel_capacity() -> usize {
     serde(deny_unknown_fields)
 )]
 pub struct StreamProtocolConfig {
-    /// Capacity of the per-peer outgoing mpsc channel in packets.
+    /// Capacity of the per-peer drop-oldest ring buffer (in packets).
+    ///
+    /// The egress drain is fully non-blocking: it enqueues each outgoing packet
+    /// via `try_send`. When the ring is full the oldest buffered packet is evicted
+    /// and the newest enqueued (drop-oldest). The ring absorbs bursts while a
+    /// stream is being opened; once open the write pump continuously drains it,
+    /// so the ring stays near-empty under normal load.
     ///
     /// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
-    /// target 7 000 / max 5 000/s) so the 50 ms per-peer send timeout is
-    /// only reached under genuine sustained overload, not on normal pre-fill
-    /// traffic. Packets that still exceed the timeout are dropped as
-    /// intentional transport drops.
+    /// target 7 000 / max 5 000/s). If the producer consistently outruns the
+    /// underlying transport, older packets are dropped as intentional transport
+    /// loss.
     ///
     /// Defaults to 5 000.
     #[validate(range(min = 1))]
     #[default(default_per_peer_channel_capacity())]
     #[cfg_attr(feature = "serde", serde(default = "default_per_peer_channel_capacity"))]
     pub per_peer_channel_capacity: usize,
+
+    /// Timeout for the `NetworkStreamControl::open` call when opening a new
+    /// outgoing stream to a peer.
+    ///
+    /// A timeout is mandatory: without it a permanently-unreachable peer would park
+    /// the opener task indefinitely. When the open attempt fails or times out the
+    /// buffered packets for that peer are dropped and a debug-level log entry is
+    /// emitted. The cache entry is then invalidated so the next send triggers a
+    /// fresh open attempt.
+    ///
+    /// Must be at least 1 ms. Defaults to 2 seconds.
+    #[validate(custom(function = "validate_stream_open_timeout"))]
+    #[default(default_stream_open_timeout())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_stream_open_timeout", with = "humantime_serde")
+    )]
+    pub stream_open_timeout: Duration,
+
+    /// Pending-write-buffer byte threshold on the framed writer before a flush is forced.
+    ///
+    /// A value of `1` flushes on every encoded frame (one syscall per message).
+    /// Larger values coalesce adjacent small frames into a single quinn write call,
+    /// reducing connection-mutex acquisitions and driver wake-ups on the hot path.
+    /// A HOPR packet is ~1 440 bytes; at the default 128 KiB threshold roughly 91
+    /// packets are coalesced per write, cutting driver wake frequency ~30×.
+    ///
+    /// Defaults to 131 072 bytes (128 KiB).
+    #[validate(range(min = 1))]
+    #[default(default_frame_writer_backpressure_bytes())]
+    #[cfg_attr(feature = "serde", serde(default = "default_frame_writer_backpressure_bytes"))]
+    pub frame_writer_backpressure_bytes: usize,
 }
 
 fn default_counter_flush_interval() -> Duration {
@@ -315,17 +373,19 @@ const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
-const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
+const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: usize = 3;
 
 const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(100);
 
 const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
+const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
+
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
 }
 
-fn default_session_establish_max_retries() -> u32 {
+fn default_session_establish_max_retries() -> usize {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
 
@@ -339,6 +399,10 @@ fn default_session_establish_retry_delay() -> Duration {
 
 fn default_session_balancer_sampling() -> Duration {
     DEFAULT_SESSION_BALANCER_SAMPLING
+}
+
+fn default_max_managed_sessions() -> usize {
+    DEFAULT_MAXIMUM_MANAGED_SESSIONS
 }
 
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -384,6 +448,14 @@ pub struct SessionGlobalConfig {
     )]
     pub idle_timeout: Duration,
 
+    /// Maximum number of Sessions that can be managed by the Session manager.
+    ///
+    /// Default is 1000, minimum is 2, maximum is 100 000.
+    #[validate(range(min = 2, max = 100_000))]
+    #[default(default_max_managed_sessions())]
+    #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]
+    pub maximum_managed_sessions: usize,
+
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.
     ///
@@ -391,7 +463,7 @@ pub struct SessionGlobalConfig {
     #[validate(range(min = 0, max = 20))]
     #[default(default_session_establish_max_retries())]
     #[cfg_attr(feature = "serde", serde(default = "default_session_establish_max_retries"))]
-    pub establish_max_retries: u32,
+    pub establish_max_retries: usize,
 
     /// Delay between Session establishment retries.
     ///
@@ -635,9 +707,14 @@ mod tests {
     }
 
     #[test]
-    fn stream_protocol_config_default_has_expected_capacity() {
+    fn stream_protocol_config_default_has_expected_values() {
         let cfg = StreamProtocolConfig::default();
         assert_eq!(cfg.per_peer_channel_capacity, DEFAULT_PER_PEER_CHANNEL_CAPACITY);
+        assert_eq!(cfg.stream_open_timeout, DEFAULT_STREAM_OPEN_TIMEOUT);
+        assert_eq!(
+            cfg.frame_writer_backpressure_bytes,
+            DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+        );
         cfg.validate().expect("default StreamProtocolConfig must be valid");
     }
 
@@ -645,6 +722,25 @@ mod tests {
     fn stream_protocol_config_zero_capacity_is_rejected() {
         let cfg = StreamProtocolConfig {
             per_peer_channel_capacity: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_backpressure_bytes_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            frame_writer_backpressure_bytes: 0,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_stream_open_timeout_is_rejected() {
+        let cfg = StreamProtocolConfig {
+            stream_open_timeout: Duration::ZERO,
+            ..Default::default()
         };
         assert!(cfg.validate().is_err());
     }

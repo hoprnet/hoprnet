@@ -593,88 +593,91 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
     hopr_utils::runtime::prelude::spawn(async move {
         let active_sessions_clone_2 = active_sessions_clone.clone();
 
-        futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
-            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
-            .for_each(move |accepted_client| {
-                let data = config_clone.clone();
-                let target = target.clone();
-                let factory = factory.clone();
-                let active_sessions = active_sessions_clone_2.clone();
-                let has_capacity = accepted_client.is_ok() && active_sessions.len() < max_clients;
-                let maybe_pooled = has_capacity.then(|| session_pool.pop()).flatten();
+        hopr_utils::runtime::DropAbortable::new_with_registration(
+            tokio_stream::wrappers::TcpListenerStream::new(tcp_listener),
+            abort_reg,
+        )
+        .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+        .for_each(move |accepted_client| {
+            let data = config_clone.clone();
+            let target = target.clone();
+            let factory = factory.clone();
+            let active_sessions = active_sessions_clone_2.clone();
+            let has_capacity = accepted_client.is_ok() && active_sessions.len() < max_clients;
+            let maybe_pooled = has_capacity.then(|| session_pool.pop()).flatten();
 
-                async move {
-                    match accepted_client {
-                        Ok((sock_addr, mut stream)) => {
-                            debug!(?sock_addr, "incoming TCP connection");
+            async move {
+                match accepted_client {
+                    Ok((sock_addr, mut stream)) => {
+                        debug!(?sock_addr, "incoming TCP connection");
 
-                            // Check that we are still within the quota,
-                            // otherwise shutdown the new client immediately
-                            if active_sessions.len() >= max_clients {
-                                error!(?bind_host, "no more client slots available at listener");
-                                use tokio::io::AsyncWriteExt;
-                                if let Err(error) = stream.shutdown().await {
-                                    error!(%error, ?sock_addr, "failed to shutdown TCP connection");
-                                }
-                                return;
+                        // Check that we are still within the quota,
+                        // otherwise shutdown the new client immediately
+                        if active_sessions.len() >= max_clients {
+                            error!(?bind_host, "no more client slots available at listener");
+                            use tokio::io::AsyncWriteExt;
+                            if let Err(error) = stream.shutdown().await {
+                                error!(%error, ?sock_addr, "failed to shutdown TCP connection");
                             }
+                            return;
+                        }
 
-                            // See if we still have some session pooled
-                            let (session, configurator) = match maybe_pooled {
-                                Some((s, c)) => {
-                                    debug!(session_id = %s.id(), "using pooled session");
-                                    (s, c)
-                                }
-                                None => {
-                                    debug!("no more active sessions in the pool, creating a new one");
-                                    match factory.create_session(destination, target, data).await {
-                                        Ok((s, c)) => (s, c),
-                                        Err(error) => {
-                                            error!(%error, "failed to establish session");
-                                            return;
-                                        }
+                        // See if we still have some session pooled
+                        let (session, configurator) = match maybe_pooled {
+                            Some((s, c)) => {
+                                debug!(session_id = %s.id(), "using pooled session");
+                                (s, c)
+                            }
+                            None => {
+                                debug!("no more active sessions in the pool, creating a new one");
+                                match factory.create_session(destination, target, data).await {
+                                    Ok((s, c)) => (s, c),
+                                    Err(error) => {
+                                        error!(%error, "failed to establish session");
+                                        return;
                                     }
                                 }
-                            };
+                            }
+                        };
 
-                            let session_id = *session.id();
-                            debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
+                        let session_id = *session.id();
+                        debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
-                            let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            active_sessions.insert(
-                                session_id,
-                                ClientEntry {
-                                    sock_addr,
-                                    abort_handle,
-                                    configurator,
+                        let (abort_handle, abort_reg) = AbortHandle::new_pair();
+                        active_sessions.insert(
+                            session_id,
+                            ClientEntry {
+                                sock_addr,
+                                abort_handle,
+                                configurator,
+                            },
+                        );
+
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                        hopr_utils::runtime::prelude::spawn(
+                            // The stream either terminates naturally (by the client closing the TCP connection)
+                            // or is terminated via the abort handle.
+                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
+                                move |_| async move {
+                                    // Regardless how the session ended, remove the abort handle
+                                    // from the map
+                                    active_sessions.remove(&session_id);
+
+                                    debug!(%session_id, "tcp session has ended");
+
+                                    #[cfg(all(feature = "telemetry", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
                                 },
-                            );
-
-                            #[cfg(all(feature = "telemetry", not(test)))]
-                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
-
-                            hopr_utils::runtime::prelude::spawn(
-                                // The stream either terminates naturally (by the client closing the TCP connection)
-                                // or is terminated via the abort handle.
-                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
-                                    move |_| async move {
-                                        // Regardless how the session ended, remove the abort handle
-                                        // from the map
-                                        active_sessions.remove(&session_id);
-
-                                        debug!(%session_id, "tcp session has ended");
-
-                                        #[cfg(all(feature = "telemetry", not(test)))]
-                                        METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
-                                    },
-                                ),
-                            );
-                        }
-                        Err(error) => error!(%error, "failed to accept connection"),
+                            ),
+                        );
                     }
+                    Err(error) => error!(%error, "failed to accept connection"),
                 }
-            })
-            .await;
+            }
+        })
+        .await;
 
         // Once the listener is done, abort all active sessions created by the listener
         active_sessions_clone.iter().for_each(|entry| {
@@ -943,7 +946,7 @@ mod tests {
             },
             primitive::prelude::Address,
         },
-        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession, SessionId},
+        exports::transport::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprSession},
     };
     use hopr_transport::session::HoprSessionConfig;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -974,7 +977,7 @@ mod tests {
     #[tokio::test]
     async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
         let session = HoprSession::new(
@@ -1017,7 +1020,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let cfg = HoprSessionConfig::default();
         let session = HoprSession::new(
@@ -1085,7 +1088,7 @@ mod tests {
     #[test]
     fn find_configurator_should_return_none_when_no_listeners() {
         let handles = ListenerJoinHandles::default();
-        let session_id = SessionId::new(1234u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         assert!(handles.find_configurator(&session_id).is_none());
     }
 
@@ -1095,7 +1098,7 @@ mod tests {
         let listener_id = ListenerId(IpProtocol::TCP, "127.0.0.1:9091".parse().unwrap());
         handles.0.insert(listener_id, stub_stored_entry());
 
-        let session_id = SessionId::new(5678u64, HoprPseudonym::random());
+        let session_id = HoprPseudonym::random();
         assert!(handles.find_configurator(&session_id).is_none());
     }
 

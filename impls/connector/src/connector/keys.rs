@@ -283,4 +283,84 @@ mod tests {
 
         Ok(())
     }
+
+    // Regression test: address caches (chain_to_packet, packet_to_chain) must be populated
+    // from the subscription stream regardless of whether backend.insert_account succeeds.
+    // Previously these were only updated inside `if let Ok(...) = &res { ... }`, so a transient
+    // backend failure left the caches empty.  packet_key_to_chain_key would then immediately
+    // cache None from the (also-failing) backend fallback and the mapping was permanently lost.
+    #[tokio::test]
+    async fn connector_address_caches_populated_from_subscription_despite_backend_insert_failure() -> anyhow::Result<()>
+    {
+        use crate::connector::BlockchainConnectorConfig;
+
+        let client_keypair = OffchainKeypair::random();
+        let client_chain_addr = Address::from([42u8; Address::SIZE]);
+        let client_account = AccountEntry {
+            public_key: *client_keypair.public(),
+            chain_addr: client_chain_addr,
+            entry_type: AccountType::NotAnnounced,
+            safe_address: None,
+            key_id: 1.into(),
+        };
+
+        // Pre-load the client account so the subscription delivers it on connect.
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_accounts([(client_account, HoprBalance::new_base(0), XDaiBalance::new_base(0))])
+            .build_static_client();
+
+        let connector = create_connector(blokli_client)?;
+
+        // sync_tolerance = 0: connect() returns immediately (min_accounts = 0) so the
+        // backend-failing account event is processed asynchronously after connect() returns.
+        let cfg = BlockchainConnectorConfig {
+            sync_tolerance: 0,
+            ..connector.cfg
+        };
+        let mapper = super::HoprKeyMapper {
+            id_to_key: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            key_to_id: moka::sync::Cache::builder()
+                .max_capacity(10)
+                .build_with_hasher(ahash::RandomState::default()),
+            backend: std::sync::Arc::new(MockErrorBackend),
+        };
+        let mut connector = crate::connector::HoprBlockchainConnector::new(
+            connector.chain_key.clone(),
+            cfg,
+            (*connector.client).clone(),
+            MockErrorBackend,
+            connector.payload_generator,
+        );
+        connector.mapper = mapper;
+        connector.connect().await?;
+
+        // Wait until the subscription loop has populated both address caches.
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let packet_to_chain_ready =
+                    connector.packet_key_to_chain_key(client_keypair.public()).ok() == Some(Some(client_chain_addr));
+                let chain_to_packet_ready =
+                    connector.chain_key_to_packet_key(&client_chain_addr).ok() == Some(Some(*client_keypair.public()));
+                if packet_to_chain_ready && chain_to_packet_ready {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await?;
+
+        // The address caches must be populated even though insert_account failed.
+        assert_eq!(
+            Some(client_chain_addr),
+            connector.packet_key_to_chain_key(client_keypair.public())?
+        );
+        assert_eq!(
+            Some(*client_keypair.public()),
+            connector.chain_key_to_packet_key(&client_chain_addr)?
+        );
+
+        Ok(())
+    }
 }

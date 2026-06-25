@@ -69,6 +69,7 @@ impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
         Self::Identify(Box::new(event))
     }
 }
+
 impl From<libp2p::autonat::Event> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p::autonat::Event) -> Self {
         Self::Autonat(event)

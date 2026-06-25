@@ -116,8 +116,8 @@ impl<'a> TryFrom<&'a [u8]> for NeighborProbe {
 impl std::fmt::Display for NeighborProbe {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NeighborProbe::Ping(nonce) => write!(f, "Ping({})", hex::encode(nonce)),
-            NeighborProbe::Pong(nonce) => write!(f, "Pong({})", hex::encode(nonce)),
+            NeighborProbe::Ping(nonce) => write!(f, "Ping({})", const_hex::encode(nonce)),
+            NeighborProbe::Pong(nonce) => write!(f, "Pong({})", const_hex::encode(nonce)),
         }
     }
 }
@@ -179,8 +179,8 @@ impl std::fmt::Display for PathTelemetry {
         write!(
             f,
             "PathTelemetry(id: {}, path: {}, timestamp: {})",
-            hex::encode(self.id),
-            hex::encode(self.path),
+            const_hex::encode(self.id),
+            const_hex::encode(self.path),
             self.timestamp
         )
     }

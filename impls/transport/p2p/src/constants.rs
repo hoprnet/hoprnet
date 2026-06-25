@@ -3,6 +3,8 @@ pub const HOPR_SWARM_IDLE_CONNECTION_TIMEOUT: std::time::Duration = std::time::D
 
 // Swarm configuration
 /// The maximum number of concurrently dialed (outbound) peers.
+#[cfg(feature = "runtime-tokio")]
 pub(crate) const HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT: u8 = 255;
 /// The maximum number of concurrently negotiating inbound peers.
+#[cfg(feature = "runtime-tokio")]
 pub(crate) const HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT: usize = 512;

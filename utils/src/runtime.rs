@@ -25,7 +25,7 @@ pub mod prelude {
     pub use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
     #[cfg(feature = "runtime-tokio")]
     pub use tokio::{
-        task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local},
+        task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local, yield_now},
         time::{sleep, timeout as timeout_fut},
     };
 }
@@ -371,6 +371,54 @@ macro_rules! spawn_as_abortable_named {
         let _jh = $crate::runtime::prelude::spawn(proc);
         abort_handle
     }};
+}
+
+/// Wrapper around [`futures::stream::Abortable`] that also automatically drops the inner stream when the abort handle
+/// is fired.
+///
+/// This is mostly useful to make MPSC channels close the channel when the AbortHandle is fired.
+/// If plain `futures::stream::Abortable` is used, the inner stream will not be dropped when the `AbortHandle` is fired,
+/// and therefore the senders can still send items, but the aborted receivers cannot process them.
+///
+/// For unbounded channels, this may cause the channels to keep memory growing indefinitely.
+/// For bounded channels, the senders will continue sending data until the channel is full and the senders will then
+/// become stuck indefinitely.
+///
+/// For streams that do not have active senders and only produce items when polled, this wrapper is not needed and
+/// the standard ` futures::stream::Abortable ` will work just fine.
+pub struct DropAbortable<St> {
+    inner: Option<futures::stream::Abortable<St>>,
+}
+
+impl<St> DropAbortable<St> {
+    pub fn new(stream: St) -> (Self, AbortHandle) {
+        let (abort_handle, reg) = futures::stream::AbortHandle::new_pair();
+        (Self::new_with_registration(stream, reg), abort_handle)
+    }
+
+    pub fn new_with_registration(stream: St, reg: futures::stream::AbortRegistration) -> Self {
+        Self {
+            inner: Some(futures::stream::Abortable::new(stream, reg)),
+        }
+    }
+}
+
+impl<St: futures::Stream + Unpin> futures::Stream for DropAbortable<St> {
+    type Item = St::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<St::Item>> {
+        let this = self.get_mut();
+        let Some(inner) = this.inner.as_mut() else {
+            return Poll::Ready(None);
+        };
+        match Pin::new(inner).poll_next(cx) {
+            Poll::Ready(None) => {
+                this.inner = None; // drops Abortable -> drops the receiver NOW
+                Poll::Ready(None)
+            }
+            other => other,
+        }
+    }
 }
 
 /// Abstraction over tasks that can be aborted (such as join or abort handles).
@@ -756,5 +804,98 @@ mod tests {
 
         let order = abort_order.lock().unwrap();
         assert_eq!(*order, vec![3, 2, 1]);
+    }
+
+    #[tokio::test]
+    async fn test_drop_abortable_drops_inner_stream_on_abort() {
+        use std::{
+            sync::atomic::{AtomicBool, Ordering},
+            time::Duration,
+        };
+
+        use futures::{channel::mpsc, stream::StreamExt};
+
+        // Track if the receiver was dropped
+        let receiver_dropped = Arc::new(AtomicBool::new(false));
+
+        let (tx, rx) = mpsc::channel::<i32>(16);
+
+        // Clone for the spawn
+        let receiver_dropped_clone = receiver_dropped.clone();
+
+        // Create DropAbortable wrapping a channel stream
+        let (drop_abortable, abort_handle) = DropAbortable::new(rx);
+
+        // Spawn task that processes items from the stream
+        let handle = tokio::spawn(async move {
+            let mut rx = drop_abortable;
+            while let Some(_item) = rx.next().await {
+                // Process items
+            }
+            // Stream ended - this is only reached when stream is fully consumed or dropped
+            receiver_dropped_clone.store(true, Ordering::SeqCst);
+        });
+
+        // Send some items using the original sender (not clone)
+        let mut tx = tx;
+        tx.try_send(1).unwrap();
+        tx.try_send(2).unwrap();
+        tx.try_send(3).unwrap();
+
+        // Give some time for processing
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Now abort - this should drop the inner stream immediately
+        abort_handle.abort();
+
+        // Drop tx after abort to ensure we're testing abort-triggered behavior
+        drop(tx);
+
+        // Wait for the task to finish
+        let _ = handle.await;
+
+        // Verify the receiver was dropped when abort was triggered
+        assert!(
+            receiver_dropped.load(Ordering::SeqCst),
+            "Receiver should be dropped when abort handle is fired"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_drop_abortable_closes_channel_on_abort() {
+        use std::time::Duration;
+
+        use futures::{channel::mpsc, stream::StreamExt};
+
+        // Small buffer
+        let (tx, rx) = mpsc::channel::<i32>(2);
+
+        let (drop_abortable, abort_handle) = DropAbortable::new(rx);
+
+        // Spawn task that processes items very slowly (never actually)
+        let handle = tokio::spawn(async move {
+            let mut rx = drop_abortable;
+            // Don't process any items - just wait to be aborted
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            while let Some(_item) = rx.next().await {
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
+        });
+
+        // Send some items
+        let mut tx = tx;
+        tx.try_send(1).unwrap();
+        tx.try_send(2).unwrap();
+
+        // Abort - this should drop the receiver, closing the channel
+        abort_handle.abort();
+
+        // Wait for the task to finish
+        let _ = handle.await;
+
+        // Now try_send should fail because receiver is gone (channel closed)
+        // Must fail specifically due to disconnection, not fullness
+        let err = tx.try_send(4).expect_err("expected channel closure after abort");
+        assert!(err.is_disconnected(), "expected disconnected sender after abort");
     }
 }

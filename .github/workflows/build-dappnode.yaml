@@ -20,8 +20,6 @@ on:
         required: true
         type: string
     secrets:
-      GCP_SA_GITHUB_RUNNER:
-        required: true
       GH_RUNNER_TOKEN:
         required: true
   workflow_dispatch:
@@ -48,6 +46,7 @@ jobs:
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -106,9 +105,8 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@ac3e0b6137b0ba470a30c373aab2ceba9e0879e4 # setup-gcp-v4
         with:
-          google_credentials: ${{ secrets.GCP_SA_GITHUB_RUNNER }}
           login_artifact_registry: 'false'
           install_sdk: 'true'
 
@@ -171,10 +169,12 @@ jobs:
           npm install
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
-          echo "DNP (DAppNode Package) built and uploaded" >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch: ${SOURCE_BRANCH}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Network: ${HOPRD_NETWORK}" >> "$GITHUB_STEP_SUMMARY"
-          grep "ipfs" build.log >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "DNP (DAppNode Package) built and uploaded"
+            echo "Branch: ${SOURCE_BRANCH}"
+            echo "Network: ${HOPRD_NETWORK}"
+            grep "ipfs" build.log
+          } >> "$GITHUB_STEP_SUMMARY"
           ipfs_hash=$(grep -oP 'Release hash : \K/ipfs/\w+' build.log)
           echo "ipfs_hash=$ipfs_hash" >> "$GITHUB_OUTPUT"
           echo "ipfs_hash=$ipfs_hash"

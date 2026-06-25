@@ -13,7 +13,7 @@ use hopr_lib::{
         network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
         transport::{
             ApplicationDataIn, ApplicationDataOut,
-            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session},
+            session::{Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session},
         },
     },
 };
@@ -35,7 +35,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     const MSG_LEN: usize = 9183;
 
     let dst: Address = (&ChainKeypair::random()).into();
-    let id = SessionId::new(1u64, HoprPseudonym::random());
+    let id = HoprPseudonym::random();
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -63,7 +63,7 @@ async fn udp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let mut bob_session = HoprSession::new(
         id,
-        DestinationRouting::Return(id.pseudonym().into()),
+        DestinationRouting::Return(id.into()),
         bob_cfg,
         (
             bob_tx,
@@ -119,7 +119,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
     const MSG_LEN: usize = 9183;
 
     let dst: Address = (&ChainKeypair::random()).into();
-    let id = SessionId::new(1u64, HoprPseudonym::random());
+    let id = HoprPseudonym::random();
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -147,7 +147,7 @@ async fn tcp_session_bridging(#[case] cap: Capabilities) -> anyhow::Result<()> {
 
     let mut bob_session = HoprSession::new(
         id,
-        DestinationRouting::Return(id.pseudonym().into()),
+        DestinationRouting::Return(id.into()),
         bob_cfg,
         (
             bob_tx,
@@ -196,7 +196,7 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 
     let dst: Address = (&ChainKeypair::random()).into();
     let pseudonym = HoprPseudonym::random();
-    let id = SessionId::new(1u64, pseudonym);
+    let id = pseudonym;
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
@@ -229,7 +229,7 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 
     let mut bob_session = HoprSession::new(
         id,
-        DestinationRouting::Return(id.pseudonym().into()),
+        DestinationRouting::Return(id.into()),
         bob_cfg,
         (
             bob_tx,

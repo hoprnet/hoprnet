@@ -299,20 +299,18 @@ where
 
         let tag_allocators = hopr_transport_tag_allocator::create_allocators_from_config(&cfg.session.tag_allocator)?;
 
-        let mut session_tag_allocator = None;
         let mut session_telemetry_tag_allocator = None;
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
-                hopr_transport_tag_allocator::Usage::Session => session_tag_allocator = Some(alloc),
+                // TODO: cleanup of Session tag allocators needed * (#8199)
+                hopr_transport_tag_allocator::Usage::Session => {}
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
                     session_telemetry_tag_allocator = Some(alloc)
                 }
                 hopr_transport_tag_allocator::Usage::ProvingTelemetry => probing_tag_allocator = Some(alloc),
             }
         }
-        let session_tag_allocator =
-            session_tag_allocator.ok_or_else(|| HoprTransportError::Api("session tag allocator missing".into()))?;
         let session_telemetry_tag_allocator = session_telemetry_tag_allocator
             .ok_or_else(|| HoprTransportError::Api("session telemetry tag allocator missing".into()))?;
         let probing_tag_allocator =
@@ -332,29 +330,27 @@ where
                 planner_config,
             ),
             my_multiaddresses,
-            smgr: Arc::new(SessionManager::new(
-                SessionManagerConfig {
-                    frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                        .ok()
-                        .and_then(|s| s.parse::<usize>().ok())
-                        .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                        .max(ApplicationData::PAYLOAD_SIZE),
-                    max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                        .ok()
-                        .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                        .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                        .max(Duration::from_millis(100)),
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                    balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                    initial_return_session_egress_rate: 10,
-                    minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
-                    maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                    surb_balance_notify_period: None,
-                    surb_target_notify: true,
-                },
-                session_tag_allocator,
-            )),
+            smgr: Arc::new(SessionManager::new(SessionManagerConfig {
+                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                    .max(ApplicationData::PAYLOAD_SIZE),
+                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                    .max(Duration::from_millis(100)),
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                initial_return_session_egress_rate: 10,
+                minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
+                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                surb_balance_notify_period: None,
+                surb_target_notify: true,
+                maximum_sessions: cfg.session.maximum_managed_sessions,
+            })),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,

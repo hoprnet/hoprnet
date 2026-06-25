@@ -3,18 +3,19 @@ use std::num::NonZeroU8;
 use std::sync::Arc;
 
 use dashmap::DashSet;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
+use futures::{FutureExt, Stream, StreamExt};
 use hopr_api::{Multiaddr, OffchainKeypair, network::BoxedProcessFn};
 use hopr_utils::network_types::prelude::is_public_address;
+#[cfg(feature = "runtime-tokio")]
+use libp2p::identity::PublicKey;
 use libp2p::{
     autonat,
-    identity::PublicKey,
     swarm::{NetworkInfo, SwarmEvent},
 };
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, constants,
+    HoprNetwork, HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery,
     errors::Result,
     utils::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
@@ -52,9 +53,9 @@ impl InactiveNetwork {
     #[cfg(feature = "runtime-tokio")]
     pub async fn build(
         me: libp2p::identity::Keypair,
-        external_discovery_events: BoxStream<'static, PeerDiscovery>,
+        external_discovery_events: futures::stream::BoxStream<'static, PeerDiscovery>,
     ) -> Result<Self> {
-        let me_public: PublicKey = me.public();
+        let me_public: libp2p::identity::PublicKey = me.public();
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
             .with_tokio()
@@ -91,7 +92,7 @@ impl InactiveNetwork {
                             let v = std::env::var("HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT")
                                 .ok()
                                 .and_then(|v| v.trim().parse::<u8>().ok())
-                                .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT);
+                                .unwrap_or(crate::constants::HOPR_SWARM_CONCURRENTLY_DIALED_PEER_COUNT);
                             v.max(1)
                         })
                         .expect("clamped to >= 1, will never fail"),
@@ -99,13 +100,13 @@ impl InactiveNetwork {
                     .with_max_negotiating_inbound_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
+                            .unwrap_or(crate::constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
                     )
                     .with_idle_connection_timeout(
                         std::env::var("HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT")
                             .and_then(|v| v.parse::<u64>().map_err(|_e| std::env::VarError::NotPresent))
                             .map(std::time::Duration::from_secs)
-                            .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
+                            .unwrap_or(crate::constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
                     )
                 })
                 .build(),
@@ -223,6 +224,7 @@ impl HoprLibp2pNetworkBuilder {
         let swarm = swarm.swarm;
         let store = crate::peer_store::NetworkPeerStore::new(me, my_multiaddresses.into_iter().collect());
         let tracker: Arc<DashSet<libp2p::PeerId>> = Default::default();
+        let liveness: crate::liveness::LivenessRegistry = Default::default();
 
         let (notifier, event_rx) = async_broadcast::broadcast(1000);
 
@@ -232,12 +234,23 @@ impl HoprLibp2pNetworkBuilder {
             control: swarm.behaviour().streams.new_control(),
             protocol: libp2p::StreamProtocol::new(protocol),
             event_rx: event_rx.deactivate(),
+            liveness: liveness.clone(),
         };
 
         #[cfg(all(feature = "telemetry", not(test)))]
         let network_inner = network.clone();
         let mut swarm = swarm;
         let process = async move {
+            // Shared teardown for both ConnectionClosed and OutgoingConnectionError: remove
+            // from the tracker and liveness registry and broadcast the disconnection event.
+            let disconnect_peer = |peer_id: libp2p::PeerId| {
+                tracker.remove(&peer_id);
+                liveness.remove(&peer_id);
+                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
+                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
+                }
+            };
+
             while let Some(event) = swarm.next().await {
                 match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
@@ -325,10 +338,7 @@ impl HoprLibp2pNetworkBuilder {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
                         if num_established == 0 {
-                            tracker.remove(&peer_id);
-                            if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
-                                error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
-                            }
+                            disconnect_peer(peer_id);
                         }
 
                         print_network_info(swarm.network_info(), "connection closed");
@@ -367,10 +377,7 @@ impl HoprLibp2pNetworkBuilder {
                                 if let Err(error) = store.remove(&peer_id) {
                                     error!(peer = %peer_id, %error, "failed to remove undialable peer from the peer store");
                                 }
-                                tracker.remove(&peer_id);
-                                if let Err(error) = notifier.try_broadcast(hopr_api::network::NetworkEvent::PeerDisconnected(peer_id)) {
-                                    error!(peer = %peer_id, %error, "failed to broadcast peer disconnected event");
-                                }
+                                disconnect_peer(peer_id);
                             }
 
                         #[cfg(all(feature = "telemetry", not(test)))]
