@@ -3,7 +3,7 @@ name = "hoprnet"
 version = "3.0.0"
 description = "HOPR network"
 readme = "README.md"
-requires-python = ">=3.14.5,<3.15"
+requires-python = ">=3.14.6,<3.15"
 dependencies = ["sdk-localcluster", "sdk-api"]
 
 [tool.uv]
