@@ -561,38 +561,6 @@ where
     Ok(())
 }
 
-/// Creates a minimal [`SessionSlot`] for benchmarking or testing purposes.
-/// The slot contains a channel that accepts dispatches but drops all received data.
-///
-/// **For benchmarking only — do not call in production code.**
-#[cfg(feature = "benchmark")]
-pub fn benchmarking_session_slot() -> SessionSlot {
-    let (session_tx, _session_rx) = benchmarking_session_slot_with_receiver();
-    session_tx
-}
-
-/// Like `benchmarking_session_slot` but also returns the receiver.
-/// The receiver **must** be kept alive by the caller for the sender to
-/// remain functional — dropping the receiver closes the channel and
-/// causes `try_send` to return an error.
-///
-/// **For benchmarking only — do not call in production code.**
-#[cfg(feature = "benchmark")]
-pub fn benchmarking_session_slot_with_receiver() -> (SessionSlot, flume::Receiver<ApplicationDataIn>) {
-    // Unbounded so `try_send` never fills up during high-iteration benchmarks.
-    // Real sessions use a bounded channel to signal back-pressure; this slot
-    // discards data anyway so unbounded is appropriate here.
-    let (session_tx, session_rx) = flume::unbounded::<ApplicationDataIn>();
-    let slot = SessionSlot {
-        session_tx,
-        routing_opts: DestinationRouting::Return(HoprPseudonym::random().into()),
-        abort_handles: Arc::new(parking_lot::Mutex::new(AbortableList::default())),
-        surb_mgmt: Arc::new(BalancerStateValues::default()),
-        surb_estimator: AtomicSurbFlowEstimator::default(),
-    };
-    (slot, session_rx)
-}
-
 impl<S> SessionManager<S>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
@@ -1720,69 +1688,6 @@ where
             debug!(%session_id, "received keep-alive request for an unknown session");
         }
         Ok(())
-    }
-
-    /// Inserts session slots for the given IDs and returns the receivers that
-    /// must be kept alive for the corresponding senders to stay functional.
-    /// Dropping a receiver closes the channel and causes `try_send` to fail.
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn insert_session_slot_for_benchmarking_multi(
-        &self,
-        ids: &[SessionId],
-    ) -> Vec<flume::Receiver<ApplicationDataIn>> {
-        let mut receivers = Vec::with_capacity(ids.len());
-        for &id in ids {
-            let (slot, rx) = benchmarking_session_slot_with_receiver();
-            receivers.push(rx);
-            self.sessions.insert(id, slot);
-        }
-        receivers
-    }
-
-    /// Inserts a session slot directly into the sessions cache.
-    /// This bypasses the full session establishment protocol and is intended only
-    /// for benchmarking and testing.
-    ///
-    /// Takes the session ID and constructs a minimal slot internally (a
-    /// discarding channel that accepts but drops all dispatches).
-    ///
-    /// Does **not** call `run_pending_tasks()` — the caller should do so if
-    /// consistency with Moka's internal state is required.
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn insert_session_slot_for_benchmarking(&self, id: SessionId) {
-        self.sessions.insert(id, benchmarking_session_slot());
-    }
-
-    /// Injects a custom start-protocol sender without going through `start()`.
-    /// For benchmarking only.
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn set_start_protocol_tx_for_benchmarking(&self, tx: flume::Sender<(HoprPseudonym, HoprStartProtocol)>) {
-        let _ = (*self.start_protocol_tx).set(tx);
-    }
-
-    /// Sets the session counter to `count` without inserting entries.
-    /// For benchmarking only — needed because `insert_session_slot_for_benchmarking_multi`
-    /// bypasses `allocate_session_slot` (which would normally increment the counter).
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn set_active_sessions_for_benchmarking(&self, count: usize) {
-        self.active_sessions.store(count, Ordering::Relaxed);
-    }
-
-    /// Triggers Moka background task processing so that eviction listeners run.
-    /// For benchmarking only.
-    ///
-    /// **For benchmarking only — do not call in production code.**
-    #[cfg(feature = "benchmark")]
-    pub fn flush_pending_tasks_for_benchmarking(&self) {
-        self.sessions.run_pending_tasks();
     }
 }
 
