@@ -20,7 +20,7 @@ const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 
 const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
 const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
-const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 4096;
+const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
@@ -93,10 +93,12 @@ pub struct StreamProtocolConfig {
     /// Pending-write-buffer byte threshold on the framed writer before a flush is forced.
     ///
     /// A value of `1` flushes on every encoded frame (one syscall per message).
-    /// Larger values coalesce adjacent small frames into a single write on busy relays
-    /// at the cost of marginally higher latency under low load.
+    /// Larger values coalesce adjacent small frames into a single quinn write call,
+    /// reducing connection-mutex acquisitions and driver wake-ups on the hot path.
+    /// A HOPR packet is ~1 440 bytes; at the default 128 KiB threshold roughly 91
+    /// packets are coalesced per write, cutting driver wake frequency ~30×.
     ///
-    /// Defaults to 4 096 bytes (~4 typical HOPR packets).
+    /// Defaults to 131 072 bytes (128 KiB).
     #[validate(range(min = 1))]
     #[default(default_frame_writer_backpressure_bytes())]
     #[cfg_attr(feature = "serde", serde(default = "default_frame_writer_backpressure_bytes"))]

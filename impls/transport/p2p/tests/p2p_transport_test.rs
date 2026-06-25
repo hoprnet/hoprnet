@@ -15,7 +15,6 @@ use futures::{
 use hopr_api::types::crypto::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_transport_p2p::{HoprLibp2pNetworkBuilder, HoprNetwork, PeerDiscovery};
 use hopr_transport_probe::ping::PingQueryReplier;
-use hopr_utils::platform::time::native::current_time;
 use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
@@ -128,10 +127,10 @@ use libp2p::{Multiaddr, PeerId};
 use more_asserts::assert_gt;
 use tokio::{
     task::{JoinHandle, spawn},
-    time::{sleep, timeout},
+    time::{Instant, sleep, timeout},
 };
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 16)]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
     let (mut api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
@@ -169,7 +168,7 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let packet_count: usize = 2 * 1024 * 10; // ~10 MB
     let target_bytes = RANDOM_GIBBERISH.len() * packet_count;
 
-    let start = current_time();
+    let start = Instant::now();
 
     let peer = api2.me;
     let mut bulk_sender = api1.send_msg.clone();
@@ -181,16 +180,24 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
         }
     });
 
-    // Receive until the target byte count is seen or the deadline expires.
+    // Receive until the target byte count is seen or no packet arrives for 2 s.
+    // Measure throughput from `start` to the instant the last packet arrived —
+    // not to the end of the loop — so that a handful of ring-buffer drops at the
+    // tail do not inflate elapsed with idle timeout time.
     let mut received_bytes = 0usize;
+    let mut last_received = start;
     while received_bytes < target_bytes {
-        match timeout(std::time::Duration::from_secs(10), api2.recv_msg.next()).await {
-            Ok(Some((_, pkt))) => received_bytes += pkt.len(),
+        match timeout(std::time::Duration::from_secs(2), api2.recv_msg.next()).await {
+            Ok(Some((_, pkt))) => {
+                received_bytes += pkt.len();
+                last_received = Instant::now();
+            }
             _ => break,
         }
     }
 
-    let speed_in_mbytes_s = received_bytes as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
+    let elapsed = last_received.duration_since(start);
+    let speed_in_mbytes_s = received_bytes as f64 / elapsed.as_secs_f64() / 1_000_000.0;
 
     assert_gt!(
         speed_in_mbytes_s,
