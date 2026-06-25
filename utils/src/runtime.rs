@@ -25,7 +25,7 @@ pub mod prelude {
     pub use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
     #[cfg(feature = "runtime-tokio")]
     pub use tokio::{
-        task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local},
+        task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local, yield_now},
         time::{sleep, timeout as timeout_fut},
     };
 }
