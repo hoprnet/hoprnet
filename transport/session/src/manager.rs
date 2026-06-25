@@ -1351,6 +1351,29 @@ where
         self.sessions.insert(session_id, slot);
     }
 
+    /// Like [`pre_populate_session`](SessionManager::pre_populate_session) but also returns the
+    /// session channel receiver so the caller can spawn a drain task.
+    ///
+    /// Requires the `"benchmark"` feature.
+    #[cfg(feature = "benchmark")]
+    pub fn pre_populate_session_with_receiver(
+        &self,
+        session_id: SessionId,
+        routing_opts: DestinationRouting,
+    ) -> crossfire::AsyncRx<crossfire::mpsc::Array<ApplicationDataIn>> {
+        let (session_tx, session_rx) =
+            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
+        let slot = SessionSlot {
+            session_tx,
+            routing_opts,
+            abort_handles: Default::default(),
+            surb_mgmt: Arc::new(BalancerStateValues::default()),
+            surb_estimator: Default::default(),
+        };
+        self.sessions.insert(session_id, slot);
+        session_rx
+    }
+
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,

@@ -199,7 +199,7 @@ impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 let strategy = tokio_retry::strategy::FixedInterval::new(self.cfg.tcp_target_retry_delay)
                     .take(self.cfg.max_tcp_target_retries as usize);
 
-                let mut tcp_bridge = tokio_retry::Retry::spawn(strategy, || {
+                let mut tcp_bridge = tokio_retry::Retry::start(strategy, || {
                     tokio::net::TcpStream::connect(resolved_tcp_targets.as_slice())
                 })
                 .await

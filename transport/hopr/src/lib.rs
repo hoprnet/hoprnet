@@ -348,6 +348,7 @@ where
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
+                ..Default::default()
             })),
             chain_api: resolver,
             session_telemetry_tag_allocator,
