@@ -79,7 +79,7 @@ fn setup_and_generate_shares(
 
 fn bench_new_exit_commitment(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::new_exit_commitment");
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -110,7 +110,7 @@ fn bench_new_exit_commitment(c: &mut Criterion) {
 
 fn bench_insert_coefficient_commitments_partial(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::insert_coefficient_commitments/partial");
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50];
@@ -151,7 +151,7 @@ fn bench_insert_coefficient_commitments_partial(c: &mut Criterion) {
 
 fn bench_insert_coefficient_commitments_full(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::insert_coefficient_commitments/full");
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50];
@@ -240,7 +240,7 @@ fn bench_insert_encrypted_share(c: &mut Criterion) {
 fn bench_acknowledge_shares_single(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/single");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -276,7 +276,7 @@ fn bench_acknowledge_shares_single(c: &mut Criterion) {
 fn bench_acknowledge_shares_partial(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/partial");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -312,7 +312,7 @@ fn bench_acknowledge_shares_partial(c: &mut Criterion) {
 fn bench_acknowledge_shares_full(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/full");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -348,7 +348,7 @@ fn bench_acknowledge_shares_full(c: &mut Criterion) {
 fn bench_acknowledge_shares_single_batch(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/single_batch");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -384,7 +384,7 @@ fn bench_acknowledge_shares_single_batch(c: &mut Criterion) {
 fn bench_acknowledge_shares_partial_batch(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/partial_batch");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
@@ -420,7 +420,7 @@ fn bench_acknowledge_shares_partial_batch(c: &mut Criterion) {
 fn bench_acknowledge_shares_full_batch(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/full_batch");
     group.throughput(Throughput::Elements(1));
-    group.measurement_time(std::time::Duration::from_secs(1));
+    group.measurement_time(std::time::Duration::from_secs(5));
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];

@@ -27,7 +27,7 @@ pub use manager::{
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
     AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
-    HoprSessionOutPixEvent, IncomingSession, ServiceId, SessionId, SessionTarget,
+    HoprSessionOutPixEvent, IncomingSession, ServiceId, SessionId, SessionTarget, HoprStartProtocol
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

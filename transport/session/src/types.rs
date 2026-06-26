@@ -98,7 +98,7 @@ pub struct AgreedSsaQuota {
 }
 
 /// Events raised by the [`SessionManager`] in response to received PIX messages.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum HoprSessionOutPixEvent {
     /// Event raised by the [`SessionManager`] of an Entry node can deposit funds to an SSA for the agreed data quota.
     ReadyToDeposit(AgreedSsaQuota),

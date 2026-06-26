@@ -51,5 +51,7 @@ pub mod auto_redeeming;
 pub mod channel_finalizer;
 #[cfg(feature = "strategy-channel-lifecycle")]
 pub mod channel_lifecycle;
+#[cfg(feature = "strategy-pix")]
+pub mod pix;
 pub mod errors;
 pub mod strategy;

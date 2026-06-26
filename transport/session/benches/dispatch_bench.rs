@@ -31,10 +31,7 @@ use hopr_protocol_app::{
     v1::{ApplicationData, ApplicationDataIn, ReservedTag, Tag},
 };
 use hopr_protocol_start::{StartChallenge, StartInitiation, StartProtocol};
-use hopr_transport_session::{
-    ByteCapabilities, HoprSessionCapabilities, IncomingSession, SESSION_APPLICATION_TAG, SessionId, SessionManager,
-    SessionManagerConfig, SessionTarget,
-};
+use hopr_transport_session::{HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig, SessionTarget};
 use hopr_utils::network_types::prelude::SealedHost;
 
 // Avoid musl's default allocator due to degraded performance.
@@ -69,7 +66,7 @@ const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(3);
 fn make_start_protocol_data() -> ApplicationDataIn {
     let challenge = StartChallenge::MAX;
     let target = SessionTarget::UdpStream(SealedHost::Plain(SocketAddr::from(([127, 0, 0, 1], 13301)).into()));
-    let msg = StartProtocol::<SessionId, SessionTarget, HoprSessionCapabilities>::StartSession(StartInitiation {
+    let msg = HoprStartProtocol::StartSession(StartInitiation {
         challenge,
         target,
         capabilities: HoprSessionCapabilities::try_from(0u8).unwrap(),

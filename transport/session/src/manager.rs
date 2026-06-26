@@ -148,7 +148,11 @@ enum SessionHandles {
     KeepAlive,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
+    /// Handle to the process which closes the Session unless the handle is aborted.
     PixKillSwitch,
+    /// Handle to the process that awaits PIX deposit for a Session.
+    ///
+    /// Once the deposit is received, the handle [`SessionHandles::PixKillSwitch`] is aborted.
     DepositAwaiter,
 }
 
@@ -2131,15 +2135,21 @@ where
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
         // Insert the newly received coefficients into the SSA Reconstructor
-        // TODO: rayon spawn blocking?
-        let ssa_client_commitment_state = pix_toolbox
-            .share_processor
-            .insert_coefficient_commitments(
-                ssa_id,
-                msg.coefficient_index,
-                msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
-            )
-            .map_err(SessionManagerError::PixError)?;
+        // TODO: confirm that spawn blocking is needed via benchmarks
+        let pix_toolbox_clone = pix_toolbox.clone();
+        let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(move || {
+            pix_toolbox_clone
+                .share_processor
+                .insert_coefficient_commitments(
+                    ssa_id,
+                    msg.coefficient_index,
+                    msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
+                )
+                .map_err(SessionManagerError::PixError)
+            }, "ssa commitment reconstructor"
+        )
+            .await
+            .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("failed to insert SSA coefficients into the SSA reconstructor")))??;
 
         let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
 
@@ -2177,6 +2187,7 @@ where
                 }),
             );
 
+            // Notify upstream that deposit is needed
             pix_toolbox
                 .pix_events
                 .try_send(HoprSessionOutPixEvent::DepositNeeded(
