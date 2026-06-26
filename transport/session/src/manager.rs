@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
+use futures::{FutureExt, Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -448,7 +448,7 @@ type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(
 pub struct PixToolbox {
     share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
     share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
-    pix_events: Sender<HoprSessionOutPixEvent>,
+    pix_events: crossfire::MTx<crossfire::mpsc::Array<HoprSessionOutPixEvent>>,
 }
 
 impl PixToolbox {
@@ -456,14 +456,14 @@ impl PixToolbox {
         share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
         share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
     ) -> (Self, impl futures::Stream<Item = HoprSessionOutPixEvent>) {
-        let (pix_events, pix_events_rx) = futures::channel::mpsc::channel(1024);
+        let (pix_events, pix_events_rx) = crossfire::mpsc::bounded_blocking_async::<HoprSessionOutPixEvent>(1024);
         (
             Self {
                 share_generator,
                 share_processor,
                 pix_events,
             },
-            pix_events_rx,
+            pix_events_rx.into_stream(),
         )
     }
 }
@@ -877,10 +877,10 @@ where
                             }
                             HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
                             HoprStartProtocol::SsaCommit(client_commit_msg) => {
-                                myself.handle_ssa_commit(pseudonym, client_commit_msg).await?;
+                                myself.handle_ssa_commit(pseudonym, client_commit_msg).await
                             }
                             HoprStartProtocol::SsaRequest(server_commit_msg) => {
-                                myself.handle_ssa_request(pseudonym, server_commit_msg).await?;
+                                myself.handle_ssa_request(pseudonym, server_commit_msg).await
                             }
                         };
 
@@ -1408,7 +1408,7 @@ where
             + self.cfg.pix_config.max_deposit_wait
             + self.cfg.pix_config.max_ssa_delivery_time;
         slot.abort_handles.lock().insert(
-            SessionTasks::PixKillSwitch,
+            SessionHandles::PixKillSwitch,
             hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
                 move |_| async move {
                     error!(%session_id, ssa_index, "pix session deposit timeout");
@@ -1506,7 +1506,7 @@ where
     /// Such an event can affect existing Sessions that use the PIX protocol.
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
         let session_id = event.pseudonym();
-        let Some(slot) = self.sessions.get(event.pseudonym()).await else {
+        let Some(slot) = self.sessions.get(event.pseudonym()) else {
             error!(%session_id, "trying to dispatch pix event on a non-existing session");
             return Err(SessionManagerError::NonExistingSession.into());
         };
@@ -1526,7 +1526,7 @@ where
                 // The PIX shares can come from different polynomials, so we can only
                 // see the total number of unverifiable shares and make the Session closure
                 // decision based on that.
-                if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(&session_id).await {
+                if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(&session_id) {
                     error!(%session_id, "closed session due to too many unverifiable shares");
                 }
             }
@@ -1614,6 +1614,7 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Arc::new(BalancerStateValues::default()),
             surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
     }
@@ -1636,6 +1637,7 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Arc::new(BalancerStateValues::default()),
             surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         session_rx
@@ -2106,7 +2108,7 @@ where
         pseudonym: HoprPseudonym,
         msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>,
     ) -> errors::Result<()> {
-        let Some(mut pix_toolbox) = self.pix_toolbox.get().cloned() else {
+        let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
         };
 
@@ -2117,7 +2119,7 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
-        let Some(session_slot) = self.sessions.get(&session_id).await else {
+        let Some(session_slot) = self.sessions.get(&session_id) else {
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
@@ -2149,7 +2151,7 @@ where
             // TODO: generalize the awaiter into a perpetual Session task that either awaits for Deposit or a signal
             // that sends Exit commitment and reinstates the kill-switch.
             session_slot.abort_handles.lock().insert(
-                SessionTasks::DepositAwaiter,
+                SessionHandles::DepositAwaiter,
                 hopr_utils::spawn_as_abortable!(async move {
                     if deposit_done_rx
                         .filter(|((evt_pseudonym, evt_index), _)| {
@@ -2166,7 +2168,10 @@ where
                         // Abort the kill switch once the deposit has been done
                         // This kill-switch is reinstated once the SSA has been recovered and a new Client commitment is
                         // needed.
-                        slot_clone.abort_handles.lock().abort_one(&SessionTasks::PixKillSwitch);
+                        slot_clone
+                            .abort_handles
+                            .lock()
+                            .abort_one(&SessionHandles::PixKillSwitch);
                         info!(%session_id, "SSA deposit successful");
                     }
                 }),
@@ -2174,7 +2179,7 @@ where
 
             pix_toolbox
                 .pix_events
-                .send(HoprSessionOutPixEvent::DepositNeeded(
+                .try_send(HoprSessionOutPixEvent::DepositNeeded(
                     AgreedSsaQuota {
                         ssa_id,
                         deposit_address,
@@ -2182,7 +2187,6 @@ where
                     },
                     deposit_done_tx,
                 ))
-                .await
                 .map_err(|_| {
                     SessionManagerError::other(anyhow::anyhow!("failed to send pix event for needed deposit"))
                 })?;
@@ -2197,7 +2201,7 @@ where
         pseudonym: HoprPseudonym,
         msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>,
     ) -> errors::Result<()> {
-        let Some(mut pix_toolbox) = self.pix_toolbox.get().cloned() else {
+        let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
         };
 
@@ -2206,7 +2210,7 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
-        let Some(session_slot) = self.sessions.get(&msg.session_id).await else {
+        let Some(session_slot) = self.sessions.get(&msg.session_id) else {
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
@@ -2264,12 +2268,11 @@ where
             // Notify the new SSA deposit address to allow the deposit to happen
             pix_toolbox
                 .pix_events
-                .send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
                     ssa_id: SsaId::new(pseudonym, ssa_index),
                     deposit_address,
                     quota_per_ssa,
                 }))
-                .await
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
 
             // Split the SSA client commitment into Start protocol commitment messages
@@ -2740,7 +2743,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
-                    current_ssa_state: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
@@ -3990,7 +3993,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
-                    current_ssa_state: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
@@ -4079,7 +4082,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
-                    current_ssa_state: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
