@@ -210,26 +210,24 @@ impl HoprSessionConfigurator {
     /// Returns an error if the Session is closed, the Session manager is gone.
     ///
     /// Returns `Ok(None)` if the Session has been created without a SURB balancer.
-    pub async fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
+    pub fn get_surb_balancer_config(&self) -> errors::Result<Option<SurbBalancerConfig>> {
         Ok(self
             .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .get_surb_balancer_config(&self.id)
-            .await?)
+            .get_surb_balancer_config(&self.id)?)
     }
 
     /// Updates the configuration of the SURB balancer.
     ///
     /// Returns an error if the Session is closed, the Session manager is gone, or the
     /// Session has been created without a SURB balancer.
-    pub async fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
+    pub fn update_surb_balancer_config(&self, config: SurbBalancerConfig) -> errors::Result<()> {
         Ok(self
             .smgr
             .upgrade()
             .ok_or(HoprTransportError::Other(anyhow::anyhow!("session manager is dropped")))?
-            .update_surb_balancer_config(&self.id, config)
-            .await?)
+            .update_surb_balancer_config(&self.id, config)?)
     }
 
     /// Explicitly closes the underlying Session in the [`SessionManager`].
@@ -238,9 +236,9 @@ impl HoprSessionConfigurator {
     /// already gone (or the manager is dropped). Frees the per-session state
     /// (frame reassembly buffers, control channels, …) immediately rather than
     /// waiting for the manager's idle-timeout eviction.
-    pub async fn close(&self) -> bool {
+    pub fn close(&self) -> bool {
         match self.smgr.upgrade() {
-            Some(smgr) => smgr.close_session(&self.id).await,
+            Some(smgr) => smgr.close_session(&self.id),
             None => false,
         }
     }
@@ -314,6 +312,7 @@ where
         let mut probing_tag_allocator = None;
         for (usage, alloc) in tag_allocators {
             match usage {
+                // TODO: cleanup of Session tag allocators needed * (#8199)
                 hopr_transport_tag_allocator::Usage::Session => {}
                 hopr_transport_tag_allocator::Usage::SessionTerminalTelemetry => {
                     session_telemetry_tag_allocator = Some(alloc)
@@ -361,6 +360,7 @@ where
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 pix_config: Default::default(),
+                ..Default::default()
             })),
             chain_api: resolver,
             session_telemetry_tag_allocator,
@@ -933,23 +933,20 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
-                        let smgr = smgr.clone();
-                        async move {
-                            match smgr.dispatch_message(pseudonym, data).await {
-                                Ok(DispatchResult::Processed) => {
-                                    tracing::trace!("message dispatch completed");
-                                    None
-                                }
-                                Ok(DispatchResult::Unrelated(data)) => {
-                                    tracing::trace!("unrelated message dispatch completed");
-                                    Some(data)
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "error while dispatching packet in the session manager");
-                                    None
-                                }
+                        futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
+                            Ok(DispatchResult::Processed) => {
+                                tracing::trace!("message dispatch completed");
+                                None
                             }
-                        }
+                            Ok(DispatchResult::Unrelated(data)) => {
+                                tracing::trace!("unrelated message dispatch completed");
+                                Some(data)
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "error while dispatching packet in the session manager");
+                                None
+                            }
+                        })
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {
