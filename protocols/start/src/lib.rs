@@ -93,6 +93,8 @@ pub struct StartEstablished<I> {
 /// - `I` is the session identifier.
 /// - `T` is the session target.
 /// - `C` are session capabilities.
+/// - `G` is the type of the commitment to the Session Stealth Address (SSA).
+///
 /// # Diagram of the protocol
 /// ```mermaid
 /// sequenceDiagram
