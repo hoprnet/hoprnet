@@ -81,7 +81,7 @@ type MaybeRecoveredSsa<S> = Option<RecoveredSsa<<S as PixSpec>::Pseudonym, <S as
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         Self {
-            commitment_builder: moka::sync::CacheBuilder::new(10)
+            commitment_builder: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
             ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
