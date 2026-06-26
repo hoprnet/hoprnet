@@ -57,6 +57,12 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 /// block, providing natural back-pressure without overflow.
 const BENCHMARK_CHANNEL_CAPACITY: usize = 2_000_000;
 
+/// Number of criterion measurement samples per benchmark.
+///
+/// 10 000 samples gives a tight confidence interval (~0.2% at p = 0.05) for sub-microsecond
+/// benchmarks without excessive runtime.
+const BENCHMARK_SAMPLE_COUNT: usize = 10_000;
+
 const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(3);
 
 /// Builds valid `ApplicationDataIn` with the Start protocol tag and a dummy encoded payload.
@@ -194,7 +200,7 @@ pub fn dispatch_start_protocol(c: &mut Criterion) {
     let in_data = make_start_protocol_data();
 
     let mut group = c.benchmark_group("dispatch_start_protocol");
-    group.sample_size(100_000);
+    group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
     group.bench_function("single", |b| {
         b.iter(|| {
@@ -226,7 +232,7 @@ pub fn dispatch_session_hit(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("dispatch_session_hit");
-    group.sample_size(100_000);
+    group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
     for &size in payload_sizes() {
         let (msg_rx, sn_rx, manager, session_id, runtime) = make_manager_with_session();
@@ -252,7 +258,7 @@ pub fn dispatch_session_miss(c: &mut Criterion) {
     let in_data = make_session_data(1018);
 
     let mut group = c.benchmark_group("dispatch_session_miss");
-    group.sample_size(100_000);
+    group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
     group.bench_function("cache_miss", |b| {
         b.iter(|| {
@@ -277,7 +283,7 @@ pub fn dispatch_unrelated(c: &mut Criterion) {
     let in_data = make_unrelated_data();
 
     let mut group = c.benchmark_group("dispatch_unrelated");
-    group.sample_size(100_000);
+    group.sample_size(BENCHMARK_SAMPLE_COUNT);
 
     group.bench_function("single", |b| {
         b.iter(|| {

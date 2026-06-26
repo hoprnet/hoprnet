@@ -323,7 +323,7 @@ impl Probe {
                         let tag_allocator = tag_allocator.clone();
                         let emit_diag = emit_diag.clone();
 
-                        emit_diag.wrap(async move {
+                        emit_diag.wrap(|| async move {
                             match peer {
                                 ProbeRouting::Neighbor(DestinationRouting::Forward {
                                     destination,

@@ -194,7 +194,7 @@ where
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
                 let keep_alive_diag = keep_alive_diag.clone();
-                keep_alive_diag.wrap(async move {
+                keep_alive_diag.wrap(|| async move {
                     sender_clone
                         .send(msg)
                         .await
@@ -229,46 +229,77 @@ mod tests {
 
     use super::*;
 
+    /// Generator that cycles through 0..4, wrapping at 5 back to 0.
+    fn cycling_generator(prev: Option<u8>) -> u8 {
+        prev.map(|v| (v + 1) % 5).unwrap_or(0)
+    }
+
+    /// Tests sequential insertion into an empty cache: each call fills the next slot.
     #[tokio::test]
-    async fn test_insert_into_next_slot() -> anyhow::Result<()> {
+    async fn test_insert_into_next_slot_sequential() -> anyhow::Result<()> {
         let cache = moka::sync::Cache::new(10);
 
         for i in 0..5 {
-            let (k, v) = insert_into_next_slot(
-                &cache,
-                |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0),
-                |k| format!("foo_{k}"),
-                Some(10u64),
-            )
-            .ok_or(anyhow!("should insert"))?;
+            let (k, v) = insert_into_next_slot(&cache, cycling_generator, |k| format!("foo_{k}"), Some(10u64))
+                .ok_or(anyhow!("should insert into slot {i}"))?;
             assert_eq!(k, i);
             assert_eq!(format!("foo_{i}"), v);
             assert_eq!(Some(v), cache.get(&i));
         }
 
+        Ok(())
+    }
+
+    /// Tests that insertion returns `None` when all slots are occupied and the generator cycles back.
+    #[tokio::test]
+    async fn test_insert_into_next_slot_returns_none_when_full() -> anyhow::Result<()> {
+        let cache = moka::sync::Cache::new(10);
+
+        for _ in 0..5 {
+            insert_into_next_slot(&cache, cycling_generator, |k| format!("foo_{k}"), Some(10u64))
+                .ok_or(anyhow!("precondition: should insert"))?;
+        }
+
         assert!(
-            insert_into_next_slot(
-                &cache,
-                |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0),
-                |_| "foo".to_string(),
-                Some(10u64),
-            )
-            .is_none(),
+            insert_into_next_slot(&cache, cycling_generator, |_| "foo".to_string(), Some(10u64)).is_none(),
             "must not find slot when full"
         );
 
-        // A cache with capacity 1 must reject a second distinct key.
+        Ok(())
+    }
+
+    /// Tests that a cache with max capacity of 1 rejects a second distinct key.
+    #[tokio::test]
+    async fn test_insert_into_next_slot_capacity_one_rejects_second_key() -> anyhow::Result<()> {
         let unit_cache = moka::sync::Cache::new(1);
-        let (k0, v0) = insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64))
+
+        let (k0, _v0) = insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64))
             .ok_or(anyhow!("first insertion must succeed"))?;
         assert_eq!(k0, 0);
 
         assert!(
-            insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64),).is_none(),
+            insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64)).is_none(),
             "second distinct key must be rejected when cache capacity is 1"
         );
-        // The first entry must still be present (not evicted).
-        assert_eq!(Some(v0), unit_cache.get(&k0));
+
+        Ok(())
+    }
+
+    /// Tests that a rejected insertion does not evict the existing entry.
+    #[tokio::test]
+    async fn test_insert_into_next_slot_rejected_insertion_does_not_evict() -> anyhow::Result<()> {
+        let unit_cache = moka::sync::Cache::new(1);
+
+        let (k0, v0) = insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64))
+            .ok_or(anyhow!("first insertion must succeed"))?;
+
+        insert_into_next_slot(&unit_cache, |prev| prev.map(|v| v + 1).unwrap_or(0), |k| k, Some(1u64));
+
+        assert_eq!(
+            Some(v0),
+            unit_cache.get(&k0),
+            "first entry must still be present after rejection"
+        );
 
         Ok(())
     }

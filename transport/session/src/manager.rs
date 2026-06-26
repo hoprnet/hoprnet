@@ -670,7 +670,7 @@ where
                 move |(session_id, closure_reason)| {
                     let myself = myself.clone();
                     let closure_diag = closure_diag.clone();
-                    closure_diag.wrap(async move {
+                    closure_diag.wrap(|| {
                         // These notifications come from the Sessions themselves once
                         // an empty read is encountered, which means the closure was done by the
                         // other party.
@@ -685,6 +685,7 @@ where
                                 "could not find session id to close, maybe the session is already closed"
                             );
                         }
+                        futures::future::ready(())
                     })
                 }
             )

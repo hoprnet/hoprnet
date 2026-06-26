@@ -268,14 +268,14 @@ pub mod diagnostics {
         }
 
         /// Wraps one child future produced by a concurrent stream operator.
-        pub fn wrap<F>(&self, inner: F) -> ConcurrentDiagnosticFuture<F> {
+        pub fn wrap<F: FnOnce() -> T, T>(&self, inner: F) -> ConcurrentDiagnosticFuture<T> {
             if let Some(state) = &self.state {
                 state.started.fetch_add(1, Ordering::Relaxed);
                 state.in_flight.fetch_add(1, Ordering::Relaxed);
             }
 
             ConcurrentDiagnosticFuture {
-                inner,
+                inner: inner(),
                 state: self.state.clone(),
                 finished: AtomicBool::new(false),
             }

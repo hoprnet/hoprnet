@@ -276,7 +276,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
                 .for_each_concurrent(None, move |session| {
                     let server = server.clone();
                     let session_diag = session_diag.clone();
-                    session_diag.wrap(async move {
+                    session_diag.wrap(|| async move {
                         let session_id = *session.session.id();
                         match server.process(session).await {
                             Ok(()) => tracing::debug!(?session_id, "session processed successfully"),
