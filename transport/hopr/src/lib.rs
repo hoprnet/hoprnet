@@ -758,14 +758,14 @@ where
                             HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
                                 ssa_id,
                                 deposit_address,
-                                ..
+                                quota_per_ssa,
                             }) =>
                                 PixEvent::NewDepositAddress((*ssa_id.pseudonym(), ssa_id.ssa_index()), deposit_address),
                             HoprSessionOutPixEvent::DepositNeeded(
                                 AgreedSsaQuota {
                                     ssa_id,
                                     deposit_address,
-                                    ..
+                                    quota_per_ssa,
                                 },
                                 notifier,
                             ) => PixEvent::DepositAddressReceived(

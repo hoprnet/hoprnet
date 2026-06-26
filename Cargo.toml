@@ -194,8 +194,8 @@ mimalloc = { version = "0.1.52", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = "1.12.0"
-hopr-types = { version = "1.9.1", features = ["use-bindings"] }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/update-pix-events"} # TODO: use at least 1.13.0
+hopr-types = {git = "https://github.com/hoprnet/hopr-types", branch = "lukas/reexport-typenum", features = ["use-bindings"] } # TODO: use at least 1.9.3
 hopr-utils = { version = "0.1.0", path = "utils", default-features = false }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [

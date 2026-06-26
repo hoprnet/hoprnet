@@ -5,10 +5,10 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
+use std::num::NonZeroU64;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::{
-    Address, HoprBalance,
+    HoprBalance,
     types::{
         internal::{prelude::HoprPseudonym, routing::DestinationRouting},
         primitive::errors::GeneralError,
@@ -16,7 +16,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::{HoprPacket, HoprPixGroupElement};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
-use hopr_protocol_pix::{SsaId, SsaIndex};
+use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -29,7 +29,7 @@ use hopr_utils::network_types::{
     utils::{AsyncWriteSink, DuplexIO},
 };
 use tracing::{debug, instrument};
-
+use hopr_crypto_packet::HoprPixSpec;
 use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
@@ -92,7 +92,7 @@ pub struct AgreedSsaQuota {
     /// ID of the SSA.
     pub ssa_id: SsaId<HoprPseudonym>,
     /// Deposit address of the SSA.
-    pub deposit_address: Address,
+    pub deposit_address: <HoprPixSpec as PixSpec>::DepositAddress,
     /// Quota of the SSA in bytes.
     pub quota_per_ssa: SsaQuota,
 }
@@ -453,6 +453,7 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
+    use hopr_api::Address;
     use hopr_api::types::{crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions};
 
     use super::*;

@@ -1,3 +1,16 @@
+//! ## Non-Anonymous PIX Strategy
+//!
+//! This strategy is responsible for handling non-anonymous PIX transactions.
+//!
+//! It is responsible for:
+//! - Handling new deposit addresses
+//! - Handling deposit address recovery
+//! - Handling PIX transfers
+//!
+//! All of these are done in a **non-anonymous** way, using plain on-chain transactions.
+//!
+//! **DO NOT USE THIS STRATEGY IN PRODUCTION**
+
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -5,7 +18,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use hopr_api::chain::ChainReadChannelOperations;
+use hopr_api::chain::{ChainReadChannelOperations, ChainWriteAccountOperations};
 use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, DepositUpdated, HasChainApi, PixAddressId, PixEvent};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
@@ -15,21 +28,21 @@ use crate::errors::StrategyError;
 use crate::strategy::Strategy as StrategyTrait;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Validate)]
-pub struct PixStrategyConfig {}
+pub struct NonAnonymousPixStrategyConfig {}
 
-/// Builder for [`PixStrategy`].
+/// Builder for [`NonAnonymousPixStrategy`].
 ///
-/// Call [`new`](PixStrategy::new) with the strategy configuration,
-/// then [`build`](PixStrategy::build) to wire in a node and obtain a
+/// Call [`new`](NonAnonymousPixStrategy::new) with the strategy configuration,
+/// then [`build`](NonAnonymousPixStrategy::build) to wire in a node and obtain a
 /// runnable `Box<dyn StrategyTrait + Send>`.
-pub struct PixStrategy {
-    cfg: PixStrategyConfig,
+pub struct NonAnonymousPixStrategy {
+    cfg: NonAnonymousPixStrategyConfig,
     interval: Duration,
 }
 
-impl PixStrategy {
+impl NonAnonymousPixStrategy {
     /// Create a new builder with the given configuration.
-    pub fn new(cfg: PixStrategyConfig, interval: Duration) -> Self {
+    pub fn new(cfg: NonAnonymousPixStrategyConfig, interval: Duration) -> Self {
         Self { cfg, interval }
     }
 
@@ -38,7 +51,7 @@ impl PixStrategy {
     where
         N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
     {
-        Box::new(PixStrategyInner {
+        Box::new(NonAnonymousPixStrategyInner {
             cfg: self.cfg,
             interval: self.interval,
             node,
@@ -46,14 +59,14 @@ impl PixStrategy {
     }
 }
 
-/// Private generic runner — constructed by [`PixStrategy::build`].
-struct PixStrategyInner<N: HasChainApi> {
+/// Private generic runner — constructed by [`NonAnonymousPixStrategy::build`].
+struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     node: Arc<N>,
-    cfg: PixStrategyConfig,
+    cfg: NonAnonymousPixStrategyConfig,
     interval: Duration,
 }
 
-impl<N> PixStrategyInner<N>
+impl<N> NonAnonymousPixStrategyInner<N>
 where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
@@ -68,6 +81,8 @@ where
         tracing::debug!(?event, "PixStrategy event");
         match event {
             PixEvent::NewDepositAddress((pseudonym, ssa_index), address) => {
+                tracing::info!(%address, %pseudonym, ssa_index, "new deposit address");
+                self.node.chain_api().withdraw()
 
             },
             PixEvent::DepositAddressReceived((pseudonym, ssa_index), address, maybe_notifier) => {
@@ -82,20 +97,20 @@ where
     }
 }
 
-impl<N: HasChainApi> Debug for PixStrategyInner<N> {
+impl<N: HasChainApi> Debug for NonAnonymousPixStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PixStrategy({:?})", self.cfg)
+        write!(f, "NonAnonymousPixStrategy({:?})", self.cfg)
     }
 }
 
-impl<N: HasChainApi> Display for PixStrategyInner<N> {
+impl<N: HasChainApi> Display for NonAnonymousPixStrategyInner<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "pix")
+        write!(f, "non_anonymous_pix")
     }
 }
 
 #[async_trait::async_trait]
-impl<N: HasChainApi> StrategyTrait for PixStrategyInner<N>
+impl<N: HasChainApi> StrategyTrait for NonAnonymousPixStrategyInner<N>
 where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
