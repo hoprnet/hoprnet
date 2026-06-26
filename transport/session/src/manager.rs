@@ -130,10 +130,6 @@ const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 3;
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-/// How many packets can be buffered if the HoprSession socket is not fast enough.
-#[allow(dead_code)]
-pub const SESSION_FORWARD_CAPACITY: usize = 10000;
-
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
@@ -425,7 +421,7 @@ pub struct SessionManagerConfig {
     ///
     /// Controls the capacity of the internal `crossfire` channel used for each session slot.
     ///
-    /// Default is 10_000.
+    /// Default is 10 000.
     #[default(10000)]
     pub session_forward_capacity: usize,
 
@@ -2398,6 +2394,8 @@ mod tests {
         }
         mgr.active_sessions().is_empty()
     }
+
+    const SESSION_FORWARD_CAPACITY: usize = 10000;
 
     #[test_log::test(tokio::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>

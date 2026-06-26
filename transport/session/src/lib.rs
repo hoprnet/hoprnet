@@ -19,8 +19,6 @@ pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SA
 use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use hopr_utils::network_types::types::*;
-#[cfg(feature = "benchmark")]
-pub use manager::SESSION_FORWARD_CAPACITY;
 pub use manager::{
     DispatchResult, IncomingSessionPixConfig, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
     SessionManagerConfig,
