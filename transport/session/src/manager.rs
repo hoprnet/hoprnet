@@ -1526,7 +1526,7 @@ where
                 // The PIX shares can come from different polynomials, so we can only
                 // see the total number of unverifiable shares and make the Session closure
                 // decision based on that.
-                if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(&session_id) {
+                if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(session_id) {
                     error!(%session_id, "closed session due to too many unverifiable shares");
                 }
             }
@@ -3565,7 +3565,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Spawn new_session so it is blocked waiting for the session establishment response.
@@ -3717,7 +3717,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Fill the cache with two incoming sessions (Exits).
@@ -3728,7 +3728,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE + i as u64,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3778,7 +3778,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(tx, new_session_tx)?;
+        mgr.start(tx, new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Verify that sending fails because the receiver is gone.
@@ -3831,12 +3831,12 @@ mod tests {
 
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
         assert!(alice_mgr.is_started());
 
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
         assert!(bob_mgr.is_started());
 
         // Record how many entries are in `session_initiations` before the call.
@@ -3975,7 +3975,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
@@ -4070,7 +4070,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
