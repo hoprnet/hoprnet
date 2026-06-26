@@ -2142,6 +2142,7 @@ dependencies = [
  "futures-core",
  "parking_lot",
  "smallvec",
+ "tokio",
 ]
 
 [[package]]
@@ -4025,11 +4026,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.22.1"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "criterion",
+ "crossfire",
  "flagset",
  "futures",
  "futures-time",
