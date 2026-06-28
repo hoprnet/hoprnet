@@ -212,12 +212,12 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more data");
             }
             CommitmentResult::SsaCommitmentDone(full_ssa_commitment) => {
-                res.is_deposit_address_fresh_known = true;
+                res.deposit_address_first_encountered = true;
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
             }
             CommitmentResult::StillIncomplete(full_ssa_commitment) => {
-                res.is_deposit_address_fresh_known = res.ssa_deposit_address.is_none();
+                res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
             }
@@ -233,7 +233,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     );
                 }
 
-                res.is_deposit_address_fresh_known = res.ssa_deposit_address.is_none();
+                res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
                 res.is_verifiable = true;

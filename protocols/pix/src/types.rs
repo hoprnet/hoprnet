@@ -499,7 +499,7 @@ pub struct SsaCommitmentState<P, A> {
     /// Whether this SSA was encountered for the first time.
     pub is_first_encountered: bool,
     /// Whether the SSA deposit address has been discovered.
-    pub is_deposit_address_fresh_known: bool,
+    pub deposit_address_first_encountered: bool,
 }
 
 impl<P, A> SsaCommitmentState<P, A> {
@@ -512,7 +512,7 @@ impl<P, A> SsaCommitmentState<P, A> {
             ssa_deposit_address: None,
             is_verifiable: false,
             is_first_encountered: true,
-            is_deposit_address_fresh_known: false,
+            deposit_address_first_encountered: false,
         }
     }
 }

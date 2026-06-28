@@ -1710,18 +1710,7 @@ where
                 reason,
             });
 
-            msg_sender
-                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!("timeout sending session error message");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(%error, "failed to send session error message");
-                    SessionManagerError::other(error)
-                })?;
+            send_via_msg_sender(&mut msg_sender, reply_routing, data, "session error message").await?;
 
             trace!(%pseudonym, "session establishment failure message sent");
 
@@ -1770,7 +1759,12 @@ where
                 challenge: session_req.challenge,
                 reason,
             });
+
             send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+
             return Ok(());
         };
 
@@ -2135,25 +2129,30 @@ where
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
         // Insert the newly received coefficients into the SSA Reconstructor
-        // TODO: confirm that spawn blocking is needed via benchmarks
         let pix_toolbox_clone = pix_toolbox.clone();
-        let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(move || {
-            pix_toolbox_clone
-                .share_processor
-                .insert_coefficient_commitments(
-                    ssa_id,
-                    msg.coefficient_index,
-                    msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
-                )
-                .map_err(SessionManagerError::PixError)
-            }, "ssa commitment reconstructor"
+        let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(
+            move || {
+                pix_toolbox_clone
+                    .share_processor
+                    .insert_coefficient_commitments(
+                        ssa_id,
+                        msg.coefficient_index,
+                        msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
+                    )
+                    .map_err(SessionManagerError::PixError)
+            },
+            "ssa commitment reconstructor",
         )
-            .await
-            .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("failed to insert SSA coefficients into the SSA reconstructor")))??;
+        .await
+        .map_err(|_| {
+            SessionManagerError::Other(anyhow::anyhow!(
+                "failed to insert SSA coefficients into the SSA reconstructor"
+            ))
+        })??;
 
         let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
 
-        if ssa_client_commitment_state.is_deposit_address_fresh_known
+        if ssa_client_commitment_state.deposit_address_first_encountered
             && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
         {
             let slot_clone = session_slot.clone();

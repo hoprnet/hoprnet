@@ -115,6 +115,8 @@ where
     /// Returns `None` if the conversion is not possible.
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress>;
     /// Convert `PixScalar` to a private key of a deposit address.
+    ///
+    /// Returns `None` if the conversion is not possible.
     fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey>;
 }
 

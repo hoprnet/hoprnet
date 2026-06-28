@@ -31,7 +31,10 @@ use hopr_protocol_app::{
     v1::{ApplicationData, ApplicationDataIn, ReservedTag, Tag},
 };
 use hopr_protocol_start::{StartChallenge, StartInitiation, StartProtocol};
-use hopr_transport_session::{HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig, SessionTarget};
+use hopr_transport_session::{
+    HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig,
+    SessionTarget,
+};
 use hopr_utils::network_types::prelude::SealedHost;
 
 // Avoid musl's default allocator due to degraded performance.

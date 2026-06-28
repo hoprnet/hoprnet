@@ -134,8 +134,8 @@ more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num-traits = "0.2.19"
 oas3 = "0.22.0"
-opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
-opentelemetry_sdk = { version = "0.31.0" }
+opentelemetry-prometheus-text-exporter = { version = "0.3.0" }
+opentelemetry_sdk = { version = "0.32.1" }
 temp-env = "0.3.6"
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
@@ -194,8 +194,10 @@ mimalloc = { version = "0.1.52", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/update-pix-events"} # TODO: use at least 1.13.0
-hopr-types = {git = "https://github.com/hoprnet/hopr-types", branch = "lukas/reexport-typenum", features = ["use-bindings"] } # TODO: use at least 1.9.3
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-pix-conversions" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "main", features = [
+  "use-bindings",
+] }
 hopr-utils = { version = "0.1.0", path = "utils", default-features = false }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [

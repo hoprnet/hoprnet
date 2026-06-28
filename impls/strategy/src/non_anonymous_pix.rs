@@ -18,14 +18,18 @@ use std::{
 };
 
 use futures::StreamExt;
-use hopr_api::chain::{ChainReadChannelOperations, ChainWriteAccountOperations};
-use hopr_api::node::{ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, DepositUpdated, HasChainApi, PixAddressId, PixEvent};
+use hopr_api::{
+    chain::{ChainReadChannelOperations, ChainWriteAccountOperations},
+    node::{
+        ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, DepositUpdated, HasChainApi, PixAddressId,
+        PixEvent,
+    },
+    types::primitive::prelude::*,
+};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
-use hopr_api::types::primitive::prelude::*;
 
-use crate::errors::StrategyError;
-use crate::strategy::Strategy as StrategyTrait;
+use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Validate)]
 pub struct NonAnonymousPixStrategyConfig {}
@@ -83,14 +87,9 @@ where
             PixEvent::NewDepositAddress((pseudonym, ssa_index), address) => {
                 tracing::info!(%address, %pseudonym, ssa_index, "new deposit address");
                 self.node.chain_api().withdraw()
-
-            },
-            PixEvent::DepositAddressReceived((pseudonym, ssa_index), address, maybe_notifier) => {
-
-            },
-            PixEvent::PrivateKeyRecovered((pseudonym, ssa_index), recovered_key) => {
-
-            },
+            }
+            PixEvent::DepositAddressReceived((pseudonym, ssa_index), address, maybe_notifier) => {}
+            PixEvent::PrivateKeyRecovered((pseudonym, ssa_index), recovered_key) => {}
         }
 
         Ok(())
@@ -130,9 +129,7 @@ where
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
         let event_stream = self
             .node
-            .subscribe_to_actionable_events(Some(&[
-                ActionableEventDiscriminant::Pix,
-            ]))
+            .subscribe_to_actionable_events(Some(&[ActionableEventDiscriminant::Pix]))
             .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
             .filter_map(|event| futures::future::ready(event.try_as_pix().map(Event::Pix)));
 
@@ -159,4 +156,3 @@ where
         Ok(())
     }
 }
-

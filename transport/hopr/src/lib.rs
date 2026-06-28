@@ -108,7 +108,10 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
-    node::PixEvent,
+    node::{
+        PixDepositAddress, PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress,
+        PixPrivateKeyRecovered,
+    },
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
@@ -242,6 +245,13 @@ impl HoprSessionConfigurator {
             None => false,
         }
     }
+}
+
+// TODO: move these into hopr-api or into hopr-types
+fn address_to_pix_address(address: Address) -> PixDepositAddress {
+    let mut data = [0u8; 32];
+    data[0..Address::SIZE].copy_from_slice(address.as_ref());
+    PixDepositAddress(data)
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
@@ -760,7 +770,11 @@ where
                                 deposit_address,
                                 quota_per_ssa,
                             }) =>
-                                PixEvent::NewDepositAddress((*ssa_id.pseudonym(), ssa_id.ssa_index()), deposit_address),
+                                PixEvent::NewDepositAddress(PixNewDepositAddress {
+                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                    address: address_to_pix_address(deposit_address),
+                                    quota: quota_per_ssa,
+                                }),
                             HoprSessionOutPixEvent::DepositNeeded(
                                 AgreedSsaQuota {
                                     ssa_id,
@@ -768,11 +782,12 @@ where
                                     quota_per_ssa,
                                 },
                                 notifier,
-                            ) => PixEvent::DepositAddressReceived(
-                                (*ssa_id.pseudonym(), ssa_id.ssa_index()),
-                                deposit_address,
-                                Some(notifier)
-                            ),
+                            ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
+                                id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                address: address_to_pix_address(deposit_address),
+                                quota: quota_per_ssa,
+                                deposit_updated: Some(notifier),
+                            }),
                         })
                         .merge(
                             ssa_share_resolution_events_rx
@@ -784,13 +799,10 @@ where
                                                 if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id)).await {
                                                     tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
                                                 }
-                                                Some(PixEvent::PrivateKeyRecovered(
-                                                    (
-                                                        *ssa_recovery_event.ssa_id.pseudonym(),
-                                                        ssa_recovery_event.ssa_id.ssa_index(),
-                                                    ),
-                                                    ssa_recovery_event.ssa,
-                                                ))
+                                                Some(PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
+                                                    id: (*ssa_recovery_event.ssa_id.pseudonym(), ssa_recovery_event.ssa_id.ssa_index()),
+                                                    secret: PixDepositSecret(ssa_recovery_event.ssa.secret().clone())
+                                                }))
                                             }
                                             ShareResolution::InvalidShare(peer, ssa_id) => {
                                                 error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
