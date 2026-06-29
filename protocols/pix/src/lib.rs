@@ -1,32 +1,33 @@
 use std::ops::Add;
 
+use elliptic_curve::{
+    Curve, CurveArithmetic, Field, PrimeCurve, PrimeField,
+    consts::U256,
+    generic_array::{
+        ArrayLength,
+        typenum::{IsLess, IsLessOrEqual},
+    },
+    group::cofactor::CofactorGroup,
+    hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
+    ops::MulByGenerator,
+};
 use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
-use vsss_rs::{
-    DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
-    elliptic_curve::{
-        Curve, CurveArithmetic, PrimeCurve, PrimeField,
-        consts::U256,
-        generic_array::{
-            ArrayLength,
-            typenum::{IsLess, IsLessOrEqual},
-        },
-        group::cofactor::CofactorGroup,
-        hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
-    },
-};
 
 pub mod ack_verify;
-pub mod errors;
+pub mod combine;
+mod errors;
 mod generator;
 mod reconstructor;
 mod traits;
 mod types;
 
+pub use combine::{CombineError, RawPolynomial, ReadableShareSet, Share};
+pub use elliptic_curve::{Group, group::GroupEncoding};
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
@@ -35,7 +36,6 @@ pub use types::{
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
 };
-pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
 
 #[doc(hidden)]
 pub mod prelude {
@@ -129,20 +129,102 @@ pub type PixGroupRepr<S> = <PixGroup<S> as GroupEncoding>::Repr; // This interna
 /// Digest used for hashing operations.
 pub type PixDigest<S> = <S as PixSpec>::Digest;
 
-pub(crate) type CompletedShare<S> =
-    DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
+/// A completed share with identifier and value.
+pub(crate) type CompletedShare<S> = Share<PixScalar<S>>;
+
+/// Wrapper for group elements that provides arithmetic operations.
+///
+/// This is a compatibility wrapper that mirrors the functionality of
+/// ShareVerifierGroup from vsss-rs, implemented directly using elliptic-curve types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ShareVerifierGroup<G>(pub G);
+
+impl<G> ShareVerifierGroup<G> {
+    /// Creates a new ShareVerifierGroup from a group element.
+    pub fn from(group: G) -> Self {
+        Self(group)
+    }
+
+    /// Returns true if the group element is the identity.
+    pub fn is_zero(&self) -> bool
+    where
+        G: Group,
+    {
+        bool::from(self.0.is_identity())
+    }
+
+    /// Converts the group element to its byte representation.
+    pub fn to_bytes(&self) -> <G as GroupEncoding>::Repr
+    where
+        G: GroupEncoding,
+    {
+        self.0.to_bytes()
+    }
+}
+
+impl<G> Default for ShareVerifierGroup<G>
+where
+    G: Default,
+{
+    fn default() -> Self {
+        Self(G::default())
+    }
+}
+
+impl<G> From<G> for ShareVerifierGroup<G> {
+    fn from(group: G) -> Self {
+        Self(group)
+    }
+}
+
+impl<G> ShareVerifierGroup<G>
+where
+    G: MulByGenerator,
+{
+    /// Creates a ShareVerifierGroup with the generator element.
+    pub fn generator() -> Self {
+        Self(G::generator())
+    }
+}
+
+impl<G> std::ops::Add<G> for ShareVerifierGroup<G>
+where
+    G: Group,
+{
+    type Output = Self;
+    fn add(self, rhs: G) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl<G> std::ops::Sub<G> for ShareVerifierGroup<G>
+where
+    G: Group,
+{
+    type Output = Self;
+    fn sub(self, rhs: G) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl<G> std::ops::Mul<&G::Scalar> for ShareVerifierGroup<G>
+where
+    G: Group,
+{
+    type Output = Self;
+    fn mul(self, rhs: &G::Scalar) -> Self::Output {
+        Self(self.0 * rhs)
+    }
+}
 
 #[inline]
 pub(crate) fn into_completed_share<S: PixSpec>(
     identifier: PixScalar<S>,
     share: &PartialSsaShare<S>,
 ) -> errors::Result<CompletedShare<S>, S::Pseudonym> {
-    Ok(DefaultShare {
-        identifier: identifier.into(),
-        value: Option::from(PixScalar::<S>::from_repr(share.0.clone()))
-            .map(|s: PixScalar<S>| s.into())
-            .ok_or(vsss_rs::Error::InvalidShare)?,
-    })
+    let value =
+        Option::from(PixScalar::<S>::from_repr(share.0.clone())).ok_or(errors::PixError::InvalidShareNoContext)?;
+    Share::new(identifier, value).ok_or(errors::PixError::InvalidShareNoContext)
 }
 
 /// Verifier for shares of a polynomial with the given [`SsaPolynomialId`].
@@ -224,14 +306,14 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
     }
 
     pub(crate) fn verify_completed_share(&self, share: &CompletedShare<S>) -> errors::Result<(), S::Pseudonym> {
-        if (share.value().is_zero() | share.identifier().is_zero()).into() {
-            return Err(vsss_rs::Error::InvalidShare.into());
+        if bool::from(share.value().is_zero()) || bool::from(share.identifier().is_zero()) {
+            return Err(errors::PixError::InvalidShareNoContext);
         }
-        if self.poly_commitment[0].is_zero().into() {
-            return Err(vsss_rs::Error::InvalidGenerator("generator is identity").into());
+        if self.poly_commitment[0].is_zero() {
+            return Err(errors::PixError::InvalidGenerator);
         }
 
-        let mut i = IdentifierPrimeField::<PixScalar<S>>::one();
+        let mut power = PixScalar::<S>::ONE;
         let mut scalars = Vec::with_capacity(self.poly_commitment.len() - 2);
 
         // The below multi-scalar multiplication method (MSM) is more efficient
@@ -239,8 +321,8 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 
         // Computes x^1, x^2, x^3, ... x^t
         for _ in 0..self.poly_commitment.len() - 2 {
-            *i.as_mut() *= share.identifier().as_ref();
-            scalars.push(i);
+            power *= share.identifier();
+            scalars.push(power);
         }
 
         #[cfg(feature = "rayon")]
@@ -250,21 +332,20 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         let scalars_iter = scalars.into_iter();
 
         // v[1] + v[2]*x + v[3]*x^2 + ... + v[t]*x^t
-        let rhs = self.poly_commitment[1].0
+        let rhs: PixGroup<S> = self.poly_commitment[1].0
             + scalars_iter
                 .enumerate()
-                .map(|(i, c)| (self.poly_commitment[i + 2] * c).0)
+                .map(|(idx, c)| (self.poly_commitment[idx + 2] * &c).0)
                 .sum::<PixGroup<S>>();
 
-        let rhs = ValueGroup::from(rhs);
-        let lhs = self.poly_commitment[0] * share.value();
+        let lhs = self.poly_commitment[0].0 * share.value();
 
         let res = rhs - lhs;
 
-        if res.is_zero().into() {
+        if bool::from(res.is_identity()) {
             Ok(())
         } else {
-            Err(vsss_rs::Error::InvalidShare.into())
+            Err(errors::PixError::InvalidShareNoContext)
         }
     }
 
@@ -279,17 +360,10 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 #[cfg(test)]
 pub(crate) mod tests {
     use anyhow::Context;
+    use elliptic_curve::rand_core::OsRng;
     use hopr_types::{
         crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
         primitive::prelude::Address,
-    };
-    use vsss_rs::{
-        ParticipantIdGeneratorType,
-        elliptic_curve::{
-            Field,
-            rand_core::{CryptoRng, RngCore},
-        },
-        feldman,
     };
 
     use super::*;
@@ -316,62 +390,53 @@ pub(crate) mod tests {
         }
     }
 
-    type Share<S> = DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>;
-    type StandardShamirResult<S> = (Vec<Share<S>>, Vec<ShareVerifierGroup<PixGroup<S>>>);
-
-    fn standard_shamir_generate<S: PixSpec>(
-        secret: PixScalar<S>,
-        t: usize,
-        x: &[PixScalar<S>],
-        mut rng: impl RngCore + CryptoRng,
-    ) -> anyhow::Result<StandardShamirResult<S>> {
-        anyhow::ensure!(t > 0, "t must be greater than 0");
-        anyhow::ensure!(x.len() >= t, "x must have at least t elements");
-
-        let (shares, verifier_set) =
-            feldman::split_secret_with_participant_generator::<Share<S>, ShareVerifierGroup<PixGroup<S>>>(
-                t,
-                x.len(),
-                &secret.into(),
-                None,
-                &mut rng,
-                &[ParticipantIdGeneratorType::list(
-                    &x.iter().map(|x| (*x).into()).collect::<Vec<_>>(),
-                )],
-            )
-            .map_err(anyhow::Error::msg)?;
-
-        Ok((shares, verifier_set))
-    }
-
     #[test]
     fn ssa_share_verifier_must_correspond_to_standard() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+        use vsss_rs::{
+            DefaultShare, IdentifierPrimeField, ParticipantIdGeneratorType, Share, ValueGroup, ValuePrimeField, feldman,
+        };
+
+        let mut rng = OsRng;
         let secret = k256::Scalar::random(&mut rng);
+        let t = 10;
 
         let spi = SsaPolynomialId::new(
             SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
             1,
         );
-        let x = (0..=20_u32)
+        let x: Vec<k256::Scalar> = (0..=20u32)
             .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
-            .collect::<Vec<_>>();
+            .collect();
 
-        let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
+        // Generate shares using vsss-rs
+        type VsssShare = DefaultShare<IdentifierPrimeField<k256::Scalar>, ValuePrimeField<k256::Scalar>>;
+        type VsssVerifier = ValueGroup<k256::ProjectivePoint>;
+        let (vsss_shares, vsss_verifier) = feldman::split_secret_with_participant_generator::<VsssShare, VsssVerifier>(
+            t,
+            x.len(),
+            &ValuePrimeField::from(secret),
+            None,
+            &mut rng,
+            &[ParticipantIdGeneratorType::list(
+                &x.iter().map(|x| ValuePrimeField::from(*x)).collect::<Vec<_>>(),
+            )],
+        )
+        .map_err(anyhow::Error::msg)?;
 
-        assert_eq!(verifier.len(), 11);
+        assert_eq!(vsss_verifier.len(), t + 1);
 
+        // Create our verifier from vsss-rs verifier
         let verifier: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
             spi,
-            poly_commitment: verifier,
+            poly_commitment: vsss_verifier.iter().map(|v| ShareVerifierGroup::from(v.0)).collect(),
         };
 
-        assert_eq!(shares.len(), x.len());
-        assert_eq!(verifier.min_shares(), 10);
+        assert_eq!(vsss_shares.len(), x.len());
+        assert_eq!(verifier.min_shares(), t);
         assert_eq!(verifier.poly_commitment.len() - 1, verifier.min_shares());
 
-        for (i, s) in shares.into_iter().enumerate() {
-            let share: PartialSsaShare<TestSpec> = PartialSsaShare(s.value.0.to_repr());
+        for (i, s) in vsss_shares.into_iter().enumerate() {
+            let share: PartialSsaShare<TestSpec> = PartialSsaShare(s.value().to_repr());
             verifier
                 .verify(&share, (i as u32).to_be_bytes())
                 .context(format!("Verification failed for share index {i}"))?;
@@ -382,22 +447,44 @@ pub(crate) mod tests {
 
     #[test]
     fn ssa_share_verifier_must_be_convertible_to_and_from_serializable_commitments() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+        use vsss_rs::{ParticipantIdGeneratorType, ValueGroup, ValuePrimeField, feldman};
+
+        let mut rng = OsRng;
         let secret = k256::Scalar::random(&mut rng);
+        let t = 10;
+        let n = 21;
 
         let spi = SsaPolynomialId::new(
             SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
             1,
         );
-        let x = (0..=20_u32)
-            .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
-            .collect::<Vec<_>>();
 
-        let (_, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
+        // Generate identifiers for the test
+        let identifiers: Vec<k256::Scalar> = (1..=n as u32).map(|i| k256::Scalar::from(i)).collect();
+
+        // Generate verifier using vsss-rs
+        type VsssVerifier = ValueGroup<k256::ProjectivePoint>;
+        let (_, vsss_verifier) = feldman::split_secret_with_participant_generator::<
+            vsss_rs::DefaultShare<vsss_rs::IdentifierPrimeField<k256::Scalar>, vsss_rs::ValuePrimeField<k256::Scalar>>,
+            VsssVerifier,
+        >(
+            t,
+            n,
+            &ValuePrimeField::from(secret),
+            None,
+            &mut rng,
+            &[ParticipantIdGeneratorType::list(
+                &identifiers
+                    .iter()
+                    .map(|x| ValuePrimeField::from(*x))
+                    .collect::<Vec<_>>(),
+            )],
+        )
+        .map_err(anyhow::Error::msg)?;
 
         let verifier_1: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
             spi,
-            poly_commitment: verifier,
+            poly_commitment: vsss_verifier.iter().map(|v| ShareVerifierGroup::from(v.0)).collect(),
         };
 
         assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, vec![]).is_err());

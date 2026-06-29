@@ -1,11 +1,8 @@
-use vsss_rs::{
-    ReadableShareSet,
-    elliptic_curve::group::{Group, GroupEncoding},
-};
+use elliptic_curve::group::{Group, GroupEncoding};
 
 use crate::{
     CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
-    PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
+    PixSpec, PolynomialIndex, SsaPolynomialId, combine::ReadableShareSet, errors, into_completed_share, types::SsaId,
 };
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.

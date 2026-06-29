@@ -1,39 +1,36 @@
 use std::collections::VecDeque;
 
-#[cfg(feature = "rayon")]
-use hopr_utils::parallelize::cpu::rayon::prelude::*;
-use vsss_rs::{
-    DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
-    elliptic_curve::{
-        Field, Group, PrimeField,
-        group::GroupEncoding,
-        rand_core::{CryptoRng, RngCore},
-    },
+use elliptic_curve::{
+    Field, Group, PrimeField,
+    rand_core::{CryptoRng, OsRng, RngCore},
 };
 
 use crate::{
     CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA,
-    PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, errors,
+    PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, ShareVerifierGroup,
+    combine::RawPolynomial,
+    errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId, TransposedVerifiers},
 };
 
-type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
 type RawPolynomialVerifier<S> = Vec<ShareVerifierGroup<PixGroup<S>>>;
+
+type PolynomialWithVerifier<S> = (RawPolynomial<PixScalar<S>>, RawPolynomialVerifier<S>);
 
 struct IndexedPolynomial<S: PixSpec> {
     spi: SsaPolynomialId<S::Pseudonym>,
-    raw: RawPolynomial<S>,
+    raw: RawPolynomial<PixScalar<S>>,
     shares_generated: usize,
     t: usize,
 }
 
 impl<S: PixSpec> IndexedPolynomial<S> {
     pub fn next_share(&mut self, x: PixScalar<S>) -> PartialSsaShare<S> {
-        let eval = self.raw.evaluate(&x.into(), self.t);
+        let eval = self.raw.evaluate(&x, self.t);
         self.shares_generated += 1;
-        PartialSsaShare(eval.0.to_repr())
+        PartialSsaShare(eval.value().to_repr())
     }
 }
 
@@ -46,30 +43,20 @@ fn new_polynomial_with_verifier<S: PixSpec>(
     secret: PixScalar<S>,
     t: usize,
     rng: impl RngCore + CryptoRng,
-) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>), S::Pseudonym> {
-    let mut polynomial = RawPolynomial::<S>::create(t);
-    polynomial.fill(&secret.into(), rng, t)?;
-
-    #[cfg(not(feature = "rayon"))]
-    use std::iter::once;
-
-    #[cfg(feature = "rayon")]
-    use hopr_utils::parallelize::cpu::rayon::iter::once;
-
-    #[cfg(feature = "rayon")]
-    let coeffs_iter = polynomial[1..].par_iter().map(|c| c.identifier());
-
-    #[cfg(not(feature = "rayon"))]
-    let coeffs_iter = polynomial[1..].iter().map(|c| c.identifier());
+) -> errors::Result<PolynomialWithVerifier<S>, S::Pseudonym> {
+    // Create a polynomial with degree t-1 (t coefficients: secret + t-1 random)
+    // This matches the threshold behavior where t shares are needed for reconstruction
+    let polynomial = RawPolynomial::create_with_threshold(t).fill(&secret, rng, t.saturating_sub(1));
 
     // Compute commitments to the coefficients of the polynomial
-    let g = ShareVerifierGroup::<PixGroup<S>>::one(); // The generator of the group of verifiers
-    let one = IdentifierPrimeField::one();
-    let verifier = once(&one) // The first verifier is the generator
-        .chain(once(polynomial[0].value())) //
-        .chain(coeffs_iter)
-        .map(|c| g * c)
-        .collect();
+    let g = PixGroup::<S>::generator();
+    // Include generator as first entry, followed by coefficient commitments
+    // Total: 1 (generator) + polynomial coefficients (degree + 1)
+    let mut verifier = Vec::with_capacity(1 + polynomial.0.len());
+    verifier.push(ShareVerifierGroup::from(g)); // Generator first
+    for coeff in polynomial.0.iter() {
+        verifier.push(ShareVerifierGroup::from(g * coeff.value()));
+    }
 
     Ok((polynomial, verifier))
 }
@@ -173,28 +160,20 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         pseudonym: &S::Pseudonym,
         ssa_index: SsaIndex,
     ) -> errors::Result<SsaCommitment<S>, S::Pseudonym> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
-
-        // Generate sub-secrets for each polynomial
-        let sub_secrets = (0..self.cfg.polynomials_per_ssa)
-            .map(|_| <PixScalar<S> as Field>::random(&mut rng))
-            .collect::<Vec<_>>();
-
-        // Overall commitment secret is the sum of all sub-secrets
-        let our_commitment_secret = sub_secrets.iter().sum::<PixScalar<S>>();
-
-        #[cfg(not(feature = "rayon"))]
-        let sub_secrets_iter = sub_secrets.into_iter();
-
-        #[cfg(feature = "rayon")]
-        let sub_secrets_iter = sub_secrets.into_par_iter();
+        let mut rng = OsRng;
 
         // Generate polynomial and verifier for each sub-secret
-        let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
-            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, rng))
-            .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>, S::Pseudonym>>()?
-            .into_iter()
-            .unzip();
+        let mut raw_polynomials = Vec::with_capacity(self.cfg.polynomials_per_ssa);
+        let mut raw_verifiers = Vec::with_capacity(self.cfg.polynomials_per_ssa);
+        let mut our_commitment_secret = PixScalar::<S>::ZERO;
+
+        for _ in 0..self.cfg.polynomials_per_ssa {
+            let secret = <PixScalar<S> as Field>::random(&mut rng);
+            our_commitment_secret += secret;
+            let (poly, verifier) = new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, &mut rng)?;
+            raw_polynomials.push(poly);
+            raw_verifiers.push(verifier);
+        }
 
         let mut verifiers: Vec<PartialSsaShareVerifier<S>> = Vec::with_capacity(raw_verifiers.len());
 
@@ -299,7 +278,7 @@ pub(crate) fn transpose_commitments<S: PixSpec>(
                 transposed
                     .entry(coeff_id as CoefficientIndex)
                     .or_default()
-                    .push((spi.poly_index(), coeff.0.to_bytes()));
+                    .push((spi.poly_index(), coeff.to_bytes()));
             });
     });
     transposed
@@ -307,11 +286,16 @@ pub(crate) fn transpose_commitments<S: PixSpec>(
 
 #[cfg(test)]
 mod tests {
+    use elliptic_curve::rand_core::OsRng;
     use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
-    use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
+    use vsss_rs::{
+        DefaultShare, IdentifierPrimeField, ParticipantIdGeneratorType, ReadableShareSet, Share, ShareVerifierGroup,
+        ValuePrimeField, feldman,
+    };
 
     use super::*;
-    use crate::{tests::TestSpec, traits::EntryShareGenerator};
+    use crate::combine::Share as OurShare;
+    use crate::{combine::ReadableShareSet as OurReadableShareSet, tests::TestSpec, traits::EntryShareGenerator};
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
@@ -428,10 +412,9 @@ mod tests {
         let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
         let orig_commitment = c.ssa_commitment;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
-        let vs = verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
         let mut recovered_secret = k256::Scalar::default();
-        for v in vs.iter().take(cfg.polynomials_per_ssa) {
+        for v in verifiers.iter().take(cfg.polynomials_per_ssa) {
             let mut shares = Vec::new();
             for _ in 0..(cfg.threshold + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
@@ -439,22 +422,132 @@ mod tests {
                 let g = generator
                     .next_share(&p, &x)?
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
-                let complete_share = DefaultShare {
-                    identifier: TestSpec::msg_to_scalar(&g.id, x)?.into(),
-                    value: k256::Scalar::from_repr(g.share.0).unwrap().into(),
-                };
+                let identifier = TestSpec::msg_to_scalar(&g.id, x)?;
+                let value = k256::Scalar::from_repr(g.share.0).unwrap();
+                let complete_share =
+                    OurShare::new(identifier, value).ok_or_else(|| anyhow::anyhow!("invalid share"))?;
 
-                v.verify_share(&complete_share)
+                // Verify using our verifier
+                v.verify_completed_share(&complete_share)
                     .map_err(|_| anyhow::anyhow!("invalid share"))?;
                 shares.push(complete_share);
             }
-            recovered_secret += shares.combine().map_err(anyhow::Error::msg)?.0;
+            // Use our combine function
+            recovered_secret += OurReadableShareSet::combine(&shares)?.0;
         }
 
         assert_eq!(
             orig_commitment.to_affine(),
             (k256::ProjectivePoint::GENERATOR * recovered_secret).to_affine()
         );
+
+        Ok(())
+    }
+
+    /// Test that verifies our polynomial implementation generates valid evaluations
+    /// and correctly reconstructs the secret using Lagrange interpolation.
+    #[test]
+    fn polynomial_generation_and_reconstruction_works() -> anyhow::Result<()> {
+        use crate::combine::ReadableShareSet;
+
+        let mut rng = OsRng;
+        let secret = k256::Scalar::random(&mut rng);
+        let t = 5;
+
+        // Generate polynomial using our implementation
+        // create_with_threshold(t) creates capacity for t coefficients (degree t-1)
+        // fill(t-1) pushes 1 (secret) + (t-1) random = t coefficients
+        let our_poly = RawPolynomial::create_with_threshold(t).fill(&secret, &mut rng, t - 1);
+
+        // Generate shares at 5 points
+        let x_values = vec![
+            k256::Scalar::from(1u32),
+            k256::Scalar::from(2u32),
+            k256::Scalar::from(3u32),
+            k256::Scalar::from(4u32),
+            k256::Scalar::from(5u32),
+        ];
+
+        // Create shares using our polynomial evaluation
+        let our_shares: Vec<OurShare> = x_values
+            .iter()
+            .map(|x| {
+                let share = our_poly.evaluate(x, t);
+                OurShare::new(*x, *share.value()).unwrap()
+            })
+            .collect();
+
+        // Verify we have the correct number of coefficients
+        assert_eq!(our_poly.len(), t);
+        assert_eq!(our_poly.0[0].value, secret);
+
+        // Reconstruct the secret using Lagrange interpolation at x=0
+        let reconstructed: Vec<OurShare> = our_shares.clone();
+        let recovered_secret = <Vec<OurShare> as ReadableShareSet<k256::Scalar>>::combine(&reconstructed)?.0;
+
+        // Verify reconstruction matches original secret
+        assert_eq!(recovered_secret, secret);
+
+        // Verify that combining any t shares reconstructs the secret
+        for i in 0..(our_shares.len() - t + 1) {
+            let subset: Vec<OurShare> = our_shares[i..i + t].to_vec();
+            let subset_recovered = <Vec<OurShare> as ReadableShareSet<k256::Scalar>>::combine(&subset)?.0;
+            assert_eq!(
+                subset_recovered, secret,
+                "Reconstruction failed with subset starting at index {}",
+                i
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Test that our combine matches vsss-rs combine
+    #[test]
+    fn combine_matches_vsss_rs() -> anyhow::Result<()> {
+        let mut rng = OsRng;
+        let secret = k256::Scalar::random(&mut rng);
+        let t = 3;
+
+        // Define share and verifier types
+        type VsssShare = DefaultShare<IdentifierPrimeField<k256::Scalar>, ValuePrimeField<k256::Scalar>>;
+        type VsssVerifier = ShareVerifierGroup<k256::ProjectivePoint>;
+
+        // Generate shares using vsss-rs
+        let (vsss_shares, _verifier) = feldman::split_secret_with_participant_generator::<VsssShare, VsssVerifier>(
+            t,
+            5,
+            &ValuePrimeField::from(secret),
+            None,
+            &mut rng,
+            &[ParticipantIdGeneratorType::list(&[
+                k256::Scalar::from(1u32).into(),
+                k256::Scalar::from(2u32).into(),
+                k256::Scalar::from(3u32).into(),
+                k256::Scalar::from(4u32).into(),
+                k256::Scalar::from(5u32).into(),
+            ])],
+        )
+        .map_err(anyhow::Error::msg)?;
+
+        // Convert to our share type
+        let our_shares: Vec<OurShare> = vsss_shares
+            .iter()
+            .map(|s| {
+                let id_scalar = s.identifier().0;
+                let val_scalar = s.value().0;
+                OurShare::new(id_scalar, val_scalar).unwrap()
+            })
+            .collect();
+
+        // Combine using our implementation
+        let our_result = OurReadableShareSet::combine(&our_shares)?;
+
+        // Combine using vsss-rs
+        let vsss_result = vsss_shares.combine().map_err(anyhow::Error::msg)?;
+
+        // Both should give the same secret
+        assert_eq!(our_result.0, vsss_result.0);
 
         Ok(())
     }

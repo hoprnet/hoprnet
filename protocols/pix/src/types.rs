@@ -4,6 +4,13 @@ use std::{
     ops::Add,
 };
 
+use elliptic_curve::{
+    Curve, PrimeField,
+    generic_array::{
+        ArrayLength, GenericArray,
+        typenum::{Sum, U, Unsigned},
+    },
+};
 use hopr_types::{
     crypto::{
         crypto_traits::{self, KeyIvInit, StreamCipher},
@@ -11,13 +18,6 @@ use hopr_types::{
         primitives::Blake3,
     },
     primitive::prelude::{BytesRepresentable, GeneralError},
-};
-use vsss_rs::elliptic_curve::{
-    Curve, PrimeField,
-    generic_array::{
-        ArrayLength, GenericArray,
-        typenum::{Sum, U, Unsigned},
-    },
 };
 
 use crate::{PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors, errors::PixError};
@@ -544,8 +544,8 @@ impl<P: std::hash::Hash, A> std::hash::Hash for RecoveredSsa<P, A> {
 
 #[cfg(test)]
 mod tests {
+    use elliptic_curve::{Field, rand_core::OsRng};
     use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
-    use vsss_rs::elliptic_curve::Field;
 
     use super::*;
     use crate::tests::TestSpec;
@@ -609,7 +609,7 @@ mod tests {
     fn ssa_part_shares_should_encrypt_and_decrypt() -> anyhow::Result<()> {
         let key = HalfKey::random();
         let spi = SsaPolynomialId::<SimplePseudonym>::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
-        let scalar = PixScalar::<TestSpec>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+        let scalar = PixScalar::<TestSpec>::random(OsRng);
 
         let share_1 = PartialSsaShare::<TestSpec>(scalar.to_repr());
         let share_2 = share_1.clone().encrypt(&spi, &key)?.decrypt(spi.pseudonym(), &key)?;

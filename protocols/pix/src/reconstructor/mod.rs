@@ -1,17 +1,17 @@
 mod utils;
 
 use ahash::HashSetExt;
+use elliptic_curve::{Field, ops::MulByGenerator};
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
-use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
 
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr,
     PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+    TaggedEncryptedPartialSsaShare, combine::CombineError, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -124,10 +124,19 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
                 return Ok(None);
             }
-            Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
-                // We need to treat this error differently, because it is critical
-                // and may be differently handled by the upper-layer components
+            Err(PixError::InvalidShare(..)) => {
+                // Share verification failed - treat as invalid share error
                 tracing::error!(%spi, "share verification failed");
+                return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
+            }
+            Err(PixError::CombineError(CombineError::TooFewShares)) => {
+                // Not enough shares yet
+                tracing::trace!(%spi, "not enough shares to reconstruct");
+                return Ok(None);
+            }
+            Err(PixError::CombineError(_)) => {
+                // Other combine errors are treated as invalid shares
+                tracing::error!(%spi, "share combination failed");
                 return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
             }
             Err(e) => return Err(e),
@@ -167,7 +176,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::InvalidInput);
         }
 
-        let exit_commitment_secret = PixScalar::<S>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+        let exit_commitment_secret = PixScalar::<S>::random(elliptic_curve::rand_core::OsRng);
         let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
 
         self.commitment_builder
@@ -306,6 +315,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 mod tests {
     use std::collections::HashMap;
 
+    use elliptic_curve::rand_core::OsRng;
     use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
     use k256::elliptic_curve::Field;
 
@@ -395,7 +405,7 @@ mod tests {
         let partial_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
 
         let peer = OffchainKeypair::random();
-        let nonce = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
+        let nonce = k256::Scalar::random(&mut OsRng);
 
         reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD)?;
 

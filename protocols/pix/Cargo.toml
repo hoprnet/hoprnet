@@ -14,7 +14,6 @@ serde = [
   "dep:elliptic-curve-tools",
   "dep:serde",
   "dep:serde_bytes",
-  "vsss-rs/serde",
   "hopr-types/serde",
 ]
 
@@ -22,19 +21,18 @@ serde = [
 ahash = { workspace = true }
 auto_impl = { workspace = true }
 elliptic-curve-tools = { workspace = true, optional = true }
+elliptic-curve = { workspace = true }
 const-hex = { workspace = true }
+k256 = { workspace = true, features = ["arithmetic", "hash2curve"] }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
+subtle = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
-vsss-rs = { workspace = true, features = [
-  "alloc",
-  "std",
-], default-features = false }
 
 hopr-utils = { workspace = true }
 hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
@@ -42,8 +40,10 @@ hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 criterion = { workspace = true }
+elliptic-curve-tools = { workspace = true, features = ["serde", "hex"] }
 k256 = { workspace = true }
 rand = { workspace = true }
+vsss-rs = { workspace = true, features = ["serde", "alloc"], default-features = false }
 
 [[bench]]
 name = "ssa_generator_bench"
