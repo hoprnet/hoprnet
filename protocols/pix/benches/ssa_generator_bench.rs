@@ -55,10 +55,8 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
                 &(t, p),
                 |b, _| {
-                    let mut index = SsaIndex::MIN;
                     b.iter(|| {
-                        generator.new_ssa_commitment(&pseudonym, index).unwrap();
-                        index = index.checked_add(1).unwrap();
+                        generator.new_ssa_commitment(&pseudonym).unwrap();
                     });
                 },
             );
@@ -75,15 +73,13 @@ fn bench_verify(c: &mut Criterion) {
     let pseudonym = SimplePseudonym::random();
     let x = hopr_types::crypto_random::random_bytes::<10>();
 
-    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         let cfg = SsaGeneratorConfig {
             threshold: t,
             ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-        let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
-        index = index.checked_add(1).unwrap();
+        let c = generator.new_ssa_commitment(&pseudonym).unwrap();
 
         let GeneratedShare { share, .. } = generator.next_share(&pseudonym, &x).unwrap().unwrap();
 
@@ -107,7 +103,6 @@ fn bench_next_share(c: &mut Criterion) {
     let polynomials_per_ssa = [2048]; // Benchmark does not depend on polynomials_per_ssa
     let pseudonym = SimplePseudonym::random();
 
-    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         for &p in &polynomials_per_ssa {
             let cfg = SsaGeneratorConfig {
@@ -118,8 +113,7 @@ fn bench_next_share(c: &mut Criterion) {
             let generator = SsaShareGenerator::<TestSpec>::new(cfg);
             // Prime the generator with an initial commitment, so the first iteration
             // has a polynomial to draw from.
-            generator.new_ssa_commitment(&pseudonym, index).unwrap();
-            index = index.checked_add(1).unwrap();
+            generator.new_ssa_commitment(&pseudonym).unwrap();
 
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
@@ -146,8 +140,7 @@ fn bench_next_share(c: &mut Criterion) {
                                 // This intentionally "wastes" any remaining shares from
                                 // the previous SSA (there are none at this point) and
                                 // ensures subsequent iterations have shares available.
-                                generator.new_ssa_commitment(&pseudonym, index).unwrap();
-                                index = index.checked_add(1).unwrap();
+                                generator.new_ssa_commitment(&pseudonym).unwrap();
                             }
                         }
                         total

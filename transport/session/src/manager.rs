@@ -2257,7 +2257,7 @@ where
                 move || {
                     pix_toolbox_clone
                         .share_generator
-                        .new_ssa_commitment(&pseudonym, ssa_index)
+                        .new_ssa_commitment(&pseudonym)
                 },
                 "client_ssa_commitment",
             )

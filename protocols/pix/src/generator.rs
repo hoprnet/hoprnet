@@ -158,7 +158,6 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     fn new_ssa_commitment(
         &self,
         pseudonym: &S::Pseudonym,
-        ssa_index: SsaIndex,
     ) -> errors::Result<SsaCommitment<S>, S::Pseudonym> {
         let mut rng = OsRng;
 
@@ -175,83 +174,57 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             raw_verifiers.push(verifier);
         }
 
+        let ssa_index = if self.polynomials.contains_key(pseudonym) {
+            let entry = self.polynomials.get(pseudonym).unwrap(); // Arc clone, stays in cache
+            let mut entry = entry.lock();
+            let ssa_index = entry.ssa_index.checked_add(1).ok_or(PixError::SsaIndexOverflow)?;
+            entry.ssa_index = ssa_index;
+            entry.poly_queue.extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
+                IndexedPolynomial {
+                    spi: SsaPolynomialId::new(
+                        SsaId::new(*pseudonym, ssa_index),
+                        poly_index as PolynomialIndex,
+                    ),
+                    raw,
+                    shares_generated: 0,
+                    t: self.cfg.threshold,
+                }
+            }));
+            ssa_index
+        } else {
+            let ssa_index = SsaIndex::MIN;
+            self.polynomials.insert(
+                *pseudonym,
+                std::sync::Arc::new(parking_lot::Mutex::new(SsaPseudonymEntry {
+                    ssa_index,
+                    poly_queue: raw_polynomials
+                        .into_iter()
+                        .enumerate()
+                        .map(|(poly_index, raw)| IndexedPolynomial {
+                            spi: SsaPolynomialId::new(
+                                SsaId::new(*pseudonym, ssa_index),
+                                poly_index as PolynomialIndex,
+                            ),
+                            raw,
+                            shares_generated: 0,
+                            t: self.cfg.threshold,
+                        })
+                        .collect(),
+                })),
+            );
+            ssa_index
+        };
+
         let mut verifiers: Vec<PartialSsaShareVerifier<S>> = Vec::with_capacity(raw_verifiers.len());
-
-        self.polynomials
-            .entry_by_ref(pseudonym)
-            .and_try_compute_with(|entry| match entry {
-                None => {
-                    verifiers.extend(
-                        raw_verifiers
-                            .into_iter()
-                            .enumerate()
-                            .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                spi: SsaPolynomialId::new(
-                                    SsaId::new(*pseudonym, ssa_index),
-                                    poly_index as PolynomialIndex,
-                                ),
-                                poly_commitment,
-                            }),
-                    );
-                    Ok::<_, PixError<S::Pseudonym>>(moka::ops::compute::Op::Put(std::sync::Arc::new(
-                        parking_lot::Mutex::new(SsaPseudonymEntry {
-                            ssa_index,
-                            poly_queue: raw_polynomials
-                                .into_iter()
-                                .enumerate()
-                                .map(|(poly_index, raw)| IndexedPolynomial {
-                                    spi: SsaPolynomialId::new(
-                                        SsaId::new(*pseudonym, ssa_index),
-                                        poly_index as PolynomialIndex,
-                                    ),
-                                    raw,
-                                    shares_generated: 0,
-                                    t: self.cfg.threshold,
-                                })
-                                .collect(),
-                        }),
-                    )))
-                }
-                Some(value) => {
-                    let value = value.into_value();
-                    {
-                        let mut entry = value.lock();
-                        if ssa_index <= entry.ssa_index {
-                            return Err(PixError::InvalidInput);
-                        }
-                        entry.ssa_index = ssa_index;
-
-                        verifiers.extend(
-                            raw_verifiers
-                                .into_iter()
-                                .enumerate()
-                                .map(|(poly_index, poly_commitment)| PartialSsaShareVerifier {
-                                    spi: SsaPolynomialId::new(
-                                        SsaId::new(*pseudonym, ssa_index),
-                                        poly_index as PolynomialIndex,
-                                    ),
-                                    poly_commitment,
-                                }),
-                        );
-
-                        entry
-                            .poly_queue
-                            .extend(raw_polynomials.into_iter().enumerate().map(|(poly_index, raw)| {
-                                IndexedPolynomial {
-                                    spi: SsaPolynomialId::new(
-                                        SsaId::new(*pseudonym, ssa_index),
-                                        poly_index as PolynomialIndex,
-                                    ),
-                                    raw,
-                                    shares_generated: 0,
-                                    t: self.cfg.threshold,
-                                }
-                            }));
-                    }
-
-                    Ok(moka::ops::compute::Op::Nop)
-                }
-            })?;
+        verifiers.extend(raw_verifiers.into_iter().enumerate().map(|(poly_index, poly_commitment)| {
+            PartialSsaShareVerifier {
+                spi: SsaPolynomialId::new(
+                    SsaId::new(*pseudonym, ssa_index),
+                    poly_index as PolynomialIndex,
+                ),
+                poly_commitment,
+            }
+        }));
 
         let ssa_id = *verifiers[0].spi.as_ref();
         Ok(SsaCommitment {
@@ -306,29 +279,30 @@ mod tests {
         });
 
         let p1 = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p1, 1.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p1)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p1, 2.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p1)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
 
         let p2 = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p2, 1.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p2)?;
         assert_eq!(c.ssa_id.pseudonym(), &p2);
         assert_eq!(c.ssa_id.ssa_index(), 1.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p1, 3.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p1)?;
         assert_eq!(c.ssa_id.pseudonym(), &p1);
         assert_eq!(c.ssa_id.ssa_index(), 3.try_into()?);
 
-        let c = generator.new_ssa_commitment(&p2, 2.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p2)?;
         assert_eq!(c.ssa_id.pseudonym(), &p2);
         assert_eq!(c.ssa_id.ssa_index(), 2.try_into()?);
 
-        // Repeated SSA index
-        assert!(generator.new_ssa_commitment(&p2, 2.try_into()?).is_err());
+        // With auto-increment, p2's index continues from 1 → 2 → 3 → … independently
+        // of p1's sequence. The overflow (SsaIndexOverflow) only triggers when a
+        // pseudonym's ssa_index reaches u32::MAX, which is not reachable in this test.
 
         Ok(())
     }
@@ -342,7 +316,7 @@ mod tests {
         });
 
         let p1 = SimplePseudonym::random();
-        generator.new_ssa_commitment(&p1, 1.try_into()?)?;
+        generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u16 {
             let g = generator
@@ -354,7 +328,7 @@ mod tests {
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
-        generator.new_ssa_commitment(&p1, 2.try_into()?)?;
+        generator.new_ssa_commitment(&p1)?;
 
         for i in 0..12_u16 {
             let g = generator
@@ -381,7 +355,7 @@ mod tests {
         assert_eq!(&cfg, generator.config());
 
         let p = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p)?;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
 
         for verifier in verifiers.iter().take(cfg.polynomials_per_ssa) {
@@ -409,7 +383,7 @@ mod tests {
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 
         let p = SimplePseudonym::random();
-        let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
+        let c = generator.new_ssa_commitment(&p)?;
         let orig_commitment = c.ssa_commitment;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
 
@@ -549,6 +523,22 @@ mod tests {
         // Both should give the same secret
         assert_eq!(our_result.0, vsss_result.0);
 
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_generator_benchmark_exact_repro() -> anyhow::Result<()> {
+        let cfg = SsaGeneratorConfig {
+            threshold: 10,
+            polynomials_per_ssa: 128,
+            ..Default::default()
+        };
+        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+        let pseudonym = SimplePseudonym::random();
+
+        for _ in 0..5 {
+            generator.new_ssa_commitment(&pseudonym)?;
+        }
         Ok(())
     }
 }

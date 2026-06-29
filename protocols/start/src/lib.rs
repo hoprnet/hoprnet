@@ -997,7 +997,7 @@ mod tests {
         });
 
         let pseudonym = SimplePseudonym::random();
-        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let commitment = generator.new_ssa_commitment(&pseudonym)?;
 
         type DummySessionId = [u8; 20];
 

@@ -7,7 +7,7 @@ use hopr_types::{
 
 use crate::{
     CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
+    SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
@@ -141,6 +141,5 @@ pub trait EntryShareGenerator<S: PixSpec> {
     fn new_ssa_commitment(
         &self,
         pseudonym: &S::Pseudonym,
-        ssa_index: SsaIndex,
     ) -> Result<SsaCommitment<S>, Self::Error>;
 }

@@ -52,7 +52,7 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
         ssa_commitment: client_commitment,
         verifiers,
         ..
-    } = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+    } = generator.new_ssa_commitment(&pseudonym)?;
 
     // Use the already transposed verifiers
     let mut transposed = verifiers

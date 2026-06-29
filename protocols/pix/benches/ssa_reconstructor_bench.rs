@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixScalar, PixSpec, SsaGeneratorConfig, SsaId,
-    SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::{
@@ -42,17 +42,16 @@ fn setup_and_generate_shares(
     reconstructor: &SsaReconstructor<TestSpec>,
     generator: &SsaShareGenerator<TestSpec>,
     peer: &OffchainKeypair,
-    ssa_index: SsaIndex,
     threshold: usize,
     polynomials_per_ssa: usize,
     num_shares: usize,
 ) -> anyhow::Result<Vec<Acknowledgement>> {
     let pseudonym = SimplePseudonym::random();
 
-    let ssa_id = SsaId::new(pseudonym, ssa_index);
-    reconstructor.new_exit_commitment(ssa_id, polynomials_per_ssa, threshold)?;
+    let commitment = generator.new_ssa_commitment(&pseudonym)?;
+    let ssa_id = commitment.ssa_id;
 
-    let commitment = generator.new_ssa_commitment(&pseudonym, ssa_index)?;
+    reconstructor.new_exit_commitment(ssa_id, polynomials_per_ssa, threshold)?;
     for (coeff_index, poly_commitments) in commitment.verifiers {
         reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_commitments.into_iter())?;
     }
@@ -93,13 +92,11 @@ fn bench_new_exit_commitment(c: &mut Criterion) {
                 |b, _| {
                     let cfg = SsaReconstructorConfig::default();
                     let pseudonym = SimplePseudonym::random();
-                    let mut index = SsaIndex::MIN;
+                    let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
 
                     b.iter(|| {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-                        let ssa_id = SsaId::new(pseudonym, index);
                         reconstructor.new_exit_commitment(ssa_id, p, t).unwrap();
-                        index = index.checked_add(1).unwrap();
                     });
                 },
             );
@@ -129,18 +126,16 @@ fn bench_insert_coefficient_commitments_partial(c: &mut Criterion) {
                         ..Default::default()
                     });
                     let pseudonym = SimplePseudonym::random();
-                    let mut index = SsaIndex::MIN;
 
                     b.iter(|| {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-                        let ssa_id = SsaId::new(pseudonym, index);
+                        let mut commitment = generator.new_ssa_commitment(&pseudonym).unwrap();
+                        let ssa_id = commitment.ssa_id;
                         reconstructor.new_exit_commitment(ssa_id, *p, *t).unwrap();
-                        let mut commitment = generator.new_ssa_commitment(&pseudonym, index).unwrap();
                         let constant_terms = commitment.verifiers.remove(&0).unwrap_or_default();
                         reconstructor
                             .insert_coefficient_commitments(ssa_id, 0, constant_terms.into_iter())
                             .unwrap();
-                        index = index.checked_add(1).unwrap();
                     });
                 },
             );
@@ -170,19 +165,17 @@ fn bench_insert_coefficient_commitments_full(c: &mut Criterion) {
                         ..Default::default()
                     });
                     let pseudonym = SimplePseudonym::random();
-                    let mut index = SsaIndex::MIN;
 
                     b.iter(|| {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-                        let ssa_id = SsaId::new(pseudonym, index);
+                        let commitment = generator.new_ssa_commitment(&pseudonym).unwrap();
+                        let ssa_id = commitment.ssa_id;
                         reconstructor.new_exit_commitment(ssa_id, *p, *t).unwrap();
-                        let commitment = generator.new_ssa_commitment(&pseudonym, index).unwrap();
                         for (coeff_index, poly_commitments) in commitment.verifiers {
                             reconstructor
                                 .insert_coefficient_commitments(ssa_id, coeff_index, poly_commitments.into_iter())
                                 .unwrap();
                         }
-                        index = index.checked_add(1).unwrap();
                     });
                 },
             );
@@ -208,10 +201,9 @@ fn bench_insert_encrypted_share(c: &mut Criterion) {
     // Pre-generate a real encrypted share outside the benchmark loop.
     // Uses a fresh pseudonym so the generator queue is clean.
     let (tagged_share, ack_challenge) = {
-        let ssa_index = SsaIndex::MIN;
-        let ssa_id = SsaId::new(pseudonym, ssa_index);
+        let commitment = generator.new_ssa_commitment(&pseudonym).unwrap();
+        let ssa_id = commitment.ssa_id;
         reconstructor.new_exit_commitment(ssa_id, 10, 10).unwrap();
-        let commitment = generator.new_ssa_commitment(&pseudonym, ssa_index).unwrap();
         for (coeff_index, poly_commitments) in commitment.verifiers {
             reconstructor
                 .insert_coefficient_commitments(ssa_id, coeff_index, poly_commitments.into_iter())
@@ -259,14 +251,12 @@ fn bench_acknowledge_shares_single(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, 1)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, 1)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
@@ -295,14 +285,12 @@ fn bench_acknowledge_shares_partial(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t - 1)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, t - 1)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
@@ -331,14 +319,12 @@ fn bench_acknowledge_shares_full(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, t)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
@@ -367,14 +353,12 @@ fn bench_acknowledge_shares_single_batch(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, 1)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, 1)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
@@ -403,14 +387,12 @@ fn bench_acknowledge_shares_partial_batch(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t - 1)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, t - 1)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
@@ -439,14 +421,12 @@ fn bench_acknowledge_shares_full_batch(c: &mut Criterion) {
                 ..Default::default()
             });
             let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
-            let mut index = SsaIndex::MIN;
 
             b.iter(|| {
                 let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t)
+                    setup_and_generate_shares(&reconstructor, &generator, &peer, t, polynomials_per_ssa, t)
                         .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
-                index = index.checked_add(1).unwrap();
             });
         });
     }
