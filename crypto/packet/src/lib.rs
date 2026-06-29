@@ -17,12 +17,6 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 pub mod sphinx;
-use hopr_types::{
-    crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
-    internal::prelude::*,
-    primitive::prelude::*,
-};
-use sphinx::prelude::*;
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -49,8 +43,16 @@ pub mod prelude {
     };
 }
 
-use hopr_protocol_pix::{PixGroup, PixScalar};
-use hopr_types::internal::routing;
+use hopr_protocol_pix::{PixGroup, PixScalar, PixSpec};
+use hopr_types::{
+    crypto::{
+        prelude::{BjjKeypair, ChainKeypair, Keypair, PublicKey, SimplePseudonym},
+        types::BjjPublicKey,
+    },
+    internal::{prelude::*, routing},
+    primitive::prelude::*,
+};
+use sphinx::prelude::*;
 pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
 /// Currently used public key cipher suite for Sphinx.
@@ -115,11 +117,33 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HoprBjjPixSpec;
+
+impl hopr_protocol_pix::PixSpec for HoprBjjPixSpec {
+    type AddressPrivateKey = BjjKeypair;
+    type Cipher = hopr_types::crypto::primitives::ChaCha20;
+    type Curve = babyjubjub_ec::BabyJubJub;
+    type DepositAddress = BjjPublicKey;
+    type Digest = hopr_types::crypto::primitives::Blake3;
+    type Pseudonym = SimplePseudonym;
+
+    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
+        BjjPublicKey::try_from(group).ok()
+    }
+
+    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
+        BjjKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
+    }
+}
+
 /// HOPR-specific encrypted partial SSA share type from the PIX protocol.
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
 /// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
-pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
+pub type HoprShareResolution =
+    hopr_protocol_pix::ShareResolution<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>;
 
 /// HOPR-specific PIX scalar type.
 ///
