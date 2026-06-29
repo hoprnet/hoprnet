@@ -26,13 +26,18 @@ use hopr_api::{
     },
     types::primitive::prelude::*,
 };
+use hopr_api::chain::ChainValues;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, Validate)]
-pub struct NonAnonymousPixStrategyConfig {}
+pub struct NonAnonymousPixStrategyConfig {
+    pub price_per_byte: HoprBalance,
+    pub max_ssa_allocation: HoprBalance,
+    pub max_deposit_tracking_time: std::time::Duration,
+}
 
 /// Builder for [`NonAnonymousPixStrategy`].
 ///
@@ -84,12 +89,48 @@ where
     async fn on_pix_event(&self, event: PixEvent) -> crate::errors::Result<()> {
         tracing::debug!(?event, "PixStrategy event");
         match event {
-            PixEvent::NewDepositAddress((pseudonym, ssa_index), address) => {
-                tracing::info!(%address, %pseudonym, ssa_index, "new deposit address");
-                self.node.chain_api().withdraw()
+            PixEvent::NewDepositAddress(new_deposit_address) => {
+                tracing::info!(?new_deposit_address, "new deposit address");
+
+                let target_deposit = self.cfg.price_per_byte * new_deposit_address.quota;
+                if target_deposit > self.cfg.max_ssa_allocation {
+                    tracing::warn!(%target_deposit, max_deposit = self.cfg.max_ssa_allocation, "target deposit too high");
+                    return Err(StrategyError::CriteriaNotSatisfied);
+                }
+
+                // TODO: do not allow parallel withdrawals to any address
+                if let Err(error) = self.node.chain_api().withdraw(target_deposit, &new_deposit_address.address.into()).await?.await {
+                    tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed");
+                    return Err(StrategyError::Other(error));
+                }
+                tracing::info!(%target_deposit, ?new_deposit_address, "deposit successful");
             }
-            PixEvent::DepositAddressReceived((pseudonym, ssa_index), address, maybe_notifier) => {}
-            PixEvent::PrivateKeyRecovered((pseudonym, ssa_index), recovered_key) => {}
+            PixEvent::DepositAddressReceived(deposit_address_recv) => {
+                tracing::info!(?deposit_address_recv, "deposit address received");
+
+                let target_deposit = self.cfg.price_per_byte * deposit_address_recv.quota;
+
+
+                let node_clone = self.node.clone();
+                let deposit_addr: Address = deposit_address_recv.address.into();
+                futures_time::stream::interval(futures_time::time::Duration::from_secs(self.cfg.max_deposit_tracking_time/10))
+                    .then(|_| async move {
+                        node_clone.chain_api().balance(deposit_addr).await
+                    });
+                    //.try_ta
+
+                hopr_utils::runtime::prelude::spawn(async move {
+                    self.node.chain_api().balance(&deposit_address_recv.address.into()).await?;
+                    tokio::time::sleep(self.cfg.max_deposit_tracking_time).await;
+                    self.node.chain_api().withdraw(target_deposit, &new_deposit_address.address.into()).await?;
+                })
+
+            }
+            PixEvent::PrivateKeyRecovered(private_key_recovered) => {
+                tracing::info!(?private_key_recovered, "private key recovered");
+
+
+            }
         }
 
         Ok(())
