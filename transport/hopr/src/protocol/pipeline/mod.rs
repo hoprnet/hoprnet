@@ -9,11 +9,11 @@ pub use config::{AcknowledgementPipelineConfig, PacketPipelineConfig};
 use futures::{SinkExt, StreamExt, future::Either};
 use futures_time::{future::FutureExt as TimeExt, stream::StreamExt as TimeStreamExt};
 use hopr_api::{
-    Address, PeerId,
+    PeerId,
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSurb};
+use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSsaCommitmentState, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
@@ -762,7 +762,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         ssa_id: SsaId<SimplePseudonym>,
         _: CoefficientIndex,
         _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
-    ) -> Result<SsaCommitmentState<HoprPseudonym, Address>, Self::Error> {
+    ) -> Result<HoprSsaCommitmentState, Self::Error> {
         Ok(SsaCommitmentState::new(ssa_id))
     }
 
@@ -781,7 +781,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         &self,
         _: OffchainPublicKey,
         _: Vec<Acknowledgement>,
-    ) -> Result<Vec<ShareResolution<HoprPseudonym, ChainKeypair>>, Self::Error> {
+    ) -> Result<Vec<HoprShareResolution>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
 }

@@ -44,11 +44,7 @@ pub mod prelude {
 }
 
 use hopr_protocol_pix::{PixGroup, PixScalar};
-use hopr_types::{
-    crypto::prelude::*,
-    internal::prelude::*,
-    primitive::prelude::*,
-};
+use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
 use sphinx::prelude::*;
 pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
@@ -118,10 +114,10 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
 #[cfg(feature = "bjj")]
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = BjjKeypair;
-    type Cipher = primitives::ChaCha20;
+    type Cipher = ChaCha20;
     type Curve = babyjubjub_ec::BabyJubJub;
     type DepositAddress = BjjPublicKey;
-    type Digest = primitives::Blake3;
+    type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
@@ -141,6 +137,12 @@ pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaSh
 pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
 #[cfg(feature = "bjj")]
 pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, BjjKeypair>;
+
+/// HOPR-specific [`hopr_protocol_pix::SsaCommitmentState`].
+#[cfg(not(feature = "bjj"))]
+pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, Address>;
+#[cfg(feature = "bjj")]
+pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, BjjPublicKey>;
 
 /// HOPR-specific PIX scalar type.
 ///

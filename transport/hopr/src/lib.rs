@@ -108,10 +108,7 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
-    node::{
-        PixDepositAddress, PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress,
-        PixPrivateKeyRecovered,
-    },
+    node::{PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
@@ -245,13 +242,6 @@ impl HoprSessionConfigurator {
             None => false,
         }
     }
-}
-
-// TODO: move these into hopr-api or into hopr-types
-fn address_to_pix_address(address: Address) -> PixDepositAddress {
-    let mut data = [0u8; 32];
-    data[0..Address::SIZE].copy_from_slice(address.as_ref());
-    PixDepositAddress(data)
 }
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
@@ -772,7 +762,7 @@ where
                             }) =>
                                 PixEvent::NewDepositAddress(PixNewDepositAddress {
                                     id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
-                                    address: address_to_pix_address(deposit_address),
+                                    address: deposit_address.into(),
                                     quota: quota_per_ssa,
                                 }),
                             HoprSessionOutPixEvent::DepositNeeded(
@@ -784,7 +774,7 @@ where
                                 notifier,
                             ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
                                 id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
-                                address: address_to_pix_address(deposit_address),
+                                address: deposit_address.into(),
                                 quota: quota_per_ssa,
                                 deposit_updated: Some(notifier),
                             }),

@@ -1393,7 +1393,7 @@ dependencies = [
 [[package]]
 name = "babyjubjub-ec"
 version = "0.2.0"
-source = "git+https://github.com/NumberFour8/babyjubjub-ec?branch=legacy-ec-13#57c3b4e45be65aa482f921938a92beea45162c40"
+source = "git+https://github.com/NumberFour8/babyjubjub-ec?branch=legacy-ec-13#c540bc1b305e54072cff9f495aae8f13e3c089da"
 dependencies = [
  "ark-ec",
  "ark-ff 0.5.0",
@@ -1401,8 +1401,10 @@ dependencies = [
  "elliptic-curve",
  "ff",
  "group",
+ "hex",
  "num-traits",
  "rand_core 0.6.4",
+ "serde",
  "subtle",
  "taceo-ark-babyjubjub",
 ]
@@ -1448,6 +1450,12 @@ dependencies = [
  "const-str",
  "match-lookup",
 ]
+
+[[package]]
+name = "base45"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "240e56f4d3c453c36faacb695c535a4d5f8c7d23dac175014f32eb0a71012a03"
 
 [[package]]
 name = "base64"
@@ -5727,12 +5735,13 @@ dependencies = [
 
 [[package]]
 name = "multibase"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8694bb4835f452b0e3bb06dbebb1d6fc5385b6ca1caf2e55fd165c042390ec77"
+checksum = "7e0e4a371cbf1dfd666b658ba137763edb23c45beb43cfe369b5593cd6b437b6"
 dependencies = [
  "base-x",
  "base256emoji",
+ "base45",
  "data-encoding",
  "data-encoding-macro",
 ]
