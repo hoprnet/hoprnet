@@ -47,6 +47,12 @@
       "commitMessageTopic": "Cargo dependencies"
     },
     {
+      "description": "Keep libc on a minor-only requirement",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["libc"],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
       "description": "Expedite cargo security updates — bypass weekly schedule",
       "matchManagers": ["cargo"],
       "matchCategories": ["security"],
