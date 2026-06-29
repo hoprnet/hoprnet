@@ -43,7 +43,7 @@ pub mod prelude {
     };
 }
 
-use hopr_protocol_pix::{PixGroup, PixScalar, PixSpec};
+use hopr_protocol_pix::{PixGroup, PixScalar};
 use hopr_types::{
     crypto::{
         prelude::{BjjKeypair, ChainKeypair, Keypair, PublicKey, SimplePseudonym},
@@ -142,8 +142,7 @@ impl hopr_protocol_pix::PixSpec for HoprBjjPixSpec {
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
 /// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
-pub type HoprShareResolution =
-    hopr_protocol_pix::ShareResolution<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>;
+pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
 
 /// HOPR-specific PIX scalar type.
 ///
