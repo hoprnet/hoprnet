@@ -45,11 +45,8 @@ pub mod prelude {
 
 use hopr_protocol_pix::{PixGroup, PixScalar};
 use hopr_types::{
-    crypto::{
-        prelude::{BjjKeypair, ChainKeypair, Keypair, PublicKey, SimplePseudonym},
-        types::BjjPublicKey,
-    },
-    internal::{prelude::*, routing},
+    crypto::prelude::*,
+    internal::prelude::*,
     primitive::prelude::*,
 };
 use sphinx::prelude::*;
@@ -67,12 +64,12 @@ pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = HoprKeyIdent;
-    type PRG = hopr_types::crypto::primitives::ChaCha20;
-    type PacketReceiverData = routing::HoprSenderId;
+    type PRG = ChaCha20;
+    type PacketReceiverData = HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
     type SurbReceiverData = types::SurbReceiverInfo;
-    type UH = hopr_types::crypto::primitives::Poly1305;
+    type UH = Poly1305;
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }
@@ -84,7 +81,7 @@ pub type HoprKeyIdent = KeyIdent<4>;
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 /// Type alias for identifiable [`ReplyOpener`].
-pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
+pub type HoprReplyOpener = (HoprSurbId, ReplyOpener);
 
 /// Size of the maximum packet payload.
 ///
@@ -100,12 +97,13 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; /
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HoprPixSpec;
 
+#[cfg(not(feature = "bjj"))]
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = ChainKeypair;
-    type Cipher = hopr_types::crypto::primitives::ChaCha20;
+    type Cipher = ChaCha20;
     type Curve = k256::Secp256k1;
     type DepositAddress = Address;
-    type Digest = hopr_types::crypto::primitives::Blake3;
+    type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
@@ -117,16 +115,13 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct HoprBjjPixSpec;
-
-impl hopr_protocol_pix::PixSpec for HoprBjjPixSpec {
+#[cfg(feature = "bjj")]
+impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = BjjKeypair;
-    type Cipher = hopr_types::crypto::primitives::ChaCha20;
+    type Cipher = primitives::ChaCha20;
     type Curve = babyjubjub_ec::BabyJubJub;
     type DepositAddress = BjjPublicKey;
-    type Digest = hopr_types::crypto::primitives::Blake3;
+    type Digest = primitives::Blake3;
     type Pseudonym = SimplePseudonym;
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
@@ -142,30 +137,39 @@ impl hopr_protocol_pix::PixSpec for HoprBjjPixSpec {
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
 /// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
+#[cfg(not(feature = "bjj"))]
 pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
+#[cfg(feature = "bjj")]
+pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, BjjKeypair>;
 
 /// HOPR-specific PIX scalar type.
 ///
 /// This is the normalized form of `hopr_protocol_pix::PixScalar<HoprPixSpec>`
 /// (i.e. `<<HoprPixSpec as PixSpec>::Curve as CurveArithmetic>::Scalar`),
 /// re-exported here so downstream crates can name it without depending on
-/// `k256` directly.
+/// directly.
 ///
 /// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
 /// itself as another generic argument.
+#[cfg(not(feature = "bjj"))]
 pub type HoprPixScalar = k256::Scalar;
+#[cfg(feature = "bjj")]
+pub type HoprPixScalar = babyjubjub_ec::Scalar;
 
 /// HOPR-specific PIX group element representation type.
 ///
 /// This is the normalized (concrete) form of `hopr_protocol_pix::PixGroupRepr<HoprPixSpec>`
 /// (i.e. `<PixGroup<HoprPixSpec> as GroupEncoding>::Repr`), re-exported here as the concrete
-/// `k256::CompressedPoint` type.
+/// type.
 ///
 /// Using the concrete type instead of the associated-type projection avoids a Rust coherence
 /// error (E0119): implementing `From`/`TryFrom` for a new-type wrapping the projection conflicts
 /// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
 /// projection is distinct from the wrapper type.
+#[cfg(not(feature = "bjj"))]
 pub type HoprPixGroupRepr = k256::CompressedPoint;
+#[cfg(feature = "bjj")]
+pub type HoprPixGroupRepr = babyjubjub_ec::GroupRepr;
 
 #[cfg(test)]
 mod tests {
