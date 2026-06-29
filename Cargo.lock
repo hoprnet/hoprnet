@@ -3657,8 +3657,8 @@ dependencies = [
  "humantime-serde",
  "insta",
  "lazy_static",
- "opentelemetry-prometheus-text-exporter 0.2.1",
- "opentelemetry_sdk 0.32.1",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "parking_lot",
  "rand 0.10.1",
  "rstest",
@@ -4108,9 +4108,9 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "num_enum",
- "opentelemetry 0.32.0",
- "opentelemetry-prometheus-text-exporter 0.3.0",
- "opentelemetry_sdk 0.32.1",
+ "opentelemetry",
+ "opentelemetry-prometheus-text-exporter",
+ "opentelemetry_sdk",
  "poly1305",
  "primitive-types 0.14.0",
  "rand 0.10.1",
@@ -5753,15 +5753,6 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opentelemetry"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84bcd6ae87133e903af7ef497404dda70c60d0ea14895fc8a5e6722754fc2a0"
-dependencies = [
- "js-sys",
-]
-
-[[package]]
-name = "opentelemetry"
 version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0142c63252a9e054e68a4c61a5778f7b14f576274d593f8ce883d191a099682"
@@ -5776,37 +5767,13 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-prometheus-text-exporter"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "897906366b17a89bec845f6051e0c3474049402a09a0711eea180941293bd013"
-dependencies = [
- "opentelemetry 0.31.0",
- "opentelemetry_sdk 0.31.0",
- "smartstring",
-]
-
-[[package]]
-name = "opentelemetry-prometheus-text-exporter"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4fe57ea90b12f643a366aa7c4fa5cfb54bd1cf252f55368337e40534b278a68"
 dependencies = [
- "opentelemetry 0.32.0",
- "opentelemetry_sdk 0.32.1",
+ "opentelemetry",
+ "opentelemetry_sdk",
  "smartstring",
-]
-
-[[package]]
-name = "opentelemetry_sdk"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e14ae4f5991976fd48df6d843de219ca6d31b01daaab2dad5af2badeded372bd"
-dependencies = [
- "futures-channel",
- "futures-executor",
- "futures-util",
- "opentelemetry 0.31.0",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5818,7 +5785,7 @@ dependencies = [
  "futures-channel",
  "futures-executor",
  "futures-util",
- "opentelemetry 0.32.0",
+ "opentelemetry",
  "percent-encoding",
  "portable-atomic",
  "rand 0.9.4",

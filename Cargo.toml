@@ -130,7 +130,7 @@ moka = { version = "0.12.15", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 oas3 = "0.22.0"
-opentelemetry-prometheus-text-exporter = { version = "0.2.1" }
+opentelemetry-prometheus-text-exporter = { version = "0.3.0" }
 opentelemetry_sdk = { version = "0.32.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
