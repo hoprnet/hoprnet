@@ -101,7 +101,7 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     complete: bool,
     exit_commitment_secret: PixScalar<S>,
     exit_commitment_public: PixGroup<S>,
-    full_ssa_commitment: Option<PixGroup<S>>,
+    full_ssa_commitment: Option<(PixGroup<S>, S::DepositAddress)>,
 }
 
 impl<S: PixSpec> SsaCommitmentBuilder<S> {
@@ -126,6 +126,10 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
     pub fn is_empty(&self) -> bool {
         self.committed_polynomials.is_empty()
+    }
+
+    pub fn get_deposit_address(&self) -> Option<&S::DepositAddress> {
+        self.full_ssa_commitment.as_ref().map(|(_, a)| a)
     }
 
     pub fn add_transposed(
@@ -171,7 +175,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .all(|committed_poly| committed_poly.get(&0).is_some());
 
         if self.complete {
-            tracing::debug!("SSA is fully committed");
+            tracing::debug!("SSA is fully committed for verification");
 
             let complete_ssa_verifier = self
                 .committed_polynomials
@@ -191,17 +195,27 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .map(|v| v.map(SsaPartBuilder::new))
                 .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
-            // Full client SSA commitment is the sum of all constant term commitments on all polynomials
-            let client_ssa_commitment: PixGroup<S> =
-                complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
-            tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
+            let full_commitment = match self.full_ssa_commitment.as_ref().map(|(c, _)| *c) {
+                None => {
+                    // Full client SSA commitment is the sum of all constant term commitments on all polynomials
+                    let client_ssa_commitment: PixGroup<S> =
+                        complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
+                    tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
+
+                    let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
+
+                    // Treat the failed conversion to deposit address as error
+                    let deposit_addr =
+                        S::group_to_deposit_address(full_ssa_commitment).ok_or(errors::PixError::InvalidInput)?;
+
+                    self.full_ssa_commitment = Some((full_ssa_commitment, deposit_addr));
+                    full_ssa_commitment
+                }
+                Some(commitment) => commitment,
+            };
 
             Ok(CommitmentResult::Completed(
-                SsaBuilder::new(
-                    client_ssa_commitment + self.exit_commitment_public,
-                    self.exit_commitment_secret,
-                    self.num_polys,
-                ),
+                SsaBuilder::new(full_commitment, self.exit_commitment_secret, self.num_polys),
                 complete_ssa_verifier,
             ))
         } else if self.full_ssa_commitment.is_none() && all_constant_terms_committed {
@@ -217,11 +231,18 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                         .ok_or(errors::PixError::InvalidInput)
                 })
                 .sum::<errors::Result<PixGroup<S>, S::Pseudonym>>()?;
+            tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
 
             let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
-            self.full_ssa_commitment = Some(full_ssa_commitment);
+
+            // Treat the failed conversion to deposit address as error
+            let deposit_addr =
+                S::group_to_deposit_address(full_ssa_commitment).ok_or(errors::PixError::InvalidInput)?;
+
+            self.full_ssa_commitment = Some((full_ssa_commitment, deposit_addr));
+
             Ok(CommitmentResult::SsaCommitmentDone(full_ssa_commitment))
-        } else if let Some(ssa_committed) = self.full_ssa_commitment.as_ref() {
+        } else if let Some(ssa_committed) = self.full_ssa_commitment.as_ref().map(|(c, _)| c) {
             Ok(CommitmentResult::StillIncomplete(*ssa_committed))
         } else {
             Ok(CommitmentResult::NotEnoughCommitments)

@@ -224,7 +224,7 @@ pub(crate) struct SessionSlot {
     // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
     // Contains currently active SSA for this Session and its quota
-    current_ssa_state: OnceLock<SessionSsaState>,
+    current_ssa_state: Arc<OnceLock<SessionSsaState>>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -680,7 +680,7 @@ async fn send_via_msg_sender<S, D>(
     routing: DestinationRouting,
     data: D,
     error_context: &'static str,
-) -> crate::errors::Result<()>
+) -> errors::Result<()>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
@@ -1004,7 +1004,33 @@ where
         )
         .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
-        let current_ssa_state = OnceLock::new();
+        let current_ssa_state = Arc::new(OnceLock::new());
+
+        let mut additional_data = 0_u64;
+
+        // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
+        if !cfg.capabilities.contains(Capability::NoRateControl) {
+            additional_data |= cfg
+                .surb_management
+                .map(|c| c.target_surb_buffer_size)
+                .unwrap_or(
+                    self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs(),
+                )
+                .min(u32::MAX as u64);
+        }
+
+        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data
+        if cfg.capabilities.contains(Capability::UsePIX)
+            && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
+        {
+            let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
+            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
+        }
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
@@ -1012,27 +1038,7 @@ where
             challenge,
             target,
             capabilities: HoprSessionCapabilities(cfg.capabilities),
-            additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
-                cfg.surb_management
-                    .map(|c| c.target_surb_buffer_size)
-                    .unwrap_or(
-                        self.cfg.initial_return_session_egress_rate as u64
-                            * self
-                                .cfg
-                                .minimum_surb_buffer_duration
-                                .max(MIN_SURB_BUFFER_DURATION)
-                                .as_secs(),
-                    )
-                    .min(u32::MAX as u64)
-            } else if cfg.capabilities.contains(Capability::UsePIX)
-                && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
-            {
-                let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
-
-                (polys_per_ssa as u64) << 32 | shares_per_ssa as u64
-            } else {
-                0
-            },
+            additional_data,
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -1662,7 +1668,10 @@ where
             let quota_per_ssa = pix_params_to_quota(polys_per_ssa, shares_per_ssa);
             debug!(
                 challenge = req.challenge,
-                offered_quota_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
+                polys_per_ssa,
+                shares_per_ssa,
+                acceptable_range = ?self.cfg.pix_config.quota_range,
+                offered_quota_mb_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
                 "client offered MB SSA quota"
             );
 
@@ -1692,7 +1701,7 @@ where
     ) -> errors::Result<()> {
         trace!(challenge = session_req.challenge, "received session initiation request");
 
-        debug!(%pseudonym, "got new session request, searching for a free session slot");
+        debug!("got new session request, searching for a free session slot");
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
@@ -1701,7 +1710,10 @@ where
 
         // Verify if the client offered the right parameters for PIX
         let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
-            error!(challenge = session_req.challenge, %pseudonym, "client offered unacceptable PIX parameters");
+            error!(
+                challenge = session_req.challenge,
+                "client offered unacceptable PIX parameters"
+            );
 
             // Notify the sender that the session could not be established
             let reason = StartErrorReason::UnacceptablePixParams;
@@ -1709,15 +1721,23 @@ where
                 challenge: session_req.challenge,
                 reason,
             });
-
-            send_via_msg_sender(&mut msg_sender, reply_routing, data, "session error message").await?;
-
-            trace!(%pseudonym, "session establishment failure message sent");
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing,
+                data,
+                "session error message due to unacceptable PIX parameters",
+            )
+            .await?;
 
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
             return Ok(());
         };
+
+        info!(
+            client_polys_per_ssa,
+            client_shares_per_ssa, "client offered acceptable PIX parameters"
+        );
 
         let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
@@ -1753,14 +1773,20 @@ where
         // request can claim the slot for a given pseudonym.
         let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()) else {
             // No slots available for this pseudonym
-            error!(%pseudonym, "no slots available for this pseudonym");
+            error!("no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
                 challenge: session_req.challenge,
                 reason,
             });
 
-            send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing.clone(),
+                data,
+                "session error message due to lack of slots",
+            )
+            .await?;
 
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
@@ -1768,7 +1794,7 @@ where
             return Ok(());
         };
 
-        debug!(?pseudonym, ?session_req, "assigned a new session");
+        debug!(?session_req, "assigned a new session");
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1971,6 +1997,7 @@ where
         // (it was previously verified that the offered parameters are acceptable for us),
         // then create initial Server SSA commitment message and send it to the client.
         if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            // We use the same quota that the client offered
             slot.current_ssa_state
                 .set(SessionSsaState::new(
                     client_polys_per_ssa as u32,
@@ -1978,7 +2005,7 @@ where
                 ))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
-            // TODO: if this fails, should we terminate the session immediately?
+            // TODO: if this fails, should we terminate the session immediately (ie. not commit)?
             self.request_next_ssa(session_id, slot).await?;
         }
 
@@ -1987,7 +2014,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self, est))]
     async fn handle_session_established(&self, est: StartEstablished<SessionId>) -> errors::Result<()> {
-        trace!(
+        debug!(
             session_id = ?est.session_id,
             "received session establishment confirmation"
         );
@@ -2100,6 +2127,7 @@ where
         Ok(())
     }
 
+    /// Handled by the Exit, when Entry replies with PIX commitment
     #[tracing::instrument(level = "debug", skip(self, msg))]
     async fn handle_ssa_commit(
         &self,
@@ -2200,11 +2228,13 @@ where
                 .map_err(|_| {
                     SessionManagerError::other(anyhow::anyhow!("failed to send pix event for needed deposit"))
                 })?;
+            info!(%ssa_id, %deposit_address, quota_per_ssa, "retrieved first client SSA commitment and deposit address");
         }
 
         Ok(())
     }
 
+    /// Handled by the Entry, when the Exit sends PIX initiation request
     #[tracing::instrument(level = "debug", skip(self, msg))]
     async fn handle_ssa_request(
         &self,
@@ -2224,7 +2254,7 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
-        trace!(
+        debug!(
             num_server_commitments = msg.commitments.len(),
             "received Exit SSA commitments"
         );
@@ -2248,7 +2278,8 @@ where
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
         // The server can theoretically send multiple SSA commitments
-        // asking us to make the equal number of client commitments and deposits
+        // asking us to make the equal number of client commitments and deposits.
+        // The server is authoritative in giving the ssa_index, the client only verifies if it's monotonic.
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
 
@@ -2265,7 +2296,7 @@ where
             .map_err(SessionManagerError::other)?
             .map_err(SessionManagerError::PixError)?;
 
-            // Construct the full SSA by adding the client and exit commitments, obtaining the deposit address
+            // Construct the full SSA by adding the client and exit commitments, getting the deposit address
             let full_ssa = client_commitment.ssa_commitment
                 + exit_commitment
                     .try_into_pix_group()
@@ -2273,7 +2304,6 @@ where
             let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
                 anyhow::anyhow!("failed to convert SSA to deposit address"),
             ))?;
-            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
 
             // Notify the new SSA deposit address to allow the deposit to happen
             pix_toolbox
@@ -2284,43 +2314,22 @@ where
                     quota_per_ssa,
                 }))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
+            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
 
             // Split the SSA client commitment into Start protocol commitment messages
             let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment);
             debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
 
-            // Feed each commitment message into the message sender
+            // Send each commitment message into the message sender
             for commitment_msg in commitment_msgs {
-                let data =
-                    ApplicationDataOut::with_no_packet_info(HoprStartProtocol::SsaCommit(commitment_msg).try_into()?);
-
-                msg_sender
-                    .feed((session_slot.routing_opts.clone(), data))
-                    .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                    .await
-                    .map_err(|_| {
-                        error!(ssa_index, "timeout feeding client pix commitment message");
-                        TransportSessionError::Timeout
-                    })?
-                    .map_err(|error| {
-                        error!(ssa_index, %error, "failed to feed client pix commitment message");
-                        SessionManagerError::other(error)
-                    })?;
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    session_slot.routing_opts.clone(),
+                    HoprStartProtocol::SsaCommit(commitment_msg),
+                    "client SSA commitment message",
+                )
+                .await?;
             }
-
-            // And flush the sender when done for each client commitment
-            msg_sender
-                .flush()
-                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
-                .await
-                .map_err(|_| {
-                    error!(ssa_index, "timeout flushing client pix commitment messages");
-                    TransportSessionError::Timeout
-                })?
-                .map_err(|error| {
-                    error!(ssa_index, %error, "failed to flush client pix commitment messages");
-                    SessionManagerError::other(error)
-                })?;
 
             debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
         }
@@ -2340,13 +2349,14 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+    use crate::{balancer::SurbBalancerConfig, types::SessionTarget};
 
     #[async_trait::async_trait]
     trait SendMsg {
@@ -2571,6 +2581,290 @@ mod tests {
                 .update_surb_balancer_config(bob_session.session.id(), SurbBalancerConfig::default())
                 .is_err()
         );
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        alice_session.close().await?;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert!(matches!(
+            alice_mgr.ping_session(alice_session.id()).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+
+        futures::stream::iter(ahs)
+            .for_each(|ah| async move { ah.abort() })
+            .await;
+
+        // Cleanup: close senders and await handles
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await;
+        let _ = bob_handle.await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it_with_pix()
+    -> anyhow::Result<()> {
+        let alice_pseudonym = HoprPseudonym::random();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=2048 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 64,
+            threshold: 64,
+            surplus_shares: 16,
+        };
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                trace!("alice sends {}", data.data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        ?;
+                    Ok(())
+                })
+            });
+
+        // Bob sends the SessionEstablished message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                trace!("bob sends {}", data.data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
+                    Ok(())
+                })
+            });
+
+        // Bob also sends SsaRequest message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                trace!("bob sends {}", data.data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::SsaRequest)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
+                    Ok(())
+                })
+            });
+
+        // Alice sends the SsaCommit message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .times(192)
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                trace!("alice sends {}", data.data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::SsaCommit)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        ?;
+                    Ok(())
+                })
+            });
+
+        // Alice sends the terminating segment to close the Session
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
+                    data.data.plain_text.as_ref(),
+                )
+                    .expect("must be a session message")
+                    .try_as_segment()
+                    .expect("must be a segment")
+                    .is_terminating()
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        ?;
+                    Ok(())
+                })
+            });
+
+        let mut ahs = Vec::new();
+
+        let ssa_rec_config = SsaReconstructorConfig::default();
+
+        let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(ssa_rec_config).into(),
+        );
+        let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(ssa_rec_config).into(),
+        );
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+        assert!(alice_mgr.is_started());
+
+        // Start Bob
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+        assert!(bob_mgr.is_started());
+
+        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+        pin_mut!(new_session_rx_bob);
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(
+                    bob_peer,
+                    SessionTarget::TcpStream(target.clone()),
+                    SessionClientConfig {
+                        pseudonym: alice_pseudonym.into(),
+                        capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                        surb_management: None,
+                        pix_ssa_quota: Some((
+                            ssa_gen_config.polynomials_per_ssa as u32,
+                            ssa_gen_config.threshold as u32,
+                        )),
+                        ..Default::default()
+                    },
+                ),
+                new_session_rx_bob.next(),
+            ),
+        )
+        .await?;
+
+        let mut alice_session = alice_session?;
+        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+
+        assert_eq!(
+            alice_session.config().capabilities,
+            Capability::Segmentation | Capability::NoRateControl | Capability::UsePIX
+        );
+        assert_eq!(
+            alice_session.config().capabilities,
+            bob_session.session.config().capabilities
+        );
+        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+
+        assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
+        assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id())?);
+        assert!(
+            alice_mgr
+                .update_surb_balancer_config(alice_session.id(), SurbBalancerConfig::default())
+                .is_err()
+        );
+
+        assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
+        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id())?);
+        assert!(
+            bob_mgr
+                .update_surb_balancer_config(bob_session.session.id(), SurbBalancerConfig::default())
+                .is_err()
+        );
+
+        pin_mut!(pix_alice_rx);
+        pin_mut!(pix_bob_rx);
+
+        let alice_session_event = pix_alice_rx
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?
+            .ok_or(anyhow!("alice must get a pix event"))?;
+
+        assert!(matches!(alice_session_event, HoprSessionOutPixEvent::ReadyToDeposit(_)));
+
+        let bob_session_event = pix_bob_rx
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?
+            .ok_or(anyhow!("bob must get a pix event"))?;
+
+        assert!(matches!(bob_session_event, HoprSessionOutPixEvent::DepositNeeded(..)));
 
         tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;

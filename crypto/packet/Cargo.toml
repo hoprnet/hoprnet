@@ -23,7 +23,7 @@ include = [
 crate-type = ["rlib"]
 
 [features]
-default = ["rayon", "ed25519", "bjj"]
+default = ["rayon", "ed25519"]
 all-benchmarks = []
 
 rayon = ["hopr-utils/parallelize-rayon"]

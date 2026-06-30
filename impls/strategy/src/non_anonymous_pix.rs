@@ -12,16 +12,20 @@
 //! **DO NOT USE THIS STRATEGY IN PRODUCTION**
 
 use std::{
+    convert::identity,
     fmt::{Debug, Display, Formatter},
     sync::Arc,
     time::Duration,
 };
-use std::convert::identity;
-use futures::{SinkExt, StreamExt, TryStreamExt, TryFutureExt, FutureExt};
+
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures_time::future::FutureExt as TimeExt;
-use hopr_api::{chain::{ChainWriteAccountOperations}, node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi, PixEvent}, types::primitive::prelude::*, ChainKeypair};
-use hopr_api::chain::ChainValues;
-use hopr_api::types::crypto::prelude::Keypair;
+use hopr_api::{
+    ChainKeypair,
+    chain::{ChainValues, ChainWriteAccountOperations},
+    node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi, PixEvent},
+    types::{crypto::prelude::Keypair, primitive::prelude::*},
+};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -94,7 +98,13 @@ where
                 }
 
                 // TODO: do not allow parallel withdrawals to any address
-                if let Err(error) = self.node.chain_api().withdraw(target_deposit, &new_deposit_address.address.into()).and_then(identity).await {
+                if let Err(error) = self
+                    .node
+                    .chain_api()
+                    .withdraw(target_deposit, &new_deposit_address.address.into())
+                    .and_then(identity)
+                    .await
+                {
                     tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed");
                     return Err(StrategyError::other(error));
                 }
@@ -110,28 +120,30 @@ where
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
 
                 let mut stream = futures_time::stream::interval(
-                    futures_time::time::Duration::from(max_tracking_time / 10)
-                        .max(Duration::from_secs(1).into())
+                    futures_time::time::Duration::from(max_tracking_time / 10).max(Duration::from_secs(1).into()),
                 )
-                    .then(move |_| {
-                        let node_clone = node_clone.clone();
-                        async move {
-                            node_clone.chain_api().balance(deposit_addr).map_err(StrategyError::other).await
-                        }
-                    })
-                    .try_skip_while(move |balance| futures::future::ok(balance < &target_deposit))
-                    .boxed();
+                .then(move |_| {
+                    let node_clone = node_clone.clone();
+                    async move {
+                        node_clone
+                            .chain_api()
+                            .balance(deposit_addr)
+                            .map_err(StrategyError::other)
+                            .await
+                    }
+                })
+                .try_skip_while(move |balance| futures::future::ok(balance < &target_deposit))
+                .boxed();
 
                 tracing::info!(%target_deposit, ?max_tracking_time, "tracking until deposit");
                 hopr_utils::runtime::prelude::spawn(
                     async move {
                         let result = stream.try_next().await?;
                         match (result, deposit_address_recv.deposit_updated) {
-                            (Some(deposit), Some(mut notifier)) => {
-                                notifier.send((deposit_address_recv.id, deposit))
-                                    .await
-                                    .map_err(StrategyError::other)
-                            }
+                            (Some(deposit), Some(mut notifier)) => notifier
+                                .send((deposit_address_recv.id, deposit))
+                                .await
+                                .map_err(StrategyError::other),
                             _ => Err(StrategyError::other(anyhow::anyhow!("deposit tracking not available"))),
                         }
                     }
@@ -139,17 +151,22 @@ where
                     .inspect(|res| match res {
                         Ok(Ok(_)) => tracing::info!("deposit tracking completed"),
                         Ok(Err(error)) => tracing::error!(%error, "deposit tracking failed:"),
-                        Err(_) => tracing::error!("deposit tracking timed out")
-                    })
+                        Err(_) => tracing::error!("deposit tracking timed out"),
+                    }),
                 );
             }
             PixEvent::PrivateKeyRecovered(private_key_recovered) => {
                 tracing::info!(?private_key_recovered, "private key recovered");
 
-                let chain_key = ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref())
-                    .map_err(StrategyError::other)?;
+                let chain_key =
+                    ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
 
-                let recovered_balance: HoprBalance = self.node.chain_api().balance(chain_key.public().to_address()).await.map_err(StrategyError::other)?;
+                let recovered_balance: HoprBalance = self
+                    .node
+                    .chain_api()
+                    .balance(chain_key.public().to_address())
+                    .await
+                    .map_err(StrategyError::other)?;
                 tracing::info!(%recovered_balance, address = %chain_key.public().to_address(), "recovered deposit balance");
 
                 // TODO: withdraw using withdraw_from_signer

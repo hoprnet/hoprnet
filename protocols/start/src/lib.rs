@@ -730,7 +730,7 @@ mod tests {
     }
 
     #[test]
-    fn start_protocol_message_start_session_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
+    fn start_protocol_message_start_session_message_should_allow_for_at_least_two_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::<i32, String, u8, Box<[u8]>>::StartSession(StartInitiation {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
@@ -738,10 +738,12 @@ mod tests {
             additional_data: 0xffffffff,
         });
 
+        // Two SURBs are needed because if the server wants to establish PIX, it needs to send an additional
+        // SsaRequest message next to the SessionEstablished message.
         let len = msg.encode()?.1.len();
         assert!(
-            HoprPacket::max_surbs_with_message(len) >= 1,
-            "StartSession message size ({len}) must allow for at least 1 SURBs in packet",
+            HoprPacket::max_surbs_with_message(len) >= 2,
+            "StartSession message size ({len}) must allow for at least 2 SURBs in packet",
         );
 
         Ok(())

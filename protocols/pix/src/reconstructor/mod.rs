@@ -204,22 +204,28 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         let maybe_complete_ssa_commitment = {
             let mut builder = builder.lock();
             res.is_first_encountered = builder.is_empty();
+            res.ssa_deposit_address = builder.get_deposit_address().copied();
             builder.add_transposed(index, commitments)?
         };
 
+        res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
+
         match maybe_complete_ssa_commitment {
             CommitmentResult::NotEnoughCommitments => {
+                res.deposit_address_first_encountered = false; // Not yet encountered
                 tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more data");
             }
             CommitmentResult::SsaCommitmentDone(full_ssa_commitment) => {
-                res.deposit_address_first_encountered = true;
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+
+                tracing::trace!(%ssa_id, "ssa commitment done");
             }
             CommitmentResult::StillIncomplete(full_ssa_commitment) => {
-                res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+
+                tracing::trace!(%ssa_id, "ssa commitment still incomplete");
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
                 let full_ssa_commitment = ssa_builder.full_commitment;
@@ -233,10 +239,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     );
                 }
 
-                res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
                 res.is_verifiable = true;
+
+                tracing::trace!(%ssa_id, "ssa commitment completed");
             }
         }
 
