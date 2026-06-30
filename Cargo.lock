@@ -3492,7 +3492,8 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.14.0"
-source = "git+https://github.com/hoprnet/hopr-api?branch=lukas%2Fadd-custom-withdraw#669e57b29e50887acbcd59bc6e064803213578d2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3161efd861baef8d2ca18cddf9fe8699ad36d737635132ce41486a28c2d0c89"
 dependencies = [
  "async-trait",
  "atomic_enum",
