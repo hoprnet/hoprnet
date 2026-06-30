@@ -30,7 +30,6 @@ runtime-tokio = [
   "crossfire/tokio",
   "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
-  "dep:tokio",
 ]
 telemetry = [
   "hopr-utils/network-types-telemetry",
@@ -65,7 +64,8 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true }
+mockall = { workspace = true }
 
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-utils = { workspace = true, features = [
@@ -80,6 +80,7 @@ hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+futures-time = { workspace = true }
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-utils = { workspace = true, features = [
   "runtime-tokio",
@@ -97,7 +98,6 @@ insta = { workspace = true, features = ["yaml"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true }
-tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_with", "humantime-serde"]
