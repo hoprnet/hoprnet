@@ -3491,9 +3491,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.12.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a6e98ff52f636edc8e3d76844831dfd53cd92146488cc721c0f7bb837fd8052"
+checksum = "e3161efd861baef8d2ca18cddf9fe8699ad36d737635132ce41486a28c2d0c89"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -3530,7 +3530,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.21.2"
+version = "0.22.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4080,9 +4080,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.9.1"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d621ab243808540504b0a1e215743d45283e3133e7a4be44d2dd4cb31587a87"
+checksum = "c842b389c9b2b84349733cb67712ae0699f6a6b756670e742206cd7ac447acd2"
 dependencies = [
  "aes",
  "anyhow",
@@ -5753,9 +5753,9 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opentelemetry"
-version = "0.31.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84bcd6ae87133e903af7ef497404dda70c60d0ea14895fc8a5e6722754fc2a0"
+checksum = "b0142c63252a9e054e68a4c61a5778f7b14f576274d593f8ce883d191a099682"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -5767,9 +5767,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry-prometheus-text-exporter"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "897906366b17a89bec845f6051e0c3474049402a09a0711eea180941293bd013"
+checksum = "b4fe57ea90b12f643a366aa7c4fa5cfb54bd1cf252f55368337e40534b278a68"
 dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
@@ -5778,19 +5778,19 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry_sdk"
-version = "0.31.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e14ae4f5991976fd48df6d843de219ca6d31b01daaab2dad5af2badeded372bd"
+checksum = "9b59f80e1ac4d5ff7a2db8fb6c80badb7f0f3f858211fba08dd9aaec750894f9"
 dependencies = [
  "futures-channel",
  "futures-executor",
  "futures-util",
  "opentelemetry",
  "percent-encoding",
+ "portable-atomic",
  "rand 0.9.4",
  "thiserror 2.0.18",
  "tokio",
- "tokio-stream",
 ]
 
 [[package]]

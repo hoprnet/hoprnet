@@ -1,8 +1,16 @@
+use std::{
+    sync::atomic::AtomicU64,
+    time::{Duration, Instant},
+};
+
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hopr_api::types::{
-    chain::prelude::{GasEstimation, SignableTransaction},
-    crypto::prelude::*,
+use hopr_api::{
+    Address,
+    types::{
+        chain::prelude::{GasEstimation, SignableTransaction},
+        crypto::prelude::*,
+    },
 };
 
 use crate::{
@@ -12,6 +20,7 @@ use crate::{
 
 type TxRequest<T> = (
     T,
+    Option<ChainKeypair>,
     futures::channel::oneshot::Sender<errors::Result<blokli_client::api::TxId>>,
 );
 
@@ -25,6 +34,52 @@ pub struct TransactionSequencer<C, R> {
 
 const TX_QUEUE_CAPACITY: usize = 2048;
 
+// How long until nonces for other signers (than node's own) expire
+const OTHER_SIGNER_NONCE_EXPIRATION: Duration = Duration::from_mins(5);
+
+struct FixedTti {
+    fixed: Address,
+    tti: std::time::Duration,
+}
+
+impl FixedTti {
+    #[inline]
+    fn duration_for(&self, key: &Address) -> Option<Duration> {
+        if key == &self.fixed {
+            None // expiration cleared => never expires by time
+        } else {
+            Some(self.tti) // standard time-to-idle
+        }
+    }
+}
+
+impl moka::Expiry<Address, std::sync::Arc<AtomicU64>> for FixedTti {
+    fn expire_after_create(&self, key: &Address, _: &std::sync::Arc<AtomicU64>, _: Instant) -> Option<Duration> {
+        self.duration_for(key)
+    }
+
+    fn expire_after_read(
+        &self,
+        key: &Address,
+        _: &std::sync::Arc<AtomicU64>,
+        _: Instant,
+        _: Option<Duration>,
+        _: Instant,
+    ) -> Option<Duration> {
+        self.duration_for(key)
+    }
+
+    fn expire_after_update(
+        &self,
+        key: &Address,
+        _: &std::sync::Arc<AtomicU64>,
+        _: Instant,
+        _: Option<Duration>,
+    ) -> Option<Duration> {
+        self.duration_for(key)
+    }
+}
+
 impl<C, R> TransactionSequencer<C, R>
 where
     C: BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
@@ -35,13 +90,22 @@ where
 
         let client_clone = client.clone();
         let (sender, receiver) = futures::channel::mpsc::channel::<TxRequest<R>>(TX_QUEUE_CAPACITY);
-        let current_nonce = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+        // Nonce of our node signer never expires, all other signers expire after a few minutes
+        let current_nonce = moka::sync::CacheBuilder::new(1024)
+            .expire_after(FixedTti {
+                fixed: signer.public().to_address(),
+                tti: OTHER_SIGNER_NONCE_EXPIRATION,
+            })
+            .build();
+
         let current_nonce_clone = current_nonce.clone();
         hopr_utils::runtime::prelude::spawn(
             receiver
-                .then(move |(tx, notifier): (R, _)| {
+                .then(move |(tx, tx_signer, notifier): (R, _, _)| {
                     let client = client_clone.clone();
-                    let signer = signer.clone();
+                    let signer = tx_signer.unwrap_or_else(|| signer.clone());
+                    let signer_addr = signer.public().to_address();
                     let current_nonce = current_nonce.clone();
                     async move {
                         let chain_info = match client.query_chain_info().map_err(ConnectorError::from).await {
@@ -49,12 +113,12 @@ where
                                 tracing::debug!(chain_id = chain_info.chain_id, "chain info retrieved for tx");
                                 chain_info
                             }
-                            Err(e) => return (Err(e), notifier),
+                            Err(e) => return (Err(e), signer_addr, notifier),
                         };
 
                         let parsed_chain_info = match model_to_chain_info(chain_info) {
                             Ok(parsed_chain_info) => parsed_chain_info,
-                            Err(error) => return (Err(error), notifier),
+                            Err(error) => return (Err(error), signer_addr, notifier),
                         };
                         let chain_id = parsed_chain_info.info.chain_id;
                         let gas_estimation = GasEstimation::from(parsed_chain_info);
@@ -63,24 +127,34 @@ where
                         // We always query the transaction count for the signer and use
                         // the maximum between this value and the local counter
                         match client
-                            .query_transaction_count(&signer.public().to_address().into())
+                            .query_transaction_count(&signer_addr.into())
                             .map_err(ConnectorError::from)
                             .await
                         {
                             Ok(tx_count) => {
-                                let prev_nonce =
-                                    current_nonce.fetch_max(tx_count, std::sync::atomic::Ordering::Relaxed);
+                                let prev_nonce = current_nonce
+                                    .entry(signer_addr)
+                                    .or_default()
+                                    .value()
+                                    .fetch_max(tx_count, std::sync::atomic::Ordering::Relaxed);
+
                                 tracing::debug!(prev_nonce, tx_count, "transaction count retrieved");
                             }
-                            Err(e) => return (Err(e), notifier),
+                            Err(e) => return (Err(e), signer_addr, notifier),
                         }
 
-                        let nonce = current_nonce.load(std::sync::atomic::Ordering::Relaxed);
-                        tracing::debug!(nonce, "nonce used for the tx");
+                        // At this point the value must be set, so we can load it
+                        let nonce = current_nonce
+                            .entry(signer_addr)
+                            .or_default()
+                            .value()
+                            .load(std::sync::atomic::Ordering::Relaxed);
+                        tracing::debug!(nonce, signer = %signer_addr, "nonce used for the tx");
+
                         tx.sign_and_encode_to_eip2718(nonce, chain_id, gas_estimation.into(), &signer)
                             .map_err(ConnectorError::from)
                             .and_then(move |tx| {
-                                tracing::debug!(nonce, "submitting transaction");
+                                tracing::debug!(nonce, signer = %signer_addr, "submitting transaction");
                                 let client = client.clone();
                                 async move {
                                     client
@@ -89,11 +163,11 @@ where
                                         .await
                                 }
                             })
-                            .map(|res| (res, notifier))
+                            .map(|res| (res, signer_addr, notifier))
                             .await
                     }
                 })
-                .for_each(move |(res, notifier)| {
+                .for_each(move |(res, signer_addr, notifier)| {
                     // The nonce is incremented when the transaction succeeded or failed due to on-chain
                     // rejection.
                     if res.is_ok()
@@ -101,10 +175,16 @@ where
                             .as_ref()
                             .is_err_and(|error| error.as_transaction_rejection_error().is_some())
                     {
-                        let prev_nonce = current_nonce_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        tracing::debug!(prev_nonce, ?res, "nonce incremented due to tx success or rejection");
+                        // Increment the nonce
+                        let prev_nonce = current_nonce_clone
+                            .entry(signer_addr)
+                            .or_default()
+                            .value()
+                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+                        tracing::debug!(prev_nonce, signer = %signer_addr, ?res, "nonce incremented due to tx success or rejection");
                     } else {
-                        tracing::warn!(?res, "nonce not incremented due to tx failure other than rejection");
+                        tracing::warn!(?res, signer = %signer_addr, "nonce not incremented due to tx failure other than rejection");
                     }
 
                     if notifier.send(res).is_err() {
@@ -133,12 +213,13 @@ where
         &self,
         transaction: R,
         timeout_until_finalized: std::time::Duration,
+        custom_signer: Option<ChainKeypair>,
     ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>> {
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
         self.sender
             .clone()
-            .send((transaction, notifier_tx))
+            .send((transaction, custom_signer, notifier_tx))
             .await
             .map_err(|_| ConnectorError::InvalidState("transaction queue dropped"))?;
 

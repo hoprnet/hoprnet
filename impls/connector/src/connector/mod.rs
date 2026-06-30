@@ -640,6 +640,7 @@ where
         &'a self,
         tx_req: P::TxRequest,
         custom_tx_multiplier: Option<u32>,
+        custom_signer: Option<ChainKeypair>,
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         let chain_info = self.query_cached_chain_info().await?;
         let tx_timeout = custom_tx_multiplier.unwrap_or(self.cfg.tx_timeout_multiplier).max(1)
@@ -647,7 +648,7 @@ where
             * chain_info.expected_block_time;
         Ok(self
             .sequencer
-            .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT))
+            .enqueue_transaction(tx_req, tx_timeout.max(MIN_TX_CONFIRM_TIMEOUT), custom_signer)
             .await?
             .and_then(|tx| {
                 if let Some(tx_exec) = tx.safe_execution
