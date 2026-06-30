@@ -101,9 +101,6 @@ harness = false
 mimalloc = { workspace = true, optional = true }
 tikv-jemallocator = { workspace = true, optional = true }
 
-[lib]
-doctest = false
-
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
 

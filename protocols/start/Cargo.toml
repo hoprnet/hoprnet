@@ -27,6 +27,3 @@ hopr-crypto-packet = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hopr-crypto-packet = { workspace = true }
-
-[lib]
-doctest = false

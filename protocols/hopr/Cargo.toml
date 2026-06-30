@@ -80,9 +80,6 @@ harness = false
 name = "codec_bench"
 harness = false
 
-[lib]
-doctest = false
-
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 

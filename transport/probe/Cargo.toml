@@ -15,7 +15,6 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
-doctest = false
 
 [features]
 default = []
