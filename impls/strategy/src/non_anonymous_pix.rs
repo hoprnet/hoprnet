@@ -19,21 +19,19 @@ use std::{
 use std::convert::identity;
 use futures::{SinkExt, StreamExt, TryStreamExt, TryFutureExt, FutureExt};
 use futures_time::future::FutureExt as TimeExt;
-use hopr_api::{chain::{ChainReadChannelOperations, ChainWriteAccountOperations}, node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi, PixEvent}, types::primitive::prelude::*, ChainKeypair};
+use hopr_api::{chain::{ChainWriteAccountOperations}, node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi, PixEvent}, types::primitive::prelude::*, ChainKeypair};
 use hopr_api::chain::ChainValues;
-use hopr_api::types::chain::payload::BasicPayloadGenerator;
-use hopr_api::types::chain::prelude::PayloadGenerator;
 use hopr_api::types::crypto::prelude::Keypair;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct NonAnonymousPixStrategyConfig {
     pub price_per_byte: HoprBalance,
     pub max_ssa_allocation: HoprBalance,
-    pub max_deposit_tracking_time: std::time::Duration,
+    pub max_deposit_tracking_time: Duration,
 }
 
 /// Builder for [`NonAnonymousPixStrategy`].
@@ -154,12 +152,7 @@ where
                 let recovered_balance: HoprBalance = self.node.chain_api().balance(chain_key.public().to_address()).await.map_err(StrategyError::other)?;
                 tracing::info!(%recovered_balance, address = %chain_key.public().to_address(), "recovered deposit balance");
 
-                let contract_addrs = self.node.chain_api().chain_info().await.map_err(StrategyError::other)?.contract_addresses;
-
-                // TODO: create withdraw remote
-                let withdraw_payload = BasicPayloadGenerator::new(chain_key.public().to_address(), contract_addrs)
-                    .transfer(self.node.identity().safe_address, recovered_balance)
-                    .map_err(StrategyError::other)?;
+                // TODO: withdraw using withdraw_from_signer
             }
         }
 
