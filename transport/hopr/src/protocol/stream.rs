@@ -68,6 +68,7 @@ type PeerStreamCache<T> = moka::sync::Cache<PeerId, PeerSink<T>>;
 /// forwards decoded frames to `ingress_from_peers`. Both tasks invalidate
 /// `cache[peer]` when they complete, but only if the cache entry still holds
 /// the same `token` — this prevents a stale task from wiping a newer sink.
+#[allow(clippy::too_many_arguments)]
 fn spawn_stream_pumps<S, C>(
     peer: PeerId,
     stream: S,
@@ -109,7 +110,7 @@ fn spawn_stream_pumps<S, C>(
             .then(move |_| async move {
                 if cache_for_write
                     .get(&peer)
-                    .map_or(false, |s| Arc::ptr_eq(&s.token, &token_write))
+                    .is_some_and(|s| Arc::ptr_eq(&s.token, &token_write))
                 {
                     cache_for_write.invalidate(&peer);
                 }
@@ -142,7 +143,7 @@ fn spawn_stream_pumps<S, C>(
             .then(move |_| async move {
                 if cache_for_read
                     .get(&peer)
-                    .map_or(false, |s| Arc::ptr_eq(&s.token, &token))
+                    .is_some_and(|s| Arc::ptr_eq(&s.token, &token))
                 {
                     cache_for_read.invalidate(&peer);
                 }
@@ -295,7 +296,7 @@ where
                                         %peer, %error,
                                         "stream open failed/timed out; dropping buffered packets"
                                     );
-                                    if cache2.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                                    if cache2.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
                                         cache2.invalidate(&peer);
                                     }
                                 }
@@ -305,7 +306,7 @@ where
                         open_count2.fetch_sub(1, Ordering::Relaxed);
                         tracing::debug!(%peer, "stream-open concurrency limit reached; dropping buffered packets");
                         hopr_utils::runtime::prelude::spawn(async move {
-                            if cache2.get(&peer).map_or(false, |s| Arc::ptr_eq(&s.token, &token)) {
+                            if cache2.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
                                 cache2.invalidate(&peer);
                             }
                         });
@@ -333,7 +334,7 @@ where
                     tracing::debug!(%peer, "peer sink disconnected; invalidating cache");
                     if cache_out
                         .get(&peer)
-                        .map_or(false, |s| Arc::ptr_eq(&s.token, &sink.token))
+                        .is_some_and(|s| Arc::ptr_eq(&s.token, &sink.token))
                     {
                         cache_out.invalidate(&peer);
                     }
@@ -906,9 +907,10 @@ mod tests {
         let mut received_bytes = 0usize;
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
         while received_bytes < expected_bytes && tokio::time::Instant::now() < deadline {
-            match tokio::time::timeout(std::time::Duration::from_millis(100), rx_in.next()).await {
-                Ok(Some((_, bytes))) => received_bytes += bytes.len(),
-                _ => {}
+            if let Ok(Some((_, bytes))) =
+                tokio::time::timeout(std::time::Duration::from_millis(100), rx_in.next()).await
+            {
+                received_bytes += bytes.len();
             }
         }
 

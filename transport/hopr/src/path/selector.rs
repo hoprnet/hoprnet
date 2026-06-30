@@ -1117,7 +1117,7 @@ mod tests {
 
         let total = paths[0].total_latency_ms.expect("latency must be Some");
         assert!(
-            total >= 100 && total <= 130,
+            (100..=130).contains(&total),
             "expected ~120ms total latency, got {total}ms"
         );
         Ok(())

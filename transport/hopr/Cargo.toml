@@ -22,6 +22,7 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []

@@ -21,6 +21,7 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = ["rayon", "ed25519"]

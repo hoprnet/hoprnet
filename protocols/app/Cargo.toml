@@ -29,6 +29,9 @@ hopr-types = { workspace = true, features = ["primitive"] }
 [dev-dependencies]
 anyhow = { workspace = true }
 
+[lib]
+doctest = false
+
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
 

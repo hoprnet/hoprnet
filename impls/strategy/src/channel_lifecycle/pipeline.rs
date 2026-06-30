@@ -696,10 +696,11 @@ where
                 if let ChannelStatus::PendingToClose(closure_time) = ch.status {
                     // elapsed() is Err when the deadline is still in the future;
                     // skip rather than treating it as zero (would fire prematurely).
-                    if let Ok(elapsed) = closure_time.elapsed() {
-                        if elapsed >= overdue && self.try_finalize_channel(ch) {
-                            finalize_count += 1;
-                        }
+                    if let Ok(elapsed) = closure_time.elapsed()
+                        && elapsed >= overdue
+                        && self.try_finalize_channel(ch)
+                    {
+                        finalize_count += 1;
                     }
                 }
             }

@@ -1296,7 +1296,7 @@ where
             }
 
             #[cfg(all(feature = "telemetry", not(test)))]
-            METRIC_DISPATCHED_MSGS.increment_by(&[&"processed"], 1);
+            METRIC_DISPATCHED_MSGS.increment_by(&["processed"], 1);
 
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
@@ -1310,7 +1310,7 @@ where
                     .try_send(in_data)
                     .map(|_| {
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        METRIC_DISPATCHED_MSGS.increment_by(&[&"processed"], 1);
+                        METRIC_DISPATCHED_MSGS.increment_by(&["processed"], 1);
 
                         DispatchResult::Processed
                     })
@@ -1327,7 +1327,7 @@ where
         trace!(tag = %in_data.data.application_tag, "received data not associated with session protocol or any existing session");
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_DISPATCHED_MSGS.increment_by(&[&"unrelated"], 1);
+        METRIC_DISPATCHED_MSGS.increment_by(&["unrelated"], 1);
 
         Ok(DispatchResult::Unrelated(in_data))
     }
@@ -3453,10 +3453,10 @@ mod tests {
         // Poll until the background task has processed the keep-alive
         tokio::time::timeout(Duration::from_secs(1), async {
             loop {
-                if let Some(slot) = alice_mgr.sessions.get(&session_id) {
-                    if slot.surb_mgmt.buffer_level() == new_buffer_level {
-                        break;
-                    }
+                if let Some(slot) = alice_mgr.sessions.get(&session_id)
+                    && slot.surb_mgmt.buffer_level() == new_buffer_level
+                {
+                    break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
@@ -3513,7 +3513,7 @@ mod tests {
         // Verify initial target
         let session_slot = alice_mgr.sessions.get(&session_id).unwrap();
         assert_eq!(
-            session_slot.surb_mgmt.controller_bounds().target() as u64,
+            session_slot.surb_mgmt.controller_bounds().target(),
             initial_target,
             "initial target should be set"
         );
@@ -3537,10 +3537,10 @@ mod tests {
         // Poll until the background task has processed the keep-alive
         tokio::time::timeout(Duration::from_secs(1), async {
             loop {
-                if let Some(slot) = alice_mgr.sessions.get(&session_id) {
-                    if slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed) == new_target {
-                        break;
-                    }
+                if let Some(slot) = alice_mgr.sessions.get(&session_id)
+                    && slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed) == new_target
+                {
+                    break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
