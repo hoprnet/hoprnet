@@ -141,10 +141,7 @@ fn spawn_stream_pumps<S, C>(
                 }
             })
             .then(move |_| async move {
-                if cache_for_read
-                    .get(&peer)
-                    .is_some_and(|s| Arc::ptr_eq(&s.token, &token))
-                {
+                if cache_for_read.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &token)) {
                     cache_for_read.invalidate(&peer);
                 }
             }),
@@ -332,10 +329,7 @@ where
                     // inserted (e.g. from an inbound stream) between our cache.get() above
                     // and this branch.
                     tracing::debug!(%peer, "peer sink disconnected; invalidating cache");
-                    if cache_out
-                        .get(&peer)
-                        .is_some_and(|s| Arc::ptr_eq(&s.token, &sink.token))
-                    {
+                    if cache_out.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &sink.token)) {
                         cache_out.invalidate(&peer);
                     }
                 }
