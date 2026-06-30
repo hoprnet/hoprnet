@@ -189,8 +189,8 @@ mimalloc = { version = "0.1.52", default-features = false, features = [
   "secure",
 ] }
 
-hopr-api = "1.12.0"
-hopr-types = { version = "1.9.1", features = ["use-bindings"] }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-custom-withdraw" }
+hopr-types = { version = "1.9.3", features = ["use-bindings"] }
 hopr-utils = { version = "0.1.0", path = "utils", default-features = false }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -207,7 +207,7 @@ hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.7.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.21.0", path = "impls/connector" }
+hopr-chain-connector = { version = "0.22.0", path = "impls/connector" }
 hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 

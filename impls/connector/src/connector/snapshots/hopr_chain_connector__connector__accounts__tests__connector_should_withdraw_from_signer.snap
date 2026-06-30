@@ -1,0 +1,56 @@
+---
+source: impls/connector/src/connector/accounts.rs
+expression: "*connector.client.snapshot()"
+---
+accounts: {}
+native_balances:
+  "0101010101010101010101010101010101010101":
+    __typename: NativeBalance
+    balance: 1 xDai
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: NativeBalance
+    balance: 10 xDai
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: NativeBalance
+    balance: 8.999999999999999998 xDai
+token_balances:
+  "0101010101010101010101010101010101010101":
+    __typename: HoprBalance
+    balance: 10 wxHOPR
+  668430def9eacd2b5064acf85d73fb0b351a1c8c:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: HoprBalance
+    balance: 990 wxHOPR
+safe_allowances: {}
+deployed_safes: {}
+safe_redeem_stats: {}
+tx_counts:
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 2
+channels: {}
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 100
+  gas_price: "1000000000"
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  max_fee_per_gas: "3000000000"
+  max_priority_fee_per_gas: "100000000"
+  min_ticket_winning_probability: 1
+  key_binding_fee: 0.01 wxHOPR
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: rotsee
+  contract_addresses: "{\"announcements\":\"0xe08E8EfAc66c83a5e2cE9E0a696f8416A5AB6136\",\"channels\":\"0x81a79fcDe8FFE6452e51D8E0493B37C2a5a09c57\",\"module_implementation\":\"0x5F36592e29D90558bc629a4afd87D37d38d9a595\",\"node_safe_migration\":\"0xb9a6F18b40f632869dEFa4bbB2212c63767Eb159\",\"node_safe_registry\":\"0x8cDf9A10646403C9aA797610D4C782aD26D334f4\",\"node_stake_factory\":\"0x6827eC1Bf6232B07f30C2F2924Ea681412b07687\",\"ticket_price_oracle\":\"0xca2c60433eC6a10dDEabBbE3Ce7f9737b1a0628C\",\"token\":\"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\"winning_probability_oracle\":\"0x5136Bac09C78af89bDA56F5086A3F3E2Ee4EAfCa\",\"xhopr_token\":\"0xD057604A14982FE8D88c5fC25Aac3267eA142a08\"}"
+  expected_block_time: "5"
+  finality: "3"
+version: "1"
+client_compatibility:
+  api_version: "1"
+  supported_client_versions: ^0.29.1
+  features:
+    - indexes_safe_events
+health: OK
+active_txs: {}

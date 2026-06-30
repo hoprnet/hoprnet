@@ -165,7 +165,7 @@ where
             .map_err(AnnouncementError::processing)?;
 
         Ok(self
-            .send_tx(tx_req, None)
+            .send_tx(tx_req, None, None)
             .map_err(AnnouncementError::processing)
             .await?
             .boxed())
@@ -180,7 +180,20 @@ where
 
         let tx_req = self.payload_generator.transfer(*recipient, balance)?;
 
-        Ok(self.send_tx(tx_req, None).await?.boxed())
+        Ok(self.send_tx(tx_req, None, None).await?.boxed())
+    }
+
+    async fn withdraw_from_signer<Cy: Currency + Send>(
+        &self,
+        signer: &ChainKeypair,
+        balance: Balance<Cy>,
+        recipient: &Address,
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+
+        let tx_req = self.payload_generator.transfer(*recipient, balance)?;
+
+        Ok(self.send_tx(tx_req, None, Some(signer.clone())).await?.boxed())
     }
 
     async fn register_safe(
@@ -230,7 +243,7 @@ where
             .map_err(SafeRegistrationError::processing)?;
 
         Ok(self
-            .send_tx(tx_req, None)
+            .send_tx(tx_req, None, None)
             .map_err(SafeRegistrationError::processing)
             .await?
             .boxed())
@@ -518,6 +531,49 @@ mod tests {
             .await?;
         connector
             .withdraw(XDaiBalance::new_base(1), &[1u8; Address::SIZE].into())
+            .await?
+            .await?;
+
+        insta::assert_yaml_snapshot!(*connector.client.snapshot());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connector_should_withdraw_from_signer() -> anyhow::Result<()> {
+        let blokli_client = BlokliTestStateBuilder::default()
+            .with_balances([([1u8; Address::SIZE].into(), HoprBalance::zero())])
+            .with_balances([([1u8; Address::SIZE].into(), XDaiBalance::zero())])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_1)?.public().to_address(),
+                HoprBalance::new_base(1000),
+            )])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+                XDaiBalance::new_base(10),
+            )])
+            .with_balances([(
+                ChainKeypair::from_secret(&PRIVATE_KEY_2)?.public().to_address(),
+                HoprBalance::new_base(1000),
+            )])
+            .with_hopr_network_chain_info("rotsee")
+            .build_dynamic_client(MODULE_ADDR.into());
+
+        let mut connector = create_connector(blokli_client)?;
+        connector.connect().await?;
+
+        let signer = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
+
+        connector
+            .withdraw_from_signer(&signer, HoprBalance::new_base(10), &[1u8; Address::SIZE].into())
+            .await?
+            .await?;
+        connector
+            .withdraw_from_signer(&signer, XDaiBalance::new_base(1), &[1u8; Address::SIZE].into())
             .await?
             .await?;
 
