@@ -34,6 +34,9 @@ pub struct TransactionSequencer<C, R> {
 
 const TX_QUEUE_CAPACITY: usize = 2048;
 
+// How long until nonces for other signers (than node's own) expire
+const OTHER_SIGNER_NONCE_EXPIRATION: Duration = Duration::from_mins(5);
+
 struct FixedTti {
     fixed: Address,
     tti: std::time::Duration,
@@ -88,11 +91,11 @@ where
         let client_clone = client.clone();
         let (sender, receiver) = futures::channel::mpsc::channel::<TxRequest<R>>(TX_QUEUE_CAPACITY);
 
-        // Nonce of our node signer never expires, all other signers expire after 10 minutes
+        // Nonce of our node signer never expires, all other signers expire after a few minutes
         let current_nonce = moka::sync::CacheBuilder::new(1024)
             .expire_after(FixedTti {
                 fixed: signer.public().to_address(),
-                tti: Duration::from_mins(10),
+                tti: OTHER_SIGNER_NONCE_EXPIRATION,
             })
             .build();
 
