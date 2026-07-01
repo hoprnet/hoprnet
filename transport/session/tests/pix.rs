@@ -13,12 +13,14 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::v1::ApplicationData;
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+use hopr_protocol_pix::{
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+};
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    ApplicationDataIn, Capability, DestinationRouting, HoprSessionOutPixEvent, HoprStartProtocol,
-    IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget,
-    SurbBalancerConfig,
+    ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
+    HoprStartProtocol, IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig,
+    SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -316,6 +318,39 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     bob_sender.close_channel();
     let _ = alice_handle.await;
     let _ = bob_handle.await;
+
+    Ok(())
+}
+
+#[test(tokio::test)]
+async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
+    let mgr = SessionManager::new(Default::default());
+
+    let transport = MockMsgSender::new();
+    let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+    let _notifications = tokio::spawn(async move {
+        pin_mut!(new_session_rx);
+        while let Some(_session) = new_session_rx.next().await {}
+    });
+    let (sender, handle) = mock_packet_planning(transport);
+    mgr.start(sender.clone(), new_session_tx, None)?;
+    assert!(mgr.is_started());
+
+    let unknown_pseudonym = HoprPseudonym::random();
+    let ssa_id = SsaId::new(unknown_pseudonym, SsaIndex::new(1).expect("ssa index must be non-zero"));
+    let event = HoprSessionInPixEvent::UnverifiableShare(ssa_id);
+
+    let result = mgr.dispatch_pix_event(event).await;
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        hopr_transport_session::errors::TransportSessionError::Manager(
+            hopr_transport_session::errors::SessionManagerError::NonExistingSession
+        )
+    ));
+
+    sender.close_channel();
+    let _ = handle.await;
 
     Ok(())
 }
