@@ -841,7 +841,7 @@ mod tests {
 
         // Channel has no probing data: last_update == Duration::ZERO, no latency, no edge_score.
         let candidate = crate::channel_lifecycle::selector::CloseCandidate {
-            channel: ch.clone(),
+            channel: ch,
             offchain_key: Some(offchain_key(99)),
             edge_info: PeerEdgeInfo {
                 edge_score: None,

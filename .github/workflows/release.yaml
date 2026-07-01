@@ -21,7 +21,7 @@ permissions:
 jobs:
   build-library:
     name: Build & Publish Library
-    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@19d69bd81be66220932b18f1a7a655b422180b4e # build-library-v3
+    uses: hoprnet/hopr-workflows/.github/workflows/build-library.yaml@d0cffaf9e9209c8eca00e8c74e82ac3f5f3cf7bb # build-library-v3
     permissions:
       contents: read
       id-token: write
@@ -42,7 +42,7 @@ jobs:
       id-token: write
     steps:
       - name: Release version
-        uses: hoprnet/hopr-workflows/actions/release-version@fd29bf3c58b72faacc300e068a05b59eb3b180bc # 0.9.4
+        uses: hoprnet/hopr-workflows/actions/release-version@5b0f0e6c7e3a02e30a33b9f5150fb5b118676e58 # 0.11.0
         with:
           source_branch: ${{ github.ref_name }}
           file: ./hopr/hopr-lib/Cargo.toml
