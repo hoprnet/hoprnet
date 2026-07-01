@@ -354,3 +354,98 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 
     Ok(())
 }
+
+#[test(tokio::test)]
+async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
+    use std::sync::Arc;
+
+    let alice_pseudonym = Arc::new(HoprPseudonym::random());
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let alice_mgr = SessionManager::new(Default::default());
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=2048 * 1024 * 1024,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    let bob_mgr_clone = Arc::new(bob_mgr.clone());
+    let alice_pseudonym_for_alice_start = alice_pseudonym.clone();
+    alice_transport.expect_send_message().returning(move |_, data| {
+        let bob_mgr_clone = bob_mgr_clone.clone();
+        let pseudonym = alice_pseudonym_for_alice_start.clone();
+        Box::pin(async move {
+            bob_mgr_clone.dispatch_message(
+                *pseudonym,
+                ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                },
+            )?;
+            Ok(())
+        })
+    });
+
+    let alice_mgr_session_established = Arc::new(alice_mgr.clone());
+    let alice_pseudonym_ret_est = alice_pseudonym.clone();
+    bob_transport.expect_send_message().times(1).returning(move |_, data| {
+        let mgr = alice_mgr_session_established.clone();
+        let pseudonym = alice_pseudonym_ret_est.clone();
+        Box::pin(async move {
+            mgr.dispatch_message(
+                *pseudonym,
+                ApplicationDataIn {
+                    data: data.data,
+                    packet_info: Default::default(),
+                },
+            )?;
+            Ok(())
+        })
+    });
+
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1);
+    alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1);
+    bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session_option) = tokio::time::timeout(
+        Duration::from_secs(2),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target),
+                SessionClientConfig {
+                    pseudonym: (*alice_pseudonym).into(),
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    pix_ssa_quota: Some((1, 1)),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
+    let _alice_session = alice_session?;
+    let _bob_session = bob_session_option.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    let _ = alice_handle.await;
+    let _ = bob_handle.await;
+
+    Ok(())
+}
