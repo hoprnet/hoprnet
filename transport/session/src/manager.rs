@@ -4548,6 +4548,72 @@ mod tests {
 
         Ok(())
     }
+
+    // ---------------------------------------------------------------------------
+    // PIX protocol tests
+    // ---------------------------------------------------------------------------
+
+    #[test_log::test(tokio::test)]
+    async fn incoming_session_with_unacceptable_pix_quota_is_rejected() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_start::{StartErrorReason, StartInitiation};
+        use tokio::sync::oneshot;
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=2048 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        let (tx, rx) = oneshot::channel();
+        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        // Encode (polys=3000, shares=3000) => quota = 9_000_000 which is way
+        // outside the acceptable range of 0..=2048*1024*1024
+        let additional_data = (u64::from(3000u32) << 48) | (u64::from(3000u32) << 32);
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data,
+            },
+        )
+        .await?;
+
+        let err = rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.challenge, MIN_CHALLENGE);
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

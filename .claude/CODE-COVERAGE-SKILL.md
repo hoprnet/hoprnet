@@ -26,6 +26,7 @@ cargo set-working-directory -p <crate>
 ```
 
 Or use the MCP tool:
+
 ```
 mcp__cargo__set_working_directory(path: "/home/luc/repos/hopr/hoprnet-2")
 ```
@@ -47,6 +48,7 @@ cargo llvm-cov --package hopr-transport-session --lib --bins --tests
 ```
 
 Flags:
+
 - `--lib`: Include library code
 - `--bins`: Include binaries
 - `--tests`: Include test code
