@@ -13,11 +13,13 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::v1::ApplicationData;
-use hopr_protocol_pix::{
-    SsaGeneratorConfig, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+use hopr_protocol_start::StartProtocolDiscriminants;
+use hopr_transport_session::{
+    ApplicationDataIn, Capability, DestinationRouting, HoprSessionOutPixEvent, HoprStartProtocol,
+    IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget,
+    SurbBalancerConfig,
 };
-use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
-use hopr_transport_session::{ApplicationDataIn, Capability, DestinationRouting, HoprSessionOutPixEvent, HoprStartProtocol, IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig};
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 use tokio::time as tokio_time;

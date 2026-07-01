@@ -176,7 +176,7 @@ impl SessionSsaState {
     }
 
     pub fn increment_errors(&self) -> usize {
-        self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
     }
 
     pub fn increment_index(&self) -> SsaIndex {
