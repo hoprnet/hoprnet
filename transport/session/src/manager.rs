@@ -4821,6 +4821,87 @@ mod tests {
         let _ = bob_handle.await;
         Ok(())
     }
+
+    #[test_log::test(tokio::test)]
+    async fn exit_requests_new_ssa_after_ssa_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // Accept all messages; track SsaRequest calls.
+        // 3 messages expected: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after SsaRecovered (3).
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (one at init, one after SsaRecovered)"
+        );
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
