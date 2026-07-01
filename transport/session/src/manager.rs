@@ -1414,6 +1414,7 @@ where
         // Set up a kill switch on the Session that has to be removed
         // once the deposit to the SSA has been made.
         let slot_clone = slot.clone();
+        let mgr_clone = self.clone();
         let session_deadline = std::time::Instant::now()
             + self.cfg.pix_config.max_deposit_wait
             + self.cfg.pix_config.max_ssa_delivery_time;
@@ -1423,6 +1424,7 @@ where
                 move |_| async move {
                     error!(%session_id, ssa_index, "pix session deposit timeout");
                     close_session(session_id, slot_clone, ClosureReason::UnrealizedDeposit);
+                    mgr_clone.close_session(&session_id);
                 }
             )),
         );
@@ -4973,6 +4975,208 @@ mod tests {
             result.unwrap_err(),
             TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
         ));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn exit_receives_ssa_commits_and_emits_deposit_needed_event() -> anyhow::Result<()> {
+        use std::collections::HashMap;
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{
+            PixGroup, PolynomialIndex, SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+        };
+        use hopr_protocol_start::StartInitiation;
+
+        use crate::test_helpers::MsgSender;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // The exit commitment is already set up by handle_incoming_session_initiation.
+        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+
+        // Deliver coefficient 0 (constant terms across all polynomials).
+        // Use the identity/infinity group element as a dummy commitment.
+        // PixGroup<HoprPixSpec> = k256::ProjectivePoint, which has identity/infinity as all-zero bytes.
+        let identity_element = {
+            let g: PixGroup<HoprPixSpec> = Default::default();
+            HoprPixGroupElement::try_from(g.to_bytes().as_ref() as &[u8]).expect("identity element must be valid")
+        };
+        let mut coeff_0_map = HashMap::new();
+        for poly in 0..2 {
+            coeff_0_map.insert(poly as PolynomialIndex, identity_element);
+        }
+        mgr.handle_ssa_commit(
+            alice_pseudonym.clone(),
+            SsaClientCommitmentMessage {
+                session_id: alice_pseudonym.clone(),
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 0,
+                coefficient_commitments: coeff_0_map,
+            },
+        )
+        .await?;
+
+        // Deliver coefficient 1 (linear terms across all polynomials).
+        let mut coeff_1_map = HashMap::new();
+        for poly in 0..2 {
+            coeff_1_map.insert(poly as PolynomialIndex, identity_element);
+        }
+        mgr.handle_ssa_commit(
+            alice_pseudonym.clone(),
+            SsaClientCommitmentMessage {
+                session_id: alice_pseudonym.clone(),
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 1,
+                coefficient_commitments: coeff_1_map,
+            },
+        )
+        .await?;
+
+        // The first coefficient commitment should trigger DepositNeeded.
+        pin_mut!(pix_events_rx);
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), pix_events_rx.next())
+            .await
+            .map_err(|e| anyhow::anyhow!("timeout waiting for pix event: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("pix_events_rx closed without emitting an event"))?;
+
+        assert!(matches!(
+            event,
+            HoprSessionOutPixEvent::DepositNeeded(AgreedSsaQuota { ssa_id: ref received_ssa_id, .. }, _)
+            if received_ssa_id == &ssa_id
+        ));
+
+        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+            unreachable!();
+        };
+        assert_eq!(quota.quota_per_ssa, pix_params_to_quota(2, 2));
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_is_closed_when_deposit_timeout_fires() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_start::StartInitiation;
+
+        use crate::test_helpers::MsgSender;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        // Short timeouts so the kill switch fires quickly.
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                max_deposit_wait: Duration::from_millis(50),
+                max_ssa_delivery_time: Duration::ZERO,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MsgSender::new();
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest (2 messages).
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // Session is active after establishment.
+        assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
+
+        // Wait for the kill switch to fire (max_deposit_wait + max_ssa_delivery_time = 50ms + 0 = 50ms).
+        // Add a 100ms buffer to be safe.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Session must be closed due to unrealized deposit.
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session should be closed after deposit timeout"
+        );
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
 
         Ok(())
     }
