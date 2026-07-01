@@ -161,6 +161,8 @@ where
                 let chain_key =
                     ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
 
+                let safe_address = self.node.identity().safe_address;
+
                 let recovered_balance: HoprBalance = self
                     .node
                     .chain_api()
@@ -169,7 +171,15 @@ where
                     .map_err(StrategyError::other)?;
                 tracing::info!(%recovered_balance, address = %chain_key.public().to_address(), "recovered deposit balance");
 
-                // TODO: withdraw using withdraw_from_signer
+                self.node
+                    .chain_api()
+                    .withdraw_from_signer(&chain_key, recovered_balance, &safe_address)
+                    .await
+                    .map_err(StrategyError::other)?
+                    .await
+                    .map_err(StrategyError::other)?;
+
+                tracing::info!(%recovered_balance, address = %chain_key.public().to_address(),  "deposit withdrawn");
             }
         }
 
