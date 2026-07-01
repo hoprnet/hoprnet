@@ -13,12 +13,11 @@ use hopr_api::types::{
     primitive::prelude::Address,
 };
 use hopr_protocol_app::v1::ApplicationData;
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
-use hopr_protocol_start::StartProtocolDiscriminants;
-use hopr_transport_session::{
-    ApplicationDataIn, Capability, DestinationRouting, HoprSessionOutPixEvent, IncomingSessionPixConfig, PixToolbox,
-    SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+use hopr_protocol_pix::{
+    SsaGeneratorConfig, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
 };
+use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
+use hopr_transport_session::{ApplicationDataIn, Capability, DestinationRouting, HoprSessionOutPixEvent, HoprStartProtocol, IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig};
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 use tokio::time as tokio_time;
@@ -43,6 +42,12 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         polynomials_per_ssa: 64,
         threshold: 64,
         surplus_shares: 16,
+    };
+
+    let expected_ssa_commits = {
+        let max_commitments_per_message = (ApplicationData::PAYLOAD_SIZE - HoprStartProtocol::START_HEADER_SIZE)
+            / (size_of::<SsaIndex>() + size_of::<hopr_crypto_packet::prelude::HoprPixGroupElement>());
+        ssa_gen_config.threshold * ssa_gen_config.polynomials_per_ssa.div_ceil(max_commitments_per_message)
     };
 
     let mut sequence = mockall::Sequence::new();
@@ -137,7 +142,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     let alice_pseudonym_for_alice_ssa = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
-        .times(192)
+        .times(expected_ssa_commits)
         .in_sequence(&mut sequence)
         .withf(move |peer, data| {
             tracing::trace!("alice sends {}", data.data.application_tag);
