@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["tempdb"],"struct":["AccountEntry","Address","ChannelEntry","HoprKeyIdent","OffchainPublicKey"],"trait":["Backend"],"type":["ChannelId"]};

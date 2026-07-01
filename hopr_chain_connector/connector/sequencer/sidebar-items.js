@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["OTHER_SIGNER_NONCE_EXPIRATION","TX_QUEUE_CAPACITY"],"struct":["FixedTti","TransactionSequencer"],"type":["TxRequest"]};

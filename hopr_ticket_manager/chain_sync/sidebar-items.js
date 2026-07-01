@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["ticket_factory_from_chain","ticket_manager_from_chain"]};

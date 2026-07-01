@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TicketManagerError"],"fn":["ticket_factory_from_chain","ticket_manager_from_chain"],"mod":["backend","chain_sync","errors","factory","manager","traits","utils"],"struct":["HoprTicketFactory","HoprTicketManager","MemoryStore","MemoryTicketQueue","RedbStore","RedbTicketQueue"],"trait":["OutgoingIndexStore","TicketQueue","TicketQueueStore"]};
