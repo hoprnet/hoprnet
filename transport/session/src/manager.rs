@@ -4749,6 +4749,78 @@ mod tests {
 
         Ok(())
     }
+
+    #[test_log::test(tokio::test)]
+    async fn session_is_closed_after_too_many_unverifiable_shares() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+        for i in 1..=4 {
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .await?;
+            if i < 4 {
+                assert!(
+                    !mgr.active_sessions().is_empty(),
+                    "session should remain open after {i} error(s)"
+                );
+            }
+        }
+
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session must be closed after 4 unverifiable shares"
+        );
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
