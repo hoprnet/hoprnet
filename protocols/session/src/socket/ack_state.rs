@@ -578,9 +578,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
         // Since segments are re-sent via Control stream, they are not later fed again
         // into the ring buffer.
-        if !ctx.rb_tx.push(segment.clone()) {
-            tracing::error!("failed to push segment into ring buffer");
-        }
+        ctx.rb_tx.push(segment.clone());
 
         // When the last segment of a frame has been sent,
         // add it to outgoing retries (if the full ack mode is enabled).

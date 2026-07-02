@@ -26,9 +26,8 @@ impl<T> std::fmt::Debug for RingBufferProducer<T> {
 }
 
 impl<T> RingBufferProducer<T> {
-    pub fn push(&mut self, item: T) -> bool {
+    pub fn push(&mut self, item: T) {
         self.0.lock().enqueue(item);
-        true
     }
 }
 

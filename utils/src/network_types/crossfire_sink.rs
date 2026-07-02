@@ -35,10 +35,6 @@ pub struct CrossfireSink<T: 'static> {
     pending: Option<PendingFut<T>>,
 }
 
-// CrossfireSink does not use structural pinning — no field is accessed exclusively through
-// Pin<&mut CrossfireSink<T>>. Moving a CrossfireSink after pinning is safe.
-impl<T: 'static> Unpin for CrossfireSink<T> {}
-
 // SAFETY: All &self methods (try_send, clone) only access `tx: MAsyncTx<Array<T>>` which
 // is Sync. The `pending` and `buffered` fields are accessed exclusively via &mut self
 // (Sink trait methods), making concurrent &self access free of data races.
