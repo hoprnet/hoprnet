@@ -2366,7 +2366,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+    use hopr_protocol_pix::SsaGeneratorConfig;
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;

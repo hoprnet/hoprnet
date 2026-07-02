@@ -15,13 +15,13 @@ use hopr_api::types::{
 use hopr_protocol_app::v1::ApplicationData;
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    test_helpers::start_msg_match, ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol,
+    SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 
-use crate::common::{MockMsgSender, mock_packet_planning, msg_type, start_msg_match};
+use crate::common::{MockMsgSender, mock_packet_planning, msg_type};
 
 #[test(tokio::test)]
 async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> Result<()> {
