@@ -140,7 +140,7 @@ impl<T: Send + Unpin + 'static> futures::Sink<T> for CrossfireSink<T> {
 }
 
 /// Creates a strict-capacity bounded MPSC channel returning a [`CrossfireSink`] sender
-/// and a [`Stream`] receiver.
+/// and a [`futures::stream::BoxStream`] receiver.
 ///
 /// The channel holds at most `capacity` items at any time, independent of how many times
 /// the sender is cloned. This contrasts with `futures::channel::mpsc::channel(N)`, where
