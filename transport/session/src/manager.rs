@@ -280,7 +280,6 @@ impl Drop for SessionSlotGuard<'_> {
             warn!(%session_id, "rolling back partially established session slot after setup failure");
             if let Some(slot) = self.sessions.remove(&session_id) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-
                 close_session(session_id, slot, ClosureReason::Eviction);
             }
         }
@@ -1413,8 +1412,8 @@ where
 
         // Set up a kill switch on the Session that has to be removed
         // once the deposit to the SSA has been made.
-        let slot_clone = slot.clone();
-        let mgr_clone = self.clone();
+        let session_cache = self.sessions.clone();
+        let active_sessions_clone = self.active_sessions.clone();
         let session_deadline = std::time::Instant::now()
             + self.cfg.pix_config.max_deposit_wait
             + self.cfg.pix_config.max_ssa_delivery_time;
@@ -1422,15 +1421,24 @@ where
             SessionHandles::PixKillSwitch,
             hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
                 move |_| async move {
-                    error!(%session_id, ssa_index, "pix session deposit timeout");
-                    close_session(session_id, slot_clone, ClosureReason::UnrealizedDeposit);
-                    mgr_clone.close_session(&session_id);
+                    if let Some(session_slot) = session_cache.remove(&session_id) {
+                        active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
+                        close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
+                        error!(%session_id, ssa_index, "pix session deposit timeout");
+                    } else {
+                        warn!(%session_id, "pix session deposit timeout - session not found");
+                    }
                 }
             )),
         );
         info!(%session_id, "pix session deposit timeout set");
 
         Ok(())
+    }
+
+    /// Returns the current number of active sessions.
+    pub fn num_active_sessions(&self) -> usize {
+        self.active_sessions.load(Ordering::Relaxed)
     }
 
     /// Returns [`SessionIds`](SessionId) of all currently active sessions.
@@ -2534,6 +2542,7 @@ mod tests {
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
+        assert_eq!(alice_mgr.num_active_sessions(), 1);
         assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id())?);
         assert!(
             alice_mgr
@@ -2542,6 +2551,7 @@ mod tests {
         );
 
         assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
         assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id())?);
         assert!(
             bob_mgr
@@ -2552,7 +2562,8 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(wait_for_no_active_sessions(&alice_mgr).await);
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
 
         assert!(matches!(
             alice_mgr.ping_session(alice_session.id()).await,
@@ -2799,6 +2810,7 @@ mod tests {
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
+        assert_eq!(alice_mgr.num_active_sessions(), 1);
         assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id())?);
         assert!(
             alice_mgr
@@ -2807,6 +2819,7 @@ mod tests {
         );
 
         assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
         assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id())?);
         assert!(
             bob_mgr
@@ -2836,7 +2849,8 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(wait_for_no_active_sessions(&alice_mgr).await);
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
 
         assert!(matches!(
             alice_mgr.ping_session(alice_session.id()).await,
@@ -2971,9 +2985,13 @@ mod tests {
         );
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
+        assert_eq!(alice_mgr.num_active_sessions(), 1);
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
+
         // Let the session timeout at Alice
         tokio::time::sleep(Duration::from_millis(300)).await;
 
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
         assert!(matches!(
             alice_mgr.ping_session(alice_session.id()).await,
             Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
@@ -3124,6 +3142,9 @@ mod tests {
             alice_session,
             Err(TransportSessionError::Manager(SessionManagerError::Loopback))
         ));
+        // There is one session in the manager, which is the incoming one that Alice's manager
+        // accepted when it received the StartSession message from itself.
+        assert_eq!(alice_mgr.num_active_sessions(), 1);
 
         drop(new_session_rx_alice);
 
@@ -3187,6 +3208,7 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
 
         Ok(())
     }
@@ -3224,6 +3246,7 @@ mod tests {
             wait_for_no_active_sessions(&mgr).await,
             "the partially established session slot was not rolled back"
         );
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -3644,6 +3667,7 @@ mod tests {
         // Verify one session exists
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should have exactly one active session");
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
 
         // Second session initiation with same pseudonym - should be handled gracefully
         // (returns Ok but sends SessionError to the requester)
@@ -3668,6 +3692,7 @@ mod tests {
         // Verify still only one session exists
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should still have exactly one active session");
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -3692,6 +3717,7 @@ mod tests {
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
+        assert_eq!(mgr.num_active_sessions(), 0);
         let result = mgr.ping_session(&fake_session_id).await;
 
         assert!(result.is_err());
@@ -3723,6 +3749,7 @@ mod tests {
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
+        assert_eq!(mgr.num_active_sessions(), 0);
         let result = mgr.close_session(&fake_session_id);
 
         assert!(!result, "closing non-existent session should return false");
@@ -3943,6 +3970,7 @@ mod tests {
 
         // Verify one session exists
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Second session - should fail with TooManySessions
         let pseudonym2 = HoprPseudonym::random();
@@ -3961,6 +3989,7 @@ mod tests {
         // The error is handled internally (sends SessionError), so result is Ok
         // But we can verify no new session was added
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -4016,6 +4045,7 @@ mod tests {
             .await?;
         }
         assert_eq!(mgr.active_sessions().len(), 2);
+        assert_eq!(mgr.num_active_sessions(), 2);
 
         // Third outgoing call hits the early return before sending anything.
         let result = mgr
@@ -4075,6 +4105,7 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+        assert_eq!(mgr.num_active_sessions(), 0);
         // The challenge must have been removed from `session_initiations` even
         // though the send failed.
         assert_eq!(
@@ -4137,6 +4168,7 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
         // The pending challenge must have been removed from `session_initiations`
         // after the timeout error propagated.
         assert_eq!(
@@ -4176,6 +4208,7 @@ mod tests {
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -4221,6 +4254,7 @@ mod tests {
 
         // Verify session exists
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Close the session - should return true
         let result = mgr.close_session(&pseudonym);
@@ -4228,6 +4262,7 @@ mod tests {
 
         // Verify session is closed
         assert_eq!(mgr.active_sessions().len(), 0);
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
@@ -4611,6 +4646,7 @@ mod tests {
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
         assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
@@ -4669,6 +4705,7 @@ mod tests {
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
         assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
@@ -4819,6 +4856,7 @@ mod tests {
                     !mgr.active_sessions().is_empty(),
                     "session should remain open after {i} error(s)"
                 );
+                assert_eq!(mgr.num_active_sessions(), 1);
             }
         }
 
@@ -4826,6 +4864,7 @@ mod tests {
             mgr.active_sessions().is_empty(),
             "session must be closed after 4 unverifiable shares"
         );
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
@@ -5190,6 +5229,7 @@ mod tests {
             mgr.active_sessions().is_empty(),
             "session should be closed after deposit timeout"
         );
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
