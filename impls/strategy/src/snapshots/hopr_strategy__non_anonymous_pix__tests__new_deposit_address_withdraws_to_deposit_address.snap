@@ -1,6 +1,5 @@
 ---
 source: impls/strategy/src/non_anonymous_pix.rs
-assertion_line: 455
 expression: "*snapshot.refresh()"
 ---
 accounts:

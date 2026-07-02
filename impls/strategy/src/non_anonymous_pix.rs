@@ -253,11 +253,6 @@ impl<N> NonAnonymousPixStrategyInner<N>
 where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
-    /// Handle a PIX event directly, bypassing the event stream.
-    async fn on_pix_event_test(&self, event: PixEvent) -> crate::errors::Result<()> {
-        self.on_pix_event(event).await
-    }
-
     /// Read the HOPR balance of the given address via the node's chain API.
     async fn get_balance(&self, address: Address) -> crate::errors::Result<HoprBalance> {
         self.node
@@ -270,20 +265,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU32;
+    use std::{num::NonZeroU32, time::Duration as StdDuration};
 
     use anyhow::Context;
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{StreamExt, channel::mpsc};
     use hex_literal::hex;
-    use hopr_api::node::{PixDepositAddressReceived, PixDepositAddress};
     use hopr_api::{
         chain::{
             AccountSelector, ChainEvents, ChainReadAccountOperations, ChainReadChannelOperations,
             ChainWriteAccountOperations, HoprChainApi,
         },
-        node::{ActionableEvent, ActionableEventDiscriminant, ComponentStatus, ComponentStatusReporter, EventWaitResult, HasChainApi, NodeOnchainIdentity, PixEvent},
+        node::{
+            ActionableEvent, ActionableEventDiscriminant, ComponentStatus, ComponentStatusReporter, EventWaitResult,
+            HasChainApi, NodeOnchainIdentity, PixDepositAddress, PixDepositAddressReceived, PixEvent,
+        },
         types::{
-            crypto::{prelude::ChainKeypair, keypairs::Keypair},
+            crypto::{keypairs::Keypair, prelude::ChainKeypair},
             crypto_random::Randomizable,
             internal::prelude::HoprPseudonym,
             primitive::prelude::{Address, HoprBalance, XDaiBalance},
@@ -291,7 +288,6 @@ mod tests {
     };
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use tokio::time::timeout;
-    use std::time::Duration as StdDuration;
 
     use super::*;
 
@@ -440,7 +436,7 @@ mod tests {
         });
 
         // Spawn the handler (returns immediately, polling runs in background).
-        strategy.on_pix_event_test(event).await?;
+        strategy.on_pix_event(event).await?;
 
         // Wait for the notifier to receive the deposit. The first poll fires after
         // max_tracking_time / 10 (capped at 1 s). Allow up to 10 s for the notification.
@@ -505,7 +501,9 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
         };
 
-        let bob_balance_before = strategy.get_balance(*BOB).await
+        let bob_balance_before = strategy
+            .get_balance(*BOB)
+            .await
             .context("get bob balance before withdraw")?;
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
@@ -514,10 +512,12 @@ mod tests {
             quota,
         });
 
-        strategy.on_pix_event_test(event).await?;
+        strategy.on_pix_event(event).await?;
 
         // The withdrawal amount is price_per_byte * quota = 1 * 20 = 20.
-        let bob_balance_after = strategy.get_balance(*BOB).await
+        let bob_balance_after = strategy
+            .get_balance(*BOB)
+            .await
             .context("get bob balance after withdraw")?;
 
         assert_eq!(
@@ -527,9 +527,7 @@ mod tests {
         );
 
         let deposit_balance = strategy
-            .get_balance(Address::from(hopr_api::node::PixDepositAddress(
-                deposit_address_bytes,
-            )))
+            .get_balance(Address::from(hopr_api::node::PixDepositAddress(deposit_address_bytes)))
             .await
             .context("get deposit address balance")?;
         assert_eq!(
@@ -587,7 +585,7 @@ mod tests {
             quota,
         });
 
-        let result = strategy.on_pix_event_test(event).await;
+        let result = strategy.on_pix_event(event).await;
         assert!(
             matches!(result, Err(crate::errors::StrategyError::CriteriaNotSatisfied)),
             "withdrawal should be rejected when target deposit exceeds max_ssa_allocation"
@@ -655,10 +653,12 @@ mod tests {
             secret: hopr_api::node::PixDepositSecret(recovered_kp.secret().clone()),
         });
 
-        strategy.on_pix_event_test(event).await?;
+        strategy.on_pix_event(event).await?;
 
         // Recovered keypair's balance should be zero after withdrawal.
-        let recovered_balance = strategy.get_balance(recovered_address).await
+        let recovered_balance = strategy
+            .get_balance(recovered_address)
+            .await
             .context("get recovered address balance after withdraw")?;
         assert_eq!(
             recovered_balance,
@@ -667,11 +667,12 @@ mod tests {
         );
 
         // Safe should have received the full recovered balance.
-        let safe_balance = strategy.get_balance(safe_address).await
+        let safe_balance = strategy
+            .get_balance(safe_address)
+            .await
             .context("get safe balance after withdraw")?;
         assert_eq!(
-            safe_balance,
-            recovered_initial_balance,
+            safe_balance, recovered_initial_balance,
             "safe should have received the full recovered balance"
         );
 

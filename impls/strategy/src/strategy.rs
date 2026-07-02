@@ -122,7 +122,7 @@ impl Strategy for MultiStrategy {
                 };
 
                 if let Err(e) = strategy_result {
-                    warn!(%e, "sub-strategy failed");
+                    tracing::warn!(%e, "sub-strategy failed");
                 }
             }
         }
