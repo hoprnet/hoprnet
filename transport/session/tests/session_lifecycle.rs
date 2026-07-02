@@ -1,7 +1,5 @@
 //! Integration tests for `SessionManager` session establishment and lifecycle.
 
-mod common;
-
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
@@ -15,13 +13,12 @@ use hopr_api::types::{
 use hopr_protocol_app::v1::ApplicationData;
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SurbBalancerConfig, test_helpers::start_msg_match,
+    test_helpers::{mock_packet_planning, start_msg_match, msg_type},
+    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig, SessionManager,
+    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
-
-use crate::common::{MockMsgSender, mock_packet_planning, msg_type};
 
 /// Verifies the full session lifecycle end-to-end using the StartProtocol.
 ///

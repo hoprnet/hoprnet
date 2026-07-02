@@ -1,7 +1,5 @@
 //! Integration tests for `SessionManager` PIX protocol support.
 
-mod common;
-
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
@@ -18,15 +16,14 @@ use hopr_protocol_pix::{
 };
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
+    test_helpers::{mock_packet_planning, msg_type},
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
-    HoprStartProtocol, IncomingSessionPixConfig, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig,
+    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig,
     SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 use tokio::time as tokio_time;
-
-use crate::common::{MockMsgSender, mock_packet_planning, msg_type};
 
 /// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
 ///

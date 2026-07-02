@@ -4362,7 +4362,7 @@ mod tests {
             .handle_ssa_commit(
                 HoprPseudonym::random(),
                 SsaClientCommitmentMessage {
-                    session_id: alice_pseudonym.clone(),
+                    session_id: alice_pseudonym,
                     ssa_index: SsaIndex::MIN,
                     coefficient_index: 0,
                     coefficient_commitments: HashMap::new(),
@@ -4448,7 +4448,7 @@ mod tests {
         )
         .await?;
 
-        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
         for i in 1..=4 {
             mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
                 .await?;
@@ -4549,7 +4549,7 @@ mod tests {
         )
         .await?;
 
-        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
         mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
             .await?;
 
@@ -4631,7 +4631,7 @@ mod tests {
         )
         .await?;
 
-        let session_id = alice_pseudonym.clone();
+        let session_id = alice_pseudonym;
 
         // Server sends a quota of (10, 10) while we offered (2, 2) — should be rejected.
         let result = mgr
@@ -4728,23 +4728,23 @@ mod tests {
         .await?;
 
         // The exit commitment is already set up by handle_incoming_session_initiation.
-        let ssa_id = SsaId::new(alice_pseudonym.clone(), SsaIndex::MIN);
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
 
         // Deliver coefficient 0 (constant terms across all polynomials).
         // Use the identity/infinity group element as a dummy commitment.
         // PixGroup<HoprPixSpec> = k256::ProjectivePoint, which has identity/infinity as all-zero bytes.
         let identity_element = {
             let g: PixGroup<HoprPixSpec> = Default::default();
-            HoprPixGroupElement::try_from(g.to_bytes().as_ref() as &[u8]).expect("identity element must be valid")
+            HoprPixGroupElement::try_from(g.to_bytes().as_ref()).expect("identity element must be valid")
         };
         let mut coeff_0_map = HashMap::new();
         for poly in 0..2 {
             coeff_0_map.insert(poly as PolynomialIndex, identity_element);
         }
         mgr.handle_ssa_commit(
-            alice_pseudonym.clone(),
+            alice_pseudonym,
             SsaClientCommitmentMessage {
-                session_id: alice_pseudonym.clone(),
+                session_id: alice_pseudonym,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 0,
                 coefficient_commitments: coeff_0_map,
@@ -4758,9 +4758,9 @@ mod tests {
             coeff_1_map.insert(poly as PolynomialIndex, identity_element);
         }
         mgr.handle_ssa_commit(
-            alice_pseudonym.clone(),
+            alice_pseudonym,
             SsaClientCommitmentMessage {
-                session_id: alice_pseudonym.clone(),
+                session_id: alice_pseudonym,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 1,
                 coefficient_commitments: coeff_1_map,
@@ -4883,15 +4883,5 @@ mod tests {
         let _ = bob_handle.await;
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod mock_test {
-    use crate::test_helpers::MsgSender;
-    #[test]
-    fn test_msg_sender_new() {
-        let m = MsgSender::new();
-        let _ = m;
     }
 }
