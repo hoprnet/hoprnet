@@ -562,9 +562,10 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
         .expect_send_message()
         .once()
         .withf(move |peer, data| {
-            start_msg_match(data, |msg| {
-                matches!(msg, HoprStartProtocol::KeepAlive(ka) if ka.session_id == alice_pseudonym)
-            }) && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
+            start_msg_match(
+                data,
+                |msg| matches!(msg, HoprStartProtocol::KeepAlive(ka) if ka.session_id == alice_pseudonym),
+            ) && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_keepalive.clone();
