@@ -16,10 +16,10 @@ use hopr_protocol_pix::{
 };
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    test_helpers::{mock_packet_planning, msg_type},
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
-    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager, SessionManagerConfig,
-    SessionTarget, SurbBalancerConfig,
+    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
+    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    test_helpers::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -70,7 +70,8 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     let expected_ssa_commits = {
         let max_commitments_per_message = (ApplicationData::PAYLOAD_SIZE - HoprStartProtocol::START_HEADER_SIZE)
             / (size_of::<SsaIndex>() + size_of::<hopr_crypto_packet::prelude::HoprPixGroupElement>());
-        ssa_gen_config.threshold * ssa_gen_config.polynomials_per_ssa.div_ceil(max_commitments_per_message)
+        ssa_gen_config.threshold as usize
+            * (ssa_gen_config.polynomials_per_ssa as usize).div_ceil(max_commitments_per_message)
     };
 
     let mut sequence = mockall::Sequence::new();
@@ -252,10 +253,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some((
-                        ssa_gen_config.polynomials_per_ssa as u32,
-                        ssa_gen_config.threshold as u32,
-                    )),
+                    pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
                     ..Default::default()
                 },
             ),

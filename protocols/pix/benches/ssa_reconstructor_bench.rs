@@ -134,7 +134,9 @@ fn bench_insert_coefficient_commitments_partial(c: &mut Criterion) {
                     b.iter(|| {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
                         let ssa_id = SsaId::new(pseudonym, index);
-                        reconstructor.new_exit_commitment(ssa_id, *p, *t).unwrap();
+                        reconstructor
+                            .new_exit_commitment(ssa_id, *p as usize, *t as usize)
+                            .unwrap();
                         let mut commitment = generator.new_ssa_commitment(&pseudonym, index).unwrap();
                         let constant_terms = commitment.verifiers.remove(&0).unwrap_or_default();
                         reconstructor
@@ -175,7 +177,9 @@ fn bench_insert_coefficient_commitments_full(c: &mut Criterion) {
                     b.iter(|| {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(cfg);
                         let ssa_id = SsaId::new(pseudonym, index);
-                        reconstructor.new_exit_commitment(ssa_id, *p, *t).unwrap();
+                        reconstructor
+                            .new_exit_commitment(ssa_id, *p as usize, *t as usize)
+                            .unwrap();
                         let commitment = generator.new_ssa_commitment(&pseudonym, index).unwrap();
                         for (coeff_index, poly_commitments) in commitment.verifiers {
                             reconstructor
@@ -244,7 +248,7 @@ fn bench_acknowledge_shares_single(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -262,9 +266,16 @@ fn bench_acknowledge_shares_single(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, 1)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    1,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });
@@ -280,7 +291,7 @@ fn bench_acknowledge_shares_partial(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -298,9 +309,16 @@ fn bench_acknowledge_shares_partial(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t - 1)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    (t - 1) as usize,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });
@@ -316,7 +334,7 @@ fn bench_acknowledge_shares_full(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -334,9 +352,16 @@ fn bench_acknowledge_shares_full(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    t as usize,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });
@@ -352,7 +377,7 @@ fn bench_acknowledge_shares_single_batch(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -370,9 +395,16 @@ fn bench_acknowledge_shares_single_batch(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, 1)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    1,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });
@@ -388,7 +420,7 @@ fn bench_acknowledge_shares_partial_batch(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -406,9 +438,16 @@ fn bench_acknowledge_shares_partial_batch(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t - 1)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    (t - 1) as usize,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });
@@ -424,7 +463,7 @@ fn bench_acknowledge_shares_full_batch(c: &mut Criterion) {
     group.sample_size(30);
 
     let thresholds = [10, 50, 128];
-    let polynomials_per_ssa = 512usize;
+    let polynomials_per_ssa = 512;
     let peer = OffchainKeypair::random();
 
     for &t in &thresholds {
@@ -442,9 +481,16 @@ fn bench_acknowledge_shares_full_batch(c: &mut Criterion) {
             let mut index = SsaIndex::MIN;
 
             b.iter(|| {
-                let acks =
-                    setup_and_generate_shares(&reconstructor, &generator, &peer, index, t, polynomials_per_ssa, t)
-                        .unwrap();
+                let acks = setup_and_generate_shares(
+                    &reconstructor,
+                    &generator,
+                    &peer,
+                    index,
+                    t as usize,
+                    polynomials_per_ssa as usize,
+                    t as usize,
+                )
+                .unwrap();
                 reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 index = index.checked_add(1).unwrap();
             });

@@ -124,7 +124,7 @@ pub struct SessionClientConfig {
     /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
     ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<(u32, u32)>,
+    pub pix_ssa_quota: Option<(u16, u16)>,
 }
 
 #[cfg(test)]

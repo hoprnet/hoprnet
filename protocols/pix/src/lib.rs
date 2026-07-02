@@ -43,14 +43,14 @@ pub mod prelude {
 }
 
 /// Number of polynomials per SSA.
-pub const DEFAULT_POLYS_PER_SSA: usize = 8192;
+pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
 /// Minimum number of shares to recover a part of an SSA.
-pub const DEFAULT_POLY_THRESHOLD: usize = 128;
+pub const DEFAULT_POLY_THRESHOLD: u16 = 128;
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
-pub const MAX_POLYS_PER_SSA: usize = 16192;
+pub const MAX_POLYS_PER_SSA: u16 = 16192;
 /// Maximum SSA polynomial threshold supported by the [`SsaReconstructor`].
-pub const MAX_POLY_THRESHOLD: usize = 4096;
+pub const MAX_POLY_THRESHOLD: u16 = 4096;
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec: Send + Sync + 'static

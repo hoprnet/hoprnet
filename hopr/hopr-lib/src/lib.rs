@@ -156,7 +156,7 @@ pub struct HoprSessionClientConfig {
     /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
     ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<(u32, u32)>,
+    pub pix_ssa_quota: Option<(u16, u16)>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.

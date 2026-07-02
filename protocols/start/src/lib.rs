@@ -234,7 +234,7 @@ pub struct SsaServerCommitmentMessage<I, G> {
     /// Parameters of the PIX protocol the server requires.
     ///
     /// Upper half is the number of polynomials per SSA, lower half is the polynomial threshold (= degree + 1).
-    pub params: u64,
+    pub params: u32,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
 }
@@ -243,25 +243,25 @@ impl<I, G> SsaServerCommitmentMessage<I, G> {
     /// Convenience constructor for creating a new `SsaServerCommitmentMessage`.
     pub fn new(
         session_id: I,
-        polys_per_ssa: u32,
-        shares_per_poly: u32,
+        polys_per_ssa: u16,
+        shares_per_poly: u16,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
     ) -> Self {
         Self {
             session_id,
-            params: ((polys_per_ssa as u64) << 32) | shares_per_poly as u64,
+            params: ((polys_per_ssa as u32) << 16) | shares_per_poly as u32,
             commitments: commitments.into_iter().collect(),
         }
     }
 
     /// Number of polynomials required to reconstruct an SSA.
-    pub fn polys_per_ssa(&self) -> u32 {
-        (self.params >> 32) as u32
+    pub fn polys_per_ssa(&self) -> u16 {
+        (self.params >> 16) as u16
     }
 
     /// Number of shares required to reconstruct a single polynomial.
-    pub fn shares_per_poly(&self) -> u32 {
-        self.params as u32
+    pub fn shares_per_poly(&self) -> u16 {
+        self.params as u16
     }
 }
 
@@ -272,7 +272,7 @@ pub struct KeepAliveMessage<I> {
     pub session_id: I,
     /// Additional flags that govern how the `additional_data` field is interpreted or 0.
     pub flags: KeepAliveFlags,
-    /// Additional data (usually `flags` dependent), ignored if `0x00000000`.
+    /// Additional data (usually `flags` dependent), ignored if `0`.
     pub additional_data: u64,
 }
 
@@ -613,16 +613,16 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SsaRequest => {
-                    if data.len() <= data_offset + size_of::<u64>() + size_of::<u16>() {
+                    if data.len() <= data_offset + size_of::<u32>() + size_of::<u16>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
-                    let params = u64::from_be_bytes(
-                        data[data_offset..data_offset + size_of::<u64>()]
+                    let params = u32::from_be_bytes(
+                        data[data_offset..data_offset + size_of::<u32>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("params".into()))?,
                     );
-                    let mut next_offset = data_offset + size_of::<u64>();
+                    let mut next_offset = data_offset + size_of::<u32>();
 
                     let num_commitments = u16::from_be_bytes(
                         data[next_offset..next_offset + size_of::<u16>()]
@@ -792,7 +792,7 @@ mod tests {
 
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
-            params: 0xfeedbeef_cafebabe,
+            params: 0xfeedbeef,
             commitments,
         });
 
@@ -818,7 +818,7 @@ mod tests {
 
         let msg = StartProtocol::<u32, (), u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
-            params: 0xfeedbeef_cafebabe,
+            params: 0xfeedbeef,
             commitments,
         });
 
@@ -931,7 +931,7 @@ mod tests {
 
         let msg = StartProtocol::<String, String, u8, [u8; 33]>::SsaRequest(SsaServerCommitmentMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            params: 0xfeedbeef_cafebabe,
+            params: 0xfeedbeef,
             commitments,
         });
         assert!(

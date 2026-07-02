@@ -717,8 +717,8 @@ where
 
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
-                polynomials_per_ssa: self.cfg.pix.num_ssa_parts,
-                threshold: self.cfg.pix.ssa_part_size,
+                polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,
+                threshold: self.cfg.pix.ssa_part_size as u16,
                 surplus_shares: self.cfg.pix.additional_shares,
             },
         ));

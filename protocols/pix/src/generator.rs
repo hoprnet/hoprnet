@@ -83,13 +83,13 @@ pub struct SsaGeneratorConfig {
     /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and [`MAX_POLYS_PER_SSA`].
     #[default(DEFAULT_POLYS_PER_SSA)]
     #[validate(range(min = 2, max = MAX_POLYS_PER_SSA))]
-    pub polynomials_per_ssa: usize,
+    pub polynomials_per_ssa: u16,
     /// Minimum number of shares required to reconstruct each SSA polynomial.
     ///
     /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and [`MAX_POLY_THRESHOLD`].
     #[default(DEFAULT_POLY_THRESHOLD)]
     #[validate(range(min = 2, max = MAX_POLY_THRESHOLD))]
-    pub threshold: usize,
+    pub threshold: u16,
     /// Additional number of shares to generate beyond the threshold for redundancy.
     ///
     /// Default is 20.
@@ -141,7 +141,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             let polys = &mut entry.lock().poly_queue;
             while !polys.is_empty() {
                 if let Some(poly) = polys.front_mut()
-                    && poly.shares_generated < self.cfg.threshold + self.cfg.surplus_shares
+                    && poly.shares_generated < self.cfg.threshold as usize + self.cfg.surplus_shares
                 {
                     let x = S::msg_to_scalar(&poly.spi, msg)?;
                     // Zero would disclose the secret, so we disallow it.
@@ -191,7 +191,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
 
         // Generate polynomial and verifier for each sub-secret
         let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
-            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold, rng))
+            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold as usize, rng))
             .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>, S::Pseudonym>>()?
             .into_iter()
             .unzip();
@@ -227,7 +227,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                     ),
                                     raw,
                                     shares_generated: 0,
-                                    t: self.cfg.threshold,
+                                    t: self.cfg.threshold as usize,
                                 })
                                 .collect(),
                         }),
@@ -265,7 +265,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                                     ),
                                     raw,
                                     shares_generated: 0,
-                                    t: self.cfg.threshold,
+                                    t: self.cfg.threshold as usize,
                                 }
                             }));
                     }
@@ -400,8 +400,8 @@ mod tests {
         let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
 
-        for verifier in verifiers.iter().take(cfg.polynomials_per_ssa) {
-            for _ in 0..(cfg.threshold + cfg.surplus_shares) {
+        for verifier in verifiers.iter().take(cfg.polynomials_per_ssa as usize) {
+            for _ in 0..(cfg.threshold as usize + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let g = generator
@@ -431,9 +431,9 @@ mod tests {
         let vs = verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
         let mut recovered_secret = k256::Scalar::default();
-        for v in vs.iter().take(cfg.polynomials_per_ssa) {
+        for v in vs.iter().take(cfg.polynomials_per_ssa as usize) {
             let mut shares = Vec::new();
-            for _ in 0..(cfg.threshold + cfg.surplus_shares) {
+            for _ in 0..(cfg.threshold as usize + cfg.surplus_shares) {
                 let x = hopr_types::crypto_random::random_bytes::<10>();
 
                 let g = generator

@@ -85,7 +85,7 @@ pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSession
 /// Quota per single SSA in bytes.
 pub type SsaQuota = u64;
 
-pub(crate) const fn pix_params_to_quota(polys_per_ssa: u32, shares_per_poly: u32) -> SsaQuota {
+pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16) -> SsaQuota {
     polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::SIZE as SsaQuota
 }
 

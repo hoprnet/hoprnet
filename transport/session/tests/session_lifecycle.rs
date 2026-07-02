@@ -13,9 +13,9 @@ use hopr_api::types::{
 use hopr_protocol_app::v1::ApplicationData;
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    test_helpers::{mock_packet_planning, start_msg_match, msg_type},
-    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig,
+    SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    test_helpers::{mock_packet_planning, msg_type, start_msg_match},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;

@@ -163,7 +163,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         polys_per_ssa: usize,
         shares_per_poly: usize,
     ) -> Result<PixGroup<S>, Self::Error> {
-        if polys_per_ssa > MAX_POLYS_PER_SSA || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_poly) {
+        if polys_per_ssa > MAX_POLYS_PER_SSA as usize || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly) {
             return Err(PixError::InvalidInput);
         }
 
@@ -404,7 +404,7 @@ mod tests {
         let peer = OffchainKeypair::random();
         let nonce = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
 
-        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD)?;
+        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
 
         reconstructor.insert_encrypted_share(
             peer.public(),

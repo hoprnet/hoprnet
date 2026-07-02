@@ -21,8 +21,8 @@ use hopr_crypto_packet::{
 };
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor,
-    SsaShareGenerator,
+    DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
+    GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
@@ -160,12 +160,12 @@ enum SessionHandles {
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
-    polys_per_ssa: u32,
-    shares_per_poly: u32,
+    polys_per_ssa: u16,
+    shares_per_poly: u16,
 }
 
 impl SessionSsaState {
-    pub fn new(polys_per_ssa: u32, shares_per_poly: u32) -> Self {
+    pub fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
         Self {
             // SSA index starts from 1, not 0.
             current_index: std::sync::atomic::AtomicU32::new(1).into(),
@@ -1666,14 +1666,11 @@ where
     /// Checks the PIX parameters offered by the Entry during the Session Initiation.
     ///
     /// Returns the validated parameters, or `None` if the offered parameters were rejected.
-    fn check_pix_params(
-        &self,
-        req: &StartInitiation<SessionTarget, HoprSessionCapabilities>,
-    ) -> Option<(usize, usize)> {
+    fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<(u16, u16)> {
         if req.capabilities.0.contains(Capability::UsePIX) {
             // Client offered PIX, so validate the offered parameters
-            let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u32;
-            let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u32;
+            let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u16;
+            let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u16;
 
             let quota_per_ssa = pix_params_to_quota(polys_per_ssa, shares_per_ssa);
             debug!(
@@ -1689,17 +1686,14 @@ where
                 .pix_config
                 .quota_range
                 .contains(&quota_per_ssa)
-                .then_some((polys_per_ssa as usize, shares_per_ssa as usize))
+                .then_some((polys_per_ssa, shares_per_ssa))
         } else if self.cfg.pix_config.enforce_pix {
             // Client didn't offer PIX, but PIX is enforced
             None
         } else {
-            // Client didn't offer PIX, and PIX is not enforced, so return the pre-configured values,
-            // but they are not going to be used.
-            Some((
-                *self.cfg.pix_config.quota_range.start() as usize,
-                *self.cfg.pix_config.quota_range.end() as usize,
-            ))
+            // Client didn't offer PIX, and PIX is not enforced, so set default values
+            // which are not going to be used.
+            Some((DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD))
         }
     }
 
@@ -2009,10 +2003,7 @@ where
         if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             // We use the same quota that the client offered
             slot.current_ssa_state
-                .set(SessionSsaState::new(
-                    client_polys_per_ssa as u32,
-                    client_shares_per_ssa as u32,
-                ))
+                .set(SessionSsaState::new(client_polys_per_ssa, client_shares_per_ssa))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
             // TODO: if this fails, should we terminate the session immediately (ie. not commit)?
@@ -2969,10 +2960,7 @@ mod tests {
                         pseudonym: alice_pseudonym.into(),
                         capabilities: Capability::Segmentation | Capability::UsePIX,
                         surb_management: Some(balancer_cfg),
-                        pix_ssa_quota: Some((
-                            ssa_gen_config.polynomials_per_ssa as u32,
-                            ssa_gen_config.threshold as u32,
-                        )),
+                        pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
                         ..Default::default()
                     },
                 ),
