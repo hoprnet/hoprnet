@@ -4706,6 +4706,10 @@ mod tests {
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -4777,6 +4781,10 @@ mod tests {
         });
 
         let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
@@ -4935,6 +4943,10 @@ mod tests {
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
 
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -5011,6 +5023,10 @@ mod tests {
         });
 
         let mut bob_transport = MsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
