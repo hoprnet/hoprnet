@@ -25,7 +25,7 @@ use crate::common::{MockMsgSender, mock_packet_planning, msg_type, start_msg_mat
 
 #[test(tokio::test)]
 async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> Result<()> {
-    let alice_pseudonym = Arc::new(HoprPseudonym::random());
+    let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let alice_mgr = SessionManager::new(Default::default());
@@ -37,7 +37,6 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     // Alice sends the StartSession message
     let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
-    let alice_pseudonym_for_alice_start = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -49,10 +48,9 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice.clone();
-            let pseudonym = alice_pseudonym_for_alice_start.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -64,8 +62,6 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     // Bob sends the SessionEstablished message
     let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
-    let alice_pseudonym_est = alice_pseudonym.clone(); // for .withf()
-    let alice_pseudonym_ret_est = alice_pseudonym.clone(); // for .returning()
     bob_transport
         .expect_send_message()
         .once()
@@ -73,14 +69,13 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         .withf(move |peer, data| {
             tracing::info!("bob sends {}", data.data.application_tag);
             msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_est.as_ref())
+                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let alice_mgr = alice_mgr_for_bob.clone();
-            let pseudonym = alice_pseudonym_ret_est.clone();
             Box::pin(async move {
                 alice_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -92,7 +87,6 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     // Alice sends the terminating segment to close the Session
     let bob_mgr_for_alice_seg = Arc::new(bob_mgr.clone());
-    let alice_pseudonym_for_alice_seg = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -109,10 +103,9 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice_seg.clone();
-            let pseudonym = alice_pseudonym_for_alice_seg.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -146,7 +139,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
                 SessionClientConfig {
-                    pseudonym: (*alice_pseudonym).into(),
+                    pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
                     ..Default::default()
@@ -217,7 +210,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
 #[test(tokio::test)]
 async fn session_manager_should_close_idle_session_automatically() -> Result<()> {
-    let alice_pseudonym = Arc::new(HoprPseudonym::random());
+    let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let cfg = SessionManagerConfig {
@@ -234,7 +227,6 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
 
     // Alice sends the StartSession message
     let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
-    let alice_pseudonym_for_alice_start = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -245,10 +237,9 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice.clone();
-            let pseudonym = alice_pseudonym_for_alice_start.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -260,22 +251,19 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
 
     // Bob sends the SessionEstablished message
     let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
-    let alice_pseudonym_est = alice_pseudonym.clone(); // for .withf()
-    let alice_pseudonym_ret_est = alice_pseudonym.clone(); // for .returning()
     bob_transport
         .expect_send_message()
         .once()
         .in_sequence(&mut sequence)
         .withf(move |peer, data| {
             msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_est.as_ref())
+                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let alice_mgr = alice_mgr_for_bob.clone();
-            let pseudonym = alice_pseudonym_ret_est.clone();
             Box::pin(async move {
                 alice_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -308,7 +296,7 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
                 bob_peer,
                 SessionTarget::TcpStream(target.clone()),
                 SessionClientConfig {
-                    pseudonym: (*alice_pseudonym).into(),
+                    pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
                     ..Default::default()
@@ -359,7 +347,7 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
 
 #[test(tokio::test)]
 async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
-    let alice_pseudonym = Arc::new(HoprPseudonym::random());
+    let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let alice_mgr = SessionManager::new(Default::default());
@@ -369,7 +357,6 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
 
     // Alice sends the StartSession message
     let alice_mgr_for_start = Arc::new(alice_mgr.clone());
-    let alice_pseudonym_for_alice_start = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -380,10 +367,9 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
         })
         .returning(move |_, data| {
             let alice_mgr = alice_mgr_for_start.clone();
-            let pseudonym = alice_pseudonym_for_alice_start.clone();
             Box::pin(async move {
                 alice_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -395,23 +381,19 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
 
     // Alice sends the SessionEstablished message (as Bob)
     let alice_mgr_for_est = Arc::new(alice_mgr.clone());
-    let alice_pseudonym_est = alice_pseudonym.clone(); // for .withf()
-    let alice_pseudonym_ret_est = alice_pseudonym.clone(); // for .returning()
-    let alice_pseudonym = alice_pseudonym.clone(); // outer-scope: original still available for new_session()
     alice_transport
         .expect_send_message()
         .once()
         .in_sequence(&mut sequence)
         .withf(move |peer, data| {
             msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_est.as_ref())
+                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let alice_mgr = alice_mgr_for_est.clone();
-            let pseudonym = alice_pseudonym_ret_est.clone();
             Box::pin(async move {
                 alice_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -433,7 +415,7 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
             SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             SessionClientConfig {
                 capabilities: None.into(),
-                pseudonym: (*alice_pseudonym).into(),
+                pseudonym: alice_pseudonym.into(),
                 surb_management: None,
                 ..Default::default()
             },
@@ -519,7 +501,7 @@ async fn session_manager_should_timeout_new_session_attempt_when_no_response() -
 
 #[test(tokio::test)]
 async fn session_manager_should_send_keep_alive_when_ping_session_is_called() -> Result<()> {
-    let alice_pseudonym = Arc::new(HoprPseudonym::random());
+    let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 
     let alice_mgr = SessionManager::new(Default::default());
@@ -530,7 +512,6 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
 
     // Alice sends the StartSession message
     let bob_mgr_for_alice = Arc::new(bob_mgr.clone());
-    let alice_pseudonym_for_alice_start = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -540,10 +521,9 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice.clone();
-            let pseudonym = alice_pseudonym_for_alice_start.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -555,21 +535,18 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
 
     // Bob sends the SessionEstablished message
     let alice_mgr_for_bob = Arc::new(alice_mgr.clone());
-    let alice_pseudonym_est = alice_pseudonym.clone();
-    let alice_pseudonym_ret_est = alice_pseudonym.clone();
     bob_transport
         .expect_send_message()
         .once()
         .withf(move |peer, data| {
             msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_est.as_ref())
+                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let alice_mgr = alice_mgr_for_bob.clone();
-            let pseudonym = alice_pseudonym_ret_est.clone();
             Box::pin(async move {
                 alice_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -580,23 +557,20 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
         });
 
     // Alice sends a KeepAlive ping to Bob (via ping_session)
-    let alice_pseudonym_for_ping = alice_pseudonym.clone();
-    let alice_pseudonym_for_ping_ret = alice_pseudonym.clone();
     let bob_mgr_for_keepalive = Arc::new(bob_mgr.clone());
     alice_transport
         .expect_send_message()
         .once()
         .withf(move |peer, data| {
             start_msg_match(data, |msg| {
-                matches!(msg, HoprStartProtocol::KeepAlive(ka) if ka.session_id == *alice_pseudonym_for_ping.as_ref())
-            }) && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_for_ping.as_ref())
+                matches!(msg, HoprStartProtocol::KeepAlive(ka) if ka.session_id == alice_pseudonym)
+            }) && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_keepalive.clone();
-            let pseudonym = alice_pseudonym_for_ping_ret.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -608,8 +582,6 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
 
     // Alice sends the terminating segment (via alice_session.close())
     let bob_mgr_for_alice_seg = Arc::new(bob_mgr.clone());
-    let alice_pseudonym_for_alice_seg = alice_pseudonym.clone();
-    let alice_pseudonym_for_alice_seg_ret = alice_pseudonym.clone();
     alice_transport
         .expect_send_message()
         .once()
@@ -621,14 +593,13 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
             .try_as_segment()
             .expect("must be a segment")
             .is_terminating()
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == alice_pseudonym_for_alice_seg.as_ref())
+                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice_seg.clone();
-            let pseudonym = alice_pseudonym_for_alice_seg_ret.clone();
             Box::pin(async move {
                 bob_mgr.dispatch_message(
-                    *pseudonym,
+                    alice_pseudonym,
                     ApplicationDataIn {
                         data: data.data,
                         packet_info: Default::default(),
@@ -662,7 +633,7 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
                 bob_peer,
                 SessionTarget::TcpStream(target),
                 SessionClientConfig {
-                    pseudonym: (*alice_pseudonym).into(),
+                    pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation,
                     surb_management: None,
                     ..Default::default()
