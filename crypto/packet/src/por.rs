@@ -91,49 +91,6 @@ impl BytesRepresentable for ProofOfRelayValues {
     const SIZE: usize = 1 + HalfKeyChallenge::SIZE + EthereumChallenge::SIZE;
 }
 
-/// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
-/// that is supposed to be passed along with the SURB.
-// TODO: currently 32 bytes are reserved for future use by Shamir's secret sharing scheme.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
-
-impl SurbReceiverInfo {
-    pub fn new(pov: ProofOfRelayValues, share: [u8; 32]) -> Self {
-        let mut ret = [0u8; Self::SIZE];
-        ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
-        // Share is currently not used but will be used in the future
-        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
-        Self(ret)
-    }
-
-    pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
-        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
-            .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")
-    }
-}
-
-impl AsRef<[u8]> for SurbReceiverInfo {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> std::result::Result<Self, Self::Error> {
-        value
-            .try_into()
-            .map(Self)
-            .map_err(|_| GeneralError::ParseError("SurbReceiverInfo".into()))
-    }
-}
-
-impl BytesRepresentable for SurbReceiverInfo {
-    const SIZE: usize = ProofOfRelayValues::SIZE + 32;
-}
-
 /// Contains the Proof of Relay challenge for the next downstream node as well as the hint that is used to
 /// verify the challenge that is given to the relayer.
 #[derive(Clone, PartialEq, Eq)]
@@ -227,8 +184,12 @@ pub fn pre_verify(
     }
 }
 
+pub type ProofOfRelayeValuesWithSolution = (ProofOfRelayValues, Option<HalfKey>);
+
 /// Helper function which generates proof of relay for the given path.
-pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayValues)> {
+pub fn generate_proof_of_relay(
+    secrets: &[SharedSecret],
+) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayeValuesWithSolution)> {
     let mut last_ack_key_share = None;
     let mut por_strings = Vec::with_capacity(secrets.len());
     let mut por_values = None;
@@ -250,6 +211,9 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
                 .to_challenge()?
                 .to_ethereum_challenge()
         } else {
+            // NOTE: we do not generate a random ack_key_share to create the challenge for performance reasons
+            // This means for 0-hop packets, the solution to the Proof of Relay is unknown, because
+            // we do not even try to solve it in such case.
             EthereumChallenge(hopr_types::crypto_random::random_bytes::<{ Address::SIZE }>().into())
         };
 
@@ -266,7 +230,10 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
     Ok((
         por_strings,
-        por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?,
+        (
+            por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?,
+            last_ack_key_share,
+        ),
     ))
 }
 
@@ -351,11 +318,32 @@ mod tests {
             let por_strings = ProofOfRelayString::from_shared_secrets(&secrets)?;
             let por_values = ProofOfRelayValues::create(&secrets[0], secrets.get(1), secrets.len() as u8)?.0;
 
-            let (gen_por_strings, gen_por_values) = generate_proof_of_relay(&secrets)?;
+            let (gen_por_strings, (gen_por_values, gen_por_solution)) = generate_proof_of_relay(&secrets)?;
 
             // The ticket challenge is randomly generated for 0-hop, so cannot compare them
             if hops > 0 {
                 assert_eq!(por_values, gen_por_values);
+                assert!(gen_por_solution.is_some());
+
+                let s1 = derive_own_key_share(&secrets[secrets.len() - 2]); // s1_own
+
+                let actual_chal = Response::from_half_keys(&s1, &gen_por_solution.unwrap())? // (s1_own + s2_ack) * G
+                    .to_challenge()?
+                    .to_ethereum_challenge();
+
+                // `gen_por_solution` is the acknowledgement key share for the last hop, so it solves
+                // the next_ticket_challenge carried by the second-to-last ProofOfRelayString (for hops > 1),
+                // or the ticket_challenge in `gen_por_values` (for hops == 1).
+                let expected_chal = if hops == 1 {
+                    gen_por_values.ticket_challenge()
+                } else {
+                    // por_strings are produced by `generate_proof_of_relay` starting from i = 1,
+                    // so the entry at i = secrets.len() - 2 maps to por_strings index len - 3.
+                    gen_por_strings[secrets.len() - 3].next_ticket_challenge()
+                };
+                assert_eq!(expected_chal, actual_chal);
+            } else {
+                assert!(gen_por_solution.is_none());
             }
 
             assert_eq!(por_strings.len(), gen_por_strings.len());

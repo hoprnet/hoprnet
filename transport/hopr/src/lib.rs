@@ -41,13 +41,14 @@ use futures::{
     channel::mpsc::{Sender, channel},
     stream::select_with_strategy,
 };
+use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 pub use hopr_api::{
     Multiaddr, PeerId,
     network::{Health, traits::NetworkView},
     types::{
         crypto::{
             keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-            types::{HalfKeyChallenge, Hash, OffchainPublicKey},
+            types::{HalfKeyChallenge, Hash, OffchainPublicKey, SimplePseudonym},
         },
         internal::{prelude::HoprPseudonym, routing::RoutingOptions},
     },
@@ -59,9 +60,12 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
+pub use hopr_crypto_packet::HoprPixSpec;
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
+pub use hopr_protocol_pix::RecoveredSsa;
+use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -70,12 +74,15 @@ use hopr_transport_probe::{
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
+use hopr_transport_session::{
+    AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
+    SessionManagerConfig,
+};
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
-use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
@@ -101,9 +108,11 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
+    node::{PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
+use hopr_crypto_packet::HoprShareResolution;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -147,6 +156,8 @@ pub enum HoprTransportProcess {
     #[cfg(feature = "runtime-tokio")]
     #[strum(to_string = "path cache refresh")]
     PathRefresh,
+    #[strum(to_string = "pix protocol event transformation")]
+    PixEvents,
     #[strum(to_string = "sync of outgoing ticket indices")]
     OutgoingIndexSync,
     #[strum(to_string = "periodic protocol counter flush")]
@@ -348,6 +359,7 @@ where
                 surb_balance_notify_period: None,
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
+                pix_config: Default::default(),
                 ..Default::default()
             })),
             chain_api: resolver,
@@ -363,13 +375,18 @@ where
     /// Relay nodes run the full packet pipeline including incoming ticket/acknowledgement
     /// processing and require a [`futures::Sink`] for ticket events as well as an
     /// `on_incoming_session` channel from the SessionManager (they can accept incoming sessions).
-    pub async fn run_relay<T, TFact, Ct>(
+    ///
+    /// The Relay node may also opt in to allow itself to use the PIX protocol by setting
+    /// the `exit_ack_share` if it wishes to also act as an Exit node.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn run_relay<T, TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
         network_process: BoxedProcessFn,
         ticket_events: T,
         ticket_factory: TFact,
+        exit_ack_share: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
         HoprSocket<
@@ -383,6 +400,8 @@ where
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
+        PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+        PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         self.run_inner(
             protocol::NodeType::Relay,
@@ -391,6 +410,7 @@ where
             network_process,
             ticket_events,
             ticket_factory,
+            exit_ack_share,
             Some(on_incoming_session),
         )
         .await
@@ -400,12 +420,16 @@ where
     ///
     /// Exit nodes do not process tickets but keep the incoming acknowledgement
     /// pipeline running and can accept incoming sessions via SessionManager.
-    pub async fn run_exit<TFact, Ct>(
+    ///
+    /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
+    /// to decrypt PIX shares.
+    pub async fn run_exit<TFact, Ct, A, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
+        pix_events: Option<PixEvt>,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
         HoprSocket<
@@ -417,6 +441,9 @@ where
     where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
+        A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
+        PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+        PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         self.run_inner(
             protocol::NodeType::Exit,
@@ -425,6 +452,7 @@ where
             network_process,
             futures::sink::drain(),
             ticket_factory,
+            pix_events,
             Some(on_incoming_session),
         )
         .await
@@ -435,12 +463,13 @@ where
     /// Entry nodes do not process tickets, do not start the incoming acknowledgement
     /// pipeline, and do not accept incoming sessions — therefore, they require neither a
     /// `ticket_events` sink nor an `on_incoming_session` channel.
-    pub async fn run_entry<TFact, Ct>(
+    pub async fn run_entry<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
         network_process: BoxedProcessFn,
         ticket_factory: TFact,
+        pix_events: Option<PixEvt>,
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
@@ -451,6 +480,8 @@ where
     where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
+        PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+        PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         self.run_inner(
             protocol::NodeType::Entry,
@@ -459,6 +490,7 @@ where
             network_process,
             futures::sink::drain(),
             ticket_factory,
+            pix_events,
             None,
         )
         .await
@@ -471,7 +503,7 @@ where
     /// - [`protocol::NodeType::Exit`]: ack-drain pipeline + incoming Sessions.
     /// - [`protocol::NodeType::Entry`]: no ack pipeline, no incoming Sessions.
     #[allow(clippy::too_many_arguments)]
-    async fn run_inner<T, TFact, Ct>(
+    async fn run_inner<T, TFact, Ct, PixEvt>(
         &self,
         role: protocol::NodeType,
         cover_traffic: Ct,
@@ -479,6 +511,7 @@ where
         network_process: BoxedProcessFn,
         ticket_events: T,
         ticket_factory: TFact,
+        exit_ack_share: Option<PixEvt>,
         on_incoming_session: Option<Sender<IncomingSession>>,
     ) -> errors::Result<(
         HoprSocket<
@@ -492,6 +525,8 @@ where
         T::Error: std::error::Error + Clone + Send,
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
+        PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+        PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
@@ -680,6 +715,14 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
+            hopr_protocol_pix::SsaGeneratorConfig {
+                polynomials_per_ssa: self.cfg.pix.num_ssa_parts,
+                threshold: self.cfg.pix.ssa_part_size,
+                surplus_shares: self.cfg.pix.additional_shares,
+            },
+        ));
+
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
             .transport((mixing_channel_tx, wire_msg_rx))
@@ -687,14 +730,102 @@ where
             .surb_store(self.path_planner.surb_store.clone())
             .chain_api(self.chain_api.clone())
             .ticket_factory(ticket_factory)
+            .ssa_generator(ssa_generator.clone())
             .channels_dst(channels_dst)
             .with_counters(self.counters.clone())
             .with_config(self.cfg.packet);
 
-        let pipeline_processes = match role {
-            protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
-            protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
-            protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
+        let mut pix_toolbox = None;
+
+        // Relays and Exits nodes can receive Exit incentives and therefore can execute the PIX share reconstruction
+        let pipeline_processes = if role != protocol::NodeType::Entry
+            && let Some(ssa_events) = exit_ack_share
+        {
+            let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+                hopr_protocol_pix::SsaReconstructorConfig::default(),
+            ));
+
+            let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
+            pix_toolbox = Some(pix_tools);
+
+            let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = channel(1024);
+            let smgr = self.smgr.clone();
+            processes.insert(
+                HoprTransportProcess::PixEvents,
+                hopr_utils::spawn_as_abortable!(
+                    session_pix_events
+                        .map(|session_pix_event| match session_pix_event {
+                            HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                                ssa_id,
+                                deposit_address,
+                                quota_per_ssa,
+                            }) =>
+                                PixEvent::NewDepositAddress(PixNewDepositAddress {
+                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                    address: deposit_address.into(),
+                                    quota: quota_per_ssa,
+                                }),
+                            HoprSessionOutPixEvent::DepositNeeded(
+                                AgreedSsaQuota {
+                                    ssa_id,
+                                    deposit_address,
+                                    quota_per_ssa,
+                                },
+                                notifier,
+                            ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
+                                id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                address: deposit_address.into(),
+                                quota: quota_per_ssa,
+                                deposit_updated: Some(notifier),
+                            }),
+                        })
+                        .merge(
+                            ssa_share_resolution_events_rx
+                                .filter_map(move |ssa_resolution: HoprShareResolution| {
+                                    let smgr = smgr.clone();
+                                    async move {
+                                        match ssa_resolution {
+                                            ShareResolution::RecoveredSsa(ssa_recovery_event) => {
+                                                if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id)).await {
+                                                    tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
+                                                }
+                                                Some(PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
+                                                    id: (*ssa_recovery_event.ssa_id.pseudonym(), ssa_recovery_event.ssa_id.ssa_index()),
+                                                    secret: PixDepositSecret(ssa_recovery_event.ssa.secret().clone())
+                                                }))
+                                            }
+                                            ShareResolution::InvalidShare(peer, ssa_id) => {
+                                                error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
+                                                if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id)).await {
+                                                    tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
+                                                }
+                                                None
+                                            }
+                                        }
+                                    }
+                            })
+                        )
+                        .map(Ok)
+                        .forward(ssa_events.sink_map_err(HoprTransportError::other))
+                ),
+            );
+
+            // SsaReconstructor must be embedded into the packet pipeline, and the pipeline can emit
+            // SSA recovery events.
+            let pipeline_builder =
+                pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
+
+            match role {
+                protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
+                protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
+                _ => unreachable!(),
+            }
+        } else {
+            match role {
+                protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
+                protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
+                protocol::NodeType::Entry => pipeline_builder.build_for_entry(),
+            }
         };
         processes.extend_from(pipeline_processes);
 
@@ -769,11 +900,12 @@ where
                 on_incoming_session.ok_or_else(|| {
                     HoprTransportError::Api("on_incoming_session channel is required for relay/exit nodes".into())
                 })?,
+                pix_toolbox,
             )
         } else {
-            // Entry nodes cannot accept incoming Sessions
+            // Entry nodes cannot accept incoming Sessions nor PIX events
             self.smgr
-                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain())
+                .start(unresolved_routing_msg_tx.clone(), futures::sink::drain(), None)
         };
 
         smgr_start_res

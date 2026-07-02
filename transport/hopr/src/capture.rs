@@ -455,7 +455,7 @@ mod tests {
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
     use hopr_transport_probe::types::{NeighborProbe, PathTelemetry};
-    use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
+    use hopr_transport_session::{Capability, HoprSessionCapabilities, SessionId, SessionTarget};
     use hopr_utils::network_types::types::SealedHost;
 
     use super::*;
@@ -683,7 +683,7 @@ mod tests {
             data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
                 SessionId,
                 SessionTarget,
-                ByteCapabilities,
+                HoprSessionCapabilities,
             >::StartSession(StartInitiation {
                 challenge: 0x01234567_89abcdef,
                 target: SessionTarget::UdpStream(SealedHost::Plain("some-dns-name.com:1234".parse()?)),
@@ -709,7 +709,7 @@ mod tests {
             data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
                 SessionId,
                 SessionTarget,
-                ByteCapabilities,
+                HoprSessionCapabilities,
             >::SessionError(StartErrorType {
                 challenge: 0x01234567_89abcdef,
                 reason: StartErrorReason::Busy,
@@ -733,7 +733,7 @@ mod tests {
             data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
                 SessionId,
                 SessionTarget,
-                ByteCapabilities,
+                HoprSessionCapabilities,
             >::SessionEstablished(StartEstablished {
                 orig_challenge: 0x01234567_89abcdef,
                 session_id: SessionId::new(1234u64, HoprPseudonym::random()),
@@ -757,7 +757,7 @@ mod tests {
             data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
                 SessionId,
                 SessionTarget,
-                ByteCapabilities,
+                HoprSessionCapabilities,
             >::KeepAlive(KeepAliveMessage {
                 session_id: SessionId::new(1234u64, HoprPseudonym::random()),
                 flags: 0xff,

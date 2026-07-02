@@ -52,4 +52,6 @@ pub mod channel_finalizer;
 #[cfg(feature = "strategy-channel-lifecycle")]
 pub mod channel_lifecycle;
 pub mod errors;
+#[cfg(feature = "strategy-pix")]
+pub mod non_anonymous_pix;
 pub mod strategy;

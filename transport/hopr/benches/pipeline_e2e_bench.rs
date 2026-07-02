@@ -27,6 +27,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor, MemorySurbStore, PacketEncoder,
     SurbStoreConfig,
 };
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 use hopr_transport_mixer::config::MixerConfig;
 use libp2p::PeerId;
@@ -131,12 +132,14 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
     // Pre-generate ack buffer using an encoder for PEERS[1] (next hop)
     let max_packets = *PACKET_COUNTS.last().unwrap();
     let ack_buffer: Vec<(PeerId, Bytes)> = runtime.block_on(async {
+        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
         let ack_encoder = HoprEncoder::new(
             PEERS_CHAIN[1].clone(),
             chain_api.clone(),
             MemorySurbStore::new(SurbStoreConfig::default()),
             HoprTicketFactory::new(MemoryStore::default()),
             Default::default(),
+            ssa_gen,
             HoprCodecConfig::default(),
         );
 
@@ -240,12 +243,15 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
 
                         let ticket_mgr = std::sync::Arc::new(HoprTicketFactory::new(MemoryStore::default()));
 
+                        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[SENDER_IDX].clone(),
                             chain_api.clone(),
                             unack_proc.clone(),
                             ticket_mgr.clone(),
                             Default::default(),
+                            ssa_gen,
                             codec_config,
                         );
 

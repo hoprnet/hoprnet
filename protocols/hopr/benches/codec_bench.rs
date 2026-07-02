@@ -17,16 +17,18 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector,
     testing::{BlokliTestClient, StaticState},
 };
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket};
 use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
 };
+use hopr_protocol_pix::SsaGeneratorConfig;
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 
 use crate::utils::{Node, PEERS, create_blokli_client, create_node};
 
 type TestEncoder = HoprEncoder<
     Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
+    Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
     MemorySurbStore,
     HoprTicketFactory<RedbStore>,
 >;
@@ -44,6 +46,7 @@ pub fn create_encoder(sender: &Node) -> TestEncoder {
         MemorySurbStore::new(SurbStoreConfig::default()),
         HoprTicketFactory::new(RedbStore::new_temp().unwrap()),
         Hash::default(),
+        Arc::new(hopr_protocol_pix::SsaShareGenerator::new(SsaGeneratorConfig::default())),
         HoprCodecConfig::default(),
     )
 }

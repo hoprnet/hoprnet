@@ -60,8 +60,8 @@ use hopr_api::{
     network::{Health, NetworkStreamControl, NetworkView},
     node::{
         ActionableEvent, ActionableEventDiscriminant, AtomicHoprState, ComponentStatus, ComponentStatusReporter,
-        EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
-        HoprNodeOperations, HoprState, NodeOnchainIdentity,
+        EitherErrExt, EventWaitResult, HasChainApi, HasExitIncentivization, HasGraphView, HasNetworkView,
+        HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState, NodeOnchainIdentity, PixEvent,
     },
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
@@ -153,6 +153,10 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<(u32, u32)>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -175,6 +179,10 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<(u32, u32)>,
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
@@ -202,6 +210,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            pix_ssa_quota: value.pix_ssa_quota,
         }
     }
 }
@@ -294,6 +303,11 @@ type TicketEvents = (
     async_broadcast::InactiveReceiver<hopr_api::node::TicketEvent>,
 );
 
+type PixEvents = (
+    async_broadcast::Sender<hopr_api::node::PixEvent>,
+    async_broadcast::InactiveReceiver<hopr_api::node::PixEvent>,
+);
+
 /// Time to wait until the node's keybinding appears on-chain
 const NODE_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -316,6 +330,7 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) transport_api: HoprTransport<Chain, Graph, Net>,
     pub(crate) chain_api: Chain,
     pub(crate) ticket_event_subscribers: TicketEvents,
+    pub(crate) pix_event_subscribers: PixEvents,
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
     pub(crate) processes: AbortableList<HoprLibProcess>,
@@ -603,6 +618,16 @@ where
     }
 }
 
+impl<Chain, Graph, Net, TMgr> HasExitIncentivization for Hopr<Chain, Graph, Net, TMgr> {
+    fn subscribe_pix_events(&self) -> impl Stream<Item = PixEvent> + Send + 'static {
+        self.pix_event_subscribers.1.activate_cloned()
+    }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
+    }
+}
+
 impl<Chain, Graph, Net, TMgr> hopr_api::node::ActionableEventSource for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Send + Sync + 'static,
@@ -643,6 +668,16 @@ where
                     .1
                     .activate_cloned()
                     .map(ActionableEvent::Ticket)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Pix) {
+            streams.push(
+                self.pix_event_subscribers
+                    .1
+                    .activate_cloned()
+                    .map(ActionableEvent::Pix)
                     .boxed(),
             );
         }

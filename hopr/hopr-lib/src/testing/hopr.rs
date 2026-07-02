@@ -59,6 +59,7 @@ pub fn create_hopr_instance_config(host_port: u16, safe: NodeSafeConfig, winn_pr
             stream: Default::default(),
             path_planner: Default::default(),
             counter_flush_interval: Default::default(),
+            pix: Default::default(),
         },
         publish: true,
         ..Default::default()

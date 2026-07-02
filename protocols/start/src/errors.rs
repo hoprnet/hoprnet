@@ -11,6 +11,8 @@ pub enum StartProtocolError {
     InvalidLength,
     #[error("unknown start protocol message")]
     UnknownMessage,
+    #[error("wrong number of commitments in message")]
+    NumberOfCommitments,
     #[error("message parse error: {0}")]
     ParseError(String),
     #[error("cbor error: {0}")]

@@ -40,7 +40,7 @@ use hopr_api::{
     ct::{CoverTrafficGeneration, ProbingTrafficGeneration},
     graph::HoprGraphApi,
     network::{BoxedProcessFn, NetworkStreamControl, NetworkView},
-    node::{AtomicHoprState, HoprState, NodeOnchainIdentity, TicketEvent},
+    node::{AtomicHoprState, HoprState, NodeOnchainIdentity, PixEvent, TicketEvent},
     tickets::{TicketFactory, TicketManagement},
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
@@ -53,7 +53,7 @@ use validator::Validate;
 
 use crate::{
     Hopr, HoprLibError, HoprLibProcess, MIN_NATIVE_BALANCE, NODE_READY_TIMEOUT, SUGGESTED_NATIVE_BALANCE,
-    config::HoprLibConfig, constants,
+    config::HoprLibConfig, constants, helpers::BroadcastSenderSink,
 };
 
 #[cfg(all(feature = "telemetry", not(test)))]
@@ -330,6 +330,10 @@ struct PreHopr<Chain, Graph, Net, Ct> {
         async_broadcast::Sender<TicketEvent>,
         async_broadcast::InactiveReceiver<TicketEvent>,
     ),
+    pix_event_subscribers: (
+        async_broadcast::Sender<PixEvent>,
+        async_broadcast::InactiveReceiver<PixEvent>,
+    ),
     processes: AbortableList<HoprLibProcess>,
     session_tx: futures::channel::mpsc::Sender<IncomingSession>,
     cover_traffic: Ct,
@@ -422,6 +426,10 @@ where
     let (mut new_tickets_tx, new_tickets_rx) = async_broadcast::broadcast(2048);
     new_tickets_tx.set_await_active(false);
     new_tickets_tx.set_overflow(true);
+
+    let (mut ssa_tx, ssa_rx) = async_broadcast::broadcast(2048);
+    ssa_tx.set_await_active(false);
+    ssa_tx.set_overflow(true);
 
     let me_onchain = chain_id.public().to_address();
 
@@ -646,6 +654,7 @@ where
         transport_api,
         chain_api,
         ticket_event_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
+        pix_event_subscribers: (ssa_tx, ssa_rx.deactivate()),
         processes,
         session_tx,
         cover_traffic,
@@ -679,6 +688,7 @@ macro_rules! impl_build_methods {
                     pre.network,
                     pre.network_process,
                     ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                 )
                 .await?;
 
@@ -697,6 +707,7 @@ macro_rules! impl_build_methods {
                 cfg: pre.cfg,
                 state: pre.state.clone(),
                 ticket_event_subscribers: pre.ticket_event_subscribers,
+                pix_event_subscribers: pre.pix_event_subscribers,
                 transport_id: pre.transport_id,
                 transport_api: pre.transport_api,
                 chain_api: pre.chain_api,
@@ -828,6 +839,7 @@ macro_rules! impl_build_methods {
                     pre.network_process,
                     tickets_tx,
                     ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
                     pre.session_tx,
                 )
                 .await?;
@@ -844,6 +856,7 @@ macro_rules! impl_build_methods {
                 cfg: pre.cfg,
                 state: pre.state.clone(),
                 ticket_event_subscribers: pre.ticket_event_subscribers,
+                pix_event_subscribers: pre.pix_event_subscribers,
                 transport_id: pre.transport_id,
                 transport_api: pre.transport_api,
                 chain_api: pre.chain_api,
