@@ -45,7 +45,7 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["node", "serde"] }
-hopr-utils = { workspace = true }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
 parking_lot = { workspace = true }
@@ -68,4 +68,4 @@ tokio = { workspace = true }
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = []

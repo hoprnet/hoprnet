@@ -1,0 +1,129 @@
+---
+source: impls/strategy/src/non_anonymous_pix.rs
+assertion_line: 455
+expression: "*snapshot.refresh()"
+---
+accounts:
+  0:
+    chain_key: 18f8ae833c85c51fbeba29cef9fbfb53b3bad950
+    keyid: 0
+    multi_addresses: []
+    packet_key: d6affd9ecd20b4fa1ea3fe65162604f01bc8fb859bb8a079b9e70be10eba15a6
+    safe_address: 93534e8ca82510a346dd329115ce7aefd4d35583
+  1:
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    keyid: 1
+    multi_addresses: []
+    packet_key: c443eb7d2eb0c95b3fe8ade2a75b7ea008087b5fe22843557273688d1e4d4f22
+    safe_address: 259bed99d230648d7c8a116af59abdd15c9f4f1e
+  2:
+    chain_key: b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
+    keyid: 2
+    multi_addresses: []
+    packet_key: 8994396d4907dc5e18e209cf958f001afe8f04d7dc1b3a4fd0f9086ee8c610b7
+    safe_address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
+native_balances:
+  18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
+    __typename: NativeBalance
+    balance: 1 xDai
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: NativeBalance
+    balance: 0 xDai
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: NativeBalance
+    balance: 0.999999999999999999 xDai
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: NativeBalance
+    balance: 0 xDai
+  b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
+    __typename: NativeBalance
+    balance: 1 xDai
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: NativeBalance
+    balance: 0 xDai
+token_balances:
+  18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: HoprBalance
+    balance: 980 wxHOPR
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  "4242424242424242424242424242424242424242":
+    __typename: HoprBalance
+    balance: 20 wxHOPR
+safe_allowances:
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+deployed_safes:
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    address: 93534e8ca82510a346dd329115ce7aefd4d35583
+    chain_key: 18f8ae833c85c51fbeba29cef9fbfb53b3bad950
+    owners:
+      - 18f8ae833c85c51fbeba29cef9fbfb53b3bad950
+    module_address: c2ac223dbf64edf995c70c5a3d5599c3fb6d6291
+    registered_nodes: []
+    threshold: "1"
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    address: 259bed99d230648d7c8a116af59abdd15c9f4f1e
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    owners:
+      - bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    module_address: ff263744a4621e2cac0f4882cc623bee3c9aef8d
+    registered_nodes: []
+    threshold: "1"
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
+    chain_key: b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
+    owners:
+      - b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
+    module_address: 1613d5898cae268775bb85aa0b7e6e7fbc9dcd47
+    registered_nodes: []
+    threshold: "1"
+safe_redeem_stats: {}
+tx_counts:
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
+channels: {}
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 31337
+  gas_price: "1000000000"
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  max_fee_per_gas: "3000000000"
+  max_priority_fee_per_gas: "100000000"
+  min_ticket_winning_probability: 1
+  key_binding_fee: 0.01 wxHOPR
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: anvil-localhost
+  contract_addresses: "{\"announcements\":\"0xfD5C1c0f5299B51282a0BCB0465ff7f536F320a9\",\"channels\":\"0x37406b53C672083cd70a2Eb44732C7276EdE2049\",\"module_implementation\":\"0x8c4C7942a75754ebE57C8BAA2341d1f4922124c5\",\"node_safe_migration\":\"0x42C47173d81fb51Fc23A1bE3804e0cBA4972E6dd\",\"node_safe_registry\":\"0x81C9a8B5c1fD9E4b5C134Dab131ebc0b35D25994\",\"node_stake_factory\":\"0x51DFBBD2612D76EcC5a157F3c236B2b1cDFfa733\",\"ticket_price_oracle\":\"0x376b4A2243b74667EA186fC89114355599E6b5C4\",\"token\":\"0xCf4c708eEDa485f3fe5cEacEc86EaE46Ef3FC87d\",\"winning_probability_oracle\":\"0x0Ecb0E77E6bDE494665993DaD5B3b14c026c08bd\",\"xhopr_token\":\"0x0000000000000000000000000000000000000000\"}"
+  expected_block_time: "5"
+  finality: "3"
+version: "1"
+client_compatibility:
+  api_version: "1"
+  supported_client_versions: ^0.29.1
+  features:
+    - indexes_safe_events
+health: OK
+active_txs: {}
