@@ -28,6 +28,28 @@ use tokio::time as tokio_time;
 
 use crate::common::{MockMsgSender, mock_packet_planning, msg_type};
 
+/// Verifies the complete session establishment and teardown when both peers use the PIX protocol.
+///
+/// Unlike the vanilla lifecycle test, Bob is configured with a generous PIX quota and both peers
+/// are given a `PixToolbox` so that the SSA (Secret Sharing Agreement) handshake runs as part of
+/// session establishment.
+///
+/// ## Steps
+/// 1. Alice's manager has no PIX config (initiator, no quota enforcement). Bob's manager accepts quotas up to 2 GiB via
+///    `IncomingSessionPixConfig`.
+/// 2. Both managers receive a `PixToolbox` seeded with a `SsaShareGenerator` and `SsaReconstructor`.
+/// 3. Alice calls `new_session` with `Capability::UsePIX` and a quota of `(64, 64)`. The mock intercepts the outbound
+///    messages in sequence:
+///    - `StartSession` → delivered to Bob
+///    - `SessionEstablished` → delivered to Alice
+///    - `SsaRequest` (from Bob) → delivered to Alice
+///    - `SsaCommit` messages (from Alice, one per polynomial group) → each delivered to Bob
+///    - terminating segment (from Alice) → delivered to Bob
+/// 4. Both sessions are established and `UsePIX | Segmentation | NoRateControl` capabilities are confirmed on both
+///    sides.
+/// 5. Alice receives a `HoprSessionOutPixEvent::ReadyToDeposit` on her PIX event stream, and Bob receives
+///    `DepositNeeded`, confirming the SSA handshake produced events on both sides.
+/// 6. Alice closes the session; `ping_session` on the closed session returns `NonExistingSession`.
 #[test(tokio::test)]
 async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it_with_pix() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
@@ -317,6 +339,15 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     Ok(())
 }
 
+/// Verifies that dispatching a PIX event to a session that does not exist returns a
+/// `NonExistingSession` error.
+///
+/// ## Steps
+/// 1. A `SessionManager` is started without a `PixToolbox`.
+/// 2. An `UnverifiableShare` event is constructed with a random (unknown) `SsaId`.
+/// 3. `dispatch_pix_event` is called on the manager with this unknown session ID.
+/// 4. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`,
+///    confirming the manager correctly rejects PIX events for sessions it does not hold.
 #[test(tokio::test)]
 async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     let mgr = SessionManager::new(Default::default());
@@ -350,6 +381,18 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that when the exit/responder side (`bob_mgr`) has no `PixToolbox`, the SSA request
+/// phase is skipped entirely — Bob still accepts the session but does not send `SsaRequest`.
+///
+/// ## Steps
+/// 1. Alice's manager has no `PixToolbox`. Bob's manager has a PIX quota config but also no `PixToolbox` — meaning the
+///    PIX state machine cannot run.
+/// 2. Alice initiates a session with `Capability::UsePIX` and `pix_ssa_quota: Some((1, 1))`.
+/// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice.
+/// 4. No `SsaRequest` is sent by Bob (Bob has no toolbox to generate one).
+/// 5. Both sessions are established and both sides receive a session handle.
+/// 6. The test passes by successfully completing the handshake without any SSA exchange, confirming that `PixToolbox`
+///    availability gates the SSA protocol.
 #[test(tokio::test)]
 async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();

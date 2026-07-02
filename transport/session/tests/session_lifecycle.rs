@@ -15,14 +15,29 @@ use hopr_api::types::{
 use hopr_protocol_app::v1::ApplicationData;
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
-    test_helpers::start_msg_match, ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol,
-    SessionClientConfig, SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, SessionClientConfig, SessionManager,
+    SessionManagerConfig, SessionTarget, SurbBalancerConfig, test_helpers::start_msg_match,
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
 
 use crate::common::{MockMsgSender, mock_packet_planning, msg_type};
 
+/// Verifies the full session lifecycle end-to-end using the StartProtocol.
+///
+/// ## Steps
+/// 1. Alice and Bob's `SessionManager`s are started with mock transports, both with no `PixToolbox`.
+/// 2. Alice calls `new_session` toward Bob. The mock transport intercepts her outbound `StartSession` message and
+///    delivers it to Bob's manager.
+/// 3. Bob's manager auto-responds with `SessionEstablished`. The mock delivers it back to Alice.
+/// 4. The resulting `alice_session` handle and the `bob_session` notification are received within a 2-second timeout.
+/// 5. Both sessions expose the expected `Segmentation | NoRateControl` capabilities and the correct `TcpStream` target.
+/// 6. Both managers report exactly one active session, and neither has a SURB balancer config (config is not set for
+///    this session).
+/// 7. After a short sleep, Alice closes her session by sending a terminating segment; the mock delivers it to Bob, who
+///    processes the close.
+/// 8. After another short sleep, `ping_session` on Alice's now-closed session returns `NonExistingSession`, confirming
+///    the session was removed.
 #[test(tokio::test)]
 async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
@@ -208,6 +223,16 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     Ok(())
 }
 
+/// Verifies that a session is automatically evicted when it remains idle past the configured `idle_timeout`.
+///
+/// ## Steps
+/// 1. Alice's manager is configured with `idle_timeout: 200ms`; Bob's has the default (long) timeout.
+/// 2. Both managers are started with mock transports and no `PixToolbox`.
+/// 3. Alice calls `new_session` toward Bob; the session is established via `StartSession` / `SessionEstablished`.
+/// 4. **No interaction occurs after establishment.** After a 300ms sleep (well past the 200ms timeout), Alice's session
+///    is gone.
+/// 5. `ping_session` on Alice's former session ID returns `NonExistingSession`, confirming the automatic eviction
+///    cleaned up the slot.
 #[test(tokio::test)]
 async fn session_manager_should_close_idle_session_automatically() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
@@ -345,6 +370,18 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
     Ok(())
 }
 
+/// Verifies that a session whose initiator and responder are the same `SessionManager` is rejected
+/// with a `Loopback` error.
+///
+/// ## Steps
+/// 1. Alice's manager is started with a mock transport that loops messages back to itself.
+/// 2. Alice calls `new_session` toward `bob_peer`. The mock intercepts her `StartSession` message and re-dispatches it
+///    to Alice's own manager (simulating a network loopback).
+/// 3. Alice's manager processes `StartSession` as an incoming initiation and internally responds with
+///    `SessionEstablished`. The mock delivers it back, completing the self-initiated handshake.
+/// 4. `new_session` returns `Err(TransportSessionError::Manager(SessionManagerError::Loopback))`.
+/// 5. Critically, one session slot IS present in Alice's manager (the incoming slot accepted from the self-delivered
+///    `StartSession`), confirming the rejection happened after slot insertion rather than before.
 #[test(tokio::test)]
 async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
@@ -439,6 +476,18 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
     Ok(())
 }
 
+/// Verifies that initiating a session times out and returns `TransportSessionError::Timeout`
+/// when the peer never responds.
+///
+/// ## Steps
+/// 1. Alice's manager is configured with `initiation_timeout_base: 100ms`. Bob's manager has the default timeout and is
+///    started but does not process any messages.
+/// 2. Alice's mock transport is set up to capture her `StartSession` message and silently discard it (Bob's manager is
+///    never invoked).
+/// 3. Alice calls `new_session`. The `StartSession` is sent but no response arrives within 100ms, so the initiation is
+///    aborted.
+/// 4. `new_session` returns `Err(TransportSessionError::Timeout)`.
+/// 5. Alice's manager shows zero active sessions, confirming no orphaned slot was left behind.
 #[test(tokio::test)]
 async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> Result<()> {
     let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -499,6 +548,19 @@ async fn session_manager_should_timeout_new_session_attempt_when_no_response() -
     Ok(())
 }
 
+/// Verifies that calling `ping_session` on an established session sends a `KeepAlive` message
+/// to the peer and that the session can still be closed afterwards.
+///
+/// ## Steps
+/// 1. Alice and Bob's managers are started with mock transports. No `PixToolbox` is provided.
+/// 2. Alice initiates a session toward Bob; `StartSession` / `SessionEstablished` completes normally.
+/// 3. The session is confirmed active on both sides with expected capabilities.
+/// 4. **Immediately** after establishment (before any background SURB balancer timer fires), Alice's manager is asked
+///    to `ping_session`. The call must succeed and send exactly one `KeepAlive` message back to Bob via the mock
+///    transport.
+/// 5. The mock delivers the `KeepAlive` to Bob's manager, which processes it without error.
+/// 6. Alice then closes the session with a terminating segment; Bob receives and processes it.
+/// 7. Both cleanup paths run without panic.
 #[test(tokio::test)]
 async fn session_manager_should_send_keep_alive_when_ping_session_is_called() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();

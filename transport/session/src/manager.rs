@@ -2395,6 +2395,14 @@ mod tests {
 
     const SESSION_FORWARD_CAPACITY: usize = 10000;
 
+    /// Verifies that a session's SURB balancer config can be retrieved and updated via the manager API.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig`
+    ///    (`target_surb_buffer_size: 1000`, `max_surbs_per_sec: 100`).
+    /// 2. `get_surb_balancer_config` returns the config, confirming round-trip storage.
+    /// 3. `update_surb_balancer_config` is called with a new config (`target: 2000`, `max: 200`).
+    /// 4. `get_surb_balancer_config` is called again and the returned config matches the updated values.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_surb_balancer_config() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2441,6 +2449,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a self-initiated session is rejected with `SessionManagerError::Loopback`.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is started with a mock transport that delivers messages back to itself.
+    /// 2. Alice initiates a session toward `bob_peer`; the mock routes her `StartSession` back to her own manager
+    ///    (simulating a network loopback).
+    /// 3. Alice's manager processes `StartSession` as incoming, auto-responds with `SessionEstablished`, and the mock
+    ///    delivers it back to complete the handshake.
+    /// 4. `new_session` returns `Err(TransportSessionError::Manager(SessionManagerError::Loopback))`.
+    /// 5. Exactly one active session is present — the incoming slot accepted from the self-delivered `StartSession`.
+    ///    The rejection fires after slot insertion, not before.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_not_allow_loopback_sessions() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2540,6 +2559,15 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a session initiation returns `TransportSessionError::Timeout` when the peer
+    /// never processes or responds to the `StartSession` message.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is configured with `initiation_timeout_base: 100ms`. Bob's manager is started but its mock
+    ///    transport silently swallows all messages (never dispatches to the manager).
+    /// 2. Alice calls `new_session`; her `StartSession` is captured by the mock and silently discarded.
+    /// 3. The 100ms timeout expires; `new_session` returns `Err(TransportSessionError::Timeout)`.
+    /// 4. `num_active_sessions` is 0, confirming no orphaned slot was left in the cache.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -2598,6 +2626,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a failed incoming session establishment does not register any telemetry.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with the `telemetry` feature enabled.
+    /// 2. The new-session notification channel's receiver is dropped immediately, so notifying about a new incoming
+    ///    session will fail.
+    /// 3. `handle_incoming_session_initiation` is called with a random pseudonym. The slot is inserted first, then
+    ///    notifying about the new session fails (receiver is gone).
+    /// 4. `wait_for_no_active_sessions` polls until there are no active sessions, confirming the partially-inserted
+    ///    slot was rolled back.
+    /// 5. `num_active_sessions` is 0, proving the rollback prevented any telemetry registration for the failed session.
     #[cfg(feature = "telemetry")]
     #[test_log::test(tokio::test)]
     async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
@@ -2640,6 +2679,15 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a session slot is rolled back if session setup fails after the slot is inserted.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started; the new-session notification channel's receiver is dropped, so notifying about
+    ///    a new incoming session will fail.
+    /// 2. `handle_incoming_session_initiation` is called with a random pseudonym. The slot is inserted into the cache
+    ///    first, then notifying about the new session fails (because the receiver is gone).
+    /// 3. The call returns an error, and `wait_for_no_active_sessions` confirms the slot was removed.
+    /// 4. `num_active_sessions` is 0, proving the rollback removed the slot and freed the pseudonym.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_roll_back_slot_when_incoming_session_setup_fails() -> anyhow::Result<()> {
         let mgr = SessionManager::new(Default::default());
@@ -2685,6 +2733,22 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that established sessions exchange `KeepAlive` messages driven by the SURB balancer,
+    /// that config updates propagate via keep-alives, and that SURB usage statistics are collected.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is started with no `PixToolbox` and a `SurbBalancerConfig` with `target_surb_buffer_size:
+    ///    10`. Bob's manager is configured with a 500ms `surb_balance_notify_period`.
+    /// 2. Alice initiates a session with the balancer config and PIX quota set; the `StartSession` /
+    ///    `SessionEstablished` handshake completes via mock transports.
+    /// 3. Both managers report the same `target_surb_buffer_size` via `get_surb_balancer_config` (confirmed from both
+    ///    Alice and Bob's perspective).
+    /// 4. A 1500ms sleep allows the SURB balancer's periodic keep-alive timer to fire multiple times.
+    /// 5. `update_surb_balancer_config` is called to raise the target to 50. After another 1500ms, Bob's manager
+    ///    reflects the updated target via `get_surb_balancer_config`, confirming keep-alives communicated the change.
+    /// 6. `get_surb_level_estimates` is called on both sides; both report positive sent/received/used counts,
+    ///    confirming the balancer collected SURB statistics.
+    /// 7. Alice closes the session; `ping_session` returns `NonExistingSession` after a short wait.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -3006,6 +3070,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a second incoming session initiation for the same pseudonym is handled gracefully
+    /// (returns `Ok`) without creating a duplicate session slot.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport that accepts two outbound messages.
+    /// 2. `handle_incoming_session_initiation` is called with pseudonym `X` — succeeds; exactly one active session is
+    ///    confirmed.
+    /// 3. `handle_incoming_session_initiation` is called again with the same pseudonym `X`. The manager detects the
+    ///    conflict and handles it internally by sending a `SessionError` to the peer.
+    /// 4. The call still returns `Ok` (error is handled internally); `num_active_sessions` remains 1 with only the
+    ///    original pseudonym present.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_duplicate_session_for_same_pseudonym() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3086,6 +3161,13 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that pinging a session that does not exist returns `NonExistingSession`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `ping_session` is called with a completely random (non-existent) session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
+    /// 4. `num_active_sessions` is 0, confirming no sessions were created.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_pinging_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -3118,6 +3200,12 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that closing a session that does not exist returns `false` (no-op).
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `close_session` is called with a random (non-existent) session ID.
+    /// 3. The call returns `false`, indicating no session was closed.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_false_when_closing_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -3142,6 +3230,12 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that updating the SURB balancer config for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `update_surb_balancer_config` is called with a random session ID.
+    /// 3. The call returns an error (no `Ok` variant is expected).
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_updating_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -3170,6 +3264,12 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that retrieving the SURB balancer config for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `get_surb_balancer_config` is called with a random session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_getting_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -3202,6 +3302,12 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that retrieving SURB level estimates for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `get_surb_level_estimates` is called with a random session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_getting_surb_estimates_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -3313,6 +3419,16 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that an incoming session initiation is rejected (handled internally) when the
+    /// manager already has `maximum_sessions` active sessions.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1`.
+    /// 2. `handle_incoming_session_initiation` is called with pseudonym `X1` — succeeds; one active session confirmed.
+    /// 3. `handle_incoming_session_initiation` is called with pseudonym `X2` — the manager detects it is at capacity
+    ///    and handles the conflict internally (sends `SessionError` to peer).
+    /// 4. The call returns `Ok` (handled internally); `num_active_sessions` remains 1, with only `X1` present — `X2`
+    ///    was rejected without creating a slot.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_new_session_when_max_sessions_reached() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3565,6 +3681,14 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that dispatching data to a session that does not exist returns `UnknownData`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `dispatch_message` is called with a random pseudonym and an `ApplicationData` carrying the
+    ///    `SESSION_APPLICATION_TAG` (a session-scoped tag).
+    /// 3. The manager has no matching session, so the call returns `Err(TransportSessionError::UnknownData)`.
+    /// 4. `num_active_sessions` is 0, confirming no session was implicitly created.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_unknown_data_error_when_dispatching_to_unknown_session() -> anyhow::Result<()>
     {
@@ -3602,6 +3726,13 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that closing an existing session returns `true` and removes the session from the manager.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport that accepts one outbound message.
+    /// 2. `handle_incoming_session_initiation` is called to create a session — one active session confirmed.
+    /// 3. `close_session` is called with the session's pseudonym — returns `true`.
+    /// 4. `num_active_sessions` is 0, confirming the session was fully removed.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_true_when_closing_existing_session() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3656,6 +3787,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a `KeepAlive` message with the `BalancerState` flag updates the session's
+    /// SURB buffer level in the manager.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig` and an initial
+    ///    buffer level of 100.
+    /// 2. A `KeepAlive` message with `KeepAliveFlag::BalancerState` and `additional_data: 200` is constructed and
+    ///    dispatched to Alice's manager via `dispatch_message`.
+    /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's `buffer_level` reaches
+    ///    200 (with a 1-second timeout).
+    /// 4. The buffer level is confirmed to be 200, proving the `BalancerState` flag updated it.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_buffer_level_on_keep_alive_with_balancer_state_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -3751,6 +3893,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a `KeepAlive` message with the `BalancerTarget` flag updates the session's
+    /// target SURB buffer size in the manager.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig` and
+    ///    `target_surb_buffer_size: 1000`.
+    /// 2. A `KeepAlive` message with `KeepAliveFlag::BalancerTarget` and `additional_data: 2000` is constructed and
+    ///    dispatched via `dispatch_message`.
+    /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's
+    ///    `target_surb_buffer_size` reaches 2000 (with a 1-second timeout).
+    /// 4. The target is confirmed to be 2000, proving the `BalancerTarget` flag updated it.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_target_on_keep_alive_with_balancer_target_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -3836,6 +3989,14 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a session is evicted after the `idle_timeout` fires, without needing an explicit close.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1` and `idle_timeout: 100ms`.
+    /// 2. `handle_incoming_session_initiation` creates one session — confirmed active.
+    /// 3. The test sleeps 200ms (well past the 100ms timeout), then calls `sessions.run_pending_tasks()` to drive the
+    ///    eviction timer.
+    /// 4. `active_sessions` is empty, confirming the idle session was cleaned up without an explicit close call.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_evict_idle_session_and_call_close_callback() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3893,6 +4054,16 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a second incoming session initiation is rejected (not evicted) when the manager
+    /// is at `maximum_sessions` capacity with a long `idle_timeout`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1` and `idle_timeout: 3600s` (long enough that
+    ///    eviction will not fire during the test).
+    /// 2. `handle_incoming_session_initiation` creates session `X1` — confirmed active.
+    /// 3. `handle_incoming_session_initiation` is called for session `X2` — the manager detects capacity is reached and
+    ///    rejects the initiation internally (sends `SessionError`).
+    /// 4. `active_sessions` still contains only `X1`; the first session was not evicted to make room.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_new_session_when_max_sessions_reached_no_eviction() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3975,6 +4146,18 @@ mod tests {
     // PIX protocol tests
     // ---------------------------------------------------------------------------
 
+    /// Verifies that an incoming session initiation with a PIX quota outside the acceptable range
+    /// is rejected with `StartErrorReason::UnacceptablePixParams`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `pix_config.quota_range: 0..=2048*1024*1024` (accepts quotas up to ~2 GiB).
+    /// 2. The test encodes `additional_data` as `(polynomials=3000, shares=3000)`, which translates to a quota of
+    ///    9,000,000 — far outside the allowed range.
+    /// 3. `handle_incoming_session_initiation` is called with `Capability::UsePIX` and the out-of-range quota.
+    /// 4. Bob's manager sends a `SessionError` back to the peer with reason `UnacceptablePixParams`.
+    /// 5. The test receives the error on a one-shot channel and asserts `err.reason == UnacceptablePixParams` and
+    ///    `err.challenge == MIN_CHALLENGE`.
+    /// 6. `num_active_sessions` is 0, confirming no session slot was created.
     #[test_log::test(tokio::test)]
     async fn incoming_session_with_unacceptable_pix_quota_is_rejected() -> anyhow::Result<()> {
         use std::sync::Arc;
@@ -4038,6 +4221,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that an incoming session initiation that does not declare `UsePIX` capability is
+    /// rejected when PIX is enforced on the responder.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `pix_config.enforce_pix: true`, requiring all incoming sessions to opt into
+    ///    PIX.
+    /// 2. The incoming initiation carries `Capability::Segmentation` only (no `UsePIX`).
+    /// 3. `handle_incoming_session_initiation` is called; Bob's manager detects the missing `UsePIX` capability and
+    ///    sends a `SessionError` with `UnacceptablePixParams`.
+    /// 4. The test receives the error and asserts `err.reason == UnacceptablePixParams`.
+    /// 5. `num_active_sessions` is 0, confirming no session slot was created.
     #[test_log::test(tokio::test)]
     async fn incoming_session_without_usepix_is_rejected_when_pix_enforced() -> anyhow::Result<()> {
         use std::sync::Arc;
@@ -4097,6 +4291,16 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that the exit/responder (Bob) rejects an `SsaCommit` for a session that has no PIX
+    /// state — i.e., the SSA commit is delivered with a session ID that Bob does not hold.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    normally via `handle_incoming_session_initiation`, establishing a session with PIX state.
+    /// 2. `handle_ssa_commit` is called with a completely different (random) session ID — one that Bob's manager does
+    ///    not have.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`,
+    ///    confirming the exit rejects commits for unknown sessions.
     #[test_log::test(tokio::test)]
     async fn exit_rejects_ssa_commit_when_session_has_no_pix_state() -> anyhow::Result<()> {
         use std::collections::HashMap;
@@ -4178,6 +4382,18 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a session is automatically closed after receiving more than the allowed number
+    /// of `UnverifiableShare` PIX events (the configurable fault tolerance threshold).
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    via `handle_incoming_session_initiation`.
+    /// 2. The test dispatches four `UnverifiableShare` events for the same `SsaId` in a loop, calling
+    ///    `dispatch_pix_event` each time.
+    /// 3. After the first 3 events, `num_active_sessions` is still 1 and `active_sessions` is non-empty — the session
+    ///    remains open (below the fault threshold).
+    /// 4. After the 4th event, the session is closed. `active_sessions` is empty and `num_active_sessions` is 0,
+    ///    confirming the kill switch fired.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_after_too_many_unverifiable_shares() -> anyhow::Result<()> {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
@@ -4256,6 +4472,18 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that when the exit/responder receives an `SsaRecovered` PIX event, it requests
+    /// a fresh SSA by sending another `SsaRequest` to the entry/initiator.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    via `handle_incoming_session_initiation`, which triggers an initial `SsaRequest` (message 1).
+    /// 2. The mock transport tracks all outbound messages; exactly 3 messages are expected: `SessionEstablished`,
+    ///    initial `SsaRequest` at init, and a second `SsaRequest` after recovery.
+    /// 3. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager.
+    /// 4. The manager processes the recovery event and emits a second `SsaRequest` to Alice.
+    /// 5. The test asserts that exactly 2 `SsaRequest` messages were sent, confirming the recovery path triggered a new
+    ///    SSA request.
     #[test_log::test(tokio::test)]
     async fn exit_requests_new_ssa_after_ssa_recovered_event() -> anyhow::Result<()> {
         use std::sync::Arc;
@@ -4337,6 +4565,16 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that the entry/initiator (Alice) rejects a `SsaRequest` from the exit when the
+    /// proposed SSA quota does not match what Alice offered in `pix_ssa_quota`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a generous PIX quota config. Alice's session initiation is
+    ///    processed with `additional_data = (polynomials=2, shares=2)`.
+    /// 2. `handle_ssa_request` is called with a mismatched quota: `(server_polynomials=10, server_shares=10)` while
+    ///    Alice offered `(2, 2)`.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::Unacceptable(_))`,
+    ///    confirming the quota mismatch was detected and rejected.
     #[test_log::test(tokio::test)]
     async fn entry_rejects_ssa_request_with_mismatched_quota() -> anyhow::Result<()> {
         use std::collections::BTreeMap;
@@ -4415,6 +4653,19 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient
+    /// commits for all polynomials causes the PIX event stream to emit `DepositNeeded`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` configured for `polynomials_per_ssa=2, threshold=2,
+    ///    surplus_shares=1`. Alice's session initiation is processed normally.
+    /// 2. The exit has already registered an exit commitment from `handle_incoming_session_initiation`.
+    /// 3. Coefficient 0 (constant terms across all polynomials) is delivered via `handle_ssa_commit` using identity
+    ///    group elements as dummy commitments.
+    /// 4. Coefficient 1 (linear terms) is delivered similarly.
+    /// 5. After the second coefficient delivery, Bob's PIX event stream emits `DepositNeeded` with the correct `SsaId`
+    ///    and `quota_per_ssa` matching `pix_params_to_quota(2, 2)`.
+    /// 6. The event is received within a 2-second timeout.
     #[test_log::test(tokio::test)]
     async fn exit_receives_ssa_commits_and_emits_deposit_needed_event() -> anyhow::Result<()> {
         use std::collections::HashMap;
@@ -4541,6 +4792,18 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a PIX session is closed automatically if the deposit is not realized within
+    /// the configured `max_deposit_wait` period.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `max_deposit_wait: 50ms` and `max_ssa_delivery_time: 0` (total kill-switch
+    ///    window: 50ms).
+    /// 2. A `PixToolbox` is provided so the PIX state machine runs. Alice's session initiation is processed via
+    ///    `handle_incoming_session_initiation`.
+    /// 3. Immediately after establishment, `active_sessions` contains Alice's pseudonym — session is live.
+    /// 4. The test sleeps 100ms (past the 50ms deadline). No deposit is ever made.
+    /// 5. `active_sessions` is empty and `num_active_sessions` is 0, confirming the kill switch closed the session due
+    ///    to the unrealized deposit.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_when_deposit_timeout_fires() -> anyhow::Result<()> {
         use std::time::Duration;
