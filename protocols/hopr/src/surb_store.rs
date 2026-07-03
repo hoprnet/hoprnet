@@ -3,7 +3,6 @@ use std::{sync::Arc, time::Duration};
 use hopr_api::types::internal::{prelude::HoprPseudonym, routing::SurbMatcher};
 use hopr_crypto_packet::prelude::*;
 use moka::notification::RemovalCause;
-use ringbuffer::RingBuffer;
 use validator::ValidationError;
 
 use crate::{FoundSurb, traits::SurbStore};
@@ -176,9 +175,11 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    if cause != RemovalCause::Explicit {
+                        tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    }
                 })
-                .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
+                .max_capacity(cfg.max_pseudonyms.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
             // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
             // For each Pseudonym, there's an RB of SURBs and their IDs.
@@ -186,7 +187,9 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    if cause != RemovalCause::Explicit {
+                        tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    }
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
@@ -269,6 +272,12 @@ impl SurbStore for MemorySurbStore {
             .get(&sender_id.pseudonym())
             .and_then(|cache| cache.remove(&sender_id.surb_id()))
     }
+
+    #[tracing::instrument(skip_all, level = "trace", fields(%pseudonym))]
+    fn remove_pseudonym(&self, pseudonym: &HoprPseudonym) {
+        self.surbs_per_pseudonym.invalidate(pseudonym);
+        self.pseudonym_openers.invalidate(pseudonym);
+    }
 }
 
 /// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
@@ -286,46 +295,63 @@ pub struct PoppedSurb<S> {
 ///
 /// All these SURBs usually belong to the same pseudonym and are therefore identified
 /// only by the [`HoprSurbId`].
+#[derive(Debug)]
+struct BoundedFifo<S> {
+    buffer: std::collections::VecDeque<(HoprSurbId, S)>,
+    capacity: usize,
+}
+
 #[derive(Clone, Debug)]
-pub struct SurbRingBuffer<S>(Arc<parking_lot::Mutex<ringbuffer::AllocRingBuffer<(HoprSurbId, S)>>>);
+pub struct SurbRingBuffer<S>(Arc<parking_lot::Mutex<BoundedFifo<S>>>);
 
 impl<S> SurbRingBuffer<S> {
     pub fn new(capacity: usize) -> Self {
-        Self(Arc::new(parking_lot::Mutex::new(ringbuffer::AllocRingBuffer::new(
+        // The buffer is allocated lazily as SURBs arrive: most pseudonyms (e.g., probe pings)
+        // only ever deliver a few SURBs, so eagerly allocating `capacity` slots per pseudonym
+        // would waste megabytes of memory each.
+        Self(Arc::new(parking_lot::Mutex::new(BoundedFifo {
+            buffer: std::collections::VecDeque::new(),
             capacity,
-        ))))
+        })))
     }
 
     /// Push all SURBs with their IDs into the RB.
     ///
+    /// If the RB is full, the oldest SURBs are dropped to make room.
+    ///
     /// Returns the total number of elements in the RB after the push.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> usize {
-        let mut rb = self.0.lock();
-        rb.extend(surbs);
-        rb.len()
+        let mut fifo = self.0.lock();
+        for surb in surbs {
+            if fifo.buffer.len() >= fifo.capacity {
+                fifo.buffer.pop_front();
+            }
+            fifo.buffer.push_back(surb);
+        }
+        fifo.buffer.len()
     }
 
     /// Pop the latest SURB and its IDs from the RB.
     pub fn pop_one(&self) -> Option<PoppedSurb<S>> {
-        let mut rb = self.0.lock();
-        let (id, surb) = rb.dequeue()?;
+        let mut fifo = self.0.lock();
+        let (id, surb) = fifo.buffer.pop_front()?;
         Some(PoppedSurb {
             id,
             surb,
-            remaining: rb.len(),
+            remaining: fifo.buffer.len(),
         })
     }
 
     /// Check if the next SURB has the given ID and pop it from the RB.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Option<PoppedSurb<S>> {
-        let mut rb = self.0.lock();
+        let mut fifo = self.0.lock();
 
-        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = rb.dequeue()?;
+        if fifo.buffer.front().is_some_and(|(surb_id, _)| surb_id == id) {
+            let (id, surb) = fifo.buffer.pop_front()?;
             Some(PoppedSurb {
                 id,
                 surb,
-                remaining: rb.len(),
+                remaining: fifo.buffer.len(),
             })
         } else {
             None

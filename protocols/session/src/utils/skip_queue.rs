@@ -18,10 +18,12 @@ struct DelayedEntry<T> {
     cancelled: AtomicBool,
 }
 
-// The entries are equal only if the items they carry are equal
+// Entries are ordered by deadline first, so that the earliest deadline sits at the
+// front of the BTreeSet. Item uniqueness is not encoded in this ordering (that would
+// make it non-transitive, corrupting the BTreeSet); it is enforced on insertion instead.
 impl<T: PartialEq> PartialEq for DelayedEntry<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.item == other.item
+        self.at == other.at && self.item == other.item
     }
 }
 
@@ -29,19 +31,7 @@ impl<T: Eq> Eq for DelayedEntry<T> {}
 
 impl<T: Ord> Ord for DelayedEntry<T> {
     fn cmp(&self, other: &Self) -> Ordering {
-        if other.item != self.item {
-            // If items are not equal, the order is determined by the deadline
-            match self.at.cmp(&other.at) {
-                // If the deadlines are equal, use the natural order of the items.
-                // This should be presumably consistent with their PartialEq and won't
-                // therefore return Ordering::Equal.
-                Ordering::Equal => self.item.cmp(&other.item),
-                x => x,
-            }
-        } else {
-            // Be consistent with PartialEq
-            Ordering::Equal
-        }
+        self.at.cmp(&other.at).then_with(|| self.item.cmp(&other.item))
     }
 }
 
@@ -120,7 +110,9 @@ impl<T> Drop for SkipDelayReceiver<T> {
         self.0.clear_poison();
         let mut queue = self.0.lock().expect("cannot panic because poison is cleared");
         queue.is_closed = true;
-        queue.rx_waker = None;
+        if let Some(waker) = queue.rx_waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -203,7 +195,9 @@ impl<T> SkipDelaySender<T> {
         queue.clear_poison();
         let mut queue = queue.lock().expect("cannot panic because poison is cleared");
         queue.is_closed = true;
-        queue.rx_waker = None;
+        if let Some(waker) = queue.rx_waker.take() {
+            waker.wake();
+        }
     }
 
     /// Forces closure of the queue (regardless of any remaining senders).
@@ -234,7 +228,10 @@ impl<T: Ord> SkipDelaySender<T> {
                 match item {
                     DelayedItem::New(item, at) => {
                         tracing::trace!(at =  ?at.saturating_duration_since(Instant::now()), "inserting");
-                        queue.entries.replace(DelayedEntry {
+                        // Each item may only have one deadline: drop any entry carrying
+                        // the same item before inserting it with the new deadline.
+                        queue.entries.retain(|e| e.item != item);
+                        queue.entries.insert(DelayedEntry {
                             item,
                             at,
                             cancelled: AtomicBool::new(false),

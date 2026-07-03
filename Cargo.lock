@@ -3735,7 +3735,6 @@ dependencies = [
  "moka",
  "parameterized",
  "parking_lot",
- "ringbuffer",
  "serde",
  "serde_with",
  "smart-default",
@@ -3748,7 +3747,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -3887,7 +3886,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.31.0"
+version = "0.32.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3997,11 +3996,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "const-hex",
+ "crossfire",
  "futures",
  "futures-concurrency",
  "hex-literal",
@@ -4136,13 +4136,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "arrayvec",
  "assertables",
  "async-lock",
  "auto_impl",
+ "crossfire",
  "flume",
  "futures",
  "futures-time",

@@ -1,4 +1,4 @@
-use futures::channel::mpsc::Sender;
+use hopr_utils::network_types::crossfire_sink::CrossfireSink;
 
 use crate::{
     errors::SessionError,
@@ -18,7 +18,8 @@ pub struct SocketComponents<const C: usize> {
     /// Allows emitting control messages to the socket.
     ///
     /// It is a regular `SessionMessage` injected into the downstream.
-    pub ctl_tx: Sender<SessionMessage<C>>,
+    /// Strict-capacity bounded channel — capacity never inflates regardless of clone count.
+    pub ctl_tx: CrossfireSink<SessionMessage<C>>,
 }
 
 /// Abstraction of the `SessionSocket` state.

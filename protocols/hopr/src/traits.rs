@@ -44,6 +44,13 @@ pub trait SurbStore {
     ///
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener>;
+
+    /// Removes all SURBs and reply openers associated with the given [`pseudonym`](HoprPseudonym).
+    ///
+    /// This should be called when the pseudonym is known to be defunct (e.g., its Session
+    /// has been closed), so that the associated resources are freed without waiting
+    /// for their idle expiration.
+    fn remove_pseudonym(&self, pseudonym: &HoprPseudonym);
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).

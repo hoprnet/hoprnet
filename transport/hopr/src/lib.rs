@@ -36,11 +36,7 @@ use std::{
 };
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{
-    FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{Sender, channel},
-    stream::select_with_strategy,
-};
+use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::Sender, stream::select_with_strategy};
 pub use hopr_api::{
     Multiaddr, PeerId,
     network::{Health, traits::NetworkView},
@@ -79,7 +75,13 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 #[cfg(feature = "telemetry")]
 pub use hopr_transport_session::{SessionAckMode, SessionLifecycleState};
 pub use hopr_transport_tag_allocator::TagAllocatorConfig;
-use hopr_utils::{network_types::prelude::*, runtime::AbortableList};
+use hopr_utils::{
+    network_types::{
+        crossfire_sink::{CrossfireSink, bounded_sink_channel},
+        prelude::*,
+    },
+    runtime::AbortableList,
+};
 pub use multiaddr::Protocol;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, trace, warn};
@@ -159,7 +161,7 @@ pub enum HoprTransportProcess {
 }
 
 /// HOPR protocol specific instantiation of the SessionManager.
-type HoprSessionManager = SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>;
+type HoprSessionManager = SessionManager<CrossfireSink<(DestinationRouting, ApplicationDataOut)>>;
 
 /// Allows configuration of one specific [`HoprSession`].
 ///
@@ -314,7 +316,9 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
-        Ok(Self {
+        let surb_store = MemorySurbStore::new(cfg.packet.surb_store);
+
+        let this = Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
@@ -322,7 +326,7 @@ where
             graph,
             path_planner: PathPlanner::new(
                 me_offchain,
-                MemorySurbStore::new(cfg.packet.surb_store),
+                surb_store.clone(),
                 resolver.clone(),
                 selector,
                 planner_config,
@@ -355,7 +359,16 @@ where
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
-        })
+        };
+
+        // Free stored SURBs and reply openers as soon as their Session closes,
+        // instead of waiting for the idle expiration in the SURB store.
+        this.smgr.set_session_close_hook(move |session_id| {
+            use hopr_protocol_hopr::SurbStore;
+            surb_store.remove_pseudonym(session_id);
+        });
+
+        Ok(this)
     }
 
     /// Execute all processes of the [`HoprTransport`] object as a **Relay** node.
@@ -374,7 +387,7 @@ where
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
         >,
         AbortableList<HoprTransportProcess>,
     )>
@@ -410,7 +423,7 @@ where
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
         >,
         AbortableList<HoprTransportProcess>,
     )>
@@ -444,7 +457,7 @@ where
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
         >,
         AbortableList<HoprTransportProcess>,
     )>
@@ -483,7 +496,7 @@ where
     ) -> errors::Result<(
         HoprSocket<
             futures::stream::BoxStream<'static, ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+            CrossfireSink<(DestinationRouting, ApplicationDataOut)>,
         >,
         AbortableList<HoprTransportProcess>,
     )>
@@ -496,7 +509,7 @@ where
         let mut processes = AbortableList::<HoprTransportProcess>::default();
 
         let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
-            channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+            bounded_sink_channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         // -- transport medium
 
@@ -564,7 +577,7 @@ where
             "creating protocol bidirectional channel"
         );
         let (tx_from_protocol, rx_from_protocol) =
-            channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+            bounded_sink_channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
         // === START === cover traffic control
         // Allocate a cover traffic tag from the session telemetry partition to avoid
@@ -734,8 +747,9 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(128);
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
-        let (manual_ping_tx, manual_ping_rx) =
-            channel::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
+        let (manual_ping_tx, manual_ping_rx_raw) =
+            crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(manual_ping_channel_capacity);
+        let manual_ping_rx = manual_ping_rx_raw.into_stream();
 
         let probe = Probe::new(self.cfg.probe, self.probing_tag_allocator.clone());
 
@@ -794,7 +808,7 @@ where
         // than collapsing the entire ingress pipeline. Callers should use HoprSocket::reader()
         // and actively drain the stream; see hopr-lib builder for the reference drain.
         let (on_incoming_data_tx, on_incoming_data_rx) =
-            channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
+            bounded_sink_channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
         let smgr = self.smgr.clone();
         let unresolved_routing_msg_tx_for_task = unresolved_routing_msg_tx.clone();
         processes.insert(

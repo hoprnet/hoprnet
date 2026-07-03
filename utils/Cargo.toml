@@ -1,7 +1,7 @@
 [package]
 name = "hopr-utils"
 description = "Shared utility crates for HOPR: async runtime, network types, parallelisation, statistics, platform, and testing helpers"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -25,6 +25,7 @@ async-lock = ["dep:async-lock"]
 
 # network-types module (from hopr-network-types)
 network-types = [
+  "dep:crossfire",
   "dep:arrayvec",
   "dep:flume",
   "dep:futures-time",
@@ -74,6 +75,8 @@ async-lock = { workspace = true, optional = true }
 indexmap = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, optional = true, features = ["time", "sync"] }
+
+crossfire = { workspace = true, optional = true }
 
 # network-types
 arrayvec = { workspace = true, optional = true }

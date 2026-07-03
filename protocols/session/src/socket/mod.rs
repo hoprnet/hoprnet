@@ -302,7 +302,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             capacity = cfg.control_channel_capacity,
             "creating session control channel"
         );
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(cfg.control_channel_capacity.max(128));
+        let (ctl_tx, ctl_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<SessionMessage<C>>(
+            cfg.control_channel_capacity.max(128),
+        );
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
@@ -422,7 +424,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.frame_size)
+            .sequencer(cfg.frame_timeout, cfg.capacity)
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
