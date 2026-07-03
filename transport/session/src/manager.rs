@@ -75,9 +75,17 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[tracing::instrument(level = "debug", skip(session_data))]
-fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+/// Hook invoked with the session ID on every session closure path,
+/// allowing external resources tied to the session (e.g., stored SURBs) to be released early.
+type SessionCloseHook = Arc<OnceLock<Box<dyn Fn(&SessionId) + Send + Sync>>>;
+
+#[tracing::instrument(level = "debug", skip(session_data, close_hook))]
+fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason, close_hook: &SessionCloseHook) {
     debug!("closing session");
+
+    if let Some(hook) = close_hook.get() {
+        hook(&session_id);
+    }
 
     #[cfg(feature = "telemetry")]
     {
@@ -174,6 +182,7 @@ struct SessionSlotGuard<'a> {
     sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     session_id: SessionId,
+    close_hook: SessionCloseHook,
     committed: bool,
 }
 
@@ -182,11 +191,13 @@ impl<'a> SessionSlotGuard<'a> {
         sessions: &'a moka::sync::Cache<SessionId, SessionSlot>,
         session_id: SessionId,
         active_sessions: Arc<std::sync::atomic::AtomicUsize>,
+        close_hook: SessionCloseHook,
     ) -> Self {
         Self {
             sessions,
             active_sessions,
             session_id,
+            close_hook,
             committed: false,
         }
     }
@@ -211,7 +222,7 @@ impl Drop for SessionSlotGuard<'_> {
             if let Some(slot) = self.sessions.remove(&session_id) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
 
-                close_session(session_id, slot, ClosureReason::Eviction);
+                close_session(session_id, slot, ClosureReason::Eviction, &self.close_hook);
             }
         }
     }
@@ -502,6 +513,7 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    close_hook: SessionCloseHook,
     cfg: SessionManagerConfig,
 }
 
@@ -515,6 +527,7 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            close_hook: self.close_hook.clone(),
         }
     }
 }
@@ -593,6 +606,9 @@ where
         let active_sessions: Arc<std::sync::atomic::AtomicUsize> = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let active_sessions_for_listener = active_sessions.clone();
 
+        let close_hook: SessionCloseHook = Arc::new(OnceLock::new());
+        let close_hook_for_listener = close_hook.clone();
+
         let msg_sender = Arc::new(OnceLock::new());
         Self {
             msg_sender: msg_sender.clone(),
@@ -612,7 +628,7 @@ where
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                         trace!(?session_id, ?reason, "session evicted from the cache");
                         active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
-                        close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
+                        close_session(*session_id.as_ref(), entry, ClosureReason::Eviction, &close_hook_for_listener);
                     }
                     _ => {}
                 })
@@ -620,8 +636,17 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
+            close_hook,
             cfg,
         }
+    }
+
+    /// Registers a hook invoked with the session ID on every session closure path
+    /// (explicit close, idle/capacity eviction, closure by counterparty, or setup rollback).
+    ///
+    /// Can only be set once; returns `false` if a hook was already registered.
+    pub fn set_session_close_hook<F: Fn(&SessionId) + Send + Sync + 'static>(&self, hook: F) -> bool {
+        self.close_hook.set(Box::new(hook)).is_ok()
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`
@@ -676,7 +701,7 @@ where
                         // other party.
                         if let Some(session_data) = myself.sessions.remove(&session_id) {
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                            close_session(session_id, session_data, closure_reason);
+                            close_session(session_id, session_data, closure_reason, &myself.close_hook);
                         } else {
                             // Do not treat this as an error
                             debug!(
@@ -805,7 +830,12 @@ where
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
                 // take_guard borrows self, so the guard stores the counter clone separately.
-                Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
+                Some(SessionSlotGuard::new(
+                    &self.sessions,
+                    session_id,
+                    counter.clone(),
+                    self.close_hook.clone(),
+                ))
             }
             _ => None,
         }
@@ -1209,7 +1239,7 @@ where
     pub fn close_session(&self, id: &SessionId) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-            close_session(*id, slot, ClosureReason::Eviction);
+            close_session(*id, slot, ClosureReason::Eviction, &self.close_hook);
             true
         } else {
             false

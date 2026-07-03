@@ -316,7 +316,9 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
-        Ok(Self {
+        let surb_store = MemorySurbStore::new(cfg.packet.surb_store);
+
+        let this = Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
@@ -324,7 +326,7 @@ where
             graph,
             path_planner: PathPlanner::new(
                 me_offchain,
-                MemorySurbStore::new(cfg.packet.surb_store),
+                surb_store.clone(),
                 resolver.clone(),
                 selector,
                 planner_config,
@@ -357,7 +359,16 @@ where
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
             cfg,
-        })
+        };
+
+        // Free stored SURBs and reply openers as soon as their Session closes,
+        // instead of waiting for the idle expiration in the SURB store.
+        this.smgr.set_session_close_hook(move |session_id| {
+            use hopr_protocol_hopr::SurbStore;
+            surb_store.remove_pseudonym(session_id);
+        });
+
+        Ok(this)
     }
 
     /// Execute all processes of the [`HoprTransport`] object as a **Relay** node.
