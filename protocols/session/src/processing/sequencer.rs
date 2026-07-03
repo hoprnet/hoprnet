@@ -156,7 +156,14 @@ where
                 State::BufferUpdated => {
                     // The buffer has been updated, check if we can yield something
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
-                        if next.eq(this.next_id) {
+                        if next.lt(this.next_id) {
+                            // A duplicate of an already emitted frame that was buffered before
+                            // the original got emitted: it must be dropped, otherwise it blocks
+                            // the top of the heap forever, stalling all frames behind it.
+                            tracing::error!("old item");
+                            this.buffer.pop();
+                            continue;
+                        } else if next.eq(this.next_id) {
                             *this.next_id = this.next_id.wrapping_add(1);
                             *this.last_emitted = Instant::now();
                             *this.state = State::BufferUpdated;
@@ -268,6 +275,30 @@ mod tests {
         seq_sink.send(2u32).await?;
         seq_sink.send(1u32).await?;
 
+        seq_sink.send(3u32).await?;
+        assert_eq!(Some(3), seq_stream.try_next().await?);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_drop_duplicates_buffered_before_emission() -> anyhow::Result<()> {
+        let (seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        let seq_stream = seq_stream.sequencer(Duration::from_millis(25), 4096);
+
+        pin_mut!(seq_sink);
+        pin_mut!(seq_stream);
+
+        // The duplicate of 2 enters the buffer before the original is emitted
+        seq_sink.send(2u32).await?;
+        seq_sink.send(2u32).await?;
+        seq_sink.send(1u32).await?;
+
+        assert_eq!(Some(1), seq_stream.try_next().await?);
+        assert_eq!(Some(2), seq_stream.try_next().await?);
+
+        // The stale duplicate must not stall the sequence
         seq_sink.send(3u32).await?;
         assert_eq!(Some(3), seq_stream.try_next().await?);
 
