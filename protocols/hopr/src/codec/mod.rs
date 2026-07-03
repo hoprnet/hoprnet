@@ -76,20 +76,20 @@ mod tests {
     use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
     use crate::{
-        HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStoreConfig,
+        HoprCodecConfig, HoprDecoder, HoprEncoder, MemorySurbStore, PacketDecoder, PacketEncoder, SurbStore,
         codec::encoder::MAX_ACKNOWLEDGEMENTS_BATCH_SIZE, utils::*,
     };
 
     type TestEncoder = HoprEncoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
         Arc<SsaShareGenerator<HoprPixSpec>>,
-        MemorySurbStore,
+        Arc<MemorySurbStore>,
         HoprTicketFactory<MemoryStore>,
     >;
 
     type TestDecoder = HoprDecoder<
         Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
-        MemorySurbStore,
+        Arc<MemorySurbStore>,
         HoprTicketFactory<MemoryStore>,
     >;
 
@@ -97,12 +97,10 @@ mod tests {
         HoprEncoder::new(
             sender.chain_key.clone(),
             sender.chain_api.clone(),
-            MemorySurbStore::new(SurbStoreConfig::default()),
+            sender.surb_store.clone(),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
-            Arc::new(hopr_protocol_pix::SsaShareGenerator::new(
-                hopr_protocol_pix::SsaGeneratorConfig::default(),
-            )),
+            sender.ssa_gen.clone(),
             HoprCodecConfig::default(),
         )
     }
@@ -111,7 +109,7 @@ mod tests {
         HoprDecoder::new(
             (receiver.offchain_key.clone(), receiver.chain_key.clone()),
             receiver.chain_api.clone(),
-            MemorySurbStore::new(SurbStoreConfig::default()),
+            receiver.surb_store.clone(),
             HoprTicketFactory::new(MemoryStore::default()),
             Hash::default(),
             HoprCodecConfig::default(),
@@ -219,6 +217,85 @@ mod tests {
         let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
 
         assert_eq!(data, in_packet.plain_text.as_ref());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn encode_decode_packet_full_round_trip() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let relay = create_node(1, &blokli_client).await?;
+        let receiver = create_node(2, &blokli_client).await?;
+
+        let sender_encoder = create_encoder(&sender);
+        let sender_decoder = create_decoder(&sender);
+
+        let relay_decoder = create_decoder(&relay);
+
+        let receiver_encoder = create_encoder(&receiver);
+        let receiver_decoder = create_decoder(&receiver);
+
+        let data = b"some random message to encode and decode";
+        let resp = b"some random response to encode and decode";
+
+        let forward_path = ValidatedPath::new(
+            sender.chain_key.public().to_address(),
+            vec![
+                relay.chain_key.public().to_address(),
+                receiver.chain_key.public().to_address(),
+            ],
+            &sender.chain_api.as_path_resolver(),
+        )
+        .await?;
+
+        let return_path = ValidatedPath::new(
+            receiver.chain_key.public().to_address(),
+            vec![
+                relay.chain_key.public().to_address(),
+                sender.chain_key.public().to_address(),
+            ],
+            &sender.chain_api.as_path_resolver(),
+        )
+        .await?;
+
+        let out_packet = sender_encoder.encode_packet(
+            data,
+            ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path,
+                return_paths: vec![return_path],
+            },
+            None,
+        )?;
+
+        let fwd_packet = relay_decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
+        let fwd_packet = fwd_packet
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+
+        let in_packet = receiver_decoder.decode(relay.offchain_key.public().into(), fwd_packet.data)?;
+        let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+
+        assert_eq!(data, in_packet.plain_text.as_ref());
+
+        let surb = receiver
+            .surb_store
+            .find_surb(SurbMatcher::Pseudonym(in_packet.sender))
+            .ok_or(anyhow::anyhow!("no surb found for pseudonym"))?;
+
+        let out_packet =
+            receiver_encoder.encode_packet(resp, ResolvedTransportRouting::Return(surb.sender_id, surb.surb), None)?;
+
+        let fwd_packet = relay_decoder.decode(receiver.offchain_key.public().into(), out_packet.data)?;
+        let fwd_packet = fwd_packet
+            .try_as_forwarded()
+            .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+
+        let in_packet = sender_decoder.decode(relay.offchain_key.public().into(), fwd_packet.data)?;
+        let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+
+        assert_eq!(resp, in_packet.plain_text.as_ref());
+
         Ok(())
     }
 

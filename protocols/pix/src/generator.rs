@@ -123,6 +123,12 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     }
 }
 
+impl<S: PixSpec> Default for SsaShareGenerator<S> {
+    fn default() -> Self {
+        Self::new(SsaGeneratorConfig::default())
+    }
+}
+
 impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
     type Error = PixError<S::Pseudonym>;
 

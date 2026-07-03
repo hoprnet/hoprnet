@@ -78,6 +78,12 @@ pub struct SsaReconstructor<S: PixSpec> {
 
 type MaybeRecoveredSsa<S> = Option<RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>>;
 
+impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         Self {
