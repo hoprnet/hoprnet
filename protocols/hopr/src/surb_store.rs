@@ -177,7 +177,7 @@ impl MemorySurbStore {
                 .eviction_listener(|sender_id, _reply_opener, cause| {
                     tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
-                .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
+                .max_capacity(cfg.max_pseudonyms.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
             // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
             // For each Pseudonym, there's an RB of SURBs and their IDs.
