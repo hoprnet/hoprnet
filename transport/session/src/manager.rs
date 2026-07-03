@@ -80,7 +80,12 @@ lazy_static::lazy_static! {
 type SessionCloseHook = Arc<OnceLock<Box<dyn Fn(&SessionId) + Send + Sync>>>;
 
 #[tracing::instrument(level = "debug", skip(session_data, close_hook))]
-fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason, close_hook: &SessionCloseHook) {
+fn close_session(
+    session_id: SessionId,
+    session_data: SessionSlot,
+    reason: ClosureReason,
+    close_hook: &SessionCloseHook,
+) {
     debug!("closing session");
 
     if let Some(hook) = close_hook.get() {
@@ -628,7 +633,12 @@ where
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                         trace!(?session_id, ?reason, "session evicted from the cache");
                         active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
-                        close_session(*session_id.as_ref(), entry, ClosureReason::Eviction, &close_hook_for_listener);
+                        close_session(
+                            *session_id.as_ref(),
+                            entry,
+                            ClosureReason::Eviction,
+                            &close_hook_for_listener,
+                        );
                     }
                     _ => {}
                 })
