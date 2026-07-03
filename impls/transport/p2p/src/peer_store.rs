@@ -56,18 +56,17 @@ impl NetworkPeerStore {
 
     /// Add a new peer with discovered addresses.
     ///
-    /// The function is smart and extends the existing multiaddresses if the peer is already present.
+    /// If the peer is already present, its multiaddresses are replaced with the given ones.
+    /// The stored addresses come from connection observations, so only the latest observation
+    /// is kept: accumulating them would grow without bound, since inbound connections carry
+    /// a fresh ephemeral source port on every reconnect.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub fn add(&self, peer: PeerId, addresses: HashSet<Multiaddr>) -> Result<()> {
         if peer == self.me {
             return Err(NetworkError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        if let Some(mut unit) = self.addresses.get_mut(&peer) {
-            unit.value_mut().extend(addresses.into_iter());
-        } else {
-            self.addresses.insert(peer, addresses);
-
+        if self.addresses.insert(peer, addresses).is_none() {
             #[cfg(all(feature = "telemetry", not(test)))]
             METRIC_PEER_COUNT.increment(1.0);
         }
@@ -146,13 +145,12 @@ mod tests {
     }
 
     #[test]
-    fn network_peer_store_adding_the_same_peer_should_extend_multiaddresses() -> anyhow::Result<()> {
+    fn network_peer_store_adding_the_same_peer_should_replace_multiaddresses() -> anyhow::Result<()> {
         let store = NetworkPeerStore::new(PeerId::random(), HashSet::new());
 
         let peer = PeerId::random();
-        assert!(store.add(peer, HashSet::new()).is_ok());
-
-        assert_eq!(store.get(&peer).context("should contain a value")?, HashSet::new());
+        let old_multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/54321".try_into()?]);
+        assert!(store.add(peer, old_multiaddresses).is_ok());
 
         let multiaddresses = HashSet::from(["/ip4/127.0.0.1/tcp/12345".try_into()?]);
         assert!(store.add(peer, multiaddresses.clone()).is_ok());
