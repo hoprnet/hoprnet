@@ -20,7 +20,10 @@ use vsss_rs::elliptic_curve::{
     },
 };
 
-use crate::{PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors, errors::PixError};
+use crate::{
+    ExitAcknowledgementShareProcessor, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors,
+    errors::PixError,
+};
 
 /// Raw zeroable SSA Index.
 pub type RawSsaIndex = u32;
@@ -483,6 +486,17 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
                 PartialSsaShareVerifier::from_serializable_commitments(spi, sorted_coeffs)
             })
             .collect()
+    }
+
+    /// Shorthand to pass all the coefficient commitments into the [reconstructor](ExitAcknowledgementShareProcessor).
+    pub fn process_into_reconstructor<R: ExitAcknowledgementShareProcessor<S>>(
+        self,
+        reconstructor: &R,
+    ) -> Result<(), R::Error> {
+        for (coeff_idx, coeffs) in self.verifiers {
+            reconstructor.insert_coefficient_commitments(self.ssa_id, coeff_idx, coeffs.into_iter())?;
+        }
+        Ok(())
     }
 }
 

@@ -103,6 +103,12 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         }
     }
 
+    /// Returns the configuration of the reconstructor.
+    #[inline]
+    pub fn config(&self) -> &SsaReconstructorConfig {
+        &self.cfg
+    }
+
     fn process_verified_ack(
         &self,
         ack: HalfKey,

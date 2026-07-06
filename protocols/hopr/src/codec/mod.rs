@@ -72,7 +72,7 @@ mod tests {
         testing::{BlokliTestClient, StaticState},
     };
     use hopr_crypto_packet::HoprPixSpec;
-    use hopr_protocol_pix::SsaShareGenerator;
+    use hopr_protocol_pix::{EntryShareGenerator, ExitAcknowledgementShareProcessor, SsaId, SsaShareGenerator};
     use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
     use crate::{
@@ -295,6 +295,147 @@ mod tests {
         let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
 
         assert_eq!(resp, in_packet.plain_text.as_ref());
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn encode_decode_packet_full_round_trip_with_pix() -> anyhow::Result<()> {
+        let blokli_client = create_blokli_client()?;
+        let sender = create_node(0, &blokli_client).await?;
+        let relay = create_node(1, &blokli_client).await?;
+        let receiver = create_node(2, &blokli_client).await?;
+
+        let sender_encoder = create_encoder(&sender);
+        let sender_decoder = create_decoder(&sender);
+
+        let relay_decoder = create_decoder(&relay);
+
+        let receiver_encoder = create_encoder(&receiver);
+        let receiver_decoder = create_decoder(&receiver);
+
+        let forward_path = ValidatedPath::new(
+            sender.chain_key.public().to_address(),
+            vec![
+                relay.chain_key.public().to_address(),
+                receiver.chain_key.public().to_address(),
+            ],
+            &sender.chain_api.as_path_resolver(),
+        )
+        .await?;
+
+        let return_path = ValidatedPath::new(
+            receiver.chain_key.public().to_address(),
+            vec![
+                relay.chain_key.public().to_address(),
+                sender.chain_key.public().to_address(),
+            ],
+            &sender.chain_api.as_path_resolver(),
+        )
+        .await?;
+
+        let pseudonym = HoprPseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        // New commitment of the receiver
+        let _ = receiver.ssa_rcn.new_exit_commitment(
+            ssa_id,
+            sender.ssa_gen.config().polynomials_per_ssa as usize,
+            sender.ssa_gen.config().threshold as usize,
+        )?;
+
+        // Sender makes a commitment too and delivers it to the receiver
+        let sender_commitment = sender.ssa_gen.new_ssa_commitment(&pseudonym, ssa_id.ssa_index())?;
+        sender_commitment.process_into_reconstructor(&receiver.ssa_rcn)?;
+
+        // Need to generate multiple messages to recover the SSA
+        let num_msgs_to_recover_ssa = sender.ssa_gen.config().polynomials_per_ssa * sender.ssa_gen.config().threshold;
+        for i in 0..num_msgs_to_recover_ssa {
+            let data = format!("some random message #{i} to encode and decode");
+            let resp = format!("some random response #{i} to encode and decode");
+
+            // Sender creates a packet
+            let out_packet = sender_encoder.encode_packet(
+                data.clone(),
+                ResolvedTransportRouting::Forward {
+                    pseudonym,
+                    forward_path: forward_path.clone(),
+                    return_paths: vec![return_path.clone()],
+                },
+                None,
+            )?;
+
+            // Relay decodes the packet
+            let fwd_packet = relay_decoder.decode(sender.offchain_key.public().into(), out_packet.data)?;
+            let fwd_packet = fwd_packet
+                .try_as_forwarded()
+                .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+
+            // Receiver receives the packet from the relay and decodes it
+            let in_packet = receiver_decoder.decode(relay.offchain_key.public().into(), fwd_packet.data)?;
+            let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+
+            assert_eq!(pseudonym, in_packet.sender);
+            assert_eq!(data.as_bytes(), in_packet.plain_text.as_ref());
+
+            // Receiver creates a response packet using a SURB
+            let surb = receiver
+                .surb_store
+                .find_surb(SurbMatcher::Pseudonym(in_packet.sender))
+                .ok_or(anyhow::anyhow!("no surb found for pseudonym"))?;
+
+            let out_packet = receiver_encoder.encode_packet(
+                resp.clone(),
+                ResolvedTransportRouting::Return(surb.sender_id, surb.surb),
+                None,
+            )?;
+
+            // Receiver discovers the encrypted share from the used SURB
+            let enc_share = out_packet
+                .encrypted_pix_share
+                .ok_or(anyhow::anyhow!("no pix share found"))?;
+            assert_eq!(pseudonym, enc_share.pseudonym);
+
+            // The receiver inserts the encrypted share to be decoded by the acknowledgement from the relay
+            receiver.ssa_rcn.insert_encrypted_share(
+                relay.offchain_key.public(),
+                out_packet.ack_challenge,
+                enc_share,
+            )?;
+
+            let fwd_packet = relay_decoder.decode(receiver.offchain_key.public().into(), out_packet.data)?;
+            let fwd_packet = fwd_packet
+                .try_as_forwarded()
+                .ok_or(anyhow::anyhow!("packet is not forwarded"))?;
+
+            // Relay delivers the acknowledgement to back to the receiver
+            let resolutions = receiver.ssa_rcn.acknowledge_shares(
+                *relay.offchain_key.public(),
+                vec![VerifiedAcknowledgement::new(fwd_packet.ack_key_prev_hop, &relay.offchain_key).leak()],
+            )?;
+
+            // Once enough shares have been received, the receiver can recover the SSA
+            if i == num_msgs_to_recover_ssa - 1 {
+                assert_eq!(1, resolutions.len());
+                let recovered_ssa = resolutions[0]
+                    .clone()
+                    .try_as_recovered_ssa()
+                    .ok_or(anyhow::anyhow!("share resolution is not recovered ssa"))?;
+                assert_eq!(recovered_ssa.ssa_id, ssa_id);
+            } else {
+                // Other resolution possibilities should not happen at this point
+                assert!(
+                    resolutions.is_empty(),
+                    "no resolutions must be present at #{i}: {resolutions:?}"
+                );
+            }
+
+            // Sender should decoded the response packet
+            let in_packet = sender_decoder.decode(relay.offchain_key.public().into(), fwd_packet.data)?;
+            let in_packet = in_packet.try_as_final().ok_or(anyhow::anyhow!("packet is not final"))?;
+
+            assert_eq!(resp.as_bytes(), in_packet.plain_text.as_ref());
+        }
 
         Ok(())
     }

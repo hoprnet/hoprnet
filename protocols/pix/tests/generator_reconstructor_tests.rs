@@ -140,3 +140,61 @@ fn test_generator_reconstructor() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
+    let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        polynomials_per_ssa: 10,
+        threshold: 10,
+        surplus_shares: 0,
+    });
+
+    let pseudonym = SimplePseudonym::random();
+    let peer = OffchainKeypair::random();
+
+    let client_commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+    let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+    let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+    let server_commitment = reconstructor.new_exit_commitment(ssa_id, 10, 10)?;
+
+    let full_ssa_deposit_address =
+        TestSpec::group_to_deposit_address(client_commitment_msg.ssa_commitment + server_commitment)
+            .ok_or(anyhow::anyhow!("failed to convert to address"))?;
+
+    client_commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+    let mut acks = Vec::new();
+
+    while let Some((msg, share)) = {
+        let msg = hopr_types::crypto_random::random_bytes::<20>();
+        generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+    }? {
+        let ack = HalfKey::random();
+        let ack_challenge = ack.to_challenge()?;
+        let enc_share = share.share.encrypt(&share.id, &ack)?;
+
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            ack_challenge,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+        )?;
+        acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+    }
+
+    acks.shuffle(&mut rand::rng());
+
+    let one_ack = acks.remove(0);
+
+    assert!(reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty());
+
+    let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
+    assert!(!res.is_empty());
+
+    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
+        if res.ssa_id == ssa_id && res.ssa.public().to_address() == full_ssa_deposit_address
+    ));
+
+    Ok(())
+}

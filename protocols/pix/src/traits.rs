@@ -14,7 +14,7 @@ use crate::{
 /// an encrypted PIX share.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::EnumTryAs)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),

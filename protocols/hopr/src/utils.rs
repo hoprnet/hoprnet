@@ -7,7 +7,7 @@ use hopr_chain_connector::{
     testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
 };
 use hopr_crypto_packet::HoprPixSpec;
-use hopr_protocol_pix::{SsaReconstructor, SsaShareGenerator};
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaShareGenerator};
 
 use crate::MemorySurbStore;
 
@@ -95,7 +95,12 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
         offchain_key: PEERS[index].1.clone(),
         chain_api: Arc::new(chain_api),
         surb_store: Arc::new(Default::default()),
-        ssa_gen: Arc::new(Default::default()),
+        ssa_gen: Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 10,
+            threshold: 10,
+            surplus_shares: 3,
+            ..Default::default()
+        })),
         ssa_rcn: Arc::new(Default::default()),
     })
 }
