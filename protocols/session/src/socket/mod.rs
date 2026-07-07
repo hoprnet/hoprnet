@@ -184,7 +184,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             // Filter old frame ids to save space in the Reassembler
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                tracing::debug!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
                                 false
                             } else {
                                 true
@@ -227,7 +227,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
+                            tracing::debug!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
                         #[cfg(feature = "telemetry")]
@@ -236,7 +236,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        tracing::error!(frame_id, "frame discarded");
+                        tracing::debug!(frame_id, "frame discarded");
                         #[cfg(feature = "telemetry")]
                         s3.frame_discarded();
                         None
@@ -382,7 +382,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         packet.try_as_segment().filter(|s| {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                tracing::debug!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
                                 false
                             } else {
                                 true
@@ -409,7 +409,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
                         if let Err(error) = st_2.frame_complete(frame.frame_id) {
-                            tracing::error!(%error, "frame complete state update failed");
+                            tracing::debug!(%error, "frame complete state update failed");
                         }
                         #[cfg(feature = "telemetry")]
                         s2.frame_completed();
@@ -437,11 +437,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         if let Err(error) = st_3.frame_emitted(frame.0.frame_id) {
-                            tracing::error!(%error, "frame received state update failed");
+                            tracing::debug!(%error, "frame received state update failed");
                         }
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
-                            tracing::warn!("terminating frame received");
+                            tracing::debug!("terminating frame received");
                             packets_in_abort_handle.abort();
                         }
                         #[cfg(feature = "telemetry")]
@@ -450,7 +450,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         if let Err(error) = st_3.frame_discarded(frame_id) {
-                            tracing::error!(%error, "frame discarded state update failed");
+                            tracing::debug!(%error, "frame discarded state update failed");
                         }
                         #[cfg(feature = "telemetry")]
                         s3.frame_discarded();

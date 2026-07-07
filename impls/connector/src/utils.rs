@@ -23,7 +23,7 @@ pub(crate) fn model_to_account_entry(
                 .filter_map(|addr| match Multiaddr::from_str(&addr) {
                     Ok(addr) => Some(addr),
                     Err(_) => {
-                        tracing::error!(%addr, "invalid multiaddress");
+                        tracing::warn!(%addr, "invalid multiaddress");
                         None
                     }
                 })

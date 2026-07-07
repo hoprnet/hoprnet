@@ -94,10 +94,10 @@ where
                             let routing = DestinationRouting::Return(pseudonym.into());
                             let data = ApplicationDataOut::with_no_packet_info(data);
                             if let Err(_error) = push_to_network.send((routing, data)).await {
-                                tracing::error!(%pseudonym, "failed to send back a pong");
+                                tracing::debug!(%pseudonym, "failed to send back a pong");
                             }
                         } else {
-                            tracing::error!(%pseudonym, "failed to convert pong message into data");
+                            tracing::debug!(%pseudonym, "failed to convert pong message into data");
                         }
                     }
                     Message::Probe(NeighborProbe::Pong(pong)) => {
@@ -354,7 +354,7 @@ impl Probe {
                                         let mut push_to_network = push_to_network.clone();
 
                                         if let Err(_error) = push_to_network.send((routing, data)).await {
-                                            tracing::error!("failed to send out a ping");
+                                            tracing::debug!("failed to send out a ping");
                                         } else {
                                             active_neighbor_probes
                                                 .insert(
@@ -368,7 +368,7 @@ impl Probe {
                                                 .await;
                                         }
                                     } else {
-                                        tracing::error!("failed to convert ping message into data");
+                                        tracing::debug!("failed to convert ping message into data");
                                     }
                                 }
                                 ProbeRouting::Neighbor(DestinationRouting::Return(_surb_matcher)) => tracing::error!(
@@ -409,7 +409,7 @@ impl Probe {
                                                 ))
                                                 .await
                                             {
-                                                tracing::error!("failed to send out a ping");
+                                                tracing::debug!("failed to send out a ping");
                                             } else {
                                                 // the object is constructed above, so will always match
                                                 if let Message::Telemetry(telemetry) = message {
@@ -419,7 +419,7 @@ impl Probe {
                                                 }
                                             }
                                         } else {
-                                            tracing::error!("failed to construct data for path telemetry")
+                                            tracing::debug!("failed to construct data for path telemetry")
                                         }
                                     } else {
                                         tracing::warn!("probing telemetry tag pool exhausted, skipping loopback probe");

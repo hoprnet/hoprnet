@@ -42,11 +42,11 @@ where
                 {
                     Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
                     Ok(Err(error)) => {
-                        tracing::error!(%error, %account_id, "backend error when looking up account");
+                        tracing::warn!(%error, %account_id, "backend error when looking up account");
                         None
                     }
                     Err(error) => {
-                        tracing::error!(%error, %account_id, "join error when looking up account");
+                        tracing::warn!(%error, %account_id, "join error when looking up account");
                         None
                     }
                 }

@@ -149,7 +149,7 @@ where
                         }
                     } else {
                         // Simulate buffer update when at capacity
-                        tracing::warn!("sequencer buffer is full");
+                        tracing::debug!("sequencer buffer is full");
                         *this.state = State::BufferUpdated;
                     }
                 }

@@ -31,12 +31,12 @@ where
     fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
         self.key_to_id.get_with_by_ref(key, || {
             let start = std::time::Instant::now();
-            tracing::warn!(%key, "cache miss on map_key_to_id");
+            tracing::debug!(%key, "cache miss on map_key_to_id");
             let result = match self.backend.get_account_by_key(key) {
                 Ok(Some(account)) => Some(account.key_id),
                 Ok(None) => None,
                 Err(error) => {
-                    tracing::error!(%error, %key, "failed to get account by key");
+                    tracing::warn!(%error, %key, "failed to get account by key");
                     None
                 }
             };
@@ -53,12 +53,12 @@ where
     fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
         self.id_to_key.get_with_by_ref(id, || {
             let start = std::time::Instant::now();
-            tracing::warn!(%id, "cache miss on map_id_to_public");
+            tracing::debug!(%id, "cache miss on map_id_to_public");
             let result = match self.backend.get_account_by_id(id) {
                 Ok(Some(account)) => Some(account.public_key),
                 Ok(None) => None,
                 Err(error) => {
-                    tracing::error!(%error, %id, "failed to get account by id");
+                    tracing::warn!(%error, %id, "failed to get account by id");
                     None
                 }
             };
@@ -88,7 +88,7 @@ where
         self.check_connection_state()?;
 
         Ok(self.chain_to_packet.try_get_with_by_ref(chain, || {
-            tracing::warn!(%chain, "cache miss on chain_key_to_packet_key");
+            tracing::debug!(%chain, "cache miss on chain_key_to_packet_key");
             self.backend
                 .get_account_by_address(chain)
                 .map(|a| a.map(|ac| ac.public_key))
@@ -100,7 +100,7 @@ where
         self.check_connection_state()?;
 
         Ok(self.packet_to_chain.try_get_with_by_ref(packet, || {
-            tracing::warn!(
+            tracing::debug!(
                 peer_id = packet.to_peerid_str(),
                 "cache miss on packet_key_to_chain_key"
             );

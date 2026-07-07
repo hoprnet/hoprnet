@@ -128,14 +128,14 @@ fn new_redemption_cache() -> moka::sync::Cache<ChannelId, AbortHandle> {
         .eviction_listener(|key: Arc<ChannelId>, value: AbortHandle, cause| {
             match cause {
                 RemovalCause::Expired => {
-                    // TTL elapsed — log an error and abort the stalled redemption task.
-                    tracing::error!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
+                    // TTL elapsed — warn and abort the stalled redemption task.
+                    tracing::warn!(%key, "redemption timed out after {:?}; aborting", REDEMPTION_TIMEOUT);
                     value.abort();
                 }
                 RemovalCause::Size => {
                     // Cache capacity exceeded — let the task run to natural completion
                     // rather than aborting work that is likely still making progress.
-                    tracing::warn!(%key, "redemption cache at capacity; entry evicted without abort");
+                    tracing::debug!(%key, "redemption cache at capacity; entry evicted without abort");
                 }
                 _ => {
                     // Explicit invalidation (task completed) or replacement.
@@ -334,7 +334,7 @@ where
         if let Err(e) = self.on_tick().await
             && !matches!(e, StrategyError::CriteriaNotSatisfied)
         {
-            tracing::error!(%e, "auto-redeeming tick failed");
+            tracing::warn!(%e, "auto-redeeming tick failed");
         }
 
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
@@ -356,7 +356,7 @@ where
                     if let Err(e) = self.on_tick().await
                         && !matches!(e, StrategyError::CriteriaNotSatisfied)
                     {
-                        tracing::error!(%e, "auto-redeeming tick failed");
+                        tracing::warn!(%e, "auto-redeeming tick failed");
                     }
                 }
                 Event::Actionable(ev) => match *ev {

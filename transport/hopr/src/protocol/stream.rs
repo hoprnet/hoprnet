@@ -127,7 +127,7 @@ fn spawn_stream_pumps<S, C>(
                         Some((peer, v))
                     }
                     Err(error) => {
-                        tracing::error!(%error, "Error decoding object from the underlying stream");
+                        tracing::warn!(%error, "Error decoding object from the underlying stream");
                         None
                     }
                 })
@@ -137,7 +137,7 @@ fn spawn_stream_pumps<S, C>(
             .inspect(move |res| match res {
                 Ok(_) => tracing::debug!(%peer, component = "stream", "incoming stream done reading"),
                 Err(error) => {
-                    tracing::error!(%peer, %error, component = "stream", "incoming stream failed on reading")
+                    tracing::warn!(%peer, %error, component = "stream", "incoming stream failed on reading")
                 }
             })
             .then(move |_| async move {

@@ -99,7 +99,7 @@ pub(crate) fn default_total_value<Q: TicketQueue + ?Sized>(
     Ok(queue
         .iter_unordered()?
         .filter_map(|res| {
-            res.inspect_err(|error| tracing::error!(%error, "failed to obtain ticket from the queue"))
+            res.inspect_err(|error| tracing::debug!(%error, "failed to obtain ticket from the queue"))
                 .ok()
                 .filter(|t| t.verified_ticket().channel_epoch == epoch && t.verified_ticket().index >= min_index)
                 .map(|t| t.verified_ticket().amount)

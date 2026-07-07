@@ -265,7 +265,7 @@ where
         // Take a snapshot of the active SURB estimator and calculate the balance change
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
         let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
-            tracing::error!("non-monotonic change in SURB estimators");
+            tracing::warn!("non-monotonic change in SURB estimators");
             return current;
         };
 

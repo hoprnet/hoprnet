@@ -176,7 +176,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    tracing::debug!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
                 .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
@@ -186,7 +186,7 @@ impl MemorySurbStore {
                 .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    tracing::debug!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
@@ -249,7 +249,7 @@ impl SurbStore for MemorySurbStore {
                     .time_to_live(opener_lifetime)
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(
+                            tracing::debug!(
                                 pseudonym = %sender_id.pseudonym(),
                                 surb_id = const_hex::encode(id.as_slice()),
                                 ?cause,
