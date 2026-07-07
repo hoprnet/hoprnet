@@ -6,8 +6,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{FutureExt, StreamExt, channel::mpsc::Sender};
+use futures::{FutureExt, StreamExt};
 use futures_time::stream::StreamExt as TimeStreamExt;
+use hopr_utils::network_types::crossfire_sink::{CrossfireSink, bounded_sink_channel};
 use tracing::Instrument;
 
 use crate::{
@@ -121,9 +122,9 @@ struct AcknowledgementStateContext<const C: usize> {
     rb_rx: RingBufferView<Segment>,
     incoming_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
     outgoing_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
-    ack_tx: futures::channel::mpsc::Sender<FrameId>,
+    ack_tx: CrossfireSink<FrameId>,
     inspector: FrameInspector,
-    ctl_tx: Sender<SessionMessage<C>>,
+    ctl_tx: CrossfireSink<SessionMessage<C>>,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -250,7 +251,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let (rb_tx, rb_rx) = searchable_ringbuffer(self.cfg.lookbehind_segments);
 
         // Full frame acknowledgements get a special channel with fixed capacity
-        let (ack_tx, ack_rx) = futures::channel::mpsc::channel(2 * self.cfg.lookbehind_segments);
+        let (ack_tx, ack_rx) = bounded_sink_channel::<FrameId>(2 * self.cfg.lookbehind_segments);
 
         let context = self.context.insert(AcknowledgementStateContext {
             rb_tx,
@@ -379,8 +380,8 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         if let Some(mut ctx) = self.context.take() {
             ctx.outgoing_frame_retries_tx.force_close();
             ctx.incoming_frame_retries_tx.force_close();
-            ctx.ack_tx.close_channel();
-            ctx.ctl_tx.close_channel();
+            // ack_tx and ctl_tx close when their last clone is dropped;
+            // dropping ctx here drops the originals, spawned-task clones drop when those tasks complete.
 
             self.started.store(false, std::sync::atomic::Ordering::Relaxed);
             tracing::debug!("state has been stopped");
@@ -577,9 +578,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
         // Since segments are re-sent via Control stream, they are not later fed again
         // into the ring buffer.
-        if !ctx.rb_tx.push(segment.clone()) {
-            tracing::error!("failed to push segment into ring buffer");
-        }
+        ctx.rb_tx.push(segment.clone());
 
         // When the last segment of a frame has been sent,
         // add it to outgoing retries (if the full ack mode is enabled).
@@ -626,7 +625,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -671,7 +670,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -735,7 +734,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -768,7 +767,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -804,7 +803,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -844,7 +843,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -913,7 +912,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -959,7 +958,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let segments = segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -1002,7 +1001,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 
@@ -1067,7 +1066,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
 
         let segments = segment(hopr_types::crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 

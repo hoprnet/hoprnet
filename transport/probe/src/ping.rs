@@ -11,7 +11,7 @@ use tracing::{debug, warn};
 use crate::errors::{ProbeError, Result};
 
 /// Heartbeat send ping TX type
-pub type HeartbeatSendPingTx = Sender<(OffchainPublicKey, PingQueryReplier)>;
+pub type HeartbeatSendPingTx = crossfire::MAsyncTx<crossfire::mpsc::Array<(OffchainPublicKey, PingQueryReplier)>>;
 
 /// Configuration for the `Ping` mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
@@ -69,7 +69,7 @@ impl Pinger {
         let (tx, mut rx) = channel::<PingQueryResult>(1);
         let replier = PingQueryReplier::new(tx);
 
-        if let Err(error) = self.send_ping.clone().try_send((*peer, replier)) {
+        if let Err(error) = self.send_ping.try_send((*peer, replier)) {
             warn!(%peer, %error, "Failed to initiate a ping request");
         }
 
@@ -142,11 +142,12 @@ mod tests {
 
     #[tokio::test]
     async fn pinger_should_return_an_error_if_the_latency_is_longer_than_the_configure_timeout() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<(OffchainPublicKey, PingQueryReplier)>(256);
+        let (tx, rx) = crossfire::mpsc::bounded_async::<(OffchainPublicKey, PingQueryReplier)>(256);
 
         let delay = Duration::from_millis(10);
         let delaying_channel = tokio::task::spawn(async move {
-            while let Some((_peer, replier)) = rx.next().await {
+            let mut rx_stream = rx.into_stream();
+            while let Some((_peer, replier)) = rx_stream.next().await {
                 tokio::time::sleep(delay).await;
 
                 replier.notify(Ok(delay));

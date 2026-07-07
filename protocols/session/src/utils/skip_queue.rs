@@ -120,7 +120,9 @@ impl<T> Drop for SkipDelayReceiver<T> {
         self.0.clear_poison();
         let mut queue = self.0.lock().expect("cannot panic because poison is cleared");
         queue.is_closed = true;
-        queue.rx_waker = None;
+        if let Some(waker) = queue.rx_waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -203,7 +205,9 @@ impl<T> SkipDelaySender<T> {
         queue.clear_poison();
         let mut queue = queue.lock().expect("cannot panic because poison is cleared");
         queue.is_closed = true;
-        queue.rx_waker = None;
+        if let Some(waker) = queue.rx_waker.take() {
+            waker.wake();
+        }
     }
 
     /// Forces closure of the queue (regardless of any remaining senders).
