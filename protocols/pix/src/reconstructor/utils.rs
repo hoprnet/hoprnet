@@ -69,7 +69,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         self.verifier.verify_completed_share(&share)?;
         self.shares.push(share);
 
-        if self.shares.len() >= self.verifier.min_shares() {
+        if self.shares.len() == self.verifier.min_shares() {
             Ok(Some(self.shares.combine()?.0))
         } else {
             Ok(None)

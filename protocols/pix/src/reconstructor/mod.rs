@@ -124,7 +124,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
-        // The share cannot be empty at this point, because we prevent empty share insertions
+        // The share cannot be empty at this point because we prevent empty share insertions
         let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
 
         let ssa_part = match reconstructor.lock().add_share(share.nonce, partial_share) {

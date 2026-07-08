@@ -349,7 +349,11 @@ mod tests {
         sender_commitment.process_into_reconstructor(&receiver.ssa_rcn)?;
 
         // Need to generate multiple messages to recover the SSA
-        let num_msgs_to_recover_ssa = sender.ssa_gen.config().polynomials_per_ssa * sender.ssa_gen.config().threshold;
+        let threshold = sender.ssa_gen.config().threshold as usize;
+        let num_polys = sender.ssa_gen.config().polynomials_per_ssa as usize;
+        let surplus = sender.ssa_gen.config().surplus_shares;
+        let num_msgs_to_recover_ssa = num_polys * (threshold + surplus);
+        let recovery_at = (num_polys - 1) * (threshold + surplus) + (threshold - 1);
         for i in 0..num_msgs_to_recover_ssa {
             let data = format!("some random message #{i} to encode and decode");
             let resp = format!("some random response #{i} to encode and decode");
@@ -415,7 +419,7 @@ mod tests {
             )?;
 
             // Once enough shares have been received, the receiver can recover the SSA
-            if i == num_msgs_to_recover_ssa - 1 {
+            if i == recovery_at {
                 assert_eq!(1, resolutions.len());
                 let recovered_ssa = resolutions[0]
                     .clone()
