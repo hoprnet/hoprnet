@@ -38,7 +38,7 @@ impl PixSpec for TestSpec {
 }
 
 #[test]
-fn test_generator_reconstructor() -> anyhow::Result<()> {
+fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
         polynomials_per_ssa: 10,
         threshold: 10,

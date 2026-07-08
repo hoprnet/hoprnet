@@ -443,7 +443,10 @@ fn create_surb_for_path<
         "multi-hop return path must have a first relayer challenge solution"
     );
 
-    tracing::debug!("first relayer solution: {:?}", first_relayer_solution.map(|s| s.to_hex()));
+    tracing::debug!(
+        "first relayer solution: {:?}",
+        first_relayer_solution.map(|s| s.to_hex())
+    );
 
     let (mut surb, (surb_id, ro)) = create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
         shared_keys,

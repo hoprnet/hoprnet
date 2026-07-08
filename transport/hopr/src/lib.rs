@@ -750,7 +750,7 @@ where
             let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
             pix_toolbox = Some(pix_tools);
 
-            let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = channel(1024);
+            let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
             let smgr = self.smgr.clone();
             processes.insert(
                 HoprTransportProcess::PixEvents,

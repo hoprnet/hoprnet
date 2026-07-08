@@ -352,8 +352,9 @@ mod tests {
         let threshold = sender.ssa_gen.config().threshold as usize;
         let num_polys = sender.ssa_gen.config().polynomials_per_ssa as usize;
         let surplus = sender.ssa_gen.config().surplus_shares;
-        let num_msgs_to_recover_ssa = num_polys * (threshold + surplus);
         let recovery_at = (num_polys - 1) * (threshold + surplus) + (threshold - 1);
+
+        let num_msgs_to_recover_ssa = num_polys * (threshold + surplus);
         for i in 0..num_msgs_to_recover_ssa {
             let data = format!("some random message #{i} to encode and decode");
             let resp = format!("some random response #{i} to encode and decode");

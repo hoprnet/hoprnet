@@ -205,9 +205,7 @@ pub fn generate_proof_of_relay(
     let first_ack_key_share = derive_ack_key_share(&secrets[0]); // s0_ack
 
     for i in 0..secrets.len() {
-        let hint = last_ack_key_share
-            .unwrap_or(first_ack_key_share)
-            .to_challenge()?;
+        let hint = last_ack_key_share.unwrap_or(first_ack_key_share).to_challenge()?;
 
         let next_ticket_challenge = if let Some(next_secret) = secrets.get(i + 1) {
             let s1 = derive_own_key_share(&secrets[i]); // s1_own
@@ -329,7 +327,8 @@ mod tests {
 
             let (gen_por_strings, (gen_por_values, gen_por_sol)) = generate_proof_of_relay(&secrets)?;
 
-            // The solution to the first Proof of Relay must be the acknowledgement key share derived from the first shared secret.
+            // The solution to the first Proof of Relay must be the acknowledgement key share derived from the first
+            // shared secret.
             assert_eq!(gen_por_sol, derive_ack_key_share(&secrets[0]));
 
             // The chain length should be the number of nodes in the path (hops + 1).
@@ -337,17 +336,15 @@ mod tests {
             assert_eq!(gen_por_values.chain_length(), (hops + 1) as u8);
 
             // The acknowledgement challenge in the PoR values must be solved by the generated solution.
-            assert_eq!(
-                gen_por_values.acknowledgement_challenge(),
-                gen_por_sol.to_challenge()?
-            );
+            assert_eq!(gen_por_values.acknowledgement_challenge(), gen_por_sol.to_challenge()?);
 
             // The ticket challenge is randomly generated for 0-hop, so cannot compare them
             if hops > 0 {
                 // For paths with at least one hop, the generated PoR values should match the expected values.
                 assert_eq!(por_values, gen_por_values);
 
-                // The ticket challenge of the first node must be solved by its own key share and the next node's acknowledgement key share.
+                // The ticket challenge of the first node must be solved by its own key share and the next node's
+                // acknowledgement key share.
                 assert!(validate_por_half_keys(
                     &gen_por_values.ticket_challenge(),
                     &derive_own_key_share(&secrets[0]),
@@ -355,11 +352,7 @@ mod tests {
                 ));
 
                 // pre_verify should correctly transition from the current node's challenge to the next node's PoR data.
-                let res = pre_verify(
-                    &secrets[0],
-                    &gen_por_strings[0],
-                    &gen_por_values.ticket_challenge(),
-                )?;
+                let res = pre_verify(&secrets[0], &gen_por_strings[0], &gen_por_values.ticket_challenge())?;
                 // The extracted next ticket challenge must match the one in the PoR string.
                 assert_eq!(res.next_ticket_challenge, gen_por_strings[0].next_ticket_challenge());
 
@@ -396,21 +389,26 @@ mod tests {
                         gen_por_strings[i].next_ticket_challenge()
                     );
 
-                    // Each hop's ticket challenge must be solved by its own key share and the next hop's acknowledgement key share.
+                    // Each hop's ticket challenge must be solved by its own key share and the next hop's
+                    // acknowledgement key share.
                     assert!(validate_por_half_keys(
                         &gen_por_strings[i].next_ticket_challenge(),
                         &derive_own_key_share(&secrets[i + 1]),
                         &derive_ack_key_share(&secrets[i + 2])
                     ));
 
-                    // pre_verify should work for all hops, correctly extracting the next challenge and verifying the current one.
+                    // pre_verify should work for all hops, correctly extracting the next challenge and verifying the
+                    // current one.
                     let res = pre_verify(
                         &secrets[i + 1],
                         &gen_por_strings[i + 1],
                         &gen_por_strings[i].next_ticket_challenge(),
                     )?;
                     // Verifies that the forwarded challenge matches the next one in the chain.
-                    assert_eq!(res.next_ticket_challenge, gen_por_strings[i + 1].next_ticket_challenge());
+                    assert_eq!(
+                        res.next_ticket_challenge,
+                        gen_por_strings[i + 1].next_ticket_challenge()
+                    );
                     // Verifies that the extracted acknowledgement challenge matches the next hint.
                     assert_eq!(
                         res.ack_challenge,

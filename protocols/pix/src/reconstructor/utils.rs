@@ -7,23 +7,24 @@ use crate::{
     CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
     PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
 };
-use ahash::{HashSet, HashSetExt};
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
 pub struct SsaBuilder<S: PixSpec> {
     pub full_commitment: PixGroup<S>,
     num_polys: usize,
     builder: PixScalar<S>,
-    received_indices: HashSet<PolynomialIndex>,
+    received_indices: ahash::HashSet<PolynomialIndex>,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
     pub fn new(full_commitment: PixGroup<S>, exit_secret_scalar: PixScalar<S>, num_polys: usize) -> Self {
+        use ahash::HashSetExt;
+
         Self {
             full_commitment,
             builder: exit_secret_scalar,
             num_polys,
-            received_indices: HashSet::with_capacity(num_polys),
+            received_indices: ahash::HashSet::with_capacity(num_polys),
         }
     }
 
@@ -43,6 +44,7 @@ impl<S: PixSpec> SsaBuilder<S> {
             return Ok(None);
         }
 
+        // This is computed only once when we have all the polynomials reconstructed
         if self.full_commitment == (PixGroup::<S>::generator() * self.builder) {
             Ok(Some(self.builder))
         } else {
@@ -53,7 +55,7 @@ impl<S: PixSpec> SsaBuilder<S> {
 
 /// Verifies shares and reconstructs a single SSA part from them.
 pub struct SsaPartBuilder<S: PixSpec> {
-    pub verifier: PartialSsaShareVerifier<S>,
+    pub(crate) verifier: PartialSsaShareVerifier<S>,
     shares: Vec<CompletedShare<S>>,
     reconstructed: Option<PixScalar<S>>,
 }
