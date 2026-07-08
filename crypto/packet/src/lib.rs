@@ -97,7 +97,7 @@ pub struct HoprPixSpec;
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = ChainKeypair;
     type Cipher = ChaCha20;
-    type Curve = k256::Secp256k1;
+    type Curve = Secp256k1;
     type DepositAddress = Address;
     type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
@@ -115,7 +115,7 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = BjjKeypair;
     type Cipher = ChaCha20;
-    type Curve = babyjubjub_ec::BabyJubJub;
+    type Curve = BabyJubJub;
     type DepositAddress = BjjPublicKey;
     type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
@@ -154,9 +154,9 @@ pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePs
 /// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
 /// itself as another generic argument.
 #[cfg(not(feature = "bjj"))]
-pub type HoprPixScalar = k256::Scalar;
+pub type HoprPixScalar = K256Scalar;
 #[cfg(feature = "bjj")]
-pub type HoprPixScalar = babyjubjub_ec::Scalar;
+pub type HoprPixScalar = BabyJubJubScalar;
 
 /// HOPR-specific PIX group element representation type.
 ///
@@ -169,9 +169,9 @@ pub type HoprPixScalar = babyjubjub_ec::Scalar;
 /// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
 /// projection is distinct from the wrapper type.
 #[cfg(not(feature = "bjj"))]
-pub type HoprPixGroupRepr = k256::CompressedPoint;
+pub type HoprPixGroupRepr = K256CompressedPoint;
 #[cfg(feature = "bjj")]
-pub type HoprPixGroupRepr = babyjubjub_ec::GroupRepr;
+pub type HoprPixGroupRepr = BabyJubJubCompressedPoint;
 
 #[cfg(test)]
 mod tests {

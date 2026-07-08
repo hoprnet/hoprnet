@@ -3742,7 +3742,6 @@ name = "hopr-crypto-packet"
 version = "1.4.0"
 dependencies = [
  "anyhow",
- "babyjubjub-ec",
  "bimap",
  "const-hex",
  "criterion",
@@ -3754,7 +3753,6 @@ dependencies = [
  "hopr-protocol-pix",
  "hopr-types 1.10.0",
  "hopr-utils",
- "k256",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4338,7 +4336,7 @@ dependencies = [
 [[package]]
 name = "hopr-types"
 version = "1.10.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Flegacy-bjj#158811c107b3411ffa58d5bb33d4df59cfc85a81"
+source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Flegacy-bjj#bb18080c5bf013fed07eecb18043a7469eedac68"
 dependencies = [
  "aes",
  "anyhow",
@@ -4583,7 +4581,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -6695,7 +6693,7 @@ dependencies = [
  "quinn-udp 0.5.14",
  "rustc-hash",
  "rustls",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -6734,7 +6732,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -6747,7 +6745,7 @@ checksum = "76150b617afc75e6e21ac5f39bc196e80b65415ae48d62dbef8e2519d040ce42"
 dependencies = [
  "cfg_aliases",
  "libc",
- "socket2 0.6.4",
+ "socket2 0.5.10",
  "windows-sys 0.61.2",
 ]
 

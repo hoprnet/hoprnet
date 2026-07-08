@@ -1,36 +1,10 @@
+#[path = "../tests/common.rs"]
+mod common;
+
+use common::TestSpec;
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use hopr_protocol_pix::{
-    EntryShareGenerator, GeneratedShare, PixGroup, PixScalar, PixSpec, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
-};
-use hopr_types::{
-    crypto::{
-        prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
-        primitives::{Blake3, ChaCha20},
-    },
-    crypto_random::Randomizable,
-    primitive::prelude::Address,
-};
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TestSpec;
-
-impl PixSpec for TestSpec {
-    type AddressPrivateKey = ChainKeypair;
-    type Cipher = ChaCha20;
-    type Curve = k256::Secp256k1;
-    type DepositAddress = Address;
-    type Digest = Blake3;
-    type Pseudonym = SimplePseudonym;
-
-    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
-        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
-    }
-
-    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
-        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
-    }
-}
+use hopr_protocol_pix::{EntryShareGenerator, GeneratedShare, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
+use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
 
 fn bench_new_ssa_commitment(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaShareGenerator::new_ssa_commitment");

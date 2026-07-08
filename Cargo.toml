@@ -203,6 +203,7 @@ hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
+  "bjj",
 ] }
 hopr-lib = { version = "4.0.2-rc.5", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }

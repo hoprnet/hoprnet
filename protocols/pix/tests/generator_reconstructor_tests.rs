@@ -1,41 +1,18 @@
+mod common;
+
 use std::collections::HashMap;
 
+use common::TestSpec;
 use hopr_protocol_pix::{
-    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixScalar, PixSpec, ShareResolution,
-    SsaCommitment, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
-    TaggedEncryptedPartialSsaShare,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaCommitment,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
-    crypto::{
-        keypairs::ChainKeypair,
-        prelude::{HalfKey, Keypair, OffchainKeypair, PublicKey, SimplePseudonym},
-    },
+    crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
     crypto_random::Randomizable,
     internal::prelude::VerifiedAcknowledgement,
-    primitive::prelude::Address,
 };
 use rand::prelude::SliceRandom;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TestSpec;
-
-impl PixSpec for TestSpec {
-    type AddressPrivateKey = ChainKeypair;
-    type Cipher = hopr_types::crypto::primitives::ChaCha20;
-    type Curve = k256::Secp256k1;
-    type DepositAddress = Address;
-    type Digest = hopr_types::crypto::primitives::Sha3_256;
-    type Pseudonym = SimplePseudonym;
-
-    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
-        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
-    }
-
-    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
-        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
-    }
-}
 
 #[test]
 fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
@@ -135,7 +112,7 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     assert!(!res.is_empty());
 
     assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
-        if res.ssa_id == ssa_id && res.ssa.public().to_address() == full_ssa_deposit_address
+        if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
     ));
 
     Ok(())
@@ -193,7 +170,7 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
     assert!(!res.is_empty());
 
     assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
-        if res.ssa_id == ssa_id && res.ssa.public().to_address() == full_ssa_deposit_address
+        if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
     ));
 
     Ok(())
