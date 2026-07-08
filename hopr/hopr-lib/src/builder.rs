@@ -30,7 +30,7 @@ mod chain_wiring;
 
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
-use futures::{FutureExt, StreamExt, channel::mpsc::channel};
+use futures::{FutureExt, StreamExt};
 pub use hopr_api::types::crypto::{
     keypairs::Keypair,
     prelude::{ChainKeypair, OffchainKeypair},
@@ -46,7 +46,7 @@ use hopr_api::{
 };
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
-    network_types::addr::is_public_address,
+    network_types::{addr::is_public_address, crossfire_sink::bounded_sink_channel},
     runtime::{AbortableList, prelude::spawn},
 };
 use validator::Validate;
@@ -131,7 +131,10 @@ pub struct HoprBuilderWithIdentity {
 impl HoprBuilderWithIdentity {
     /// Sets the node configuration and produces the configured builder.
     pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
-        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel(PEER_DISCOVERY_CHANNEL_CAPACITY);
+        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel::<(
+            hopr_api::PeerId,
+            Vec<hopr_api::Multiaddr>,
+        )>(PEER_DISCOVERY_CHANNEL_CAPACITY);
         HoprBuilderConfigured {
             ctx: BuildCtx {
                 chain_key: self.chain_key,
@@ -261,7 +264,7 @@ impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
     ) -> HoprBuilderWithSession<Chain, Graph, Net, Ct> {
         let incoming_session_capacity = self.ctx.cfg.incoming_session_capacity.max(1);
 
-        let (session_tx, session_rx) = channel::<IncomingSession>(incoming_session_capacity);
+        let (session_tx, session_rx) = futures::channel::mpsc::channel::<IncomingSession>(incoming_session_capacity);
 
         tracing::debug!(capacity = incoming_session_capacity, "spawning session server");
         let session_diag = hopr_utils::runtime::diagnostics::ConcurrentDiagnostics::new(
@@ -740,7 +743,7 @@ macro_rules! impl_build_methods {
             let mut processes = pre.processes;
 
             tracing::info!("starting ticket events processor");
-            let (tickets_tx, tickets_rx) = channel(8192);
+            let (tickets_tx, tickets_rx) = bounded_sink_channel::<TicketEvent>(8192);
 
             // Need to use DropAbortable, so that the receiver is dropped when aborted and no new items can be sent by the senders.
             let (tickets_rx_stream, tickets_handle) = hopr_utils::runtime::DropAbortable::new(tickets_rx);
@@ -936,7 +939,7 @@ where
         futures::channel::mpsc::Sender<IncomingSession>,
         AbortableList<HoprLibProcess>,
     ) {
-        let (tx, _rx) = channel::<IncomingSession>(1);
+        let (tx, _rx) = futures::channel::mpsc::channel::<IncomingSession>(1);
         let processes = AbortableList::<HoprLibProcess>::default();
         (self, tx, processes)
     }

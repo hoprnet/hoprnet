@@ -836,12 +836,15 @@ where
         lazy_static::initialize(&METRIC_VALIDATION_ERRORS);
     }
 
-    let (outgoing_ack_tx, outgoing_ack_rx) =
-        futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(cfg.ack_config.ack_out_buffer_size);
+    let (outgoing_ack_tx, outgoing_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(
+        OffchainPublicKey,
+        Option<HalfKey>,
+    )>(cfg.ack_config.ack_out_buffer_size);
 
-    let (incoming_ack_tx, incoming_ack_rx) = futures::channel::mpsc::channel::<(OffchainPublicKey, Vec<Acknowledgement>)>(
-        cfg.ack_config.ticket_ack_buffer_size,
-    );
+    let (incoming_ack_tx, incoming_ack_rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel::<(
+        OffchainPublicKey,
+        Vec<Acknowledgement>,
+    )>(cfg.ack_config.ticket_ack_buffer_size);
 
     // Attach timeouts to all Sinks so that the pipelines are not blocked when
     // some channel is not being timely processed

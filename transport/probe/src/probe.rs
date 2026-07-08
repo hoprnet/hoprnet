@@ -197,7 +197,7 @@ impl Probe {
     where
         T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
         T::Error: Send,
-        V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + Sync + 'static,
+        V: futures::Stream<Item = (OffchainPublicKey, PingQueryReplier)> + Send + 'static,
         Tr: ProbingTrafficGeneration + Send + Sync + 'static,
         G: NetworkGraphView + NetworkGraphUpdate + Clone + Send + Sync + 'static,
     {

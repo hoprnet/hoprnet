@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fs::File};
 
 use bytes::Bytes;
-use futures::{StreamExt, pin_mut};
+use futures::StreamExt;
 use hopr_api::types::{
     crypto::types::OffchainPublicKey,
     internal::{
@@ -98,12 +98,12 @@ impl PacketWriter for PcapPacketWriter {
 /// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
-) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
-    let (sender, receiver) = futures::channel::mpsc::channel(20_000);
+) -> (crossfire::MAsyncTx<crossfire::mpsc::Array<CapturedPacket>>, AbortHandle) {
+    let (sender, receiver) = crossfire::mpsc::bounded_async::<CapturedPacket>(20_000);
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
     let ah = hopr_utils::spawn_as_abortable!(async move {
-        pin_mut!(receiver);
-        while let Some(packet) = receiver.next().await {
+        let mut rx_stream = receiver.into_stream();
+        while let Some(packet) = rx_stream.next().await {
             let writer = writer.clone();
             match hopr_utils::runtime::prelude::spawn_blocking(move || {
                 writer
@@ -301,7 +301,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
 pub struct CapturePacketCodec<C> {
     inner: std::sync::Arc<C>,
     packet_key: OffchainPublicKey,
-    sender: futures::channel::mpsc::Sender<CapturedPacket>,
+    sender: crossfire::MAsyncTx<crossfire::mpsc::Array<CapturedPacket>>,
 }
 
 impl<C> Clone for CapturePacketCodec<C> {
@@ -318,7 +318,7 @@ impl<C> CapturePacketCodec<C> {
     pub fn new(
         inner: C,
         packet_key: OffchainPublicKey,
-        sender: futures::channel::mpsc::Sender<CapturedPacket>,
+        sender: crossfire::MAsyncTx<crossfire::mpsc::Array<CapturedPacket>>,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(inner),
@@ -342,7 +342,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
     fn decode(&self, peer: PeerId, data: Bytes) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
         let packet = self.inner.decode(peer, data)?;
 
-        if let Err(error) = self.sender.clone().try_send(
+        if let Err(error) = self.sender.try_send(
             PacketBeforeTransit::IncomingPacket {
                 me: self.packet_key,
                 packet: &packet,
@@ -355,7 +355,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
         if let IncomingPacket::Forwarded(fwd_packet) = &packet {
             let IncomingForwardedPacket { next_hop, data, .. } = fwd_packet.as_ref();
 
-            if let Err(error) = self.sender.clone().try_send(
+            if let Err(error) = self.sender.try_send(
                 PacketBeforeTransit::OutgoingPacket {
                     me: self.packet_key,
                     next_hop: *next_hop,
@@ -391,7 +391,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
 
         let packet = self.inner.encode_packet(data, routing, signals)?;
 
-        if let Err(error) = self.sender.clone().try_send(
+        if let Err(error) = self.sender.try_send(
             PacketBeforeTransit::OutgoingPacket {
                 me: self.packet_key,
                 next_hop: packet.next_hop,
@@ -417,7 +417,7 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
     ) -> Result<OutgoingPacket, Self::Error> {
         let packet_ack = self.inner.encode_acknowledgements(acks, destination)?;
 
-        if let Err(error) = self.sender.clone().try_send(
+        if let Err(error) = self.sender.try_send(
             PacketBeforeTransit::OutgoingAck {
                 me: self.packet_key,
                 is_random: false,
@@ -435,7 +435,6 @@ impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
 
 #[cfg(test)]
 mod tests {
-    use futures::{SinkExt, pin_mut};
     use hex_literal::hex;
     use hopr_api::types::{
         crypto::{
@@ -466,7 +465,6 @@ mod tests {
 
         File::create("/tmp/start_capturing")?;
         let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
-        pin_mut!(pcap);
 
         let packet = IncomingPacket::Final(
             IncomingFinalPacket {
@@ -489,9 +487,7 @@ mod tests {
             .index(10)
             .build_signed(&ChainKeypair::random(), &Hash::default())?;
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let msg = SessionMessage::<1000>::Segment(Segment {
             frame_id: 1,
@@ -514,9 +510,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let msg = SessionMessage::<1000>::Segment(Segment {
             frame_id: 2,
@@ -539,9 +533,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::try_from(vec![1, 2, 100])?);
 
@@ -557,9 +549,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
             (15 as FrameId, [0b10100001].into()),
@@ -578,9 +568,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let kp = OffchainKeypair::random();
         let packet = IncomingPacket::Acknowledgement(
@@ -595,9 +583,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let packet = IncomingPacket::Forwarded(
             IncomingForwardedPacket {
@@ -612,9 +598,7 @@ mod tests {
             .into(),
         );
 
-        let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
-            .await;
+        let _ = pcap.try_send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -635,7 +619,7 @@ mod tests {
             signals: PacketSignal::OutOfSurbs.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -654,7 +638,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -673,7 +657,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -699,7 +683,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -723,7 +707,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -747,7 +731,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -772,7 +756,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
@@ -786,7 +770,7 @@ mod tests {
             signals: None.into(),
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let kp = OffchainKeypair::random();
 
@@ -800,7 +784,7 @@ mod tests {
             is_random: false,
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
@@ -812,7 +796,7 @@ mod tests {
             is_random: true,
         };
 
-        let _ = pcap.send(packet.into()).await;
+        let _ = pcap.try_send(packet.into());
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
