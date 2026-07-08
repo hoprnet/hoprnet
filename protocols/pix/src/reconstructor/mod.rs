@@ -149,7 +149,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             .ssa_builders
             .get(spi.as_ref())
             .ok_or(PixError::MissingSsaCommitment)?;
-        let Some(ssa) = builder.lock().add_recovered_ssa_part(ssa_part)? else {
+        let Some(ssa) = builder.lock().add_recovered_ssa_part(spi.poly_index(), ssa_part)? else {
             tracing::trace!(%spi, "ssa not yet complete, waiting for more ssa parts");
             return Ok(None);
         };

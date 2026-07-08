@@ -7,12 +7,14 @@ use crate::{
     CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
     PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
 };
+use ahash::{HashSet, HashSetExt};
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
 pub struct SsaBuilder<S: PixSpec> {
     pub full_commitment: PixGroup<S>,
     num_polys: usize,
     builder: PixScalar<S>,
+    received_indices: HashSet<PolynomialIndex>,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
@@ -21,20 +23,24 @@ impl<S: PixSpec> SsaBuilder<S> {
             full_commitment,
             builder: exit_secret_scalar,
             num_polys,
+            received_indices: HashSet::with_capacity(num_polys),
         }
     }
 
     pub fn add_recovered_ssa_part(
         &mut self,
+        index: PolynomialIndex,
         sub_secret: PixScalar<S>,
     ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
-        if let Some(n) = self.num_polys.checked_sub(1) {
-            self.num_polys = n;
-            self.builder += sub_secret;
-            if n > 0 {
-                // SSA private scalar is not yet complete
-                return Ok(None);
-            }
+        if !self.received_indices.insert(index) {
+            return Ok(None);
+        }
+
+        self.builder += sub_secret;
+
+        if self.received_indices.len() < self.num_polys {
+            // SSA private scalar is not yet complete
+            return Ok(None);
         }
 
         if self.full_commitment == (PixGroup::<S>::generator() * self.builder) {
@@ -49,6 +55,7 @@ impl<S: PixSpec> SsaBuilder<S> {
 pub struct SsaPartBuilder<S: PixSpec> {
     pub verifier: PartialSsaShareVerifier<S>,
     shares: Vec<CompletedShare<S>>,
+    reconstructed: Option<PixScalar<S>>,
 }
 
 impl<S: PixSpec> SsaPartBuilder<S> {
@@ -56,6 +63,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         Self {
             verifier,
             shares: Vec::new(),
+            reconstructed: None,
         }
     }
 
@@ -64,13 +72,19 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         msg: PixScalar<S>,
         share: PartialSsaShare<S>,
     ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
+        if let Some(reconstructed) = self.reconstructed {
+            return Ok(Some(reconstructed));
+        }
+
         let share = into_completed_share(msg, &share)?;
 
         self.verifier.verify_completed_share(&share)?;
         self.shares.push(share);
 
-        if self.shares.len() == self.verifier.min_shares() {
-            Ok(Some(self.shares.combine()?.0))
+        if self.shares.len() >= self.verifier.min_shares() {
+            let reconstructed = self.shares.combine()?.0;
+            self.reconstructed = Some(reconstructed);
+            Ok(Some(reconstructed))
         } else {
             Ok(None)
         }
