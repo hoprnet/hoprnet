@@ -69,7 +69,8 @@ impl PathKeyData {
             shared_keys,
             por_strings,
             por_values,
-            first_relayer_solution,
+            // We do not offer the first relayer solution on 0-hops
+            first_relayer_solution: (path.len() > 1).then_some(first_relayer_solution),
         })
     }
 
@@ -441,6 +442,8 @@ fn create_surb_for_path<
             || (return_path.len() > 1 && first_relayer_solution.is_some()),
         "multi-hop return path must have a first relayer challenge solution"
     );
+
+    tracing::debug!("first relayer solution: {:?}", first_relayer_solution.map(|s| s.to_hex()));
 
     let (mut surb, (surb_id, ro)) = create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
         shared_keys,
