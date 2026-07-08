@@ -223,11 +223,18 @@ impl HoprSession {
 
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
+            // `NoDelay` flushes each write as its own frame (frame = datagram), which is
+            // exactly the precondition that makes unordered delivery safe: datagram payloads
+            // (e.g. UDP/WireGuard) tolerate reordering, so frames are delivered in arrival
+            // order rather than sequenced and discarded on a gap. Without `NoDelay`, writes
+            // coalesce into frames (frame != datagram) and strict ordering must be preserved.
+            let no_delay = cfg.capabilities.contains(Capability::NoDelay);
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
                 capacity: SESSION_SOCKET_CAPACITY,
-                flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
+                flush_immediately: no_delay,
+                deliver_in_order: !no_delay,
                 ..Default::default()
             };
 
@@ -627,6 +634,92 @@ mod tests {
             DestinationRouting::Return(id.into()),
             HoprSessionConfig {
                 capabilities: Capability::Segmentation.into(),
+                ..Default::default()
+            },
+            (
+                bob_tx,
+                bob_rx
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
+            ),
+            None,
+        )?;
+
+        let alice_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_api::types::crypto_random::random_bytes::<DATA_LEN>();
+
+        let mut bob_recv = [0u8; DATA_LEN];
+        let mut alice_recv = [0u8; DATA_LEN];
+
+        tokio::time::timeout(Duration::from_secs(1), alice_session.write_all(&alice_sent))
+            .await
+            .context("alice write failed")?
+            .context("alice write timed out")?;
+        alice_session.flush().await?;
+
+        tokio::time::timeout(Duration::from_secs(1), bob_session.write_all(&bob_sent))
+            .await
+            .context("bob write failed")?
+            .context("bob write timed out")?;
+        bob_session.flush().await?;
+
+        tokio::time::timeout(Duration::from_secs(1), bob_session.read_exact(&mut bob_recv))
+            .await
+            .context("bob read failed")?
+            .context("bob read timed out")?;
+
+        tokio::time::timeout(Duration::from_secs(1), alice_session.read_exact(&mut alice_recv))
+            .await
+            .context("alice read failed")?
+            .context("alice read timed out")?;
+
+        assert_eq!(alice_sent, bob_recv);
+        assert_eq!(bob_sent, alice_recv);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_session_bidirectional_flow_with_no_delay() -> anyhow::Result<()> {
+        // NoDelay implies Segmentation and switches the socket to immediate flushing and
+        // unordered (arrival-order) delivery. Over the in-order in-memory transport used
+        // here, arrival order equals send order, so byte-exact assertions remain valid;
+        // the unordered delivery semantics themselves are covered by the socket tests in
+        // `hopr-protocol-session`.
+        let dst: Address = (&ChainKeypair::random()).into();
+        let id: SessionId = HoprPseudonym::random();
+        const DATA_LEN: usize = 5000;
+
+        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+
+        let mut alice_session = HoprSession::new(
+            id,
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
+            HoprSessionConfig {
+                capabilities: Capability::NoDelay.into(),
+                ..Default::default()
+            },
+            (
+                alice_tx,
+                alice_rx
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
+            ),
+            None,
+        )?;
+
+        let mut bob_session = HoprSession::new(
+            id,
+            DestinationRouting::Return(id.into()),
+            HoprSessionConfig {
+                capabilities: Capability::NoDelay.into(),
                 ..Default::default()
             },
             (

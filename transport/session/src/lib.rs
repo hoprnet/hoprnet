@@ -59,6 +59,11 @@ flagset::flags! {
         RetransmissionNack = 0b000_1010,
         /// Disable packet buffering.
         ///
+        /// Each write is flushed immediately as its own frame, and frames are delivered
+        /// in arrival order: no in-order sequencing and no discarding of frames behind a
+        /// gap. Intended for datagram payloads (e.g. UDP/WireGuard) that tolerate
+        /// reordering.
+        ///
         /// Implies [`Segmentation`].
         NoDelay = 0b0000_1001,
         /// Disable SURB-based egress rate control.
