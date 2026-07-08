@@ -1,4 +1,4 @@
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
     EntryShareGenerator, GeneratedShare, PixGroup, PixScalar, PixSpec, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
 };
@@ -10,6 +10,7 @@ use hopr_types::{
     crypto_random::Randomizable,
     primitive::prelude::Address,
 };
+use std::hint::black_box;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -33,14 +34,14 @@ impl PixSpec for TestSpec {
 }
 
 fn bench_new_ssa_commitment(c: &mut Criterion) {
-    let mut group = c.benchmark_group("SsaShareGenerator::new_ssa_commitment");
+    let mut group = c.benchmark_group("SsaShareGenerator::new_ssa_commitment/sequential");
 
     // Cap measurement time so larger parameter combinations don't blow up wall-clock time.
     group.measurement_time(std::time::Duration::from_secs(30));
+    group.throughput(Throughput::Elements(1));
 
-    let thresholds = [10, 50, 100, 200];
-    let polynomials_per_ssa = [128, 512, 1024, 2048];
-    let pseudonym = SimplePseudonym::random();
+    let thresholds = [10, 50, 100];
+    let polynomials_per_ssa = [128, 512, 1024];
 
     for &t in &thresholds {
         for &p in &polynomials_per_ssa {
@@ -49,16 +50,52 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                 polynomials_per_ssa: p,
                 ..Default::default()
             };
-            let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
                 &(t, p),
                 |b, _| {
+                    let generator = SsaShareGenerator::<TestSpec>::new(cfg);
                     let mut index = SsaIndex::MIN;
+                    let pseudonym = SimplePseudonym::random();
                     b.iter(|| {
                         generator.new_ssa_commitment(&pseudonym, index).unwrap();
                         index = index.checked_add(1).unwrap();
+                    });
+                },
+            );
+        }
+    }
+    group.finish();
+}
+
+fn bench_new_ssa_commitment_fresh(c: &mut Criterion) {
+    let mut group = c.benchmark_group("SsaShareGenerator::new_ssa_commitment/fresh");
+
+    // Cap measurement time so larger parameter combinations don't blow up wall-clock time.
+    group.measurement_time(std::time::Duration::from_secs(30));
+    group.throughput(Throughput::Elements(1));
+
+    let thresholds = [10, 50, 100];
+    let polynomials_per_ssa = [128, 512, 1024];
+
+    for &t in &thresholds {
+        for &p in &polynomials_per_ssa {
+            let cfg = SsaGeneratorConfig {
+                threshold: t,
+                polynomials_per_ssa: p,
+                ..Default::default()
+            };
+
+            group.bench_with_input(
+                BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
+                &(t, p),
+                |b, _| {
+                    let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+                    let index = SsaIndex::MIN;
+                    b.iter(|| {
+                        let pseudonym = SimplePseudonym::random();
+                        generator.new_ssa_commitment(&pseudonym, index).unwrap();
                     });
                 },
             );
@@ -73,18 +110,16 @@ fn bench_verify(c: &mut Criterion) {
 
     let thresholds = [10, 50, 100, 200];
     let pseudonym = SimplePseudonym::random();
-    let x = hopr_types::crypto_random::random_bytes::<10>();
 
-    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         let cfg = SsaGeneratorConfig {
             threshold: t,
             ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-        let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
-        index = index.checked_add(1).unwrap();
+        let c = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
 
+        let x = hopr_types::crypto_random::random_bytes::<10>();
         let GeneratedShare { share, .. } = generator.next_share(&pseudonym, &x).unwrap().unwrap();
 
         let verifiers = c.reconstruct_verifiers().unwrap();
@@ -105,9 +140,7 @@ fn bench_next_share(c: &mut Criterion) {
 
     let thresholds = [10, 50, 100, 200];
     let polynomials_per_ssa = [2048]; // Benchmark does not depend on polynomials_per_ssa
-    let pseudonym = SimplePseudonym::random();
 
-    let mut index = SsaIndex::MIN;
     for &t in &thresholds {
         for &p in &polynomials_per_ssa {
             let cfg = SsaGeneratorConfig {
@@ -115,16 +148,20 @@ fn bench_next_share(c: &mut Criterion) {
                 polynomials_per_ssa: p,
                 ..Default::default()
             };
-            let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-            // Prime the generator with an initial commitment, so the first iteration
-            // has a polynomial to draw from.
-            generator.new_ssa_commitment(&pseudonym, index).unwrap();
-            index = index.checked_add(1).unwrap();
 
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
                 &(t, p),
                 |b, _| {
+                    let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+                    let mut index = SsaIndex::MIN;
+                    let pseudonym = SimplePseudonym::random();
+
+                    // Prime the generator with an initial commitment, so the first iteration
+                    // has a polynomial to draw from.
+                    generator.new_ssa_commitment(&pseudonym, index).unwrap();
+                    index = index.checked_add(1).unwrap();
+
                     // `next_share` mutates internal state, consuming one share per call,
                     // and requires that `msg` is unique for a given pseudonym. We use
                     // `iter_custom` so that whenever the underlying SSA gets exhausted
@@ -181,9 +218,45 @@ fn bench_next_share_no_ssa(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_reconstruct_verifiers(c: &mut Criterion) {
+    let mut group = c.benchmark_group("SsaCommitment::reconstruct_verifiers");
+    group.throughput(Throughput::Elements(1));
+
+    let thresholds = [10, 50, 100];
+    let polynomials_per_ssa = [128, 512, 1024];
+    let pseudonym = SimplePseudonym::random();
+
+    for &t in &thresholds {
+        for &p in &polynomials_per_ssa {
+            let cfg = SsaGeneratorConfig {
+                threshold: t,
+                polynomials_per_ssa: p,
+                ..Default::default()
+            };
+            let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+            let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+
+            group.bench_with_input(
+                BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
+                &(t, p),
+                |b, _| {
+                    b.iter_batched(
+                        || commitment.clone(),
+                        |c| black_box(c).reconstruct_verifiers().unwrap(),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_new_ssa_commitment,
+    bench_new_ssa_commitment_fresh,
+    bench_reconstruct_verifiers,
     bench_verify,
     bench_next_share,
     bench_next_share_no_ssa
