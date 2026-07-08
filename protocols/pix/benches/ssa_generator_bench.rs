@@ -2,7 +2,7 @@
 mod common;
 
 use common::TestSpec;
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{EntryShareGenerator, GeneratedShare, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
 use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
 
@@ -14,7 +14,6 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
 
     let thresholds = [10, 50, 100, 200];
     let polynomials_per_ssa = [128, 512, 1024, 2048];
-    let pseudonym = SimplePseudonym::random();
 
     for &t in &thresholds {
         for &p in &polynomials_per_ssa {
@@ -29,11 +28,24 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                 BenchmarkId::from_parameter(format!("t{}_p{}", t, p)),
                 &(t, p),
                 |b, _| {
-                    let mut index = SsaIndex::MIN;
-                    b.iter(|| {
-                        generator.new_ssa_commitment(&pseudonym, index).unwrap();
-                        index = index.checked_add(1).unwrap();
-                    });
+                    // A fresh, random pseudonym is generated for every iteration in the
+                    // untimed setup closure. This matters: committing repeatedly for the
+                    // *same* pseudonym takes `new_ssa_commitment`'s "append to existing
+                    // entry" branch, which pushes another `p` polynomials onto that
+                    // pseudonym's queue on every call. Because `next_share` is never
+                    // invoked here, that queue would never drain and would grow without
+                    // bound *inside the measured region*, polluting the timing with
+                    // ever-growing allocation/reallocation cost (and eventually leaking
+                    // gigabytes of live scalars). Using a distinct pseudonym per
+                    // iteration keeps every call on the constant-cost "fresh entry"
+                    // branch, which is exactly the operation we want to measure. The
+                    // returned commitment is handed back so it is dropped outside the
+                    // timed region and cannot be optimized away.
+                    b.iter_batched(
+                        SimplePseudonym::random,
+                        |pseudonym| generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap(),
+                        BatchSize::SmallInput,
+                    );
                 },
             );
         }
