@@ -5,10 +5,10 @@ use futures::StreamExt;
 use hopr_api::types::{
     crypto::types::OffchainPublicKey,
     internal::{
-        prelude::{Ticket, VerifiedAcknowledgement},
+        prelude::{Acknowledgement, Ticket, VerifiedAcknowledgement},
         routing::ResolvedTransportRouting,
     },
-    primitive::prelude::BytesEncodable,
+    primitive::prelude::{BytesEncodable, BytesRepresentable},
 };
 use hopr_crypto_packet::{HoprSurb, prelude::PacketSignals};
 use hopr_protocol_hopr::{
@@ -226,7 +226,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         + next_hop_peerid.len()
                         + 1
                         + 1
-                        + 2,
+                        + 2
+                        + acks.len() * Acknowledgement::SIZE,
                 );
                 out.push(PacketType::OutAck as u8);
                 out.extend_from_slice(me.as_ref());
@@ -357,7 +358,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         + me.as_ref().len()
                         + me_peerid.len()
                         + 1
-                        + 2,
+                        + 2
+                        + received_acks.len() * Acknowledgement::SIZE,
                 );
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
