@@ -368,21 +368,21 @@ mod tests {
             frame_id: 1,
             seq_idx: 1,
             seq_flags: 3.try_into()?,
-            data: (*b" new ").into(),
+            data: bytes::Bytes::from_static(b" new "),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 2,
             seq_flags: 3.try_into()?,
-            data: (*b"world").into(),
+            data: bytes::Bytes::from_static(b"world"),
         })?;
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 3.try_into()?,
-            data: (*b"hello").into(),
+            data: bytes::Bytes::from_static(b"hello"),
         })?;
 
         assert!(fb.is_complete());
@@ -401,21 +401,21 @@ mod tests {
             frame_id: 1,
             seq_idx: 1,
             seq_flags: 3.try_into()?,
-            data: (*b" new ").into(),
+            data: bytes::Bytes::from_static(b" new "),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 2,
             seq_flags: SeqIndicator::new_with_flags(3, true),
-            data: (*b"world").into(),
+            data: bytes::Bytes::from_static(b"world"),
         })?;
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 3.try_into()?,
-            data: (*b"hello").into(),
+            data: bytes::Bytes::from_static(b"hello"),
         })?;
 
         assert!(fb.is_complete());
@@ -435,28 +435,28 @@ mod tests {
             frame_id: 1,
             seq_idx: 1,
             seq_flags: 4.try_into()?,
-            data: (*b" new ").into(),
+            data: bytes::Bytes::from_static(b" new "),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 2,
             seq_flags: 4.try_into()?,
-            data: (*b"world").into(),
+            data: bytes::Bytes::from_static(b"world"),
         })?;
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 4.try_into()?,
-            data: (*b"hello").into(),
+            data: bytes::Bytes::from_static(b"hello"),
         })?;
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 3,
             seq_flags: SeqIndicator::new_with_flags(4, true),
-            data: Box::new([]),
+            data: bytes::Bytes::new(),
         })?;
 
         assert!(fb.is_complete());
@@ -476,14 +476,14 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 2.try_into()?,
-            data: (*b"hello world").into(),
+            data: bytes::Bytes::from_static(b"hello world"),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 3,
             seq_flags: 2.try_into()?,
-            data: (*b"foo").into(),
+            data: bytes::Bytes::from_static(b"foo"),
         })
         .expect_err("should not accept invalid segment");
 
@@ -491,7 +491,7 @@ mod tests {
             frame_id: 2,
             seq_idx: 1,
             seq_flags: 2.try_into()?,
-            data: (*b"foo").into(),
+            data: bytes::Bytes::from_static(b"foo"),
         })
         .expect_err("should not accept segment from another frame");
 
@@ -499,7 +499,7 @@ mod tests {
             frame_id: 1,
             seq_idx: 1,
             seq_flags: 3.try_into()?,
-            data: (*b"foo").into(),
+            data: bytes::Bytes::from_static(b"foo"),
         })
         .expect_err("should not accept invalid segment");
 
@@ -512,14 +512,14 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 1.try_into()?,
-            data: (*b"hello world").into(),
+            data: bytes::Bytes::from_static(b"hello world"),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 1.try_into()?,
-            data: (*b"foo").into(),
+            data: bytes::Bytes::from_static(b"foo"),
         })
         .expect_err("should not accept segment when complete");
 
@@ -532,14 +532,14 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 2.try_into()?,
-            data: (*b"hello world").into(),
+            data: bytes::Bytes::from_static(b"hello world"),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: 2.try_into()?,
-            data: (*b"foo").into(),
+            data: bytes::Bytes::from_static(b"foo"),
         })
         .expect_err("should not accept duplicate segment");
 

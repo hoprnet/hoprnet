@@ -143,7 +143,7 @@ pub fn segment_into<T: AsRef<[u8]>, E: Extend<Segment>>(
         frame_id,
         seq_flags: seq_len,
         seq_idx: idx as u8,
-        data: data.into(),
+        data: bytes::Bytes::copy_from_slice(data),
     }));
 
     Ok(())

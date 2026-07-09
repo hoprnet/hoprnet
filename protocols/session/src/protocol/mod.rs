@@ -239,20 +239,21 @@ impl<const C: usize> Decoder for SessionCodec<C> {
             return Ok(None);
         }
 
+        let discriminant = SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)?;
+
+        // Detach the message from `src` and hand it to the variant's parser as an owned,
+        // cheaply-cloneable `Bytes` — for `Segment`, this lets its `data` borrow directly
+        // from this buffer instead of being copied into a new allocation.
+        src.advance(SessionMessage::<C>::HEADER_SIZE);
+        let payload = src.split_to(payload_len).freeze();
+
         // Read the message
-        let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
+        let res = match discriminant {
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(payload.try_into()?),
+            SessionMessageDiscriminants::Request => SessionMessage::Request((&payload[..]).try_into()?),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge((&payload[..]).try_into()?),
         };
 
-        src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
         Ok(Some(res))
     }
 }

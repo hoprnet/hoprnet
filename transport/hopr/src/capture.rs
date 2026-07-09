@@ -493,9 +493,9 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(1, true),
-            data: Box::new(hex!(
+            data: Bytes::from_static(hex!(
                 "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
-            )),
+            ).as_slice()),
         });
 
         let packet = IncomingPacket::Final(
@@ -516,9 +516,9 @@ mod tests {
             frame_id: 2,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(10, false),
-            data: Box::new(hex!(
+            data: Bytes::from_static(hex!(
                 "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
-            )),
+            ).as_slice()),
         });
 
         let packet = IncomingPacket::Final(
