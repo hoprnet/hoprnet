@@ -1040,11 +1040,12 @@ mod tests {
             ..Default::default()
         };
 
-        // Generous latency expectation so the tiny mixing delays never trigger spurious
-        // retransmissions: in unordered mode a re-sent single-segment frame would be
+        // Generous latency expectation so that scheduler stalls under CI load never
+        // trigger spurious retransmissions: in unordered mode a re-sent frame would be
         // delivered twice (duplicates are legitimate datagram semantics, but would make
         // this multiset assertion flaky).
         let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(1000),
             acknowledgement_delay: Duration::from_millis(5),
             ..Default::default()
         };
@@ -1344,23 +1345,114 @@ mod tests {
         alice_socket.flush().await?;
 
         // Without mixing, the network preserves order, so everything after the lost
-        // first frame arrives byte-exact. The 1 s read timeout (« 5 s frame_timeout)
-        // is the actual no-stall assertion.
-        let start = std::time::Instant::now();
+        // first frame arrives byte-exact. The 2 s read timeout (« 5 s frame_timeout)
+        // is the actual no-stall assertion: ordered mode would hold everything back
+        // until the frame_timeout expires.
         let mut bob_data = [0u8; DATA_SIZE - 1500];
         bob_socket
             .read_exact(&mut bob_data)
-            .timeout(futures_time::time::Duration::from_secs(1))
+            .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        assert!(
-            start.elapsed() < Duration::from_secs(1),
-            "unordered delivery must not wait for frame_timeout"
-        );
         assert_eq!(&data[1500..], &bob_data[..]);
 
         alice_socket.close().await?;
         bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_unordered_delivers_swapped_frames_in_arrival_order() -> anyhow::Result<()> {
+        use hopr_utils::network_types::utils::DuplexIO;
+
+        /// Records each write as one wire packet, preserving segment boundaries.
+        #[derive(Clone, Default)]
+        struct PacketRecorder(std::sync::Arc<std::sync::Mutex<Vec<Box<[u8]>>>>);
+
+        impl futures::io::AsyncWrite for PacketRecorder {
+            fn poll_write(self: Pin<&mut Self>, _: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                self.0.lock().unwrap().push(buf.to_vec().into_boxed_slice());
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        // Two full frames, captured at segment granularity and re-fed with ALL of
+        // frame 2's segments ahead of frame 1's. Unlike the mixing tests, this
+        // reordering is fully deterministic.
+        const TWO_FRAMES: usize = 2 * FRAME_SIZE;
+
+        let recorder = PacketRecorder::default();
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            DuplexIO::from((recorder.clone(), futures::io::empty())),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<TWO_FRAMES>();
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        let packets = recorder.0.lock().unwrap().clone();
+        let frame_id_of = |packet: &[u8]| -> anyhow::Result<u32> {
+            SessionMessage::<MTU>::try_from(packet)?
+                .try_as_segment()
+                .map(|s| s.frame_id)
+                .ok_or_else(|| anyhow::anyhow!("expected a segment"))
+        };
+        let mut wire = Vec::new();
+        for want in [2u32, 1] {
+            for packet in packets.iter().filter(|p| frame_id_of(p).is_ok_and(|id| id == want)) {
+                wire.extend_from_slice(packet);
+            }
+        }
+
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            DuplexIO::from((futures::io::sink(), futures::io::Cursor::new(wire))),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                // Deliberately large: unordered delivery must not depend on it.
+                frame_timeout: Duration::from_secs(5),
+                deliver_in_order: false,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        // Frame 2 must be delivered first (arrival order), and frame 1 must NOT be
+        // dropped by the `frame already seen` filter although its lower id arrives
+        // after a higher one has been emitted.
+        let mut received = [0u8; TWO_FRAMES];
+        bob_socket
+            .read_exact(&mut received)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+
+        assert_eq!(
+            &data[FRAME_SIZE..],
+            &received[..FRAME_SIZE],
+            "frame 2 must arrive first"
+        );
+        assert_eq!(
+            &data[..FRAME_SIZE],
+            &received[FRAME_SIZE..],
+            "frame 1 must not be discarded"
+        );
 
         Ok(())
     }

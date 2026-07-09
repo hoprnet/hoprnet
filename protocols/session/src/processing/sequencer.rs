@@ -318,17 +318,20 @@ mod tests {
         pin_mut!(seq_stream);
 
         // Frame 1 is missing; later frames must still be delivered immediately
-        // (no head-of-line stall, no FrameDiscarded for the gap).
+        // (no head-of-line stall, no FrameDiscarded for the gap). The timeouts turn
+        // a regression to ordered behavior into a failure instead of a hung test.
+        let timeout = futures_time::time::Duration::from_secs(5);
+
         seq_sink.send(2u32).await?;
-        assert_eq!(Some(2), seq_stream.try_next().await?);
+        assert_eq!(Some(2), seq_stream.try_next().timeout(timeout).await??);
 
         seq_sink.send(3u32).await?;
-        assert_eq!(Some(3), seq_stream.try_next().await?);
+        assert_eq!(Some(3), seq_stream.try_next().timeout(timeout).await??);
 
         // The straggler arrives very late and out of order — it must still be
         // delivered, not rejected.
         seq_sink.send(1u32).await?;
-        assert_eq!(Some(1), seq_stream.try_next().await?);
+        assert_eq!(Some(1), seq_stream.try_next().timeout(timeout).await??);
 
         Ok(())
     }

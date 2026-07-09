@@ -233,8 +233,16 @@ pub fn stateless_socket_reordering(c: &mut Criterion) {
         ..Default::default()
     };
 
+    let in_order_wire = window_shuffle(&packets, 0, [0xEE; 32]);
+
     for mixing_factor in [0usize, 10, 32] {
         let wire_data = window_shuffle(&packets, mixing_factor, [0xEE; 32]);
+        if mixing_factor > 0 {
+            assert_ne!(
+                in_order_wire, wire_data,
+                "window_shuffle must actually reorder the wire packets"
+            );
+        }
 
         // Sanity: ordered mode restores the exact byte stream...
         let ordered_out = runtime.block_on(bob_receive_data_with_cfg(
