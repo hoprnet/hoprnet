@@ -676,7 +676,7 @@ mod tests {
                 packet_tag: hopr_api::types::crypto_random::random_bytes(),
                 previous_hop: *OffchainKeypair::random().public(),
                 next_hop: *OffchainKeypair::random().public(),
-                data: Box::new([0x08]),
+                data: Bytes::from_static(&[0x08]),
                 ack_challenge: HalfKeyChallenge::default(),
                 received_ticket: ticket.into_unacknowledged(HalfKey::random()),
                 ack_key_prev_hop: HalfKey::random(),
@@ -806,7 +806,7 @@ mod tests {
                 ByteCapabilities,
             >::SessionEstablished(StartEstablished {
                 orig_challenge: 0x01234567_89abcdef,
-                session_id: SessionId::new(1234u64, HoprPseudonym::random()),
+                session_id: HoprPseudonym::random(),
             }))?
             .to_bytes()
             .into_vec()
@@ -829,8 +829,8 @@ mod tests {
                 SessionTarget,
                 ByteCapabilities,
             >::KeepAlive(KeepAliveMessage {
-                session_id: SessionId::new(1234u64, HoprPseudonym::random()),
-                flags: 0xff,
+                session_id: HoprPseudonym::random(),
+                flags: hopr_protocol_start::KeepAliveFlags::full(),
                 additional_data: 0xffffffff,
             }))?
             .to_bytes()
