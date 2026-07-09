@@ -152,21 +152,54 @@ impl<const C: usize> Encoder for SessionCodec<C> {
 
         let disc = SessionMessageDiscriminants::from(&item) as u8;
 
-        let msg = match item {
-            SessionMessage::Segment(s) => Vec::from(s),
-            SessionMessage::Request(r) => Vec::from(r),
-            SessionMessage::Acknowledge(a) => Vec::from(a),
+        // Computed up front so the header can be written before the payload, without
+        // materializing the payload into an intermediate buffer first.
+        let msg_len = match &item {
+            SessionMessage::Segment(s) => Segment::HEADER_SIZE + s.data.len(),
+            SessionMessage::Request(_) => SegmentRequest::<C>::SIZE,
+            SessionMessage::Acknowledge(_) => FrameAcknowledgements::<C>::SIZE,
         };
 
-        if msg.len() > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+        if msg_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
             return Err(SessionError::IncorrectMessageLength);
         }
 
-        let msg_len = msg.len() as u16;
+        dst.reserve(SessionMessage::<C>::HEADER_SIZE + msg_len);
         dst.put_u8(SessionMessage::<C>::VERSION);
         dst.put_u8(disc);
-        dst.put_u16(msg_len);
-        dst.extend_from_slice(&msg);
+        dst.put_u16(msg_len as u16);
+
+        match item {
+            SessionMessage::Segment(s) => {
+                dst.put_u32(s.frame_id);
+                dst.put_u8(s.seq_idx);
+                dst.put_u8(s.seq_flags.value());
+                dst.put_slice(&s.data);
+            }
+            SessionMessage::Request(r) => {
+                let mut written = 0;
+                for (frame_id, seq_num) in r.0 {
+                    if written + SegmentRequest::<C>::ENTRY_SIZE > SegmentRequest::<C>::SIZE {
+                        break;
+                    }
+                    dst.put_u32(frame_id);
+                    dst.put_u8(seq_num);
+                    written += SegmentRequest::<C>::ENTRY_SIZE;
+                }
+                dst.put_bytes(0, SegmentRequest::<C>::SIZE - written);
+            }
+            SessionMessage::Acknowledge(a) => {
+                let mut written = 0;
+                for frame_id in a.0 {
+                    if written + size_of::<FrameId>() > FrameAcknowledgements::<C>::SIZE {
+                        break;
+                    }
+                    dst.put_u32(frame_id);
+                    written += size_of::<FrameId>();
+                }
+                dst.put_bytes(0, FrameAcknowledgements::<C>::SIZE - written);
+            }
+        }
 
         tracing::trace!(disc, msg_len, "encoded message");
         Ok(())
