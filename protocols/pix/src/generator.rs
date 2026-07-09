@@ -4,11 +4,7 @@ use std::collections::VecDeque;
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
-    elliptic_curve::{
-        Field, Group, PrimeField,
-        group::GroupEncoding,
-        rand_core::{CryptoRng, RngCore},
-    },
+    elliptic_curve::{Field, Group, PrimeField, group::GroupEncoding, rand_core::CryptoRng},
 };
 
 use crate::{
@@ -45,7 +41,7 @@ struct SsaPseudonymEntry<S: PixSpec> {
 fn new_polynomial_with_verifier<S: PixSpec>(
     secret: PixScalar<S>,
     t: usize,
-    rng: impl RngCore + CryptoRng,
+    rng: impl CryptoRng,
 ) -> errors::Result<(RawPolynomial<S>, RawPolynomialVerifier<S>), S::Pseudonym> {
     let mut polynomial = RawPolynomial::<S>::create(t);
     polynomial.fill(&secret.into(), rng, t)?;
@@ -197,7 +193,9 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
 
         // Generate polynomial and verifier for each sub-secret
         let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
-            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold as usize, hopr_types::crypto_random::rng()))
+            .map(|secret| {
+                new_polynomial_with_verifier::<S>(secret, self.cfg.threshold as usize, hopr_types::crypto_random::rng())
+            })
             .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>, S::Pseudonym>>()?
             .into_iter()
             .unzip();

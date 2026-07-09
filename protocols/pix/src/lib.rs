@@ -1,22 +1,21 @@
-use std::ops::Add;
+use std::ops::{Add, Mul};
 
+use elliptic_curve::ops::Reduce;
+use hash2curve::{ExpandMsgXmd, GroupDigest, MapToCurve, hash_to_scalar};
 use hopr_types::crypto::{
     crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
     prelude::Pseudonym,
 };
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
+use hybrid_array::{
+    Array, ArraySize,
+    typenum::{IsGreaterOrEqual, IsLess, IsLessOrEqual, NonZero, Prod, True, U2},
+};
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
-    elliptic_curve::{
-        Curve, CurveArithmetic, PrimeCurve, PrimeField,
-        consts::U256,
-        group::cofactor::CofactorGroup,
-    },
+    elliptic_curve::{Curve, CurveArithmetic, PrimeCurve, PrimeField, consts::U256, group::cofactor::CofactorGroup},
 };
-use hash2curve::{hash_to_scalar, ExpandMsgXmd, GroupDigest, MapToCurve};
-use hybrid_array::ArraySize;
-use hybrid_array::typenum::{IsLess, IsLessOrEqual};
 
 pub mod ack_verify;
 pub mod errors;
@@ -57,9 +56,17 @@ where
     PixGroup<Self>: Group<Scalar = PixScalar<Self>> + GroupEncoding + Default + CofactorGroup,
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
-    <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLessOrEqual<<PixDigest<Self> as BlockSizeUser>::BlockSize>,
+    <PixDigest<Self> as OutputSizeUser>::OutputSize:
+        IsLessOrEqual<<PixDigest<Self> as BlockSizeUser>::BlockSize, Output = True>,
     <Self::Curve as Curve>::FieldBytesSize: Add<SsaPolyIndexPrefixSize>,
     <<Self::Curve as Curve>::FieldBytesSize as Add<SsaPolyIndexPrefixSize>>::Output: ArraySize,
+    // hash2curve `hash_to_scalar` bounds for `msg_to_scalar`
+    <<Self::Curve as MapToCurve>::SecurityLevel as Mul<U2>>::Output: Sized,
+    <Self::Curve as MapToCurve>::SecurityLevel: Mul<U2>,
+    <PixDigest<Self> as OutputSizeUser>::OutputSize:
+        IsGreaterOrEqual<Prod<<Self::Curve as MapToCurve>::SecurityLevel, U2>, Output = True>,
+    <Self::Curve as Curve>::FieldBytesSize: NonZero,
+    PixScalar<Self>: Reduce<Array<u8, <Self::Curve as Curve>::FieldBytesSize>>,
 {
     /// Prime order elliptic curve use for commitments.
     type Curve: PrimeCurve + CurveArithmetic + GroupDigest;
@@ -87,10 +94,7 @@ where
     where
         Self: Sized,
     {
-        Ok(hash_to_scalar::<Self::Curve,
-            ExpandMsgXmd<Self::Digest>,
-            _
-        >(
+        hash_to_scalar::<Self::Curve, ExpandMsgXmd<Self::Digest>, <Self::Curve as Curve>::FieldBytesSize>(
             &[
                 msg.as_ref(),
                 spi.pseudonym().as_ref(),
@@ -106,7 +110,8 @@ where
                 .as_bytes(),
                 Self::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
             ],
-        ).map_err(|_| errors::PixError::InvalidInput)?)
+        )
+        .map_err(|_| errors::PixError::InvalidInput)
     }
 
     /// Converts `PixGroup` to an address that can be deposited to.
@@ -138,7 +143,7 @@ pub(crate) fn into_completed_share<S: PixSpec>(
 ) -> errors::Result<CompletedShare<S>, S::Pseudonym> {
     Ok(DefaultShare {
         identifier: identifier.into(),
-        value: Option::from(PixScalar::<S>::from_repr(share.0.clone()))
+        value: Option::from(PixScalar::<S>::from_repr(share.0))
             .map(|s: PixScalar<S>| s.into())
             .ok_or(vsss_rs::Error::InvalidShare)?,
     })
@@ -284,10 +289,7 @@ pub(crate) mod tests {
     };
     use vsss_rs::{
         ParticipantIdGeneratorType,
-        elliptic_curve::{
-            Field,
-            rand_core::{CryptoRng, RngCore},
-        },
+        elliptic_curve::{Field, rand_core::CryptoRng},
         feldman,
     };
 
@@ -322,7 +324,7 @@ pub(crate) mod tests {
         secret: PixScalar<S>,
         t: usize,
         x: &[PixScalar<S>],
-        mut rng: impl RngCore + CryptoRng,
+        mut rng: impl CryptoRng,
     ) -> anyhow::Result<StandardShamirResult<S>> {
         anyhow::ensure!(t > 0, "t must be greater than 0");
         anyhow::ensure!(x.len() >= t, "x must have at least t elements");

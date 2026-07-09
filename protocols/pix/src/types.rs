@@ -4,6 +4,7 @@ use std::{
     ops::Add,
 };
 
+use elliptic_curve::{Curve, PrimeField};
 use hopr_types::{
     crypto::{
         crypto_traits::{self, KeyIvInit, StreamCipher},
@@ -12,10 +13,11 @@ use hopr_types::{
     },
     primitive::prelude::{BytesRepresentable, GeneralError},
 };
-use elliptic_curve::{Curve, PrimeField};
+use hybrid_array::{
+    Array, ArraySize,
+    typenum::{Sum, U, Unsigned},
+};
 
-use hybrid_array::{Array, ArraySize};
-use hybrid_array::typenum::{Sum, U, Unsigned};
 use crate::{
     ExitAcknowledgementShareProcessor, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors,
     errors::PixError,
@@ -233,7 +235,7 @@ where
 impl<S: PixSpec> serde::Serialize for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArraySize
+    EncShareSize<S>: ArraySize,
 {
     fn serialize<Ser: serde::Serializer>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error> {
         serde_bytes::Bytes::new(self.0.as_ref()).serialize(serializer)
@@ -244,7 +246,7 @@ where
 impl<'de, S: PixSpec> serde::Deserialize<'de> for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArraySize
+    EncShareSize<S>: ArraySize,
 {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let bytes = <&serde_bytes::Bytes as serde::Deserialize>::deserialize(deserializer)?;
@@ -255,7 +257,7 @@ where
 impl<S: PixSpec> EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArraySize
+    EncShareSize<S>: ArraySize,
 {
     /// [`SsaIndex`] and [`PolynomialIndex`] embedded in this encrypted share.
     ///
@@ -314,7 +316,7 @@ where
 impl<S: PixSpec> AsRef<[u8]> for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArraySize
+    EncShareSize<S>: ArraySize,
 {
     fn as_ref(&self) -> &[u8] {
         &self.0
@@ -324,15 +326,14 @@ where
 impl<'a, S: PixSpec> TryFrom<&'a [u8]> for EncryptedPartialSsaShare<S>
 where
     FieldBytesSize<S>: Add<SsaPolyIndexPrefixSize>,
-    EncShareSize<S>: ArraySize
+    EncShareSize<S>: ArraySize,
 {
     type Error = GeneralError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        if value.len() != Self::SIZE {
-            return Err(GeneralError::ParseError("EncryptedPartialSsaShare.size".into()));
-        }
-        Ok(Self(Array::clone_from_slice(value)))
+        Array::try_from(value)
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("EncryptedPartialSsaShare.size".into()))
     }
 }
 

@@ -1,14 +1,18 @@
 mod utils;
 
 use ahash::HashSetExt;
+use elliptic_curve::Field;
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
-use elliptic_curve::{Field};
 
-use crate::{CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId, Group};
+use crate::{
+    CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
+    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState,
+    SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+};
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
