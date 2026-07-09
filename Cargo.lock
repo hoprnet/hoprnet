@@ -3585,6 +3585,7 @@ dependencies = [
  "postcard",
  "serde",
  "serde_bytes",
+ "smallvec",
  "strum 0.28.0",
  "subtle",
  "thiserror 2.0.18",

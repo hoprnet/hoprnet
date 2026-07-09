@@ -182,38 +182,39 @@ where
 {
     /// Tries to encode the message into binary format and [`Tag`]
     pub fn encode(self) -> errors::Result<(Tag, Box<[u8]>)> {
-        let mut out = Vec::with_capacity(ApplicationData::PAYLOAD_SIZE);
+        let mut out = Vec::with_capacity(16);
         out.push(Self::START_PROTOCOL_VERSION);
         out.push(StartProtocolDiscriminants::from(&self) as u8);
+        out.extend_from_slice(&[0, 0]); // 2-byte payload length prefix, patched in below
 
-        let mut data = Vec::with_capacity(ApplicationData::PAYLOAD_SIZE - 2);
+        let payload_start = out.len();
         match self {
             StartProtocol::StartSession(init) => {
-                data.extend_from_slice(&init.challenge.to_be_bytes());
-                data.push(init.capabilities.into());
-                data.extend_from_slice(&init.additional_data.to_be_bytes());
+                out.extend_from_slice(&init.challenge.to_be_bytes());
+                out.push(init.capabilities.into());
+                out.extend_from_slice(&init.additional_data.to_be_bytes());
                 let target = serde_cbor_2::to_vec(&init.target)?;
-                data.extend_from_slice(&target);
+                out.extend_from_slice(&target);
             }
             StartProtocol::SessionEstablished(est) => {
-                data.extend_from_slice(&est.orig_challenge.to_be_bytes());
+                out.extend_from_slice(&est.orig_challenge.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&est.session_id)?;
-                data.extend(session_id);
+                out.extend_from_slice(&session_id);
             }
             StartProtocol::SessionError(err) => {
-                data.extend_from_slice(&err.challenge.to_be_bytes());
-                data.push(err.reason as u8);
+                out.extend_from_slice(&err.challenge.to_be_bytes());
+                out.push(err.reason as u8);
             }
             StartProtocol::KeepAlive(ping) => {
-                data.push(ping.flags.bits());
-                data.extend_from_slice(&ping.additional_data.to_be_bytes());
+                out.push(ping.flags.bits());
+                out.extend_from_slice(&ping.additional_data.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
-                data.extend(session_id);
+                out.extend_from_slice(&session_id);
             }
         }
 
-        out.extend_from_slice(&(data.len() as u16).to_be_bytes());
-        out.extend(data);
+        let payload_len = (out.len() - payload_start) as u16;
+        out[payload_start - 2..payload_start].copy_from_slice(&payload_len.to_be_bytes());
 
         Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }

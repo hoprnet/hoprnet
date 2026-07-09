@@ -160,9 +160,8 @@ enum PacketBeforeTransit<'a> {
 
 impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
     fn from(value: PacketBeforeTransit<'a>) -> Self {
-        let mut out = Vec::new();
         let mut direction = PacketDirection::Incoming;
-        match value {
+        let out = match value {
             PacketBeforeTransit::OutgoingPacket {
                 me,
                 next_hop,
@@ -173,12 +172,31 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 num_surbs,
                 is_forwarded,
             } => {
+                let me_peerid = me.to_peerid_str();
+                let next_hop_peerid = next_hop.to_peerid_str();
+
+                let mut out = Vec::with_capacity(
+                    1 + me.as_ref().len()
+                        + me_peerid.len()
+                        + 1
+                        + next_hop.as_ref().len()
+                        + next_hop_peerid.len()
+                        + 1
+                        + ack_challenge.len()
+                        + 1
+                        + ticket.len()
+                        + 1
+                        + 1
+                        + 1
+                        + 2
+                        + data.len(),
+                );
                 out.push(PacketType::Outgoing as u8);
                 out.extend_from_slice(me.as_ref());
-                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.extend_from_slice(me_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(next_hop.as_ref());
-                out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(next_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(ack_challenge.as_ref());
                 out.push(ticket.len() as u8);
@@ -189,6 +207,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
+                out
             }
             PacketBeforeTransit::OutgoingAck {
                 me,
@@ -196,18 +215,32 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 acks,
                 is_random,
             } => {
+                let me_peerid = me.to_peerid_str();
+                let next_hop_peerid = next_hop.to_peerid_str();
+
+                let mut out = Vec::with_capacity(
+                    1 + me.as_ref().len()
+                        + me_peerid.len()
+                        + 1
+                        + next_hop.as_ref().len()
+                        + next_hop_peerid.len()
+                        + 1
+                        + 1
+                        + 2,
+                );
                 out.push(PacketType::OutAck as u8);
                 out.extend_from_slice(me.as_ref());
-                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.extend_from_slice(me_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(next_hop.as_ref());
-                out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(next_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.push(if is_random { 1 } else { 0 });
                 out.extend((acks.len() as u16).to_be_bytes());
                 acks.into_iter()
                     .for_each(|ack| out.extend_from_slice(ack.leak().as_ref()));
                 direction = PacketDirection::Outgoing;
+                out
             }
             PacketBeforeTransit::IncomingPacket {
                 me,
@@ -222,19 +255,38 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     info,
                 } = final_packet.as_ref();
 
+                let previous_hop_peerid = previous_hop.to_peerid_str();
+                let me_peerid = me.to_peerid_str();
+                let sender_bytes: &[u8] = sender.as_ref();
+
+                let mut out = Vec::with_capacity(
+                    1 + packet_tag.len()
+                        + previous_hop.as_ref().len()
+                        + previous_hop_peerid.len()
+                        + 1
+                        + me.as_ref().len()
+                        + me_peerid.len()
+                        + 1
+                        + sender_bytes.len()
+                        + ack_key.as_ref().len()
+                        + 1
+                        + 2
+                        + plain_text.len(),
+                );
                 out.push(PacketType::Final as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
-                out.extend_from_slice(previous_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(previous_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(me.as_ref());
-                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.extend_from_slice(me_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(sender.as_ref());
+                out.extend_from_slice(sender_bytes);
                 out.extend_from_slice(ack_key.as_ref());
                 out.push(info.packet_signals.bits());
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
+                out
             }
             PacketBeforeTransit::IncomingPacket {
                 packet: IncomingPacket::Forwarded(fwd_packet),
@@ -250,19 +302,38 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     ..
                 } = fwd_packet.as_ref();
                 let ticket = (*ticket.verified_ticket()).into_encoded();
+
+                let previous_hop_peerid = previous_hop.to_peerid_str();
+                let next_hop_peerid = next_hop.to_peerid_str();
+
+                let mut out = Vec::with_capacity(
+                    1 + packet_tag.len()
+                        + previous_hop.as_ref().len()
+                        + previous_hop_peerid.len()
+                        + 1
+                        + next_hop.as_ref().len()
+                        + next_hop_peerid.len()
+                        + 1
+                        + ack_key.as_ref().len()
+                        + 1
+                        + ticket.len()
+                        + 2
+                        + data.len(),
+                );
                 out.push(PacketType::Forwarded as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
-                out.extend_from_slice(previous_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(previous_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(next_hop.as_ref());
-                out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(next_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(ack_key.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
+                out
             }
             PacketBeforeTransit::IncomingPacket {
                 me,
@@ -274,18 +345,33 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     previous_hop,
                     received_acks,
                 } = ack_packet.as_ref();
+
+                let previous_hop_peerid = previous_hop.to_peerid_str();
+                let me_peerid = me.to_peerid_str();
+
+                let mut out = Vec::with_capacity(
+                    1 + packet_tag.len()
+                        + previous_hop.as_ref().len()
+                        + previous_hop_peerid.len()
+                        + 1
+                        + me.as_ref().len()
+                        + me_peerid.len()
+                        + 1
+                        + 2,
+                );
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
-                out.extend_from_slice(previous_hop.to_peerid_str().as_bytes());
+                out.extend_from_slice(previous_hop_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(me.as_ref());
-                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.extend_from_slice(me_peerid.as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend((received_acks.len() as u16).to_be_bytes());
                 received_acks.iter().for_each(|ack| out.extend_from_slice(ack.as_ref()));
+                out
             }
-        }
+        };
 
         Self {
             direction,
