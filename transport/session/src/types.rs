@@ -88,6 +88,26 @@ pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     }
 }
 
+/// Derives the session socket configuration from the session config and reliability mode.
+///
+/// `NoDelay` flushes each write as its own frame (frame = datagram) and, on unreliable
+/// sockets, switches to unordered (arrival-order) delivery: datagram payloads (e.g.
+/// UDP/WireGuard) tolerate reordering, so a late frame must not stall or discard the
+/// frames around it. Reliable (retransmission) sockets always keep in-order delivery:
+/// their duplicate suppression relies on the ordered receive path, and skipping it would
+/// let retransmitted frames be delivered to the application twice.
+fn session_socket_config(cfg: &HoprSessionConfig, reliable: bool) -> SessionSocketConfig {
+    let no_delay = cfg.capabilities.contains(Capability::NoDelay);
+    SessionSocketConfig {
+        frame_size: cfg.frame_mtu,
+        frame_timeout: cfg.frame_timeout,
+        capacity: SESSION_SOCKET_CAPACITY,
+        flush_immediately: no_delay,
+        deliver_in_order: !no_delay || reliable,
+        ..Default::default()
+    }
+}
+
 /// Indicates the closure reason of a [`HoprSession`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 pub enum ClosureReason {
@@ -223,26 +243,14 @@ impl HoprSession {
 
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
-            // `NoDelay` flushes each write as its own frame (frame = datagram), which is
-            // exactly the precondition that makes unordered delivery safe: datagram payloads
-            // (e.g. UDP/WireGuard) tolerate reordering, so frames are delivered in arrival
-            // order rather than sequenced and discarded on a gap. Without `NoDelay`, writes
-            // coalesce into frames (frame != datagram) and strict ordering must be preserved.
-            let no_delay = cfg.capabilities.contains(Capability::NoDelay);
-            let socket_cfg = SessionSocketConfig {
-                frame_size: cfg.frame_mtu,
-                frame_timeout: cfg.frame_timeout,
-                capacity: SESSION_SOCKET_CAPACITY,
-                flush_immediately: no_delay,
-                deliver_in_order: !no_delay,
-                ..Default::default()
-            };
-
             // Need to test the capabilities separately, because any Retransmission capability
             // implies Segmentation, and therefore `is_disjoint` would fail
-            if cfg.capabilities.contains(Capability::RetransmissionAck)
-                || cfg.capabilities.contains(Capability::RetransmissionNack)
-            {
+            let reliable = cfg.capabilities.contains(Capability::RetransmissionAck)
+                || cfg.capabilities.contains(Capability::RetransmissionNack);
+
+            let socket_cfg = session_socket_config(&cfg, reliable);
+
+            if reliable {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
@@ -680,6 +688,38 @@ mod tests {
         assert_eq!(bob_sent, alice_recv);
 
         Ok(())
+    }
+
+    #[test]
+    fn no_delay_capability_maps_to_unordered_delivery_only_without_retransmission() {
+        // Plain NoDelay (datagram use-case): immediate flushing, arrival-order delivery.
+        let cfg = HoprSessionConfig {
+            capabilities: Capability::NoDelay.into(),
+            ..Default::default()
+        };
+        let socket_cfg = session_socket_config(&cfg, false);
+        assert!(socket_cfg.flush_immediately);
+        assert!(!socket_cfg.deliver_in_order);
+
+        // Segmentation only: buffered, strictly ordered.
+        let cfg = HoprSessionConfig {
+            capabilities: Capability::Segmentation.into(),
+            ..Default::default()
+        };
+        let socket_cfg = session_socket_config(&cfg, false);
+        assert!(!socket_cfg.flush_immediately);
+        assert!(socket_cfg.deliver_in_order);
+
+        // NoDelay combined with a retransmission capability (reliable socket): the
+        // reliability layer requires the ordered receive path, so only the flushing
+        // behavior of NoDelay applies.
+        let cfg = HoprSessionConfig {
+            capabilities: Capability::NoDelay | Capability::RetransmissionAck,
+            ..Default::default()
+        };
+        let socket_cfg = session_socket_config(&cfg, true);
+        assert!(socket_cfg.flush_immediately);
+        assert!(socket_cfg.deliver_in_order);
     }
 
     #[test_log::test(tokio::test)]

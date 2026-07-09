@@ -83,6 +83,15 @@ pub struct SessionSocketConfig {
     /// discarding. This is the correct behavior for datagram payloads (e.g. UDP/WireGuard)
     /// that tolerate reordering, where a late frame from a slow path must not stall or
     /// drop the frames around it.
+    ///
+    /// Unordered delivery is intended for stateless sockets. On stateful sockets the
+    /// reliability layer's duplicate suppression relies on the ordered receive path:
+    /// without it, retransmitted frames can be delivered to the application twice and
+    /// duplicate segments of already-delivered frames can solicit spurious
+    /// retransmission requests.
+    ///
+    /// Note also the close semantics of arrival-order delivery: a terminating frame that
+    /// overtakes in-flight data frames aborts the receive pipeline without waiting for them.
     #[default(true)]
     pub deliver_in_order: bool,
 }

@@ -59,10 +59,15 @@ flagset::flags! {
         RetransmissionNack = 0b000_1010,
         /// Disable packet buffering.
         ///
-        /// Each write is flushed immediately as its own frame, and frames are delivered
-        /// in arrival order: no in-order sequencing and no discarding of frames behind a
-        /// gap. Intended for datagram payloads (e.g. UDP/WireGuard) that tolerate
-        /// reordering.
+        /// Each write is flushed immediately as its own frame. Unless a retransmission
+        /// capability is also set, frames are delivered in arrival order: no in-order
+        /// sequencing and no discarding of frames behind a gap. Intended for datagram
+        /// payloads (e.g. UDP/WireGuard) that tolerate reordering; byte-stream payloads
+        /// must not rely on ordering with this capability.
+        ///
+        /// Note the datagram close semantics of arrival-order delivery: a terminating
+        /// frame that overtakes in-flight data frames ends the session without waiting
+        /// for them.
         ///
         /// Implies [`Segmentation`].
         NoDelay = 0b0000_1001,
