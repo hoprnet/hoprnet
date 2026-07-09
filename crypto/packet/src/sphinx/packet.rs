@@ -8,7 +8,12 @@ use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::prelude::*,
 };
+use smallvec::SmallVec;
 use typenum::Unsigned;
+
+/// Inline PRP-init storage for short paths; longer paths spill to the heap without
+/// constraining route length.
+const TYPICAL_INTERMEDIATE_HOPS: usize = 3;
 
 use super::{
     derivation::derive_packet_tag,
@@ -199,7 +204,9 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
 pub struct PartialPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
     alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
     routing_info: RoutingInfo<H>,
-    prp_inits: Vec<IvKey<S::PRP>>,
+    // Packet construction usually needs only a few PRP initializers, but
+    // arbitrary path lengths still have to be accepted.
+    prp_inits: SmallVec<[IvKey<S::PRP>; TYPICAL_INTERMEDIATE_HOPS]>,
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
@@ -241,13 +248,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
                         .into_iter()
                         .rev()
                         .map(|key| S::new_prp_init(&key))
-                        .collect::<Result<Vec<_>, _>>()?,
+                        .collect::<Result<SmallVec<_>, _>>()?,
                 })
             }
             MetaPacketRouting::Surb(surb, receiver_data) => Ok(Self {
                 alpha: surb.alpha,
                 routing_info: surb.header,
-                prp_inits: vec![S::new_reply_prp_init(&surb.sender_key, receiver_data.as_ref())?],
+                prp_inits: smallvec::smallvec![S::new_reply_prp_init(&surb.sender_key, receiver_data.as_ref())?],
             }),
         }
     }

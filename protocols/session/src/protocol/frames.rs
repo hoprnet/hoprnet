@@ -5,6 +5,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
+use bytes::Bytes;
 use hopr_types::primitive::prelude::{GeneralError, to_hex_shortened};
 
 use crate::errors::SessionError;
@@ -194,9 +195,9 @@ pub struct Segment {
     pub seq_idx: SeqNum,
     /// Flags of the segment sequence (includes sequence length).
     pub seq_flags: SeqIndicator,
-    /// Data in this segment.
-    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
-    pub data: Box<[u8]>,
+    /// Data in this segment. Reference-counting lets decoded segments keep a
+    /// view into the codec buffer while they wait for frame reassembly.
+    pub data: Bytes,
 }
 
 impl Segment {
@@ -232,7 +233,7 @@ impl Segment {
             frame_id,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(1, true),
-            data: Box::default(),
+            data: Bytes::new(),
         }
     }
 }
@@ -284,16 +285,29 @@ impl TryFrom<&[u8]> for Segment {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        // Borrowed callers cannot share ownership with the decoded segment, so
+        // copy once and reuse the owned parser.
+        Bytes::copy_from_slice(value).try_into()
+    }
+}
+
+impl TryFrom<Bytes> for Segment {
+    type Error = SessionError;
+
+    /// Parses a `Segment` out of `value`, taking over its underlying buffer for
+    /// [`data`](Segment::data) without copying (e.g. when `value` was split off a
+    /// `BytesMut` receive buffer).
+    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
         if value.len() < Self::HEADER_SIZE {
             return Err(SessionError::InvalidSegment);
         }
 
-        let (header, data) = value.split_at(Self::HEADER_SIZE);
+        let header = value.split_to(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
             seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| SessionError::InvalidSegment)?),
             seq_flags: SeqIndicator::new_unchecked(header[5]),
-            data: data.into(),
+            data: value,
         };
         (segment.frame_id > 0 && segment.seq_idx < segment.seq_flags.seq_len())
             .then_some(segment)
@@ -320,7 +334,7 @@ mod tests {
             frame_id: 10,
             seq_idx: 0,
             seq_flags: 2.try_into()?,
-            data: Box::new([123u8]),
+            data: Bytes::from_static(&[123u8]),
         };
 
         let seg_2 = Segment::try_from(Vec::from(seg_1.clone()).as_slice())?;

@@ -152,21 +152,59 @@ impl<const C: usize> Encoder for SessionCodec<C> {
 
         let disc = SessionMessageDiscriminants::from(&item) as u8;
 
-        let msg = match item {
-            SessionMessage::Segment(s) => Vec::from(s),
-            SessionMessage::Request(r) => Vec::from(r),
-            SessionMessage::Acknowledge(a) => Vec::from(a),
+        // Computed up front so the header can be written before the payload, without
+        // materializing the payload into an intermediate buffer first.
+        let msg_len = match &item {
+            SessionMessage::Segment(s) => Segment::HEADER_SIZE + s.data.len(),
+            SessionMessage::Request(_) => SegmentRequest::<C>::SIZE,
+            SessionMessage::Acknowledge(_) => FrameAcknowledgements::<C>::SIZE,
         };
 
-        if msg.len() > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+        if msg_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
             return Err(SessionError::IncorrectMessageLength);
         }
 
-        let msg_len = msg.len() as u16;
+        dst.reserve(SessionMessage::<C>::HEADER_SIZE + msg_len);
         dst.put_u8(SessionMessage::<C>::VERSION);
         dst.put_u8(disc);
-        dst.put_u16(msg_len);
-        dst.extend_from_slice(&msg);
+        dst.put_u16(msg_len as u16);
+
+        match item {
+            SessionMessage::Segment(s) => {
+                dst.put_u32(s.frame_id);
+                dst.put_u8(s.seq_idx);
+                dst.put_u8(s.seq_flags.value());
+                dst.put_slice(&s.data);
+            }
+            SessionMessage::Request(r) => {
+                let mut written = 0;
+                // Requests have a fixed-size padded wire representation. Writing
+                // directly into `dst` preserves that shape without first building
+                // a temporary Vec.
+                for (frame_id, seq_num) in r.0 {
+                    if written + SegmentRequest::<C>::ENTRY_SIZE > SegmentRequest::<C>::SIZE {
+                        break;
+                    }
+                    dst.put_u32(frame_id);
+                    dst.put_u8(seq_num);
+                    written += SegmentRequest::<C>::ENTRY_SIZE;
+                }
+                dst.put_bytes(0, SegmentRequest::<C>::SIZE - written);
+            }
+            SessionMessage::Acknowledge(a) => {
+                let mut written = 0;
+                // Acknowledgements are fixed-width as well; trailing zero frame
+                // IDs are padding and are ignored by the parser.
+                for frame_id in a.0 {
+                    if written + size_of::<FrameId>() > FrameAcknowledgements::<C>::SIZE {
+                        break;
+                    }
+                    dst.put_u32(frame_id);
+                    written += size_of::<FrameId>();
+                }
+                dst.put_bytes(0, FrameAcknowledgements::<C>::SIZE - written);
+            }
+        }
 
         tracing::trace!(disc, msg_len, "encoded message");
         Ok(())
@@ -206,20 +244,23 @@ impl<const C: usize> Decoder for SessionCodec<C> {
             return Ok(None);
         }
 
+        let discriminant = SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)?;
+
+        // Detach the message from `src` and hand it to the variant's parser as an owned,
+        // cheaply-cloneable `Bytes` — for `Segment`, this lets its `data` borrow directly
+        // from this buffer instead of being copied into a new allocation.
+        src.advance(SessionMessage::<C>::HEADER_SIZE);
+        let payload = src.split_to(payload_len).freeze();
+
         // Read the message
-        let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(
-                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
-            ),
+        let res = match discriminant {
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(payload.try_into()?),
+            // Requests and acknowledgements decode into compact map/set state, so
+            // borrowing from the detached payload is enough here.
+            SessionMessageDiscriminants::Request => SessionMessage::Request((&payload[..]).try_into()?),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge((&payload[..]).try_into()?),
         };
 
-        src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
         Ok(Some(res))
     }
 }

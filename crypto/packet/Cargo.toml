@@ -39,6 +39,7 @@ serde = [
   "curve25519-dalek/serde",
   "k256/serde",
   "hopr-types/serde",
+  "smallvec/serde",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",
@@ -61,6 +62,7 @@ curve25519-dalek = { workspace = true }
 elliptic-curve = "0.13.8"
 generic-array = { workspace = true }
 k256 = { workspace = true, features = ["arithmetic", "ecdh", "hash2curve"] }
+smallvec = { workspace = true }
 subtle = { workspace = true }
 typenum = { workspace = true }
 

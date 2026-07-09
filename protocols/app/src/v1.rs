@@ -320,6 +320,32 @@ impl TryFrom<&[u8]> for ApplicationData {
     }
 }
 
+impl TryFrom<Box<[u8]>> for ApplicationData {
+    type Error = ApplicationLayerError;
+
+    /// Same parsing as `TryFrom<&[u8]>`, but starts from owned packet bytes so the
+    /// plaintext storage can be derived from the same allocation.
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        if value.len() >= Tag::SIZE && value.len() <= HoprPacket::PAYLOAD_SIZE {
+            let application_tag = Tag::from_be_bytes(
+                value[0..Tag::SIZE]
+                    .try_into()
+                    .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
+            );
+            let mut plain_text = Vec::from(value);
+            // Remove the tag after it has been decoded; the remaining bytes are the
+            // application payload and can reuse the owned buffer.
+            plain_text.drain(0..Tag::SIZE);
+            Ok(Self {
+                application_tag,
+                plain_text: plain_text.into_boxed_slice(),
+            })
+        } else {
+            Err(ApplicationLayerError::DecodingError("ApplicationData.size".into()))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +411,26 @@ mod tests {
 
         assert!(ApplicationData::try_from([0_u8; Tag::SIZE - 1].as_ref()).is_err());
         assert!(ApplicationData::try_from([0_u8; ApplicationData::PAYLOAD_SIZE + Tag::SIZE + 1].as_ref()).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn application_data_owned_buffer_parse_should_match_borrowed_buffer_parse() -> anyhow::Result<()> {
+        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
+        let bytes = ad_1.to_bytes();
+        let from_borrowed = ApplicationData::try_from(bytes.as_ref())?;
+        let from_owned = ApplicationData::try_from(bytes)?;
+        assert_eq!(ad_1, from_borrowed);
+        assert_eq!(ad_1, from_owned);
+
+        assert!(ApplicationData::try_from(Box::from([0_u8; Tag::SIZE - 1].as_ref())).is_err());
+        assert!(
+            ApplicationData::try_from(Box::from(
+                [0_u8; ApplicationData::PAYLOAD_SIZE + Tag::SIZE + 1].as_ref()
+            ))
+            .is_err()
+        );
 
         Ok(())
     }

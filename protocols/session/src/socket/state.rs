@@ -57,11 +57,19 @@ pub trait SocketState<const C: usize>: Send {
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
 
     /// Convenience method to dispatch a `SessionMessage` to one of the available handlers.
-    fn incoming_message(&mut self, message: &SessionMessage<C>) -> Result<(), SessionError> {
-        match &message {
-            SessionMessage::Segment(s) => self.incoming_segment(&s.id(), s.seq_flags),
-            SessionMessage::Request(r) => self.incoming_retransmission_request(r.clone()),
-            SessionMessage::Acknowledge(a) => self.incoming_acknowledged_frames(a.clone()),
+    ///
+    /// Consumes `message` so `Request`/`Acknowledge` payloads can be passed to their handlers
+    /// without cloning. If `message` was a [`Segment`], it is always handed back — regardless
+    /// of whether the dispatched handler returned an error — so the caller can still forward
+    /// it downstream.
+    fn incoming_message(&mut self, message: SessionMessage<C>) -> (Option<Segment>, Result<(), SessionError>) {
+        match message {
+            SessionMessage::Segment(s) => {
+                let result = self.incoming_segment(&s.id(), s.seq_flags);
+                (Some(s), result)
+            }
+            SessionMessage::Request(r) => (None, self.incoming_retransmission_request(r)),
+            SessionMessage::Acknowledge(a) => (None, self.incoming_acknowledged_frames(a)),
         }
     }
 }

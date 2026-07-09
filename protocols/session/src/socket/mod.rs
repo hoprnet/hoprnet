@@ -372,14 +372,16 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 .entered();
                 futures::future::ready(match packet {
                     Ok(packet) => {
-                        if let Err(error) = st_1.incoming_message(&packet) {
-                            tracing::debug!(%error, "incoming message state update failed");
-                        }
                         #[cfg(feature = "telemetry")]
                         s1.incoming_message(packet.discriminant());
 
+                        let (segment, result) = st_1.incoming_message(packet);
+                        if let Err(error) = result {
+                            tracing::debug!(%error, "incoming message state update failed");
+                        }
+
                         // Filter old frame ids to save space in the Reassembler
-                        packet.try_as_segment().filter(|s| {
+                        segment.filter(|s| {
                             let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
                             if s.frame_id <= last_emitted_id {
                                 tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
