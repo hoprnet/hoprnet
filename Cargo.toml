@@ -64,7 +64,7 @@ order = [
 ahash = "0.8.12"
 anyhow = "1.0.103"
 aquamarine = "0.6.0"
-arrayvec = { version = "0.7.7" }
+arrayvec = { version = "0.7.8" }
 assertables = "10.1.0"
 async-broadcast = "0.7.2"
 async_channel_io = "0.3.0"
@@ -79,8 +79,8 @@ bimap = "0.6.3"
 bitvec = "1.1.1"
 blokli-client = "0.29.1"
 bloomfilter = { version = "3.0.1" }
-bytesize = { version = "2.4.0", features = ["serde"] }
-bytes = "1.12.0"
+bytesize = { version = "2.4.2", features = ["serde"] }
+bytes = "1.12.1"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
 chrono = { version = "0.4.45", default-features = false, features = [
@@ -94,11 +94,11 @@ criterion = { version = "0.8.2", default-features = false, features = [
   "cargo_bench_support",
   "async_tokio",
 ] }
-crossfire = { version = "3.1.18", default-features = false }
-curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
+crossfire = { version = "3.1.19", default-features = false }
+curve25519-dalek = { version = "5.0.0", features = ["rand_core"] }
 dashmap = { version = "6.2.1", features = ["inline"] }
-elliptic-curve = "0.13.8"
-elliptic-curve-tools = "0.2.0"
+elliptic-curve = "0.14.1"
+elliptic-curve-tools = "0.3.0"
 flagset = "0.4.7"
 flume = { version = "0.12.0", default-features = false, features = ["async"] }
 futures = { version = "0.3.32", default-features = false, features = [
@@ -119,7 +119,7 @@ human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humantime-serde = "1.1.1"
 indexmap = { version = "2.14.0" }
 insta = { version = "1.48.0", features = ["yaml", "redactions"] }
-k256 = { version = "0.13.4", features = ["arithmetic", "ecdh", "hash2curve"] }
+k256 = { version = "0.14.0", features = ["arithmetic", "ecdh", "hash2curve"] }
 lazy_static = "1.5.0"
 libc = "0.2" # intentionally minor-pinned
 libp2p = { version = "0.56.0", default-features = false }
@@ -153,7 +153,7 @@ pin-project = "1.1.13"
 postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
 proc-macro-regex = "~1.1.0"
 quinn-udp = { version = "0.6.1", default-features = false }
-rand = { version = "0.10.1", features = ["thread_rng"] }
+rand = { version = "0.10.2", features = ["thread_rng"] }
 rand_distr = "0.6.0"
 rayon = "1.12.0"
 redb = "4.1.0"
@@ -165,7 +165,7 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.150"
 serde_repr = "0.1.20"
-serde-saphyr = "0.0.28"
+serde-saphyr = "0.0.29"
 serde_with = { version = "3.21.0", features = ["base64"] }
 serial_test = "3.5.0"
 smallvec = "1.15.2"
@@ -192,10 +192,10 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 typenum = "1.20.1"
 validator = { version = "0.20.0", features = ["derive"] }
-vsss-rs = { version = "5.4.0", default-features = false }
+vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
 hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-pix-conversions" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/legacy-bjj", features = [
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/update-deps", features = [
   "use-bindings",
 ] }
 hopr-utils = { version = "0.2.0", path = "utils", default-features = false }
