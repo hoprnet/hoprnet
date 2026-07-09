@@ -175,6 +175,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let me_peerid = me.to_peerid_str();
                 let next_hop_peerid = next_hop.to_peerid_str();
 
+                // Peer IDs are materialized once so the exact capture size can be
+                // reserved before writing the custom packet record.
                 let mut out = Vec::with_capacity(
                     1 + me.as_ref().len()
                         + me_peerid.len()
@@ -218,6 +220,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let me_peerid = me.to_peerid_str();
                 let next_hop_peerid = next_hop.to_peerid_str();
 
+                // Reserve the full acknowledgement record, including each fixed-size
+                // leaked acknowledgement payload.
                 let mut out = Vec::with_capacity(
                     1 + me.as_ref().len()
                         + me_peerid.len()
@@ -260,6 +264,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let me_peerid = me.to_peerid_str();
                 let sender_bytes: &[u8] = sender.as_ref();
 
+                // The final-packet record has no delimiter around the fixed-size
+                // fields, so capacity is derived from the exact serialized widths.
                 let mut out = Vec::with_capacity(
                     1 + packet_tag.len()
                         + previous_hop.as_ref().len()
@@ -307,6 +313,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let previous_hop_peerid = previous_hop.to_peerid_str();
                 let next_hop_peerid = next_hop.to_peerid_str();
 
+                // `ticket` is encoded once because both its length byte and bytes
+                // are needed in the capture representation.
                 let mut out = Vec::with_capacity(
                     1 + packet_tag.len()
                         + previous_hop.as_ref().len()
@@ -350,6 +358,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let previous_hop_peerid = previous_hop.to_peerid_str();
                 let me_peerid = me.to_peerid_str();
 
+                // Incoming acknowledgements use the same fixed acknowledgement
+                // width as the wire codec, so the record can be sized exactly.
                 let mut out = Vec::with_capacity(
                     1 + packet_tag.len()
                         + previous_hop.as_ref().len()

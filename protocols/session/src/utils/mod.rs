@@ -143,6 +143,8 @@ pub fn segment_into<T: AsRef<[u8]>, E: Extend<Segment>>(
         frame_id,
         seq_flags: seq_len,
         seq_idx: idx as u8,
+        // `data` is borrowed from the caller's frame chunk, so segment creation
+        // copies once into reference-counted storage.
         data: bytes::Bytes::copy_from_slice(data),
     }));
 

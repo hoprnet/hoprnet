@@ -182,10 +182,12 @@ where
 {
     /// Tries to encode the message into binary format and [`Tag`]
     pub fn encode(self) -> errors::Result<(Tag, Box<[u8]>)> {
+        // Most Start messages are small; grow from a compact buffer and patch
+        // the payload length once all variant-specific bytes are known.
         let mut out = Vec::with_capacity(16);
         out.push(Self::START_PROTOCOL_VERSION);
         out.push(StartProtocolDiscriminants::from(&self) as u8);
-        out.extend_from_slice(&[0, 0]); // 2-byte payload length prefix, patched in below
+        out.extend_from_slice(&[0, 0]);
 
         let payload_start = out.len();
         match self {

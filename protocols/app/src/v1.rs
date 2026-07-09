@@ -323,9 +323,8 @@ impl TryFrom<&[u8]> for ApplicationData {
 impl TryFrom<Box<[u8]>> for ApplicationData {
     type Error = ApplicationLayerError;
 
-    /// Same parsing as `TryFrom<&[u8]>`, but takes over `value`'s buffer for
-    /// [`plain_text`](ApplicationData::plain_text) instead of copying out of a borrow, since
-    /// the caller already owns it.
+    /// Same parsing as `TryFrom<&[u8]>`, but starts from owned packet bytes so the
+    /// plaintext storage can be derived from the same allocation.
     fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
         if value.len() >= Tag::SIZE && value.len() <= HoprPacket::PAYLOAD_SIZE {
             let application_tag = Tag::from_be_bytes(
@@ -334,6 +333,8 @@ impl TryFrom<Box<[u8]>> for ApplicationData {
                     .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
             );
             let mut plain_text = Vec::from(value);
+            // Remove the tag after it has been decoded; the remaining bytes are the
+            // application payload and can reuse the owned buffer.
             plain_text.drain(0..Tag::SIZE);
             Ok(Self {
                 application_tag,

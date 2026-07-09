@@ -195,7 +195,8 @@ pub struct Segment {
     pub seq_idx: SeqNum,
     /// Flags of the segment sequence (includes sequence length).
     pub seq_flags: SeqIndicator,
-    /// Data in this segment.
+    /// Data in this segment. Reference-counting lets decoded segments keep a
+    /// view into the codec buffer while they wait for frame reassembly.
     pub data: Bytes,
 }
 
@@ -284,6 +285,8 @@ impl TryFrom<&[u8]> for Segment {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        // Borrowed callers cannot share ownership with the decoded segment, so
+        // copy once and reuse the owned parser.
         Bytes::copy_from_slice(value).try_into()
     }
 }

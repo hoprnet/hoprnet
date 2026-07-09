@@ -178,6 +178,9 @@ impl<const C: usize> Encoder for SessionCodec<C> {
             }
             SessionMessage::Request(r) => {
                 let mut written = 0;
+                // Requests have a fixed-size padded wire representation. Writing
+                // directly into `dst` preserves that shape without first building
+                // a temporary Vec.
                 for (frame_id, seq_num) in r.0 {
                     if written + SegmentRequest::<C>::ENTRY_SIZE > SegmentRequest::<C>::SIZE {
                         break;
@@ -190,6 +193,8 @@ impl<const C: usize> Encoder for SessionCodec<C> {
             }
             SessionMessage::Acknowledge(a) => {
                 let mut written = 0;
+                // Acknowledgements are fixed-width as well; trailing zero frame
+                // IDs are padding and are ignored by the parser.
                 for frame_id in a.0 {
                     if written + size_of::<FrameId>() > FrameAcknowledgements::<C>::SIZE {
                         break;
@@ -250,6 +255,8 @@ impl<const C: usize> Decoder for SessionCodec<C> {
         // Read the message
         let res = match discriminant {
             SessionMessageDiscriminants::Segment => SessionMessage::Segment(payload.try_into()?),
+            // Requests and acknowledgements decode into compact map/set state, so
+            // borrowing from the detached payload is enough here.
             SessionMessageDiscriminants::Request => SessionMessage::Request((&payload[..]).try_into()?),
             SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge((&payload[..]).try_into()?),
         };

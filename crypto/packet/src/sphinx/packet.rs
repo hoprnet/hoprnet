@@ -11,8 +11,8 @@ use hopr_types::{
 use smallvec::SmallVec;
 use typenum::Unsigned;
 
-/// Typical number of intermediate hops in a HOPR path, used to size [`PartialPacket::prp_inits`]
-/// so it stays on the stack for the common case without bounding the actual path length.
+/// Inline PRP-init storage for short paths; longer paths spill to the heap without
+/// constraining route length.
 const TYPICAL_INTERMEDIATE_HOPS: usize = 3;
 
 use super::{
@@ -204,6 +204,8 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
 pub struct PartialPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
     alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
     routing_info: RoutingInfo<H>,
+    // Packet construction usually needs only a few PRP initializers, but
+    // arbitrary path lengths still have to be accepted.
     prp_inits: SmallVec<[IvKey<S::PRP>; TYPICAL_INTERMEDIATE_HOPS]>,
 }
 
