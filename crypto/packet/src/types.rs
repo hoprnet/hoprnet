@@ -256,8 +256,14 @@ impl BytesRepresentable for SurbReceiverInfo {
 }
 
 /// New-type wrapper for the PIX group element representation to provide additional functionality.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HoprPixGroupElement(pub HoprPixGroupRepr);
+
+impl std::hash::Hash for HoprPixGroupElement {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_ref().hash(state);
+    }
+}
 
 impl HoprPixGroupElement {
     /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
@@ -286,7 +292,9 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
         if value.len() != size_of::<HoprPixGroupRepr>() {
             return Err(GeneralError::ParseError("pix repr length".into()));
         }
-        Ok(Self(HoprPixGroupRepr::clone_from_slice(value)))
+        let mut arr = HoprPixGroupRepr::default();
+        arr.as_mut().copy_from_slice(value);
+        Ok(Self(arr))
     }
 }
 

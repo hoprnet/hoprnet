@@ -8,7 +8,7 @@ use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::prelude::*,
 };
-use typenum::Unsigned;
+use hybrid_array::{Array, typenum::Unsigned};
 
 use super::{
     derivation::derive_packet_tag,
@@ -253,13 +253,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     }
 
     /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
-    #[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
+    #[allow(deprecated)]
     pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
         for iv_key in self.prp_inits {
             let prp = iv_key.into_init::<S::PRP>();
             // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
             // However, it would be nicer to make PaddedPayload take P as a typenum parameter
             // and enforce this invariant at compile time.
+            #[allow(deprecated)]
             let block = crypto_traits::Block::<S::PRP>::from_mut_slice(&mut payload);
             prp.forward(block);
         }
@@ -434,8 +435,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
+        let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
+            .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
-            Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
+            &alpha_arr,
             &(node_keypair.into()),
             node_keypair.public().into(),
         )?;
@@ -446,7 +449,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.inverse(decrypted.into());
+        #[allow(deprecated)]
+        prp.inverse(crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -483,13 +487,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_secrets.into_iter().rev() {
                         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-                        prp.forward(decrypted.into());
+                        #[allow(deprecated)]
+                        prp.forward(crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
                     }
 
                     // Invert the initial encryption using the sender key
                     let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
-                    prp.inverse(decrypted.into());
+                    #[allow(deprecated)]
+                    prp.inverse(crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
                 }
 
                 // Remove all the data before the actual decrypted payload

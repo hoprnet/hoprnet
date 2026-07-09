@@ -1,12 +1,12 @@
 use std::{marker::PhantomData, ops::Mul};
 
-use generic_array::{ArrayLength, GenericArray};
 use hopr_types::crypto::prelude::*;
+use hybrid_array::{Array, ArraySize};
 
 use super::derivation::{create_kdf_instance, generate_key_iv};
 
 /// Represents a shared secret with a remote peer.
-pub type SharedSecret = SecretValue<typenum::U32>;
+pub type SharedSecret = SecretValue<hybrid_array::typenum::U32>;
 
 /// Types representing a valid non-zero scalar of an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -19,14 +19,14 @@ pub trait Scalar: Mul<Output = Self> + Sized {
 
 /// Represents the Alpha value of a certain length in the Sphinx protocol
 /// The length of the alpha value is directly dependent on the group element.
-pub type Alpha<A> = GenericArray<u8, A>;
+pub type Alpha<A> = Array<u8, A>;
 
 /// Generic additive abelian group element with an associated scalar type.
 /// It also comes with the associated Alpha value size.
 /// A group element is considered valid if it is not neutral or a torsion element of small order.
 pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Length of the Alpha value - a binary representation of the group element.
-    type AlphaLen: ArrayLength;
+    type AlphaLen: ArraySize;
 
     /// Converts the group element to a binary format suitable for representing the Alpha value.
     fn to_alpha(&self) -> Alpha<Self::AlphaLen>;

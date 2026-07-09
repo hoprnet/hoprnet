@@ -3999,11 +3999,11 @@ dependencies = [
  "curve25519-dalek 5.0.0",
  "elliptic-curve 0.14.1",
  "flagset",
- "generic-array 1.4.3",
  "hex-literal",
  "hopr-protocol-pix",
  "hopr-types 1.12.0",
  "hopr-utils",
+ "hybrid-array",
  "lazy_static",
  "mimalloc",
  "parameterized",
@@ -4016,7 +4016,6 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "tracing",
- "typenum",
 ]
 
 [[package]]

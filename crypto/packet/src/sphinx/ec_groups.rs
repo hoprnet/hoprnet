@@ -50,13 +50,13 @@ impl Scalar for k256::Scalar {
 
 #[cfg(feature = "x25519")]
 impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::MontgomeryPoint {
-    type AlphaLen = typenum::U32;
+    type AlphaLen = hybrid_array::typenum::U32;
 
-    fn to_alpha(&self) -> Alpha<typenum::U32> {
+    fn to_alpha(&self) -> Alpha<hybrid_array::typenum::U32> {
         self.0.into()
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
+    fn from_alpha(alpha: Alpha<hybrid_array::typenum::U32>) -> Result<Self> {
         Ok(curve25519_dalek::MontgomeryPoint(alpha.into()))
     }
 
@@ -72,13 +72,13 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::Montgo
 
 #[cfg(feature = "ed25519")]
 impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::EdwardsPoint {
-    type AlphaLen = typenum::U32;
+    type AlphaLen = hybrid_array::typenum::U32;
 
-    fn to_alpha(&self) -> Alpha<typenum::U32> {
+    fn to_alpha(&self) -> Alpha<hybrid_array::typenum::U32> {
         self.compress().0.into()
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
+    fn from_alpha(alpha: Alpha<hybrid_array::typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
             .ok_or(hopr_types::crypto::errors::CryptoError::InvalidInputValue("alpha"))
@@ -99,15 +99,15 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::Edward
 
 #[cfg(feature = "secp256k1")]
 impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
-    type AlphaLen = typenum::U33;
+    type AlphaLen = hybrid_array::typenum::U33;
 
-    fn to_alpha(&self) -> Alpha<typenum::U33> {
-        let mut ret = Alpha::<typenum::U33>::default();
+    fn to_alpha(&self) -> Alpha<hybrid_array::typenum::U33> {
+        let mut ret = Alpha::<hybrid_array::typenum::U33>::default();
         ret.copy_from_slice(self.to_affine().to_encoded_point(true).as_ref());
         ret
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
+    fn from_alpha(alpha: Alpha<hybrid_array::typenum::U33>) -> Result<Self> {
         EncodedPoint::from_bytes(alpha)
             .map_err(|_| CryptoError::InvalidInputValue("alpha"))
             .and_then(|ep| {
@@ -130,10 +130,11 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 // TODO: invert this, so that each SphinxSuite takes this as a type argument
 /// Default packet block size for the Sphinx protocol.
 ///
-/// Currently, 1038 bytes.
-pub type DefaultSphinxPacketSize = typenum::Sum<typenum::U1024, typenum::U14>;
+// TODO: set this back to 1038 once https://github.com/RustCrypto/hybrid-array/issues/66 is done
+/// Currently, 1024 bytes.
+pub type DefaultSphinxPacketSize = hybrid_array::typenum::U1024;
 
-pub use typenum::Unsigned;
+pub use hybrid_array::typenum::Unsigned;
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
 #[cfg(feature = "secp256k1")]
