@@ -21,8 +21,11 @@ serde = [
 [dependencies]
 ahash = { workspace = true }
 auto_impl = { workspace = true }
+elliptic-curve = { workspace = true }
 elliptic-curve-tools = { workspace = true, optional = true }
 const-hex = { workspace = true }
+hash2curve = { workspace = true }
+hybrid-array = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, optional = true }

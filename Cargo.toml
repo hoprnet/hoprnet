@@ -97,7 +97,7 @@ criterion = { version = "0.8.2", default-features = false, features = [
 crossfire = { version = "3.1.19", default-features = false }
 curve25519-dalek = { version = "5.0.0", features = ["rand_core"] }
 dashmap = { version = "6.2.1", features = ["inline"] }
-elliptic-curve = "0.14.1"
+elliptic-curve = { version = "0.14.1", features = ["arithmetic"] }
 elliptic-curve-tools = "0.3.0"
 flagset = "0.4.7"
 flume = { version = "0.12.0", default-features = false, features = ["async"] }
@@ -111,12 +111,14 @@ futures-timer = "3.0.4"
 generic-array = "1.4.3"
 halfbrown = "0.4.0"
 hashbrown = "0.17.1"
+hash2curve = "0.14.0"
 hex-literal = "1.1.0"
 hickory-resolver = { version = "0.26.1", default-features = false, features = [
   "system-config",
 ] }
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humantime-serde = "1.1.1"
+hybrid-array = "0.4.13"
 indexmap = { version = "2.14.0" }
 insta = { version = "1.48.0", features = ["yaml", "redactions"] }
 k256 = { version = "0.14.0", features = ["arithmetic", "ecdh", "hash2curve"] }

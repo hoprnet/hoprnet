@@ -179,7 +179,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         pseudonym: &S::Pseudonym,
         ssa_index: SsaIndex,
     ) -> errors::Result<SsaCommitment<S>, S::Pseudonym> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+        let mut rng = hopr_types::crypto_random::rng();
 
         // Generate sub-secrets for each polynomial
         let sub_secrets = (0..self.cfg.polynomials_per_ssa)
@@ -197,7 +197,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
 
         // Generate polynomial and verifier for each sub-secret
         let (raw_polynomials, raw_verifiers): (Vec<RawPolynomial<S>>, Vec<RawPolynomialVerifier<S>>) = sub_secrets_iter
-            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold as usize, rng))
+            .map(|secret| new_polynomial_with_verifier::<S>(secret, self.cfg.threshold as usize, hopr_types::crypto_random::rng()))
             .collect::<errors::Result<Vec<(RawPolynomial<S>, RawPolynomialVerifier<S>)>, S::Pseudonym>>()?
             .into_iter()
             .unzip();

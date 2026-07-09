@@ -11,14 +11,12 @@ use vsss_rs::{
     elliptic_curve::{
         Curve, CurveArithmetic, PrimeCurve, PrimeField,
         consts::U256,
-        generic_array::{
-            ArrayLength,
-            typenum::{IsLess, IsLessOrEqual},
-        },
         group::cofactor::CofactorGroup,
-        hash2curve::{ExpandMsgXmd, FromOkm, GroupDigest},
     },
 };
+use hash2curve::{hash_to_scalar, ExpandMsgXmd, GroupDigest, MapToCurve};
+use hybrid_array::ArraySize;
+use hybrid_array::typenum::{IsLess, IsLessOrEqual};
 
 pub mod ack_verify;
 pub mod errors;
@@ -55,13 +53,13 @@ pub const MAX_POLY_THRESHOLD: u16 = 4096;
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec: Send + Sync + 'static
 where
-    PixScalar<Self>: PrimeField + FromOkm,
+    PixScalar<Self>: PrimeField,
     PixGroup<Self>: Group<Scalar = PixScalar<Self>> + GroupEncoding + Default + CofactorGroup,
     PixGroupRepr<Self>: std::fmt::Debug + PartialEq + Eq,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLess<U256>,
     <PixDigest<Self> as OutputSizeUser>::OutputSize: IsLessOrEqual<<PixDigest<Self> as BlockSizeUser>::BlockSize>,
     <Self::Curve as Curve>::FieldBytesSize: Add<SsaPolyIndexPrefixSize>,
-    <<Self::Curve as Curve>::FieldBytesSize as Add<SsaPolyIndexPrefixSize>>::Output: ArrayLength<u8>,
+    <<Self::Curve as Curve>::FieldBytesSize as Add<SsaPolyIndexPrefixSize>>::Output: ArraySize,
 {
     /// Prime order elliptic curve use for commitments.
     type Curve: PrimeCurve + CurveArithmetic + GroupDigest;
@@ -89,8 +87,9 @@ where
     where
         Self: Sized,
     {
-        Ok(<Self::Curve as GroupDigest>::hash_to_scalar::<
+        Ok(hash_to_scalar::<Self::Curve,
             ExpandMsgXmd<Self::Digest>,
+            _
         >(
             &[
                 msg.as_ref(),
@@ -107,7 +106,7 @@ where
                 .as_bytes(),
                 Self::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
             ],
-        )?)
+        ).map_err(|_| errors::PixError::InvalidInput)?)
     }
 
     /// Converts `PixGroup` to an address that can be deposited to.
@@ -302,7 +301,7 @@ pub(crate) mod tests {
     impl PixSpec for TestSpec {
         type AddressPrivateKey = ChainKeypair;
         type Cipher = hopr_types::crypto::primitives::ChaCha20;
-        type Curve = k256::Secp256k1;
+        type Curve = hopr_types::crypto::primitives::Secp256k1;
         type DepositAddress = Address;
         type Digest = hopr_types::crypto::primitives::Sha3_256;
         type Pseudonym = SimplePseudonym;
@@ -346,7 +345,7 @@ pub(crate) mod tests {
 
     #[test]
     fn ssa_share_verifier_must_correspond_to_standard() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+        let mut rng = rand::rng();
         let secret = k256::Scalar::random(&mut rng);
 
         let spi = SsaPolynomialId::new(
@@ -382,7 +381,7 @@ pub(crate) mod tests {
 
     #[test]
     fn ssa_share_verifier_must_be_convertible_to_and_from_serializable_commitments() -> anyhow::Result<()> {
-        let mut rng = vsss_rs::elliptic_curve::rand_core::OsRng;
+        let mut rng = rand::rng();
         let secret = k256::Scalar::random(&mut rng);
 
         let spi = SsaPolynomialId::new(

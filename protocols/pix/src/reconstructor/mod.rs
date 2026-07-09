@@ -6,13 +6,9 @@ use hopr_types::{
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
-use vsss_rs::elliptic_curve::{Field, ops::MulByGenerator};
+use elliptic_curve::{Field};
 
-use crate::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
-};
+use crate::{CoefficientIndex, ExitAcknowledgementShareProcessor, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId, Group};
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
@@ -179,7 +175,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::InvalidInput);
         }
 
-        let exit_commitment_secret = PixScalar::<S>::random(vsss_rs::elliptic_curve::rand_core::OsRng);
+        let exit_commitment_secret = PixScalar::<S>::random(&mut hopr_types::crypto_random::rng());
         let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
 
         self.commitment_builder
@@ -414,7 +410,7 @@ mod tests {
         let partial_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
 
         let peer = OffchainKeypair::random();
-        let nonce = k256::Scalar::random(&mut vsss_rs::elliptic_curve::rand_core::OsRng);
+        let nonce = k256::Scalar::random(&mut hopr_types::crypto_random::rng());
 
         reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
 
