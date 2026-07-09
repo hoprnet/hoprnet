@@ -195,7 +195,7 @@ validator = { version = "0.20.0", features = ["derive"] }
 vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
 hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-pix-conversions" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/update-deps", features = [
+hopr-types = { version = "1.11.2", features = [
   "use-bindings",
 ] }
 hopr-utils = { version = "0.2.0", path = "utils", default-features = false }
