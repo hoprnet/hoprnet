@@ -396,7 +396,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
-                .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data.as_ref())
+                .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data)
                     .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                     .ok()
                     .map(|data| (sender, ApplicationDataIn {
