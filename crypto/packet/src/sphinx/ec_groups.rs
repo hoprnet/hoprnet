@@ -3,11 +3,10 @@ use hopr_types::crypto::errors::Result;
 use {
     elliptic_curve::{
         Group,
-        ops::MulByGenerator,
-        sec1::{FromEncodedPoint, ToEncodedPoint},
+        sec1::{FromSec1Point, Sec1Point, ToSec1Point},
     },
     hopr_types::crypto::prelude::CryptoError,
-    k256::{AffinePoint, EncodedPoint},
+    k256::AffinePoint,
 };
 
 use super::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
@@ -103,15 +102,15 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 
     fn to_alpha(&self) -> Alpha<hybrid_array::typenum::U33> {
         let mut ret = Alpha::<hybrid_array::typenum::U33>::default();
-        ret.copy_from_slice(self.to_affine().to_encoded_point(true).as_ref());
+        ret.copy_from_slice(self.to_affine().to_sec1_point(true).as_ref());
         ret
     }
 
     fn from_alpha(alpha: Alpha<hybrid_array::typenum::U33>) -> Result<Self> {
-        EncodedPoint::from_bytes(alpha)
+        Sec1Point::<k256::Secp256k1>::from_bytes(alpha)
             .map_err(|_| CryptoError::InvalidInputValue("alpha"))
             .and_then(|ep| {
-                AffinePoint::from_encoded_point(&ep)
+                AffinePoint::from_sec1_point(&ep)
                     .into_option()
                     .ok_or(CryptoError::InvalidInputValue("alpha"))
             })

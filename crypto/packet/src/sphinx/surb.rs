@@ -263,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
+    fn surb_serialize_deserialize() -> anyhow::Result<()> {
         let (surb_1, _) = generate_surbs::<CurrentSuite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
 
         let surb_1_enc = surb_1.into_boxed();

@@ -4004,6 +4004,7 @@ dependencies = [
  "hopr-types 2.0.0",
  "hopr-utils",
  "hybrid-array",
+ "k256 0.14.0",
  "lazy_static",
  "mimalloc",
  "parameterized",
