@@ -8,7 +8,7 @@ use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
     primitive::prelude::*,
 };
-use typenum::Unsigned;
+use hopr_types::primitive::typenum::Unsigned;
 
 use super::{
     derivation::derive_packet_tag,
@@ -260,7 +260,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
             // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
             // However, it would be nicer to make PaddedPayload take P as a typenum parameter
             // and enforce this invariant at compile time.
-            let block = crypto_traits::Block::<S::PRP>::from_mut_slice(&mut payload);
+            let block = hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(&mut payload);
             prp.forward(block);
         }
 
@@ -434,6 +434,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
+        #[allow(deprecated)]
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
@@ -446,7 +447,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.inverse(decrypted.into());
+        #[allow(deprecated)]
+        prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -483,13 +485,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_secrets.into_iter().rev() {
                         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-                        prp.forward(decrypted.into());
+                        #[allow(deprecated)]
+                        prp.forward(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
                     }
 
                     // Invert the initial encryption using the sender key
                     let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
-                    prp.inverse(decrypted.into());
+                    #[allow(deprecated)]
+                    prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
                 }
 
                 // Remove all the data before the actual decrypted payload
