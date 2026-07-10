@@ -6,9 +6,11 @@ use std::{
 
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
-    primitive::prelude::*,
+    primitive::{
+        hybrid_array::{Array, typenum::Unsigned},
+        prelude::*,
+    },
 };
-use hybrid_array::{Array, typenum::Unsigned};
 
 use super::{
     derivation::derive_packet_tag,

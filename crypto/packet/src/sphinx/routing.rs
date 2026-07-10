@@ -11,9 +11,8 @@ use hopr_types::{
         types::Pseudonym,
     },
     crypto_random::random_fill,
-    primitive::prelude::*,
+    primitive::{hybrid_array::typenum::Unsigned, prelude::*},
 };
-use hybrid_array::typenum::Unsigned;
 
 use super::{
     derivation::{generate_key, generate_key_iv},
@@ -428,7 +427,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(&header[0..H::HEADER_LEN]);
     #[allow(deprecated)]
-    let tag = hybrid_array::Array::<u8, <H::UH as crypto_traits::BlockSizeUser>::BlockSize>::from_slice(
+    let tag = hopr_types::primitive::hybrid_array::Array::<u8, <H::UH as crypto_traits::BlockSizeUser>::BlockSize>::from_slice(
         &header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE],
     );
     uh.verify(tag).map_err(|_| CryptoError::TagMismatch)?;

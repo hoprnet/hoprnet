@@ -4,18 +4,22 @@ use std::{
     ops::Add,
 };
 
-use elliptic_curve::{Curve, PrimeField};
 use hopr_types::{
     crypto::{
-        crypto_traits::{self, KeyIvInit, StreamCipher},
+        crypto_traits::{
+            self, KeyIvInit, StreamCipher,
+            elliptic_curve::{Curve, PrimeField},
+        },
         prelude::HalfKey,
         primitives::Blake3,
     },
-    primitive::prelude::{BytesRepresentable, GeneralError},
-};
-use hybrid_array::{
-    Array, ArraySize,
-    typenum::{Sum, U, Unsigned},
+    primitive::{
+        hybrid_array::{
+            Array, ArraySize,
+            typenum::{Sum, U, Unsigned},
+        },
+        prelude::{BytesRepresentable, GeneralError},
+    },
 };
 
 use crate::{

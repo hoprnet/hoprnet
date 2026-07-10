@@ -1,17 +1,21 @@
 use std::ops::{Add, Mul};
 
-use elliptic_curve::ops::Reduce;
-use hash2curve::{ExpandMsgXmd, GroupDigest, MapToCurve, hash_to_scalar};
-use hopr_types::crypto::{
-    crypto_traits::{BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher},
-    prelude::Pseudonym,
+use hopr_types::{
+    crypto::{
+        crypto_traits::{
+            BlockSizeUser, FixedOutput, HashMarker, KeyIvInit, OutputSizeUser, StreamCipher,
+            elliptic_curve::ops::Reduce,
+            hash2curve::{ExpandMsgXmd, GroupDigest, MapToCurve, hash_to_scalar},
+        },
+        prelude::Pseudonym,
+    },
+    primitive::hybrid_array::{
+        Array, ArraySize,
+        typenum::{IsGreaterOrEqual, IsLess, IsLessOrEqual, NonZero, Prod, True, U2},
+    },
 };
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
-use hybrid_array::{
-    Array, ArraySize,
-    typenum::{IsGreaterOrEqual, IsLess, IsLessOrEqual, NonZero, Prod, True, U2},
-};
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
     elliptic_curve::{Curve, CurveArithmetic, PrimeCurve, PrimeField, consts::U256, group::cofactor::CofactorGroup},
@@ -284,7 +288,10 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 pub(crate) mod tests {
     use anyhow::Context;
     use hopr_types::{
-        crypto::prelude::{ChainKeypair, Keypair, PublicKey, SimplePseudonym},
+        crypto::{
+            crypto_traits,
+            prelude::{ChainKeypair, Keypair, PublicKey, Secp256k1, SimplePseudonym},
+        },
         primitive::prelude::Address,
     };
     use vsss_rs::{
@@ -348,7 +355,7 @@ pub(crate) mod tests {
     #[test]
     fn ssa_share_verifier_must_correspond_to_standard() -> anyhow::Result<()> {
         let mut rng = rand::rng();
-        let secret = k256::Scalar::random(&mut rng);
+        let secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut rng);
 
         let spi = SsaPolynomialId::new(
             SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
@@ -384,7 +391,7 @@ pub(crate) mod tests {
     #[test]
     fn ssa_share_verifier_must_be_convertible_to_and_from_serializable_commitments() -> anyhow::Result<()> {
         let mut rng = rand::rng();
-        let secret = k256::Scalar::random(&mut rng);
+        let secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut rng);
 
         let spi = SsaPolynomialId::new(
             SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),

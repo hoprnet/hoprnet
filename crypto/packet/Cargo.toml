@@ -28,18 +28,14 @@ default = ["rayon", "ed25519", "bjj"]
 all-benchmarks = []
 
 rayon = ["hopr-utils/parallelize-rayon"]
-ed25519 = ["dep:curve25519-dalek"]
-x25519 = ["dep:curve25519-dalek"]
-secp256k1 = ["dep:k256"]
+ed25519 = []
+x25519 = []
+secp256k1 = []
 bjj = []
 serde = [
   "dep:serde",
   "dep:serde_bytes",
   "flagset/serde",
-  "k256?/serde",
-  "hybrid-array/serde",
-  "elliptic-curve/serde",
-  "curve25519-dalek?/serde",
   "hopr-protocol-pix/serde",
   "hopr-types/serde",
 ]
@@ -53,7 +49,6 @@ allocator-jemalloc = [
 [dependencies]
 const-hex = { workspace = true }
 flagset = { workspace = true }
-k256 = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
@@ -61,9 +56,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 bimap = { workspace = true }
-curve25519-dalek = { workspace = true, optional = true }
-elliptic-curve = { workspace = true }
-hybrid-array = { workspace = true, features = ["extra-sizes"] }
 subtle = { workspace = true }
 
 hopr-protocol-pix = { workspace = true }

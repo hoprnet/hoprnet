@@ -1,7 +1,9 @@
 use std::{marker::PhantomData, ops::Mul};
 
-use hopr_types::crypto::prelude::*;
-use hybrid_array::{Array, ArraySize};
+use hopr_types::{
+    crypto::prelude::*,
+    primitive::hybrid_array::{self, Array, ArraySize},
+};
 
 use super::derivation::{create_kdf_instance, generate_key_iv};
 

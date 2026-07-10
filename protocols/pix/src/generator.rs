@@ -311,7 +311,10 @@ pub(crate) fn transpose_commitments<S: PixSpec>(
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::{crypto::types::SimplePseudonym, crypto_random::Randomizable};
+    use hopr_types::{
+        crypto::{crypto_traits, prelude::Secp256k1, types::SimplePseudonym},
+        crypto_random::Randomizable,
+    };
     use vsss_rs::{FeldmanVerifierSet, ReadableShareSet};
 
     use super::*;
@@ -434,7 +437,7 @@ mod tests {
         let verifiers = c.reconstruct_verifiers().map_err(anyhow::Error::msg)?;
         let vs = verifiers.into_iter().map(|v| v.poly_commitment).collect::<Vec<_>>();
 
-        let mut recovered_secret = k256::Scalar::default();
+        let mut recovered_secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::default();
         for v in vs.iter().take(cfg.polynomials_per_ssa as usize) {
             let mut shares = Vec::new();
             for _ in 0..(cfg.threshold as usize + cfg.surplus_shares) {
@@ -445,7 +448,9 @@ mod tests {
                     .ok_or(anyhow::anyhow!("failed to generate share"))?;
                 let complete_share = DefaultShare {
                     identifier: TestSpec::msg_to_scalar(&g.id, x)?.into(),
-                    value: k256::Scalar::from_repr(g.share.0).unwrap().into(),
+                    value: crypto_traits::elliptic_curve::Scalar::<Secp256k1>::from_repr(g.share.0)
+                        .unwrap()
+                        .into(),
                 };
 
                 v.verify_share(&complete_share)
@@ -457,7 +462,7 @@ mod tests {
 
         assert_eq!(
             orig_commitment.to_affine(),
-            (k256::ProjectivePoint::GENERATOR * recovered_secret).to_affine()
+            (crypto_traits::elliptic_curve::ProjectivePoint::<Secp256k1>::GENERATOR * recovered_secret).to_affine()
         );
 
         Ok(())

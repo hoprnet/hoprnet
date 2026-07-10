@@ -1,9 +1,11 @@
 mod utils;
 
 use ahash::HashSetExt;
-use elliptic_curve::Field;
 use hopr_types::{
-    crypto::prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
+    crypto::{
+        crypto_traits::elliptic_curve::Field,
+        prelude::{HalfKey, HalfKeyChallenge, OffchainPublicKey},
+    },
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
@@ -325,8 +327,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 mod tests {
     use std::collections::HashMap;
 
-    use hopr_types::{crypto::prelude::*, crypto_random::Randomizable};
-    use k256::elliptic_curve::Field;
+    use hopr_types::{
+        crypto::{crypto_traits, prelude::*},
+        crypto_random::Randomizable,
+    };
+    use vsss_rs::elliptic_curve::Field;
 
     use super::*;
     use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShare, tests::TestSpec};
@@ -414,7 +419,7 @@ mod tests {
         let partial_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
 
         let peer = OffchainKeypair::random();
-        let nonce = k256::Scalar::random(&mut hopr_types::crypto_random::rng());
+        let nonce = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut hopr_types::crypto_random::rng());
 
         reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
 

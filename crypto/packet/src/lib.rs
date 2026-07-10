@@ -154,7 +154,7 @@ pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePs
 /// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
 /// itself as another generic argument.
 #[cfg(not(feature = "bjj"))]
-pub type HoprPixScalar = K256Scalar;
+pub type HoprPixScalar = crypto_traits::elliptic_curve::Scalar<Secp256k1>;
 #[cfg(feature = "bjj")]
 pub type HoprPixScalar = BabyJubJubScalar;
 
@@ -169,7 +169,7 @@ pub type HoprPixScalar = BabyJubJubScalar;
 /// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
 /// projection is distinct from the wrapper type.
 #[cfg(not(feature = "bjj"))]
-pub type HoprPixGroupRepr = K256CompressedPoint;
+pub type HoprPixGroupRepr = crypto_traits::elliptic_curve::array::Array<u8, crypto_traits::elliptic_curve::consts::U33>;
 #[cfg(feature = "bjj")]
 pub type HoprPixGroupRepr = BabyJubJubCompressedPoint;
 

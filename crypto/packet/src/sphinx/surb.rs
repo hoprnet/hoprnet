@@ -1,7 +1,13 @@
 use std::fmt::Formatter;
 
-use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, primitive::prelude::*};
-use hybrid_array::{Array, typenum::Unsigned};
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::Randomizable,
+    primitive::{
+        hybrid_array::{Array, typenum::Unsigned},
+        prelude::*,
+    },
+};
 use subtle::ConstantTimeEq;
 
 use super::{
