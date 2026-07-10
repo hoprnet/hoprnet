@@ -1858,9 +1858,9 @@ dependencies = [
 
 [[package]]
 name = "c-kzg"
-version = "2.1.7"
+version = "2.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6648ed1e4ea8e8a1a4a2c78e1cda29a3fd500bc622899c340d8525ea9a76b24a"
+checksum = "38d04308254695569fdb9bfe3bacc1c91837a670d0806605eb82d63748fbd3a6"
 dependencies = [
  "blst",
  "cc",
@@ -4255,7 +4255,6 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "flagset",
- "generic-array 0.14.7",
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-protocol-pix",
@@ -4592,7 +4591,7 @@ dependencies = [
 [[package]]
 name = "hopr-types"
 version = "2.0.0"
-source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Fhybrid-array#00b2c59f8db766ee33d65f269de17439867e78b1"
+source = "git+https://github.com/hoprnet/hopr-types?branch=lukas%2Fhybrid-array#88e650d0b27a87a19827d43fa8f14877fd9cb656"
 dependencies = [
  "aes 0.9.1",
  "anyhow",

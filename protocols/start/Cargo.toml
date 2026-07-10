@@ -27,6 +27,5 @@ hopr-protocol-pix = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-generic-array = "0.14"
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["crypto"] }

@@ -108,7 +108,6 @@ futures = { version = "0.3.32", default-features = false, features = [
 futures-concurrency = "7.7.1"
 futures-time = "3.1.0"
 futures-timer = "3.0.4"
-generic-array = "1.4.3"
 halfbrown = "0.4.0"
 hashbrown = "0.17.1"
 hash2curve = "0.14.0"
