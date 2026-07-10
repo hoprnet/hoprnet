@@ -106,7 +106,10 @@ impl GroupElement<elliptic_curve::Scalar<Secp256k1>> for elliptic_curve::Project
 
     fn to_alpha(&self) -> Alpha<hopr_types::primitive::typenum::U33> {
         let mut ret = Alpha::<hopr_types::primitive::typenum::U33>::default();
-        ret.copy_from_slice(self.to_affine().to_sec1_point(true).as_ref());
+        // Copy only if the point is not the identity, we do not care here about constant-time here.
+        if !bool::from(self.is_identity()) {
+            ret.copy_from_slice(self.to_affine().to_sec1_point(true).as_ref());
+        }
         ret
     }
 
