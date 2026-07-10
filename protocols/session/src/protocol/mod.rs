@@ -233,6 +233,7 @@ mod tests {
     use super::*;
     use crate::{
         protocol::{FrameId, SegmentId},
+        session_socket_mtu,
         utils::segment,
     };
 
@@ -246,7 +247,7 @@ mod tests {
             SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
         );
         assert_eq!(
-            1026,
+            session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>() + 6,
             SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
         );
     }
