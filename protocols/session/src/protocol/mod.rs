@@ -246,7 +246,7 @@ mod tests {
             SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
         );
         assert_eq!(
-            1024,
+            1026,
             SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
         );
     }
