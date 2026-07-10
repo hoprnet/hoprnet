@@ -61,7 +61,7 @@ tracing = { workspace = true }
 bimap = { workspace = true }
 curve25519-dalek = { workspace = true }
 elliptic-curve = { workspace = true }
-hybrid-array = { workspace = true }
+hybrid-array = { workspace = true, features = ["extra-sizes"] }
 subtle = { workspace = true }
 
 hopr-protocol-pix = { workspace = true }

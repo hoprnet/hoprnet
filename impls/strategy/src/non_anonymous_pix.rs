@@ -101,7 +101,7 @@ where
                 if let Err(error) = self
                     .node
                     .chain_api()
-                    .withdraw(target_deposit, &new_deposit_address.address.into())
+                    .withdraw(target_deposit, &new_deposit_address.address.try_into()?)
                     .and_then(identity)
                     .await
                 {
@@ -115,7 +115,7 @@ where
 
                 let target_deposit = self.cfg.price_per_byte * deposit_address_recv.quota;
                 let node_clone = self.node.clone();
-                let deposit_addr: Address = deposit_address_recv.address.into();
+                let deposit_addr: Address = deposit_address_recv.address.try_into()?;
 
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
 
@@ -394,8 +394,7 @@ mod tests {
         let quota = 100_u64;
         let target_deposit = price_per_byte * quota; // 100 wxHOPR
 
-        let deposit_address_bytes = [0x99u8; 32];
-        let deposit_addr = Address::from(PixDepositAddress(deposit_address_bytes));
+        let deposit_addr: Address = [0x99u8; 20].into();
 
         let (tx, mut rx) = mpsc::channel::<(hopr_api::node::PixAddressId, HoprBalance)>(1);
 
@@ -430,7 +429,7 @@ mod tests {
 
         let event = PixEvent::DepositAddressReceived(PixDepositAddressReceived {
             id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
-            address: PixDepositAddress(deposit_address_bytes),
+            address: deposit_addr.into(),
             quota,
             deposit_updated: Some(tx),
         });
@@ -467,7 +466,7 @@ mod tests {
         let max_ssa_allocation = HoprBalance::new_base(100);
         let quota = 20_u64;
 
-        let deposit_address_bytes = [0x42u8; 32];
+        let deposit_address: Address = [0x42u8; 20].into();
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
@@ -492,12 +491,12 @@ mod tests {
         let cfg = NonAnonymousPixStrategyConfig {
             price_per_byte,
             max_ssa_allocation,
-            max_deposit_tracking_time: std::time::Duration::from_secs(5),
+            max_deposit_tracking_time: Duration::from_secs(5),
         };
 
         let strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: std::time::Duration::from_secs(60),
+            interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
         };
 
@@ -508,7 +507,7 @@ mod tests {
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
             id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
-            address: hopr_api::node::PixDepositAddress(deposit_address_bytes),
+            address: deposit_address.into(),
             quota,
         });
 
@@ -527,7 +526,7 @@ mod tests {
         );
 
         let deposit_balance = strategy
-            .get_balance(Address::from(hopr_api::node::PixDepositAddress(deposit_address_bytes)))
+            .get_balance(deposit_address)
             .await
             .context("get deposit address balance")?;
         assert_eq!(
@@ -570,18 +569,18 @@ mod tests {
         let cfg = NonAnonymousPixStrategyConfig {
             price_per_byte,
             max_ssa_allocation,
-            max_deposit_tracking_time: std::time::Duration::from_secs(5),
+            max_deposit_tracking_time: Duration::from_secs(5),
         };
 
         let strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: std::time::Duration::from_secs(60),
+            interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::new(chain_connector))),
         };
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
             id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
-            address: hopr_api::node::PixDepositAddress([0x42u8; 32]),
+            address: Address::from([0x42u8; 20]).into(),
             quota,
         });
 
@@ -642,7 +641,7 @@ mod tests {
 
         let strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: std::time::Duration::from_secs(60),
+            interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
         };
 
@@ -714,9 +713,9 @@ mod tests {
             NonAnonymousPixStrategyConfig {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
-                max_deposit_tracking_time: std::time::Duration::from_secs(60),
+                max_deposit_tracking_time: Duration::from_secs(60),
             },
-            std::time::Duration::from_secs(60),
+            Duration::from_secs(60),
         )
         .build(node);
 

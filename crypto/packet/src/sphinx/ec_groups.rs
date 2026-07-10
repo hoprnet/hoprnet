@@ -130,9 +130,8 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 // TODO: invert this, so that each SphinxSuite takes this as a type argument
 /// Default packet block size for the Sphinx protocol.
 ///
-// TODO: set this back to 1038 once https://github.com/RustCrypto/hybrid-array/issues/66 is done
-/// Currently, 1024 bytes.
-pub type DefaultSphinxPacketSize = hybrid_array::typenum::U1024;
+/// Currently, 1040 bytes.
+pub type DefaultSphinxPacketSize = hybrid_array::sizes::U1040;
 
 pub use hybrid_array::typenum::Unsigned;
 
