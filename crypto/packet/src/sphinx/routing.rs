@@ -11,9 +11,8 @@ use hopr_types::{
         types::Pseudonym,
     },
     crypto_random::random_fill,
-    primitive::prelude::*,
+    primitive::{prelude::*, typenum::Unsigned},
 };
-use hopr_types::primitive::typenum::Unsigned;
 
 use super::{
     derivation::{generate_key, generate_key_iv},

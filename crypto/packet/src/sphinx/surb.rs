@@ -1,8 +1,11 @@
 use std::fmt::Formatter;
 
-use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, primitive::prelude::*};
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::Randomizable,
+    primitive::{prelude::*, typenum::Unsigned},
+};
 use subtle::ConstantTimeEq;
-use hopr_types::primitive::typenum::Unsigned;
 
 use super::{
     routing::{RoutingInfo, SphinxHeaderSpec},

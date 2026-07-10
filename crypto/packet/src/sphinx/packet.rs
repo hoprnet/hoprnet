@@ -6,9 +6,8 @@ use std::{
 
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
-    primitive::prelude::*,
+    primitive::{prelude::*, typenum::Unsigned},
 };
-use hopr_types::primitive::typenum::Unsigned;
 
 use super::{
     derivation::derive_packet_tag,
@@ -448,7 +447,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         let decrypted = self.payload_mut();
         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
         #[allow(deprecated)]
-        prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
+        prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(
+            decrypted,
+        ));
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -486,14 +487,18 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     for secret in local_surb.shared_secrets.into_iter().rev() {
                         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
                         #[allow(deprecated)]
-                        prp.forward(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
+                        prp.forward(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(
+                            decrypted,
+                        ));
                     }
 
                     // Invert the initial encryption using the sender key
                     let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
                     #[allow(deprecated)]
-                    prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(decrypted));
+                    prp.inverse(hopr_types::crypto::crypto_traits::Block::<S::PRP>::from_mut_slice(
+                        decrypted,
+                    ));
                 }
 
                 // Remove all the data before the actual decrypted payload

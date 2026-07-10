@@ -1,4 +1,8 @@
 use hopr_types::crypto::errors::Result;
+#[cfg(feature = "x25519")]
+use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
+#[cfg(any(feature = "x25519", feature = "ed25519"))]
+use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity};
 #[cfg(feature = "secp256k1")]
 use {
     hopr_types::crypto::crypto_traits::elliptic_curve::{
@@ -8,12 +12,6 @@ use {
     },
     hopr_types::crypto::prelude::{CryptoError, Secp256k1},
 };
-#[cfg(any(feature = "x25519", feature = "ed25519"))]
-use hopr_types::crypto::primitives::{
-    Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity,
-};
-#[cfg(feature = "x25519")]
-use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
 
 use super::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
@@ -191,8 +189,8 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[test]
     fn test_extract_key_from_group_element() {
-        use hopr_types::crypto::crypto_traits::elliptic_curve;
-        use hopr_types::crypto::prelude::Secp256k1;
+        use hopr_types::crypto::{crypto_traits::elliptic_curve, prelude::Secp256k1};
+
         use super::super::shared_keys::GroupElement;
 
         let salt = [0xde, 0xad, 0xbe, 0xef];
@@ -208,8 +206,8 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[test]
     fn test_expand_key_from_group_element() {
-        use hopr_types::crypto::crypto_traits::elliptic_curve;
-        use hopr_types::crypto::prelude::Secp256k1;
+        use hopr_types::crypto::{crypto_traits::elliptic_curve, prelude::Secp256k1};
+
         use super::super::shared_keys::GroupElement;
 
         let salt = [0xde, 0xad, 0xbe, 0xef];
