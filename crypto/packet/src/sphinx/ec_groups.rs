@@ -161,6 +161,7 @@ impl GroupElement<Secp256k1Scalar> for Secp256k1Point {
     type AlphaLen = hopr_types::primitive::typenum::U33;
 
     fn to_alpha(&self) -> Alpha<hopr_types::primitive::typenum::U33> {
+        debug_assert!(self.is_valid(), "to_alpha called on identity point");
         let mut ret = Alpha::<hopr_types::primitive::typenum::U33>::default();
         // Copy only if the point is not the identity, we do not care here about constant-time here.
         if !bool::from(self.0.is_identity()) {
