@@ -433,6 +433,17 @@ fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationE
     }
 }
 
+fn validate_surb_balance_notify_period(value: &Duration) -> Result<(), ValidationError> {
+    // `custom` on an `Option` field skips `None` and passes the inner value on `Some`.
+    if *value >= Duration::from_secs(1) {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "SURB balance notify period must be at least 1 second",
+        ))
+    }
+}
+
 /// Global configuration of Sessions and the Session manager.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
@@ -511,10 +522,14 @@ pub struct SessionGlobalConfig {
     /// send reply data.
     ///
     /// Default is 60 seconds. Set to `null` to disable; minimum effective period is 1 second.
+    #[validate(custom(function = "validate_surb_balance_notify_period"))]
     #[default(default_session_surb_balance_notify_period())]
     #[cfg_attr(
         feature = "serde",
-        serde(default = "default_session_surb_balance_notify_period", with = "humantime_serde")
+        serde(
+            default = "default_session_surb_balance_notify_period",
+            with = "humantime_serde::option"
+        )
     )]
     pub surb_balance_notify_period: Option<Duration>,
 
