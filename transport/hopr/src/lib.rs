@@ -349,7 +349,7 @@ where
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
                 // Periodic absolute correction of the Entry's SURB buffer estimate;
                 // without it, cumulative packet loss silently starves the Exit of SURBs.
-                surb_balance_notify_period: SessionManagerConfig::default().surb_balance_notify_period,
+                surb_balance_notify_period: cfg.session.surb_balance_notify_period,
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 ..Default::default()

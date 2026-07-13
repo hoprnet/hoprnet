@@ -10,7 +10,9 @@ use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
+use hopr_transport_session::{
+    MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION, MIN_SURB_BUFFER_NOTIFICATION_PERIOD,
+};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
@@ -381,8 +383,14 @@ const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_secs(5
 
 const DEFAULT_MAXIMUM_MANAGED_SESSIONS: usize = 100;
 
+const DEFAULT_SURB_BALANCE_NOTIFY_PERIOD: Option<Duration> = Some(Duration::from_secs(60));
+
 fn default_session_balancer_buffer_duration() -> Duration {
     DEFAULT_SESSION_BALANCER_BUFFER_DURATION
+}
+
+fn default_surb_balance_notify_period() -> Option<Duration> {
+    DEFAULT_SURB_BALANCE_NOTIFY_PERIOD
 }
 
 fn default_session_establish_max_retries() -> usize {
@@ -426,6 +434,15 @@ fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationE
         Ok(())
     } else {
         Err(ValidationError::new("minmum SURB buffer duration is too low"))
+    }
+}
+
+fn validate_surb_balance_notify_period(value: &Option<Duration>) -> Result<(), ValidationError> {
+    match value {
+        Some(period) if *period < MIN_SURB_BUFFER_NOTIFICATION_PERIOD => {
+            Err(ValidationError::new("SURB balance notify period is too low"))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -500,6 +517,23 @@ pub struct SessionGlobalConfig {
         serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
     )]
     pub balancer_minimum_surb_buffer_duration: Duration,
+
+    /// Period at which the Session recipient (Exit) notifies the Session initiator (Entry)
+    /// about its actual SURB balance.
+    ///
+    /// This is the only absolute correction of the Entry's dead-reckoned estimate of the
+    /// Exit's SURB buffer. Without it, packets lost in either direction permanently inflate
+    /// the Entry's estimate, until the Exit silently runs out of SURBs and can no longer
+    /// send any reply data.
+    ///
+    /// Default is 60 seconds, minimum is 1 second. Set to `None` to disable the notifications.
+    #[validate(custom(function = "validate_surb_balance_notify_period"))]
+    #[default(default_surb_balance_notify_period())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_surb_balance_notify_period", with = "humantime_serde")
+    )]
+    pub surb_balance_notify_period: Option<Duration>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
