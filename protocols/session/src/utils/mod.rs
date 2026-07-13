@@ -9,7 +9,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::StreamExt;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::{
@@ -17,18 +16,18 @@ use crate::{
     protocol::{FrameId, Segment, SeqIndicator, SeqNum},
 };
 
-#[derive(Debug)]
-pub(crate) struct RingBufferProducer<T>(futures::channel::mpsc::Sender<T>);
+#[derive(Clone)]
+pub(crate) struct RingBufferProducer<T>(Arc<parking_lot::FairMutex<AllocRingBuffer<T>>>);
 
-impl<T> Clone for RingBufferProducer<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
+impl<T> std::fmt::Debug for RingBufferProducer<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RingBufferProducer").finish()
     }
 }
 
 impl<T> RingBufferProducer<T> {
-    pub fn push(&mut self, item: T) -> bool {
-        self.0.try_send(item).is_ok()
+    pub fn push(&mut self, item: T) {
+        self.0.lock().enqueue(item);
     }
 }
 
@@ -47,20 +46,9 @@ impl<T: Clone> RingBufferView<T> {
     }
 }
 
-pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
-    capacity: usize,
-) -> (RingBufferProducer<T>, RingBufferView<T>) {
-    // The channel gets the same capacity as RB in case the task cannot keep up (due to locking)
-    let (rb_tx, rb_rx) = futures::channel::mpsc::channel(capacity);
+pub(crate) fn searchable_ringbuffer<T: Send + 'static>(capacity: usize) -> (RingBufferProducer<T>, RingBufferView<T>) {
     let rb = Arc::new(parking_lot::FairMutex::new(AllocRingBuffer::new(capacity)));
-
-    let rb_clone = rb.clone();
-    hopr_utils::runtime::prelude::spawn(rb_rx.for_each(move |s| {
-        rb_clone.lock().enqueue(s);
-        futures::future::ready(())
-    }));
-
-    (RingBufferProducer(rb_tx), RingBufferView(rb))
+    (RingBufferProducer(rb.clone()), RingBufferView(rb))
 }
 
 const MAX_BACKOFF: Duration = Duration::from_secs(300);
