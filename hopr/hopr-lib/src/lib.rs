@@ -196,7 +196,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
-            pix_ssa_quota: None
+            pix_ssa_quota: None,
         }
     }
 }
@@ -233,7 +233,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
-            pix_ssa_quota: None
+            pix_ssa_quota: None,
         })
     }
 }

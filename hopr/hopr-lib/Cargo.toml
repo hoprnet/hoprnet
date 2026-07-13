@@ -142,6 +142,8 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+hopr-ct-full-network = { workspace = true }
+hopr-transport-session = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 

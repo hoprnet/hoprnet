@@ -103,3 +103,76 @@ async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+// =========================================================================
+//  Bidirectional data flow through sessions
+// =========================================================================
+
+use std::{str::FromStr, time::Duration};
+
+use anyhow::Context;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use hopr_lib::{
+    api::node::HoprSessionClientOperations,
+    exports::network::types::prelude::{IpOrHost, SealedHost},
+};
+use hopr_transport_session::SurbBalancerConfig;
+
+#[rstest]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[cfg(feature = "session-client")]
+/// 0-hop bidirectional data flow through a HOPR session.
+///
+/// Uses a 2-node cluster (cluster_fixture) where the destination node runs an
+/// EchoServer. Data is sent entry→exit, then exit→entry (via SURBs) with
+/// `always_max_out_surbs: true` for the return path.
+async fn capture_direct_session() -> anyhow::Result<()> {
+    let cluster = cluster_fixture(vec![TestNodeConfig::default(); 2]);
+    assert_eq!(cluster.size(), 2, "expected 2-node cluster");
+
+    let src = &cluster[0];
+    let dst = &cluster[1];
+
+    tracing::info!("cluster ready, establishing 0-hop session");
+
+    let ip = IpOrHost::from_str(":0")?;
+    let (mut entry_session, _) = src
+        .inner()
+        .connect_to(
+            dst.address(),
+            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            hopr_lib::HoprSessionClientConfig {
+                forward_path: 0.try_into()?,
+                return_path: 0.try_into()?,
+                capabilities: Default::default(),
+                pseudonym: None,
+                surb_management: Some(SurbBalancerConfig::default()),
+                always_max_out_surbs: true,
+                pix_ssa_quota: None,
+            },
+        )
+        .await?;
+
+    tracing::info!("session established");
+
+    // Forward: entry → exit — session is with an EchoServer on the destination,
+    // so writing to entry_session should make the data arrive on the exit side,
+    // get copied back by EchoServer, and come back to us. We need to read
+    // what the echo server sends back.
+    let msg: [u8; 32] = hopr_lib::api::types::crypto_random::random_bytes();
+    entry_session.write_all(&msg).await?;
+    entry_session.flush().await?;
+
+    // With EchoServer, data gets echoed back — read the echoed data on entry side
+    let mut echoed = vec![0u8; 32];
+    tokio::time::timeout(Duration::from_secs(10), entry_session.read_exact(&mut echoed))
+        .await
+        .context("echo read timeout")??;
+    assert_eq!(&msg[..], &echoed[..], "echo mismatch");
+
+    tracing::info!("echo verified");
+
+    Ok(())
+}

@@ -4075,6 +4075,7 @@ dependencies = [
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
+ "hopr-transport-session",
  "hopr-utils",
  "humantime-serde",
  "insta",

@@ -364,7 +364,7 @@ pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
 };
 
 lazy_static::lazy_static! {
-    static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
+    pub static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
         ChainKeypair::from_secret(&hex!("76a4edbc3f595d4d07671779a0055e30b2b8477ecfd5d23c37afd7b5aa83781d")).unwrap(),
         ChainKeypair::from_secret(&hex!("c90f09e849aa512be3dd007452977e32c7cfdc1e3de1a62bd92ba6592bcc9e90")).unwrap(),
         ChainKeypair::from_secret(&hex!("40d4749a620d1a4278d030a3153b5b94d6fcd4f9677f6ce8e37e6ebb1987ad53")).unwrap(),
@@ -375,7 +375,7 @@ lazy_static::lazy_static! {
         ChainKeypair::from_secret(&hex!("5a4a67919f3b1bd09de351056a9cfd82054092648c4658e36621a46870a44c77")).unwrap(),
         ChainKeypair::from_secret(&hex!("73680d318cca7f0a6280c21daee02cc13ba988b0de9be5d333bbc19003d1f86b")).unwrap(),
     ];
-    static ref NODE_OFFCHAIN_KEYS: Vec<OffchainKeypair> = vec![
+    pub static ref NODE_OFFCHAIN_KEYS: Vec<OffchainKeypair> = vec![
         OffchainKeypair::from_secret(&hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a")).unwrap(),
         OffchainKeypair::from_secret(&hex!("c3659450e994f3ad086373440e4e7070629a1bfbd555387237ccb28d17acbfc8")).unwrap(),
         OffchainKeypair::from_secret(&hex!("4a14c5aeb53629a2dd45058a8d233f24dd90192189e8200a1e5f10069868f963")).unwrap(),
@@ -387,7 +387,7 @@ lazy_static::lazy_static! {
         OffchainKeypair::from_secret(&hex!("7c8fca94af22557421b5e4ee8a4532a77b4ee2ce5c15b410825ffe7b5b60462d")).unwrap(),
     ];
     // (Safe address, Module address)
-    static ref NODE_SAFES_MODULES: Vec<(Address, Address)> = vec![
+    pub static ref NODE_SAFES_MODULES: Vec<(Address, Address)> = vec![
         ("7e641055ee5427572aafb1de11b56f0472f3af47".parse().unwrap(), "cd4d1e4c3a9acf604e6715d14cae64a165a381ec".parse().unwrap()),
         ("e4d759ab6e1c57d5cc0b271c0bf5fa5137bcefd9".parse().unwrap(), "6fb8f33c1ac1a1c56a959680e8a14d918cbb2be7".parse().unwrap()),
         ("1f835eb942f39dfac4c007bea41ce547de404f02".parse().unwrap(), "093364b60d2b4083958d779a6368ad3559985e38".parse().unwrap()),
@@ -636,7 +636,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
     ClusterGuard { cluster, chain_client }
 }
 
-async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
+pub async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
     info!("Waiting for full connectivity");
     loop {
         let peers = instance.inner().network_view().connected_peers();
@@ -677,7 +677,7 @@ async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
     }
 }
 
-async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
+pub async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
     info!(
         "Waiting for node {} to reach status {:?}",
         instance.address(),
