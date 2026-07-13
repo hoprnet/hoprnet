@@ -300,8 +300,13 @@ pub struct SessionManagerConfig {
     /// Keep in mind that each notification also costs 1 SURB, so the notification period should
     /// not be too frequent.
     ///
-    /// Default is None (no notification sent to the client), minimum is 1 second.
-    #[default(None)]
+    /// These notifications are the only absolute correction of the Entry's dead-reckoned
+    /// estimate of the Exit's SURB buffer. Without them, every packet lost in either
+    /// direction permanently inflates the Entry's estimate, until the Exit silently runs
+    /// out of SURBs and can no longer send any reply data.
+    ///
+    /// Default is 60 seconds (None disables the notifications), minimum is 1 second.
+    #[default(Some(Duration::from_secs(60)))]
     pub surb_balance_notify_period: Option<Duration>,
 
     /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
