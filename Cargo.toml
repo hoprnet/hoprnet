@@ -189,10 +189,8 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "lukas/add-pix-conversions" }
-hopr-types = { git = "https://github.com/hoprnet/hopr-types", branch = "lukas/hybrid-array", features = [
-  "use-bindings",
-] }
+hopr-api = "1.15.0"
+hopr-types = { version = "2.0.0", features = ["use-bindings"] }
 hopr-utils = { version = "0.2.0", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
