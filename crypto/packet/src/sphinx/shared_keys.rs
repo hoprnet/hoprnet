@@ -2,13 +2,13 @@ use std::{marker::PhantomData, ops::Mul};
 
 use hopr_types::{
     crypto::prelude::*,
-    primitive::hybrid_array::{self, Array, ArraySize},
+    primitive::hybrid_array::{Array, ArraySize},
 };
 
 use super::derivation::{create_kdf_instance, generate_key_iv};
 
 /// Represents a shared secret with a remote peer.
-pub type SharedSecret = SecretValue<hybrid_array::typenum::U32>;
+pub type SharedSecret = SecretValue<hopr_types::primitive::typenum::U32>;
 
 /// Types representing a valid non-zero scalar of an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
@@ -138,6 +138,10 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         let b_k_checked = E::from_bytes(b_k.as_ref())?;
         let alpha_new = alpha_point.mul(&b_k_checked);
+
+        if !alpha_new.is_valid() {
+            return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
+        }
 
         Ok((alpha_new.to_alpha(), secret))
     }

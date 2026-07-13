@@ -143,7 +143,7 @@ mod tests {
     #[test]
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
-        assert_eq!(1018, SESSION_MTU);
+        assert_eq!(1020, SESSION_MTU); // Needs to be changed when HOPR packet payload size changes
     }
 
     #[test]
