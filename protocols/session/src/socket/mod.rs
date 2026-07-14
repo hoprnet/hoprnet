@@ -470,7 +470,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // Put the frames into the correct sequence by Frame Ids, unless datagram delivery
         // is requested — both arms yield the same `Sequencer` type.
         let sequenced = if deliver_in_order {
-            pre_sequencer.sequencer(cfg.frame_timeout, cfg.frame_size)
+            pre_sequencer.sequencer(cfg.frame_timeout, cfg.capacity)
         } else {
             pre_sequencer.sequencer_unordered()
         };

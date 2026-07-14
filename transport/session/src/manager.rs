@@ -300,8 +300,13 @@ pub struct SessionManagerConfig {
     /// Keep in mind that each notification also costs 1 SURB, so the notification period should
     /// not be too frequent.
     ///
-    /// Default is None (no notification sent to the client), minimum is 1 second.
-    #[default(None)]
+    /// These notifications are the only absolute correction of the Entry's dead-reckoned
+    /// estimate of the Exit's SURB buffer. Without them, every packet lost in either
+    /// direction permanently inflates the Entry's estimate, until the Exit silently runs
+    /// out of SURBs and can no longer send any reply data.
+    ///
+    /// Default is 60 seconds (None disables the notifications), minimum is 1 second.
+    #[default(Some(Duration::from_secs(60)))]
     pub surb_balance_notify_period: Option<Duration>,
 
     /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
@@ -1398,6 +1403,19 @@ where
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
 
+        // A repeated initiation for a pseudonym that already has a Session means the
+        // initiator has lost or abandoned its side of it (it never received our
+        // SessionEstablished reply, or it reuses its pseudonym on reconnect).
+        // The pseudonym is known only to the initiator, so the existing Session cannot
+        // serve anyone else anymore: close it and let this initiation take the slot over.
+        // Otherwise, re-initiations would keep being rejected with NoSlotsAvailable
+        // until the stale Session gets evicted by the idle timeout.
+        if let Some(stale_slot) = self.sessions.remove(&pseudonym) {
+            self.active_sessions.fetch_sub(1, Ordering::Relaxed);
+            info!(%pseudonym, "closing stale session superseded by a new initiation with the same pseudonym");
+            close_session(pseudonym, stale_slot, ClosureReason::Eviction);
+        }
+
         let session_id = pseudonym;
 
         let (session_tx, session_rx) =
@@ -1418,8 +1436,9 @@ where
         // insert (inside the helper) also prevents a TOCTOU race, so only one concurrent
         // request can claim the slot for a given pseudonym.
         let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()) else {
-            // No slots available for this pseudonym
-            error!(%pseudonym, "no slots available for this pseudonym");
+            // Either the maximum number of sessions has been reached, or a concurrent
+            // initiation for the same pseudonym has claimed the slot first.
+            error!(%pseudonym, "no session slot available");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
                 challenge: session_req.challenge,
@@ -2744,7 +2763,8 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
-    async fn session_manager_should_reject_duplicate_session_for_same_pseudonym() -> anyhow::Result<()> {
+    async fn session_manager_should_supersede_stale_session_on_reinitiation_with_same_pseudonym() -> anyhow::Result<()>
+    {
         use hopr_utils::network_types::prelude::SealedHost;
 
         let bob_mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -2790,13 +2810,14 @@ mod tests {
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should have exactly one active session");
 
-        // Second session initiation with same pseudonym - should be handled gracefully
-        // (returns Ok but sends SessionError to the requester)
+        // Second session initiation with the same pseudonym: the stale session is
+        // closed and the new initiation takes the slot over (a re-initiation means
+        // the initiator has lost or abandoned its side of the old session).
         let result = bob_mgr
             .handle_incoming_session_initiation(
                 pseudonym,
                 StartInitiation {
-                    challenge: MIN_CHALLENGE,
+                    challenge: MIN_CHALLENGE + 1,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                     capabilities: ByteCapabilities(Capabilities::empty()),
                     additional_data: 0,
@@ -2804,13 +2825,9 @@ mod tests {
             )
             .await;
 
-        // The second initiation returns Ok but handles the duplicate by sending SessionError
-        assert!(
-            result.is_ok(),
-            "second session initiation should return Ok (error is handled internally)"
-        );
+        assert!(result.is_ok(), "re-initiation should supersede the stale session");
 
-        // Verify still only one session exists
+        // The stale session must have been replaced, not duplicated
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should still have exactly one active session");
 
