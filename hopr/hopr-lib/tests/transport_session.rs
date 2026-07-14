@@ -1,19 +1,14 @@
-#[cfg(feature = "session-client")]
-use futures::future::try_join_all;
-use hopr_chain_connector::blokli_client::BlokliQueryClient;
-#[cfg(feature = "session-client")]
-use hopr_lib::api::types::primitive::prelude::HoprBalance;
-use hopr_lib::testing::{
-    fixtures::{
-        MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
-    },
-    hopr::ChannelGuard,
+use hopr_lib::testing::fixtures::{
+    MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
 };
-use rand::seq::SliceRandom;
-use rstest::*;
-use serial_test::serial;
+#[cfg(feature = "session-client")]
+use {
+    futures::future::try_join_all, hopr_chain_connector::blokli_client::BlokliQueryClient,
+    hopr_lib::api::types::primitive::prelude::HoprBalance, hopr_lib::testing::hopr::ChannelGuard,
+    rand::seq::SliceRandom, rstest::*, serial_test::serial,
+};
 
-const FUNDING_AMOUNT: &str = "100 wxHOPR";
+const FUNDING_AMOUNT: &str = "500 wxHOPR";
 
 #[rstest]
 #[case(0)]
@@ -114,9 +109,30 @@ use anyhow::Context;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use hopr_lib::{
     api::node::HoprSessionClientOperations,
-    exports::network::types::prelude::{IpOrHost, SealedHost},
+    exports::{
+        network::types::prelude::{IpOrHost, SealedHost},
+        transport::SessionCapability,
+    },
 };
-use hopr_transport_session::SurbBalancerConfig;
+
+/// Run bidirectional echo on a session, verifying data round-trips via EchoServer.
+async fn verify_session_echo(
+    entry_session: &mut hopr_lib::exports::transport::HoprSession,
+    label: &str,
+) -> anyhow::Result<()> {
+    let msg: [u8; 32] = hopr_lib::api::types::crypto_random::random_bytes();
+    entry_session.write_all(&msg).await?;
+    entry_session.flush().await?;
+
+    let mut echoed = vec![0u8; 32];
+    tokio::time::timeout(Duration::from_secs(10), entry_session.read_exact(&mut echoed))
+        .await
+        .with_context(|| format!("{label}: echo read timeout"))??;
+    assert_eq!(&msg[..], &echoed[..], "{label}: echo mismatch");
+
+    tracing::info!("{label}: echo verified");
+    Ok(())
+}
 
 #[rstest]
 #[serial]
@@ -124,21 +140,15 @@ use hopr_transport_session::SurbBalancerConfig;
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[cfg(feature = "session-client")]
 /// 0-hop bidirectional data flow through a HOPR session.
-///
-/// Uses a 2-node cluster (cluster_fixture) where the destination node runs an
-/// EchoServer. Data is sent entry→exit, then exit→entry (via SURBs) with
-/// `always_max_out_surbs: true` for the return path.
 async fn capture_direct_session() -> anyhow::Result<()> {
     let cluster = cluster_fixture(vec![TestNodeConfig::default(); 2]);
-    assert_eq!(cluster.size(), 2, "expected 2-node cluster");
+    assert_eq!(cluster.size(), 2);
 
     let src = &cluster[0];
     let dst = &cluster[1];
 
-    tracing::info!("cluster ready, establishing 0-hop session");
-
     let ip = IpOrHost::from_str(":0")?;
-    let (mut entry_session, _) = src
+    let (mut session, _) = src
         .inner()
         .connect_to(
             dst.address(),
@@ -146,33 +156,76 @@ async fn capture_direct_session() -> anyhow::Result<()> {
             hopr_lib::HoprSessionClientConfig {
                 forward_path: 0.try_into()?,
                 return_path: 0.try_into()?,
-                capabilities: Default::default(),
+                capabilities: (SessionCapability::Segmentation | SessionCapability::NoRateControl).into(),
                 pseudonym: None,
-                surb_management: Some(SurbBalancerConfig::default()),
+                surb_management: None,
                 always_max_out_surbs: true,
                 pix_ssa_quota: None,
             },
         )
         .await?;
+    verify_session_echo(&mut session, "0-hop").await?;
+    Ok(())
+}
 
-    tracing::info!("session established");
+#[rstest]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[cfg(feature = "session-client")]
+/// 1-hop bidirectional data flow through a HOPR session via a relay.
+///
+/// SURB balancing is not used — with `always_max_out_surbs: true`, each small
+/// data packet (32 bytes) carries enough SURBs alongside the payload for a
+/// symmetric 1:1 echo pattern (1 SURB delivered → 1 reply).
+async fn capture_one_hop_session() -> anyhow::Result<()> {
+    let cluster = cluster_fixture(vec![
+        TestNodeConfig::default(),                                   // src:  win_prob=1.0
+        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB), // relay: win_prob=0.2
+        TestNodeConfig::default(),                                   // dst:  win_prob=1.0
+    ]);
+    let src = &cluster[0];
+    let relay = &cluster[1];
+    let dst = &cluster[2];
 
-    // Forward: entry → exit — session is with an EchoServer on the destination,
-    // so writing to entry_session should make the data arrive on the exit side,
-    // get copied back by EchoServer, and come back to us. We need to read
-    // what the echo server sends back.
-    let msg: [u8; 32] = hopr_lib::api::types::crypto_random::random_bytes();
-    entry_session.write_all(&msg).await?;
-    entry_session.flush().await?;
+    // Open path channels in both directions for forward and SURB return routing
+    let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
+    let mut channels = Vec::new();
+    for (from, to) in [(src, relay), (relay, dst), (dst, relay), (relay, src)] {
+        channels
+            .push(ChannelGuard::open_channel_between_nodes(from.instance.clone(), to.instance.clone(), funding).await?);
+    }
 
-    // With EchoServer, data gets echoed back — read the echoed data on entry side
-    let mut echoed = vec![0u8; 32];
-    tokio::time::timeout(Duration::from_secs(10), entry_session.read_exact(&mut echoed))
-        .await
-        .context("echo read timeout")??;
-    assert_eq!(&msg[..], &echoed[..], "echo mismatch");
+    let chain_info = cluster.chain_client.query_chain_info().await?;
+    cluster
+        .wait_for_channel_graph(src, channels.len(), chain_propagation_delay(&chain_info) * 6)
+        .await?;
 
-    tracing::info!("echo verified");
+    let ip = IpOrHost::from_str(":0")?;
+    let (mut session, _) = src
+        .inner()
+        .connect_to(
+            dst.address(),
+            hopr_lib::exports::transport::SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            hopr_lib::HoprSessionClientConfig {
+                forward_path: 1.try_into()?,
+                return_path: 1.try_into()?,
+                capabilities: (SessionCapability::Segmentation | SessionCapability::NoRateControl).into(),
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: true,
+                pix_ssa_quota: None,
+            },
+        )
+        .await?;
+    verify_session_echo(&mut session, "1-hop").await?;
+
+    try_join_all(
+        channels
+            .into_iter()
+            .map(|guard| async move { guard.try_close_channels_all_channels().await }),
+    )
+    .await?;
 
     Ok(())
 }
