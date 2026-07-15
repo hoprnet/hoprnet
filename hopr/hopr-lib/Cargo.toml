@@ -16,6 +16,42 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 [lib]
 crate-type = ["rlib"]
 
+[[test]]
+name = "api_general"
+required-features = ["testing"]
+
+[[test]]
+name = "chain_operations-size2"
+required-features = ["testing"]
+
+[[test]]
+name = "chain_operations-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "stress_cluster-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_liveness-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_p2p-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_session"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_session-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_tickets"
+required-features = ["testing"]
+
 
 [features]
 capture = ["hopr-transport/capture"]

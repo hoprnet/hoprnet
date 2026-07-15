@@ -74,17 +74,17 @@ impl IpOrHost {
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                static RESOLVER: std::sync::OnceLock<hickory_resolver::TokioResolver> = std::sync::OnceLock::new();
+                static RESOLVER: tokio::sync::OnceCell<hickory_resolver::TokioResolver> =
+                    tokio::sync::OnceCell::const_new();
 
-                let resolver = if let Some(resolver) = RESOLVER.get() {
-                    resolver
-                } else {
-                    let resolver = hickory_resolver::Resolver::builder_tokio()
-                        .map_err(std::io::Error::other)?
-                        .build()
-                        .map_err(std::io::Error::other)?;
-                    RESOLVER.get_or_init(|| resolver)
-                };
+                let resolver = RESOLVER
+                    .get_or_try_init(|| async {
+                        hickory_resolver::Resolver::builder_tokio()
+                            .map_err(std::io::Error::other)?
+                            .build()
+                            .map_err(std::io::Error::other)
+                    })
+                    .await?;
 
                 let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
                 Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())

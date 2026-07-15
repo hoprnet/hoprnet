@@ -15,7 +15,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d122413f284cf2d62fb1b7db97e02edb8cda96d769b16e443a4f6195e35662b0"
 dependencies = [
  "crypto-common 0.1.7",
- "generic-array 0.14.7",
+ "generic-array",
 ]
 
 [[package]]
@@ -1587,7 +1587,7 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
 ]
 
 [[package]]
@@ -1601,9 +1601,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.29.1"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ecdfbd15f4ff885b4aaea1630d1e318f15462c85971b0bb3150b228b7792d60"
+checksum = "24c4a03b3618185436fc74269e51c6945a55a3347eb05bde61a5fd3750d28401"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -1616,18 +1616,16 @@ dependencies = [
  "futures",
  "futures-time",
  "hex",
- "hopr-types 1.11.2",
+ "hopr-types",
  "http",
  "indexmap 2.14.0",
  "launchdarkly-sdk-transport",
  "parking_lot",
  "rand 0.10.2",
  "reqwest",
- "semver 1.0.28",
  "serde",
  "serde_json",
  "smart-default",
- "strum 0.28.0",
  "thiserror 2.0.18",
  "tracing",
  "url",
@@ -1738,9 +1736,9 @@ dependencies = [
 
 [[package]]
 name = "bytes"
-version = "1.12.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae3f5d315924270530207e2a68396c3cc547f6dca3fbdca317cfb1a51edb593"
+checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 dependencies = [
  "serde",
 ]
@@ -2270,7 +2268,7 @@ version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
  "rand_core 0.6.4",
  "subtle",
  "zeroize",
@@ -2298,7 +2296,7 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
  "rand_core 0.6.4",
  "typenum",
 ]
@@ -2647,7 +2645,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
 ]
 
 [[package]]
@@ -2824,7 +2822,7 @@ dependencies = [
  "crypto-bigint 0.5.5",
  "digest 0.10.7",
  "ff 0.13.1",
- "generic-array 0.14.7",
+ "generic-array",
  "group 0.13.0",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
@@ -3356,17 +3354,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generic-array"
-version = "1.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2e55f16dcf0e9c00efbe2e655ffe45fc98e7066b52bc92f8a79e64060a79351"
-dependencies = [
- "rustversion",
- "typenum",
- "zeroize",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3777,7 +3764,7 @@ dependencies = [
  "chrono",
  "futures",
  "futures-concurrency",
- "hopr-types 2.0.0",
+ "hopr-types",
  "libp2p-identity",
  "multiaddr",
  "serde",
@@ -3849,7 +3836,7 @@ dependencies = [
  "criterion",
  "flagset",
  "hex-literal",
- "hopr-types 2.0.0",
+ "hopr-types",
  "hopr-utils",
  "lazy_static",
  "mimalloc",
@@ -3976,7 +3963,7 @@ version = "1.0.1"
 dependencies = [
  "anyhow",
  "hopr-crypto-packet",
- "hopr-types 2.0.0",
+ "hopr-types",
  "serde",
  "serde_bytes",
  "strum 0.28.0",
@@ -4037,7 +4024,7 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-packet",
  "hopr-protocol-app",
- "hopr-types 2.0.0",
+ "hopr-types",
  "hopr-utils",
  "indexmap 2.14.0",
  "insta",
@@ -4223,7 +4210,7 @@ dependencies = [
  "criterion",
  "futures",
  "futures-timer",
- "hopr-types 2.0.0",
+ "hopr-types",
  "humantime-serde",
  "insta",
  "lazy_static",
@@ -4352,53 +4339,6 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "1.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffe8de530de5d86e896cc67ffa9b57496626d381112442800b18cd7b41e440c4"
-dependencies = [
- "aes 0.9.1",
- "aquamarine",
- "arrayvec",
- "async-trait",
- "babyjubjub-ec",
- "bigdecimal",
- "blake3",
- "chacha20 0.10.1",
- "chrono",
- "cipher 0.5.2",
- "const-hex",
- "ctr 0.10.1",
- "curve25519-dalek 5.0.0",
- "digest 0.11.3",
- "ed25519-dalek 3.0.0",
- "float-cmp",
- "generic-array 1.4.3",
- "hash2curve",
- "hex-literal",
- "k256 0.14.0",
- "lazy_static",
- "libp2p-identity",
- "multiaddr",
- "num_enum",
- "poly1305 0.9.1",
- "primitive-types 0.14.0",
- "rand 0.10.2",
- "rayon",
- "regex",
- "secp256k1 0.31.1",
- "sha2 0.11.0",
- "sha3 0.12.0",
- "smart-default",
- "strum 0.28.0",
- "subtle",
- "thiserror 2.0.18",
- "tracing",
- "typenum",
- "zeroize",
-]
-
-[[package]]
-name = "hopr-types"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e24293a5ce7289056c4e01b8d91beebc8663cdcca8ffbc24d847f3f22af4f274"
@@ -4471,7 +4411,7 @@ dependencies = [
  "futures",
  "futures-time",
  "hickory-resolver 0.26.1",
- "hopr-types 2.0.0",
+ "hopr-types",
  "indexmap 2.14.0",
  "lazy_static",
  "libc",
@@ -4939,7 +4879,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
- "generic-array 0.14.7",
+ "generic-array",
 ]
 
 [[package]]
@@ -5185,9 +5125,9 @@ dependencies = [
 
 [[package]]
 name = "launchdarkly-sdk-transport"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a048341aa360a768a7d91ebf6232a574f355ada0724acff2df7c5d8dc1e04c98"
+checksum = "032d66802c461d7254ed1de887be6ca98ebbe126867d9a60c754baae81c4d10d"
 dependencies = [
  "bytes",
  "futures",
@@ -7509,7 +7449,7 @@ checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
 dependencies = [
  "base16ct 0.2.0",
  "der 0.7.10",
- "generic-array 0.14.7",
+ "generic-array",
  "pkcs8 0.10.2",
  "serdect 0.2.0",
  "subtle",
