@@ -358,9 +358,9 @@ pub const SWARM_N: usize = 9;
 /// when running under `cargo llvm-cov` (which sets `cfg(coverage)`).
 #[allow(unexpected_cfgs)]
 pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
-    Duration::from_mins(12)
+    Duration::from_mins(8)
 } else {
-    Duration::from_mins(6)
+    Duration::from_mins(4)
 };
 
 lazy_static::lazy_static! {
@@ -401,28 +401,46 @@ lazy_static::lazy_static! {
 }
 
 pub const INITIAL_SAFE_NATIVE: u64 = 1;
-pub const INITIAL_SAFE_TOKEN: u64 = 1000;
+pub const INITIAL_SAFE_TOKEN: u64 = 90000;
 pub const INITIAL_NODE_NATIVE: u64 = 1;
 pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
 /// Per-node configuration for test clusters.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TestNodeConfig {
     /// Outgoing winning probability for this node.
     pub win_prob: f64,
+    /// Optional PIX session config for incoming sessions on this node (Exit side).
+    pub incoming_pix_config: Option<crate::exports::transport::session::IncomingSessionPixConfig>,
+    /// Session idle timeout in milliseconds (default 2500).
+    pub idle_timeout_ms: u64,
+    /// Optional PIX global config override (num_ssa_parts, ssa_part_size).
+    /// When set, configures the transport-level SsaShareGenerator dimensions.
+    /// Must match the dimensions used in pix_ssa_quota for PIX sessions.
+    pub pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
 }
 
 impl Default for TestNodeConfig {
     fn default() -> Self {
-        Self { win_prob: 1.0 }
+        Self {
+            win_prob: 1.0,
+            incoming_pix_config: None,
+            idle_timeout_ms: 2500,
+            pix_global_config: None,
+        }
     }
 }
 
 impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
-        Self { win_prob }
+        Self {
+            win_prob,
+            incoming_pix_config: None,
+            idle_timeout_ms: 2500,
+            pix_global_config: None,
+        }
     }
 }
 
@@ -532,6 +550,9 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
             let win_prob = configs[i].win_prob;
+            let incoming_pix_config = configs[i].incoming_pix_config.clone();
+            let idle_timeout_ms = configs[i].idle_timeout_ms;
+            let pix_global_config = configs[i].pix_global_config;
 
             let blokli_client = chain_client
                 .clone()
@@ -572,7 +593,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let connector = std::sync::Arc::new(connector);
 
-                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
+                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob, incoming_pix_config, idle_timeout_ms, pix_global_config);
 
                     let instance = crate::testing::wiring::build_full_with_chain(
                         &onchain_keys[i],

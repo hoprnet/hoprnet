@@ -2251,8 +2251,24 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
-        let Some(session_slot) = self.sessions.get(&msg.session_id) else {
-            return Err(SessionManagerError::NonExistingSession.into());
+        // The SsaRequest can arrive before new_session() has finished allocating the
+        // session slot, since both SessionEstablished and SsaRequest are sent by the Exit
+        // back-to-back and processed concurrently by the Start protocol handler.
+        // Retry briefly to give the slot time to be registered.
+        let session_slot = {
+            let mut retries = 0u32;
+            let session_id = msg.session_id;
+            loop {
+                if let Some(slot) = self.sessions.get(&session_id) {
+                    break slot;
+                }
+                retries += 1;
+                if retries > 50 {
+                    error!(%session_id, "session slot not found after retries");
+                    return Err(SessionManagerError::NonExistingSession.into());
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
         };
 
         debug!(
@@ -2278,12 +2294,26 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
+        // Read the negotiated PIX params before the for loop (which partially moves msg)
+        let _negotiated_polys = msg.polys_per_ssa();
+        let _negotiated_shares = msg.shares_per_poly();
+
         // The server can theoretically send multiple SSA commitments
         // asking us to make the equal number of client commitments and deposits.
         // The server is authoritative in giving the ssa_index, the client only verifies if it's monotonic.
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
 
+            // Use the global `pix_toolbox.share_generator` to generate the client
+            // commitment. The generator is shared with the packet pipeline's
+            // `next_share`, so polynomials created here will be used when the
+            // pipeline embeds PIX shares into return-path SURBs.
+            //
+            // The generator dimension (polys × threshold) must match what the
+            // Exit's reconstructor expects — both are set from the session's
+            // negotiated PIX params (pix_global_config on Entry → SsaRequest
+            // params on Exit).  If the client sends commitments that exceed the
+            // Exit's expected dimensions, the Exit rejects them as InvalidInput.
             let pix_toolbox_clone = pix_toolbox.clone();
             let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
                 move || {

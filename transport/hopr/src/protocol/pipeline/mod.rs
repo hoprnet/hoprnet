@@ -627,25 +627,34 @@ where
     );
 }
 
-async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
+async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
+    exit_ack_proc: std::sync::Arc<A>,
+    recovered_ssa: SEvt,
     concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
 {
     ack_incoming
         .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            let exit_proc = exit_ack_proc.clone();
+            let mut ssa_evt = recovered_ssa.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
+                let ack_clone = acks.clone();
+                // Process ticket acknowledgements
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || ticket_proc.acknowledge_tickets(peer, acks),
+                    move || ticket_proc.acknowledge_tickets(peer, ack_clone),
                     "ack_decode",
                 )
                 .await
@@ -681,6 +690,31 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
                     }
                     Err(error) => {
                         tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
+                    }
+                }
+
+                // Process PIX share acknowledgements.
+                // Relays that also act as Exit nodes process encrypted PIX shares
+                // embedded in return-path SURBs when they receive acknowledgements.
+                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    move || exit_proc.acknowledge_shares(peer, acks),
+                    "exit_ack_decode",
+                )
+                .await
+                {
+                    Ok(Ok(ssa_priv_keys)) => {
+                        if let Err(error) = ssa_evt
+                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "failed to send pix resolution");
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
+                    }
+                    Err(error) => {
+                        tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
                     }
                 }
             }
@@ -878,7 +912,7 @@ where
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
-                (node_type == NodeType::Exit).then(|| exit_ack_proc.clone()),
+                (node_type != NodeType::Entry).then(|| exit_ack_proc.clone()),
                 wire_out.clone(),
                 counters.clone(),
                 output_concurrency
@@ -927,7 +961,9 @@ where
                         incoming_ack_rx,
                         ticket_events,
                         ticket_proc,
-                        ack_input_concurrency
+                        exit_ack_proc.clone(),
+                        ssa_events.clone(),
+                        ack_input_concurrency,
                     )
                     .in_current_span()
                 ),

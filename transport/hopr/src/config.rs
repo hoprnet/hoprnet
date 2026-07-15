@@ -10,7 +10,7 @@ use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
+use hopr_transport_session::{IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
@@ -137,6 +137,9 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(skip))]
     pub pix: PixGlobalConfig,
+    /// Per-node PIX session configuration for incoming sessions.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub incoming_session_pix_config: IncomingSessionPixConfig,
     /// Mixer configuration.
     #[cfg_attr(feature = "serde", serde(default))]
     pub mixer: MixerConfig,
