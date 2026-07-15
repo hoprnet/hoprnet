@@ -740,18 +740,18 @@ where
         // ── PixToolbox for the SessionManager ────────────────────────────
         // The SessionManager needs a PixToolbox on all node types to handle
         // PIX protocol messages (SsaRequest on Entry, SsaCommit on Exit).
-        // Only Exit/Relay nodes also construct an SsaReconstructor and wire
-        // SSA recovery events back through the packet pipeline.
+        // Only Exit nodes construct an SsaReconstructor and wire SSA recovery
+        // events back through the packet pipeline. Relay nodes do NOT
+        // participate in PIX share processing at the pipeline level.
         // Entry nodes get a bare-bones PixToolbox (share_generator + dummy
         // reconstructor) to handle SsaRequest, but do not use the
         // reconstructor for SSA recovery.
         let pix_toolbox = match (role, exit_ack_share) {
-            (protocol::NodeType::Exit | protocol::NodeType::Relay, Some(ref ssa_events)) => {
+            (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
-                let (pix_tools, session_pix_events) =
-                    PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
+                let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
                 let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
                 let smgr_clone = self.smgr.clone();
                 processes.insert(
@@ -826,15 +826,26 @@ where
                     ),
                 );
 
-                // SsaReconstructor must be embedded into the packet pipeline
                 let pipeline_builder =
                     pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
 
-                let pipeline_processes = match role {
-                    protocol::NodeType::Relay => pipeline_builder.with_ticket_events(ticket_events).build_for_relay(),
-                    protocol::NodeType::Exit => pipeline_builder.build_for_exit(),
-                    _ => unreachable!(),
-                };
+                let pipeline_processes = pipeline_builder.build_for_exit();
+                processes.extend_from(pipeline_processes);
+                Some(pix_tools)
+            }
+            (protocol::NodeType::Relay, Some(_)) => {
+                // Relay nodes need a PixToolbox for the SessionManager (SSA
+                // quota negotiation during return-path session setup), but the
+                // packet pipeline uses NopExitAcknowledgementShareProcessor —
+                // relays never process PIX shares.
+                let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                ));
+                let (pix_tools, _session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
+                // _session_pix_events dropped intentionally — relay node does
+                // not forward PIX lifecycle events to subscribers.
+
+                let pipeline_processes = pipeline_builder.with_ticket_events(ticket_events).build_for_relay();
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
@@ -846,8 +857,7 @@ where
                 let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
-                let (pix_tools, session_pix_events) =
-                    PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
+                let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
                 processes.insert(
                     HoprTransportProcess::PixEvents,
                     hopr_utils::spawn_as_abortable!(
@@ -862,7 +872,7 @@ where
                                     address: deposit_address.into(),
                                     quota: quota_per_ssa,
                                 }),
-                                HoprSessionOutPixEvent::DepositNeeded(_, _) => {
+                                HoprSessionOutPixEvent::DepositNeeded(..) => {
                                     unreachable!("Entry received DepositNeeded PIX event")
                                 }
                             })

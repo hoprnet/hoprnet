@@ -912,7 +912,7 @@ where
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
-                (node_type != NodeType::Entry).then(|| exit_ack_proc.clone()),
+                (node_type == NodeType::Exit).then(|| exit_ack_proc.clone()),
                 wire_out.clone(),
                 counters.clone(),
                 output_concurrency

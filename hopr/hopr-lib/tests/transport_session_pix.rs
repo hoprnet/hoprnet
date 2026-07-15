@@ -11,9 +11,8 @@
 //!   → SessionManager requests next SSA → goto 1
 
 use hopr_lib::testing::fixtures::{
-    MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
+    MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster, chain_propagation_delay,
 };
-
 #[cfg(feature = "session-client")]
 use {
     anyhow::Context,
@@ -21,14 +20,15 @@ use {
     hopr_api::types::primitive::prelude::HoprBalance,
     hopr_chain_connector::blokli_client::BlokliQueryClient,
     hopr_lib::{
-        api::node::{HasExitIncentivization, HoprSessionClientOperations, PixEvent},
-        testing::hopr::ChannelGuard,
+        HoprSessionClientConfig,
+        api::node::{
+            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations, PixEvent,
+        },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
-            transport::{SessionCapability, SessionTarget},
             transport::session::IncomingSessionPixConfig,
+            transport::{SessionCapability, SessionTarget},
         },
-        HoprSessionClientConfig,
     },
     rstest::rstest,
     serial_test::serial,
@@ -48,16 +48,16 @@ const PIX_SHARES: u16 = 2;
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 /// 1-hop PIX multi-cycle session test.
 ///
-/// Creates a 3-node cluster (Entry, Relay, Exit). The Exit accepts tiny PIX quotas.
-/// Keeps symmetric 32-byte traffic flowing Entry↔Exit while observing the PIX event
-/// cycle repeat 3 times.
+/// Creates a 3-node role-typed cluster (Entry, Relay, Exit) where each node
+/// is built with the correct transport role. The Exit accepts tiny PIX quotas.
+/// Keeps symmetric 32-byte traffic flowing Entry↔Exit while observing the PIX
+/// event cycle repeat 3 times.
 async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
-    // ── Cluster: Exit gets custom PIX config with low quota_range ──────────
-    let cluster = cluster_fixture(vec![
+    // ── Role-typed cluster: Entry + Relay + Exit ────────────────────────────
+    let cluster = build_role_cluster(
         TestNodeConfig {
             win_prob: 1.0,
-
-            // Entry needs PIX global config matching the session-negotiated (2,2)
+            // Entry needs PIX global config matching session-negotiated (2,2)
             pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
                 num_ssa_parts: 8,
                 ssa_part_size: 2,
@@ -65,8 +65,8 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
                 ..Default::default()
             }),
             ..Default::default()
-        }, // src (Entry):   win_prob=1.0
-        TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB), // relay:         win_prob=0.2
+        }, // Entry: win_prob=1.0
+        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB)], // Relay: win_prob=0.2
         TestNodeConfig {
             win_prob: 1.0,
             incoming_pix_config: Some(IncomingSessionPixConfig {
@@ -78,57 +78,71 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
             }),
             idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
             ..Default::default()
-        }, // dst (Exit):   win_prob=1.0, custom PIX config
-    ]);
-    let src = &cluster[0];
-    let relay = &cluster[1];
-    let dst = &cluster[2];
+        }, // Exit: win_prob=1.0, custom PIX config
+    )
+    .await?;
 
     // ── Open bidirectional channels ───────────────────────────────────────
     tracing::info!("opening channels");
     let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
-    let mut channels = Vec::new();
-    for (from, to) in [(src, relay), (relay, dst), (dst, relay), (relay, src)] {
-        channels.push(
-            ChannelGuard::open_channel_between_nodes(from.instance.clone(), to.instance.clone(), funding).await?,
-        );
+    let mut channel_ids = Vec::new();
+
+    // Helper macro: open channel from `$from` to `$to` using IncentiveChannelOperations
+    macro_rules! open_chan {
+        ($from:expr, $to:expr) => {{
+            let chan = IncentiveChannelOperations::open_channel(
+                &*$from.instance,
+                $to.instance.identity().node_address,
+                funding,
+            )
+            .await
+            .context("opening channel must succeed")?;
+            channel_ids.push(*chan.output().expect("open_channel must return a channel ID"));
+        }};
     }
+
+    open_chan!(cluster.entry, cluster.relays[0]);
+    open_chan!(cluster.relays[0], cluster.exit);
+    open_chan!(cluster.exit, cluster.relays[0]);
+    open_chan!(cluster.relays[0], cluster.entry);
     let chain_info = cluster.chain_client.query_chain_info().await?;
     tracing::info!("waiting for channel graph");
-    cluster
-        .wait_for_channel_graph(src, channels.len(), chain_propagation_delay(&chain_info) * 6)
-        .await?;
+
+    // Wait for channels to propagate
+    tokio::time::sleep(chain_propagation_delay(&chain_info) * 6).await;
+
     tracing::info!("channel graph ready");
 
     // ── Subscribe to PixEvent streams BEFORE creating the session ─────────
     tracing::info!("subscribing to PIX events");
-    let mut entry_events = Box::pin(src.inner().subscribe_pix_events());
-    let mut exit_events = Box::pin(dst.inner().subscribe_pix_events());
+    let mut entry_events = Box::pin(cluster.entry.inner().subscribe_pix_events());
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
 
     // ── Establish PIX-enabled session: Entry → Exit, 1-hop ────────────────
     tracing::info!("establishing PIX session");
     let connect_fut = {
-        let src = src.inner();
-        let dst_addr = dst.address();
+        let src_inner = cluster.entry.inner();
+        let dst_addr = cluster.exit.address();
         let ip = IpOrHost::from_str(":0")?;
         async move {
-            src.connect_to(
-                dst_addr,
-                SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                HoprSessionClientConfig {
-                    forward_path: 1.try_into().unwrap(),
-                    return_path: 1.try_into().unwrap(),
-                    capabilities: (SessionCapability::Segmentation
-                        | SessionCapability::NoRateControl
-                        | SessionCapability::UsePIX)
-                        .into(),
-                    pseudonym: None,
-                    surb_management: None,
-                    always_max_out_surbs: false,
-                    pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
-                },
-            )
-            .await
+            src_inner
+                .connect_to(
+                    dst_addr,
+                    SessionTarget::UdpStream(SealedHost::Plain(ip)),
+                    HoprSessionClientConfig {
+                        forward_path: 1.try_into().unwrap(),
+                        return_path: 1.try_into().unwrap(),
+                        capabilities: (SessionCapability::Segmentation
+                            | SessionCapability::NoRateControl
+                            | SessionCapability::UsePIX)
+                            .into(),
+                        pseudonym: None,
+                        surb_management: None,
+                        always_max_out_surbs: false,
+                        pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
+                    },
+                )
+                .await
         }
     };
     let (session, _) = tokio::time::timeout(Duration::from_secs(120), connect_fut)
@@ -224,12 +238,8 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
         "expected {target_cycles} PrivateKeyRecovered on Exit, got {pk_recovered_count}"
     );
 
-    // ── Stop background data task and close channels ──────────────────────
+    // ── Stop background data task ─────────────────────────────────────────
     bg_handle.abort();
-
-    for guard in channels {
-        guard.try_close_channels_all_channels().await?;
-    }
 
     tracing::info!("PIX multi-cycle session test PASSED");
     Ok(())

@@ -44,7 +44,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
-use hopr_transport::{HoprTransport, IncomingSession};
+use hopr_transport::{HoprTransport, IncomingSession, protocol::NopExitAcknowledgementShareProcessor};
 use hopr_utils::{
     network_types::{addr::is_public_address, crossfire_sink::bounded_sink_channel},
     runtime::{AbortableList, prelude::spawn},
@@ -723,6 +723,125 @@ macro_rules! impl_build_methods {
                 id = %hopr.transport_id.public().to_peerid_str(),
                 version = constants::APP_VERSION,
                 "EDGE NODE STARTED AND RUNNING"
+            );
+
+            Ok(hopr)
+        }
+
+        /// Builds an entry (source) [`Hopr`] node.
+        ///
+        /// Entry nodes do not process tickets, do not have ticket manager state,
+        /// and do not accept incoming sessions.
+        pub async fn build_entry<TFact>(
+            self,
+            ticket_factory: TFact,
+        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
+        where
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            let (configured, session_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, processes).await?;
+
+            tracing::info!("starting transport for entry node");
+            let (socket, transport_processes) = pre
+                .transport_api
+                .run_entry(
+                    pre.cover_traffic,
+                    pre.network,
+                    pre.network_process,
+                    ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
+                )
+                .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
+
+            let mut processes = pre.processes;
+            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+            let hopr = Hopr {
+                chain_id: NodeOnchainIdentity {
+                    node_address: pre.chain_id.public().to_address(),
+                    safe_address: pre.cfg.safe_module.safe_address,
+                    module_address: pre.cfg.safe_module.module_address,
+                },
+                cfg: pre.cfg,
+                state: pre.state.clone(),
+                ticket_event_subscribers: pre.ticket_event_subscribers,
+                pix_event_subscribers: pre.pix_event_subscribers,
+                transport_id: pre.transport_id,
+                transport_api: pre.transport_api,
+                chain_api: pre.chain_api,
+                processes,
+                ticket_manager: (),
+            };
+
+            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+            tracing::info!(
+                id = %hopr.transport_id.public().to_peerid_str(),
+                version = constants::APP_VERSION,
+                "ENTRY NODE STARTED AND RUNNING"
+            );
+
+            Ok(hopr)
+        }
+
+        /// Builds an exit (destination) [`Hopr`] node.
+        ///
+        /// Exit nodes accept incoming sessions and process PIX acknowledgements,
+        /// but do not process tickets (no ticket manager state).
+        pub async fn build_exit<TFact>(
+            self,
+            ticket_factory: TFact,
+        ) -> Result<Hopr<Chain, Graph, Net, ()>, HoprLibError>
+        where
+            TFact: TicketFactory + Clone + Send + Sync + 'static,
+        {
+            let (configured, session_tx, processes) = self.into_parts();
+            let pre = pre_build_inner(configured, session_tx, processes).await?;
+
+            tracing::info!("starting transport for exit node");
+            let (socket, transport_processes) = pre
+                .transport_api
+                .run_exit::<TFact, Ct, NopExitAcknowledgementShareProcessor, _>(
+                    pre.cover_traffic,
+                    pre.network,
+                    pre.network_process,
+                    ticket_factory,
+                    Some(BroadcastSenderSink(pre.pix_event_subscribers.0.clone())),
+                    pre.session_tx,
+                )
+                .await?;
+
+            // Drain unrelated packets to avoid missing blackhole
+            spawn(drain_incoming_data(socket.reader()));
+
+            let mut processes = pre.processes;
+            processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
+
+            let hopr = Hopr {
+                chain_id: NodeOnchainIdentity {
+                    node_address: pre.chain_id.public().to_address(),
+                    safe_address: pre.cfg.safe_module.safe_address,
+                    module_address: pre.cfg.safe_module.module_address,
+                },
+                cfg: pre.cfg,
+                state: pre.state.clone(),
+                ticket_event_subscribers: pre.ticket_event_subscribers,
+                pix_event_subscribers: pre.pix_event_subscribers,
+                transport_id: pre.transport_id,
+                transport_api: pre.transport_api,
+                chain_api: pre.chain_api,
+                processes,
+                ticket_manager: (),
+            };
+
+            hopr.state.store(HoprState::Running, std::sync::atomic::Ordering::Relaxed);
+            tracing::info!(
+                id = %hopr.transport_id.public().to_peerid_str(),
+                version = constants::APP_VERSION,
+                "EXIT NODE STARTED AND RUNNING"
             );
 
             Ok(hopr)
