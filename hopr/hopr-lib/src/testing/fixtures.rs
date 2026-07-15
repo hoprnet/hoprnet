@@ -1,4 +1,4 @@
-use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
+use std::{convert::identity, ops::Div, str::FromStr, sync::Arc, time::Duration};
 
 use futures::StreamExt as _;
 use futures_time::future::FutureExt as _;
@@ -37,6 +37,7 @@ use crate::{
         transport::{HoprSession, SessionTarget},
     },
     testing::{
+        TestingConnector,
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
     },
@@ -593,7 +594,14 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let connector = std::sync::Arc::new(connector);
 
-                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob, incoming_pix_config, idle_timeout_ms, pix_global_config);
+                    let config = create_hopr_instance_config(
+                        3001 + i as u16,
+                        safes[i],
+                        win_prob,
+                        incoming_pix_config,
+                        idle_timeout_ms,
+                        pix_global_config,
+                    );
 
                     let instance = crate::testing::wiring::build_full_with_chain(
                         &onchain_keys[i],
@@ -657,7 +665,237 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
     ClusterGuard { cluster, chain_client }
 }
 
-pub async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
+/// Intermediate result from a `block_on` build — avoids moving `runtime` into the async block.
+enum RawRoleNode {
+    Entry(
+        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        TestingConnector,
+    ),
+    Relay(
+        Arc<crate::testing::wiring::FullHopr<TestingConnector>>,
+        TestingConnector,
+    ),
+    Exit(
+        Arc<crate::testing::wiring::EdgeHopr<TestingConnector>>,
+        TestingConnector,
+    ),
+}
+
+enum RoleThreadNode {
+    Entry(TestedHopr<()>),
+    Relay(TestedHopr),
+    Exit(TestedHopr<()>),
+}
+
+/// A guard for role-typed clusters (Entry + Relays + Exit).
+///
+/// Unlike `ClusterGuard` which holds a flat `Vec<TestedHopr>` of relays,
+/// this guard preserves the node roles so callers can access `entry`,
+/// `relays`, and `exit` by name while keeping their distinct `TMgr` types.
+pub struct RoleClusterGuard {
+    pub entry: TestedHopr<()>,
+    pub relays: Vec<TestedHopr>,
+    pub exit: TestedHopr<()>,
+    pub chain_client: BlokliTestClient<FullStateEmulator>,
+}
+
+/// Builds a role-typed cluster with one Entry, N Relays, and one Exit.
+///
+/// Each node is built with the correct transport role (`run_entry` / `run_relay` / `run_exit`).
+/// Entry and Exit nodes use `()` as their ticket manager (no ticket processing).
+/// Relay nodes use `SharedTicketManager` (full ticket processing).
+///
+/// This function is separate from `cluster_fixture` and `ClusterGuard` — those
+/// remain unchanged for backward compatibility with existing tests.
+pub async fn build_role_cluster(
+    entry_cfg: TestNodeConfig,
+    relay_cfgs: Vec<TestNodeConfig>,
+    exit_cfg: TestNodeConfig,
+) -> anyhow::Result<RoleClusterGuard> {
+    let total_size = 1 + relay_cfgs.len() + 1;
+    if !(3..=SWARM_N).contains(&total_size) {
+        anyhow::bail!("total cluster size {total_size} must be between 3 and {SWARM_N}");
+    }
+
+    // Reduce mixer delay range
+    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+
+    let chain_client = build_blokli_client();
+
+    // Assign onchain keys: entry = 0, relays = 1..N, exit = N
+    let all_cfgs = {
+        let mut cfgs = vec![entry_cfg];
+        cfgs.extend(relay_cfgs);
+        cfgs.push(exit_cfg);
+        cfgs
+    };
+    let onchain_keys = NODE_CHAIN_KEYS[0..total_size].to_vec();
+    let offchain_keys = NODE_OFFCHAIN_KEYS[0..total_size].to_vec();
+    let safes = NODE_SAFES_MODULES[0..total_size]
+        .iter()
+        .map(|(safe, module)| NodeSafeConfig {
+            safe_address: *safe,
+            module_address: *module,
+        })
+        .collect::<Vec<_>>();
+
+    let handles: Vec<_> = (0..total_size)
+        .map(|i| {
+            let onchain_keys = onchain_keys.clone();
+            let offchain_keys = offchain_keys.clone();
+            let safes = safes.clone();
+            let cfg = all_cfgs[i].clone();
+            let blokli_client = chain_client
+                .clone()
+                .with_mutator(FullStateEmulator::new(safes[i].module_address));
+            let is_entry = i == 0;
+            let is_exit = i == total_size - 1;
+
+            std::thread::spawn(move || {
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(
+                        std::thread::available_parallelism()
+                            .map(|v| v.get())
+                            .unwrap_or(1)
+                            .div(total_size)
+                            .max(3)
+                            - 1,
+                    )
+                    .thread_stack_size(5 * 1024 * 1024)
+                    .thread_name(format!("hopr-node-{i}"))
+                    .enable_all()
+                    .build()
+                    .expect("failed to build Tokio runtime");
+
+                let result = runtime.block_on(async {
+                    let mut connector = create_trustful_hopr_blokli_connector(
+                        &onchain_keys[i],
+                        BlockchainConnectorConfig::default(),
+                        blokli_client,
+                        safes[i].module_address,
+                    )
+                    .await
+                    .expect("failed to create HoprBlockchainSafeConnector for node");
+
+                    connector
+                        .connect()
+                        .await
+                        .expect("failed to connect to HoprBlockchainSafeConnector");
+
+                    let connector = std::sync::Arc::new(connector);
+
+                    let config = create_hopr_instance_config(
+                        3001 + i as u16,
+                        safes[i],
+                        cfg.win_prob,
+                        cfg.incoming_pix_config,
+                        cfg.idle_timeout_ms,
+                        cfg.pix_global_config,
+                    );
+
+                    let prober = Some(hopr_ct_full_network::ProberConfig {
+                        interval: std::time::Duration::from_secs(3),
+                        ..Default::default()
+                    });
+
+                    let node: anyhow::Result<RawRoleNode> = if is_entry {
+                        let instance = crate::testing::wiring::build_entry_with_chain(
+                            &onchain_keys[i],
+                            &offchain_keys[i],
+                            config,
+                            prober,
+                            connector.clone(),
+                            EchoServer::new(),
+                        )
+                        .await?;
+                        Ok(RawRoleNode::Entry(instance, connector))
+                    } else if is_exit {
+                        let instance = crate::testing::wiring::build_exit_with_chain(
+                            &onchain_keys[i],
+                            &offchain_keys[i],
+                            config,
+                            prober,
+                            connector.clone(),
+                            EchoServer::new(),
+                        )
+                        .await?;
+                        Ok(RawRoleNode::Exit(instance, connector))
+                    } else {
+                        let instance = crate::testing::wiring::build_full_with_chain(
+                            &onchain_keys[i],
+                            &offchain_keys[i],
+                            config,
+                            prober,
+                            connector.clone(),
+                            EchoServer::new(),
+                        )
+                        .await?;
+                        Ok(RawRoleNode::Relay(instance, connector))
+                    };
+
+                    node
+                });
+
+                result.map(|raw| match raw {
+                    RawRoleNode::Entry(instance, connector) => {
+                        RoleThreadNode::Entry(TestedHopr::<()>::new(runtime, instance, connector))
+                    }
+                    RawRoleNode::Exit(instance, connector) => {
+                        RoleThreadNode::Exit(TestedHopr::<()>::new(runtime, instance, connector))
+                    }
+                    RawRoleNode::Relay(instance, connector) => {
+                        RoleThreadNode::Relay(TestedHopr::new(runtime, instance, connector))
+                    }
+                })
+            })
+        })
+        .collect();
+
+    let mut entry: Option<TestedHopr<()>> = None;
+    let mut relays: Vec<TestedHopr> = Vec::new();
+    let mut exit: Option<TestedHopr<()>> = None;
+
+    for handle in handles {
+        let thread_result = handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("a hopr node thread panicked"))?
+            .map_err(|e| anyhow::anyhow!("hopr node build failed: {e}"))?;
+
+        match thread_result {
+            RoleThreadNode::Entry(n) => entry = Some(n),
+            RoleThreadNode::Relay(n) => relays.push(n),
+            RoleThreadNode::Exit(n) => exit = Some(n),
+        }
+    }
+
+    let entry = entry.expect("entry should be set");
+    let exit = exit.expect("exit should be set");
+
+    // Wait for all nodes to reach Running state
+    wait_for_status(&entry, &HoprState::Running).await;
+    for relay in &relays {
+        wait_for_status(relay, &HoprState::Running).await;
+    }
+    wait_for_status(&exit, &HoprState::Running).await;
+
+    // Wait for full mesh connectivity
+    wait_for_connectivity(&entry, total_size).await;
+    for relay in &relays {
+        wait_for_connectivity(relay, total_size).await;
+    }
+    wait_for_connectivity(&exit, total_size).await;
+
+    info!(total_size, "ROLE CLUSTER STARTED");
+
+    Ok(RoleClusterGuard {
+        entry,
+        relays,
+        exit,
+        chain_client,
+    })
+}
+
+pub async fn wait_for_connectivity<TMgr: 'static + Send + Sync>(instance: &TestedHopr<TMgr>, swarm_size: usize) {
     info!("Waiting for full connectivity");
     loop {
         let peers = instance.inner().network_view().connected_peers();
@@ -698,7 +936,7 @@ pub async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
     }
 }
 
-pub async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
+pub async fn wait_for_status<TMgr: 'static + Send + Sync>(instance: &TestedHopr<TMgr>, expected_status: &HoprState) {
     info!(
         "Waiting for node {} to reach status {:?}",
         instance.address(),
