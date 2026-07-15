@@ -151,7 +151,7 @@ impl ClusterGuard {
             }
 
             tracing::trace!(open_count, expected_channels, "waiting for channel graph convergence");
-            sleep(Duration::from_secs(2)).await;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -498,7 +498,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
         .with_ticket_price(HoprBalance::new_base(1))
         .with_closure_grace_period(Duration::from_secs(1))
         .build_dynamic_client(Address::default()) // Placeholder module address, to be filled in later
-        .with_tx_simulation_delay(Duration::from_millis(300))
+        .with_tx_simulation_delay(Duration::from_millis(100))
 }
 
 #[fixture]
@@ -671,7 +671,7 @@ pub async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
             peers.len(),
             instance.address()
         );
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(200)).await;
     }
 
     // Wait for probe warmup: all connected peers should be individually reachable.
@@ -694,7 +694,7 @@ pub async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
             swarm_size - 1,
             instance.address()
         );
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(200)).await;
     }
 }
 
@@ -711,6 +711,6 @@ pub async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState)
         }
 
         tracing::trace!("{status} on {}, waiting for {expected_status}", instance.address());
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(200)).await;
     }
 }
