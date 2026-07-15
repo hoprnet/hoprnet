@@ -496,7 +496,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
         ))
         .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
         .with_ticket_price(HoprBalance::new_base(1))
-        .with_closure_grace_period(Duration::from_secs(1))
+        .with_closure_grace_period(Duration::ZERO)
         .build_dynamic_client(Address::default()) // Placeholder module address, to be filled in later
         .with_tx_simulation_delay(Duration::from_millis(100))
 }

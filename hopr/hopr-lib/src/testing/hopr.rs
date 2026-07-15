@@ -245,7 +245,7 @@ impl ChannelGuard {
                     }
                     Ok::<_, crate::errors::HoprLibError>(false)
                 },
-                Duration::from_secs(30),
+                Duration::from_secs(5),
             )
             .await
             .context("channel did not reach Closed state")?;
@@ -282,7 +282,7 @@ impl Drop for ChannelGuard {
                                 }
                                 Ok::<_, crate::errors::HoprLibError>(false)
                             },
-                            Duration::from_secs(30),
+                            Duration::from_secs(5),
                         )
                         .await;
                     }
