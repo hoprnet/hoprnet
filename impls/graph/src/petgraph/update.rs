@@ -114,7 +114,25 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 // For each edge (including the target), use intermediate QoS if available,
                 // otherwise fall back to immediate QoS. The residual is attributed to the
                 // target edge as its new intermediate measurement.
-                let total_rtt = std::time::Duration::from_millis(telemetry.timestamp() as u64);
+                //
+                // `timestamp()` is the probe's creation time (unix epoch millis), so the
+                // RTT is the elapsed time until now. Values above the plausibility cap
+                // (clock skew, stale telemetry) are discarded instead of poisoning the
+                // latency EMA with an absurd measurement.
+                const MAX_PLAUSIBLE_LOOPBACK_RTT: std::time::Duration = std::time::Duration::from_secs(30);
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis();
+                let total_rtt =
+                    std::time::Duration::from_millis(now_ms.saturating_sub(telemetry.timestamp()) as u64);
+                if total_rtt > MAX_PLAUSIBLE_LOOPBACK_RTT {
+                    tracing::debug!(
+                        rtt_ms = total_rtt.as_millis(),
+                        "implausible loopback probe RTT, skipping attribution"
+                    );
+                    return;
+                }
                 let mut known_latency = std::time::Duration::ZERO;
 
                 for &edge in &edges {
@@ -222,6 +240,7 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
+    use assertables::assert_in_delta;
     use hex_literal::hex;
     use hopr_api::{
         OffchainPublicKey,
@@ -542,14 +561,25 @@ mod tests {
         }
     }
 
-    /// Helper to send a loopback probe with the given path and timestamp.
-    fn send_loopback(graph: &ChannelGraph, path_id: [u64; 5], timestamp_ms: u128) {
+    /// Current unix epoch time in milliseconds, mirroring how production code derives RTT.
+    fn now_unix_ms() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    }
+
+    /// Helper to send a loopback probe with the given path and desired RTT.
+    ///
+    /// The telemetry timestamp is set `rtt_ms` in the past so the receiver
+    /// computes an elapsed RTT of approximately `rtt_ms`.
+    fn send_loopback(graph: &ChannelGraph, path_id: [u64; 5], rtt_ms: u128) {
         let telemetry: Result<
             EdgeTransportTelemetry<TestNeighbor, LoopbackTestPath>,
             NetworkGraphError<LoopbackTestPath>,
         > = Ok(EdgeTransportTelemetry::Loopback(LoopbackTestPath::new(
             path_id,
-            timestamp_ms,
+            now_unix_ms() - rtt_ms,
         )));
         graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
     }
@@ -588,9 +618,10 @@ mod tests {
         let qos = obs
             .intermediate_qos()
             .context("intermediate QoS should be present on a→b")?;
-        assert_eq!(
-            qos.average_latency().context("latency should be set")?,
-            std::time::Duration::from_millis(200),
+        assert_in_delta!(
+            qos.average_latency().context("latency should be set")?.as_millis(),
+            200,
+            25
         );
 
         // me→a should NOT have intermediate QoS from this probe
@@ -627,11 +658,11 @@ mod tests {
         let qos = obs
             .intermediate_qos()
             .context("intermediate QoS should be present on b→c")?;
-        assert_eq!(
-            qos.average_latency().context("latency should be set")?,
-            std::time::Duration::from_millis(300),
-            "no preceding intermediate latencies, so full RTT is attributed"
-        );
+        assert_in_delta!(
+            qos.average_latency().context("latency should be set")?.as_millis(),
+            300,
+            25
+        ); // no preceding intermediate latencies, so full RTT is attributed
 
         // Earlier edges should NOT have intermediate QoS from this probe
         let obs_me_a = graph.edge(&me, &a).context("edge me→a should exist")?;
@@ -683,11 +714,11 @@ mod tests {
         let qos = obs
             .intermediate_qos()
             .context("intermediate QoS should be present on b→c")?;
-        assert_eq!(
-            qos.average_latency().context("latency should be set")?,
-            std::time::Duration::from_millis(180),
-            "300ms total - 80ms (me→a) - 40ms (a→b) = 180ms attributed to b→c"
-        );
+        assert_in_delta!(
+            qos.average_latency().context("latency should be set")?.as_millis(),
+            180,
+            25
+        ); // 300ms total - 80ms (me→a) - 40ms (a→b) = 180ms attributed to b→c
 
         Ok(())
     }
@@ -723,11 +754,11 @@ mod tests {
         let qos = obs
             .intermediate_qos()
             .context("intermediate QoS should be present on a→b")?;
-        assert_eq!(
-            qos.average_latency().context("latency should be set")?,
-            std::time::Duration::from_millis(140),
-            "200ms total - 60ms (me→a immediate) = 140ms attributed to a→b"
-        );
+        assert_in_delta!(
+            qos.average_latency().context("latency should be set")?.as_millis(),
+            140,
+            25
+        ); // 200ms total - 60ms (me→a immediate) = 140ms attributed to a→b
 
         Ok(())
     }
@@ -756,6 +787,34 @@ mod tests {
         assert!(
             obs.intermediate_qos().is_none(),
             "invalid path bytes should not produce any intermediate measurement"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn loopback_implausible_rtt_should_be_ignored() -> anyhow::Result<()> {
+        // Regression: a raw epoch timestamp was once misread as the RTT itself,
+        // poisoning the latency EMA with a ~56-year measurement. Any computed
+        // RTT above the plausibility cap must be discarded.
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &me)?; // return edge
+
+        // Timestamp 90 s in the past → RTT far above the 30 s cap.
+        send_loopback(&graph, [0, 1, 2, 0, 0], 90_000);
+
+        let obs = graph.edge(&a, &b).context("edge a→b should exist")?;
+        assert!(
+            obs.intermediate_qos().is_none(),
+            "implausible RTT must not produce an intermediate measurement"
         );
 
         Ok(())
@@ -815,11 +874,11 @@ mod tests {
         let qos = obs
             .intermediate_qos()
             .context("intermediate QoS should be present on me→a")?;
-        assert_eq!(
-            qos.average_latency().context("latency should be set")?,
-            std::time::Duration::from_millis(50),
-            "100ms total - 50ms (me→a immediate) = 50ms attributed to me→a"
-        );
+        assert_in_delta!(
+            qos.average_latency().context("latency should be set")?.as_millis(),
+            50,
+            25
+        ); // 100ms total - 50ms (me→a immediate) = 50ms attributed to me→a
 
         // Immediate QoS should still be intact
         let imm = obs
