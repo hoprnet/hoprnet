@@ -61,6 +61,7 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
             pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
                 num_ssa_parts: 8,
                 ssa_part_size: 2,
+                additional_shares: 2,
                 ..Default::default()
             }),
             ..Default::default()
