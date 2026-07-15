@@ -4,7 +4,7 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.0";
@@ -33,7 +33,6 @@
     hopli.inputs.flake-parts.follows = "flake-parts";
     hopli.inputs.nixpkgs.follows = "nixpkgs";
     hopli.inputs.rust-overlay.follows = "rust-overlay";
-    hopli.inputs.crane.follows = "crane";
     hopli.inputs.nix-lib.follows = "nix-lib";
     hopli.inputs.foundry.follows = "foundry";
     hopli.inputs.pre-commit.follows = "pre-commit";

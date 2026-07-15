@@ -24,7 +24,7 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 /// Testing utilities: cluster fixtures, node wiring helpers, echo server.
-#[cfg(any(feature = "testing", test))]
+#[cfg(feature = "testing")]
 pub mod testing;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;

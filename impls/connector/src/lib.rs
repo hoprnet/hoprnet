@@ -78,7 +78,6 @@ pub fn create_blokli_client(cfg: HoprBlokliClientConfig) -> blokli_client::Blokl
         blokli_client::BlokliClientConfig {
             timeout: std::time::Duration::from_secs(3),
             stream_reconnect_timeout: std::time::Duration::from_secs(30),
-            auto_compatibility_check: false,
             dns_override: cfg
                 .dns_override
                 .map(|(ip, port)| ::blokli_client::BlokliDnsOverride { ip, port }),

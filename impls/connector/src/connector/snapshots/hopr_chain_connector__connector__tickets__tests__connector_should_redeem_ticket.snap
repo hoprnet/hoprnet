@@ -70,6 +70,8 @@ safe_redeem_stats:
     __typename: RedeemedStats
     redeemed_amount: 0.000000000000000001 wxHOPR
     redemption_count: "1"
+    rejected_amount: "0"
+    rejection_count: "0"
 tx_counts:
   668430def9eacd2b5064acf85d73fb0b351a1c8c: 1
 channels:
@@ -100,10 +102,5 @@ chain_info:
   expected_block_time: "5"
   finality: "3"
 version: "1"
-client_compatibility:
-  api_version: "1"
-  supported_client_versions: ^0.29.1
-  features:
-    - indexes_safe_events
 health: OK
 active_txs: {}
