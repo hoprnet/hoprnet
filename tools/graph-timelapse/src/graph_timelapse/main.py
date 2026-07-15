@@ -109,7 +109,7 @@ def parse_path_nodes(raw: str) -> list[str]:
 def _parse_json_line(line: str) -> tuple[Optional[datetime], Optional[str], Optional[str]]:
     try:
         obj = json.loads(line)
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError, KeyError:
         return None, None, None
     ts_str = obj.get("timestamp") or obj.get("time") or obj.get("ts")
     ts = parse_timestamp(ts_str) if isinstance(ts_str, str) else None

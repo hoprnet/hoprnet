@@ -83,5 +83,11 @@ test:
     echo "==> Checking metrics documentation..."
     ./.github/scripts/generate-metrics-docs.sh
     echo ""
-    echo "==> Running unit & integration tests..."
-    NEXTEST_HIDE_PROGRESS_BAR=1 cargo nextest run --test '*' -j 1 --features testing
+    echo "==> Running unit tests..."
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --lib --features testing
+    echo ""
+    echo "==> Running doc tests..."
+    cargo test --doc --workspace --features testing
+    echo ""
+    echo "==> Running integration tests..."
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --test '*' -j 1 --features testing
