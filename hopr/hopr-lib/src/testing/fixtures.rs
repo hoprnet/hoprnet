@@ -878,12 +878,15 @@ pub async fn build_role_cluster(
     }
     wait_for_status(&exit, &HoprState::Running).await;
 
-    // Wait for full mesh connectivity
-    wait_for_connectivity(&entry, total_size).await;
+    // Wait for P2P connectivity on all nodes (libp2p connections).
+    // Probe warmup is only meaningful for relays — Entry/Exit nodes use
+    // `drain_incoming_data` for their socket reader which drops probe
+    // echo responses, making probe warmup stall indefinitely.
+    wait_for_p2p_connectivity(&entry, total_size).await;
     for relay in &relays {
         wait_for_connectivity(relay, total_size).await;
     }
-    wait_for_connectivity(&exit, total_size).await;
+    wait_for_p2p_connectivity(&exit, total_size).await;
 
     info!(total_size, "ROLE CLUSTER STARTED");
 
@@ -893,6 +896,28 @@ pub async fn build_role_cluster(
         exit,
         chain_client,
     })
+}
+
+/// Waits for P2P connectivity without probe warmup.
+///
+/// Checks only that `connected_peers` reaches `swarm_size - 1` — suitable for
+/// Entry/Exit nodes which do not run a probe-based liveness system.
+pub async fn wait_for_p2p_connectivity<TMgr: 'static + Send + Sync>(instance: &TestedHopr<TMgr>, swarm_size: usize) {
+    info!("Waiting for full connectivity");
+    loop {
+        let peers = instance.inner().network_view().connected_peers();
+
+        if peers.len() == swarm_size - 1 {
+            break;
+        }
+
+        tracing::trace!(
+            "{} peers connected on {}, waiting for full mesh",
+            peers.len(),
+            instance.address()
+        );
+        sleep(Duration::from_secs(1)).await;
+    }
 }
 
 pub async fn wait_for_connectivity<TMgr: 'static + Send + Sync>(instance: &TestedHopr<TMgr>, swarm_size: usize) {
