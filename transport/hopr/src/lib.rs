@@ -358,7 +358,7 @@ where
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                surb_balance_notify_period: None,
+                surb_balance_notify_period: cfg.session.surb_balance_notify_period,
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 pix_config: cfg.incoming_session_pix_config.clone(),

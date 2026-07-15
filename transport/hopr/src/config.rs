@@ -450,6 +450,10 @@ fn default_max_managed_sessions() -> usize {
     DEFAULT_MAXIMUM_MANAGED_SESSIONS
 }
 
+fn default_session_surb_balance_notify_period() -> Option<Duration> {
+    Some(Duration::from_secs(60))
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -471,6 +475,17 @@ fn validate_balancer_buffer_duration(value: &Duration) -> Result<(), ValidationE
         Ok(())
     } else {
         Err(ValidationError::new("minmum SURB buffer duration is too low"))
+    }
+}
+
+fn validate_surb_balance_notify_period(value: &Duration) -> Result<(), ValidationError> {
+    // `custom` on an `Option` field skips `None` and passes the inner value on `Some`.
+    if *value >= Duration::from_secs(1) {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "SURB balance notify period must be at least 1 second",
+        ))
     }
 }
 
@@ -545,6 +560,23 @@ pub struct SessionGlobalConfig {
         serde(default = "default_session_balancer_buffer_duration", with = "humantime_serde")
     )]
     pub balancer_minimum_surb_buffer_duration: Duration,
+
+    /// How often the Exit reports its true SURB buffer level to the Entry, as an absolute
+    /// correction of the Entry's dead-reckoned estimate. Without it, cumulative packet loss
+    /// silently inflates the estimate until the Exit runs out of SURBs and can no longer
+    /// send reply data.
+    ///
+    /// Default is 60 seconds. Set to `null` to disable; minimum effective period is 1 second.
+    #[validate(custom(function = "validate_surb_balance_notify_period"))]
+    #[default(default_session_surb_balance_notify_period())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "default_session_surb_balance_notify_period",
+            with = "humantime_serde::option"
+        )
+    )]
+    pub surb_balance_notify_period: Option<Duration>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
