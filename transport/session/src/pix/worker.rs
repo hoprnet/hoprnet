@@ -201,7 +201,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
-    use hopr_protocol_pix::SsaIndex;
+    use hopr_protocol_pix::{SsaId, SsaIndex};
 
     use super::*;
 
@@ -273,5 +273,87 @@ mod tests {
         handle.gate.acquire().await.unwrap();
         handle.gate.release_service();
         assert!(handle.gate.funded());
+    }
+
+    #[tokio::test]
+    async fn event_sent_via_handle_reaches_core() {
+        let p = HoprPseudonym::random();
+        let (handle, mut action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Consume initial RequestSsa.
+        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+
+        // Send SsaRequestSent via the handle — the worker should process it
+        // and produce no further actions (event is idempotent).
+        let id = SsaId::new(p, SsaIndex::new(1).unwrap());
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).unwrap();
+
+        // Give the worker time to process the event.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // No extra actions should appear (idempotent event).
+        let maybe_action = tokio::time::timeout(Duration::from_millis(50), action_rx.recv()).await;
+        assert!(maybe_action.is_err(), "expected no extra actions");
+    }
+
+    #[tokio::test]
+    async fn action_result_feedback_processed() {
+        let p = HoprPseudonym::random();
+        let (handle, mut action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Consume initial RequestSsa.
+        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+
+        // Send action result for a failed RequestSsa — should trigger close.
+        handle
+            .send_action_result(
+                SessionPixAction::RequestSsa {
+                    ssa_id: SsaId::new(p, SsaIndex::new(1).unwrap()),
+                    polys: 10,
+                    threshold: 5,
+                },
+                false,
+            )
+            .unwrap();
+
+        let close_action = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+        assert!(matches!(close_action, SessionPixAction::Close(_)));
+    }
+
+    #[tokio::test]
+    async fn deadline_via_worker_closes() {
+        let mut cfg = default_cfg();
+        cfg.max_ssa_delivery_time = Duration::from_millis(10);
+        let p = HoprPseudonym::random();
+        let (handle, mut action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
+
+        // Consume initial RequestSsa.
+        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+
+        // Tell the worker the request was sent so the commitment deadline starts.
+        let id = SsaId::new(p, SsaIndex::new(1).unwrap());
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).unwrap();
+
+        // Wait for the commitment deadline to expire.
+        let close_action = tokio::time::timeout(Duration::from_secs(2), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+        assert!(matches!(
+            close_action,
+            SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
+        ));
     }
 }
