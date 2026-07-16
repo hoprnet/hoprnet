@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use common::TestSpec;
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaCommitment,
-    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+    TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -37,7 +38,10 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
         .map(|(k, v)| (k, v.into_iter().collect::<HashMap<_, _>>()))
         .collect::<HashMap<_, _>>();
 
-    let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        early_recovery_threshold: 1.0,
+        ..Default::default()
+    });
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 
@@ -130,7 +134,10 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
     let peer = OffchainKeypair::random();
 
     let client_commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-    let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        early_recovery_threshold: 1.0,
+        ..Default::default()
+    });
 
     let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
 

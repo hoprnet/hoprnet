@@ -14,6 +14,7 @@ pub struct SsaBuilder<S: PixSpec> {
     num_polys: usize,
     builder: PixScalar<S>,
     received_indices: ahash::HashSet<PolynomialIndex>,
+    early_notified: bool,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
@@ -25,6 +26,23 @@ impl<S: PixSpec> SsaBuilder<S> {
             builder: exit_secret_scalar,
             num_polys,
             received_indices: ahash::HashSet::with_capacity(num_polys),
+            early_notified: false,
+        }
+    }
+
+    /// Returns `true` once, when the number of received polynomial parts reaches
+    /// `ceil(threshold * num_polys)` for the first time. Subsequent calls return
+    /// `false` (idempotent guard — fires at most once per SSA lifecycle).
+    pub fn check_early_threshold(&mut self, threshold: f64) -> bool {
+        if self.early_notified {
+            return false;
+        }
+        let needed = (threshold * self.num_polys as f64).ceil() as usize;
+        if self.received_indices.len() >= needed {
+            self.early_notified = true;
+            true
+        } else {
+            false
         }
     }
 
@@ -46,6 +64,7 @@ impl<S: PixSpec> SsaBuilder<S> {
 
         // This is computed only once when we have all the polynomials reconstructed
         if self.full_commitment == (PixGroup::<S>::generator() * self.builder) {
+            self.early_notified = true;
             Ok(Some(self.builder))
         } else {
             Err(errors::PixError::InvalidSsa)

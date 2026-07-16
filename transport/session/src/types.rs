@@ -120,6 +120,9 @@ pub enum HoprSessionOutPixEvent {
 pub enum HoprSessionInPixEvent {
     /// Informs the [`SessionManager`] that an SSA was fully recovered.
     SsaRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`SessionManager`] that the early recovery threshold was reached
+    /// for an SSA — the next SSA request can be made.
+    SsaAlmostRecovered(SsaId<HoprPseudonym>),
     /// Informs the [`SessionManager`] that unverifiable shares were encountered.
     UnverifiableShare(SsaId<HoprPseudonym>),
 }
@@ -129,6 +132,7 @@ impl HoprSessionInPixEvent {
     pub fn pseudonym(&self) -> &HoprPseudonym {
         match self {
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
         }
     }

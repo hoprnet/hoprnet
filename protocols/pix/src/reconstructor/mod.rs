@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Configuration for the SSA reconstructor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 pub struct SsaReconstructorConfig {
     /// Maximum time an SSA can be incomplete before it is discarded.
     ///
@@ -52,6 +52,13 @@ pub struct SsaReconstructorConfig {
     /// Default is true.
     #[default(true)]
     pub use_batch_verification: bool,
+    /// Fraction of reconstructed polynomials at which to emit an early recovery
+    /// notification, triggering pipelined SSA request preparation.
+    ///
+    /// Range: 0.0..1.0. Default: 0.85.
+    #[default(0.85)]
+    #[validate(range(min = 0.0, max = 1.0))]
+    pub early_recovery_threshold: f64,
 }
 
 type EncryptedShareCache<S> =
@@ -78,7 +85,15 @@ pub struct SsaReconstructor<S: PixSpec> {
     cfg: SsaReconstructorConfig,
 }
 
-type MaybeRecoveredSsa<S> = Option<RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>>;
+/// Result of processing a single verified acknowledgement in the SSA reconstructor.
+enum ProcessedAckResult<S: PixSpec> {
+    /// No SSA recovery progress — still waiting for more polynomial parts.
+    NoProgress,
+    /// The early recovery threshold was crossed (identified by SsaId).
+    EarlyRecovery(SsaId<<S as PixSpec>::Pseudonym>),
+    /// Full SSA was recovered.
+    FullRecovery(RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>),
+}
 
 impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
     fn default() -> Self {
@@ -116,10 +131,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         ack: HalfKey,
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
-    ) -> Result<MaybeRecoveredSsa<S>, PixError<S::Pseudonym>> {
+    ) -> Result<ProcessedAckResult<S>, PixError<S::Pseudonym>> {
         let Some(share) = awaiting_ack_from_peer.remove(&ack_challenge) else {
             tracing::trace!(?ack_challenge, "received ack for unknown share");
-            return Ok(None);
+            return Ok(ProcessedAckResult::NoProgress);
         };
 
         let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
@@ -136,7 +151,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             }
             Ok(None) => {
                 tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
-                return Ok(None);
+                return Ok(ProcessedAckResult::NoProgress);
             }
             Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
                 // We need to treat this error differently, because it is critical
@@ -151,20 +166,31 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             .ssa_builders
             .get(spi.as_ref())
             .ok_or(PixError::MissingSsaCommitment)?;
-        let Some(ssa) = builder.lock().add_recovered_ssa_part(spi.poly_index(), ssa_part)? else {
-            tracing::trace!(%spi, "ssa not yet complete, waiting for more ssa parts");
-            return Ok(None);
-        };
 
-        let Some(ssa) = S::scalar_to_private_key(ssa) else {
-            tracing::error!(%spi, "ssa reconstruction failed");
-            return Err(PixError::InvalidSsa);
-        };
-
-        let ssa_id = *spi.as_ref();
-        tracing::info!(%ssa_id, "ssa recovered");
-
-        Ok(Some(RecoveredSsa { ssa_id, ssa }))
+        let mut builder_guard = builder.lock();
+        let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
+        match ssa {
+            Some(scalar) => {
+                let Some(ssa) = S::scalar_to_private_key(scalar) else {
+                    tracing::error!(%spi, "ssa reconstruction failed");
+                    return Err(PixError::InvalidSsa);
+                };
+                let ssa_id = *spi.as_ref();
+                tracing::info!(%ssa_id, "ssa recovered");
+                Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }))
+            }
+            None => {
+                tracing::trace!(%spi, "ssa not yet complete, waiting for more ssa parts");
+                // Check early threshold while we hold the lock
+                if builder_guard.check_early_threshold(self.cfg.early_recovery_threshold) {
+                    let ssa_id = *spi.as_ref();
+                    tracing::info!(%ssa_id, "early recovery threshold reached");
+                    Ok(ProcessedAckResult::EarlyRecovery(ssa_id))
+                } else {
+                    Ok(ProcessedAckResult::NoProgress)
+                }
+            }
+        }
     }
 }
 
@@ -301,10 +327,13 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
-                Ok(Some(ssa)) => {
+                Ok(ProcessedAckResult::FullRecovery(ssa)) => {
                     res.insert(ShareResolution::RecoveredSsa(ssa));
                 }
-                Ok(None) => {}
+                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
+                    res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
+                }
+                Ok(ProcessedAckResult::NoProgress) => {}
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
                     tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
@@ -330,11 +359,17 @@ mod tests {
     use hopr_types::{
         crypto::{crypto_traits, prelude::*},
         crypto_random::Randomizable,
+        internal::prelude::VerifiedAcknowledgement,
     };
     use vsss_rs::elliptic_curve::Field;
 
     use super::*;
-    use crate::{DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShare, tests::TestSpec};
+    use crate::{
+        DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShare, SsaGeneratorConfig, SsaIndex,
+        SsaShareGenerator,
+        tests::TestSpec,
+        traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
+    };
 
     #[test]
     fn reconstructor_invalid_commitment_inputs() -> anyhow::Result<()> {
@@ -469,6 +504,130 @@ mod tests {
                 )
                 .is_err()
         );
+
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // early_recovery_threshold tests
+    // -----------------------------------------------------------------------
+
+    /// Helper: create an SsaBuilder that accepts zero-valued sub-secrets.
+    fn make_builder(num_polys: usize) -> SsaBuilder<TestSpec> {
+        let exit_secret = PixScalar::<TestSpec>::default();
+        let full_commitment = PixGroup::<TestSpec>::default();
+        SsaBuilder::new(full_commitment, exit_secret, num_polys)
+    }
+
+    /// Helper: add `n` zero-valued polynomial parts to `builder`, returning
+    /// the result of each call.
+    fn add_parts(
+        builder: &mut SsaBuilder<TestSpec>,
+        n: usize,
+    ) -> crate::errors::Result<Vec<Option<PixScalar<TestSpec>>>, <TestSpec as PixSpec>::Pseudonym> {
+        let mut results = Vec::with_capacity(n);
+        for i in 0..n {
+            let sub = PixScalar::<TestSpec>::default();
+            results.push(builder.add_recovered_ssa_part(i as PolynomialIndex, sub)?);
+        }
+        Ok(results)
+    }
+
+    #[test]
+    fn ssa_builder_early_threshold_below() -> anyhow::Result<()> {
+        // num_polys=10, threshold=0.85 → ceil(0.85×10)=9.
+        // Adding 8 parts should NOT reach the threshold.
+        let mut builder = make_builder(10);
+        add_parts(&mut builder, 8)?;
+        assert!(!builder.check_early_threshold(0.85));
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_builder_early_threshold_hits_ceil_at_9() -> anyhow::Result<()> {
+        // num_polys=10, threshold=0.85 → ceil(0.85×10)=9.
+        // Adding 9 parts SHOULD fire on the first check.
+        let mut builder = make_builder(10);
+        add_parts(&mut builder, 9)?;
+        assert!(builder.check_early_threshold(0.85));
+        // Second call must return false (idempotent guard).
+        assert!(!builder.check_early_threshold(0.85));
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_builder_threshold_1_dot_0_fires_at_full_recovery() -> anyhow::Result<()> {
+        // num_polys=10, threshold=1.0 → ceil(1.0×10)=10.
+        // Only fires when ALL 10 polynomial parts are received.
+        let mut builder = make_builder(10);
+        add_parts(&mut builder, 9)?;
+        assert!(!builder.check_early_threshold(1.0));
+        add_parts(&mut builder, 1)?; // 10th part → completes SSA
+        // After full recovery, early_notified is set by add_recovered_ssa_part.
+        // check_early_threshold should still report false.
+        assert!(!builder.check_early_threshold(1.0));
+        Ok(())
+    }
+
+    #[test]
+    fn process_verified_ack_emits_early_and_full_recovery() -> anyhow::Result<()> {
+        // Use a small SSA config where we can observe both events.
+        // 4 polynomials, threshold=4, surplus=0 → 16 shares total.
+        // early_recovery_threshold=0.5 → ceil(0.5×4)=2.
+        // After 2 polynomial parts → EarlyRecovery.
+        // After all 4         → FullRecovery.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 4,
+            threshold: 4,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            early_recovery_threshold: 0.5,
+            ..Default::default()
+        });
+
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 4, 4)?;
+
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Generate and insert all 16 encrypted shares
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc_share = share.share.encrypt(&share.id, &ack)?;
+
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        // Process all acks in one batch
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+
+        // Both events MUST be present
+        let has_early = resolutions
+            .iter()
+            .any(|r| matches!(r, ShareResolution::AlmostRecoveredSsa(id) if *id == ssa_id));
+        let has_full = resolutions
+            .iter()
+            .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id));
+
+        assert!(has_early, "expected AlmostRecoveredSsa event");
+        assert!(has_full, "expected RecoveredSsa event");
 
         Ok(())
     }

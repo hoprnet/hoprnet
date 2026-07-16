@@ -1532,10 +1532,14 @@ where
         };
 
         match event {
-            // When an SSA is recovered, we need to issue a new SSA server request
-            HoprSessionInPixEvent::SsaRecovered(_) => {
+            // When the early recovery threshold is reached, issue a new SSA server request
+            // to pipeline deposit preparation with the last ~15% of share collection.
+            HoprSessionInPixEvent::SsaAlmostRecovered(_) => {
                 self.request_next_ssa(*session_id, slot).await?;
             }
+            // SSA fully recovered — the next SSA request was already triggered by
+            // SsaAlmostRecovered. Deposit-key processing is handled in the upper layer.
+            HoprSessionInPixEvent::SsaRecovered(_) => {}
             HoprSessionInPixEvent::UnverifiableShare(_) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
@@ -4490,7 +4494,7 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that when the exit/responder receives an `SsaRecovered` PIX event, it requests
+    /// Verifies that when the exit/responder receives an `SsaAlmostRecovered` PIX event, it requests
     /// a fresh SSA by sending another `SsaRequest` to the entry/initiator.
     ///
     /// ## Steps
@@ -4498,12 +4502,12 @@ mod tests {
     ///    via `handle_incoming_session_initiation`, which triggers an initial `SsaRequest` (message 1).
     /// 2. The mock transport tracks all outbound messages; exactly 3 messages are expected: `SessionEstablished`,
     ///    initial `SsaRequest` at init, and a second `SsaRequest` after recovery.
-    /// 3. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager.
-    /// 4. The manager processes the recovery event and emits a second `SsaRequest` to Alice.
-    /// 5. The test asserts that exactly 2 `SsaRequest` messages were sent, confirming the recovery path triggered a new
-    ///    SSA request.
+    /// 3. `dispatch_pix_event(SsaAlmostRecovered(ssa_id))` is called on Bob's manager.
+    /// 4. The manager processes the event and emits a second `SsaRequest` to Alice.
+    /// 5. The test asserts that exactly 2 `SsaRequest` messages were sent, confirming the early recovery path triggered
+    ///    a new SSA request.
     #[test_log::test(tokio::test)]
-    async fn exit_requests_new_ssa_after_ssa_recovered_event() -> anyhow::Result<()> {
+    async fn exit_requests_new_ssa_after_almost_recovered_event() -> anyhow::Result<()> {
         use std::sync::Arc;
 
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
@@ -4533,8 +4537,98 @@ mod tests {
         let sent_ssa_requests_clone = sent_ssa_requests.clone();
 
         // Accept all messages; track SsaRequest calls.
-        // 3 messages expected: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after SsaRecovered (3).
+        // 3 messages expected: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after early event (3).
         bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (one at init, one after SsaAlmostRecovered)"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that the exit/responder does NOT request a new SSA when it receives
+    /// `SsaRecovered` (the request was already triggered by `SsaAlmostRecovered`).
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed,
+    ///    which triggers an initial `SsaRequest` (message 1).
+    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager.
+    /// 3. The test asserts that exactly 1 `SsaRequest` message was sent (only the one at init), confirming
+    ///    `SsaRecovered` alone does NOT trigger `request_next_ssa`.
+    #[test_log::test(tokio::test)]
+    async fn exit_does_not_request_new_ssa_on_ssa_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // Accept 2 messages: SessionEstablished (1) + SsaRequest at init (2) only.
+        // SsaRecovered must NOT trigger a third message.
+        bob_transport.expect_send_message().times(2).returning(move |_, data| {
             let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
             Box::pin(async move {
                 if let Ok(HoprStartProtocol::SsaRequest(_)) =
@@ -4576,8 +4670,8 @@ mod tests {
 
         assert_eq!(
             sent_ssa_requests.lock().unwrap().len(),
-            2,
-            "expected exactly 2 SsaRequest messages (one at init, one after SsaRecovered)"
+            1,
+            "expected exactly 1 SsaRequest message (only the one at init), SsaRecovered must not trigger a second"
         );
 
         Ok(())

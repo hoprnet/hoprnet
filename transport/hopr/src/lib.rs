@@ -805,6 +805,17 @@ where
                                                         secret: PixDepositSecret(ssa_recovery_event.ssa.secret().clone()),
                                                     }))
                                                 }
+                                                ShareResolution::AlmostRecoveredSsa(ssa_id) => {
+                                                    if let Err(error) = smgr
+                                                        .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(
+                                                            ssa_id,
+                                                        ))
+                                                        .await
+                                                    {
+                                                        tracing::error!(%error, %ssa_id, "failed to dispatch early SSA recovery event to the SessionManager");
+                                                    }
+                                                    None
+                                                }
                                                 ShareResolution::InvalidShare(peer, ssa_id) => {
                                                     error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
                                                     if let Err(error) = smgr
