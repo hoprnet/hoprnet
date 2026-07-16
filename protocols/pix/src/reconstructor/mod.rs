@@ -23,6 +23,11 @@ use crate::{
     SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
+/// Tracks polynomial verifier IDs per SSA so `retire_ssa` can remove all of them.
+type SsaVerifierMap<S> = std::sync::Arc<
+    parking_lot::Mutex<HashMap<SsaId<<S as PixSpec>::Pseudonym>, Vec<SsaPolynomialId<<S as PixSpec>::Pseudonym>>>>,
+>;
+
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 pub struct SsaReconstructorConfig {
@@ -119,9 +124,7 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// Dedicated TTL-only cache for per-SSA counters (no TTI).
     /// Counters survive builder/verifier eviction.
     ssa_counters: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<std::sync::Mutex<SsaCounterEntry>>>,
-    /// Tracks polynomial verifier IDs per SSA so `retire_ssa` can remove all of them.
-    ssa_to_verifier_ids:
-        std::sync::Arc<parking_lot::Mutex<HashMap<SsaId<S::Pseudonym>, Vec<SsaPolynomialId<S::Pseudonym>>>>>,
+    ssa_to_verifier_ids: SsaVerifierMap<S>,
     cfg: SsaReconstructorConfig,
 }
 

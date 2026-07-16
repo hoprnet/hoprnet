@@ -13,12 +13,6 @@ use super::{
     supervisor::SessionPixSupervisor,
 };
 
-/// Maximum number of queued commands.
-const EVENT_CHANNEL_CAPACITY: usize = 256;
-
-/// Action driver channel capacity.
-const ACTION_CHANNEL_CAPACITY: usize = 64;
-
 // ---------------------------------------------------------------------------
 // SessionPixSupervisorHandle
 // ---------------------------------------------------------------------------
@@ -37,13 +31,20 @@ impl SessionPixSupervisorHandle {
     pub fn send_event(&self, ev: SessionPixEvent) -> Result<(), ()> {
         self.cmd_tx.send(WorkerCommand::Event(ev)).map_err(|_| ())
     }
+
+    /// Send an action result feedback to the supervisor.
+    pub fn send_action_result(&self, action: SessionPixAction, ok: bool) -> Result<(), ()> {
+        self.cmd_tx
+            .send(WorkerCommand::ActionResult { action, ok })
+            .map_err(|_| ())
+    }
 }
 
 // ---------------------------------------------------------------------------
 // WorkerCommand
 // ---------------------------------------------------------------------------
 
-enum WorkerCommand {
+pub(crate) enum WorkerCommand {
     Event(SessionPixEvent),
     ActionResult { action: SessionPixAction, ok: bool },
 }
