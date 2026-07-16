@@ -205,6 +205,8 @@ pub(crate) struct SessionSlot {
     // Handle to the PIX supervisor worker for this session.
     // Shared via OnceLock so it can be set after cache insertion.
     pix_supervisor: Arc<OnceLock<crate::pix::worker::SessionPixSupervisorHandle>>,
+    // Egress gate shared with the supervisor; set when PIX is negotiated.
+    pix_egress_gate: Arc<OnceLock<Arc<crate::pix::gate::ServiceGate>>>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -1293,6 +1295,7 @@ where
                                 surb_estimator: surb_estimator.clone(),
                                 ssa_params: Arc::new(OnceLock::new()),
                                 pix_supervisor: Arc::new(OnceLock::new()),
+                                pix_egress_gate: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1374,6 +1377,7 @@ where
                                 surb_estimator: Default::default(), // No SURB estimator needed
                                 ssa_params: Arc::new(OnceLock::new()),
                                 pix_supervisor: Arc::new(OnceLock::new()),
+                                pix_egress_gate: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1747,6 +1751,7 @@ where
             surb_estimator: Default::default(),
             ssa_params: Default::default(),
             pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
         };
         self.sessions.insert(session_id, slot);
     }
@@ -1771,6 +1776,7 @@ where
             surb_estimator: Default::default(),
             ssa_params: Default::default(),
             pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         session_rx
@@ -1903,6 +1909,7 @@ where
             surb_estimator: Default::default(),
             ssa_params: Default::default(),
             pix_supervisor: Default::default(),
+            pix_egress_gate: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -1963,6 +1970,8 @@ where
             };
 
             let surb_estimator_clone = slot.surb_estimator.clone();
+            let gate_for_sink = Arc::clone(&slot.pix_egress_gate);
+            let gate_for_keepalive = gate_for_sink.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -1972,6 +1981,12 @@ where
                     msg_sender
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            // Gate the egress for PIX-enabled sessions.
+                            if let Some(gate) = gate_for_sink.get()
+                                && gate.try_acquire_sync().is_err()
+                            {
+                                // Gate poisoned; let the packet through — closure is near.
+                            }
                             // Each outgoing packet consumes one SURB
                             surb_estimator_clone
                                 .consumed
@@ -2036,6 +2051,9 @@ where
                     msg_sender
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            if let Some(gate) = gate_for_keepalive.get() {
+                                let _ = gate.try_acquire_sync();
+                            }
                             // Each sent keepalive consumes 1 SURB
                             surb_estimator_clone
                                 .consumed
@@ -2185,10 +2203,11 @@ where
                 .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
                 .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
             let _ = slot.pix_supervisor.set(handle.clone());
+            let _ = slot.pix_egress_gate.set(handle.gate.clone());
 
             // Spawn the action driver task.
             let myself = self.clone();
-            let gate = slot.pix_supervisor.get().unwrap().gate.clone();
+            let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
                 while let Some(action) = action_rx.recv().await {
@@ -2775,6 +2794,7 @@ mod tests {
                 surb_estimator: Default::default(),
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
             },
         );
 
@@ -4177,6 +4197,7 @@ mod tests {
                 surb_estimator: Default::default(),
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
             },
         );
 
@@ -4278,6 +4299,7 @@ mod tests {
                 surb_estimator: Default::default(),
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
             },
         );
 
