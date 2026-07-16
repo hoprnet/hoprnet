@@ -7,6 +7,7 @@ commands) lives in [`session-pix-supervisor-plan.md`](session-pix-supervisor-pla
 # Requirements
 
 ### Outcome
+
 Add a standalone, separately unit-testable `SessionPixSupervisor` for PIX-enabled
 incoming sessions, implemented as a new module (`src/pix/`) inside the
 `hopr-transport-session` crate.
@@ -17,6 +18,7 @@ close/request decisions. `SessionManager` remains responsible for network I/O,
 reconstructor calls, session-cache removal, and executing supervisor actions.
 
 ### Design principle
+
 Enforcement is **service-relative, not wall-clock**. The threat is "return service
 consumed without payment progress", so idle detection is gated on service actually
 having been consumed, the predeposit allowance is a bounded packet budget, and the
@@ -25,7 +27,9 @@ mechanism. Wall-clock proxies both over-trigger on honest quiet/slow sessions an
 under-constrain attackers.
 
 ### Scope
+
 #### In scope
+
 - One supervisor actor per incoming `Capability::UsePIX` session; outgoing Entry
   sessions and non-PIX sessions do not create one.
 - A deterministic core driven by explicit timestamps and explicit service
@@ -56,6 +60,7 @@ under-constrain attackers.
   trustworthy progress/fault observations and explicit counter lifecycle.
 
 #### Known bugs fixed by this work (each requires a regression test)
+
 1. **Silent session stall**: if a single acknowledgement batch completes recovery,
    `check_early_threshold` never fires, `AlmostRecoveredSsa` is never emitted, and
    today's `SsaRecovered → no-op` (`manager.rs:1541`) means the next SSA is never
@@ -71,6 +76,7 @@ under-constrain attackers.
    point, so the session should fail fast with a distinct reason.
 
 #### Deferred explicitly
+
 - A hard postdeposit packet ceiling. The wire contract prices
   `polynomials × threshold`, while the generator emits unnegotiated surplus
   shares; safe enforcement requires surplus negotiation and pricing first.
@@ -92,6 +98,7 @@ under-constrain attackers.
   accept-any behavior while the contract already supports validation.
 
 ### Acceptance Criteria
+
 - `SessionHandles::PixKillSwitch`, `SessionHandles::DepositAwaiter`, and
   manager-owned incoming PIX error/index policy are removed.
 - Every open incoming PIX session always has at least one supervised SSA phase or
@@ -119,6 +126,7 @@ under-constrain attackers.
 # Technical Design
 
 ### Current Implementation (verified against the code)
+
 - `transport/session/src/manager.rs` stores the Exit SSA index and a session-wide
   error counter in `SessionSsaState` (`manager.rs:160`); `increment_index` resets
   the error counter (bug 3 above). The unverifiable-share threshold is the
@@ -143,7 +151,7 @@ under-constrain attackers.
   `Hash`/`Eq` impls on `ShareResolution` keyed by `SsaId` (`traits.rs:27-51`).
   All reconstructor state lives in moka caches with TTI/TTL eviction
   (`SsaReconstructorConfig`, `mod.rs:19-62`); `incomplete_ssa_lifetime` (600 s)
-  is a time-to-*idle*.
+  is a time-to-_idle_.
 - `transport/hopr/src/lib.rs` translates `ShareResolution` into
   `HoprSessionInPixEvent` in two byte-identical branches (Exit `:787-828`,
   relay-as-Exit `:888-928`).
@@ -156,6 +164,7 @@ under-constrain attackers.
   permit mechanism, and `NoRateControl` sessions have no keep-alives.
 
 ### Chosen Architecture
+
 Use the selected **actor plus deterministic core** model, extended with a shared
 lock-free **service gate** on the egress hot path.
 
@@ -194,7 +203,9 @@ graph LR
   `ReleaseService` is executed by the worker directly against the gate.
 
 ### Files and Types
+
 Add, inside the `hopr-transport-session` crate:
+
 - `transport/session/src/pix/mod.rs` — module root, config, public-in-crate re-exports.
 - `transport/session/src/pix/supervisor.rs` — deterministic core + exhaustive tests.
 - `transport/session/src/pix/worker.rs` — actor, handle, action driver.
@@ -255,8 +266,10 @@ message ("PIX deposit confirmation channel closed without a value — is a PIX
 deposit strategy consuming node events?").
 
 ### Configuration
+
 Keep existing `IncomingSessionPixConfig.max_ssa_delivery_time` (20 s) and
 `max_deposit_wait` (60 s). Add:
+
 - `max_recovery_idle` (default 60 s) — service-gated idle window (see Behavior).
 - `max_recovery_time` (default **1 hour**) — immutable absolute bound per SSA.
   This is a **resource backstop** (session slot + reconstructor memory), not the
@@ -273,6 +286,7 @@ wiring layer that constructs both the `SsaReconstructor` and the
 `SessionManager` (`transport/hopr/src/lib.rs`) — via a validation function
 exported from `hopr-transport-session`. Constraints (note
 `incomplete_ssa_lifetime` is a TTI, refreshed by acknowledgement activity):
+
 - All durations nonzero; `max_recovery_idle >= max_ack_await_time`.
 - `max_recovery_idle < incomplete_ssa_lifetime` (progress refreshes the builder's
   TTI, so the builder provably survives between progress events).
@@ -283,12 +297,14 @@ exported from `hopr-transport-session`. Constraints (note
   newer SSA.
 
 ### Manager Integration
+
 Refactor `SessionSlot` to separate immutable Entry negotiation data from incoming
 supervision: `ssa_params: Option<SessionSsaParameters>` plus
 `pix_supervisor: Option<SessionPixSupervisorHandle>` replace
 `current_ssa_state: Arc<OnceLock<SessionSsaState>>`.
 
 For an incoming PIX session:
+
 1. Validate exact PIX dimensions and create the supervisor before exposing the
    `HoprSession`.
 2. Insert its worker/action-driver handles into `SessionSlot.abort_handles`.
@@ -314,6 +330,7 @@ For an incoming PIX session:
    deposit observers, and poisons the `ServiceGate` so parked writers error out.
 
 ### Provisional Service Behavior (ServiceGate)
+
 - Route incoming-session application egress — and manager keep-alives that consume
   recovery-bearing SURBs — through the `ServiceGate` before forwarding to the
   underlying sink, in **both** the rate-controlled and `NoRateControl` branches.
@@ -338,6 +355,7 @@ For an incoming PIX session:
   an error so writers observe the closed session promptly.
 
 ### Metrics & Diagnostics
+
 - Counter `hopr_session_pix_closures_total` labeled by internal
   `SessionPixCloseReason`.
 - Gauge (or labeled counter pair) for supervised SSA phase transitions.
@@ -348,6 +366,7 @@ For an incoming PIX session:
   phase, counters, and deadlines.
 
 ### Architecture Invariants
+
 - No lock is held across an `.await`; all policy mutation occurs in actor order.
   The `ServiceGate` fast path is lock-free; parking uses a dedicated async
   primitive, never the actor channel.
@@ -369,6 +388,7 @@ For an incoming PIX session:
 # Behavior
 
 ### Per-SSA State Machine
+
 ```mermaid
 stateDiagram-v2
     [*] --> RequestPending
@@ -386,6 +406,7 @@ stateDiagram-v2
 ```
 
 ### Progress Definition
+
 `hopr-protocol-pix` must expose an absolute snapshot:
 
 ```rust
@@ -413,9 +434,11 @@ commitment/deposit deadlines; a sufficient deposit confirmation starts a fresh
 recovery-idle window from confirmation time.
 
 ### Service-Gated Idle Rule
+
 The core records `served_total_at_last_progress` (sampled from the gate) whenever
 useful progress is accepted, and on entry into `Recovering`. When the idle timer
 fires on the serving SSA:
+
 - `served_total == served_total_at_last_progress` → the session is merely quiet;
   no progress was possible because no recovery-bearing packet was sent. Re-arm the
   idle timer silently. This protects honest quiet sessions, including
@@ -431,28 +454,30 @@ a stalled older funded SSA. Any live SSA deadline expiring closes the whole
 session.
 
 ### Deadline and Event Rules
-| Event | Required phase | Effect | Refreshes recovery idle? |
-|---|---|---|---|
-| SSA request sent | `RequestPending` | Start commitment-delivery deadline | No |
-| Verifiable commitment | `AwaitingCommitment` | Start independent deposit deadline; store `expected_deposit`; expose `DepositNeeded` | No |
-| Matching sufficient deposit | `AwaitingDeposit` | Enter `Recovering`; start idle + immutable hard deadlines; emit deferred next-SSA request if flagged; first funding emits `ReleaseService` | Starts it |
-| Matching **underfunded** deposit | `AwaitingDeposit` | Log + ignore; deadline keeps running (a later top-up confirmation may still arrive) | No |
-| Deposit sender closes (after drain) | `AwaitingDeposit` | Close immediately — confirmation is no longer deliverable; error-level diagnostic | No |
-| Larger useful snapshot | Any known SSA | Record absolute progress; record `served_total`; update matching recovery state | Only in `Recovering` |
-| Equal snapshot | Any known SSA | Ignore as duplicate/reordering | No |
-| **Lower** snapshot | Any known SSA | Counter regression → close (`InvalidTransition`) | N/A |
-| Invalid-share absolute count increase | Known/recent SSA | Apply positive delta to SSA and session totals | No |
-| Invalid-share absolute count decrease | Known/recent SSA | Counter regression → close (`InvalidTransition`) | N/A |
-| Almost recovered | `Recovering` | Emit one next-SSA request; retain old guard | No |
-| Almost recovered | `AwaitingDeposit` | Set `next_request_pending_deposit`; request emitted on deposit confirmation | No |
-| Fully recovered | Known active SSA | Clear only that SSA's deadlines; keep tombstone; fallback next-SSA request if early recovery never observed | Terminal |
-| Empty/unknown/stale observation | Any | Trace/ignore or count as non-attributable protocol diagnostics | No |
-| Idle deadline fires, no service since last progress | `Recovering` | Re-arm idle timer; no action | Re-armed |
-| Idle deadline fires, service consumed since last progress | `Recovering` | Close as `RecoveryIdle` | N/A |
-| Hard deadline fires | `Recovering` | Close as `RecoveryDeadline` | N/A |
-| Other live deadline | Matching phase | Recheck current state, then emit one close action | N/A |
+
+| Event                                                     | Required phase       | Effect                                                                                                                                     | Refreshes recovery idle? |
+| --------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| SSA request sent                                          | `RequestPending`     | Start commitment-delivery deadline                                                                                                         | No                       |
+| Verifiable commitment                                     | `AwaitingCommitment` | Start independent deposit deadline; store `expected_deposit`; expose `DepositNeeded`                                                       | No                       |
+| Matching sufficient deposit                               | `AwaitingDeposit`    | Enter `Recovering`; start idle + immutable hard deadlines; emit deferred next-SSA request if flagged; first funding emits `ReleaseService` | Starts it                |
+| Matching **underfunded** deposit                          | `AwaitingDeposit`    | Log + ignore; deadline keeps running (a later top-up confirmation may still arrive)                                                        | No                       |
+| Deposit sender closes (after drain)                       | `AwaitingDeposit`    | Close immediately — confirmation is no longer deliverable; error-level diagnostic                                                          | No                       |
+| Larger useful snapshot                                    | Any known SSA        | Record absolute progress; record `served_total`; update matching recovery state                                                            | Only in `Recovering`     |
+| Equal snapshot                                            | Any known SSA        | Ignore as duplicate/reordering                                                                                                             | No                       |
+| **Lower** snapshot                                        | Any known SSA        | Counter regression → close (`InvalidTransition`)                                                                                           | N/A                      |
+| Invalid-share absolute count increase                     | Known/recent SSA     | Apply positive delta to SSA and session totals                                                                                             | No                       |
+| Invalid-share absolute count decrease                     | Known/recent SSA     | Counter regression → close (`InvalidTransition`)                                                                                           | N/A                      |
+| Almost recovered                                          | `Recovering`         | Emit one next-SSA request; retain old guard                                                                                                | No                       |
+| Almost recovered                                          | `AwaitingDeposit`    | Set `next_request_pending_deposit`; request emitted on deposit confirmation                                                                | No                       |
+| Fully recovered                                           | Known active SSA     | Clear only that SSA's deadlines; keep tombstone; fallback next-SSA request if early recovery never observed                                | Terminal                 |
+| Empty/unknown/stale observation                           | Any                  | Trace/ignore or count as non-attributable protocol diagnostics                                                                             | No                       |
+| Idle deadline fires, no service since last progress       | `Recovering`         | Re-arm idle timer; no action                                                                                                               | Re-armed                 |
+| Idle deadline fires, service consumed since last progress | `Recovering`         | Close as `RecoveryIdle`                                                                                                                    | N/A                      |
+| Hard deadline fires                                       | `Recovering`         | Close as `RecoveryDeadline`                                                                                                                | N/A                      |
+| Other live deadline                                       | Matching phase       | Recheck current state, then emit one close action                                                                                          | N/A                      |
 
 ### Unverifiable Shares
+
 `hopr-protocol-pix` emits an absolute per-SSA invalid count, not one
 deduplicatable marker. The supervisor applies only the increase over the stored
 count, preserving correctness under duplicate/reordered events; a decrease closes
@@ -471,6 +496,7 @@ of a counter would reset it to zero and silently blind the supervisor's
 max-snapshot logic forever.
 
 ### Threat Model Notes (for reviewers and operators)
+
 - **Fault attribution.** `UnverifiableShares` is attributable to the Entry, not a
   relayer: the encrypted share is stored Exit-side at send time
   (`pipeline/mod.rs:125-149`); the first return-path relayer only supplies the
@@ -491,9 +517,12 @@ max-snapshot logic forever.
 # Testing & Crates
 
 ### Required Cross-Crate Changes
+
 #### `hopr-protocol-pix` — required
+
 Modify `protocols/pix/src/reconstructor/utils.rs`, `reconstructor/mod.rs`,
 `traits.rs`, and exports in `lib.rs`:
+
 - Detect canonical duplicate evaluation identifiers in `SsaPartBuilder`.
 - Track absolute useful-share/recovered-polynomial progress and per-SSA invalid
   counts in a dedicated counter map with explicit lifecycle (`retire_ssa`,
@@ -508,12 +537,14 @@ Modify `protocols/pix/src/reconstructor/utils.rs`, `reconstructor/mod.rs`,
 - Add `retire_ssa` to `ExitAcknowledgementShareProcessor`.
 
 #### `hopr-transport` — required
+
 Update the two adapters in `transport/hopr/src/lib.rs` (one private shared
 helper) to translate progress and absolute fault resolutions into the expanded
 `HoprSessionInPixEvent`, while preserving recovered-key forwarding to
 `PixEvent::PrivateKeyRecovered`. Host the config cross-validation call here.
 
 #### Other crates
+
 - `hopr-protocol-start`: no production change in this scope.
 - `impls/strategy` and `hopr-api`: keep the existing deposit notifier payload;
   no production change required (the `HoprBalance` is already in the payload).
@@ -523,8 +554,10 @@ helper) to translate progress and absolute fault resolutions into the expanded
   the existing multi-cycle test may need assertions/config values.
 
 ### Test Matrix
+
 See `session-pix-supervisor-plan.md` for the full named test list per step. In
 summary:
+
 - Exhaustive timestamp/counter-driven core tests colocated in
   `transport/session/src/pix/supervisor.rs`, including property-based tests
   (random valid/duplicate/reordered event sequences asserting idempotence and
@@ -538,6 +571,7 @@ summary:
   the `hopr-lib` three-cycle end-to-end regression.
 
 ### Validation Commands
+
 Follow repository conventions (`CLAUDE.md`): `cargo nextest run`, integration
 tests single-threaded.
 
@@ -553,6 +587,7 @@ cargo nextest run -p hopr-lib --test transport_session_pix -j 1
 ```
 
 ### Known Residual Risk
+
 Until surplus is negotiated and priced, the supervisor bounds time, predeposit
 volume, and service-without-progress — but not postdeposit service volume. This
 guide states this prominently and does not describe service accounting as a
@@ -560,6 +595,7 @@ security-enforced quota. The count-based `max_served_without_progress` bound and
 the postdeposit ceiling are the designated follow-ups.
 
 # Delivery
+
 The ordered, executable implementation plan — including per-step file lists,
 exact contracts, named test cases, coverage targets, and validation commands —
 is maintained in [`session-pix-supervisor-plan.md`](session-pix-supervisor-plan.md).
