@@ -241,6 +241,13 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_millis(800))]
     pub max_frame_timeout: Duration,
 
+    /// Maximum number of segments to buffer in the downstream transport of a Session's socket.
+    /// If 0 is given, the transport is unbuffered.
+    ///
+    /// Default is 0.
+    #[default(0)]
+    pub max_buffered_segments: usize,
+
     /// The base timeout for initiation of Session initiation.
     ///
     /// The actual timeout is adjusted according to the number of hops for that Session:
@@ -529,6 +536,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
         capabilities,
         frame_mtu: cfg.frame_mtu,
         frame_timeout: cfg.max_frame_timeout,
+        max_buffered_segments: cfg.max_buffered_segments,
     }
 }
 
@@ -1781,6 +1789,26 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    #[test]
+    fn session_config_forwards_max_buffered_segments() {
+        assert_eq!(
+            SessionManagerConfig::default().max_buffered_segments,
+            0,
+            "default must leave the transport unbuffered"
+        );
+
+        for segments in [0, 64] {
+            let cfg = SessionManagerConfig {
+                max_buffered_segments: segments,
+                ..Default::default()
+            };
+            assert_eq!(
+                session_config(&cfg, Capabilities::empty()).max_buffered_segments,
+                segments
+            );
+        }
+    }
 
     #[async_trait::async_trait]
     trait SendMsg {
