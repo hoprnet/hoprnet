@@ -24,9 +24,11 @@ use crate::{
 };
 
 /// Tracks polynomial verifier IDs per SSA so `retire_ssa` can remove all of them.
-type SsaVerifierMap<S> = std::sync::Arc<
-    parking_lot::Mutex<HashMap<SsaId<<S as PixSpec>::Pseudonym>, Vec<SsaPolynomialId<<S as PixSpec>::Pseudonym>>>>,
->;
+///
+/// Uses TTL-only cache (same lifetime as `ssa_counters`) so entries auto-expire
+/// if `retire_ssa` is not called.
+type SsaVerifierMap<S> =
+    moka::sync::Cache<SsaId<<S as PixSpec>::Pseudonym>, Vec<SsaPolynomialId<<S as PixSpec>::Pseudonym>>>;
 
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
@@ -178,7 +180,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_counters: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
                 .build(),
-            ssa_to_verifier_ids: std::sync::Arc::new(parking_lot::Mutex::new(HashMap::new())),
+            ssa_to_verifier_ids: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+                .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
+                .build(),
             cfg,
         }
     }
@@ -391,8 +395,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     self.ssa_verifiers
                         .insert(spi, std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)));
                 }
-                let mut map = self.ssa_to_verifier_ids.lock();
-                map.entry(ssa_id).or_insert(verifier_ids);
+                self.ssa_to_verifier_ids.insert(ssa_id, verifier_ids);
 
                 // Initialize the counter entry when the commitment becomes verifiable
                 self.ssa_counters.insert(
@@ -461,10 +464,16 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(&peer, ack, ack_challenge, &awaiting_ack_from_peer) {
                 Ok(ProcessedAckResult::FullRecovery(ssa)) => {
+                    // Record the share that triggered full recovery.
+                    self.record_useful_share(&ssa.ssa_id);
+                    self.record_completed_part(&ssa.ssa_id);
                     progress_touched.insert(ssa.ssa_id);
                     terminal_events.push(ShareResolution::RecoveredSsa(ssa));
                 }
                 Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
+                    // Record the share that triggered early recovery.
+                    self.record_useful_share(&ssa_id);
+                    self.record_completed_part(&ssa_id);
                     progress_touched.insert(ssa_id);
                     terminal_events.push(ShareResolution::AlmostRecoveredSsa(ssa_id));
                 }
@@ -543,12 +552,12 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         // Remove SSA builder
         self.ssa_builders.invalidate(ssa_id);
         // Remove all verifiers for this SSA's polynomials
-        let mut map = self.ssa_to_verifier_ids.lock();
-        if let Some(ids) = map.remove(ssa_id) {
-            for id in ids {
-                self.ssa_verifiers.invalidate(&id);
+        if let Some(ids) = self.ssa_to_verifier_ids.get(ssa_id) {
+            for id in &ids {
+                self.ssa_verifiers.invalidate(id);
             }
         }
+        self.ssa_to_verifier_ids.invalidate(ssa_id);
         // Remove counter entry
         self.ssa_counters.invalidate(ssa_id);
         tracing::trace!(%ssa_id, "ssa retired");
@@ -1050,6 +1059,92 @@ mod tests {
 
         assert!(has_early, "expected AlmostRecoveredSsa event");
         assert!(has_full, "expected RecoveredSsa event");
+
+        Ok(())
+    }
+
+    #[test]
+    fn retire_ssa_removes_builders_verifiers_and_counters() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        // Create a commitment so builders, verifiers, and counters are populated
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let mut poly_map = HashMap::new();
+        for poly in 0..2 {
+            poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        }
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map.into_iter())?;
+        let mut poly_map2 = HashMap::new();
+        for poly in 0..2 {
+            poly_map2.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        }
+        reconstructor.insert_coefficient_commitments(ssa_id, 1, poly_map2.into_iter())?;
+
+        // Verify SSA builder, counters, and verifier map are populated
+        assert!(
+            reconstructor.ssa_builders.get(&ssa_id).is_some(),
+            "ssa_builders should exist"
+        );
+        assert!(
+            reconstructor.ssa_counters.get(&ssa_id).is_some(),
+            "ssa_counters should exist"
+        );
+        assert!(
+            reconstructor.ssa_to_verifier_ids.get(&ssa_id).is_some(),
+            "ssa_to_verifier_ids should exist"
+        );
+
+        // Now retire the SSA
+        reconstructor.retire_ssa(&ssa_id);
+
+        // All entries must be gone
+        assert!(reconstructor.ssa_builders.get(&ssa_id).is_none());
+        assert!(reconstructor.ssa_counters.get(&ssa_id).is_none());
+        assert!(reconstructor.ssa_to_verifier_ids.get(&ssa_id).is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn retire_and_recreate_same_pseudonym() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        for coeff in 0..2 {
+            let mut poly_map = HashMap::new();
+            for poly in 0..2 {
+                poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+            }
+            reconstructor.insert_coefficient_commitments(ssa_id, coeff as CoefficientIndex, poly_map.into_iter())?;
+        }
+
+        reconstructor.retire_ssa(&ssa_id);
+
+        // Re-create a new SSA with a different index
+        let ssa_id2 = SsaId::new(pseudonym, 2.try_into()?);
+        reconstructor.new_exit_commitment(ssa_id2, 2, 2)?;
+        for coeff in 0..2 {
+            let mut poly_map = HashMap::new();
+            for poly in 0..2 {
+                poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+            }
+            reconstructor.insert_coefficient_commitments(ssa_id2, coeff as CoefficientIndex, poly_map.into_iter())?;
+        }
+
+        // New SSA should have its own tracker entries
+        assert!(
+            reconstructor.ssa_builders.get(&ssa_id2).is_some(),
+            "new SSA should have builders"
+        );
+        assert!(
+            reconstructor.ssa_to_verifier_ids.get(&ssa_id2).is_some(),
+            "new SSA should have verifier map"
+        );
 
         Ok(())
     }

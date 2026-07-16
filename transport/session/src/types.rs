@@ -130,7 +130,11 @@ pub enum HoprSessionInPixEvent {
     /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
     /// for an SSA — the next SSA request can be made.
     SsaAlmostRecovered(SsaId<HoprPseudonym>),
-    /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
+    /// Informs the [`SessionManager`] that unverifiable shares were encountered.
+    ///
+    /// This variant is deprecated. Use [`UnverifiableShares`] instead, which includes
+    /// an absolute per-SSA total count.
+    #[deprecated(note = "use UnverifiableShares with absolute total instead")]
     UnverifiableShare(SsaId<HoprPseudonym>),
     /// Reports absolute SSA recovery progress.
     Progress(hopr_protocol_pix::SsaRecoveryProgress<HoprPseudonym>),
@@ -149,6 +153,7 @@ impl HoprSessionInPixEvent {
         match self {
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
+            #[allow(deprecated)]
             HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::Progress(p) => p.ssa_id.pseudonym(),
             HoprSessionInPixEvent::UnverifiableShares { ssa_id, .. } => ssa_id.pseudonym(),

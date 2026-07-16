@@ -123,7 +123,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         let identifier: IdentifierPrimeField<PixScalar<S>> = msg.into();
 
         // Duplicate: evaluation identifier already collected for this polynomial
-        if !self.collected_identifiers.insert(identifier) {
+        if self.collected_identifiers.contains(&identifier) {
             return Ok(AddShareOutcome::Duplicate);
         }
 
@@ -138,7 +138,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         }
 
         self.verifier.verify_completed_share(&share)?;
-
+        self.collected_identifiers.insert(identifier);
         self.shares.push(share);
 
         if self.shares.len() >= self.verifier.min_shares() {

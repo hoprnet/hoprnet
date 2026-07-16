@@ -1,11 +1,15 @@
 use std::{
+    future::Future,
     pin::Pin,
     sync::{Arc, OnceLock, atomic::Ordering},
+    task::{Context, Poll, Waker},
     time::Duration,
 };
 
 use anyhow::anyhow;
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
+use futures::future::Either;
+use hopr_utils::runtime::prelude::sleep;
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -84,6 +88,11 @@ lazy_static::lazy_static! {
         "Number of HOPR session errors sent to an Entry node",
         &["kind"]
     ).unwrap();
+    static ref METRIC_PIX_CLOSURES: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_session_pix_closures_total",
+        "Number of PIX-supervised sessions closed, by close reason",
+        &["reason"]
+    ).unwrap();
 }
 
 /// Map a `SessionPixCloseReason` to the public `ClosureReason`.
@@ -132,6 +141,58 @@ pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
 pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
+/// Runtime-agnostic multi-waker notification primitive.
+///
+/// Multi-waker notification — runtime-agnostic, no tokio dependency.
+struct SlotNotify {
+    inner: parking_lot::Mutex<Vec<Waker>>,
+}
+
+impl SlotNotify {
+    const fn new() -> Self {
+        Self {
+            inner: parking_lot::Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Wake all parked waiters.
+    fn notify_waiters(&self) {
+        for waker in self.inner.lock().drain(..) {
+            waker.wake();
+        }
+    }
+
+    /// Return a future that completes the next time `notify_waiters` is called.
+    fn notified(self: &Arc<Self>) -> SlotNotifyFuture {
+        SlotNotifyFuture {
+            notify: self.clone(),
+            registered: false,
+        }
+    }
+}
+
+/// Future returned by [`SlotNotify::notified`].
+struct SlotNotifyFuture {
+    notify: Arc<SlotNotify>,
+    registered: bool,
+}
+
+impl Future for SlotNotifyFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.get_mut();
+        if this.registered {
+            // Already registered — a wake means the waker was called.
+            Poll::Ready(())
+        } else {
+            this.registered = true;
+            this.notify.inner.lock().push(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 
@@ -162,9 +223,6 @@ enum SessionHandles {
     KeepAlive,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
-    /// Handle to the PIX supervisor worker task.
-    #[expect(dead_code, reason = "wired in SessionManager teardown (Step 4)")]
-    PixSupervisor,
     /// Handle to the PIX action driver task.
     PixActionDriver,
     /// Handle to the PIX deposit observer for one SSA.
@@ -334,6 +392,12 @@ pub struct IncomingSessionPixConfig {
     /// Default is 1024.
     #[default(1024)]
     pub max_predeposit_packets: u64,
+    /// How long to retain tombstones for recovered SSAs.
+    ///
+    /// Must be >= the reconstructor's `max_ack_await_time`.
+    /// Default is 30 seconds.
+    #[default(Duration::from_secs(30))]
+    pub tombstone_retention_window: Duration,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -733,6 +797,8 @@ pub struct SessionManager<S> {
     /// and decremented at every removal path (explicit close, eviction, guard rollback).
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
+    /// Notify when a session slot is allocated (for event-driven slot-wait).
+    slot_notify: Arc<SlotNotify>,
     msg_sender: Arc<OnceLock<S>>,
     pix_toolbox: OnceLock<PixToolbox>,
     cfg: SessionManagerConfig,
@@ -749,6 +815,7 @@ impl<S> Clone for SessionManager<S> {
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
+            slot_notify: self.slot_notify.clone(),
         }
     }
 }
@@ -852,6 +919,7 @@ where
                     _ => {}
                 })
                 .build(),
+            slot_notify: Arc::new(SlotNotify::new()),
             pix_toolbox: OnceLock::new(),
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
@@ -1060,6 +1128,7 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                self.slot_notify.notify_waiters();
                 // take_guard borrows self, so the guard stores the counter clone separately.
                 Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
             }
@@ -1640,6 +1709,7 @@ where
             }
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => crate::pix::SessionPixEvent::AlmostRecovered(*ssa_id),
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => crate::pix::SessionPixEvent::Recovered(*ssa_id),
+            #[allow(deprecated)]
             HoprSessionInPixEvent::UnverifiableShare(_) => {
                 // Old single-observation variant — should not be emitted by new code;
                 // ignore silently.
@@ -1970,8 +2040,7 @@ where
             };
 
             let surb_estimator_clone = slot.surb_estimator.clone();
-            let gate_for_sink = Arc::clone(&slot.pix_egress_gate);
-            let gate_for_keepalive = gate_for_sink.clone();
+            let surb_estimator_for_egress = slot.surb_estimator.clone();
             let session = HoprSession::new(
                 session_id,
                 reply_routing.clone(),
@@ -1980,20 +2049,25 @@ where
                     // Sent packets = SURB consumption estimate
                     msg_sender
                         .clone()
-                        .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            // Gate the egress for PIX-enabled sessions.
-                            if let Some(gate) = gate_for_sink.get()
-                                && gate.try_acquire_sync().is_err()
-                            {
-                                // Gate poisoned; let the packet through — closure is near.
+                        .with({
+                            let gate = Arc::clone(&slot.pix_egress_gate);
+                            let surb = surb_estimator_for_egress;
+                            move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                                let gate = gate.get().cloned();
+                                let surb = surb.clone();
+                                Box::pin(async move {
+                                    // Park while predeposit budget is exhausted;
+                                    // on poison, the session is closing so pass through.
+                                    if let Some(g) = gate {
+                                        let _ = g.acquire().await;
+                                    }
+                                    // Each outgoing packet consumes one SURB
+                                    surb.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    #[cfg(feature = "telemetry")]
+                                    telemetry::record_session_surb_consumed(&session_id, 1);
+                                    Ok::<_, S::Error>((routing, data))
+                                })
                             }
-                            // Each outgoing packet consumes one SURB
-                            surb_estimator_clone
-                                .consumed
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(feature = "telemetry")]
-                            telemetry::record_session_surb_consumed(&session_id, 1);
-                            futures::future::ok::<_, S::Error>((routing, data))
                         })
                         .rate_limit_with_controller(&egress_rate_control)
                         .buffer((2 * target_surb_buffer_size) as usize),
@@ -2051,9 +2125,6 @@ where
                     msg_sender
                         .clone()
                         .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
-                            if let Some(gate) = gate_for_keepalive.get() {
-                                let _ = gate.try_acquire_sync();
-                            }
                             // Each sent keepalive consumes 1 SURB
                             surb_estimator_clone
                                 .consumed
@@ -2087,7 +2158,21 @@ where
                 session_id,
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
-                (msg_sender.clone(), session_rx),
+                (
+                    msg_sender.clone().with({
+                        let gate = Arc::clone(&slot.pix_egress_gate);
+                        move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
+                            let gate = gate.get().cloned();
+                            Box::pin(async move {
+                                if let Some(g) = gate {
+                                    let _ = g.acquire().await;
+                                }
+                                Ok::<_, S::Error>((routing, data))
+                            })
+                        }
+                    }),
+                    session_rx,
+                ),
                 Some(closure_notifier),
             )?
         };
@@ -2167,7 +2252,7 @@ where
                 max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
                 max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
                 max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
-                tombstone_retention_window: Duration::from_secs(30),
+                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
             };
 
             let (handle, mut action_rx) =
@@ -2209,7 +2294,12 @@ where
             let myself = self.clone();
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
+            let supervisor_handle = handle.clone();
+            let pix_toolbox_for_driver = self.pix_toolbox.get().cloned();
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
+                // Track requested SSAs so they can be retired on close.
+                let mut tracked_ssas: Vec<SsaId<HoprPseudonym>> = Vec::new();
+
                 while let Some(action) = action_rx.recv().await {
                     match action {
                         crate::pix::SessionPixAction::RequestSsa {
@@ -2217,6 +2307,11 @@ where
                             polys,
                             threshold,
                         } => {
+                            let action_key = crate::pix::SessionPixAction::RequestSsa {
+                                ssa_id,
+                                polys,
+                                threshold,
+                            };
                             // Look up the session slot and send the request.
                             if let Some(s) = myself.sessions.get(&session_id) {
                                 let result = myself.send_ssa_request(session_id, &s, ssa_id.ssa_index()).await;
@@ -2224,22 +2319,30 @@ where
                                     let _ = handle.send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id));
                                 }
                                 if let Some(handle) = s.pix_supervisor.get() {
-                                    let _ = handle.send_action_result(
-                                        crate::pix::SessionPixAction::RequestSsa {
-                                            ssa_id,
-                                            polys,
-                                            threshold,
-                                        },
-                                        result.is_ok(),
-                                    );
+                                    let _ = handle.send_action_result(action_key, result.is_ok());
                                 }
+                                if result.is_ok() {
+                                    tracked_ssas.push(ssa_id);
+                                }
+                            } else {
+                                // Slot missing — supervisor must have already closed it.
+                                // Report failure so the supervisor can transition.
+                                let _ = supervisor_handle.send_action_result(action_key, false);
                             }
                         }
                         crate::pix::SessionPixAction::ReleaseService => {
                             gate.release_service();
                         }
                         crate::pix::SessionPixAction::Close(reason) => {
+                            // Retire all tracked SSAs from the reconstructor.
+                            if let Some(ref toolbox) = pix_toolbox_for_driver {
+                                for ssa_id in &tracked_ssas {
+                                    toolbox.share_processor.retire_ssa(ssa_id);
+                                }
+                            }
                             let closure_reason = pix_close_to_closure_reason(reason);
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
                             error!(%session_id, ?reason, "pix supervisor closed session");
                             if let Some(slot) = myself.sessions.remove(&session_id) {
                                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
@@ -2250,6 +2353,14 @@ where
                     }
                 }
                 // action channel closed: supervisor worker died.
+                // Retire all tracked SSAs from the reconstructor.
+                if let Some(ref toolbox) = pix_toolbox_for_driver {
+                    for ssa_id in &tracked_ssas {
+                        toolbox.share_processor.retire_ssa(ssa_id);
+                    }
+                }
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_PIX_CLOSURES.increment(&["PixFailure"]);
                 if let Some(slot) = myself.sessions.remove(&session_id) {
                     myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                     close_session(session_id, slot, ClosureReason::PixFailure);
@@ -2454,47 +2565,57 @@ where
             }
 
             // Spawn the PixDepositObserver that forwards deposit confirmations
-            // to the supervisor.
+            // to the supervisor. This loops to support top-up deposits.
             let pix_supervisor_for_observer = session_slot.pix_supervisor.clone();
             let ssa_id_for_observer = commitment_ssa_id;
             let max_deposit_wait = self.cfg.pix_config.max_deposit_wait;
             session_slot.abort_handles.lock().insert(
                 SessionHandles::PixDepositObserver(commitment_ssa_id.ssa_index()),
                 hopr_utils::spawn_as_abortable!(async move {
-                    let result = deposit_done_rx
-                        .filter(|((evt_pseudonym, evt_index), _)| {
+                    let mut deposit_stream = Box::pin(
+                        deposit_done_rx.filter(|((evt_pseudonym, evt_index), _)| {
                             futures::future::ready(
                                 evt_index == &ssa_id_for_observer.ssa_index()
                                     && evt_pseudonym == ssa_id_for_observer.pseudonym(),
                             )
-                        })
-                        .next()
-                        .delay(futures_time::time::Duration::from_millis(100))
-                        .timeout(futures_time::time::Duration::from(max_deposit_wait))
-                        .await;
-                    match result {
-                        Ok(Some(((..), amount))) => {
-                            if let Some(h) = pix_supervisor_for_observer.get() {
-                                let _ = h.send_event(crate::pix::SessionPixEvent::DepositConfirmed {
-                                    ssa_id: ssa_id_for_observer,
-                                    amount,
-                                });
+                        }),
+                    );
+                    loop {
+                        let result = deposit_stream
+                            .next()
+                            .delay(futures_time::time::Duration::from_millis(100))
+                            .timeout(futures_time::time::Duration::from(max_deposit_wait))
+                            .await;
+                        match result {
+                            Ok(Some(((..), amount))) => {
+                                // Forward every deposit — the supervisor decides
+                                // whether the accumulated amount is sufficient.
+                                if let Some(h) = pix_supervisor_for_observer.get() {
+                                    let _ = h.send_event(
+                                        crate::pix::SessionPixEvent::DepositConfirmed {
+                                            ssa_id: ssa_id_for_observer,
+                                            amount,
+                                        },
+                                    );
+                                }
                             }
-                        }
-                        Ok(None) => {
-                            warn!(%session_id, "deposit channel closed without confirmation");
-                            if let Some(h) = pix_supervisor_for_observer.get() {
-                                let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
-                                    ssa_id_for_observer,
-                                ));
+                            Ok(None) => {
+                                error!(%session_id, "deposit channel closed without confirmation; check deposit address and funding");
+                                if let Some(h) = pix_supervisor_for_observer.get() {
+                                    let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                        ssa_id_for_observer,
+                                    ));
+                                }
+                                break;
                             }
-                        }
-                        Err(_) => {
-                            warn!(%session_id, "deposit confirmation timed out");
-                            if let Some(h) = pix_supervisor_for_observer.get() {
-                                let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
-                                    ssa_id_for_observer,
-                                ));
+                            Err(_) => {
+                                error!(%session_id, "deposit confirmation timed out; check deposit address and funding");
+                                if let Some(h) = pix_supervisor_for_observer.get() {
+                                    let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                        ssa_id_for_observer,
+                                    ));
+                                }
+                                break;
                             }
                         }
                     }
@@ -2540,20 +2661,31 @@ where
         // The SsaRequest can arrive before new_session() has finished allocating the
         // session slot, since both SessionEstablished and SsaRequest are sent by the Exit
         // back-to-back and processed concurrently by the Start protocol handler.
-        // Retry briefly to give the slot time to be registered.
+        // Wait event-driven for the slot to appear, with a fallback timeout.
         let session_slot = {
-            let mut retries = 0u32;
             let session_id = msg.session_id;
+            let notify = self.slot_notify.clone();
+            let start = std::time::Instant::now();
+            const DEADLINE: Duration = Duration::from_millis(1000);
             loop {
                 if let Some(slot) = self.sessions.get(&session_id) {
                     break slot;
                 }
-                retries += 1;
-                if retries > 50 {
-                    error!(%session_id, "session slot not found after retries");
+                if start.elapsed() >= DEADLINE {
+                    error!(%session_id, "session slot not found within {DEADLINE:?}");
                     return Err(SessionManagerError::NonExistingSession.into());
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                // Race the notification future against a sleep timeout.
+                match futures::future::select(notify.notified(), Box::pin(sleep(Duration::from_millis(200)))).await {
+                    Either::Left((_, _)) => {
+                        // Woken by slot insertion; retry.
+                        continue;
+                    }
+                    Either::Right((_, _)) => {
+                        // Timeout guard; retry.
+                        continue;
+                    }
+                }
             }
         };
 

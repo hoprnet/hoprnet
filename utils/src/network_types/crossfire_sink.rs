@@ -14,6 +14,9 @@ pub enum CrossfireSinkError {
     /// The channel receiver has been dropped.
     #[error("channel receiver disconnected")]
     Disconnected,
+    /// The PIX service gate is poisoned (session closing).
+    #[error("PIX service gate poisoned (session closing)")]
+    GateClosed,
 }
 
 /// A [`futures::Sink`] backed by a bounded crossfire MPSC channel sender.

@@ -196,7 +196,6 @@ fn send_actions(actions: &[SessionPixAction], action_tx: &mpsc::UnboundedSender<
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-#[cfg(feature = "runtime-tokio")]
 mod tests {
     use std::time::{Duration, Instant};
 
