@@ -36,7 +36,10 @@ pub use types::{
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
 };
-pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding, group::cofactor::CofactorGroup};
+pub use vsss_rs::elliptic_curve::{
+    Group,
+    group::{GroupEncoding, cofactor::CofactorGroup},
+};
 
 #[doc(hidden)]
 pub mod prelude {
@@ -425,15 +428,15 @@ pub(crate) mod tests {
     #[test]
     fn from_serializable_commitments_must_reject_all_generator() {
         let spi = SsaPolynomialId::new(
-            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(), 1.try_into().unwrap()),
+            SsaId::new(
+                SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
+                1.try_into().unwrap(),
+            ),
             1,
         );
         // A polynomial whose coefficient commitments are all the generator point:
         // the filter removes every one and the result collapses to length 1.
-        let all_generator = vec![
-            PixGroup::<TestSpec>::generator().to_bytes();
-            10
-        ];
+        let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
         assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator).is_err());
     }
 }
