@@ -1790,6 +1790,26 @@ mod tests {
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
+    #[test]
+    fn session_config_forwards_max_buffered_segments() {
+        assert_eq!(
+            SessionManagerConfig::default().max_buffered_segments,
+            0,
+            "default must leave the transport unbuffered"
+        );
+
+        for segments in [0, 64] {
+            let cfg = SessionManagerConfig {
+                max_buffered_segments: segments,
+                ..Default::default()
+            };
+            assert_eq!(
+                session_config(&cfg, Capabilities::empty()).max_buffered_segments,
+                segments
+            );
+        }
+    }
+
     #[async_trait::async_trait]
     trait SendMsg {
         async fn send_message(

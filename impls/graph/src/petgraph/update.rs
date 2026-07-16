@@ -116,14 +116,19 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 // target edge as its new intermediate measurement.
                 //
                 // `timestamp()` is the probe's creation time (unix epoch millis), so the
-                // RTT is the elapsed time until now. Values above the plausibility cap
-                // (clock skew, stale telemetry) are discarded instead of poisoning the
-                // latency EMA with an absurd measurement.
+                // RTT is the elapsed time until now. A timestamp in the future (backward
+                // clock drift) underflows and is discarded rather than recorded as a
+                // zero-duration RTT. Values above the plausibility cap (clock skew, stale
+                // telemetry) are likewise discarded instead of poisoning the latency EMA.
                 let now_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis();
-                let total_rtt = std::time::Duration::from_millis(now_ms.saturating_sub(telemetry.timestamp()) as u64);
+                let Some(elapsed_ms) = now_ms.checked_sub(telemetry.timestamp()) else {
+                    tracing::debug!("loopback probe timestamp in the future, skipping attribution");
+                    return;
+                };
+                let total_rtt = std::time::Duration::from_millis(elapsed_ms as u64);
                 if total_rtt > self.max_plausible_loopback_rtt {
                     tracing::debug!(
                         rtt_ms = total_rtt.as_millis(),
@@ -813,6 +818,40 @@ mod tests {
         assert!(
             obs.intermediate_qos().is_none(),
             "implausible RTT must not produce an intermediate measurement"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn loopback_future_timestamp_should_be_ignored() -> anyhow::Result<()> {
+        // Backward clock drift can place the probe's creation timestamp in the future,
+        // so `now - timestamp` underflows. Such a probe is discarded rather than
+        // recorded as a zero-duration RTT, which would poison the latency EMA toward 0.
+        let me = pubkey_from(&SECRET_0);
+        let a = pubkey_from(&SECRET_1);
+        let b = pubkey_from(&SECRET_2);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(b);
+        graph.add_edge(&me, &a)?;
+        graph.add_edge(&a, &b)?;
+        graph.add_edge(&b, &me)?; // return edge
+
+        let telemetry: Result<
+            EdgeTransportTelemetry<TestNeighbor, LoopbackTestPath>,
+            NetworkGraphError<LoopbackTestPath>,
+        > = Ok(EdgeTransportTelemetry::Loopback(LoopbackTestPath::new(
+            [0, 1, 2, 0, 0],
+            now_unix_ms() + 5_000, // timestamp 5 s in the future
+        )));
+        graph.record_edge(hopr_api::graph::MeasurableEdge::Probe(telemetry));
+
+        let obs = graph.edge(&a, &b).context("edge a→b should exist")?;
+        assert!(
+            obs.intermediate_qos().is_none(),
+            "future timestamp must not produce an intermediate measurement"
         );
 
         Ok(())
