@@ -352,6 +352,10 @@ where
                     .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
                     .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
                     .max(Duration::from_millis(100)),
+                max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,

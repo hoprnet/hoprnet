@@ -229,6 +229,12 @@ pub struct HoprSessionConfig {
     #[default(Duration::from_millis(800))]
     #[serde(with = "humantime_serde")]
     pub frame_timeout: Duration,
+    /// Maximum number of segments to buffer in the downstream transport.
+    /// If 0 is given, the transport is unbuffered.
+    ///
+    /// Default is 0.
+    #[default(0)]
+    pub max_buffered_segments: usize,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -306,6 +312,7 @@ impl HoprSession {
                 frame_timeout: cfg.frame_timeout,
                 capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
+                max_buffered_segments: cfg.max_buffered_segments,
                 ..Default::default()
             };
 
