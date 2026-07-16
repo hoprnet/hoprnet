@@ -22,7 +22,7 @@ pub mod errors;
 
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
-use hopr_protocol_pix::SsaCommitment;
+use hopr_protocol_pix::{MAX_POLYS_PER_SSA, SsaCommitment};
 
 use crate::errors::StartProtocolError;
 
@@ -571,7 +571,7 @@ where
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
                     );
-                    if num_polys == 0 {
+                    if num_polys == 0 || num_polys > MAX_POLYS_PER_SSA {
                         return Err(StartProtocolError::NumberOfCommitments);
                     }
 

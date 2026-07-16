@@ -50,6 +50,7 @@ pub struct HoprCodecConfig {
 impl PartialEq for HoprCodecConfig {
     fn eq(&self, other: &Self) -> bool {
         self.outgoing_ticket_price.eq(&other.outgoing_ticket_price)
+            && self.min_incoming_ticket_price.eq(&other.min_incoming_ticket_price)
             && match (self.outgoing_win_prob, other.outgoing_win_prob) {
                 (Some(a), Some(b)) => a.approx_eq(&b),
                 (None, None) => true,

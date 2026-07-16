@@ -110,7 +110,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
-            ssa_verifiers: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+            ssa_verifiers: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA as u64) * 4)
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)

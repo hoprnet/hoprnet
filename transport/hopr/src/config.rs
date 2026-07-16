@@ -176,7 +176,7 @@ pub struct PixGlobalConfig {
     /// This scales will with the CPU parallelism.
     ///
     /// Default is 4096.
-    #[validate(range(min = 8, max = 32384))]
+    #[validate(range(min = 8, max = 16192))]
     #[default(4096)]
     pub num_ssa_parts: usize,
 

@@ -22,7 +22,8 @@ use hopr_crypto_packet::{
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    GroupEncoding, PixSpec, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
+    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, SsaId, SsaIndex, SsaReconstructor,
+    SsaShareGenerator,
 };
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
@@ -1686,11 +1687,10 @@ where
                 "client offered MB SSA quota"
             );
 
-            self.cfg
-                .pix_config
-                .quota_range
-                .contains(&quota_per_ssa)
-                .then_some((polys_per_ssa, shares_per_ssa))
+            let in_quota_range = self.cfg.pix_config.quota_range.contains(&quota_per_ssa);
+            let valid_polys = polys_per_ssa <= MAX_POLYS_PER_SSA;
+            let valid_shares = (2_u16..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa);
+            (in_quota_range && valid_polys && valid_shares).then_some((polys_per_ssa, shares_per_ssa))
         } else if self.cfg.pix_config.enforce_pix {
             // Client didn't offer PIX, but PIX is enforced
             None
@@ -1994,25 +1994,27 @@ where
             Some(&slot.surb_mgmt),
         );
 
-        info!(%session_id, "new session established");
-
-        #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_NUM_ESTABLISHED_SESSIONS.increment();
-
-        slot_guard.commit();
-
         // If client requested PIX, and we support it
         // (it was previously verified that the offered parameters are acceptable for us),
         // then create initial Server SSA commitment message and send it to the client.
+        // Defer slot_guard.commit() until after PIX setup succeeds: if request_next_ssa
+        // fails, the Drop impl rolls back the session slot (removes it from the cache and
+        // closes the session), preventing an established session without a PixKillSwitch.
         if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             // We use the same quota that the client offered
             slot.current_ssa_state
                 .set(SessionSsaState::new(client_polys_per_ssa, client_shares_per_ssa))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
-            // TODO: if this fails, should we terminate the session immediately (ie. not commit)?
             self.request_next_ssa(session_id, slot).await?;
         }
+
+        info!(%session_id, "new session established");
+
+        #[cfg(all(feature = "telemetry", not(test)))]
+        METRIC_NUM_ESTABLISHED_SESSIONS.increment();
+
+        slot_guard.commit();
 
         Ok(())
     }

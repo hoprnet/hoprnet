@@ -207,7 +207,7 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self, S::Pseudonym> {
-        if poly_commitments.is_empty() {
+        if poly_commitments.len() < 2 {
             return Err(errors::PixError::InvalidInput);
         }
 

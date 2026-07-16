@@ -459,7 +459,7 @@ async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some((1, 1)),
+                    pix_ssa_quota: Some((1, 2)),
                     ..Default::default()
                 },
             ),
