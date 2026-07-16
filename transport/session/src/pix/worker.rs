@@ -200,8 +200,8 @@ fn send_actions(actions: &[SessionPixAction], action_tx: &mpsc::UnboundedSender<
 mod tests {
     use std::time::{Duration, Instant};
 
-    use hopr_api::types::crypto_random::Randomizable;
-    use hopr_protocol_pix::{SsaId, SsaIndex};
+    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_protocol_pix::SsaIndex;
 
     use super::*;
 
