@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod errors;
 mod manager;
+pub(crate) mod pix;
 #[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
