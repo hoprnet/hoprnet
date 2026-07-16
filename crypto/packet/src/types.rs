@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_protocol_pix::{GroupEncoding, PixGroup};
+use hopr_protocol_pix::{CofactorGroup, GroupEncoding, PixGroup};
 use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{
@@ -269,6 +269,11 @@ impl HoprPixGroupElement {
     /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
     pub fn try_into_pix_group(self) -> Result<PixGroup<HoprPixSpec>, GeneralError> {
         Option::<PixGroup<HoprPixSpec>>::from(PixGroup::<HoprPixSpec>::from_bytes(&self.0))
+            .filter(|pt| {
+                // Reject points outside the prime-order subgroup. Baby JubJub has
+                // cofactor 8, so small-order points can pass the on-curve check.
+                bool::from(pt.is_torsion_free())
+            })
             .ok_or(GeneralError::ParseError("pix group from bytes failed".into()))
     }
 }

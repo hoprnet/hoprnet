@@ -18,7 +18,7 @@ use hopr_types::{
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
-    elliptic_curve::{Curve, CurveArithmetic, PrimeCurve, PrimeField, consts::U256, group::cofactor::CofactorGroup},
+    elliptic_curve::{Curve, CurveArithmetic, PrimeCurve, PrimeField, consts::U256},
 };
 
 pub mod ack_verify;
@@ -36,7 +36,7 @@ pub use types::{
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
     TaggedEncryptedPartialSsaShare,
 };
-pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding};
+pub use vsss_rs::elliptic_curve::{Group, group::GroupEncoding, group::cofactor::CofactorGroup};
 
 #[doc(hidden)]
 pub mod prelude {
@@ -207,14 +207,15 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self, S::Pseudonym> {
-        if poly_commitments.len() < 2 {
-            return Err(errors::PixError::InvalidInput);
-        }
-
         let recv_commitments = poly_commitments
             .into_iter()
             .map(|c| {
                 Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
+                    .filter(|pt| {
+                        // Reject points outside the prime-order subgroup. Baby JubJub has
+                        // cofactor 8, so small-order points can pass the on-curve check.
+                        bool::from(pt.is_torsion_free())
+                    })
                     .map(ShareVerifierGroup::<PixGroup<S>>::from)
                     .ok_or(errors::PixError::InvalidInput)
             })
@@ -228,6 +229,9 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
             .chain(recv_commitments)
             .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
+        if poly_commitment.len() < 2 {
+            return Err(errors::PixError::InvalidInput);
+        }
         Ok(Self { spi, poly_commitment })
     }
 
@@ -416,5 +420,20 @@ pub(crate) mod tests {
         assert_eq!(verifier_1, verifier_2);
 
         Ok(())
+    }
+
+    #[test]
+    fn from_serializable_commitments_must_reject_all_generator() {
+        let spi = SsaPolynomialId::new(
+            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(), 1.try_into().unwrap()),
+            1,
+        );
+        // A polynomial whose coefficient commitments are all the generator point:
+        // the filter removes every one and the result collapses to length 1.
+        let all_generator = vec![
+            PixGroup::<TestSpec>::generator().to_bytes();
+            10
+        ];
+        assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator).is_err());
     }
 }
