@@ -34,7 +34,7 @@ pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareRe
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RawSsaIndex,
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare,
+    SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
 };
 pub use vsss_rs::elliptic_curve::{
     Group,

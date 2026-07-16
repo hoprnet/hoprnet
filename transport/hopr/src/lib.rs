@@ -810,7 +810,7 @@ where
                                                     }
                                                     None
                                                 }
-                                                ShareResolution::InvalidShare(peer, ssa_id) => {
+                                                ShareResolution::InvalidShares { peer, ssa_id, .. } => {
                                                     error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
                                                     if let Err(error) = smgr
                                                         .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(
@@ -822,6 +822,7 @@ where
                                                     }
                                                     None
                                                 }
+                                                ShareResolution::Progress(_) => None,
                                             }
                                         }
                                     }),
@@ -911,7 +912,7 @@ where
                                                     }
                                                     None
                                                 }
-                                                ShareResolution::InvalidShare(peer, ssa_id) => {
+                                                ShareResolution::InvalidShares { peer, ssa_id, .. } => {
                                                     error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
                                                     if let Err(error) = smgr
                                                         .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(
@@ -923,6 +924,7 @@ where
                                                     }
                                                     None
                                                 }
+                                                ShareResolution::Progress(_) => None,
                                             }
                                         }
                                     }),
