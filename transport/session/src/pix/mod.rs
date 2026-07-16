@@ -190,7 +190,6 @@ pub(crate) enum SessionPixCloseReason {
 /// mutually consistent.
 ///
 /// Returns an error if constraints are violated.
-#[expect(dead_code, reason = "will be called from SessionManager init (Step 4)")]
 pub fn validate_pix_supervision(
     cfg: &SupervisorConfig,
     reconstructor_cfg: &SsaReconstructorConfig,

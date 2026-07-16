@@ -14,7 +14,10 @@ use tokio::sync::Notify;
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("service gate is poisoned (session closed)")]
-#[cfg_attr(not(test), expect(dead_code, reason = "error variant returned via acquire() which is wired in Step 4"))]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "error variant returned via acquire() which is wired in Step 4")
+)]
 pub(crate) struct GateClosed;
 
 /// Bounded predeposit service gate for a single PIX session.
@@ -33,7 +36,6 @@ pub(crate) struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
     /// Remaining predeposit budget (tracked separately so we can park on 0).
-    #[cfg_attr(not(test), expect(dead_code, reason = "read inside acquire() which is wired in Step 4"))]
     remaining: AtomicU64,
     /// Whether the funded flag has been flipped.
     funded: AtomicBool,
@@ -142,6 +144,36 @@ impl ServiceGate {
     pub fn poison(&self) {
         self.poisoned.store(true, Ordering::Release);
         self.notify.notify_waiters();
+    }
+
+    /// Non-blocking try-acquire for use in sync sink closures.
+    ///
+    /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
+    /// exhausted (packet should be dropped silently), or `Err(())` if the gate
+    /// is poisoned (session closing).
+    pub fn try_acquire_sync(&self) -> Result<bool, ()> {
+        if self.poisoned.load(Ordering::Acquire) {
+            return Err(());
+        }
+        if self.funded.load(Ordering::Acquire) {
+            self.served.fetch_add(1, Ordering::Relaxed);
+            return Ok(true);
+        }
+        // Try to consume from predeposit budget (non-blocking CAS loop).
+        loop {
+            let remaining = self.remaining.load(Ordering::Acquire);
+            if remaining == 0 {
+                return Ok(false);
+            }
+            if self
+                .remaining
+                .compare_exchange(remaining, remaining - 1, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                self.served.fetch_add(1, Ordering::Relaxed);
+                return Ok(true);
+            }
+        }
     }
 }
 
