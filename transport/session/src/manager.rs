@@ -2443,7 +2443,6 @@ mod tests {
     use super::*;
     // Import helpers from the top-level test_helpers module
     use crate::test_helpers::{msg_type, start_msg_match};
-    use crate::{balancer::SurbBalancerConfig, types::SessionTarget};
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
     #[test]
