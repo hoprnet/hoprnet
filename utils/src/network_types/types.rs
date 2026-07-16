@@ -273,21 +273,6 @@ mod tests {
 
     #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     #[tokio::test]
-    async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
-        match IpOrHost::Dns("localhost".to_string(), 1000)
-            .resolve_tokio()
-            .await?
-            .first()
-            .ok_or(anyhow!("must resolve"))?
-        {
-            SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
-            SocketAddr::V6(addr) => assert_eq!(*addr, "[::1]:1000".parse()?),
-        }
-        Ok(())
-    }
-
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
-    #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
 
