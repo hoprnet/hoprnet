@@ -164,6 +164,7 @@ pub(crate) enum SessionPixCloseReason {
     /// The deposit deadline expired without a sufficient deposit.
     DepositTimeout,
     /// A confirmed deposit was below the expected amount and never topped up.
+    #[expect(dead_code, reason = "will be emitted by supervisor in deposit flow (Step 4)")]
     DepositUnderfundedTimeout,
     /// The deposit observer channel closed without delivering a confirmation.
     DepositObserverClosed,
@@ -189,6 +190,7 @@ pub(crate) enum SessionPixCloseReason {
 /// mutually consistent.
 ///
 /// Returns an error if constraints are violated.
+#[expect(dead_code, reason = "will be called from SessionManager init (Step 4)")]
 pub fn validate_pix_supervision(
     cfg: &SupervisorConfig,
     reconstructor_cfg: &SsaReconstructorConfig,
@@ -228,7 +230,7 @@ pub fn validate_pix_supervision(
             "max_recovery_idle must be < incomplete_ssa_lifetime".into(),
         ));
     }
-    if reconstructor_cfg.ssa_counter_lifetime_secs as u64
+    if reconstructor_cfg.ssa_counter_lifetime_secs
         <= cfg.max_recovery_time.as_secs() + cfg.tombstone_retention_window.as_secs()
     {
         return Err(TransportSessionError::InvalidConfig(

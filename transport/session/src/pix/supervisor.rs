@@ -37,6 +37,7 @@ enum SsaPhase {
 /// Internal state for one supervised SSA.
 struct PerSsaState {
     ssa_id: SsaId<HoprPseudonym>,
+    #[expect(dead_code, reason = "used for debugging/index tracking in supervisor lifecycle")]
     index: SsaIndex,
     phase: SsaPhase,
 
@@ -48,6 +49,7 @@ struct PerSsaState {
 
     // Progress tracking.
     largest_useful_shares: u64,
+    #[expect(dead_code, reason = "used in deposit-amount calculation (Step 4)")]
     target_useful_shares: u64,
     recovered_polynomials: u16,
 
@@ -86,6 +88,7 @@ impl PerSsaState {
         }
     }
 
+    #[expect(dead_code, reason = "used in supervisor logging and debug")]
     fn ssa_index(&self) -> SsaIndex {
         self.index
     }
@@ -597,16 +600,16 @@ impl PerSsaState {
                 .map(|_| SessionPixCloseReason::DepositTimeout),
             SsaPhase::Recovering => {
                 // Hard deadline is immutable.
-                if let Some(d) = self.recovery_hard_deadline {
-                    if now >= d {
-                        return Some(SessionPixCloseReason::RecoveryDeadline);
-                    }
+                if let Some(d) = self.recovery_hard_deadline
+                    && now >= d
+                {
+                    return Some(SessionPixCloseReason::RecoveryDeadline);
                 }
                 // Idle deadline — service gating happens in handle_deadline.
-                if let Some(d) = self.recovery_idle_deadline {
-                    if now >= d {
-                        return Some(SessionPixCloseReason::RecoveryIdle);
-                    }
+                if let Some(d) = self.recovery_idle_deadline
+                    && now >= d
+                {
+                    return Some(SessionPixCloseReason::RecoveryIdle);
                 }
                 None
             }

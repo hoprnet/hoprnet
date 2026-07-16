@@ -14,6 +14,7 @@ use tokio::sync::Notify;
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("service gate is poisoned (session closed)")]
+#[cfg_attr(not(test), expect(dead_code, reason = "error variant returned via acquire() which is wired in Step 4"))]
 pub(crate) struct GateClosed;
 
 /// Bounded predeposit service gate for a single PIX session.
@@ -32,6 +33,7 @@ pub(crate) struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
     /// Remaining predeposit budget (tracked separately so we can park on 0).
+    #[cfg_attr(not(test), expect(dead_code, reason = "read inside acquire() which is wired in Step 4"))]
     remaining: AtomicU64,
     /// Whether the funded flag has been flipped.
     funded: AtomicBool,
@@ -58,6 +60,7 @@ impl ServiceGate {
     /// After funding or if the predeposit budget is not exhausted, this returns
     /// immediately. Otherwise it parks until a permit becomes available or the
     /// gate is poisoned.
+    #[cfg_attr(not(test), expect(dead_code, reason = "wired from egress path in Step 4"))]
     pub async fn acquire(self: &Arc<Self>) -> Result<(), GateClosed> {
         // Fast path: already funded.
         if self.funded.load(Ordering::Acquire) {
@@ -118,6 +121,7 @@ impl ServiceGate {
     }
 
     /// Whether the gate has been funded.
+    #[expect(dead_code, reason = "used in tests and will be exposed via egress gating in Step 4")]
     pub fn funded(&self) -> bool {
         self.funded.load(Ordering::Acquire)
     }
@@ -147,7 +151,7 @@ impl ServiceGate {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use super::*;
 

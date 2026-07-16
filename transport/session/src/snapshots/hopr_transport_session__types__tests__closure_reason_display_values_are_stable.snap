@@ -6,4 +6,6 @@ expression: reasons
     WriteClosed,
     EmptyRead,
     Eviction,
+    UnrealizedDeposit,
+    PixFailure,
 ]
