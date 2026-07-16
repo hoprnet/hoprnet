@@ -119,14 +119,12 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 // RTT is the elapsed time until now. Values above the plausibility cap
                 // (clock skew, stale telemetry) are discarded instead of poisoning the
                 // latency EMA with an absurd measurement.
-                const MAX_PLAUSIBLE_LOOPBACK_RTT: std::time::Duration = std::time::Duration::from_secs(30);
                 let now_ms = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis();
-                let total_rtt =
-                    std::time::Duration::from_millis(now_ms.saturating_sub(telemetry.timestamp()) as u64);
-                if total_rtt > MAX_PLAUSIBLE_LOOPBACK_RTT {
+                let total_rtt = std::time::Duration::from_millis(now_ms.saturating_sub(telemetry.timestamp()) as u64);
+                if total_rtt > self.max_plausible_loopback_rtt {
                     tracing::debug!(
                         rtt_ms = total_rtt.as_millis(),
                         "implausible loopback probe RTT, skipping attribution"
@@ -794,9 +792,9 @@ mod tests {
 
     #[tokio::test]
     async fn loopback_implausible_rtt_should_be_ignored() -> anyhow::Result<()> {
-        // Regression: a raw epoch timestamp was once misread as the RTT itself,
-        // poisoning the latency EMA with a ~56-year measurement. Any computed
-        // RTT above the plausibility cap must be discarded.
+        // Adversarial mitigation: an attacker who withholds a probe past the
+        // plausibility cap before replaying it would otherwise poison the latency
+        // EMA with an inflated measurement. Any computed RTT above the cap is discarded.
         let me = pubkey_from(&SECRET_0);
         let a = pubkey_from(&SECRET_1);
         let b = pubkey_from(&SECRET_2);
@@ -808,7 +806,7 @@ mod tests {
         graph.add_edge(&a, &b)?;
         graph.add_edge(&b, &me)?; // return edge
 
-        // Timestamp 90 s in the past → RTT far above the 30 s cap.
+        // Probe withheld 90 s before replay: computed RTT far above the 30 s cap.
         send_loopback(&graph, [0, 1, 2, 0, 0], 90_000);
 
         let obs = graph.edge(&a, &b).context("edge a→b should exist")?;

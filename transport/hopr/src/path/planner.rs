@@ -76,6 +76,11 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
+    /// Upper bound on a loopback probe's round-trip time considered plausible.
+    /// Measurements above this cap (clock skew, stale telemetry) are discarded
+    /// instead of poisoning the latency EMA with an absurd value.
+    #[default(Duration::from_secs(30))]
+    pub max_plausible_loopback_rtt: Duration,
 }
 
 fn validate_unit_interval(value: f64) -> std::result::Result<(), ValidationError> {
