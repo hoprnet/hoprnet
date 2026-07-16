@@ -336,7 +336,7 @@ where
             max_unverifiable_shares_per_ssa: cfg.incoming_session_pix_config.max_unverifiable_shares_per_ssa,
             max_unverifiable_shares_per_session: cfg.incoming_session_pix_config.max_unverifiable_shares_per_session,
             max_predeposit_packets: cfg.incoming_session_pix_config.max_predeposit_packets,
-            tombstone_retention_window: Duration::from_secs(30),
+            tombstone_retention_window: cfg.incoming_session_pix_config.tombstone_retention_window,
         };
         validate_pix_supervision(&pix_cfg, &Default::default())
             .map_err(|e| HoprTransportError::Api(format!("PIX supervision config validation failed: {e}")))?;

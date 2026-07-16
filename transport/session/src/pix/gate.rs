@@ -14,10 +14,6 @@ use tokio::sync::Notify;
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("service gate is poisoned (session closed)")]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "error variant returned via acquire() which is wired in Step 4")
-)]
 pub(crate) struct GateClosed;
 
 /// Bounded predeposit service gate for a single PIX session.
@@ -62,7 +58,6 @@ impl ServiceGate {
     /// After funding or if the predeposit budget is not exhausted, this returns
     /// immediately. Otherwise it parks until a permit becomes available or the
     /// gate is poisoned.
-    #[cfg_attr(not(test), expect(dead_code, reason = "wired from egress path in Step 4"))]
     pub async fn acquire(self: &Arc<Self>) -> Result<(), GateClosed> {
         // Fast path: already funded.
         if self.funded.load(Ordering::Acquire) {
@@ -122,8 +117,10 @@ impl ServiceGate {
         self.served.load(Ordering::Acquire)
     }
 
-    /// Whether the gate has been funded.
-    #[expect(dead_code, reason = "used in tests and will be exposed via egress gating in Step 4")]
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "used in tests and will be exposed via egress gating in Step 4")
+    )]
     pub fn funded(&self) -> bool {
         self.funded.load(Ordering::Acquire)
     }
@@ -146,11 +143,11 @@ impl ServiceGate {
         self.notify.notify_waiters();
     }
 
-    /// Non-blocking try-acquire for use in sync sink closures.
+    /// Non-blocking try-acquire for tests and sync-only callers.
     ///
     /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
-    /// exhausted (packet should be dropped silently), or `Err(())` if the gate
-    /// is poisoned (session closing).
+    /// exhausted, or `Err(())` if the gate is poisoned (session closing).
+    #[cfg(test)]
     pub fn try_acquire_sync(&self) -> Result<bool, ()> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(());
