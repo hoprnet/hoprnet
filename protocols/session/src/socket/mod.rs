@@ -73,6 +73,27 @@ pub struct SessionSocketConfig {
     /// Default is 2048.
     #[default(2048)]
     pub control_channel_capacity: usize,
+    /// Whether reassembled frames are delivered strictly in `FrameId` order.
+    ///
+    /// When `true` (default), frames are sequenced and a frame missing for longer than
+    /// `frame_timeout` is discarded to avoid head-of-line blocking — the correct
+    /// TCP-like byte-stream behavior.
+    ///
+    /// When `false`, frames are delivered in arrival order without sequencing or gap
+    /// discarding. This is the correct behavior for datagram payloads (e.g. UDP/WireGuard)
+    /// that tolerate reordering, where a late frame from a slow path must not stall or
+    /// drop the frames around it.
+    ///
+    /// Unordered delivery is intended for stateless sockets. On stateful sockets the
+    /// reliability layer's duplicate suppression relies on the ordered receive path:
+    /// without it, retransmitted frames can be delivered to the application twice and
+    /// duplicate segments of already-delivered frames can solicit spurious
+    /// retransmission requests.
+    ///
+    /// Note also the close semantics of arrival-order delivery: a terminating frame that
+    /// overtakes in-flight data frames aborts the receive pipeline without waiting for them.
+    #[default(true)]
+    pub deliver_in_order: bool,
 }
 
 enum WriteState {
@@ -168,10 +189,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
+        // Datagram sessions (e.g. UDP/WireGuard) deliver frames in arrival order without
+        // sequencing; the `already seen` drop is also skipped, since out-of-order frames
+        // are legitimate there.
+        let deliver_in_order = cfg.deliver_in_order;
+
         // Pipeline OUT: Packets incoming from Downstream
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
-        let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
+        let pre_sequencer = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 let _span = stage1_span.enter();
@@ -181,14 +207,17 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                             #[cfg(feature = "telemetry")]
                             s1.incoming_message(SessionMessageDiscriminants::Segment);
 
-                            // Filter old frame ids to save space in the Reassembler
-                            let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
-                            if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
-                                false
-                            } else {
-                                true
+                            // Filter old frame ids to save space in the Reassembler — but only
+                            // under in-order delivery. In datagram mode a frame_id below the last
+                            // emitted one is a legitimately reordered datagram, not a duplicate.
+                            if deliver_in_order {
+                                let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
+                                if s.frame_id <= last_emitted_id {
+                                    tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                    return false;
+                                }
                             }
+                            true
                         })
                     }
                     Err(error) => {
@@ -217,9 +246,17 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
-            })
-            // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            });
+
+        // Put the frames into the correct sequence by Frame Ids, unless datagram delivery
+        // is requested — both arms yield the same `Sequencer` type.
+        let sequenced = if deliver_in_order {
+            pre_sequencer.sequencer(cfg.frame_timeout, cfg.capacity)
+        } else {
+            pre_sequencer.sequencer_unordered()
+        };
+
+        let downstream_frames_out = sequenced
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -355,6 +392,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
+        // Datagram sessions deliver frames in arrival order without sequencing; the
+        // `already seen` drop is also skipped, since out-of-order frames are legitimate.
+        let deliver_in_order = cfg.deliver_in_order;
+
         // Pipeline OUT: Packets incoming from Downstream
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
@@ -362,7 +403,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         // Continue receiving packets from downstream, unless we received a terminating frame.
         // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
-        let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
+        let pre_sequencer = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
                 let _span = tracing::debug_span!(
@@ -378,15 +419,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         #[cfg(feature = "telemetry")]
                         s1.incoming_message(packet.discriminant());
 
-                        // Filter old frame ids to save space in the Reassembler
+                        // Filter old frame ids to save space in the Reassembler — but only under
+                        // in-order delivery; in datagram mode a lower frame_id is a reordered frame.
                         packet.try_as_segment().filter(|s| {
-                            let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
-                            if s.frame_id <= last_emitted_id {
-                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
-                                false
-                            } else {
-                                true
+                            if deliver_in_order {
+                                let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
+                                if s.frame_id <= last_emitted_id {
+                                    tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                    return false;
+                                }
                             }
+                            true
                         })
                     }
                     Err(error) => {
@@ -422,9 +465,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         None
                     }
                 })
-            })
-            // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            });
+
+        // Put the frames into the correct sequence by Frame Ids, unless datagram delivery
+        // is requested — both arms yield the same `Sequencer` type.
+        let sequenced = if deliver_in_order {
+            pre_sequencer.sequencer(cfg.frame_timeout, cfg.capacity)
+        } else {
+            pre_sequencer.sequencer_unordered()
+        };
+
+        let downstream_frames_out = sequenced
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
@@ -855,6 +906,68 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn stateless_socket_unordered_delivers_all_frames_under_mixing() -> anyhow::Result<()> {
+        // Heavy segment reordering. In ordered mode the sequencer re-sorts frames back
+        // (see `stateless_socket_unidirectional_should_work_with_mixing`). In datagram
+        // (unordered) mode frames are delivered in arrival order — nothing is held back
+        // or discarded for a gap — so all data still arrives, just possibly reordered.
+        let network_cfg = FaultyNetworkConfig {
+            mixing_factor: 10,
+            ..Default::default()
+        };
+
+        let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
+
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            deliver_in_order: false,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket
+            .write_all(&data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        alice_socket.flush().await?;
+
+        // `read_exact` only completes if every byte arrives — i.e. no frame was discarded.
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket
+            .read_exact(&mut bob_recv_data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+
+        // No data lost: the received bytes are the same multiset as sent. Datagram mode
+        // neither discards a gap nor stalls behind a missing frame — the arrival-order
+        // semantics themselves are covered by the `sequencer` unit tests.
+        let (mut sent_sorted, mut recv_sorted) = (data.to_vec(), bob_recv_data.to_vec());
+        sent_sorted.sort_unstable();
+        recv_sorted.sort_unstable();
+        assert_eq!(sent_sorted, recv_sorted, "all frames must be delivered, none discarded");
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn stateful_socket_unidirectional_should_work_with_mixing() -> anyhow::Result<()> {
         let network_cfg = FaultyNetworkConfig {
             mixing_factor: 10,
@@ -902,6 +1015,73 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
         assert_eq!(data, bob_recv_data);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateful_socket_unordered_delivers_all_frames_under_mixing() -> anyhow::Result<()> {
+        // The stateful (reliable) socket with unordered delivery: retransmission and
+        // acknowledgements still operate on frames, but delivery is in arrival order.
+        // This is the production combination `RetransmissionAck | NoDelay`.
+        let network_cfg = FaultyNetworkConfig {
+            mixing_factor: 10,
+            ..Default::default()
+        };
+
+        let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
+
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            deliver_in_order: false,
+            ..Default::default()
+        };
+
+        // Generous latency expectation so that scheduler stalls under CI load never
+        // trigger spurious retransmissions: in unordered mode a re-sent frame would be
+        // delivered twice (duplicates are legitimate datagram semantics, but would make
+        // this multiset assertion flaky).
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(1000),
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(
+            alice,
+            AcknowledgementState::new("alice", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(
+            bob,
+            AcknowledgementState::new("bob", ack_cfg),
+            sock_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket
+            .write_all(&data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        alice_socket.flush().await?;
+
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket
+            .read_exact(&mut bob_recv_data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+
+        let (mut sent_sorted, mut recv_sorted) = (data.to_vec(), bob_recv_data.to_vec());
+        sent_sorted.sort_unstable();
+        recv_sorted.sort_unstable();
+        assert_eq!(sent_sorted, recv_sorted, "all frames must be delivered, none discarded");
 
         alice_socket.close().await?;
         bob_socket.close().await?;
@@ -1107,6 +1287,172 @@ mod tests {
             insta::assert_yaml_snapshot!(alice_tracker);
             insta::assert_yaml_snapshot!(bob_tracker);
         }
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_unordered_does_not_stall_on_missing_frame() -> anyhow::Result<()> {
+        // The first segment (and thus the whole first frame) is lost. In ordered mode the
+        // sequencer holds ALL later frames back until `frame_timeout` elapses and only then
+        // skips the gap (see `stateless_socket_unidirectional_should_should_skip_missing_frames`,
+        // which needs a short 55 ms timeout to finish quickly). In unordered mode the later
+        // frames must flow immediately — even with a `frame_timeout` far larger than the
+        // read timeout used here.
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let alice_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
+        let bob_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            // Deliberately huge: unordered delivery must not depend on this value at all.
+            frame_timeout: Duration::from_secs(5),
+            deliver_in_order: false,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            alice_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            bob_cfg,
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket
+            .write_all(&data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        alice_socket.flush().await?;
+
+        // Without mixing, the network preserves order, so everything after the lost
+        // first frame arrives byte-exact. The 2 s read timeout (« 5 s frame_timeout)
+        // is the actual no-stall assertion: ordered mode would hold everything back
+        // until the frame_timeout expires.
+        let mut bob_data = [0u8; DATA_SIZE - 1500];
+        bob_socket
+            .read_exact(&mut bob_data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+
+        assert_eq!(&data[1500..], &bob_data[..]);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_unordered_delivers_swapped_frames_in_arrival_order() -> anyhow::Result<()> {
+        use hopr_utils::network_types::utils::DuplexIO;
+
+        /// Records each write as one wire packet, preserving segment boundaries.
+        #[derive(Clone, Default)]
+        struct PacketRecorder(std::sync::Arc<std::sync::Mutex<Vec<Box<[u8]>>>>);
+
+        impl futures::io::AsyncWrite for PacketRecorder {
+            fn poll_write(self: Pin<&mut Self>, _: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+                self.0.lock().unwrap().push(buf.to_vec().into_boxed_slice());
+                Poll::Ready(Ok(buf.len()))
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        // Two full frames, captured at segment granularity and re-fed with ALL of
+        // frame 2's segments ahead of frame 1's. Unlike the mixing tests, this
+        // reordering is fully deterministic.
+        const TWO_FRAMES: usize = 2 * FRAME_SIZE;
+
+        let recorder = PacketRecorder::default();
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            DuplexIO::from((recorder.clone(), futures::io::empty())),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<TWO_FRAMES>();
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        let packets = recorder.0.lock().unwrap().clone();
+        let frame_id_of = |packet: &[u8]| -> anyhow::Result<u32> {
+            SessionMessage::<MTU>::try_from(packet)?
+                .try_as_segment()
+                .map(|s| s.frame_id)
+                .ok_or_else(|| anyhow::anyhow!("expected a segment"))
+        };
+        let mut wire = Vec::new();
+        for want in [2u32, 1] {
+            for packet in packets.iter().filter(|p| frame_id_of(p).is_ok_and(|id| id == want)) {
+                wire.extend_from_slice(packet);
+            }
+        }
+
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            DuplexIO::from((futures::io::sink(), futures::io::Cursor::new(wire))),
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                // Deliberately large: unordered delivery must not depend on it.
+                frame_timeout: Duration::from_secs(5),
+                deliver_in_order: false,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            NoopTracker,
+        )?;
+
+        // Frame 2 must be delivered first (arrival order), and frame 1 must NOT be
+        // dropped by the `frame already seen` filter although its lower id arrives
+        // after a higher one has been emitted.
+        let mut received = [0u8; TWO_FRAMES];
+        bob_socket
+            .read_exact(&mut received)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+
+        assert_eq!(
+            &data[FRAME_SIZE..],
+            &received[..FRAME_SIZE],
+            "frame 2 must arrive first"
+        );
+        assert_eq!(
+            &data[..FRAME_SIZE],
+            &received[FRAME_SIZE..],
+            "frame 1 must not be discarded"
+        );
 
         Ok(())
     }

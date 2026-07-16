@@ -27,6 +27,7 @@ use tokio::{
 #[rstest]
 #[case(Capabilities::empty())]
 #[case(Capabilities::from(Capability::Segmentation))]
+#[case(Capabilities::from(Capability::NoDelay))]
 #[tokio::test]
 /// Creates paired Hopr sessions bridged to a UDP listener to prove that messages
 /// sent over UDP end up in the remote session buffer regardless of capability set.
