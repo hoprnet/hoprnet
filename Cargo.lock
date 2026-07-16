@@ -4179,6 +4179,7 @@ dependencies = [
  "elliptic-curve-tools",
  "hopr-types",
  "hopr-utils",
+ "indexmap 2.14.0",
  "moka",
  "parking_lot",
  "rand 0.10.2",

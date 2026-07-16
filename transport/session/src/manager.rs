@@ -7,9 +7,10 @@ use std::{
 };
 
 use anyhow::anyhow;
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
-use futures::future::Either;
-use hopr_utils::runtime::prelude::sleep;
+use futures::{
+    Sink, SinkExt, StreamExt, TryStreamExt,
+    future::{AbortHandle, Either},
+};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -33,7 +34,7 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
     StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::AbortableList;
+use hopr_utils::runtime::{AbortableList, prelude::sleep};
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -93,6 +94,11 @@ lazy_static::lazy_static! {
         "Number of PIX-supervised sessions closed, by close reason",
         &["reason"]
     ).unwrap();
+    static ref METRIC_PIX_UNVERIFIABLE_SHARES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_session_pix_unverifiable_shares_total",
+            "Total number of unverifiable PIX share observations across all sessions"
+        ).unwrap();
 }
 
 /// Map a `SessionPixCloseReason` to the public `ClosureReason`.
@@ -1702,6 +1708,8 @@ where
         let pix_ev = match &event {
             HoprSessionInPixEvent::Progress(p) => crate::pix::SessionPixEvent::RecoveryProgress(*p),
             HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total } => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_PIX_UNVERIFIABLE_SHARES.increment();
                 crate::pix::SessionPixEvent::UnverifiableShares {
                     ssa_id: *ssa_id,
                     observed_total: *observed_total,
@@ -2677,11 +2685,11 @@ where
                 }
                 // Race the notification future against a sleep timeout.
                 match futures::future::select(notify.notified(), Box::pin(sleep(Duration::from_millis(200)))).await {
-                    Either::Left((_, _)) => {
+                    Either::Left((..)) => {
                         // Woken by slot insertion; retry.
                         continue;
                     }
-                    Either::Right((_, _)) => {
+                    Either::Right((..)) => {
                         // Timeout guard; retry.
                         continue;
                     }

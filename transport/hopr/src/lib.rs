@@ -61,7 +61,7 @@ use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 pub use hopr_protocol_pix::RecoveredSsa;
-use hopr_protocol_pix::{PixSpec, ShareResolution};
+use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaReconstructorConfig};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -261,6 +261,7 @@ pub struct HoprTransport<Chain, Graph, Net> {
     session_telemetry_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     probing_tag_allocator: Arc<dyn hopr_transport_tag_allocator::TagAllocator + Send + Sync>,
     counters: PeerProtocolCounterRegistry,
+    pix_reconstructor_cfg: SsaReconstructorConfig,
     cfg: HoprProtocolConfig,
 }
 
@@ -338,7 +339,8 @@ where
             max_predeposit_packets: cfg.incoming_session_pix_config.max_predeposit_packets,
             tombstone_retention_window: cfg.incoming_session_pix_config.tombstone_retention_window,
         };
-        validate_pix_supervision(&pix_cfg, &Default::default())
+        let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig::default();
+        validate_pix_supervision(&pix_cfg, &reconstructor_cfg)
             .map_err(|e| HoprTransportError::Api(format!("PIX supervision config validation failed: {e}")))?;
 
         Ok(Self {
@@ -386,6 +388,7 @@ where
             session_telemetry_tag_allocator,
             probing_tag_allocator,
             counters: PeerProtocolCounterRegistry::default(),
+            pix_reconstructor_cfg: reconstructor_cfg,
             cfg,
         })
     }
@@ -776,10 +779,7 @@ where
         let pix_toolbox = match (role, exit_ack_share) {
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default values (max_awaiting_acks=10_000_000,
-                    // early_recovery_threshold=0.85) are within validated range,
-                    // so the constructor's validate().expect() cannot panic.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    self.pix_reconstructor_cfg,
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
                 let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
@@ -842,8 +842,7 @@ where
                 // A relay that also acts as an Exit (has exit_ack_share) needs
                 // a full PixToolbox to handle the PIX handshake.
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default config values are within validated range.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    self.pix_reconstructor_cfg,
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
                 let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
@@ -899,8 +898,7 @@ where
                 // No SSA reconstruction needed on Entry — forward events to the
                 // PIX event broadcast so subscribers (e.g. tests) see them.
                 let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default config values are within validated range.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    self.pix_reconstructor_cfg,
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
                 processes.insert(

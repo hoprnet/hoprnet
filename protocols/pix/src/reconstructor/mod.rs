@@ -9,6 +9,7 @@ use hopr_types::{
     },
     internal::prelude::Acknowledgement,
 };
+use indexmap::IndexSet;
 use utils::{AddShareOutcome, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use validator::Validate;
 
@@ -178,9 +179,16 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .time_to_live(cfg.max_ack_await_time)
                 .build(),
             ssa_counters: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+                // Capacity is a generous per-SSA estimate. In practice the
+                // key domain is (max concurrent sessions × SSAs per session),
+                // which is far smaller than MAX_POLYS_PER_SSA (≈16k). The
+                // TTL-only eviction means counters survive builder/verifier
+                // eviction — they are never TTI-evicted while the session
+                // is live.
                 .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
                 .build(),
             ssa_to_verifier_ids: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+                // Same generous sizing + TTL-only policy as ssa_counters.
                 .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
                 .build(),
             cfg,
@@ -456,10 +464,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::UnexpectedShare);
         };
 
-        // Ordered aggregation per SSA: collect terminal events for each touched SSA
-        let mut progress_touched: ahash::AHashSet<SsaId<S::Pseudonym>> = ahash::AHashSet::new();
+        // Ordered aggregation per SSA: collect terminal events for each touched SSA,
+        // using IndexSet for deterministic first-seen ordering.
+        let mut progress_touched: IndexSet<SsaId<S::Pseudonym>> = IndexSet::new();
         let mut terminal_events: Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> = Vec::new();
-        let mut invalid_ssas: ahash::AHashSet<SsaId<S::Pseudonym>> = ahash::AHashSet::new();
+        let mut invalid_ssas: IndexSet<SsaId<S::Pseudonym>> = IndexSet::new();
 
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(&peer, ack, ack_challenge, &awaiting_ack_from_peer) {
