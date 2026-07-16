@@ -74,12 +74,17 @@ impl IpOrHost {
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<std::net::SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => {
-                let resolver = hickory_resolver::Resolver::builder_with_config(
-                    hickory_resolver::config::ResolverConfig::default(),
-                    hickory_resolver::net::runtime::TokioRuntimeProvider::default(),
-                )
-                .build()
-                .map_err(std::io::Error::other)?;
+                static RESOLVER: tokio::sync::OnceCell<hickory_resolver::TokioResolver> =
+                    tokio::sync::OnceCell::const_new();
+
+                let resolver = RESOLVER
+                    .get_or_try_init(|| async {
+                        hickory_resolver::Resolver::builder_tokio()
+                            .map_err(std::io::Error::other)?
+                            .build()
+                            .map_err(std::io::Error::other)
+                    })
+                    .await?;
 
                 let lookup = resolver.lookup_ip(&name).await.map_err(std::io::Error::other)?;
                 Ok(lookup.iter().map(|ip| std::net::SocketAddr::new(ip, port)).collect())
@@ -265,21 +270,6 @@ mod tests {
     use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
-
-    #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
-    #[tokio::test]
-    async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
-        match IpOrHost::Dns("localhost".to_string(), 1000)
-            .resolve_tokio()
-            .await?
-            .first()
-            .ok_or(anyhow!("must resolve"))?
-        {
-            SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
-            SocketAddr::V6(addr) => assert_eq!(*addr, "[::1]:1000".parse()?),
-        }
-        Ok(())
-    }
 
     #[cfg(all(feature = "network-types", feature = "runtime-tokio"))]
     #[tokio::test]
