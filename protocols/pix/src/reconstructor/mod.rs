@@ -1,6 +1,7 @@
 mod utils;
 
-use ahash::HashSetExt;
+use std::collections::HashMap;
+
 use hopr_types::{
     crypto::{
         crypto_traits::elliptic_curve::Field,
@@ -8,7 +9,7 @@ use hopr_types::{
     },
     internal::prelude::Acknowledgement,
 };
-use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
+use utils::{AddShareOutcome, CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use validator::Validate;
 
 /// Maximum number of concurrent SSA cycles (current + pipelined + sessions) that
@@ -19,7 +20,7 @@ const MAX_CONCURRENT_SSA_CYCLES: u64 = 8;
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
     PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState,
-    SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+    SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -65,10 +66,31 @@ pub struct SsaReconstructorConfig {
     #[default(0.85)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub early_recovery_threshold: f64,
+    /// Time-to-live for the per-SSA counter entry (progress, faults).
+    ///
+    /// The counter cache uses **TTL only** (no TTI), so counters survive
+    /// builder/verifier eviction. Callers must validate this value against their
+    /// supervision horizon.
+    ///
+    /// Default is 7200 seconds (2 hours).
+    #[default(7200)]
+    #[validate(range(min = 60, max = 86400))]
+    pub ssa_counter_lifetime_secs: u64,
 }
 
 type EncryptedShareCache<S> =
     moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, <S as PixSpec>::Pseudonym, PixScalar<S>>>;
+
+/// Per-SSA counter entry tracked in the dedicated TTL-only cache.
+/// Counters are absolute — they represent the total observed so far for this SSA.
+struct SsaCounterEntry {
+    useful_shares: u64,
+    target_useful_shares: u64,
+    recovered_polynomials: u16,
+    /// Per-peer invalid share totals for this SSA.
+    /// Values are absolute counts (not deltas).
+    invalid_by_peer: HashMap<OffchainPublicKey, u64>,
+}
 
 /// Allows server-side reconstruction of SSAs.
 ///
@@ -90,18 +112,32 @@ pub struct SsaReconstructor<S: PixSpec> {
     awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
     /// Cache of ack keys whose verifier was not yet available.
     /// `HalfKeyChallenge → (OffchainPublicKey, HalfKey)`. When a verified ack hits
-    /// `MissingVerifier`, it is stored here so subsequent `acknowledge_shares` calls can
+    /// `MissingVerifier`, it is stashed here so subsequent `acknowledge_shares` calls can
     /// retry once the verifier arrives. Tied to `max_ack_await_time` in line with the
     /// awaiting_acks TTL.
     pending_ack_keys: moka::sync::Cache<HalfKeyChallenge, (OffchainPublicKey, HalfKey)>,
+    /// Dedicated TTL-only cache for per-SSA counters (no TTI).
+    /// Counters survive builder/verifier eviction.
+    ssa_counters: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<std::sync::Mutex<SsaCounterEntry>>>,
+    /// Tracks polynomial verifier IDs per SSA so `retire_ssa` can remove all of them.
+    ssa_to_verifier_ids:
+        std::sync::Arc<parking_lot::Mutex<HashMap<SsaId<S::Pseudonym>, Vec<SsaPolynomialId<S::Pseudonym>>>>>,
     cfg: SsaReconstructorConfig,
 }
 
 /// Result of processing a single verified acknowledgement in the SSA reconstructor.
 enum ProcessedAckResult<S: PixSpec> {
-    /// No SSA recovery progress — still waiting for more polynomial parts.
+    /// No matching encrypted share found (ack for unknown challenge).
     NoProgress,
-    /// The early recovery threshold was crossed (identified by SsaId).
+    /// Share was a duplicate evaluation identifier — no counters affected.
+    Duplicate,
+    /// Share arrived after the polynomial was already reconstructed — no counters affected.
+    Surplus,
+    /// A useful (new, verified, below-threshold) share was collected.
+    UsefulShare(SsaId<<S as PixSpec>::Pseudonym>),
+    /// A polynomial part was completed (share reached threshold).
+    PolynomialPartComplete(SsaId<<S as PixSpec>::Pseudonym>),
+    /// The early recovery threshold was crossed.
     EarlyRecovery(SsaId<<S as PixSpec>::Pseudonym>),
     /// Full SSA was recovered.
     FullRecovery(RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>),
@@ -136,6 +172,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
                 .time_to_live(cfg.max_ack_await_time)
                 .build(),
+            ssa_counters: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+                .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
+                .build(),
+            ssa_to_verifier_ids: std::sync::Arc::new(parking_lot::Mutex::new(HashMap::new())),
             cfg,
         }
     }
@@ -146,8 +186,48 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         &self.cfg
     }
 
+    /// Updates the per-SSA counter for a useful share.
+    fn record_useful_share(&self, ssa_id: &SsaId<S::Pseudonym>) {
+        if let Some(entry) = self.ssa_counters.get(ssa_id) {
+            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            entry.useful_shares += 1;
+        }
+    }
+
+    /// Updates the per-SSA counter for a completed polynomial part.
+    fn record_completed_part(&self, ssa_id: &SsaId<S::Pseudonym>) {
+        if let Some(entry) = self.ssa_counters.get(ssa_id) {
+            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            entry.recovered_polynomials += 1;
+        }
+    }
+
+    /// Updates the per-peer invalid-share counter for an SSA and returns the absolute total.
+    fn record_invalid_share(&self, peer: &OffchainPublicKey, ssa_id: &SsaId<S::Pseudonym>) -> u64 {
+        if let Some(entry) = self.ssa_counters.get(ssa_id) {
+            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            let count = entry.invalid_by_peer.entry(*peer).or_insert(0);
+            *count += 1;
+            return *count;
+        }
+        1
+    }
+
+    /// Returns a snapshot of current progress for the given SSA, if a counter entry exists.
+    fn snapshot_progress(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<SsaRecoveryProgress<S::Pseudonym>> {
+        let entry = self.ssa_counters.get(ssa_id)?;
+        let e = entry.lock().expect("ssa counter lock poisoned");
+        Some(SsaRecoveryProgress {
+            ssa_id: *ssa_id,
+            useful_shares: e.useful_shares,
+            target_useful_shares: e.target_useful_shares,
+            recovered_polynomials: e.recovered_polynomials,
+        })
+    }
+
     fn process_verified_ack(
         &self,
+        _peer: &OffchainPublicKey,
         ack: HalfKey,
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
@@ -158,6 +238,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         };
 
         let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
+        let ssa_id = *spi.as_ref();
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
@@ -167,52 +248,51 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         // The share cannot be empty at this point because we prevent empty share insertions
         let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
 
-        let ssa_part = match reconstructor.lock().add_share(share.nonce, partial_share) {
-            Ok(Some(share)) => {
+        match reconstructor.lock().add_share(share.nonce, partial_share) {
+            Ok(AddShareOutcome::Duplicate) => {
+                tracing::trace!(%spi, "duplicate evaluation identifier — not useful");
+                Ok(ProcessedAckResult::Duplicate)
+            }
+            Ok(AddShareOutcome::Surplus) => {
+                tracing::trace!(%spi, "share after polynomial reconstruction — surplus");
+                Ok(ProcessedAckResult::Surplus)
+            }
+            Ok(AddShareOutcome::Useful) => {
+                tracing::trace!(%spi, "useful share collected, part not yet complete");
+                Ok(ProcessedAckResult::UsefulShare(ssa_id))
+            }
+            Ok(AddShareOutcome::Completed(ssa_part)) => {
                 tracing::trace!(%spi, "ssa part complete");
-                share
-            }
-            Ok(None) => {
-                tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
-                return Ok(ProcessedAckResult::NoProgress);
-            }
-            Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
-                // We need to treat this error differently, because it is critical
-                // and may be differently handled by the upper-layer components
-                tracing::error!(%spi, "share verification failed");
-                return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
-            }
-            Err(e) => return Err(e),
-        };
+                let builder = self.ssa_builders.get(&ssa_id).ok_or(PixError::MissingSsaCommitment)?;
 
-        let builder = self
-            .ssa_builders
-            .get(spi.as_ref())
-            .ok_or(PixError::MissingSsaCommitment)?;
-
-        let mut builder_guard = builder.lock();
-        let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
-        match ssa {
-            Some(scalar) => {
-                let Some(ssa) = S::scalar_to_private_key(scalar) else {
-                    tracing::error!(%spi, "ssa reconstruction failed");
-                    return Err(PixError::InvalidSsa);
-                };
-                let ssa_id = *spi.as_ref();
-                tracing::info!(%ssa_id, "ssa recovered");
-                Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }))
-            }
-            None => {
-                tracing::trace!(%spi, "ssa not yet complete, waiting for more ssa parts");
-                // Check early threshold while we hold the lock
-                if builder_guard.check_early_threshold(self.cfg.early_recovery_threshold) {
-                    let ssa_id = *spi.as_ref();
-                    tracing::info!(%ssa_id, "early recovery threshold reached");
-                    Ok(ProcessedAckResult::EarlyRecovery(ssa_id))
-                } else {
-                    Ok(ProcessedAckResult::NoProgress)
+                let mut builder_guard = builder.lock();
+                let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
+                match ssa {
+                    Some(scalar) => {
+                        let Some(ssa) = S::scalar_to_private_key(scalar) else {
+                            tracing::error!(%spi, "ssa reconstruction failed");
+                            return Err(PixError::InvalidSsa);
+                        };
+                        tracing::info!(%ssa_id, "ssa recovered");
+                        Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }))
+                    }
+                    None => {
+                        tracing::trace!(%spi, "ssa part complete, ssa not yet complete");
+                        // Check early threshold while we hold the lock
+                        if builder_guard.check_early_threshold(self.cfg.early_recovery_threshold) {
+                            tracing::info!(%ssa_id, "early recovery threshold reached");
+                            Ok(ProcessedAckResult::EarlyRecovery(ssa_id))
+                        } else {
+                            Ok(ProcessedAckResult::PolynomialPartComplete(ssa_id))
+                        }
+                    }
                 }
             }
+            Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
+                tracing::error!(%spi, "share verification failed");
+                Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()))
+            }
+            Err(e) => Err(e),
         }
     }
 }
@@ -294,15 +374,33 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
                 let full_ssa_commitment = ssa_builder.full_commitment;
+                let polys = ssa_builder.num_polys() as u16;
+                let threshold = ssa_reconstructors.first().map(|r| r.verifier.min_shares()).unwrap_or(0);
+                let target = polys as u64 * threshold as u64;
                 self.ssa_builders
                     .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
 
+                // Track verifier IDs for this SSA so retire_ssa can invalidate them
+                let mut verifier_ids = Vec::with_capacity(ssa_reconstructors.len());
                 for ssa_reconstructor in ssa_reconstructors {
-                    self.ssa_verifiers.insert(
-                        ssa_reconstructor.verifier.spi,
-                        std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
-                    );
+                    let spi = ssa_reconstructor.verifier.spi;
+                    verifier_ids.push(spi);
+                    self.ssa_verifiers
+                        .insert(spi, std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)));
                 }
+                let mut map = self.ssa_to_verifier_ids.lock();
+                map.entry(ssa_id).or_insert(verifier_ids);
+
+                // Initialize the counter entry when the commitment becomes verifiable
+                self.ssa_counters.insert(
+                    ssa_id,
+                    std::sync::Arc::new(std::sync::Mutex::new(SsaCounterEntry {
+                        useful_shares: 0,
+                        target_useful_shares: target,
+                        recovered_polynomials: 0,
+                        invalid_by_peer: HashMap::new(),
+                    })),
+                );
 
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
@@ -352,64 +450,39 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::UnexpectedShare);
         };
 
-        // Feed output into HashSet, that deduplicates
-        let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
-
-        // Drain pending retries from previous calls — the verifier may have
-        // been inserted since the last acknowledge_shares invocation.
-        let stashed: Vec<(HalfKeyChallenge, HalfKey)> = self
-            .pending_ack_keys
-            .iter()
-            .filter_map(|challenge_ack| {
-                let (challenge, stashed_peer, ack) = (challenge_ack.0.as_ref(), &challenge_ack.1.0, &challenge_ack.1.1);
-                (*stashed_peer == peer).then_some((*challenge, *ack))
-            })
-            .collect();
-        for (challenge, ack) in &stashed {
-            if !awaiting_ack_from_peer.contains_key(challenge) {
-                // Share was already consumed (e.g. by the main loop in a prior call).
-                self.pending_ack_keys.invalidate(challenge);
-                continue;
-            }
-            match self.process_verified_ack(*ack, *challenge, &awaiting_ack_from_peer) {
-                Ok(ProcessedAckResult::FullRecovery(ssa)) => {
-                    self.pending_ack_keys.invalidate(challenge);
-                    res.insert(ShareResolution::RecoveredSsa(ssa));
-                }
-                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
-                    self.pending_ack_keys.invalidate(challenge);
-                    res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
-                }
-                Ok(ProcessedAckResult::NoProgress) => {
-                    self.pending_ack_keys.invalidate(challenge);
-                }
-                Err(PixError::MissingVerifier) => {
-                    // Verifier still not available — leave in pending_ack_keys for the next call.
-                    tracing::trace!(%peer, "verifier not yet available, share retained in pending cache");
-                }
-                Err(_) => {
-                    // Permanent failure — don't retry.
-                    self.pending_ack_keys.invalidate(challenge);
-                }
-            }
-        }
+        // Ordered aggregation per SSA: collect terminal events for each touched SSA
+        let mut progress_touched: ahash::AHashSet<SsaId<S::Pseudonym>> = ahash::AHashSet::new();
+        let mut terminal_events: Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> = Vec::new();
+        let mut invalid_ssas: ahash::AHashSet<SsaId<S::Pseudonym>> = ahash::AHashSet::new();
 
         for (ack, ack_challenge) in half_keys_challenges {
-            match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
+            match self.process_verified_ack(&peer, ack, ack_challenge, &awaiting_ack_from_peer) {
                 Ok(ProcessedAckResult::FullRecovery(ssa)) => {
-                    res.insert(ShareResolution::RecoveredSsa(ssa));
+                    progress_touched.insert(ssa.ssa_id);
+                    terminal_events.push(ShareResolution::RecoveredSsa(ssa));
                 }
                 Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
-                    res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
+                    progress_touched.insert(ssa_id);
+                    terminal_events.push(ShareResolution::AlmostRecoveredSsa(ssa_id));
                 }
-                Ok(ProcessedAckResult::NoProgress) => {}
+                Ok(ProcessedAckResult::UsefulShare(ssa_id)) => {
+                    progress_touched.insert(ssa_id);
+                    self.record_useful_share(&ssa_id);
+                }
+                Ok(ProcessedAckResult::PolynomialPartComplete(ssa_id)) => {
+                    progress_touched.insert(ssa_id);
+                    self.record_useful_share(&ssa_id);
+                    self.record_completed_part(&ssa_id);
+                }
+                Ok(ProcessedAckResult::Duplicate)
+                | Ok(ProcessedAckResult::Surplus)
+                | Ok(ProcessedAckResult::NoProgress) => {}
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
-                    tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
-                    res.insert(ShareResolution::InvalidShare(
-                        peer.into(),
-                        SsaId::new(pseudonym, ssa_index),
-                    ));
+                    let ssa_id = SsaId::new(pseudonym, ssa_index);
+                    progress_touched.insert(ssa_id);
+                    invalid_ssas.insert(ssa_id);
+                    self.record_invalid_share(&peer, &ssa_id);
                 }
                 Err(PixError::MissingVerifier) => {
                     // Share retained in awaiting_acks (process_verified_ack now uses .get()).
@@ -423,7 +496,59 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             }
         }
 
-        Ok(res.into_iter().collect())
+        // Build the result in deterministic order:
+        // 1. One Progress snapshot per touched SSA (final post-batch counters)
+        // 2. One InvalidShares per (peer, SSA) with absolute total
+        // 3. Terminal events (AlmostRecoveredSsa, RecoveredSsa) that same-batch progressed
+        let mut res = Vec::with_capacity(progress_touched.len() + terminal_events.len());
+
+        for ssa_id in &progress_touched {
+            if let Some(progress) = self.snapshot_progress(ssa_id) {
+                res.push(ShareResolution::Progress(progress));
+            }
+        }
+
+        // Emit one InvalidShares per touched SSA where faults were observed
+        for ssa_id in &invalid_ssas {
+            let abs_total = self
+                .ssa_counters
+                .get(ssa_id)
+                .map(|entry| {
+                    let e = entry.lock().expect("ssa counter lock poisoned");
+                    e.invalid_by_peer.get(&peer).copied().unwrap_or(0)
+                })
+                .unwrap_or(0);
+            // Only emit if we have a positive count (should always be true here)
+            if abs_total > 0 {
+                res.push(ShareResolution::InvalidShares {
+                    peer: Box::new(peer),
+                    ssa_id: *ssa_id,
+                    observed_total: abs_total,
+                });
+            }
+        }
+
+        // Append terminal events (their progress snapshot already precedes them)
+        res.extend(terminal_events);
+
+        Ok(res)
+    }
+
+    fn retire_ssa(&self, ssa_id: &SsaId<S::Pseudonym>) {
+        // Remove commitment builder
+        self.commitment_builder.invalidate(ssa_id);
+        // Remove SSA builder
+        self.ssa_builders.invalidate(ssa_id);
+        // Remove all verifiers for this SSA's polynomials
+        let mut map = self.ssa_to_verifier_ids.lock();
+        if let Some(ids) = map.remove(ssa_id) {
+            for id in ids {
+                self.ssa_verifiers.invalidate(&id);
+            }
+        }
+        // Remove counter entry
+        self.ssa_counters.invalidate(ssa_id);
+        tracing::trace!(%ssa_id, "ssa retired");
     }
 }
 
@@ -650,6 +775,7 @@ mod tests {
         )?;
 
         let result = reconstructor.process_verified_ack(
+            peer.public(),
             ack_key,
             challenge,
             reconstructor

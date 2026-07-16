@@ -4,8 +4,8 @@ use vsss_rs::{
 };
 
 use crate::{
-    CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
-    PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
+    CoefficientIndex, CompletedShare, IdentifierPrimeField, PartialSsaShare, PartialSsaShareVerifier, PixGroup,
+    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
 };
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
@@ -46,6 +46,11 @@ impl<S: PixSpec> SsaBuilder<S> {
         }
     }
 
+    /// Number of polynomials in this SSA.
+    pub fn num_polys(&self) -> usize {
+        self.num_polys
+    }
+
     pub fn add_recovered_ssa_part(
         &mut self,
         index: PolynomialIndex,
@@ -72,11 +77,27 @@ impl<S: PixSpec> SsaBuilder<S> {
     }
 }
 
+/// Outcome of adding a share to an [`SsaPartBuilder`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddShareOutcome<S: PixSpec> {
+    /// Share was a duplicate (same evaluation identifier already collected for this polynomial).
+    Duplicate,
+    /// Share arrived after the polynomial was already fully reconstructed.
+    Surplus,
+    /// Share was useful (new, verified) but threshold not yet reached.
+    Useful,
+    /// Polynomial threshold reached and the reconstructed value is available.
+    Completed(PixScalar<S>),
+}
+
 /// Verifies shares and reconstructs a single SSA part from them.
 pub struct SsaPartBuilder<S: PixSpec> {
     pub(crate) verifier: PartialSsaShareVerifier<S>,
     shares: Vec<CompletedShare<S>>,
     reconstructed: Option<PixScalar<S>>,
+    /// Set of evaluation identifiers already collected for this polynomial.
+    /// Used to detect duplicate shares.
+    collected_identifiers: ahash::AHashSet<IdentifierPrimeField<PixScalar<S>>>,
 }
 
 impl<S: PixSpec> SsaPartBuilder<S> {
@@ -85,6 +106,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
             verifier,
             shares: Vec::new(),
             reconstructed: None,
+            collected_identifiers: ahash::AHashSet::new(),
         }
     }
 
@@ -92,9 +114,17 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         &mut self,
         msg: PixScalar<S>,
         share: PartialSsaShare<S>,
-    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
-        if let Some(reconstructed) = self.reconstructed {
-            return Ok(Some(reconstructed));
+    ) -> errors::Result<AddShareOutcome<S>, S::Pseudonym> {
+        // Surplus: polynomial already reconstructed
+        if self.reconstructed.is_some() {
+            return Ok(AddShareOutcome::Surplus);
+        }
+
+        let identifier: IdentifierPrimeField<PixScalar<S>> = msg.into();
+
+        // Duplicate: evaluation identifier already collected for this polynomial
+        if !self.collected_identifiers.insert(identifier) {
+            return Ok(AddShareOutcome::Duplicate);
         }
 
         let share = into_completed_share(msg, &share)?;
@@ -114,9 +144,9 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         if self.shares.len() >= self.verifier.min_shares() {
             let reconstructed = self.shares.combine()?.0;
             self.reconstructed = Some(reconstructed);
-            Ok(Some(reconstructed))
+            Ok(AddShareOutcome::Completed(reconstructed))
         } else {
-            Ok(None)
+            Ok(AddShareOutcome::Useful)
         }
     }
 }

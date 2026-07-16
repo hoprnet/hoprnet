@@ -547,6 +547,22 @@ impl<P, A> SsaCommitmentState<P, A> {
     }
 }
 
+/// Absolute recovery progress for a single SSA, emitted after each acknowledgment batch.
+///
+/// Carries wall-clock counters rather than deltas, so observers can detect stalls,
+/// regressions, and completion independently of the reconstructor's internal cache.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SsaRecoveryProgress<P> {
+    /// The SSA this progress snapshot refers to.
+    pub ssa_id: SsaId<P>,
+    /// Number of useful (non-duplicate, non-surplus, verified) shares collected so far.
+    pub useful_shares: u64,
+    /// Total number of useful shares needed for full recovery (polynomials × threshold).
+    pub target_useful_shares: u64,
+    /// Number of fully reconstructed polynomial parts.
+    pub recovered_polynomials: u16,
+}
+
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
