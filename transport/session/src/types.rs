@@ -83,10 +83,15 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
 
 /// Quota per single SSA in bytes.
+/// 
+/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent 
+/// before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred before SSA private key recovery.
+/// 
+/// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
 pub type SsaQuota = u64;
 
 pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16) -> SsaQuota {
-    polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::SIZE as SsaQuota
+    polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
 }
 
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
