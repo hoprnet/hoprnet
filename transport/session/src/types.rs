@@ -83,10 +83,11 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
 
 /// Quota per single SSA in bytes.
-/// 
-/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent 
-/// before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred before SSA private key recovery.
-/// 
+///
+/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent from
+/// Exit -> Entry before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred
+/// before SSA private key recovery at the Exit.
+///
 /// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
 pub type SsaQuota = u64;
 
