@@ -30,6 +30,7 @@ pub struct ChannelGraph {
     pub(crate) me: OffchainPublicKey,
     pub(crate) edge_penalty: f64,
     pub(crate) min_ack_rate: f64,
+    pub(crate) max_plausible_loopback_rtt: std::time::Duration,
     pub(crate) inner: Arc<RwLock<InnerGraph>>,
 }
 
@@ -43,7 +44,7 @@ impl ChannelGraph {
     /// Production code should prefer [`with_edge_params`](Self::with_edge_params) to
     /// receive values from `PathPlannerConfig`.
     pub fn new(me: OffchainPublicKey) -> Self {
-        Self::with_edge_params(me, 0.5, 0.1)
+        Self::with_edge_params(me, 0.5, 0.1, std::time::Duration::from_secs(30))
     }
 
     /// Creates a new channel graph with custom edge scoring parameters.
@@ -51,7 +52,14 @@ impl ChannelGraph {
     /// * `me` – offchain public key of the local node (added as the first graph node).
     /// * `edge_penalty` – penalty multiplier for edges lacking probe-based quality observations.
     /// * `min_ack_rate` – minimum acceptable message acknowledgment rate for path selection.
-    pub fn with_edge_params(me: OffchainPublicKey, edge_penalty: f64, min_ack_rate: f64) -> Self {
+    /// * `max_plausible_loopback_rtt` – upper bound on a loopback probe RTT considered plausible; measurements above it
+    ///   are discarded during attribution.
+    pub fn with_edge_params(
+        me: OffchainPublicKey,
+        edge_penalty: f64,
+        min_ack_rate: f64,
+        max_plausible_loopback_rtt: std::time::Duration,
+    ) -> Self {
         let mut graph = DiGraph::new();
         let mut indices = BiHashMap::new();
 
@@ -62,6 +70,7 @@ impl ChannelGraph {
             me,
             edge_penalty,
             min_ack_rate,
+            max_plausible_loopback_rtt,
             inner: Arc::new(RwLock::new(InnerGraph { graph, indices })),
         }
     }

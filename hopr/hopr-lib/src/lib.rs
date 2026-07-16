@@ -235,7 +235,14 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             always_max_out_surbs: value.always_max_out_surbs,
             pix_ssa_quota: value
                 .pix_ssa_quota
-                .map(|(p, s)| Ok::<_, hopr_api::types::primitive::errors::GeneralError>((p.try_into()?, s.try_into()?)))
+                .map(|(p, s)| {
+                    let to_u16 = |v: u32| -> Result<u16, hopr_api::types::primitive::errors::GeneralError> {
+                        v.try_into().map_err(|e: std::num::TryFromIntError| {
+                            hopr_api::types::primitive::errors::GeneralError::NonSpecificError(e.to_string())
+                        })
+                    };
+                    Ok((to_u16(p)?, to_u16(s)?))
+                })
                 .transpose()?,
         })
     }

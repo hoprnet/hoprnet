@@ -421,6 +421,13 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_millis(800))]
     pub max_frame_timeout: Duration,
 
+    /// Maximum number of segments to buffer in the downstream transport of a Session's socket.
+    /// If 0 is given, the transport is unbuffered.
+    ///
+    /// Default is 0.
+    #[default(0)]
+    pub max_buffered_segments: usize,
+
     /// The base timeout for initiation of Session initiation.
     ///
     /// The actual timeout is adjusted according to the number of hops for that Session:
@@ -738,6 +745,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: Capabilities) -> Hop
         capabilities,
         frame_mtu: cfg.frame_mtu,
         frame_timeout: cfg.max_frame_timeout,
+        max_buffered_segments: cfg.max_buffered_segments,
     }
 }
 
@@ -2719,7 +2727,75 @@ mod tests {
     use super::*;
     // Import helpers from the top-level test_helpers module
     use crate::test_helpers::{msg_type, start_msg_match};
-    use crate::{balancer::SurbBalancerConfig, types::SessionTarget};
+    use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    #[test]
+    fn session_config_forwards_max_buffered_segments() {
+        assert_eq!(
+            SessionManagerConfig::default().max_buffered_segments,
+            0,
+            "default must leave the transport unbuffered"
+        );
+
+        for segments in [0, 64] {
+            let cfg = SessionManagerConfig {
+                max_buffered_segments: segments,
+                ..Default::default()
+            };
+            assert_eq!(
+                session_config(&cfg, Capabilities::empty()).max_buffered_segments,
+                segments
+            );
+        }
+    }
+
+    #[async_trait::async_trait]
+    trait SendMsg {
+        async fn send_message(
+            &self,
+            routing: DestinationRouting,
+            data: ApplicationDataOut,
+        ) -> crate::errors::Result<()>;
+    }
+
+    mockall::mock! {
+        MsgSender {}
+        impl SendMsg for MsgSender {
+            fn send_message<'a, 'b>(&'a self, routing: DestinationRouting, data: ApplicationDataOut)
+            -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
+        }
+    }
+
+    fn mock_packet_planning(
+        sender: MockMsgSender,
+    ) -> (
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let handle = tokio::task::spawn(async move {
+            pin_mut!(rx);
+            while let Some((routing, data)) = rx.next().await {
+                sender
+                    .send_message(routing, data)
+                    .await
+                    .expect("send message must not fail in mock");
+            }
+        });
+        (tx, handle)
+    }
+
+    fn msg_type(data: &ApplicationDataOut, expected: StartProtocolDiscriminants) -> bool {
+        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+            .map(|d| StartProtocolDiscriminants::from(d) == expected)
+            .unwrap_or(false)
+    }
+
+    fn start_msg_match(data: &ApplicationDataOut, msg: impl Fn(HoprStartProtocol) -> bool) -> bool {
+        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+            .map(msg)
+            .unwrap_or(false)
+    }
 
     /// Waits (bounded) until the manager reports no active sessions.
     ///
