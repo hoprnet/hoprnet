@@ -238,3 +238,111 @@ pub fn validate_pix_supervision(
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+#[cfg(feature = "runtime-tokio")]
+mod tests {
+    use std::time::Duration;
+
+    use hopr_protocol_pix::SsaReconstructorConfig;
+
+    use super::*;
+
+    fn valid_cfg() -> SupervisorConfig {
+        SupervisorConfig {
+            max_ssa_delivery_time: Duration::from_secs(20),
+            max_deposit_wait: Duration::from_secs(60),
+            max_recovery_idle: Duration::from_secs(60),
+            max_recovery_time: Duration::from_secs(3600),
+            max_unverifiable_shares_per_ssa: 3,
+            max_unverifiable_shares_per_session: 10,
+            max_predeposit_packets: 1024,
+            tombstone_retention_window: Duration::from_secs(30),
+        }
+    }
+
+    fn valid_rcn_cfg() -> SsaReconstructorConfig {
+        SsaReconstructorConfig {
+            max_ack_await_time: Duration::from_secs(10),
+            incomplete_ssa_lifetime: Duration::from_secs(600),
+            ssa_counter_lifetime_secs: 4000,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn validation_accepts_valid_configs() {
+        assert!(validate_pix_supervision(&valid_cfg(), &valid_rcn_cfg()).is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_ssa_delivery_time() {
+        let mut cfg = valid_cfg();
+        cfg.max_ssa_delivery_time = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_deposit_wait() {
+        let mut cfg = valid_cfg();
+        cfg.max_deposit_wait = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_recovery_idle() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_idle = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_recovery_time() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_time = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_tombstone_retention_window() {
+        let mut cfg = valid_cfg();
+        cfg.tombstone_retention_window = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_idle_shorter_than_ack_await() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_idle = Duration::from_secs(5);
+        let rcn = valid_rcn_cfg();
+        // max_ack_await_time is 10 s, so 5 < 10 should fail.
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_idle_exceeds_incomplete_ssa_lifetime() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_idle = Duration::from_secs(700);
+        let rcn = valid_rcn_cfg();
+        // incomplete_ssa_lifetime is 600 s, so 700 >= 600 should fail.
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_counter_lifetime_shorter_than_recovery_horizon() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_time = Duration::from_secs(3600);
+        cfg.tombstone_retention_window = Duration::from_secs(60);
+        let mut rcn = valid_rcn_cfg();
+        // ssa_counter_lifetime_secs must be > 3600 + 60 = 3660.
+        rcn.ssa_counter_lifetime_secs = 3660; // equal, not greater → reject
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err());
+
+        rcn.ssa_counter_lifetime_secs = 3661;
+        assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
+    }
+}

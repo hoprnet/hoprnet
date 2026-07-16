@@ -1875,4 +1875,150 @@ mod tests {
             SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)
         ));
     }
+
+    // ---------------------------------------------------------------
+    // Tombstone and multi-SSA lifecycle
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn tombstone_expiry_clears_recovered_ssa() {
+        let mut cfg = default_cfg();
+        cfg.tombstone_retention_window = Duration::from_secs(10);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        assert_eq!(sup.ssas.len(), 1);
+
+        // Before tombstone expires — still present.
+        let actions = sup.handle_deadline(start + Duration::from_secs(5), 0);
+        assert!(actions.is_empty());
+        assert_eq!(sup.ssas.len(), 1);
+
+        // After tombstone expires — removed.
+        let actions = sup.handle_deadline(start + Duration::from_secs(11), 5);
+        assert_eq!(actions.len(), 1);
+        assert!(matches!(
+            actions[0],
+            SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)
+        ));
+    }
+
+    #[test]
+    fn all_ssas_terminal_closes_session_after_multi_ssa_close() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id1 = ssa_id(p, 1);
+
+        // Set up first SSA through recovery.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id1,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id1,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        // AlmostRecovered triggers next SSA request.
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), start, 0);
+        assert_eq!(actions.len(), 1);
+        assert!(matches!(actions[0], SessionPixAction::RequestSsa { .. }));
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 2)), start, 0);
+
+        // Both deadlines have expired by now (SSA 1 hard deadline at start + 3600s,
+        // SSA 2 commitment deadline at start + 20s). The loop processes SSA 1 first
+        // (RecoveryDeadline → removed), then SSA 2 (CommitmentTimeout → session close).
+        let actions = sup.handle_deadline(start + Duration::from_secs(7200), 5);
+        assert_eq!(actions.len(), 1);
+        assert!(matches!(
+            actions[0],
+            SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
+        ));
+        assert!(sup.closed);
+    }
+
+    #[test]
+    fn next_deadline_none_when_after_tombstone_expiry() {
+        let mut cfg = default_cfg();
+        cfg.tombstone_retention_window = Duration::from_secs(10);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        // While tombstone is alive, next_deadline returns the tombstone_until.
+        assert!(sup.next_deadline().is_some());
+
+        // After tombstone expires, handle_deadline removes it and closes.
+        sup.handle_deadline(start + Duration::from_secs(11), 0);
+
+        assert!(sup.next_deadline().is_none());
+    }
+
+    #[test]
+    fn action_result_close_sets_closed() {
+        let p = pseudonym();
+        let (mut sup, _actions) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        assert!(!sup.closed);
+
+        // First fake-close via action_result.
+        let _ = sup.action_result(&SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle), true, now);
+        assert!(sup.closed);
+
+        // After close, all subsequent calls are no-ops.
+        let actions = sup.handle_deadline(now, 0);
+        assert!(actions.is_empty());
+        let actions = sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 1)), now, 0);
+        assert!(actions.is_empty());
+    }
 }

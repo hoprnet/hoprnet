@@ -293,4 +293,40 @@ mod tests {
 
         assert_eq!(gate.served_total(), 1000);
     }
+
+    #[tokio::test]
+    async fn try_acquire_sync_succeeds_within_budget() {
+        let gate = ServiceGate::new(5);
+        for _ in 0..5 {
+            assert!(gate.try_acquire_sync().unwrap());
+        }
+        assert_eq!(gate.served_total(), 5);
+    }
+
+    #[tokio::test]
+    async fn try_acquire_sync_returns_false_when_budget_exhausted() {
+        let gate = ServiceGate::new(2);
+        assert!(gate.try_acquire_sync().unwrap());
+        assert!(gate.try_acquire_sync().unwrap());
+        assert!(!gate.try_acquire_sync().unwrap());
+        assert_eq!(gate.served_total(), 2);
+    }
+
+    #[tokio::test]
+    async fn try_acquire_sync_succeeds_after_funding() {
+        let gate = ServiceGate::new(0);
+        // Exhausted predeposit budget.
+        assert!(!gate.try_acquire_sync().unwrap());
+
+        gate.release_service();
+        assert!(gate.try_acquire_sync().unwrap());
+        assert_eq!(gate.served_total(), 1);
+    }
+
+    #[tokio::test]
+    async fn try_acquire_sync_errors_when_poisoned() {
+        let gate = ServiceGate::new(10);
+        gate.poison();
+        assert!(gate.try_acquire_sync().is_err());
+    }
 }
