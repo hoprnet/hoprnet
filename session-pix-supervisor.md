@@ -146,12 +146,13 @@ under-constrain attackers.
   `SsaCommitmentState::is_verifiable` (set at `reconstructor/mod.rs:284`)
   distinguishes complete commitment installation.
 - `protocols/pix/src/reconstructor/mod.rs` collapses useful partial shares into
-  the private `ProcessedAckResult::NoProgress`; `acknowledge_shares` deduplicates
-  resolutions through an `ahash::HashSet` (`mod.rs:331`), enabled by manual
-  `Hash`/`Eq` impls on `ShareResolution` keyed by `SsaId` (`traits.rs:27-51`).
+  the private `ProcessedAckResult::NoProgress`; `acknowledge_shares` tracks
+  touched SSAs in an `IndexSet` for deterministic first-seen ordering, and emits
+  absolute `InvalidShares` counts instead of deduplicated markers.
   All reconstructor state lives in moka caches with TTI/TTL eviction
-  (`SsaReconstructorConfig`, `mod.rs:19-62`); `incomplete_ssa_lifetime` (600 s)
-  is a time-to-_idle_.
+  (`SsaReconstructorConfig`, `mod.rs:29-80`); `incomplete_ssa_lifetime` (600 s)
+  is a time-to-_idle_. Counter caches (`ssa_counters`, `ssa_to_verifier_ids`) use
+  TTL-only eviction so they survive builder/verifier eviction.
 - `transport/hopr/src/lib.rs` translates `ShareResolution` into
   `HoprSessionInPixEvent` in two byte-identical branches (Exit `:787-828`,
   relay-as-Exit `:888-928`).
@@ -284,8 +285,11 @@ Keep existing `IncomingSessionPixConfig.max_ssa_delivery_time` (20 s) and
 **Validation** happens where both configs are in scope — the `hopr-transport`
 wiring layer that constructs both the `SsaReconstructor` and the
 `SessionManager` (`transport/hopr/src/lib.rs`) — via a validation function
-exported from `hopr-transport-session`. Constraints (note
-`incomplete_ssa_lifetime` is a TTI, refreshed by acknowledgement activity):
+exported from `hopr-transport-session`. A single `SsaReconstructorConfig` value
+is built and passed to both `validate_pix_supervision` and every
+`SsaReconstructor::new` call, so the validated config is provably the deployed
+one. Constraints (note `incomplete_ssa_lifetime` is a TTI, refreshed by
+acknowledgement activity):
 
 - All durations nonzero; `max_recovery_idle >= max_ack_await_time`.
 - `max_recovery_idle < incomplete_ssa_lifetime` (progress refreshes the builder's
@@ -331,11 +335,16 @@ For an incoming PIX session:
 
 ### Provisional Service Behavior (ServiceGate)
 
-- Route incoming-session application egress — and manager keep-alives that consume
-  recovery-bearing SURBs — through the `ServiceGate` before forwarding to the
-  underlying sink, in **both** the rate-controlled and `NoRateControl` branches.
-  Start/PIX handshake control messages remain exempt (they use `msg_sender`, not
-  the session sink).
+- Route incoming-session application egress through the `ServiceGate` before
+  forwarding to the underlying sink, in **both** the rate-controlled and
+  `NoRateControl` branches. Start/PIX handshake control messages remain exempt
+  (they use `msg_sender`, not the session sink).
+- Manager-initiated keep-alives are **not** routed through the `ServiceGate`.
+  They are Exit-autonomous SURB-notification messages and consume SURBs rather
+  than predeposit service budget. The service-gated idle rule still accounts for
+  them via the gate's `served_total` counter (the `NoRateControl` branch has no
+  keep-alives at all, which is consistent with service-gated idle never closing
+  a genuinely quiet session).
 - Before any SSA is funded, the session-global budget is
   `min(target_useful_shares − 1, max_predeposit_packets)`. The `target − 1` term
   preserves the no-full-recovery-before-funding invariant for tiny SSAs; the cap
@@ -357,13 +366,18 @@ For an incoming PIX session:
 ### Metrics & Diagnostics
 
 - Counter `hopr_session_pix_closures_total` labeled by internal
-  `SessionPixCloseReason`.
-- Gauge (or labeled counter pair) for supervised SSA phase transitions.
-- Counter for unverifiable-share observations (per session totals are internal
-  state; the metric is global).
-- Error-level log for `DepositObserverClosed` naming the likely misconfiguration;
-  warn-level structured log for every close with the internal reason, SSA id,
-  phase, counters, and deadlines.
+  `SessionPixCloseReason`. Implemented in `manager.rs` (`METRIC_PIX_CLOSURES`).
+- Counter `hopr_session_pix_unverifiable_shares_total` for global unverifiable-share
+  observations. Implemented in `manager.rs` (`METRIC_PIX_UNVERIFIABLE_SHARES`).
+- **Phase transition gauge deferred.** The gauge (or labeled counter pair) for
+  supervised SSA phase transitions was planned but not implemented — the existing
+  close-reason counter provides operational visibility, and phase transitions can
+  be added when a concrete operational need arises.
+- Error-level log for `DepositObserverClosed` naming the likely misconfiguration.
+- Warn-level structured log for every close via `close_ssa_and_collect` in
+  `supervisor.rs` — includes SSA id, reason, phase, counters, and deadlines. The
+  log is emitted in the deterministic core (before the `Close` action is returned)
+  so it is present for all close paths.
 
 ### Architecture Invariants
 
@@ -530,10 +544,12 @@ Modify `protocols/pix/src/reconstructor/utils.rs`, `reconstructor/mod.rs`,
 - Add `SsaRecoveryProgress`; extend `ShareResolution` with a progress variant and
   change the invalid-share variant to carry the absolute per-SSA total.
 - Remove the manual `Hash`/`Eq` impls on `ShareResolution` (they exist only to
-  serve the `HashSet` dedup and become misleading once counts are carried).
+  serve the dedup and become misleading once counts are carried). **Status:
+  completed** — `ShareResolution` no longer requires these impls.
 - Replace `HashSet` result collection with deterministic ordered aggregation so
   multiple invalid shares in one acknowledgement batch are not collapsed and
-  terminal events follow their final progress snapshot.
+  terminal events follow their final progress snapshot. **Status: completed** —
+  uses `indexmap::IndexSet` for first-seen ordering.
 - Add `retire_ssa` to `ExitAcknowledgementShareProcessor`.
 
 #### `hopr-transport` — required

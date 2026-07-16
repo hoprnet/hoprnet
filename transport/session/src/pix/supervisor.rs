@@ -49,7 +49,6 @@ struct PerSsaState {
 
     // Progress tracking.
     largest_useful_shares: u64,
-    #[expect(dead_code, reason = "used in deposit-amount calculation (Step 4)")]
     target_useful_shares: u64,
     recovered_polynomials: u16,
 
@@ -519,6 +518,25 @@ impl SessionPixSupervisor {
         if matches!(self.ssas[idx].phase, SsaPhase::Closing) {
             return Vec::new();
         }
+
+        // Warn-level diagnostic with full SSA state before closing.
+        let ssa = &self.ssas[idx];
+        tracing::warn!(
+            ssa_id = %ssa.ssa_id,
+            ?reason,
+            phase = ?ssa.phase,
+            largest_useful_shares = ssa.largest_useful_shares,
+            target_useful_shares = ssa.target_useful_shares,
+            recovered_polynomials = ssa.recovered_polynomials,
+            per_ssa_invalid_total = ssa.per_ssa_invalid_total,
+            served_total_at_last_progress = ssa.served_total_at_last_progress,
+            ?ssa.commitment_deadline,
+            ?ssa.deposit_deadline,
+            ?ssa.recovery_idle_deadline,
+            ?ssa.recovery_hard_deadline,
+            "closing PIX SSA"
+        );
+
         self.ssas[idx].phase = SsaPhase::Closing;
 
         if self.ssas.len() == 1 {

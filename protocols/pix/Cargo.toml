@@ -39,6 +39,7 @@ vsss-rs = { workspace = true, features = [
 
 hopr-utils = { workspace = true }
 hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
+indexmap.workspace = true
 
 [dev-dependencies]
 anyhow = { workspace = true }
