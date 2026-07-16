@@ -61,7 +61,7 @@ use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 pub use hopr_protocol_pix::RecoveredSsa;
-use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, ShareResolution};
+use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, PixSpec, ShareResolution};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -797,13 +797,7 @@ where
                                                     {
                                                         tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
                                                     }
-                                                    Some(PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
-                                                        id: (
-                                                            *ssa_recovery_event.ssa_id.pseudonym(),
-                                                            ssa_recovery_event.ssa_id.ssa_index(),
-                                                        ),
-                                                        secret: PixDepositSecret(ssa_recovery_event.ssa.secret().clone()),
-                                                    }))
+                                                    Some(recovered_ssa_to_pix_event(&ssa_recovery_event))
                                                 }
                                                 ShareResolution::AlmostRecoveredSsa(ssa_id) => {
                                                     if let Err(error) = smgr
@@ -1238,6 +1232,17 @@ where
     }
 }
 
+/// Maps a fully recovered SSA into the downstream event that carries the recovered deposit
+/// key to the withdrawal strategy.
+pub(crate) fn recovered_ssa_to_pix_event(
+    rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
+) -> PixEvent {
+    PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
+        id: (*rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
+        secret: PixDepositSecret(rec.ssa.secret().clone()),
+    })
+}
+
 // ---------------------------------------------------------------------------
 // NetworkView impl for HoprTransport — wraps OnceLock<Net> access
 // ---------------------------------------------------------------------------
@@ -1319,5 +1324,83 @@ where
 
     async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
         self.network_observed_multiaddresses(key).await
+    }
+}
+
+#[cfg(test)]
+mod pix_recovery_event_tests {
+    use hopr_api::{
+        node::PixEvent,
+        types::{
+            crypto::{
+                keypairs::{Keypair, OffchainKeypair},
+                types::{HalfKey, SimplePseudonym},
+            },
+            crypto_random::{Randomizable, random_bytes},
+            internal::prelude::VerifiedAcknowledgement,
+        },
+    };
+    use hopr_crypto_packet::HoprPixSpec;
+    use hopr_protocol_pix::{
+        EntryShareGenerator, ExitAcknowledgementShareProcessor, PixSpec, SsaGeneratorConfig, SsaId, SsaIndex,
+        SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    };
+
+    use super::recovered_ssa_to_pix_event;
+
+    #[test]
+    fn recovered_ssa_maps_to_private_key_event_with_correct_secret_and_id() -> anyhow::Result<()> {
+        let cfg = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        };
+        let generator = SsaShareGenerator::<HoprPixSpec>::new(cfg);
+        let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {
+            early_recovery_threshold: 1.0,
+            ..Default::default()
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let client = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let expected_addr = HoprPixSpec::group_to_deposit_address(client.ssa_commitment + server_commitment)
+            .ok_or_else(|| anyhow::anyhow!("deposit address"))?;
+        client.process_into_reconstructor(&reconstructor)?;
+
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg = random_bytes::<20>();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let enc = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack.to_challenge()?,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        let rec = resolutions
+            .into_iter()
+            .find_map(|r| r.try_as_recovered_ssa())
+            .ok_or_else(|| anyhow::anyhow!("expected a RecoveredSsa resolution"))?;
+
+        assert_eq!(<HoprPixSpec as PixSpec>::DepositAddress::from(&rec.ssa), expected_addr);
+
+        let PixEvent::PrivateKeyRecovered(pk) = recovered_ssa_to_pix_event(&rec) else {
+            anyhow::bail!("expected PrivateKeyRecovered");
+        };
+
+        assert_eq!(pk.id, (pseudonym, ssa_id.ssa_index()));
+        assert_eq!(pk.secret.0.as_ref(), rec.ssa.secret().as_ref());
+
+        Ok(())
     }
 }
