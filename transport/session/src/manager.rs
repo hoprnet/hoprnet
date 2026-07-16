@@ -2393,7 +2393,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use hopr_protocol_pix::SsaGeneratorConfig;
+    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
@@ -4990,6 +4990,141 @@ mod tests {
         assert!(
             mgr.active_sessions().is_empty(),
             "session should be closed after deposit timeout"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        let _ = bob_handle.await;
+
+        Ok(())
+    }
+
+    /// Verifies that `check_pix_params` rejects out-of-bounds parameters that pass the
+    /// quota-range check but exceed the protocol limits.
+    ///
+    /// This is a regression test for the incentive-bypass fix (round-1 finding #1).
+    #[test_log::test(tokio::test)]
+    async fn check_pix_params_must_reject_invalid_bounds() -> anyhow::Result<()> {
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        // polys_per_ssa > MAX_POLYS_PER_SSA (16192) with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(65535u16) << 48) | (u64::from(128u16) << 32),
+        });
+        assert!(result.is_none(), "should reject polys_per_ssa > MAX_POLYS_PER_SSA");
+
+        // shares_per_ssa < 2 with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(1u16) << 48) | (u64::from(1u16) << 32),
+        });
+        assert!(result.is_none(), "should reject shares_per_ssa < 2");
+
+        // shares_per_ssa > MAX_POLY_THRESHOLD (4096) with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(1u16) << 48) | (u64::from(5000u16) << 32),
+        });
+        assert!(result.is_none(), "should reject shares_per_ssa > MAX_POLY_THRESHOLD");
+
+        // Valid params should still be accepted
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(8192u16) << 48) | (u64::from(128u16) << 32),
+        });
+        assert!(result.is_some(), "should accept valid params");
+
+        Ok(())
+    }
+
+    /// Verifies that dispatching too many `UnverifiableShare` events closes the session.
+    #[test_log::test(tokio::test)]
+    async fn too_many_unverifiable_shares_closes_session() -> anyhow::Result<()> {
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    max_deposit_wait: Duration::from_secs(1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // Session is active
+        assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
+
+        // `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES = 3`, so 4 dispatch events close the session.
+        // The first 3 increment the counter; the 4th exceeds the limit.
+        for _ in 0..=MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES {
+            let result = mgr
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .await;
+            // The first 3 succeed; the 4th also "succeeds" because closing the session returns Ok.
+            assert!(result.is_ok(), "dispatch_pix_event should not return an error");
+        }
+
+        // Session should be closed after too many unverifiable shares.
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session should be closed after too many unverifiable shares"
         );
         assert_eq!(mgr.num_active_sessions(), 0);
 

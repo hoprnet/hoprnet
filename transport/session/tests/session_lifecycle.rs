@@ -464,6 +464,10 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
         ))
     ));
 
+    // Assert one session slot IS present (the incoming slot from the self-delivered StartSession),
+    // confirming the rejection happened after slot insertion rather than before (doc claim at line 379-381).
+    assert_eq!(alice_mgr.active_sessions().len(), 1);
+
     drop(new_session_rx_alice);
 
     // Cleanup: close sender and await handle
@@ -541,6 +545,9 @@ async fn session_manager_should_timeout_new_session_attempt_when_no_response() -
         result,
         Err(hopr_transport_session::errors::TransportSessionError::Timeout)
     ));
+
+    // Assert no orphaned slot was left behind (doc claim at line 487)
+    assert_eq!(alice_mgr.num_active_sessions(), 0);
 
     Ok(())
 }
