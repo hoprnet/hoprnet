@@ -33,6 +33,9 @@ pub enum TransportSessionError {
 
     #[error("session is closed")]
     Closed,
+
+    #[error("invalid configuration: {0}")]
+    InvalidConfig(String),
 }
 
 impl TransportSessionError {
