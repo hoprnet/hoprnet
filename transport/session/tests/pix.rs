@@ -376,18 +376,15 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     Ok(())
 }
 
-/// Verifies that when the exit/responder side (`bob_mgr`) has no `PixToolbox`, the SSA request
-/// phase is skipped entirely — Bob still accepts the session but does not send `SsaRequest`.
+/// Verifies that when neither side has a `PixToolbox`, the session establishes without any SSA
+/// exchange — the PIX protocol is simply skipped.
 ///
 /// ## Steps
-/// 1. Alice's manager has no `PixToolbox`. Bob's manager has a PIX quota config but also no `PixToolbox` — meaning the
-///    PIX state machine cannot run.
-/// 2. Alice initiates a session with `Capability::UsePIX` and `pix_ssa_quota: Some((1, 1))`.
+/// 1. Both managers are started without a `PixToolbox`.
+/// 2. Alice initiates a session without `Capability::UsePIX` — neither side can run the PIX state machine.
 /// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice.
 /// 4. No `SsaRequest` is sent by Bob (Bob has no toolbox to generate one).
 /// 5. Both sessions are established and both sides receive a session handle.
-/// 6. The test passes by successfully completing the handshake without any SSA exchange, confirming that `PixToolbox`
-///    availability gates the SSA protocol.
 #[test(tokio::test)]
 async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
@@ -457,9 +454,9 @@ async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
                 SessionTarget::TcpStream(target),
                 SessionClientConfig {
                     pseudonym: alice_pseudonym.into(),
-                    capabilities: Capability::UsePIX.into(),
+                    capabilities: Capability::Segmentation.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some((1, 2)),
+                    pix_ssa_quota: None,
                     ..Default::default()
                 },
             ),

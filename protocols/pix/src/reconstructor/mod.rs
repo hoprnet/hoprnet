@@ -114,7 +114,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
-                .time_to_live(cfg.max_ack_await_time)
+                .time_to_idle(cfg.max_ack_await_time)
                 .build(),
             cfg,
         }
@@ -302,7 +302,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
         self.awaiting_acks
             .get_with_by_ref(peer, || {
-                moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64).build()
+                // Inner cache keyed by HalfKeyChallenge — each entry gets its own TTL
+                // so a late-arriving share gets the full max_ack_await_time window.
+                moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64)
+                    .time_to_live(self.cfg.max_ack_await_time)
+                    .build()
             })
             .insert(challenge, tagged_enc_share);
 

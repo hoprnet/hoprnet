@@ -1672,6 +1672,7 @@ where
     ///
     /// Returns the validated parameters, or `None` if the offered parameters were rejected.
     fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<(u16, u16)> {
+        // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
         if req.capabilities.0.contains(Capability::UsePIX) {
             // Client offered PIX, so validate the offered parameters
             let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u16;
@@ -1715,6 +1716,27 @@ where
 
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
+
+        // Reject UsePIX if this node is not configured with a PixToolbox
+        // (e.g. relay nodes that do not participate in PIX processing).
+        if self.pix_toolbox.get().is_none() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            error!(
+                challenge = session_req.challenge,
+                "client offered PIX but this node has no PIX support installed"
+            );
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                challenge: session_req.challenge,
+                reason: StartErrorReason::UnacceptablePixParams,
+            });
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing,
+                data,
+                "session error due to missing PIX support",
+            )
+            .await?;
+            return Ok(());
+        }
 
         // Verify if the client offered the right parameters for PIX
         let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
@@ -2197,7 +2219,7 @@ where
             session_slot.abort_handles.lock().insert(
                 SessionHandles::DepositAwaiter,
                 hopr_utils::spawn_as_abortable!(async move {
-                    if deposit_done_rx
+                    let deposit_done_rx_result = deposit_done_rx
                         .filter(|((evt_pseudonym, evt_index), _)| {
                             futures::future::ready(
                                 evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym(),
@@ -2206,17 +2228,26 @@ where
                         .next()
                         .delay(futures_time::time::Duration::from_millis(100))
                         .timeout(futures_time::time::Duration::from(max_deposit_wait))
-                        .await
-                        .is_ok()
-                    {
-                        // Abort the kill switch once the deposit has been done
-                        // This kill-switch is reinstated once the SSA has been recovered and a new Client commitment is
-                        // needed.
-                        slot_clone
-                            .abort_handles
-                            .lock()
-                            .abort_one(&SessionHandles::PixKillSwitch);
-                        info!(%session_id, "SSA deposit successful");
+                        .await;
+                    match deposit_done_rx_result {
+                        Ok(Some(_)) => {
+                            // Abort the kill switch once the deposit has been done
+                            // This kill-switch is reinstated once the SSA has been recovered and a new Client
+                            // commitment is needed.
+                            // TODO: how to kill the Session if we do not observe progress towards the current SSA
+                            // deposit recovery?
+                            slot_clone
+                                .abort_handles
+                                .lock()
+                                .abort_one(&SessionHandles::PixKillSwitch);
+                            info!(%session_id, "SSA deposit successful");
+                        }
+                        Ok(None) => {
+                            warn!(%session_id, "deposit channel closed without confirmation");
+                        }
+                        Err(_) => {
+                            warn!(%session_id, "deposit confirmation timed out");
+                        }
                     }
                 }),
             );
@@ -2342,17 +2373,6 @@ where
                 anyhow::anyhow!("failed to convert SSA to deposit address"),
             ))?;
 
-            // Notify the new SSA deposit address to allow the deposit to happen
-            pix_toolbox
-                .pix_events
-                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
-                    ssa_id: SsaId::new(pseudonym, ssa_index),
-                    deposit_address,
-                    quota_per_ssa,
-                }))
-                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
-            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
-
             // Split the SSA client commitment into Start protocol commitment messages
             let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment);
             debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
@@ -2369,6 +2389,19 @@ where
             }
 
             debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
+
+            // Notify the new SSA deposit address *after* all commitment messages have been
+            // sent out successfully, so the deposit cannot begin before the Exit has the
+            // complete commitment to reconstruct the deposit key.
+            pix_toolbox
+                .pix_events
+                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                    ssa_id: SsaId::new(pseudonym, ssa_index),
+                    deposit_address,
+                    quota_per_ssa,
+                }))
+                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
+            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
         }
 
         trace!(quota_per_ssa, "Exit commitment message has been fully processed");
@@ -2979,12 +3012,6 @@ mod tests {
             ..Default::default()
         };
 
-        let ssa_gen_config = SsaGeneratorConfig {
-            polynomials_per_ssa: 256,
-            threshold: 512,
-            surplus_shares: 16,
-        };
-
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = timeout(
             Duration::from_secs(2),
@@ -2994,9 +3021,8 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
-                        capabilities: Capability::Segmentation | Capability::UsePIX,
+                        capabilities: Capability::Segmentation.into(),
                         surb_management: Some(balancer_cfg),
-                        pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
                         ..Default::default()
                     },
                 ),
@@ -4329,7 +4355,7 @@ mod tests {
     async fn exit_rejects_ssa_commit_when_session_has_no_pix_state() -> anyhow::Result<()> {
         use std::collections::HashMap;
 
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         let ssa_gen_config = SsaGeneratorConfig {
@@ -4420,7 +4446,7 @@ mod tests {
     ///    confirming the kill switch fired.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_after_too_many_unverifiable_shares() -> anyhow::Result<()> {
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         let ssa_gen_config = SsaGeneratorConfig {
@@ -4512,7 +4538,7 @@ mod tests {
     async fn exit_requests_new_ssa_after_almost_recovered_event() -> anyhow::Result<()> {
         use std::sync::Arc;
 
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         let ssa_gen_config = SsaGeneratorConfig {
@@ -4602,7 +4628,7 @@ mod tests {
     async fn exit_does_not_request_new_ssa_on_ssa_recovered_event() -> anyhow::Result<()> {
         use std::sync::Arc;
 
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         let ssa_gen_config = SsaGeneratorConfig {
@@ -4693,7 +4719,7 @@ mod tests {
     async fn entry_rejects_ssa_request_with_mismatched_quota() -> anyhow::Result<()> {
         use std::collections::BTreeMap;
 
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         let ssa_gen_config = SsaGeneratorConfig {
@@ -4922,7 +4948,7 @@ mod tests {
     async fn session_is_closed_when_deposit_timeout_fires() -> anyhow::Result<()> {
         use std::time::Duration;
 
-        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
         use crate::test_helpers::MsgSender;

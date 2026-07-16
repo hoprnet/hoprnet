@@ -233,7 +233,10 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
-            pix_ssa_quota: None,
+            pix_ssa_quota: value
+                .pix_ssa_quota
+                .map(|(p, s)| Ok::<_, hopr_api::types::primitive::errors::GeneralError>((p.try_into()?, s.try_into()?)))
+                .transpose()?,
         })
     }
 }

@@ -21,6 +21,7 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []
@@ -50,7 +51,6 @@ async-trait = { workspace = true }
 crossfire = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
-const-hex = { workspace = true }
 humantime-serde = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }

@@ -519,7 +519,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
-                    if data.len() <= data_offset + size_of::<u32>() {
+                    if data.len() < data_offset + 1 + size_of::<u64>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -1039,5 +1039,24 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn start_protocol_keep_alive_truncated_lengths_should_not_panic() {
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::KeepAlive(KeepAliveMessage {
+            session_id: "test-session".to_string(),
+            flags: None.into(),
+            additional_data: 0,
+        });
+        let (tag, encoded) = msg.encode().expect("encode must succeed");
+        let full_len = encoded.len();
+
+        for trunc_len in 4..full_len {
+            let result = StartProtocol::<String, String, u8, Box<[u8]>>::decode(tag, &encoded[..trunc_len]);
+            assert!(
+                result.is_err(),
+                "truncated keep-alive at length {trunc_len}/{full_len} should return error, got {result:?}"
+            );
+        }
     }
 }

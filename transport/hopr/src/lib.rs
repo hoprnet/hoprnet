@@ -838,18 +838,102 @@ where
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
             }
-            (protocol::NodeType::Relay, Some(_)) => {
-                // Relay nodes need a PixToolbox for the SessionManager (SSA
-                // quota negotiation during return-path session setup), but the
-                // packet pipeline uses NopExitAcknowledgementShareProcessor —
-                // relays never process PIX shares.
-                let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+            (protocol::NodeType::Relay, None) => {
+                // Pure relay nodes do not participate in PIX — do not create a
+                // PixToolbox so the SessionManager rejects UsePIX
+                // pre-emptively during session initiation.
+                let pipeline_processes = pipeline_builder.with_ticket_events(ticket_events).build_for_relay();
+                processes.extend_from(pipeline_processes);
+                None
+            }
+            (protocol::NodeType::Relay, Some(ref ssa_events)) => {
+                // A relay that also acts as an Exit (has exit_ack_share) needs
+                // a full PixToolbox to handle the PIX handshake.
+                let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
-                let (pix_tools, _session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
-                // _session_pix_events dropped intentionally — relay node does
-                // not forward PIX lifecycle events to subscribers.
+                let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
+                let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
+                let smgr_clone = self.smgr.clone();
+                processes.insert(
+                    HoprTransportProcess::PixEvents,
+                    hopr_utils::spawn_as_abortable!(
+                        session_pix_events
+                            .map(|session_pix_event| match session_pix_event {
+                                HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                                    ssa_id,
+                                    deposit_address,
+                                    quota_per_ssa,
+                                }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
+                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                    address: deposit_address.into(),
+                                    quota: quota_per_ssa,
+                                }),
+                                HoprSessionOutPixEvent::DepositNeeded(
+                                    AgreedSsaQuota {
+                                        ssa_id,
+                                        deposit_address,
+                                        quota_per_ssa,
+                                    },
+                                    notifier,
+                                ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
+                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+                                    address: deposit_address.into(),
+                                    quota: quota_per_ssa,
+                                    deposit_updated: Some(notifier),
+                                }),
+                            })
+                            .merge(
+                                ssa_share_resolution_events_rx
+                                    .filter_map(move |ssa_resolution: HoprShareResolution| {
+                                        let smgr = smgr_clone.clone();
+                                        async move {
+                                            match ssa_resolution {
+                                                ShareResolution::RecoveredSsa(ssa_recovery_event) => {
+                                                    if let Err(error) = smgr
+                                                        .dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(
+                                                            ssa_recovery_event.ssa_id,
+                                                        ))
+                                                        .await
+                                                    {
+                                                        tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
+                                                    }
+                                                    Some(recovered_ssa_to_pix_event(&ssa_recovery_event))
+                                                }
+                                                ShareResolution::AlmostRecoveredSsa(ssa_id) => {
+                                                    if let Err(error) = smgr
+                                                        .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(
+                                                            ssa_id,
+                                                        ))
+                                                        .await
+                                                    {
+                                                        tracing::error!(%error, %ssa_id, "failed to dispatch early SSA recovery event to the SessionManager");
+                                                    }
+                                                    None
+                                                }
+                                                ShareResolution::InvalidShare(peer, ssa_id) => {
+                                                    error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
+                                                    if let Err(error) = smgr
+                                                        .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(
+                                                            ssa_id,
+                                                        ))
+                                                        .await
+                                                    {
+                                                        tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
+                                                    }
+                                                    None
+                                                }
+                                            }
+                                        }
+                                    }),
+                            )
+                            .map(Ok)
+                            .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
+                    ),
+                );
 
+                let pipeline_builder =
+                    pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
                 let pipeline_processes = pipeline_builder.with_ticket_events(ticket_events).build_for_relay();
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)

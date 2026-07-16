@@ -4072,7 +4072,6 @@ dependencies = [
  "hopr-ticket-manager",
  "hopr-transport",
  "hopr-transport-p2p",
- "hopr-transport-session",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4484,7 +4483,6 @@ version = "0.23.1"
 dependencies = [
  "anyhow",
  "async-trait",
- "const-hex",
  "criterion",
  "crossfire",
  "flagset",
