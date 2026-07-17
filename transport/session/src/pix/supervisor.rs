@@ -55,6 +55,8 @@ struct PerSsaState {
 
     // Deposit state.
     expected_deposit: Option<HoprBalance>,
+    /// Accumulated deposit amount across top-up deposits.
+    accumulated_deposit: HoprBalance,
 
     // Overlap / deferred-request state.
     next_request_pending_deposit: bool,
@@ -78,6 +80,7 @@ impl PerSsaState {
             recovered_polynomials: 0,
             per_ssa_invalid_total: 0,
             expected_deposit: None,
+            accumulated_deposit: HoprBalance::new_base(0),
             next_request_pending_deposit: false,
             next_requested: false,
             served_total_at_last_progress: 0,
@@ -105,6 +108,9 @@ pub(crate) struct SessionPixSupervisor {
     release_service_emitted: bool,
     /// Ordered SSAs (oldest first, newest last). At most 2 live + 1 tombstone.
     ssas: Vec<PerSsaState>,
+    /// Tracks the first failure reason when multiple SSAs fail, so the
+    /// earliest cause is used for the final `Close` action rather than the last.
+    first_failure_reason: Option<SessionPixCloseReason>,
 }
 
 impl SessionPixSupervisor {
@@ -124,6 +130,7 @@ impl SessionPixSupervisor {
             closed: false,
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
+            first_failure_reason: None,
         };
 
         let actions = s.emit_request_next_ssa(now);
@@ -319,9 +326,12 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Check deposit sufficiency.
+        // Accumulate deposit across top-ups.
+        ssa.accumulated_deposit = ssa.accumulated_deposit + amount;
+
+        // Check deposit sufficiency against accumulated amount.
         let sufficient = match ssa.expected_deposit {
-            Some(expected) => amount >= expected,
+            Some(expected) => ssa.accumulated_deposit >= expected,
             None => true,
         };
 
@@ -511,6 +521,10 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
+        // Track the first close reason so it isn't lost when multiple SSAs close.
+        self.first_failure_reason.get_or_insert(reason);
+        let close_reason = self.first_failure_reason.unwrap_or(reason);
+
         // Warn-level diagnostic with full SSA state before closing.
         let ssa = &self.ssas[idx];
         tracing::warn!(
@@ -533,7 +547,7 @@ impl SessionPixSupervisor {
 
         if self.ssas.len() == 1 {
             self.closed = true;
-            return vec![SessionPixAction::Close(reason)];
+            return vec![SessionPixAction::Close(close_reason)];
         }
 
         // Clear deadlines on this SSA.
@@ -549,7 +563,7 @@ impl SessionPixSupervisor {
             .all(|s| matches!(s.phase, SsaPhase::Closing | SsaPhase::Recovered { .. }))
         {
             self.closed = true;
-            return vec![SessionPixAction::Close(reason)];
+            return vec![SessionPixAction::Close(close_reason)];
         }
 
         // Remove this closing SSA.
@@ -984,6 +998,53 @@ mod tests {
 
         let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
         assert_eq!(ssa.phase, SsaPhase::Recovering);
+        assert!(!actions.is_empty());
+    }
+
+    #[test]
+    fn underfunded_then_sufficient_topup_accumulates() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: Some(HoprBalance::new_base(500)),
+            },
+            now,
+            0,
+        );
+
+        // First deposit: 300 < 500 -> accumulated=300, no-op.
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(300),
+            },
+            now,
+            0,
+        );
+
+        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
+        assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
+        assert_eq!(ssa.accumulated_deposit, HoprBalance::new_base(300));
+
+        // Second deposit: 200 + 300 >= 500 -> transitions to Recovering.
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(200),
+            },
+            now,
+            0,
+        );
+
+        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
+        assert_eq!(ssa.phase, SsaPhase::Recovering);
+        assert_eq!(ssa.accumulated_deposit, HoprBalance::new_base(500));
         assert!(!actions.is_empty());
     }
 
@@ -1970,9 +2031,10 @@ mod tests {
         // (RecoveryDeadline → removed), then SSA 2 (CommitmentTimeout → session close).
         let actions = sup.handle_deadline(start + Duration::from_secs(7200), 5);
         assert_eq!(actions.len(), 1);
+        // SSA 1 fails with RecoveryDeadline first, so that reason is surfaced.
         assert!(matches!(
             actions[0],
-            SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
+            SessionPixAction::Close(SessionPixCloseReason::RecoveryDeadline)
         ));
         assert!(sup.closed);
     }

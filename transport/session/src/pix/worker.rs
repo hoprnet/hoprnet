@@ -119,7 +119,10 @@ async fn worker_loop(
                     gate.poison();
                     return;
                 }
-                send_actions(&actions, &action_tx);
+                if !send_actions(&actions, &action_tx) {
+                    gate.poison();
+                    return;
+                }
                 continue;
             }
 
@@ -136,7 +139,10 @@ async fn worker_loop(
                         gate.poison();
                         return;
                     }
-                    send_actions(&actions, &action_tx);
+                    if !send_actions(&actions, &action_tx) {
+                        gate.poison();
+                        return;
+                    }
                     continue;
                 }
             }
@@ -164,7 +170,10 @@ async fn worker_loop(
                     gate.poison();
                     return;
                 }
-                send_actions(&actions, &action_tx);
+                if !send_actions(&actions, &action_tx) {
+                    gate.poison();
+                    return;
+                }
             }
             WorkerCommand::ActionResult { action, ok } => {
                 let now = Instant::now();
@@ -174,7 +183,10 @@ async fn worker_loop(
                     gate.poison();
                     return;
                 }
-                send_actions(&actions, &action_tx);
+                if !send_actions(&actions, &action_tx) {
+                    gate.poison();
+                    return;
+                }
             }
         }
     }
