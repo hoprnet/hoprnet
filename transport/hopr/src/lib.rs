@@ -72,7 +72,7 @@ pub use hopr_transport_session as session;
 pub use hopr_transport_session::transfer_session;
 use hopr_transport_session::{
     AgreedSsaQuota, DispatchResult, HoprSessionInPixEvent, HoprSessionOutPixEvent, PixToolbox, SessionManager,
-    SessionManagerConfig, SupervisorConfig, validate_pix_supervision,
+    SessionManagerConfig, validate_pix_supervision,
 };
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
@@ -329,17 +329,7 @@ where
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
         // Cross-validate PIX supervisor config against the reconstructor config.
-        let pix_cfg = SupervisorConfig {
-            max_ssa_delivery_time: cfg.incoming_session_pix_config.max_ssa_delivery_time,
-            max_deposit_wait: cfg.incoming_session_pix_config.max_deposit_wait,
-            max_recovery_idle: cfg.incoming_session_pix_config.max_recovery_idle,
-            max_recovery_time: cfg.incoming_session_pix_config.max_recovery_time,
-            max_unverifiable_shares_per_ssa: cfg.incoming_session_pix_config.max_unverifiable_shares_per_ssa,
-            max_unverifiable_shares_per_session: cfg.incoming_session_pix_config.max_unverifiable_shares_per_session,
-            max_predeposit_packets: cfg.incoming_session_pix_config.max_predeposit_packets,
-            max_served_without_progress: cfg.incoming_session_pix_config.max_served_without_progress,
-            tombstone_retention_window: cfg.incoming_session_pix_config.tombstone_retention_window,
-        };
+        let pix_cfg = cfg.incoming_session_pix_config.supervisor_cfg.clone();
         let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig::default();
         validate_pix_supervision(&pix_cfg, &reconstructor_cfg)
             .map_err(|e| HoprTransportError::Api(format!("PIX supervision config validation failed: {e}")))?;
