@@ -51,10 +51,11 @@ const SSA_INDEX_SIZE: usize = size_of::<SsaIndex>();
 /// Byte size of the [`PolynomialIndex`] when serialized as a big-endian prefix.
 const POLY_INDEX_SIZE: usize = size_of::<PolynomialIndex>();
 
+/// [`typenum`]: hopr_types::primitive::hybrid_array::typenum
 /// Size of the [`SsaIndex`] and [`PolynomialIndex`] prefix prepended to the encrypted share.
 ///
 /// Derived at compile time from `size_of::<SsaIndex>() + size_of::<PolynomialIndex>()` via
-/// [`typenum`]'s `Const`/`ToUInt` machinery. The matching runtime invariant is asserted by
+/// `typenum`'s `Const`/`ToUInt` machinery. The matching runtime invariant is asserted by
 /// the `size_of_indices_must_match` unit test below.
 pub type SsaPolyIndexPrefixSize = Sum<U<SSA_INDEX_SIZE>, U<POLY_INDEX_SIZE>>;
 
@@ -217,7 +218,7 @@ fn derive_ssa_encryption_key<S: PixSpec>(
 pub type FieldBytesSize<S> = <<S as PixSpec>::Curve as Curve>::FieldBytesSize;
 
 /// Total size of the [`EncryptedPartialSsaShare`] internal representation:
-/// [`SsaPolyIndexPrefixSize`] + [`FieldBytesSize`].
+/// `SsaPolyIndexPrefixSize` + FieldBytesSize.
 pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
 
 /// Contains an encrypted partial Session Stealth Address (SSA) share.
@@ -225,9 +226,9 @@ pub type EncShareSize<S> = Sum<FieldBytesSize<S>, SsaPolyIndexPrefixSize>;
 /// The internal byte layout is:
 /// 1. [`SsaIndex`] (big-endian, 4 bytes)
 /// 2. [`PolynomialIndex`] (big-endian, 2 bytes)
-/// 3. The encrypted scalar share ([`FieldBytesSize`] bytes)
+/// 3. The encrypted scalar share (FieldBytesSize bytes)
 ///
-/// This share can be [decrypted](EncryptedPartialSsaShare::decrypt) to [`PartialSsaShare`]
+/// This share can be decrypted to [`PartialSsaShare`]
 /// to be verified and used for reconstruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct EncryptedPartialSsaShare<S: PixSpec>(Array<u8, EncShareSize<S>>)
