@@ -533,6 +533,35 @@ where
         .filter(|a| !is_public_address(a))
         .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
 
+    // Preflight for the on-chain announcement
+    if ctx.cfg.publish {
+        let key_binding_fee = chain_api.key_binding_fee().await.map_err(HoprLibError::chain)?;
+        if !key_binding_fee.is_zero() {
+            let safe_hopr_balance: hopr_api::types::primitive::prelude::HoprBalance =
+                chain_api.balance(safe_addr).await.map_err(HoprLibError::chain)?;
+            if safe_hopr_balance < key_binding_fee
+                && chain_api
+                    .await_key_binding(transport_id.public(), Duration::from_secs(1))
+                    .await
+                    .is_err()
+            {
+                tracing::warn!(
+                    %safe_addr,
+                    safe_balance = %safe_hopr_balance,
+                    required = %key_binding_fee,
+                    "the safe does not hold enough wxHOPR to pay the node announcement (key-binding) fee",
+                );
+                crate::helpers::wait_for_safe_hopr_balance(
+                    key_binding_fee,
+                    Duration::from_secs(200),
+                    safe_addr,
+                    &chain_api,
+                )
+                .await?;
+            }
+        }
+    }
+
     let chain_api_clone = chain_api.clone();
     let me_offchain = *transport_id.public();
     let node_ready = spawn(async move {
@@ -545,7 +574,12 @@ where
     match chain_api.announce(&multiaddresses_to_announce, &transport_id).await {
         Ok(awaiter) => {
             awaiter.await.map_err(|error| {
-                tracing::error!(?multiaddresses_to_announce, %error, "node announcement failed");
+                tracing::error!(
+                    ?multiaddresses_to_announce,
+                    %error,
+                    "node announcement failed; this is commonly caused by the safe not holding enough wxHOPR to pay \
+                     the key-binding fee",
+                );
                 HoprLibError::chain(error)
             })?;
             tracing::info!(?multiaddresses_to_announce, "node announced successfully");
