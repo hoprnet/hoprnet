@@ -37,8 +37,6 @@ enum SsaPhase {
 /// Internal state for one supervised SSA.
 struct PerSsaState {
     ssa_id: SsaId<HoprPseudonym>,
-    #[expect(dead_code, reason = "used for debugging/index tracking in supervisor lifecycle")]
-    index: SsaIndex,
     phase: SsaPhase,
 
     // Deadlines (None means not set for this phase).
@@ -67,10 +65,9 @@ struct PerSsaState {
 }
 
 impl PerSsaState {
-    fn new(ssa_id: SsaId<HoprPseudonym>, index: SsaIndex, target_useful_shares: u64, _now: Instant) -> Self {
+    fn new(ssa_id: SsaId<HoprPseudonym>, target_useful_shares: u64, _now: Instant) -> Self {
         Self {
             ssa_id,
-            index,
             phase: SsaPhase::AwaitingCommitment,
             commitment_deadline: None,
             deposit_deadline: None,
@@ -85,11 +82,6 @@ impl PerSsaState {
             next_requested: false,
             served_total_at_last_progress: 0,
         }
-    }
-
-    #[expect(dead_code, reason = "used in supervisor logging and debug")]
-    fn ssa_index(&self) -> SsaIndex {
-        self.index
     }
 
     /// True if this SSA is past the recovery phase.
@@ -278,7 +270,7 @@ impl SessionPixSupervisor {
 
         let target = self.dims.target_useful_shares();
         let deadline = now.checked_add(self.cfg.max_ssa_delivery_time);
-        let mut state = PerSsaState::new(*ssa_id, ssa_id.ssa_index(), target, now);
+        let mut state = PerSsaState::new(*ssa_id, target, now);
         state.commitment_deadline = deadline;
         self.ssas.push(state);
 
