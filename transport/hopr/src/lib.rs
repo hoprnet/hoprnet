@@ -337,6 +337,7 @@ where
             max_unverifiable_shares_per_ssa: cfg.incoming_session_pix_config.max_unverifiable_shares_per_ssa,
             max_unverifiable_shares_per_session: cfg.incoming_session_pix_config.max_unverifiable_shares_per_session,
             max_predeposit_packets: cfg.incoming_session_pix_config.max_predeposit_packets,
+            max_served_without_progress: cfg.incoming_session_pix_config.max_served_without_progress,
             tombstone_retention_window: cfg.incoming_session_pix_config.tombstone_retention_window,
         };
         let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig::default();

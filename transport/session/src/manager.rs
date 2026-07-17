@@ -7,10 +7,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use futures::{
-    Sink, SinkExt, StreamExt, TryStreamExt,
-    future::{AbortHandle, Either},
-};
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -34,7 +31,7 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
     StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::{AbortableList, prelude::sleep};
+use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
@@ -154,21 +151,30 @@ pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1)
 
 /// Runtime-agnostic multi-waker notification primitive.
 ///
-/// Multi-waker notification — runtime-agnostic, no tokio dependency.
+/// Uses unique IDs per waiter so that dropping a future cleanly
+/// removes its waker from the vector — no waker leak on cancellation.
 struct SlotNotify {
-    inner: parking_lot::Mutex<Vec<Waker>>,
+    inner: parking_lot::Mutex<SlotNotifyInner>,
+}
+
+struct SlotNotifyInner {
+    wakers: Vec<(u64, Waker)>,
+    next_id: u64,
 }
 
 impl SlotNotify {
     const fn new() -> Self {
         Self {
-            inner: parking_lot::Mutex::new(Vec::new()),
+            inner: parking_lot::Mutex::new(SlotNotifyInner {
+                wakers: Vec::new(),
+                next_id: 0,
+            }),
         }
     }
 
     /// Wake all parked waiters.
     fn notify_waiters(&self) {
-        for waker in self.inner.lock().drain(..) {
+        for (_, waker) in self.inner.lock().wakers.drain(..) {
             waker.wake();
         }
     }
@@ -177,15 +183,29 @@ impl SlotNotify {
     fn notified(self: &Arc<Self>) -> SlotNotifyFuture {
         SlotNotifyFuture {
             notify: self.clone(),
+            waker_id: 0,
             registered: false,
         }
     }
 }
 
 /// Future returned by [`SlotNotify::notified`].
+///
+/// On cancellation (drop without completion), the registered waker is
+/// automatically removed from [`SlotNotify`] so stale entries are never
+/// left behind.
 struct SlotNotifyFuture {
     notify: Arc<SlotNotify>,
+    waker_id: u64,
     registered: bool,
+}
+
+impl Drop for SlotNotifyFuture {
+    fn drop(&mut self) {
+        if self.registered {
+            self.notify.inner.lock().wakers.retain(|(id, _)| *id != self.waker_id);
+        }
+    }
 }
 
 impl Future for SlotNotifyFuture {
@@ -197,8 +217,11 @@ impl Future for SlotNotifyFuture {
             // Already registered — a wake means the waker was called.
             Poll::Ready(())
         } else {
+            let mut inner = this.notify.inner.lock();
+            this.waker_id = inner.next_id;
+            inner.next_id += 1;
+            inner.wakers.push((this.waker_id, cx.waker().clone()));
             this.registered = true;
-            this.notify.inner.lock().push(cx.waker().clone());
             Poll::Pending
         }
     }
@@ -215,6 +238,20 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
+
+/// How long to wait for the supervisor to produce its initial
+/// [`RequestSsa`](crate::pix::SessionPixAction::RequestSsa) action.
+///
+/// The supervisor creates the action synchronously in the worker's first
+/// tick, so this is purely a safety guard in case of an internal stall.
+const INITIAL_SSA_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Polling guard when waiting for a session slot to appear.
+///
+/// The slot is populated by a concurrent start-protocol handler after the
+/// SSA server commitment arrives; if it hasn't appeared within this window
+/// the loop re-checks rather than sleeping forever.
+const SLOT_NOTIFY_TIMEOUT: Duration = Duration::from_millis(200);
 
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
@@ -409,6 +446,12 @@ pub struct IncomingSessionPixConfig {
     /// Default is 30 seconds.
     #[default(Duration::from_secs(30))]
     pub tombstone_retention_window: Duration,
+    /// Maximum packets served without SSA recovery progress before the gate
+    /// blocks further service (defense-in-depth backstop).
+    ///
+    /// Default is 256.
+    #[default(256)]
+    pub max_served_without_progress: u64,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1930,6 +1973,79 @@ where
             }
         });
 
+        // If PIX is active, set up the supervisor and install the egress gate
+        // BEFORE constructing the session, so the gate is populated before any
+        // write reaches the egress adapter.
+        let pix: Option<(
+            crate::pix::worker::SessionPixSupervisorHandle,
+            SsaId<HoprPseudonym>,
+            crate::pix::worker::ActionRx,
+        )> = if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            let params = SessionSsaParameters {
+                polys_per_ssa: client_polys_per_ssa,
+                shares_per_poly: client_shares_per_ssa,
+            };
+
+            let dims = crate::pix::SsaDimensions {
+                polys: params.polys_per_ssa,
+                threshold: params.shares_per_poly,
+            };
+
+            let pix_cfg = crate::pix::SupervisorConfig {
+                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
+                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
+                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
+                max_recovery_time: self.cfg.pix_config.max_recovery_time,
+                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
+                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
+                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
+                max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
+                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
+            };
+
+            let (handle, action_rx) =
+                crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
+
+            // Receive the initial RequestSsa action and send it synchronously.
+            let initial_action = action_rx
+                .recv()
+                .timeout(futures_time::time::Duration::from(INITIAL_SSA_REQUEST_TIMEOUT))
+                .await
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("timeout waiting for initial SSA request")))?
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("action driver closed prematurely")))?;
+
+            let ssa_id = match &initial_action {
+                crate::pix::SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
+                other => {
+                    error!(?other, "unexpected initial action from supervisor");
+                    return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
+                }
+            };
+
+            // Store params in slot first — send_ssa_request reads them.
+            let _ = slot.ssa_params.set(params);
+
+            // Send the SSA request message on the wire.
+            if let Err(e) = self.send_ssa_request(session_id, &slot, ssa_id.ssa_index()).await {
+                error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
+                return Err(e);
+            }
+
+            // Notify supervisor that the request was sent.
+            handle
+                .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
+
+            // Install the gate in the slot BEFORE session construction so the
+            // egress adapters inside HoprSession see a populated gate.
+            let _ = slot.pix_supervisor.set(handle.clone());
+            let _ = slot.pix_egress_gate.set(handle.gate.clone());
+
+            Some((handle, ssa_id, action_rx))
+        } else {
+            None
+        };
+
         let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
             // Because of SURB scarcity, control the egress rate of incoming sessions
             let egress_rate_control =
@@ -1968,9 +2084,13 @@ where
                                 let surb = surb.clone();
                                 Box::pin(async move {
                                     // Park while predeposit budget is exhausted;
-                                    // on poison, the session is closing so pass through.
+                                    // on poison, park forever — the task will be
+                                    // aborted by session teardown.
                                     if let Some(g) = gate {
-                                        let _ = g.acquire().await;
+                                        if g.acquire().await.is_err() {
+                                            // Gate poisoned — session is closing.
+                                            futures::future::pending::<()>().await;
+                                        }
                                     }
                                     // Each outgoing packet consumes one SURB
                                     surb.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -2076,7 +2196,10 @@ where
                             let gate = gate.get().cloned();
                             Box::pin(async move {
                                 if let Some(g) = gate {
-                                    let _ = g.acquire().await;
+                                    if g.acquire().await.is_err() {
+                                        // Gate poisoned — session is closing.
+                                        futures::future::pending::<()>().await;
+                                    }
                                 }
                                 Ok::<_, S::Error>((routing, data))
                             })
@@ -2140,68 +2263,9 @@ where
             Some(&slot.surb_mgmt),
         );
 
-        // If client requested PIX, and we support it
-        // (it was previously verified that the offered parameters are acceptable for us),
-        // then create the PIX supervisor and send the initial SSA commitment request.
-        // Defer slot_guard.commit() until after PIX setup succeeds.
-        if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
-            let params = SessionSsaParameters {
-                polys_per_ssa: client_polys_per_ssa,
-                shares_per_poly: client_shares_per_ssa,
-            };
-
-            let dims = crate::pix::SsaDimensions {
-                polys: params.polys_per_ssa,
-                threshold: params.shares_per_poly,
-            };
-
-            let pix_cfg = crate::pix::SupervisorConfig {
-                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
-                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
-                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
-                max_recovery_time: self.cfg.pix_config.max_recovery_time,
-                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
-                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
-                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
-                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
-            };
-
-            let (handle, mut action_rx) =
-                crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
-
-            // Receive the initial RequestSsa action and send it synchronously.
-            let initial_action = tokio::time::timeout(Duration::from_secs(5), action_rx.recv())
-                .await
-                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("timeout waiting for initial SSA request")))?
-                .ok_or(SessionManagerError::Other(anyhow::anyhow!(
-                    "action driver closed prematurely"
-                )))?;
-
-            let ssa_id = match &initial_action {
-                crate::pix::SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
-                other => {
-                    error!(?other, "unexpected initial action from supervisor");
-                    return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
-                }
-            };
-
-            // Store params in slot first — send_ssa_request reads them.
-            let _ = slot.ssa_params.set(params);
-
-            // Send the SSA request message on the wire.
-            if let Err(e) = self.send_ssa_request(session_id, &slot, ssa_id.ssa_index()).await {
-                error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
-                return Err(e);
-            }
-
-            // Notify supervisor that the request was sent.
-            handle
-                .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
-                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
-            let _ = slot.pix_supervisor.set(handle.clone());
-            let _ = slot.pix_egress_gate.set(handle.gate.clone());
-
-            // Spawn the action driver task.
+        // If PIX was set up before session construction, spawn the action
+        // driver task now (after the session is published).
+        if let Some((handle, ssa_id, action_rx)) = pix {
             let myself = self.clone();
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
@@ -2209,9 +2273,15 @@ where
             let pix_toolbox_for_driver = self.pix_toolbox.get().cloned();
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
                 // Track requested SSAs so they can be retired on close.
-                let mut tracked_ssas: Vec<SsaId<HoprPseudonym>> = Vec::new();
+                // Seed with the initial SSA (implicitly requested by
+                // supervisor construction) so it gets retired on close.
+                let mut tracked_ssas: Vec<SsaId<HoprPseudonym>> = vec![ssa_id];
 
-                while let Some(action) = action_rx.recv().await {
+                loop {
+                    let action = match action_rx.recv().await {
+                        Ok(a) => a,
+                        Err(_) => break, // sender dropped → close
+                    };
                     match action {
                         crate::pix::SessionPixAction::RequestSsa {
                             ssa_id,
@@ -2243,6 +2313,9 @@ where
                         }
                         crate::pix::SessionPixAction::ReleaseService => {
                             gate.release_service();
+                        }
+                        crate::pix::SessionPixAction::ProgressNotification => {
+                            gate.notify_progress();
                         }
                         crate::pix::SessionPixAction::Close(reason) => {
                             // Poison the gate so any parked writers get GateClosed.
@@ -2590,17 +2663,11 @@ where
                     error!(%session_id, "session slot not found within {DEADLINE:?}");
                     return Err(SessionManagerError::NonExistingSession.into());
                 }
-                // Race the notification future against a sleep timeout.
-                match futures::future::select(notify.notified(), Box::pin(sleep(Duration::from_millis(200)))).await {
-                    Either::Left((..)) => {
-                        // Woken by slot insertion; retry.
-                        continue;
-                    }
-                    Either::Right((..)) => {
-                        // Timeout guard; retry.
-                        continue;
-                    }
-                }
+                // Await notification with timeout guard.
+                let _ = notify
+                    .notified()
+                    .timeout(futures_time::time::Duration::from(SLOT_NOTIFY_TIMEOUT))
+                    .await;
             }
         };
 

@@ -12,6 +12,7 @@ use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 use crate::errors::TransportSessionError;
 
 pub(crate) mod gate;
+pub(crate) mod notify;
 pub(crate) mod supervisor;
 pub(crate) mod worker;
 
@@ -69,6 +70,16 @@ pub struct SupervisorConfig {
     /// Default: 1024 packets.
     #[default(1024)]
     pub max_predeposit_packets: u64,
+
+    /// Maximum packets served without SSA recovery progress before the gate
+    /// blocks further service as a defense-in-depth backstop.
+    ///
+    /// This is a ceiling enforced by [`ServiceGate::acquire`] after the gate is
+    /// funded. Each [`RecoveryProgress`] event resets the ceiling counter.
+    ///
+    /// Default: 256 packets.
+    #[default(256)]
+    pub max_served_without_progress: u64,
 
     /// How long to retain recovered-SSA tombstones for late events.
     ///
@@ -146,6 +157,9 @@ pub(crate) enum SessionPixAction {
     },
     /// Release the service gate (from predeposit to funded mode).
     ReleaseService,
+    /// Notifies the gate that SSA recovery made progress, resetting the
+    /// served-without-progress ceiling.
+    ProgressNotification,
     /// Close the session with the given reason.
     Close(SessionPixCloseReason),
 }
@@ -219,9 +233,22 @@ pub fn validate_pix_supervision(
             "tombstone_retention_window must be non-zero".into(),
         ));
     }
+    if cfg.max_served_without_progress == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "max_served_without_progress must be non-zero".into(),
+        ));
+    }
     if cfg.max_recovery_idle < reconstructor_cfg.max_ack_await_time {
         return Err(TransportSessionError::InvalidConfig(
             "max_recovery_idle must be >= max_ack_await_time".into(),
+        ));
+    }
+    // Documented invariant: tombstone must outlive the ack window.
+    if cfg.tombstone_retention_window < reconstructor_cfg.max_ack_await_time {
+        return Err(TransportSessionError::InvalidConfig(
+            "tombstone_retention_window must be >= max_ack_await_time (otherwise late acks arrive after the tombstone \
+             expires)"
+                .into(),
         ));
     }
     if cfg.max_recovery_idle >= reconstructor_cfg.incomplete_ssa_lifetime {
@@ -235,6 +262,24 @@ pub fn validate_pix_supervision(
         return Err(TransportSessionError::InvalidConfig(
             "ssa_counter_lifetime must be > max_recovery_time + tombstone_retention_window".into(),
         ));
+    }
+    // Reject durations that would overflow the monotonic clock when used as
+    // deadlines. 24 h is a safe upper bound — no supervisor duration should
+    // ever be this large, and the cap prevents silent deadline loss via
+    // Instant::checked_add returning None.
+    const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
+    for (name, dur) in [
+        ("max_ssa_delivery_time", &cfg.max_ssa_delivery_time),
+        ("max_deposit_wait", &cfg.max_deposit_wait),
+        ("max_recovery_idle", &cfg.max_recovery_idle),
+        ("max_recovery_time", &cfg.max_recovery_time),
+        ("tombstone_retention_window", &cfg.tombstone_retention_window),
+    ] {
+        if *dur > MAX_SUPERVISOR_DURATION {
+            return Err(TransportSessionError::InvalidConfig(
+                format!("{name} ({dur:?}) must not exceed {MAX_SUPERVISOR_DURATION:?}").into(),
+            ));
+        }
     }
     Ok(())
 }
@@ -261,6 +306,7 @@ mod tests {
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
             max_predeposit_packets: 1024,
+            max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
         }
     }
@@ -311,6 +357,13 @@ mod tests {
     fn validation_rejects_zero_tombstone_retention_window() {
         let mut cfg = valid_cfg();
         cfg.tombstone_retention_window = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_served_without_progress() {
+        let mut cfg = valid_cfg();
+        cfg.max_served_without_progress = 0;
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
     }
 
