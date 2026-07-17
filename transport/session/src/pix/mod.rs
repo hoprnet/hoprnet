@@ -71,6 +71,16 @@ pub struct SupervisorConfig {
     #[default(1024)]
     pub max_predeposit_packets: u64,
 
+    /// Maximum packets served without SSA recovery progress before the gate
+    /// blocks further service as a defense-in-depth backstop.
+    ///
+    /// This is a ceiling enforced by [`ServiceGate::acquire`] after the gate is
+    /// funded. Each [`RecoveryProgress`] event resets the ceiling counter.
+    ///
+    /// Default: 256 packets.
+    #[default(256)]
+    pub max_served_without_progress: u64,
+
     /// How long to retain recovered-SSA tombstones for late events.
     ///
     /// Must be >= the reconstructor's `max_ack_await_time`.
@@ -147,6 +157,9 @@ pub(crate) enum SessionPixAction {
     },
     /// Release the service gate (from predeposit to funded mode).
     ReleaseService,
+    /// Notifies the gate that SSA recovery made progress, resetting the
+    /// served-without-progress ceiling.
+    ProgressNotification,
     /// Close the session with the given reason.
     Close(SessionPixCloseReason),
 }
@@ -220,6 +233,11 @@ pub fn validate_pix_supervision(
             "tombstone_retention_window must be non-zero".into(),
         ));
     }
+    if cfg.max_served_without_progress == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "max_served_without_progress must be non-zero".into(),
+        ));
+    }
     if cfg.max_recovery_idle < reconstructor_cfg.max_ack_await_time {
         return Err(TransportSessionError::InvalidConfig(
             "max_recovery_idle must be >= max_ack_await_time".into(),
@@ -288,6 +306,7 @@ mod tests {
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
             max_predeposit_packets: 1024,
+            max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
         }
     }
@@ -338,6 +357,13 @@ mod tests {
     fn validation_rejects_zero_tombstone_retention_window() {
         let mut cfg = valid_cfg();
         cfg.tombstone_retention_window = Duration::ZERO;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_zero_max_served_without_progress() {
+        let mut cfg = valid_cfg();
+        cfg.max_served_without_progress = 0;
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
     }
 

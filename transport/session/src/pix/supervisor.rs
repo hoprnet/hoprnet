@@ -425,7 +425,8 @@ impl SessionPixSupervisor {
             ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
         }
 
-        Vec::new()
+        // Signal the gate to reset its served-without-progress ceiling.
+        vec![SessionPixAction::ProgressNotification]
     }
 
     fn on_almost_recovered(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
@@ -698,6 +699,7 @@ mod tests {
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
             max_predeposit_packets: 1024,
+            max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
         }
     }
