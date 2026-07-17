@@ -76,12 +76,6 @@ parameterized = { workspace = true }
 postcard = { workspace = true }
 tokio = { workspace = true }
 
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
-
-[package.metadata.cargo-shear]
-ignored = ["serde_bytes"]
-
 [[bench]]
 name = "packet_bench"
 harness = false

@@ -1,6 +1,6 @@
 //! Common acknowledgement verification helper shared by acknowledgement processors.
 //!
-//! Both [`crate::SsaReconstructor::acknowledge_shares`] and the
+//! Both the `acknowledge_shares` method on [`crate::ExitAcknowledgementShareProcessor`] and the
 //! `HoprUnacknowledgedTicketProcessor::acknowledge_tickets` over in `hopr-protocol-hopr`
 //! need to perform the very same steps when an incoming batch of [`Acknowledgement`]s
 //! arrives from a peer:

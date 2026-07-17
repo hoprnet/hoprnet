@@ -132,7 +132,6 @@ mockall = "0.15.0"
 moka = { version = "0.12.15", features = ["future", "sync"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
-num-traits = "0.2.19"
 oas3 = "0.22.0"
 opentelemetry-prometheus-text-exporter = { version = "0.3" }
 opentelemetry_sdk = { version = "0.32" }
@@ -269,7 +268,6 @@ similar.opt-level = 3
 ignored = [
   "oas3",
   "serde_bytes",
-  "humantime-serde",
   "hopr-session-server-forwarder",
   "hopr-strategy",
   "hopr-utils-session",

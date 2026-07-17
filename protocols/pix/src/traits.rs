@@ -60,7 +60,7 @@ pub type ShareResolutions<S> = Vec<ShareResolution<<S as PixSpec>::Pseudonym, <S
 ///    [`insert_coefficient_commitments`](ExitAcknowledgementShareProcessor::insert_coefficient_commitments))
 /// 2. Extraction of pending encrypted shares (added via
 ///    [`insert_encrypted_share`](ExitAcknowledgementShareProcessor::insert_encrypted_share)
-/// 3. Decryption of pending encrypted shares via [`Acknowledgements`](Acknowledgements) (via
+/// 3. Decryption of pending encrypted shares via [`Acknowledgement`]s (via
 ///    [`acknowledge_shares`](ExitAcknowledgementShareProcessor::acknowledge_shares))
 #[auto_impl::auto_impl(&, Arc, Box)]
 pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
@@ -98,7 +98,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         tagged_enc_share: TaggedEncryptedPartialSsaShare<S>,
     ) -> Result<(), Self::Error>;
 
-    /// Finds and acknowledges previously inserted encrypted share, using incoming [`Acknowledgements`](Acknowledgement)
+    /// Finds and acknowledges previously inserted encrypted share, using incoming [`Acknowledgement`]s
     /// from the upstream [`peer`](OffchainPublicKey).
     ///
     /// Function should first check if any acknowledgements are expected from the given `peer`.
@@ -113,7 +113,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     ///
     /// Challenges for which encrypted shares were not found are skipped.
     ///
-    /// Must return an error if no `Acknowledgements` from the given `peer` were expected.
+    /// Must return an error if no acknowledgements from the given `peer` were expected.
     ///
     /// This operation is expected to be somewhat long-running and significantly blocking.
     fn acknowledge_shares(
@@ -127,7 +127,7 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
 pub trait EntryShareGenerator<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Generate the next [`PartialSsaShare`] for the given pseudonym and message `msg`.
+    /// Generate the next [`crate::PartialSsaShare`] for the given pseudonym and message `msg`.
     ///
     /// IMPORTANT: Each `msg` MUST be unique for a given pseudonym.
     ///

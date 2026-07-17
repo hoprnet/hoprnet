@@ -71,7 +71,7 @@ type EncryptedShareCache<S> =
 ///    [`insert_coefficient_commitments`](ExitAcknowledgementShareProcessor::insert_coefficient_commitments))
 /// 2. Extraction of pending encrypted shares (added via
 ///    [`insert_encrypted_share`](ExitAcknowledgementShareProcessor::insert_encrypted_share)
-/// 3. Decryption of pending encrypted shares via [`Acknowledgements`](Acknowledgements) (via
+/// 3. Decryption of pending encrypted shares via [`Acknowledgement`]s (via
 ///    [`acknowledge_shares`](ExitAcknowledgementShareProcessor::acknowledge_shares))
 ///
 /// It is able to track SSA for multiple different pseudonyms (Sessions).
