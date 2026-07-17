@@ -1,6 +1,6 @@
 mod utils;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use hopr_types::{
     crypto::{
@@ -313,6 +313,78 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             }
             Err(e) => Err(e),
         }
+    }
+}
+
+/// RAII guard that owns an Exit SSA commitment in the reconstructor.
+///
+/// Created by [`SsaReconstructor::new_guarded_exit_commitment`]. On [`Drop`],
+/// the SSA is retired from all internal caches via [`SsaReconstructor::retire_ssa`],
+/// preventing orphaned commitments on any error path or task cancellation.
+///
+/// This is a move-only type (no `Clone`, no `Copy`) to maintain single-ownership
+/// of the commitment lifecycle.
+#[must_use = "SsaCommitmentGuard does nothing if unused — the SSA will be immediately retired"]
+pub struct SsaCommitmentGuard<S: PixSpec + Clone>(Option<(Arc<SsaReconstructor<S>>, SsaId<S::Pseudonym>)>);
+
+impl<S: PixSpec + Clone> std::fmt::Debug for SsaCommitmentGuard<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SsaCommitmentGuard")
+            .field("ssa_id", &self.0.as_ref().map(|(_, id)| id))
+            .finish()
+    }
+}
+
+impl<S: PixSpec + Clone> SsaCommitmentGuard<S> {
+    /// Creates a new guard that will retire the SSA on drop.
+    fn new(reconstructor: Arc<SsaReconstructor<S>>, ssa_id: SsaId<S::Pseudonym>) -> Self {
+        Self(Some((reconstructor, ssa_id)))
+    }
+
+    /// Returns the [`SsaId`] tracked by this guard.
+    pub fn ssa_id(&self) -> &SsaId<S::Pseudonym> {
+        &self
+            .0
+            .as_ref()
+            .expect("SsaCommitmentGuard invariant: Option is always Some until disarm")
+            .1
+    }
+
+    /// Consumes the guard without retiring the SSA, returning the tracked [`SsaId`].
+    ///
+    /// Use this when ownership of the commitment is transferred to another owner
+    /// (e.g., `SsaRetirementGuard`).
+    pub fn disarm(mut self) -> SsaId<S::Pseudonym> {
+        let (_, ssa_id) = self.0.take().expect("SsaCommitmentGuard disarmed twice");
+        ssa_id
+    }
+}
+
+impl<S: PixSpec + Clone> Drop for SsaCommitmentGuard<S> {
+    fn drop(&mut self) {
+        if let Some((ref reconstructor, ref ssa_id)) = self.0 {
+            reconstructor.retire_ssa(ssa_id);
+        }
+    }
+}
+
+impl<S: PixSpec + Clone> SsaReconstructor<S> {
+    /// Like [`ExitAcknowledgementShareProcessor::new_exit_commitment`] but returns an RAII
+    /// [`SsaCommitmentGuard`] that retires the SSA on drop.
+    ///
+    /// The guard ensures the commitment is always cleaned up if the caller fails to
+    /// transfer it to a permanent owner (e.g., the PIX action driver's retirement guard).
+    ///
+    /// On duplicate, returns [`PixError::DuplicateCommitment`] — no guard is created.
+    pub fn new_guarded_exit_commitment(
+        self: &Arc<Self>,
+        id: SsaId<S::Pseudonym>,
+        polys_per_ssa: usize,
+        shares_per_poly: usize,
+    ) -> Result<(PixGroup<S>, SsaCommitmentGuard<S>), PixError<S::Pseudonym>> {
+        let exit_commitment = self.new_exit_commitment(id, polys_per_ssa, shares_per_poly)?;
+        let guard = SsaCommitmentGuard::new(self.clone(), id);
+        Ok((exit_commitment, guard))
     }
 }
 

@@ -24,8 +24,8 @@ use hopr_crypto_packet::{
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, SsaId, SsaIndex, SsaReconstructor,
-    SsaShareGenerator,
+    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, SsaCommitmentGuard, SsaId, SsaIndex,
+    SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
@@ -1576,7 +1576,7 @@ where
         session_id: SessionId,
         slot: &SessionSlot,
         ssa_index: SsaIndex,
-    ) -> errors::Result<()> {
+    ) -> errors::Result<SsaCommitmentGuard<HoprPixSpec>> {
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
@@ -1592,16 +1592,16 @@ where
         // commitment
         let polys_per_ssa = params.polys_per_ssa;
         let shares_per_poly = params.shares_per_poly;
-        let exit_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+        let (exit_commitment, guard) = hopr_utils::parallelize::cpu::spawn_blocking(
             move || {
                 pix_toolbox
                     .share_processor
-                    .new_exit_commitment(
+                    .new_guarded_exit_commitment(
                         SsaId::new(session_id, ssa_index),
                         polys_per_ssa as usize,
                         shares_per_poly as usize,
                     )
-                    .map(|commitment| HoprPixGroupElement(commitment.to_bytes()))
+                    .map(|(commitment, guard)| (HoprPixGroupElement(commitment.to_bytes()), guard))
             },
             "server_ssa_commitment",
         )
@@ -1629,7 +1629,7 @@ where
         .await
         .map_err(TransportSessionError::packet_sending)?;
 
-        Ok(())
+        Ok(guard)
     }
 
     /// Returns the current number of active sessions.
@@ -2052,7 +2052,7 @@ where
         // write reaches the egress adapter.
         let pix: Option<(
             SessionPixSupervisorHandle,
-            SsaId<HoprPseudonym>,
+            SsaCommitmentGuard<HoprPixSpec>,
             ActionRx,
         )> = if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             let params = SessionSsaParameters {
@@ -2089,11 +2089,14 @@ where
             // Store params in slot first — send_ssa_request reads them.
             let _ = slot.ssa_params.set(params);
 
-            // Send the SSA request message on the wire.
-            if let Err(e) = self.send_ssa_request(session_id, &slot, ssa_id.ssa_index()).await {
-                error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
-                return Err(e);
-            }
+            // Send the SSA request message on the wire and capture the RAII guard.
+            let guard = self
+                .send_ssa_request(session_id, &slot, ssa_id.ssa_index())
+                .await
+                .map_err(|e| {
+                    error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
+                    e
+                })?;
 
             // Notify supervisor that the request was sent.
             handle
@@ -2106,7 +2109,7 @@ where
             let _ = slot.pix_supervisor.set(handle.clone());
             let _ = slot.pix_egress_gate.set(handle.gate.clone());
 
-            Some((handle, ssa_id, action_rx))
+            Some((handle, guard, action_rx))
         } else {
             None
         };
@@ -2342,20 +2345,17 @@ where
 
         // If PIX was set up before session construction, spawn the action
         // driver task now (after the session is published).
-        if let Some((handle, ssa_id, action_rx)) = pix {
+        if let Some((handle, initial_guard, action_rx)) = pix {
             let myself = self.clone();
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
             let supervisor_handle = handle.clone();
-            let pix_toolbox_for_driver = self.pix_toolbox.get().cloned();
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
-                // Track requested SSAs via a Drop-guarded wrapper so they are
-                // retired from the reconstructor even when the task is aborted.
-                // Seed with the initial SSA (implicitly requested by supervisor
-                // construction) so it gets retired on close.
+                // Owned collection of SsaCommitmentGuards — each guard calls
+                // retire_ssa on drop, so clearing the vec or dropping it
+                // handles cleanup automatically.
                 let mut retirement = SsaRetirementGuard {
-                    ssas: vec![ssa_id],
-                    share_processor: pix_toolbox_for_driver.clone().map(|tb| tb.share_processor.clone()),
+                    guards: vec![initial_guard],
                 };
 
                 loop {
@@ -2390,8 +2390,8 @@ where
                                 {
                                     error!(%session_id, "failed to send action result to PIX supervisor");
                                 }
-                                if result.is_ok() {
-                                    retirement.ssas.push(ssa_id);
+                                if let Ok(guard) = result {
+                                    retirement.guards.push(guard);
                                 }
                             } else {
                                 // Slot missing — supervisor must have already closed it.
@@ -2408,12 +2408,9 @@ where
                             gate.notify_progress();
                         }
                         SessionPixAction::RetireSsa(ssa_id) => {
-                            // Release the old SSA from the reconstructor and the
-                            // retirement guard so per-SSA state does not accumulate.
-                            if let Some(ref proc) = retirement.share_processor {
-                                proc.retire_ssa(&ssa_id);
-                            }
-                            retirement.ssas.retain(|id| id != &ssa_id);
+                            // Release the old SSA by dropping its guard — the guard's
+                            // Drop calls retire_ssa on the reconstructor automatically.
+                            retirement.guards.retain(|g| *g.ssa_id() != ssa_id);
                             // Remove the corresponding deposit-observer handle.
                             if let Some(slot) = myself.sessions.get(&session_id) {
                                 slot.abort_handles
@@ -2451,28 +2448,18 @@ where
                 }
             });
 
-            /// Drop-guarded wrapper that retires tracked SSAs from the reconstructor,
-            /// ensuring cleanup even when the task is aborted by `spawn_as_abortable!`.
+            /// Owned collection of [`SsaCommitmentGuard`]s for the PIX action driver.
+            ///
+            /// Each guard calls [`SsaReconstructor::retire_ssa`] on drop, so simply
+            /// clearing the vec or letting it drop handles cleanup automatically.
             struct SsaRetirementGuard {
-                ssas: Vec<SsaId<HoprPseudonym>>,
-                share_processor: Option<Arc<SsaReconstructor<HoprPixSpec>>>,
+                guards: Vec<SsaCommitmentGuard<HoprPixSpec>>,
             }
 
             impl SsaRetirementGuard {
-                /// Explicitly retire all tracked SSAs (called on Close and normal exit).
+                /// Explicitly retire all tracked SSAs by clearing the guard vec.
                 fn retire_all(&mut self) {
-                    if let Some(ref proc) = self.share_processor {
-                        for ssa_id in &self.ssas {
-                            proc.retire_ssa(ssa_id);
-                        }
-                        self.ssas.clear();
-                    }
-                }
-            }
-
-            impl Drop for SsaRetirementGuard {
-                fn drop(&mut self) {
-                    self.retire_all();
+                    self.guards.clear();
                 }
             }
 
