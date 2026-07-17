@@ -106,13 +106,14 @@ pub struct AgreedSsaQuota {
     pub quota_per_ssa: SsaQuota,
 }
 
-/// Events raised by the [`SessionManager`] in response to received PIX messages.
+/// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
 #[derive(Debug)]
 pub enum HoprSessionOutPixEvent {
-    /// Event raised by the [`SessionManager`] of an Entry node can deposit funds to an SSA for the agreed data quota.
+    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
+    /// agreed data quota.
     ReadyToDeposit(AgreedSsaQuota),
-    /// Event raised by the [`SessionManager`] of an Exit node, whenever it knows a new SSA and expects funds to be
-    /// deposited.
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
+    /// funds to be deposited.
     ///
     /// The attached sender is used to deliver updates once the deposit is completed.
     DepositNeeded(
@@ -121,12 +122,12 @@ pub enum HoprSessionOutPixEvent {
     ),
 }
 
-/// Events received by the [`SessionManager`] in reaction to received shares from the packet pipeline.
+/// Events received by the [`crate::manager::SessionManager`] in reaction to received shares from the packet pipeline.
 #[derive(Debug, Clone)]
 pub enum HoprSessionInPixEvent {
-    /// Informs the [`SessionManager`] that an SSA was fully recovered.
+    /// Informs the [`crate::manager::SessionManager`] that an SSA was fully recovered.
     SsaRecovered(SsaId<HoprPseudonym>),
-    /// Informs the [`SessionManager`] that the early recovery threshold was reached
+    /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
     /// for an SSA — the next SSA request can be made.
     SsaAlmostRecovered(SsaId<HoprPseudonym>),
     /// Reports absolute SSA recovery progress.
