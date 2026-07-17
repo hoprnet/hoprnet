@@ -157,7 +157,7 @@ pub enum CommitmentResult<S: PixSpec> {
     Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>),
 }
 
-/// Builds [`CommittedSsa`] from the incoming client polynomial coefficient commitments of
+/// Builds a complete SSA from the incoming client polynomial coefficient commitments of
 /// SSA-part polynomials for a specific Session Stealth Address (SSA).
 pub struct SsaCommitmentBuilder<S: PixSpec> {
     id: SsaId<S::Pseudonym>,

@@ -182,6 +182,3 @@ path = "tests/mixer_shared_heap.rs"
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
-
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde"]

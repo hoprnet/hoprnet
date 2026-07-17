@@ -76,12 +76,6 @@ parameterized = { workspace = true }
 postcard = { workspace = true }
 tokio = { workspace = true }
 
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
-
-[package.metadata.cargo-shear]
-ignored = ["serde_bytes"]
-
 [[bench]]
 name = "packet_bench"
 harness = false
@@ -93,6 +87,9 @@ harness = false
 [[bench]]
 name = "validation_bench"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
