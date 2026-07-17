@@ -26,14 +26,16 @@
 //!
 //! # Architecture
 //!
-//! The module is split into four components:
+//! The module is split into three components:
 //!
 //! | Component | File | Role |
 //! |---|---|---|
 //! | [`SessionPixSupervisor`] | [`supervisor`] | Pure state machine — no I/O, no async, no spawning.  Driven by explicit [`Instant`] timestamps and service-gate snapshots. |
 //! | [`ServiceGate`] | [`gate`] | Concurrent, lock-free egress gate.  Before funding: bounded predeposit budget.  After funding: ceiling on packets served without SSA recovery progress.  Callers park on a generation-counter waker. |
 //! | Worker loop | [`worker`] | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, and forwards supervisor actions to the caller. |
-//! | [`SlotNotify`] | [`notify`] | Runtime-agnostic multi-waker primitive.  Used by [`ServiceGate`] to park and wake callers without a tokio dependency. |
+//!
+//! The [`SlotNotify`](crate::utils::SlotNotify) multi-waker primitive is shared from [`utils`](crate::utils) and used
+//! by [`ServiceGate`] to park and wake callers without a tokio dependency.
 //!
 //! ## The [`SessionPixSupervisor`] state machine
 //!
@@ -218,7 +220,6 @@ use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 use crate::errors::TransportSessionError;
 
 mod gate;
-mod notify;
 mod supervisor;
 mod worker;
 
@@ -273,8 +274,8 @@ pub struct SupervisorConfig {
 
     /// Cap on the provisional predeposit service budget.
     ///
-    /// Default: 1024 packets.
-    #[default(1024)]
+    /// Default: 10000 packets.
+    #[default(10000)]
     pub max_predeposit_packets: u64,
 
     /// Maximum packets served without SSA recovery progress before the gate
@@ -283,8 +284,8 @@ pub struct SupervisorConfig {
     /// This is a ceiling enforced by [`ServiceGate::acquire`] after the gate is
     /// funded. Each [`RecoveryProgress`] event resets the ceiling counter.
     ///
-    /// Default: 256 packets.
-    #[default(256)]
+    /// Default: 2048 packets.
+    #[default(2048)]
     pub max_served_without_progress: u64,
 
     /// How long to retain recovered-SSA tombstones for late events.
@@ -299,11 +300,10 @@ pub struct SupervisorConfig {
     ///
     /// A deposit confirmation below this amount is a no-op (the deposit
     /// deadline keeps running and further top-ups accumulate).  Set to zero
-    /// (default) to accept any non-zero deposit — equivalent to the previous
-    /// `expected_deposit: None` behaviour.
+    /// (default) to accept any non-zero deposit.
     ///
-    /// Default: zero (accept any).
-    #[default(_code = "HoprBalance::new_base(0)")]
+    /// Default: zero (accepts any deposit).
+    #[default(HoprBalance::zero())]
     pub min_deposit: HoprBalance,
 }
 

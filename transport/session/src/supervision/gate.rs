@@ -1,6 +1,6 @@
 //! [`ServiceGate`] — bounded predeposit egress gate for PIX sessions.
 //!
-//! Before funding, the gate enforces a provisional packet budget.
+//! Before funding, the gate enforces a provisional packet budget from Exit to Entry.
 //! After funding, it enforces a ceiling on packets served without SSA
 //! recovery progress as a defense-in-depth backstop.
 //! On poisoning, all acquires fail permanently.
@@ -10,7 +10,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
-use super::notify::SlotNotify;
+use crate::utils::SlotNotify;
 
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -164,10 +164,7 @@ impl ServiceGate {
         self.served.load(Ordering::Acquire)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used in tests and will be exposed via egress gating in Step 4")
-    )]
+    #[cfg(test)]
     pub fn funded(&self) -> bool {
         self.funded.load(Ordering::Acquire)
     }

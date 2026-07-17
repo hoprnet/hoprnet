@@ -726,7 +726,7 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     /// Notify when a session slot is allocated (for event-driven slot-wait).
-    slot_notify: Arc<SlotNotify>,
+    slot_notify: SlotNotify,
     msg_sender: Arc<OnceLock<S>>,
     pix_toolbox: OnceLock<PixToolbox>,
     cfg: SessionManagerConfig,
@@ -847,7 +847,7 @@ where
                     _ => {}
                 })
                 .build(),
-            slot_notify: Arc::new(SlotNotify::new()),
+            slot_notify: SlotNotify::new(),
             pix_toolbox: OnceLock::new(),
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
