@@ -193,12 +193,6 @@ impl ServiceGate {
         self.notify.notify_waiters();
     }
 
-    /// Return the remaining predeposit budget (for diagnostics).
-    #[cfg(test)]
-    pub fn remaining_budget(&self) -> u64 {
-        self.remaining.load(Ordering::Acquire)
-    }
-
     /// Non-blocking try-acquire for tests and sync-only callers.
     ///
     /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is

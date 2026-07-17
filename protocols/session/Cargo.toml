@@ -59,7 +59,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
-hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types"] }
+hopr-utils = { workspace = true, features = ["network-types"] }
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive", "random"] }
 
