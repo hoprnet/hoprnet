@@ -3,15 +3,32 @@
 //! The worker serializes lifecycle events through the deterministic core,
 //! manages the deadline timer, and drives actions through an external
 //! action driver.
+//!
+//! Runtime-agnostic: uses crossfire channels and the runtime prelude from
+//! `hopr_utils` so no direct tokio dependency (tests use tokio freely).
 
 use std::{sync::Arc, time::Instant};
 
-use tokio::{select, sync::mpsc, time::sleep_until};
+use crossfire::{AsyncRx, MAsyncTx, TrySendError, mpsc::Array};
+use futures_time::future::FutureExt as TimeExt;
+use hopr_utils::runtime::prelude::spawn;
 
 use super::{
     SessionPixAction, SessionPixCloseReason, SessionPixEvent, SsaDimensions, SupervisorConfig, gate::ServiceGate,
     supervisor::SessionPixSupervisor,
 };
+
+// ---------------------------------------------------------------------------
+// Channel type aliases
+// ---------------------------------------------------------------------------
+
+type CmdChannel = Array<WorkerCommand>;
+type CmdTx = MAsyncTx<CmdChannel>;
+type CmdRx = AsyncRx<CmdChannel>;
+
+type ActionChannel = Array<SessionPixAction>;
+pub(crate) type ActionTx = MAsyncTx<ActionChannel>;
+pub(crate) type ActionRx = AsyncRx<ActionChannel>;
 
 // ---------------------------------------------------------------------------
 // SessionPixSupervisorHandle
@@ -20,23 +37,42 @@ use super::{
 /// Cloneable handle to a running [`SessionPixWorker`].
 #[derive(Clone)]
 pub(crate) struct SessionPixSupervisorHandle {
-    cmd_tx: mpsc::UnboundedSender<WorkerCommand>,
+    cmd_tx: CmdTx,
     pub(crate) gate: Arc<ServiceGate>,
 }
 
 impl SessionPixSupervisorHandle {
     /// Send a PIX event to the supervisor.
     ///
-    /// Returns `Err` if the worker is no longer running (fail-closed).
+    /// Returns `Err` if the worker is no longer running or the channel is
+    /// full (fail-closed).
     pub fn send_event(&self, ev: SessionPixEvent) -> Result<(), ()> {
-        self.cmd_tx.send(WorkerCommand::Event(ev)).map_err(|_| ())
+        match self.cmd_tx.try_send(WorkerCommand::Event(ev)) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_)) => {
+                tracing::warn!("PIX supervisor command channel full, dropping event");
+                Err(())
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                tracing::warn!("PIX supervisor command channel closed");
+                Err(())
+            }
+        }
     }
 
     /// Send an action result feedback to the supervisor.
     pub fn send_action_result(&self, action: SessionPixAction, ok: bool) -> Result<(), ()> {
-        self.cmd_tx
-            .send(WorkerCommand::ActionResult { action, ok })
-            .map_err(|_| ())
+        match self.cmd_tx.try_send(WorkerCommand::ActionResult { action, ok }) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_)) => {
+                tracing::warn!("PIX supervisor result channel full, dropping result");
+                Err(())
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                tracing::warn!("PIX supervisor result channel closed");
+                Err(())
+            }
+        }
     }
 }
 
@@ -59,9 +95,9 @@ pub(crate) fn spawn_supervisor_worker(
     dims: SsaDimensions,
     pseudonym: hopr_api::types::internal::prelude::HoprPseudonym,
     now: Instant,
-) -> (SessionPixSupervisorHandle, mpsc::UnboundedReceiver<SessionPixAction>) {
-    let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<WorkerCommand>();
-    let (action_tx, action_rx) = mpsc::unbounded_channel::<SessionPixAction>();
+) -> (SessionPixSupervisorHandle, ActionRx) {
+    let (cmd_tx, cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(64);
+    let (action_tx, action_rx) = crossfire::mpsc::bounded_async::<SessionPixAction>(64);
 
     let predeposit_budget = std::cmp::min(
         dims.target_useful_shares().saturating_sub(1),
@@ -76,7 +112,7 @@ pub(crate) fn spawn_supervisor_worker(
 
     let (supervisor, initial_actions) = SessionPixSupervisor::new(cfg, dims, pseudonym, now);
 
-    tokio::spawn(worker_loop(supervisor, cmd_rx, action_tx, gate, initial_actions));
+    spawn(worker_loop(supervisor, cmd_rx, action_tx, gate, initial_actions));
 
     (handle, action_rx)
 }
@@ -87,8 +123,8 @@ pub(crate) fn spawn_supervisor_worker(
 
 async fn worker_loop(
     mut supervisor: SessionPixSupervisor,
-    mut cmd_rx: mpsc::UnboundedReceiver<WorkerCommand>,
-    action_tx: mpsc::UnboundedSender<SessionPixAction>,
+    cmd_rx: CmdRx,
+    action_tx: ActionTx,
     gate: Arc<ServiceGate>,
     initial_actions: Vec<SessionPixAction>,
 ) {
@@ -110,7 +146,7 @@ async fn worker_loop(
     loop {
         let deadline = supervisor.next_deadline();
 
-        let cmd = if let Some(dl) = deadline {
+        if let Some(dl) = deadline {
             let now = Instant::now();
             if now >= dl {
                 let actions = supervisor.handle_deadline(now, gate.served_total());
@@ -126,12 +162,15 @@ async fn worker_loop(
                 continue;
             }
 
-            let sleep = sleep_until(dl.into());
-            select! {
-                biased;
+            let duration = dl.saturating_duration_since(Instant::now());
 
-                cmd = cmd_rx.recv() => { cmd }
-                _ = sleep => {
+            match cmd_rx
+                .recv()
+                .timeout(futures_time::time::Duration::from(duration))
+                .await
+            {
+                Ok(result) => process_cmd(result.ok(), &mut supervisor, &action_tx, &gate).await,
+                Err(_) => {
                     let now = Instant::now();
                     let actions = supervisor.handle_deadline(now, gate.served_total());
                     if supervisor.closed {
@@ -143,60 +182,68 @@ async fn worker_loop(
                         gate.poison();
                         return;
                     }
-                    continue;
                 }
             }
         } else {
-            cmd_rx.recv().await
-        };
+            let cmd = cmd_rx.recv().await.ok();
+            process_cmd(cmd, &mut supervisor, &action_tx, &gate).await;
+        }
+    }
+}
 
-        let cmd = match cmd {
-            Some(c) => c,
-            None => {
-                // All senders dropped — close.
-                let actions = vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)];
-                send_actions(&actions, &action_tx);
+/// Handle a received command from the handle.
+async fn process_cmd(
+    cmd: Option<WorkerCommand>,
+    supervisor: &mut SessionPixSupervisor,
+    action_tx: &ActionTx,
+    gate: &Arc<ServiceGate>,
+) {
+    let cmd = match cmd {
+        Some(c) => c,
+        None => {
+            // All senders dropped — close.
+            let actions = vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)];
+            send_actions(&actions, action_tx);
+            gate.poison();
+            return;
+        }
+    };
+
+    match cmd {
+        WorkerCommand::Event(ev) => {
+            let now = Instant::now();
+            let actions = supervisor.handle_event(&ev, now, gate.served_total());
+            if supervisor.closed {
+                send_actions(&actions, action_tx);
                 gate.poison();
                 return;
             }
-        };
-
-        match cmd {
-            WorkerCommand::Event(ev) => {
-                let now = Instant::now();
-                let actions = supervisor.handle_event(&ev, now, gate.served_total());
-                if supervisor.closed {
-                    send_actions(&actions, &action_tx);
-                    gate.poison();
-                    return;
-                }
-                if !send_actions(&actions, &action_tx) {
-                    gate.poison();
-                    return;
-                }
+            if !send_actions(&actions, action_tx) {
+                gate.poison();
+                return;
             }
-            WorkerCommand::ActionResult { action, ok } => {
-                let now = Instant::now();
-                let actions = supervisor.action_result(&action, ok, now);
-                if supervisor.closed {
-                    send_actions(&actions, &action_tx);
-                    gate.poison();
-                    return;
-                }
-                if !send_actions(&actions, &action_tx) {
-                    gate.poison();
-                    return;
-                }
+        }
+        WorkerCommand::ActionResult { action, ok } => {
+            let now = Instant::now();
+            let actions = supervisor.action_result(&action, ok, now);
+            if supervisor.closed {
+                send_actions(&actions, action_tx);
+                gate.poison();
+                return;
+            }
+            if !send_actions(&actions, action_tx) {
+                gate.poison();
+                return;
             }
         }
     }
 }
 
 /// Non-blocking forward of actions to the driver.
-fn send_actions(actions: &[SessionPixAction], action_tx: &mpsc::UnboundedSender<SessionPixAction>) -> bool {
+fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
     for action in actions {
-        if action_tx.send(action.clone()).is_err() {
-            tracing::warn!(?action, "action driver disconnected");
+        if action_tx.try_send(action.clone()).is_err() {
+            tracing::warn!(?action, "action driver disconnected or channel full");
             return false;
         }
     }

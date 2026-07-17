@@ -9,7 +9,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
-use tokio::sync::Notify;
+use super::notify::SlotNotify;
 
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -38,7 +38,7 @@ pub(crate) struct ServiceGate {
     /// Whether the gate is poisoned.
     poisoned: AtomicBool,
     /// Waker for parked writers.
-    notify: Notify,
+    notify: SlotNotify,
 }
 
 impl ServiceGate {
@@ -49,7 +49,7 @@ impl ServiceGate {
             remaining: AtomicU64::new(predeposit_budget),
             funded: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
-            notify: Notify::new(),
+            notify: SlotNotify::new(),
         })
     }
 
@@ -102,13 +102,34 @@ impl ServiceGate {
             }
 
             // Budget exhausted — park.
+            //
+            // Register interest FIRST, then re-check conditions. This
+            // prevents a missed wake-up: without the double-check, a
+            // concurrent release_service()/poison() can call
+            // notify_waiters() between the budget check above and the
+            // Notified creation below, and the new Notified would never
+            // observe that notification.
             let notified = self.notify.notified();
-            tokio::select! {
-                _ = notified => {
-                    // Woken by release_service or poison; loop to re-check.
-                    continue;
-                }
+
+            // Double-check: after registering, re-read all conditions
+            // that could have changed since the last load above.
+            if self.poisoned.load(Ordering::Acquire) {
+                return Err(GateClosed);
             }
+            if self.funded.load(Ordering::Acquire) {
+                self.served.fetch_add(1, Ordering::Relaxed);
+                return Ok(());
+            }
+            if self.remaining.load(Ordering::Acquire) > 0 {
+                // Another thread may have released the gate or a
+                // deposit freed budget while we were registering.
+                // Drop the unused Notified (unpolled — clean) and
+                // retry the main loop.
+                continue;
+            }
+
+            // Budget exhausted — park and wait for wake-up.
+            notified.await;
         }
     }
 
