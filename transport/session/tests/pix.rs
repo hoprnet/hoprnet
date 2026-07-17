@@ -377,7 +377,10 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 
     let unknown_pseudonym = HoprPseudonym::random();
     let ssa_id = SsaId::new(unknown_pseudonym, SsaIndex::new(1).expect("ssa index must be non-zero"));
-    let event = HoprSessionInPixEvent::UnverifiableShare(ssa_id);
+    let event = HoprSessionInPixEvent::UnverifiableShares {
+        ssa_id,
+        observed_total: 1,
+    };
 
     let result = mgr.dispatch_pix_event(event).await;
     assert!(result.is_err());

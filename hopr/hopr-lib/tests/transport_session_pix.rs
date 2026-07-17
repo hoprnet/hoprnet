@@ -559,9 +559,6 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
                     PixEvent::NewDepositAddress(data) => {
                         tracing::info!(id = ?data.id, quota = data.quota, "Entry: NewDepositAddress");
                     }
-                    other => {
-                        anyhow::bail!("unexpected Exit PixEvent: {other:?}");
-                    }
                 }
             }
         }

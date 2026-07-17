@@ -286,7 +286,7 @@ mod tests {
 
     #[tokio::test]
     async fn worker_creates_and_forwards_initial_request() {
-        let (_handle, mut action_rx) =
+        let (_handle, action_rx) =
             spawn_supervisor_worker(default_cfg(), dims(), HoprPseudonym::random(), Instant::now());
 
         let action = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -319,7 +319,7 @@ mod tests {
     #[tokio::test]
     async fn release_service_action_flips_gate() {
         let p = HoprPseudonym::random();
-        let (handle, mut action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
 
         // Consume initial RequestSsa.
         let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -337,7 +337,7 @@ mod tests {
     #[tokio::test]
     async fn event_sent_via_handle_reaches_core() {
         let p = HoprPseudonym::random();
-        let (handle, mut action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
 
         // Consume initial RequestSsa.
         let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -361,7 +361,7 @@ mod tests {
     #[tokio::test]
     async fn action_result_feedback_processed() {
         let p = HoprPseudonym::random();
-        let (handle, mut action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
 
         // Consume initial RequestSsa.
         let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -393,7 +393,7 @@ mod tests {
         let mut cfg = default_cfg();
         cfg.max_ssa_delivery_time = Duration::from_millis(10);
         let p = HoprPseudonym::random();
-        let (handle, mut action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
+        let (handle, action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
 
         // Consume initial RequestSsa.
         let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
