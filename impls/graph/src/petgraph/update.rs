@@ -1,7 +1,30 @@
 use hopr_api::graph::{MeasurableEdge, MeasurableNode, NetworkGraphWrite, traits::EdgeObservableWrite};
+#[cfg(all(feature = "telemetry", not(test)))]
+use hopr_api::graph::{NetworkGraphView, traits::EdgeObservableRead};
 use petgraph::graph::{EdgeIndex, NodeIndex};
 
 use crate::{ChannelGraph, Observations, graph::InnerGraph};
+
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_PEERS_BY_QUALITY: hopr_api::types::telemetry::SimpleHistogram =
+        hopr_api::types::telemetry::SimpleHistogram::new(
+            "hopr_peers_by_quality",
+            "Distribution of the quality score of the node's directly-probed neighbors",
+            vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+        )
+        .unwrap();
+}
+
+/// Records the current quality score of a directly-probed neighbor into the
+/// `hopr_peers_by_quality` histogram. Called after each successful or failed neighbor probe
+/// so the distribution tracks quality as it evolves per probe round.
+#[cfg(all(feature = "telemetry", not(test)))]
+fn observe_neighbor_quality(graph: &ChannelGraph, peer: &hopr_api::OffchainPublicKey) {
+    if let Some(obs) = graph.edge(graph.me(), peer) {
+        METRIC_PEERS_BY_QUALITY.observe(obs.score());
+    }
+}
 
 /// Resolves a loopback path from serialized node-index bytes into a validated chain of edge indices.
 ///
@@ -94,6 +117,9 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                     obs.record(EdgeWeightType::Connected(true));
                     obs.record(EdgeWeightType::Immediate(Ok(telemetry.rtt() / 2)));
                 });
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                observe_neighbor_quality(self, telemetry.peer());
             }
             MeasurableEdge::Probe(Ok(hopr_api::graph::EdgeTransportTelemetry::Loopback(telemetry))) => {
                 tracing::trace!("loopback probe successful");
@@ -183,6 +209,9 @@ impl hopr_api::graph::NetworkGraphUpdate for ChannelGraph {
                 self.upsert_edge(peer, &self.me, |obs| {
                     obs.record(EdgeWeightType::Immediate(Err(())));
                 });
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                observe_neighbor_quality(self, peer);
             }
             MeasurableEdge::Probe(Err(hopr_api::graph::NetworkGraphError::ProbeLoopbackTimeout(telemetry))) => {
                 tracing::trace!("loopback probe failed");

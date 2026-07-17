@@ -27,11 +27,13 @@ default = ["petgraph"]
 all-benchmarks = []
 petgraph = ["dep:petgraph", "dep:indexmap", "dep:rand"]
 graph-api = ["petgraph"]
+telemetry = ["hopr-api/types-telemetry", "dep:lazy_static"]
 
 [dependencies]
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 indexmap = { workspace = true, optional = true, features = ["rayon"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, optional = true, features = ["rayon"] }

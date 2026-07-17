@@ -52,10 +52,7 @@ pub(super) async fn process_chain_events<C, G>(
     // sets are seeded correctly without an explicit query. Set operations are idempotent,
     // making this robust to duplicated events.
     #[cfg(all(feature = "telemetry", not(test)))]
-    let (mut incoming_open, mut outgoing_open) = (
-        std::collections::HashSet::new(),
-        std::collections::HashSet::new(),
-    );
+    let (mut incoming_open, mut outgoing_open) = (std::collections::HashSet::new(), std::collections::HashSet::new());
 
     while let Some(chain_event) = events.next().await {
         tracing::debug!(event = %chain_event, "processing chain event");
