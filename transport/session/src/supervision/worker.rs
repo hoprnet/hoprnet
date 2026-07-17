@@ -278,8 +278,10 @@ fn is_coalescible(action: &SessionPixAction) -> bool {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
-    use hopr_api::HoprBalance;
+    use hopr_api::{
+        HoprBalance,
+        types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym},
+    };
     use hopr_protocol_pix::{SsaId, SsaIndex};
 
     use super::*;
@@ -603,5 +605,35 @@ mod tests {
         let result = tokio::time::timeout(Duration::from_secs(1), parked).await;
         assert!(result.is_ok(), "parked send should complete after channel is drained");
         assert!(result.unwrap().is_ok(), "send should succeed");
+    }
+
+    // -----------------------------------------------------------------------
+    // PD-02: Action-channel Full handling
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn coalescible_dropped_on_full_non_coalescible_and_disconnected_are_fatal() {
+        let (action_tx, _action_rx) = crossfire::mpsc::bounded_async::<SessionPixAction>(1);
+
+        // Fill the channel so the next send hits TrySendError::Full.
+        action_tx.try_send(SessionPixAction::ReleaseService).unwrap();
+
+        // Flood with coalescible actions — silently dropped, send_actions
+        // returns true (session survives).
+        let progress: Vec<_> = (0..100).map(|_| SessionPixAction::ProgressNotification).collect();
+        assert!(send_actions(&progress, &action_tx));
+
+        // Non-coalescible action on the same full channel → returns false
+        // (session must be terminated).
+        assert!(!send_actions(
+            &[SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)],
+            &action_tx
+        ));
+
+        // Disconnected channel — also fatal. Use a separate channel so the
+        // sender is still alive but the receiver is dropped.
+        let (action_tx2, action_rx2) = crossfire::mpsc::bounded_async::<SessionPixAction>(1);
+        drop(action_rx2);
+        assert!(!send_actions(&progress, &action_tx2));
     }
 }

@@ -1154,6 +1154,52 @@ mod tests {
     }
 
     #[test]
+    fn min_deposit_config_rejects_dust_and_accepts_full() {
+        let mut cfg = default_cfg();
+        cfg.min_deposit = HoprBalance::new_base(500);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: Some(HoprBalance::new_base(500)),
+            },
+            now,
+            0,
+        );
+
+        // Dust (100 < 500) → no-op, still AwaitingDeposit.
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(100),
+            },
+            now,
+            0,
+        );
+        assert!(actions.is_empty());
+        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
+        assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
+
+        // Sufficient (500 >= 500) → transitions to Recovering.
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(500),
+            },
+            now,
+            0,
+        );
+        assert!(!actions.is_empty());
+        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
+        assert_eq!(ssa.phase, SsaPhase::Recovering);
+    }
+
+    #[test]
     fn duplicate_deposit_confirmation_is_idempotent() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
