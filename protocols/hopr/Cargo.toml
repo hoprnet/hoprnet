@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.7.0"
+version = "4.8.0"
 description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
 edition.workspace = true
 license.workspace = true

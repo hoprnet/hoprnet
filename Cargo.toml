@@ -195,26 +195,26 @@ hopr-types = { version = "2.0.0", features = ["use-bindings"] }
 hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
-hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
+hopr-crypto-packet = { version = "1.5.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
   "bjj",
 ] }
 hopr-lib = { version = "4.0.2-rc.5", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false, features = [
+hopr-protocol-hopr = { version = "4.8.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
 ] }
 hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-features = false, features = [
   "rayon",
 ] }
-hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
-hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
+hopr-protocol-session = { version = "1.2.3", path = "protocols/session", default-features = false }
+hopr-protocol-start = { version = "1.2.0", path = "protocols/start", default-features = false }
+hopr-strategy = { version = "0.20.0", path = "impls/strategy" }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.32.0", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.33.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.24.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.22.0", path = "impls/connector" }
 
