@@ -705,12 +705,18 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
     match result {
         Ok(Err(e)) => {
             tracing::info!("connection rejected as expected: {e:?}");
+            // Require a PIX-specific rejection, not just any error.
+            let err_msg = e.to_string();
+            assert!(
+                err_msg.to_lowercase().contains("pix") || err_msg.to_lowercase().contains("enforce"),
+                "expected PIX-related rejection, got: {e:?}"
+            );
         }
         Ok(Ok((_session, _configurator))) => {
             anyhow::bail!("expected connection rejection but session was established");
         }
         Err(_) => {
-            tracing::info!("connection timed out as expected (no PIX-enabled session accepted)");
+            anyhow::bail!("expected explicit rejection, got timeout");
         }
     }
 

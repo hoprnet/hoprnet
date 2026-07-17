@@ -88,6 +88,17 @@ pub struct SupervisorConfig {
     /// Default: 30 s.
     #[default(Duration::from_secs(30))]
     pub tombstone_retention_window: Duration,
+
+    /// Minimum deposit amount required before the gate is released.
+    ///
+    /// A deposit confirmation below this amount is a no-op (the deposit
+    /// deadline keeps running and further top-ups accumulate).  Set to zero
+    /// (default) to accept any non-zero deposit — equivalent to the previous
+    /// `expected_deposit: None` behaviour.
+    ///
+    /// Default: zero (accept any).
+    #[default(_code = "HoprBalance::new_base(0)")]
+    pub min_deposit: HoprBalance,
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +207,8 @@ pub(crate) enum SessionPixCloseReason {
     CounterRegression,
     /// Internal inconsistency (e.g., mismatched target, event on unknown SSA).
     InvalidTransition,
+    /// The SSA set drained (all SSAs expired/recovered without a successor).
+    NoSsaRemaining,
     /// The supervisor action driver failed or was dropped.
     SupervisorUnavailable,
 }
@@ -261,12 +274,13 @@ pub fn validate_pix_supervision(
         ));
     }
     let supervision_horizon = cfg
-        .max_recovery_time
-        .checked_add(cfg.tombstone_retention_window)
+        .max_deposit_wait
+        .checked_add(cfg.max_recovery_time)
+        .and_then(|sum| sum.checked_add(cfg.tombstone_retention_window))
         .unwrap_or(Duration::MAX);
     if Duration::from_secs(reconstructor_cfg.ssa_counter_lifetime_secs) <= supervision_horizon {
         return Err(TransportSessionError::InvalidConfig(
-            "ssa_counter_lifetime must be > max_recovery_time + tombstone_retention_window".into(),
+            "ssa_counter_lifetime must be > max_deposit_wait + max_recovery_time + tombstone_retention_window".into(),
         ));
     }
     // Reject durations that would overflow the monotonic clock when used as
@@ -314,6 +328,7 @@ mod tests {
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
+            min_deposit: HoprBalance::new_base(0),
         }
     }
 
@@ -394,30 +409,32 @@ mod tests {
     #[test]
     fn validation_rejects_counter_lifetime_shorter_than_recovery_horizon() {
         let mut cfg = valid_cfg();
+        cfg.max_deposit_wait = Duration::from_secs(60);
         cfg.max_recovery_time = Duration::from_secs(3600);
         cfg.tombstone_retention_window = Duration::from_secs(60);
         let mut rcn = valid_rcn_cfg();
-        // ssa_counter_lifetime_secs must be > 3600 + 60 = 3660.
-        rcn.ssa_counter_lifetime_secs = 3660; // equal, not greater → reject
+        // horizon = 60 + 3600 + 60 = 3720.  ssa_counter_lifetime must be > 3720.
+        rcn.ssa_counter_lifetime_secs = 3720; // equal, not greater → reject
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
 
-        rcn.ssa_counter_lifetime_secs = 3661;
+        rcn.ssa_counter_lifetime_secs = 3721;
         assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
     }
 
     #[test]
     fn subsecond_boundary_preserves_precision() {
-        // max_recovery_time = 3600.9 s, tombstone_retention_window = 30.9 s
-        // supervision horizon = 3631.8 s (not 3630 s as with as_secs truncation).
-        // counter_lifetime of 3631 s (= 3631.0 s) is NOT > 3631.8 s → reject
+        // max_deposit_wait = 60, max_recovery_time = 3600.9 s, tombstone = 30.9 s
+        // supervision horizon = 60 + 3600.9 + 30.9 = 3691.8 s.
+        // counter_lifetime of 3691 s (= 3691.0 s) is NOT > 3691.8 s → reject
         let mut cfg = valid_cfg();
+        cfg.max_deposit_wait = Duration::from_secs(60);
         cfg.max_recovery_time = Duration::new(3600, 900_000_000);
         cfg.tombstone_retention_window = Duration::new(30, 900_000_000);
         let mut rcn = valid_rcn_cfg();
-        rcn.ssa_counter_lifetime_secs = 3631;
+        rcn.ssa_counter_lifetime_secs = 3691;
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
         // One second beyond the subsecond horizon → accept.
-        rcn.ssa_counter_lifetime_secs = 3632;
+        rcn.ssa_counter_lifetime_secs = 3692;
         assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
     }
 

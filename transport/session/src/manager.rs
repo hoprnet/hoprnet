@@ -110,7 +110,8 @@ fn pix_close_to_closure_reason(reason: crate::pix::SessionPixCloseReason) -> Clo
         | TooManyUnverifiableShares
         | DepositUnderfundedTimeout
         | SupervisorUnavailable
-        | InvalidTransition => ClosureReason::PixFailure,
+        | InvalidTransition
+        | NoSsaRemaining => ClosureReason::PixFailure,
     }
 }
 
@@ -970,17 +971,20 @@ where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
     {
+        // Validate the PIX supervision config before populating any OnceLock.
+        // This ensures a validation failure does not leave the manager in a
+        // permanently unstartable state with msg_sender already set.
+        if let Some(pix) = &pix {
+            let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
+            crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config())
+                .map_err(|e| TransportSessionError::InvalidConfig(e.to_string()))?;
+        }
+
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         if let Some(pix) = pix {
-            let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
-            // Validate the PIX supervision config before committing to start.
-            // Returning Err here prevents the manager from starting in a
-            // partially-initialised state with invalid supervision settings.
-            crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config())
-                .map_err(|e| TransportSessionError::InvalidConfig(e.to_string()))?;
             self.pix_toolbox
                 .set(pix)
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -2217,6 +2221,17 @@ where
                 .insert(SessionHandles::Balancer, balancer_abort_handle);
 
             // Spawn a keep-alive stream notifying about the SURB buffer level towards the Entry
+            //
+            // NOTE: The keep-alive egress path intentionally bypasses the PIX service gate
+            // (pix_egress_gate.acquire()).  This is a deliberate, bounded exemption:
+            //
+            //   - Keep-alive payloads carry no client-usable data — they are SURB-level notifications only.
+            //   - They cannot advance SSA recovery or deposit redemption.
+            //   - The Exit-side cost per unfunded session is ≤1 win-prob-scaled ticket/s for at most
+            //     max_ssa_delivery_time + max_deposit_wait (~80 s at defaults).
+            //   - poison() does NOT stop the keep-alive stream; only teardown via the KeepAlive abort handle does.
+            //
+            // The gate governs only data-plane egress, not control-plane keep-alive.
             if let Some(period) = self.cfg.surb_balance_notify_period {
                 let surb_estimator_clone = slot.surb_estimator.clone();
                 let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
@@ -2658,11 +2673,16 @@ where
             // Notify the supervisor that the commitment is verifiable.
             // On the Exit side we do not know the expected deposit amount, so
             // pass None (any amount accepted by the supervisor).
+            //
+            // If a min_deposit is configured, pass it as the expected amount
+            // so the supervisor rejects dust confirmations.
+            let min_deposit = self.cfg.pix_config.supervisor_cfg.min_deposit;
+            let expected_deposit = (!min_deposit.is_zero()).then_some(min_deposit);
             if let Some(handle) = session_slot.pix_supervisor.get()
                 && handle
                     .send_event(crate::pix::SessionPixEvent::CommitmentVerified {
                         ssa_id: commitment_ssa_id,
-                        expected_deposit: None,
+                        expected_deposit,
                     })
                     .await
                     .is_err()
@@ -2689,6 +2709,11 @@ where
                     loop {
                         let result = deposit_stream
                             .next()
+                            // An initial delay allows the deposit to arrive naturally
+                            // before entering the timeout loop.  NOTE: if
+                            // max_deposit_wait is at or below this delay, the timeout
+                            // fires before the delay completes and every session with
+                            // this configuration closes with DepositObserverClosed.
                             .delay(futures_time::time::Duration::from_millis(100))
                             .timeout(futures_time::time::Duration::from(max_deposit_wait))
                             .await;
@@ -5812,7 +5837,12 @@ mod tests {
 
         let (pix_toolbox, _) = PixToolbox::new(
             SsaShareGenerator::new(ssa_gen_config).into(),
-            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            SsaReconstructor::new(SsaReconstructorConfig {
+                // horizon = 3600 + 3600 + 30 = 7230, so lifetime must be > 7230.
+                ssa_counter_lifetime_secs: 8000,
+                ..Default::default()
+            })
+            .into(),
         );
 
         let mgr = SessionManager::new(SessionManagerConfig {

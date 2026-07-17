@@ -409,17 +409,19 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 }
                 self.ssa_to_verifier_ids.insert(ssa_id, verifier_ids);
 
-                // Initialize the counter entry when the commitment becomes verifiable
-                self.ssa_counters.insert(
-                    ssa_id,
+                // Initialize the counter entry when the commitment becomes verifiable.
+                // Use get_with so a pre-existing counter (e.g. after builder TTI eviction
+                // and re-commitment) is not clobbered — counters must survive across
+                // builder invalidation for the full TTL duration.
+                self.ssa_counters.get_with(ssa_id, || {
                     std::sync::Arc::new(std::sync::Mutex::new(SsaCounterEntry {
                         useful_shares: 0,
                         target_useful_shares: target,
                         recovered_polynomials: 0,
                         invalid_total: 0,
                         invalid_by_peer: HashMap::new(),
-                    })),
-                );
+                    }))
+                });
 
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
@@ -1501,6 +1503,87 @@ mod tests {
     }
 
     #[test]
+    fn invalid_shares_cross_peer_aggregation() -> anyhow::Result<()> {
+        // Two distinct peers each submit invalid shares for the same SSA.
+        // The reconstructor must emit the cross-peer aggregate total, not a
+        // per-peer count.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        let peer_a = OffchainKeypair::random();
+        let peer_b = OffchainKeypair::random();
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+
+        // Helper: insert a bogus encrypted share for the given peer.
+        let insert_bad_share = |spi: SsaPolynomialId<SimplePseudonym>,
+                                reconstructor: &SsaReconstructor<TestSpec>,
+                                peer: &OffchainKeypair|
+         -> anyhow::Result<HalfKey> {
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let bad_msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let bad_enc = PartialSsaShare::<TestSpec>::default().encrypt(&spi, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &bad_msg, bad_enc)?,
+            )?;
+            Ok(ack)
+        };
+
+        // Peer A submits 2 invalid shares.
+        let a_a1 = insert_bad_share(spi, &reconstructor, &peer_a)?;
+        let a_a2 = insert_bad_share(spi, &reconstructor, &peer_a)?;
+        let acks_a = vec![
+            VerifiedAcknowledgement::new(a_a1, &peer_a).leak(),
+            VerifiedAcknowledgement::new(a_a2, &peer_a).leak(),
+        ];
+        let resolutions_a = reconstructor.acknowledge_shares(*peer_a.public(), acks_a)?;
+        let invalid_a: Vec<_> = resolutions_a
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::InvalidShares { observed_total, .. } = r {
+                    Some(*observed_total)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(invalid_a.len(), 1, "expected one InvalidShares event after peer a");
+        assert_eq!(invalid_a[0], 2, "peer a's 2 bad shares → observed_total 2");
+
+        // Peer B submits 1 invalid share → observed_total must be 3 (2 + 1).
+        let b_ack = insert_bad_share(spi, &reconstructor, &peer_b)?;
+        let acks_b = vec![VerifiedAcknowledgement::new(b_ack, &peer_b).leak()];
+        let resolutions_b = reconstructor.acknowledge_shares(*peer_b.public(), acks_b)?;
+        let invalid_b: Vec<_> = resolutions_b
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::InvalidShares { observed_total, .. } = r {
+                    Some(*observed_total)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(invalid_b.len(), 1, "expected one InvalidShares event after peer b");
+        assert_eq!(invalid_b[0], 3, "total must be cross-peer sum (2+1 = 3)");
+
+        Ok(())
+    }
+
+    #[test]
     fn recovered_polynomials_tracks_completed_parts() -> anyhow::Result<()> {
         // 2 polys, threshold=2, surplus=0 → 4 shares total (poly0:1, poly0:2, poly1:1, poly1:2).
         // The generator exhausts each poly before moving to the next, so the
@@ -1628,6 +1711,10 @@ mod tests {
         assert!(reconstructor.ssa_builders.get(&ssa_id).is_some());
         assert!(reconstructor.ssa_counters.get(&ssa_id).is_some());
 
+        // Record progress before eviction to demonstrate non-zero values survive.
+        reconstructor.record_useful_share(&ssa_id);
+        reconstructor.record_completed_part(&ssa_id);
+
         // Evict only the builder (simulating moka TTI eviction)
         reconstructor.ssa_builders.invalidate(&ssa_id);
         assert!(
@@ -1641,11 +1728,17 @@ mod tests {
             "counter must survive builder eviction (TTL-only cache)"
         );
 
-        // Verify counter contents are intact
+        // Verify counter contents survived with recorded values
         let entry = reconstructor.ssa_counters.get(&ssa_id).unwrap();
         let e = entry.lock().expect("lock");
-        assert_eq!(e.useful_shares, 0, "initial counter state preserved");
-        assert_eq!(e.recovered_polynomials, 0);
+        assert_eq!(
+            e.useful_shares, 1,
+            "recorded useful share must survive builder eviction"
+        );
+        assert_eq!(
+            e.recovered_polynomials, 1,
+            "recorded completed part must survive builder eviction"
+        );
 
         Ok(())
     }

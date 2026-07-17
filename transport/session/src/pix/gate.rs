@@ -98,6 +98,12 @@ impl ServiceGate {
                     continue;
                 }
 
+                // Re-check poison right before CAS so that a concurrent
+                // poison() is not missed between the entry check and here.
+                if self.poisoned.load(Ordering::Acquire) {
+                    return Err(GateClosed);
+                }
+
                 if self
                     .served
                     .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
@@ -197,6 +203,12 @@ impl ServiceGate {
     /// Poison the gate: prevent all further acquires.
     ///
     /// Parked and future callers receive [`GateClosed`].
+    ///
+    /// # Semantics
+    ///
+    /// After `poison()` returns, at most one in-flight `acquire()` per
+    /// concurrent caller may still observe the gate as not poisoned (a
+    /// parked awaiter that wakes before the poison store is visible).
     pub fn poison(&self) {
         self.poisoned.store(true, Ordering::Release);
         self.notify.notify_waiters();
