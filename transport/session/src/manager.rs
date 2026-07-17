@@ -128,7 +128,9 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
         debug!("data tx channel closed on session");
     }
 
-    // Poison the egress gate so any parked writers get GateClosed.
+    // Poison the egress gate so any parked writers are unblocked
+    // (they will hang on `pending()` until the session teardown
+    // aborts their task).
     if let Some(gate) = session_data.pix_egress_gate.get() {
         gate.poison();
     }
@@ -1141,6 +1143,17 @@ where
             shares_per_poly: shares,
         });
 
+        // Pre-populate the OnceLock with the Entry's offered params so that
+        // handle_ssa_request can verify the Exit's response matches. The lock
+        // is shared across both SessionSlot construction sites below.
+        let ssa_params_lock = {
+            let lock = Arc::new(OnceLock::new());
+            if let Some(ref params) = ssa_params {
+                let _ = lock.set(*params);
+            }
+            lock
+        };
+
         let mut additional_data = 0_u64;
 
         // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
@@ -1323,7 +1336,7 @@ where
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: surb_mgmt.clone(),
                                 surb_estimator: surb_estimator.clone(),
-                                ssa_params: Arc::new(OnceLock::new()),
+                                ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
                             },
@@ -1405,7 +1418,7 @@ where
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: Default::default(), // Disabled SURB management
                                 surb_estimator: Default::default(), // No SURB estimator needed
-                                ssa_params: Arc::new(OnceLock::new()),
+                                ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
                             },
@@ -2347,7 +2360,9 @@ where
                             }
                         }
                         SessionPixAction::Close(reason) => {
-                            // Poison the gate so any parked writers get GateClosed.
+                            // Poison the gate so any parked writers are
+                            // unblocked (they hang on pending() until the
+                            // session task is aborted).
                             gate.poison();
                             // Retire all tracked SSAs from the reconstructor.
                             retirement.retire_all();
@@ -2367,7 +2382,9 @@ where
                     }
                 }
                 // action channel closed: supervisor worker died.
-                // Poison the gate so any parked writers get GateClosed.
+                // Poison the gate so any parked writers are
+                // unblocked (they hang on pending() until the
+                // session task is aborted).
                 gate.poison();
                 // Retire all tracked SSAs from the reconstructor.
                 retirement.retire_all();
@@ -2612,6 +2629,7 @@ where
             session_slot.abort_handles.lock().insert(
                 SessionHandles::PixDepositObserver(commitment_ssa_id.ssa_index()),
                 hopr_utils::spawn_as_abortable!(async move {
+                    let mut deposit_forwarded = false;
                     let mut deposit_stream = Box::pin(
                         deposit_done_rx.filter(|((evt_pseudonym, evt_index), _)| {
                             futures::future::ready(
@@ -2646,6 +2664,7 @@ where
                                     error!(%session_id, "failed to send DepositConfirmed to PIX supervisor");
                                     break;
                                 }
+                                deposit_forwarded = true;
                             }
                             Ok(None) => {
                                 error!(%session_id, "deposit channel closed without confirmation; check deposit address and funding");
@@ -2659,6 +2678,14 @@ where
                                 break;
                             }
                             Err(_) => {
+                                if deposit_forwarded {
+                                    // After the first forwarded deposit the
+                                    // supervisor handles lifecycle. A timeout
+                                    // here just means no further deposits
+                                    // arrived — not a problem.
+                                    debug!(%session_id, "deposit observer timeout after successful deposit — exiting silently");
+                                    break;
+                                }
                                 error!(%session_id, "deposit confirmation timed out; check deposit address and funding");
                                 if let Some(h) = pix_supervisor_for_observer.get()
                                     && h.send_event(SessionPixEvent::DepositObserverClosed(
@@ -2740,20 +2767,25 @@ where
             "received Exit SSA commitments"
         );
 
-        // Entry-side: store the negotiated params the first time we see an SsaRequest.
-        // The Exit (which runs the supervisor) already has these from
-        // handle_incoming_session_initiation; the Entry creates the slot without
-        // params since the server's response determines the final values.
-        let _ = session_slot.ssa_params.get_or_init(|| SessionSsaParameters {
-            polys_per_ssa: msg.polys_per_ssa(),
-            shares_per_poly: msg.shares_per_poly(),
-        });
+        // Entry-side: verify the Exit's PIX params match what we offered.
+        // The slot was pre-populated in new_session() with our offered params.
+        let our_params = session_slot
+            .ssa_params
+            .get()
+            .ok_or_else(|| SessionManagerError::Unacceptable("PIX was not negotiated on this session".into()))?;
+        let polys_per_ssa = msg.polys_per_ssa();
+        let shares_per_poly = msg.shares_per_poly();
 
-        let quota_per_ssa = session_slot.ssa_params.get().unwrap().quota_per_ssa();
+        // Bounds check: reject dimensions that exceed protocol limits.
+        if polys_per_ssa > MAX_POLYS_PER_SSA || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_poly) {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit sent out-of-bounds PIX params: polys={polys_per_ssa}, shares={shares_per_poly}"
+            ))
+            .into());
+        }
 
-        // We (Entry) offered some quota in the Session Initiation message, the Exit has accepted it,
-        // but could have still replaced it with a different one from its range.
-        let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
+        let quota_per_ssa = our_params.quota_per_ssa();
+        let server_quota = pix_params_to_quota(polys_per_ssa, shares_per_poly);
         if quota_per_ssa != server_quota {
             return Err(SessionManagerError::Unacceptable(format!(
                 "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
@@ -2762,10 +2794,6 @@ where
         }
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
-
-        // Read the negotiated PIX params before the for loop (which partially moves msg)
-        let _negotiated_polys = msg.polys_per_ssa();
-        let _negotiated_shares = msg.shares_per_poly();
 
         // The server can theoretically send multiple SSA commitments
         // asking us to make the equal number of client commitments and deposits.
@@ -5585,7 +5613,7 @@ mod tests {
     }
 
     /// Verifies that closing a session due to unverifiable shares also poisons the
-    /// egress gate, so that any writer parked on the gate receives `GateClosed`.
+    /// egress gate, so that any writer parked on the gate is unblocked.
     ///
     /// ## Steps
     /// 1. Bob's manager establishes a PIX session with Alice.
@@ -5770,6 +5798,73 @@ mod tests {
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
+
+        Ok(())
+    }
+
+    /// Entry rejects an SSA request whose PIX parameters exceed protocol
+    /// limits (MAX_POLYS_PER_SSA, MAX_POLY_THRESHOLD). Without the bounds
+    /// check the Entry would accept u16::MAX × u16::MAX and emit
+    /// ReadyToDeposit with a quota the Entry never offered.
+    #[test_log::test(tokio::test)]
+    async fn entry_rejects_exit_dictated_ssa_params() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let reconstructor: Arc<SsaReconstructor<HoprPixSpec>> =
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default()));
+        let (pix_toolbox, _pix_events) =
+            PixToolbox::new(SsaShareGenerator::new(ssa_gen_config).into(), reconstructor.clone());
+
+        let mgr = SessionManager::new(SessionManagerConfig::default());
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender, new_session_tx, Some(pix_toolbox))?;
+
+        let pseudonym = HoprPseudonym::random();
+        let (dummy_tx, _dummy_rx) =
+            crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+        let ssa_params = Arc::new(OnceLock::new());
+        let _ = ssa_params.set(SessionSsaParameters {
+            polys_per_ssa: 2,
+            shares_per_poly: 2,
+        });
+        mgr.sessions.insert(
+            pseudonym,
+            SessionSlot {
+                session_tx: dummy_tx,
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)),
+                abort_handles: Default::default(),
+                surb_mgmt: Default::default(),
+                surb_estimator: Default::default(),
+                ssa_params,
+                pix_supervisor: Default::default(),
+                pix_egress_gate: Default::default(),
+            },
+        );
+
+        let ssa_index = SsaIndex::new(1).expect("non-zero");
+        let exit_commitment = reconstructor.new_exit_commitment(SsaId::new(pseudonym, ssa_index), 2, 2)?;
+        let exit_commitment = HoprPixGroupElement(exit_commitment.to_bytes());
+
+        let msg = SsaServerCommitmentMessage::new(pseudonym, u16::MAX, u16::MAX, [(ssa_index, exit_commitment)]);
+
+        let result = mgr.handle_ssa_request(pseudonym, msg).await;
+
+        assert!(
+            result.is_err(),
+            "Entry must reject Exit-dictated PIX params, got {result:?}"
+        );
 
         Ok(())
     }
