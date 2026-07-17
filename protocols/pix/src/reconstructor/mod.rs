@@ -1157,4 +1157,467 @@ mod tests {
 
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // Counter correctness tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn progress_increments_once_per_unique_verified_share() -> anyhow::Result<()> {
+        // 3 polynomials, threshold=2, surplus=0 → 6 shares total.
+        // After first 3 useful shares → useful_shares=3.
+        // After all 6             → useful_shares=6.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 3,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 3, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Batch 1: 3 useful shares
+        let mut acks = Vec::new();
+        for _ in 0..3 {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let gs = generator.next_share(&pseudonym, &msg)?.unwrap();
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc = gs.share.encrypt(&gs.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        let res = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        let progress: Vec<_> = res
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(progress.len(), 1, "expected one Progress per SSA per batch");
+        assert_eq!(progress[0].useful_shares, 3);
+
+        // Batch 2: remaining 3 shares
+        let mut acks2 = Vec::new();
+        for _ in 0..3 {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let gs = generator.next_share(&pseudonym, &msg)?.unwrap();
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc = gs.share.encrypt(&gs.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            acks2.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        let res2 = reconstructor.acknowledge_shares(*peer.public(), acks2)?;
+        let progress2: Vec<_> = res2
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(progress2.len(), 1, "expected one Progress per SSA per batch");
+        assert_eq!(progress2[0].useful_shares, 6);
+
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_share_is_not_useful() -> anyhow::Result<()> {
+        // 2 polys, threshold=2, surplus=0 → 4 shares total when fully drawn.
+        // Insert: poly0:share1, poly0:share1 (duplicate), poly1:share1.
+        // useful_shares must be 2 (the duplicate does not count).
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Generate shares: poly0:1, poly0:2(completing), poly1:3, poly1:4(completing)
+        let msg1: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        let share1 = generator.next_share(&pseudonym, &msg1)?.unwrap(); // poly0
+        // Skip poly0's completing share — we want the duplicate BEFORE the poly completes
+        let msg2: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        let share2 = generator.next_share(&pseudonym, &msg2)?.unwrap(); // poly1
+
+        // Insert share1 (poly0) encrypted with ack1 — legitimate first copy
+        let ack1 = HalfKey::random();
+        let challenge1 = ack1.to_challenge()?;
+        let enc1 = share1.share.clone().encrypt(&share1.id, &ack1)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge1,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg1, enc1)?,
+        )?;
+
+        // Insert the SAME share1 (poly0) encrypted with ack2 — duplicate identifier
+        let ack2 = HalfKey::random();
+        let challenge2 = ack2.to_challenge()?;
+        let enc2 = share1.share.encrypt(&share1.id, &ack2)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge2,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg1, enc2)?,
+        )?;
+
+        // Insert share2 (poly1) — legitimate
+        let ack3 = HalfKey::random();
+        let challenge3 = ack3.to_challenge()?;
+        let enc3 = share2.share.encrypt(&share2.id, &ack3)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge3,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg2, enc3)?,
+        )?;
+
+        let acks = vec![
+            VerifiedAcknowledgement::new(ack1, &peer).leak(),
+            VerifiedAcknowledgement::new(ack2, &peer).leak(),
+            VerifiedAcknowledgement::new(ack3, &peer).leak(),
+        ];
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+
+        let progress: Vec<_> = resolutions
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(progress.len(), 1);
+        assert_eq!(
+            progress[0].useful_shares, 2,
+            "duplicate must not increment useful_shares"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn surplus_share_is_not_useful() -> anyhow::Result<()> {
+        // 2 polys, threshold=2, surplus_shares=1 → 3 shares per poly (6 total).
+        // Submit poly0:3 shares: 2 reach threshold (completing poly0 → 2 useful),
+        // the 3rd arrives after polynomial is done → Surplus.
+        // Submit poly1:1 share (useful).
+        // Expected useful_shares = 3 (the surplus is excluded).
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Generate 6 shares (poly0:3, poly1:3)
+        let mut shares_data: Vec<([u8; 20], crate::types::GeneratedShare<TestSpec>)> = Vec::new();
+        for _ in 0..6 {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let gs = generator.next_share(&pseudonym, &msg)?.unwrap();
+            shares_data.push((msg, gs));
+        }
+
+        // Insert first 4 shares: poly0:3 (1st, 2nd=completing, 3rd=surplus) + poly1:1 (1st=useful)
+        let mut acks_and_data = Vec::new();
+        for (msg, gs) in &shares_data[..4] {
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let enc = gs.share.clone().encrypt(&gs.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, msg, enc)?,
+            )?;
+            acks_and_data.push((ack, challenge));
+        }
+
+        let acks: Vec<_> = acks_and_data
+            .iter()
+            .map(|(ack, _)| VerifiedAcknowledgement::new(*ack, &peer).leak())
+            .collect();
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+
+        let progress: Vec<_> = resolutions
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(progress.len(), 1);
+        assert_eq!(progress[0].useful_shares, 3, "surplus share must not count");
+        assert_eq!(progress[0].target_useful_shares, 4, "2 polys × 2 threshold");
+
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_shares_reports_absolute_totals_per_ssa() -> anyhow::Result<()> {
+        // Submit a share with a zero (invalid) scalar that fails vsss verification.
+        // The reconstructor must emit InvalidShares with observed_total=1.
+        // Submit a second invalid share for the same (peer, SSA) → observed_total=2.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Helper: insert a bogus encrypted share (zero scalar) for the given SPI
+        let insert_bad_share = |spi: SsaPolynomialId<SimplePseudonym>,
+                                reconstructor: &SsaReconstructor<TestSpec>,
+                                peer: &OffchainKeypair|
+         -> anyhow::Result<HalfKey> {
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let bad_msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let bad_enc = PartialSsaShare::<TestSpec>::default().encrypt(&spi, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &bad_msg, bad_enc)?,
+            )?;
+            Ok(ack)
+        };
+
+        let spi0 = SsaPolynomialId::new(ssa_id, 0);
+        let ack1 = insert_bad_share(spi0, &reconstructor, &peer)?;
+        let ack2 = insert_bad_share(spi0, &reconstructor, &peer)?;
+
+        let acks = vec![
+            VerifiedAcknowledgement::new(ack1, &peer).leak(),
+            VerifiedAcknowledgement::new(ack2, &peer).leak(),
+        ];
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+
+        let invalid: Vec<_> = resolutions
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::InvalidShares {
+                    peer: p,
+                    ssa_id: id,
+                    observed_total,
+                } = r
+                {
+                    Some((**p, *id, *observed_total))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        // Should be exactly one InvalidShares per (peer, SSA) per batch with absolute total
+        assert_eq!(invalid.len(), 1, "one InvalidShares entry per (peer, SSA) per batch");
+        assert_eq!(invalid[0].0, *peer.public());
+        assert_eq!(invalid[0].1, ssa_id);
+        assert_eq!(
+            invalid[0].2, 2,
+            "observed_total must be absolute (2 after two bad shares)"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn recovered_polynomials_tracks_completed_parts() -> anyhow::Result<()> {
+        // 2 polys, threshold=2, surplus=0 → 4 shares total (poly0:1, poly0:2, poly1:1, poly1:2).
+        // The generator exhausts each poly before moving to the next, so the
+        // share order is: poly0:1, poly0:2(completes), poly1:1, poly1:2(completes).
+        //
+        // Batch 1: 1 share  (poly0:1)         → useful=1, recovered_polynomials=0
+        // Batch 2: 3 shares (poly0:2+poly1:1+poly1:2) → useful=4, recovered_polynomials=2
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Helper: generate, encrypt, insert and return acks for N shares
+        fn prepare_acks(
+            generator: &SsaShareGenerator<TestSpec>,
+            pseudonym: &SimplePseudonym,
+            reconstructor: &SsaReconstructor<TestSpec>,
+            peer: &OffchainKeypair,
+            count: usize,
+        ) -> anyhow::Result<Vec<HalfKey>> {
+            let mut half_keys = Vec::new();
+            for _ in 0..count {
+                let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+                let gs = generator.next_share(pseudonym, &msg)?.unwrap();
+                let ack = HalfKey::random();
+                let challenge = ack.to_challenge()?;
+                let enc = gs.share.encrypt(&gs.id, &ack)?;
+                reconstructor.insert_encrypted_share(
+                    peer.public(),
+                    challenge,
+                    TaggedEncryptedPartialSsaShare::new(*pseudonym, &msg, enc)?,
+                )?;
+                half_keys.push(ack);
+            }
+            Ok(half_keys)
+        }
+
+        // Batch 1: 1 share — first polynomial not yet complete
+        let hk1 = prepare_acks(&generator, &pseudonym, &reconstructor, &peer, 1)?;
+        let acks1: Vec<_> = hk1
+            .iter()
+            .map(|k| VerifiedAcknowledgement::new(*k, &peer).leak())
+            .collect();
+        let res1 = reconstructor.acknowledge_shares(*peer.public(), acks1)?;
+        let p1: Vec<_> = res1
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(p1.len(), 1);
+        assert_eq!(p1[0].useful_shares, 1);
+        assert_eq!(
+            p1[0].recovered_polynomials, 0,
+            "first share: no polynomial should be complete yet"
+        );
+
+        // Batch 2: remaining 3 shares — both polys complete
+        let hk2 = prepare_acks(&generator, &pseudonym, &reconstructor, &peer, 3)?;
+        let acks2: Vec<_> = hk2
+            .iter()
+            .map(|k| VerifiedAcknowledgement::new(*k, &peer).leak())
+            .collect();
+        let res2 = reconstructor.acknowledge_shares(*peer.public(), acks2)?;
+        let p2: Vec<_> = res2
+            .iter()
+            .filter_map(|r| {
+                if let ShareResolution::Progress(p) = r {
+                    Some(*p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert_eq!(p2.len(), 1);
+        assert_eq!(p2[0].useful_shares, 4);
+        assert_eq!(p2[0].recovered_polynomials, 2, "both polynomials should be complete");
+
+        // Full SSA must be recovered
+        assert!(
+            res2.iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
+            "expected RecoveredSsa"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn counters_survive_builder_eviction() -> anyhow::Result<()> {
+        // ssa_counters lives in a TTL-only cache, independent of ssa_builders (TTI).
+        // After invalidating just the builder, the counter entry must still exist.
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let mut poly_map = HashMap::new();
+        for poly in 0..2 {
+            poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        }
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map.into_iter())?;
+        let mut poly_map2 = HashMap::new();
+        for poly in 0..2 {
+            poly_map2.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        }
+        reconstructor.insert_coefficient_commitments(ssa_id, 1, poly_map2.into_iter())?;
+
+        // Confirm both builder and counter exist
+        assert!(reconstructor.ssa_builders.get(&ssa_id).is_some());
+        assert!(reconstructor.ssa_counters.get(&ssa_id).is_some());
+
+        // Evict only the builder (simulating moka TTI eviction)
+        reconstructor.ssa_builders.invalidate(&ssa_id);
+        assert!(
+            reconstructor.ssa_builders.get(&ssa_id).is_none(),
+            "builder must be evicted"
+        );
+
+        // Counter must survive independently
+        assert!(
+            reconstructor.ssa_counters.get(&ssa_id).is_some(),
+            "counter must survive builder eviction (TTL-only cache)"
+        );
+
+        // Verify counter contents are intact
+        let entry = reconstructor.ssa_counters.get(&ssa_id).unwrap();
+        let e = entry.lock().expect("lock");
+        assert_eq!(e.useful_shares, 0, "initial counter state preserved");
+        assert_eq!(e.recovered_polynomials, 0);
+
+        Ok(())
+    }
 }
