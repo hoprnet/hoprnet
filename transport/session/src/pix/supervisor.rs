@@ -327,7 +327,7 @@ impl SessionPixSupervisor {
         }
 
         // Accumulate deposit across top-ups.
-        ssa.accumulated_deposit = ssa.accumulated_deposit + amount;
+        ssa.accumulated_deposit += amount;
 
         // Check deposit sufficiency against accumulated amount.
         let sufficient = match ssa.expected_deposit {
@@ -391,6 +391,12 @@ impl SessionPixSupervisor {
             Some(i) => i,
             None => return Vec::new(),
         };
+
+        // Absorb late progress on tombstones — the SSA is already fully
+        // recovered and should not reset the session-wide gate watermark.
+        if self.ssas[idx].is_terminal() {
+            return Vec::new();
+        }
 
         // Validate target consistency before mutating.
         if progress.target_useful_shares != self.dims.target_useful_shares() {
@@ -478,6 +484,16 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
+        // Only accept recovery completion from the Recovering phase.
+        // Recovered arriving in AwaitingCommitment or AwaitingDeposit
+        // means recovery outpaced commitment/deposit notification —
+        // ignore, the normal lifecycle transition will handle it when
+        // those events arrive.
+        match self.ssas[idx].phase {
+            SsaPhase::Recovering => {}
+            _ => return Vec::new(),
+        }
+
         let next_requested = self.ssas[idx].next_requested;
 
         // Transition to tombstone.
@@ -514,6 +530,12 @@ impl SessionPixSupervisor {
             Some(i) => i,
             None => return Vec::new(),
         };
+
+        // Absorb late fault reports on tombstones — the SSA is already
+        // terminal so fault totals are no longer relevant.
+        if self.ssas[idx].is_terminal() {
+            return Vec::new();
+        }
 
         let per_ssa_total = self.ssas[idx].per_ssa_invalid_total;
 
@@ -2119,5 +2141,122 @@ mod tests {
         assert!(actions.is_empty());
         let actions = sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 1)), now, 0);
         assert!(actions.is_empty());
+    }
+
+    // -------------------------------------------------------------------
+    // M-02: Event ordering guards
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn recovered_before_commitment_is_ignored() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+
+        // Recovered arrives before CommitmentVerified — should be ignored.
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(id), now, 0);
+        assert!(actions.is_empty(), "recovered before commitment should be ignored");
+        assert!(!sup.closed);
+    }
+
+    #[test]
+    fn recovered_before_deposit_is_ignored() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            now,
+            0,
+        );
+
+        // Recovered arrives before DepositConfirmed — should be ignored.
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(id), now, 0);
+        assert!(actions.is_empty(), "recovered before deposit should be ignored");
+    }
+
+    #[test]
+    fn late_tombstone_progress_is_absorbed() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        // Late progress on tombstone — should be absorbed.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(id, 50, 50, 10)),
+            start,
+            100,
+        );
+        assert!(actions.is_empty(), "late tombstone progress should be absorbed");
+    }
+
+    #[test]
+    fn late_tombstone_unverifiable_shares_are_absorbed() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        // Late unverifiable shares on tombstone — should be absorbed.
+        let actions = sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 5,
+            },
+            start,
+            100,
+        );
+        assert!(
+            actions.is_empty(),
+            "late tombstone unverifiable shares should be absorbed"
+        );
     }
 }

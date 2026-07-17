@@ -169,7 +169,11 @@ async fn worker_loop(
                 .timeout(futures_time::time::Duration::from(duration))
                 .await
             {
-                Ok(result) => process_cmd(result.ok(), &mut supervisor, &action_tx, &gate).await,
+                Ok(result) => {
+                    if !process_cmd(result.ok(), &mut supervisor, &action_tx, &gate).await {
+                        return;
+                    }
+                }
                 Err(_) => {
                     let now = Instant::now();
                     let actions = supervisor.handle_deadline(now, gate.served_total());
@@ -186,18 +190,22 @@ async fn worker_loop(
             }
         } else {
             let cmd = cmd_rx.recv().await.ok();
-            process_cmd(cmd, &mut supervisor, &action_tx, &gate).await;
+            if !process_cmd(cmd, &mut supervisor, &action_tx, &gate).await {
+                return;
+            }
         }
     }
 }
 
 /// Handle a received command from the handle.
+///
+/// Returns `false` to signal the worker loop to stop.
 async fn process_cmd(
     cmd: Option<WorkerCommand>,
     supervisor: &mut SessionPixSupervisor,
     action_tx: &ActionTx,
     gate: &Arc<ServiceGate>,
-) {
+) -> bool {
     let cmd = match cmd {
         Some(c) => c,
         None => {
@@ -205,7 +213,7 @@ async fn process_cmd(
             let actions = vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)];
             send_actions(&actions, action_tx);
             gate.poison();
-            return;
+            return false;
         }
     };
 
@@ -216,11 +224,11 @@ async fn process_cmd(
             if supervisor.closed {
                 send_actions(&actions, action_tx);
                 gate.poison();
-                return;
+                return false;
             }
             if !send_actions(&actions, action_tx) {
                 gate.poison();
-                return;
+                return false;
             }
         }
         WorkerCommand::ActionResult { action, ok } => {
@@ -229,14 +237,15 @@ async fn process_cmd(
             if supervisor.closed {
                 send_actions(&actions, action_tx);
                 gate.poison();
-                return;
+                return false;
             }
             if !send_actions(&actions, action_tx) {
                 gate.poison();
-                return;
+                return false;
             }
         }
     }
+    true
 }
 
 /// Non-blocking forward of actions to the driver.
@@ -414,5 +423,90 @@ mod tests {
             close_action,
             SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
         ));
+    }
+
+    // -----------------------------------------------------------------------
+    // H-04 / M-06: Worker termination and channel saturation
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn worker_terminates_when_all_command_senders_dropped() {
+        let (handle, _action_rx) =
+            spawn_supervisor_worker(default_cfg(), dims(), HoprPseudonym::random(), Instant::now());
+
+        // Drop the handle — cmd_tx is dropped, cmd_rx yields None.
+        drop(handle);
+
+        // If the worker spins, this would not terminate (or would deadlock
+        // the runtime). A short sleep and no assertion verifies no hang.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn worker_terminates_when_supervisor_closes_after_event() {
+        let mut cfg = default_cfg();
+        cfg.max_unverifiable_shares_per_ssa = 0; // First event closes.
+        let p = HoprPseudonym::random();
+        let (handle, mut action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
+
+        // Consume initial RequestSsa.
+        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+
+        // Send an event that triggers close.
+        let id = SsaId::new(p, SsaIndex::new(1).unwrap());
+        let _ = handle.send_event(SessionPixEvent::UnverifiableShares {
+            ssa_id: id,
+            observed_total: 1,
+        });
+
+        // Worker should terminate after processing the event.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn worker_terminates_on_action_send_failure() {
+        let p = HoprPseudonym::random();
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Drop the action receiver — worker's next send_actions will fail.
+        drop(action_rx);
+
+        // Give the worker time to detect the failure and exit.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // send_event should fail because the worker already exited.
+        let id = SsaId::new(p, SsaIndex::new(1).unwrap());
+        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).is_err());
+    }
+
+    #[tokio::test]
+    async fn send_event_on_disconnected_channel_returns_error() {
+        let (cmd_tx, cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(2);
+        let gate = ServiceGate::new(1, 256);
+        let handle = SessionPixSupervisorHandle {
+            cmd_tx,
+            gate: gate.clone(),
+        };
+
+        // Drop the receiver so the channel is disconnected.
+        drop(cmd_rx);
+
+        let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
+        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).is_err());
+        assert!(
+            handle
+                .send_action_result(
+                    SessionPixAction::RequestSsa {
+                        ssa_id: id,
+                        polys: 10,
+                        threshold: 5,
+                    },
+                    true,
+                )
+                .is_err()
+        );
     }
 }

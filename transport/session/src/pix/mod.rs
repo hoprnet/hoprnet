@@ -256,9 +256,11 @@ pub fn validate_pix_supervision(
             "max_recovery_idle must be < incomplete_ssa_lifetime".into(),
         ));
     }
-    if reconstructor_cfg.ssa_counter_lifetime_secs
-        <= cfg.max_recovery_time.as_secs() + cfg.tombstone_retention_window.as_secs()
-    {
+    let supervision_horizon = cfg
+        .max_recovery_time
+        .checked_add(cfg.tombstone_retention_window)
+        .unwrap_or(Duration::MAX);
+    if Duration::from_secs(reconstructor_cfg.ssa_counter_lifetime_secs) <= supervision_horizon {
         return Err(TransportSessionError::InvalidConfig(
             "ssa_counter_lifetime must be > max_recovery_time + tombstone_retention_window".into(),
         ));
@@ -276,9 +278,9 @@ pub fn validate_pix_supervision(
         ("tombstone_retention_window", &cfg.tombstone_retention_window),
     ] {
         if *dur > MAX_SUPERVISOR_DURATION {
-            return Err(TransportSessionError::InvalidConfig(
-                format!("{name} ({dur:?}) must not exceed {MAX_SUPERVISOR_DURATION:?}").into(),
-            ));
+            return Err(TransportSessionError::InvalidConfig(format!(
+                "{name} ({dur:?}) must not exceed {MAX_SUPERVISOR_DURATION:?}"
+            )));
         }
     }
     Ok(())
@@ -396,6 +398,46 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
 
         rcn.ssa_counter_lifetime_secs = 3661;
+        assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
+    }
+
+    #[test]
+    fn subsecond_boundary_preserves_precision() {
+        // max_recovery_time = 3600.9 s, tombstone_retention_window = 30.9 s
+        // supervision horizon = 3631.8 s (not 3630 s as with as_secs truncation).
+        // counter_lifetime of 3631 s (= 3631.0 s) is NOT > 3631.8 s → reject
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_time = Duration::new(3600, 900_000_000);
+        cfg.tombstone_retention_window = Duration::new(30, 900_000_000);
+        let mut rcn = valid_rcn_cfg();
+        rcn.ssa_counter_lifetime_secs = 3631;
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err());
+        // One second beyond the subsecond horizon → accept.
+        rcn.ssa_counter_lifetime_secs = 3632;
+        assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
+    }
+
+    #[test]
+    fn overflow_safety_uses_checked_add() {
+        // Durations near Duration::MAX should not panic on addition.
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_time = Duration::MAX;
+        cfg.tombstone_retention_window = Duration::from_secs(1);
+        let rcn = valid_rcn_cfg();
+        // checked_add should saturate to Duration::MAX, so the comparison
+        // with ssa_counter_lifetime_secs will fail (Duration::MAX seconds
+        // ≫ 4000). The call should not panic.
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err());
+    }
+
+    #[test]
+    fn subsecond_horizon_accepts_large_counter_lifetime() {
+        let mut cfg = valid_cfg();
+        cfg.max_recovery_time = Duration::new(3600, 1); // 3600 + 1 ns
+        cfg.tombstone_retention_window = Duration::new(30, 1);
+        let mut rcn = valid_rcn_cfg();
+        // horizon = 3630.000000002 s ≪ 4000 s → accept.
+        rcn.ssa_counter_lifetime_secs = 4000;
         assert!(validate_pix_supervision(&cfg, &rcn).is_ok());
     }
 }
