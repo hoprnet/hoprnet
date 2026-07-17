@@ -49,7 +49,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{self, SessionManagerError, TransportSessionError},
-    pix::{SupervisorConfig, gate::ServiceGate, worker::SessionPixSupervisorHandle},
+    pix::{ServiceGate, SessionPixSupervisorHandle, SupervisorConfig},
     types::{
         ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
         SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
@@ -1745,12 +1745,6 @@ where
             }
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => crate::pix::SessionPixEvent::AlmostRecovered(*ssa_id),
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => crate::pix::SessionPixEvent::Recovered(*ssa_id),
-            #[allow(deprecated)]
-            HoprSessionInPixEvent::UnverifiableShare(_) => {
-                // Old single-observation variant — should not be emitted by new code;
-                // ignore silently.
-                return Ok(());
-            }
         };
 
         handle.send_event(pix_ev).await.map_err(|_| {
@@ -2058,9 +2052,9 @@ where
         // BEFORE constructing the session, so the gate is populated before any
         // write reaches the egress adapter.
         let pix: Option<(
-            crate::pix::worker::SessionPixSupervisorHandle,
+            crate::pix::SessionPixSupervisorHandle,
             SsaId<HoprPseudonym>,
-            crate::pix::worker::ActionRx,
+            crate::pix::ActionRx,
         )> = if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             let params = SessionSsaParameters {
                 polys_per_ssa: client_polys_per_ssa,
@@ -2075,7 +2069,7 @@ where
             let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
 
             let (handle, action_rx) =
-                crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
+                crate::pix::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
 
             // Receive the initial RequestSsa action and send it synchronously.
             let initial_action = action_rx

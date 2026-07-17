@@ -38,12 +38,12 @@ struct SlotNotifyInner {
 ///
 /// Clone is cheap (clones the inner `Arc`).
 #[derive(Clone)]
-pub(crate) struct SlotNotify {
+pub struct SlotNotify {
     inner: Arc<Mutex<SlotNotifyInner>>,
 }
 
 impl SlotNotify {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(SlotNotifyInner {
                 wakers: Vec::new(),
@@ -58,7 +58,7 @@ impl SlotNotify {
     /// Bumps the generation counter **before** draining wakers so that
     /// futures created between this call and their first `poll()` see the
     /// advanced generation and return `Ready` immediately.
-    pub(crate) fn notify_waiters(&self) {
+    pub fn notify_waiters(&self) {
         let mut inner = self.inner.lock();
         inner.generation += 1;
         for (_, waker) in inner.wakers.drain(..) {
@@ -72,7 +72,7 @@ impl SlotNotify {
     /// concurrent [`notify_waiters`] call that fires before the first
     /// `poll()` will have bumped the generation, so the future still
     /// completes — no notification is lost.
-    pub(crate) fn notified(&self) -> SlotNotifyFuture {
+    pub fn notified(&self) -> SlotNotifyFuture {
         let generation = self.inner.lock().generation;
         SlotNotifyFuture {
             inner: self.inner.clone(),
@@ -88,7 +88,7 @@ impl SlotNotify {
 /// On cancellation (drop without completion), the registered waker is
 /// automatically removed from [`SlotNotify`] so stale entries are never
 /// left behind.
-pub(crate) struct SlotNotifyFuture {
+pub struct SlotNotifyFuture {
     inner: Arc<Mutex<SlotNotifyInner>>,
     waker_id: u64,
     registered: bool,

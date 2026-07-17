@@ -15,7 +15,7 @@ use super::notify::SlotNotify;
 /// Error returned when the gate is poisoned.
 #[derive(Debug, Clone, thiserror::Error)]
 #[error("service gate is poisoned (session closed)")]
-pub(crate) struct GateClosed;
+pub struct GateClosed;
 
 /// Bounded predeposit service gate for a single PIX session.
 ///
@@ -26,7 +26,7 @@ pub(crate) struct GateClosed;
 /// parks on the same mechanism.
 /// On [`release_service`](Self::release_service), [`notify_progress`](Self::notify_progress),
 /// or [`poison`](Self::poison), all parked callers are woken.
-pub(crate) struct ServiceGate {
+pub struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
     /// Remaining predeposit budget (tracked separately so we can park on 0).

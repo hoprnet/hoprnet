@@ -11,10 +11,10 @@ use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 
 use crate::errors::TransportSessionError;
 
-pub(crate) mod gate;
-pub(crate) mod notify;
-pub(crate) mod supervisor;
-pub(crate) mod worker;
+mod gate;
+mod notify;
+mod supervisor;
+mod worker;
 
 // ---------------------------------------------------------------------------
 // SupervisorConfig
@@ -107,7 +107,7 @@ pub struct SupervisorConfig {
 
 /// PIX dimensions agreed upon during session negotiation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SsaDimensions {
+pub struct SsaDimensions {
     pub polys: u16,
     pub threshold: u16,
 }
@@ -125,7 +125,7 @@ impl SsaDimensions {
 
 /// Events consumed by the [`SessionPixSupervisor`].
 #[derive(Debug, Clone)]
-pub(crate) enum SessionPixEvent {
+pub enum SessionPixEvent {
     /// The initial or next SSA request was successfully sent on the wire.
     SsaRequestSent(SsaId<HoprPseudonym>),
     /// A verifiable commitment was installed in the reconstructor.
@@ -159,7 +159,7 @@ pub(crate) enum SessionPixEvent {
 
 /// Actions emitted by the [`SessionPixSupervisor`] for the caller to execute.
 #[derive(Debug, Clone)]
-pub(crate) enum SessionPixAction {
+pub enum SessionPixAction {
     /// Request a new SSA with the given dimensions.
     RequestSsa {
         ssa_id: SsaId<HoprPseudonym>,
@@ -187,7 +187,7 @@ pub(crate) enum SessionPixAction {
 ///
 /// These are mapped to public [`ClosureReason`] by the caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
-pub(crate) enum SessionPixCloseReason {
+pub enum SessionPixCloseReason {
     /// The commitment delivery deadline expired.
     CommitmentTimeout,
     /// The deposit deadline expired without a sufficient deposit.
@@ -212,6 +212,13 @@ pub(crate) enum SessionPixCloseReason {
     /// The supervisor action driver failed or was dropped.
     SupervisorUnavailable,
 }
+
+// ---------------------------------------------------------------------------
+// Re-exports from submodules
+// ---------------------------------------------------------------------------
+
+pub use gate::ServiceGate;
+pub use worker::{ActionRx, SessionPixSupervisorHandle, spawn_supervisor_worker};
 
 // ---------------------------------------------------------------------------
 // Validation

@@ -98,7 +98,7 @@ impl PerSsaState {
 // ---------------------------------------------------------------------------
 
 /// Deterministic core of the PIX session supervisor.
-pub(crate) struct SessionPixSupervisor {
+pub struct SessionPixSupervisor {
     pub(crate) cfg: SupervisorConfig,
     pub(crate) dims: SsaDimensions,
     pub(crate) pseudonym: HoprPseudonym,
