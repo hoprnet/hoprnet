@@ -1,6 +1,6 @@
-//! End-to-end PIX multi-cycle session test (1-hop).
+//! End-to-end PIX multi-cycle session test (n-hop).
 //!
-//! Establishes a 1-hop session between Entry and Exit with PIX enabled, keeps
+//! Establishes an n-hop session between Entry and Exit with PIX enabled, keeps
 //! symmetric traffic flowing in the background, and observes the PIX event cycle
 //! repeat multiple times:
 //!
@@ -43,17 +43,26 @@ const PIX_SHARES: u16 = 2;
 
 #[cfg(feature = "session-client")]
 #[rstest]
+#[case(1)]
+#[case(2)]
+#[case(3)]
 #[serial]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
-/// 1-hop PIX multi-cycle session test.
+/// n-hop PIX multi-cycle session test.
 ///
-/// Creates a 3-node role-typed cluster (Entry, Relay, Exit) where each node
-/// is built with the correct transport role. The Exit accepts tiny PIX quotas.
-/// Keeps symmetric 32-byte traffic flowing Entry↔Exit while observing the PIX
-/// event cycle repeat 3 times.
-async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
-    // ── Role-typed cluster: Entry + Relay + Exit ────────────────────────────
+/// Creates a (n+2)-node role-typed cluster (Entry, N relays, Exit) where each
+/// node is built with the correct transport role. The Exit accepts tiny PIX
+/// quotas. Keeps symmetric 32-byte traffic flowing Entry↔Exit while observing
+/// the PIX event cycle repeat 3 times.
+async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
+    // 2-hop and 3-hop tests are too slow under coverage instrumentation
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    // ── Role-typed cluster: Entry + N relays + Exit ─────────────────────────
     let cluster = build_role_cluster(
         TestNodeConfig {
             win_prob: 1.0,
@@ -66,7 +75,7 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
             }),
             ..Default::default()
         }, // Entry: win_prob=1.0
-        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB)], // Relay: win_prob=0.2
+        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops], // N relays: win_prob=0.2
         TestNodeConfig {
             win_prob: 1.0,
             incoming_pix_config: Some(IncomingSessionPixConfig {
@@ -78,33 +87,38 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
             }),
             idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
             ..Default::default()
-        }, // Exit: win_prob=1.0, custom PIX config
+        }, /* Exit: win_prob=1.0, custom PIX
+                                                                                  * config */
     )
     .await?;
 
-    // ── Open bidirectional channels ───────────────────────────────────────
+    // ── Open bidirectional channels along the relay path ───────────────────
     tracing::info!("opening channels");
     let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
-    let mut channel_ids = Vec::new();
 
     // Helper macro: open channel from `$from` to `$to` using IncentiveChannelOperations
     macro_rules! open_chan {
         ($from:expr, $to:expr) => {{
-            let chan = IncentiveChannelOperations::open_channel(
-                &*$from.instance,
-                $to.instance.identity().node_address,
-                funding,
-            )
-            .await
-            .context("opening channel must succeed")?;
-            channel_ids.push(*chan.output().expect("open_channel must return a channel ID"));
+            IncentiveChannelOperations::open_channel(&*$from.instance, $to.instance.identity().node_address, funding)
+                .await
+                .context("opening channel must succeed")?;
         }};
     }
 
+    // Forward: Entry → Relay[0] → Relay[1] → ... → Exit
     open_chan!(cluster.entry, cluster.relays[0]);
-    open_chan!(cluster.relays[0], cluster.exit);
-    open_chan!(cluster.exit, cluster.relays[0]);
+    for i in 0..hops.saturating_sub(1) {
+        open_chan!(cluster.relays[i], cluster.relays[i + 1]);
+    }
+    open_chan!(cluster.relays[hops - 1], cluster.exit);
+
+    // Backward: Exit → Relay[N-1] → ... → Relay[0] → Entry
+    open_chan!(cluster.exit, cluster.relays[hops - 1]);
+    for i in (1..hops).rev() {
+        open_chan!(cluster.relays[i], cluster.relays[i - 1]);
+    }
     open_chan!(cluster.relays[0], cluster.entry);
+
     let chain_info = cluster.chain_client.query_chain_info().await?;
     tracing::info!("waiting for channel graph");
 
@@ -118,8 +132,9 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
     let mut entry_events = Box::pin(cluster.entry.inner().subscribe_pix_events());
     let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
 
-    // ── Establish PIX-enabled session: Entry → Exit, 1-hop ────────────────
+    // ── Establish PIX-enabled session: Entry → Exit, n-hop ────────────────
     tracing::info!("establishing PIX session");
+    let routing = hops.try_into()?;
     let connect_fut = {
         let src_inner = cluster.entry.inner();
         let dst_addr = cluster.exit.address();
@@ -130,8 +145,8 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
                     dst_addr,
                     SessionTarget::UdpStream(SealedHost::Plain(ip)),
                     HoprSessionClientConfig {
-                        forward_path: 1.try_into().unwrap(),
-                        return_path: 1.try_into().unwrap(),
+                        forward_path: routing,
+                        return_path: routing,
                         capabilities: (SessionCapability::Segmentation
                             | SessionCapability::NoRateControl
                             | SessionCapability::UsePIX)
@@ -241,6 +256,6 @@ async fn capture_one_hop_pix_session() -> anyhow::Result<()> {
     // ── Stop background data task ─────────────────────────────────────────
     bg_handle.abort();
 
-    tracing::info!("PIX multi-cycle session test PASSED");
+    tracing::info!(hops, "PIX multi-cycle session test PASSED");
     Ok(())
 }
