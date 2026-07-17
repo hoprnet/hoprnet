@@ -630,7 +630,7 @@ impl PixToolbox {
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
 ///
-/// ## PIX (Proof-of-Incentive eXchange) Protocol Flow
+/// ## PIX (Protocol for Incentivization of eXits) Protocol Flow
 ///
 /// When a Session is opened with the [`Capability::UsePIX`] flag, the following protocol
 /// runs between the Entry (initiator) and Exit (recipient) to provide on-chain payment
@@ -644,7 +644,7 @@ impl PixToolbox {
 /// many polynomials and shares each SSA will use, which together define the data quota per SSA.
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
 ///
@@ -657,9 +657,10 @@ impl PixToolbox {
 /// *Exit commitment* (a group element) that is sent back to the Entry as a
 /// [`SsaServerCommitmentMessage`].
 ///
-/// The Exit also installs a *PIX kill switch* — a deadline (`max_deposit_wait` +
-/// `max_ssa_delivery_time`). If no deposit is observed before this deadline, the Session is
-/// closed with `ClosureReason::UnrealizedDeposit`.
+/// The Exit's [`SessionPixSupervisor`] transitions the SSA into the
+/// [`SsaRequestSent`](supervision::supervisor::SsaState::SsaRequestSent) phase.  If no
+/// commitment arrives before `max_ssa_delivery_time` elapses, the supervisor closes the
+/// Session with `SessionPixCloseReason::CommitmentTimeout`.
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -680,14 +681,34 @@ impl PixToolbox {
 /// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
 /// [`AgreedSsaQuota`] and a channel to confirm the deposit.
 ///
-/// A *deposit awaiter* task waits for the deposit confirmation. Once confirmed, the PIX
-/// kill switch is aborted. If the deposit times out, the kill switch closes the Session.
+/// The [`SessionPixSupervisor`] tracks this as the
+/// [`AwaitingDeposit`](supervision::supervisor::SsaState::AwaitingDeposit) phase.  A
+/// per-session worker actor manages the deadline timer asynchronously.  Once the deposit
+/// is confirmed (satisfying the expected quota), the supervisor transitions to
+/// [`Recovering`](supervision::supervisor::SsaState::Recovering).  If the deposit times
+/// out (`max_deposit_wait`), the supervisor closes the Session with
+/// `SessionPixCloseReason::UnrealizedDeposit`.
 ///
-/// ### 5. SSA Collection, Recovery and Pipelining
+/// ### 5. SSA Collection, Recovery, and Pipelining
 ///
 /// As the Entry sends return-path SURBs during the Session, each SURB can carry a PIX
 /// share generated from the client's polynomial set. The Exit's [`SsaReconstructor`]
 /// collects these shares.
+///
+/// The [`SessionPixSupervisor`] tracks recovery through
+/// [`Recovering`](supervision::supervisor::SsaState::Recovering).  During recovery, the
+/// supervisor enforces two deadlines:
+/// - A **service-gated idle timer** (`max_recovery_idle`) — resets every time the [`ServiceGate`] observes useful
+///   progress.  If no packets are being served, the timer re-arms instead of closing, preventing disconnection of a
+///   slow-but-honest Entry.
+/// - A **hard recovery deadline** (`max_recovery_time`) — an absolute per-SSA backstop for resource protection (session
+///   slot + reconstructor memory).  Never extended.
+///
+/// Egress data packets from the Exit back to the Entry are gated by the
+/// [`ServiceGate`](supervision::gate::ServiceGate).  Before the first deposit, a
+/// bounded predeposit budget (`max_predeposit_packets`) allows provisional bidirectional
+/// traffic.  After funding, the gate enforces a ceiling on packets served without recovery
+/// progress.
 ///
 /// When the reconstructor reaches the *early recovery threshold* (≈85%), an
 /// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires, which triggers
@@ -695,25 +716,22 @@ impl PixToolbox {
 /// commitment exchange with the tail of share collection for the current SSA.
 ///
 /// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the
-/// Exit to unlock and redeem the deposited funds. The deposit awaiter for the next SSA
-/// replaces the kill switch that was aborted for the previous one.
+/// Exit to unlock and redeem the deposited funds.  The recovered SSA enters a **tombstone**
+/// phase before being retired.  The supervisor maintains at most two live SSAs in flight
+/// plus one in tombstone phase.
 ///
 /// ### 6. Unverifiable Shares
 ///
 /// If the reconstructor receives a share whose proof-of-possession cannot be verified
 /// against its polynomial commitment, an [`HoprSessionInPixEvent::UnverifiableShare`]
-/// event fires. After `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES` (3) such events, the
-/// Session is forcefully closed to prevent a malicious Entry from wasting the Exit's
-/// resources.
+/// event fires. The [`SessionPixSupervisor`] tracks these per-SSA and per-session:
+/// - After `max_unverifiable_shares_per_ssa` (default 3), the offending SSA is closed.
+/// - After `max_unverifiable_shares_per_session` (default 10, covering multiple SSAs), the entire Session is forcefully
+///   closed to prevent a malicious Entry from wasting the Exit's resources.
 ///
 /// ### Configuring PIX at the Exit
 ///
-/// The Exit configures PIX via [`IncomingSessionPixConfig`] within [`SessionManagerConfig`]:
-///
-/// - `enforce_pix` — reject Sessions without PIX (default: false).
-/// - `quota_range` — acceptable SSA quota in bytes (default: 128 MB–512 MB).
-/// - `max_ssa_delivery_time` — time to wait for SSA commitment delivery.
-/// - `max_deposit_wait` — time to wait for deposit confirmation.
+/// The Exit configures PIX via [`IncomingSessionPixConfig`] within [`SessionManagerConfig`].
 ///
 /// The [`PixToolbox`] (holding the [`SsaShareGenerator`] and [`SsaReconstructor`]) must
 /// be provided via [`SessionManager::start`] for PIX to function.
