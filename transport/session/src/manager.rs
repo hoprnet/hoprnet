@@ -638,8 +638,8 @@ impl PixToolbox {
 ///
 /// ### 1. PIX Parameter Negotiation (Session Initiation)
 ///
-/// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Secret Sharing
-/// Aggregation) parameters in the upper 32 bits of the `StartSession.additional_data` field:
+/// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
+/// Address) parameters in the upper 32 bits of the `StartSession.additional_data` field:
 /// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
 /// many polynomials and shares each SSA will use, which together define the data quota per SSA.
 ///
@@ -647,6 +647,9 @@ impl PixToolbox {
 /// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
+/// - The Exit only checks the product of the number of polynomials and the threshold, so
+/// the Entry can set the individual parameters so that they better fit its computing power.
+/// The computation is easily parallelizable in the number of polynomials, but not in threshold.
 ///
 /// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
 ///
@@ -671,7 +674,7 @@ impl PixToolbox {
 /// via [`HoprPixSpec::group_to_deposit_address`].
 ///
 /// The Entry then sends one or more [`SsaClientCommitmentMessage`]s back to the Exit and
-/// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signalling that
+/// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signaling that
 /// funds can be deposited at the computed address.
 ///
 /// ### 4. Deposit Awaiting (Exit Side)
@@ -713,7 +716,7 @@ impl PixToolbox {
 /// When the reconstructor reaches the *early recovery threshold* (≈85%), an
 /// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires, which triggers
 /// `request_next_ssa` for the next SSA index — pipelining the costly
-/// commitment exchange with the tail of share collection for the current SSA.
+/// commitment exchange with the tail of the share collection for the current SSA.
 ///
 /// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the
 /// Exit to unlock and redeem the deposited funds.  The recovered SSA enters a **tombstone**
@@ -722,7 +725,7 @@ impl PixToolbox {
 ///
 /// ### 6. Unverifiable Shares
 ///
-/// If the reconstructor receives a share whose proof-of-possession cannot be verified
+/// If the reconstructor receives a share whose proof-of-correspondence cannot be verified
 /// against its polynomial commitment, an [`HoprSessionInPixEvent::UnverifiableShare`]
 /// event fires. The [`SessionPixSupervisor`] tracks these per-SSA and per-session:
 /// - After `max_unverifiable_shares_per_ssa` (default 3), the offending SSA is closed.
