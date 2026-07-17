@@ -1,215 +1,121 @@
 # Re-review: `lukas/session-pix-supervisor`
 
 **Review date:** 2026-07-17
-**Compared:** `origin/lukas/pix` (`0fc767f904fe8587fa8d4513b78ff88147eba88a`) to `HEAD` (`ca42ab145d556b45b11afac3b1761999cb2e4b2c`)
-**Diff size:** 23 files, 5,364 insertions, 517 deletions
+**Compared:** `origin/lukas/pix` (`0fc767f904fe8587fa8d4513b78ff88147eba88a`) to `HEAD` (`63e3930afa`)
 **Verdict:** **CHANGES REQUESTED**
 
 ## Executive summary
 
-The branch addresses the main implementation defects behind H-01, H-02, H-03, M-01, L-01, and the unbounded-channel part of L-03. M-02, M-03, and L-02 are only partially addressed, while M-04 remains and was directly reproduced.
+The latest fixes address the prior worker hot loop, funding watermark, notification race, and event-ordering findings. The affected crate tests and the complete downstream PIX integration suite are green on the reviewed head, including all one-, two-, and three-hop cases.
 
-This re-review also found one new high-severity regression and two new medium-severity issues:
+Three previous findings remain open or partial:
 
-1. **H-04:** a closed supervisor command channel makes the worker spin forever.
-2. **M-05:** funding can fail to release service because predeposit traffic is charged against the post-funding no-progress ceiling.
-3. **M-06:** bounded supervisor queues now drop lifecycle/security events without a fail-closed fallback.
+1. **M-06:** a full supervisor command queue still drops lifecycle/security events without closing the session or coalescing state.
+2. **M-03:** cancellation cleanup is now guarded, but recovered SSA state and completed deposit-observer handles remain retained until the entire session closes.
+3. **L-02:** cross-configuration validation is comprehensive, but `SessionManager::start()` only logs validation errors and continues with invalid settings.
 
-The affected unit and session integration suites pass, but the downstream multi-hop PIX suite is not green or deterministic: the one-hop case passed, the two-hop case timed out once and passed on retry, and the three-hop case timed out without obtaining a usable route. The branch should not be approved until the new worker regression and remaining lifecycle/concurrency issues are fixed and covered by deterministic tests.
+No new high-severity implementation regression was found. Approval should wait for the remaining queue-overflow behavior and lifecycle cleanup to be made deterministic and covered by tests.
 
-## Status of the previous findings
+## Status of all previous findings
 
-| ID   | Severity | Status                    | Re-review result                                                                                                                         |
-| ---- | -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| H-01 | High     | Addressed                 | Both PIX egress adapters now acquire the gate before forwarding, and a poisoned gate parks instead of forwarding.                        |
-| H-02 | High     | Addressed in code         | The reconstructor emits a mutex-protected cross-peer aggregate. The requested two-peer interleaving regression test is still missing.    |
-| H-03 | High     | Addressed with caveat     | A finite `max_served_without_progress` ceiling now exists. See M-02 and M-05 for epoch/reset weaknesses.                                 |
-| M-01 | Medium   | Addressed                 | The supervisor and gate are installed before session construction and application publication.                                           |
-| M-02 | Medium   | Partial                   | Lower snapshots are ignored, but terminal/tombstone ordering remains unsafe.                                                             |
-| M-03 | Medium   | Partial                   | The initial SSA is tracked and supervisor-driven close retires it, but cancellation and normal tombstone expiry still bypass retirement. |
-| M-04 | Medium   | Not addressed             | Both replacement notification futures can still miss a wake; they can also complete on a second poll without any notification.           |
-| L-01 | Low      | Addressed                 | Canceled waiters unregister on `Drop`; notification correctness remains tracked under M-04.                                              |
-| L-02 | Low      | Partial                   | More invariants and a duration cap were added, but validation remains bypassable and uses unsafe/lossy horizon arithmetic.               |
-| L-03 | Low      | Addressed with regression | The queues are bounded, but overflow handling introduced M-06.                                                                           |
-
-## New findings
-
-### H-04 — Closed supervisor workers spin forever
-
-**Affected code**
-
-- `transport/session/src/pix/worker.rs:146-190`
-- `transport/session/src/pix/worker.rs:195-248`
-- `transport/session/src/manager.rs:2320-2337`
-
-The runtime-conversion refactor moved command processing into `process_cmd()`, but that helper returns `()` and cannot terminate `worker_loop()`.
-
-When all command senders are dropped, `cmd_rx.recv()` immediately returns `Err`. `worker_loop()` converts that to `None`, `process_cmd()` sends a close action, poisons the gate, and returns only to the outer loop. The next receive is immediately ready with the same disconnection, so the task loops continuously. Because each receive is immediately ready, the loop need not yield to cooperative cancellation; the review reproducer could not stop it with `JoinHandle::abort()`. The same control-flow defect occurs when `process_cmd()` observes a closed supervisor or an action-send failure.
-
-The implementation immediately before commit `f559162dbf44bd272ff94071ee94a0d0ab14278a` returned from the outer worker on these paths. The regression is therefore introduced by this branch's runtime conversion.
-
-**Impact**
-
-- Every normally closed or rolled-back PIX session can leave a permanently runnable task.
-- A remote client can trigger closure through ordinary supervisor deadlines and accumulate CPU-consuming workers.
-- Setup failure after spawning the worker can leak the worker even before the session is published.
-- The non-yielding loop can prevent ordinary async task cancellation and runtime shutdown.
-
-**Required fix**
-
-- Make `process_cmd()` return `ControlFlow`, `bool`, or a result that causes `worker_loop()` to break/return on every terminal path.
-- Retain an abort/join handle in the session owner as a second cancellation boundary, but do not rely on cancellation to fix the non-yielding loop.
-- Add a deterministic test that drops all command handles and asserts the worker task terminates; also cover closed/full action queues and supervisor-generated close.
-
-### M-05 — Funding may not release a predeposit-blocked writer
-
-**Affected code**
-
-- `transport/session/src/pix/gate.rs:45-105`
-- `transport/session/src/pix/gate.rs:116-123`
-- `transport/session/src/pix/mod.rs:89-96`
-
-`release_service()` sets `funded = true` and wakes waiters, but it does not snapshot `served_total` into `served_at_last_progress`. The funded path therefore counts every predeposit packet against `max_served_without_progress`.
-
-With the defaults, `max_predeposit_packets` is 1,024 while `max_served_without_progress` is 256. If 256 or more packets were served before deposit confirmation, the waiter wakes on `ReleaseService`, enters the funded path, and parks again immediately. A valid deposit therefore does not actually release service until an independent recovery-progress event arrives.
-
-**Impact**
-
-- Validly funded sessions can remain stalled.
-- The behavior depends on the interaction of two independently configurable limits and is not validated or documented.
-- Existing tests cover release with no prior service and release after an explicit progress reset, but not release after consuming more than the funded ceiling predeposit.
-
-**Required fix**
-
-- If the ceiling is intended to be post-funding, set the progress watermark when funding is confirmed.
-- If predeposit traffic is intentionally included, validate/document the relationship between both limits and make `ReleaseService` semantics explicit.
-- Add a test that consumes more than `max_served_without_progress` under predeposit credit, confirms funding, and asserts the intended behavior.
-
-### M-06 — Queue overflow drops supervisor events without failing closed
-
-**Affected code**
-
-- `transport/session/src/pix/worker.rs:30-64`
-- `transport/session/src/pix/worker.rs:242-248`
-- `transport/session/src/manager.rs:2297-2304`
-- `transport/session/src/manager.rs:2545-2605`
-- `transport/hopr/src/lib.rs:1281-1323`
-
-The old unbounded channels were replaced with capacity-64 `crossfire` queues, but all producers use `try_send()`. Queue-full and disconnected errors are either ignored or only logged.
-
-This can discard `CommitmentVerified`, `DepositConfirmed`, `RecoveryProgress`, unverifiable-share totals, terminal recovery events, and action results. A dropped fault/action event can delay enforcement; a dropped valid lifecycle event can produce a false timeout. Poisoning only inside the worker does not help when the command never reaches the worker.
-
-**Required fix**
-
-- Define explicit behavior per event class: coalesce monotonic snapshots, await bounded capacity where safe, or synchronously poison/close the session when a non-coalescible security event cannot be delivered.
-- Do not ignore action-result or deposit-observer send failures.
-- Add queue-saturation tests proving that overflow is bounded and fail-closed without losing the latest absolute counters.
+| ID   | Severity | Status                     | Re-review result                                                                                                                                                 |
+| ---- | -------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H-01 | High     | Addressed                  | PIX egress acquires a permit before forwarding; predeposit service is capped below full recovery.                                                                |
+| H-02 | High     | Addressed in code          | Invalid-share totals are cross-peer and mutex-protected. The requested two-peer interleaving regression test is still missing.                                   |
+| H-03 | High     | Addressed                  | `max_served_without_progress` provides a finite post-deposit backstop, and M-05's funding watermark issue is fixed.                                              |
+| H-04 | High     | Addressed in code          | `process_cmd()` now returns a termination signal and every terminal path exits `worker_loop()`. The drop-sender test does not actually observe task termination. |
+| M-01 | Medium   | Addressed                  | The gate and supervisor are installed before session construction and publication.                                                                               |
+| M-02 | Medium   | Addressed                  | Recovery is phase-gated, stale snapshots are ignored, and tombstones absorb late progress/fault events.                                                          |
+| M-03 | Medium   | Partial                    | A `Drop` guard makes whole-session retirement cancellation-safe, but normal tombstone expiry does not retire individual SSA state.                               |
+| M-04 | Medium   | Addressed                  | `SlotNotify` now uses a generation counter and covers latent notification, spurious polls, cancellation, and waker replacement.                                  |
+| M-05 | Medium   | Addressed                  | Funding snapshots the served watermark and has a regression test with predeposit usage above the post-funding ceiling.                                           |
+| M-06 | Medium   | Not addressed              | Capacity-64 queues still use `try_send`; `Full` drops the event and several callers only log the error.                                                          |
+| L-01 | Low      | Addressed                  | Canceled notification futures unregister their wakers on `Drop`.                                                                                                 |
+| L-02 | Low      | Partial                    | Checked `Duration` arithmetic and boundary tests were added, but invalid configuration is only warned about.                                                     |
+| L-03 | Low      | Addressed with M-06 caveat | The queues are bounded; overflow semantics remain tracked under M-06.                                                                                            |
 
 ## Remaining findings
 
-### M-02 — Event ordering remains only partially hardened
-
-**What improved**
-
-- Lower absolute progress and fault snapshots are treated as stale instead of closing the session.
-- `AlmostRecovered` no longer mutates state while awaiting commitment.
-
-**What remains**
-
-- Relay acknowledgement batches are still processed with `for_each_concurrent()` and cloned sinks, so inter-batch order is not guaranteed.
-- `on_recovered()` accepts completion from any non-tombstone phase. If recovery wins the race against commitment/deposit notification, the supervisor can skip the normal release transition and tombstone the SSA.
-- Recovered tombstones still process late `RecoveryProgress` and unverifiable-share events. A late old-SSA progress event can reset the session-wide gate watermark during a later epoch.
-
-Require phase-valid terminal events and absorb late tombstone progress/faults. Add reversed/interleaved event tests covering commitment, deposit, progress, almost-recovered, recovered, and tombstone delivery.
-
-### M-03 — Reconstructor cleanup is still cancellation-unsafe
-
-**What improved**
-
-- `tracked_ssas` is seeded with the initial SSA.
-- Supervisor-driven `Close` and a clean action-channel shutdown retire tracked SSAs.
-
-**What remains**
-
-- `close_session()` only poisons the gate and aborts session tasks. Explicit close, idle eviction, empty read, and setup rollback can abort the action driver before its post-loop cleanup executes.
-- Normal tombstone expiry removes supervisor state without calling `retire_ssa()`.
-- Deposit-observer abort handles remain indexed by completed SSA IDs.
-
-Move authoritative SSA ownership and retirement to a cancellation-safe object reached from centralized session closure, and retire completed SSAs when their tombstones expire.
-
-### M-04 — Notification race remains
+### M-06 — Queue overflow still drops supervisor events without failing closed
 
 **Affected code**
 
-- `transport/session/src/manager.rs:152-225`
-- `transport/session/src/pix/notify.rs:29-92`
-- `transport/session/src/pix/gate.rs:75-105`
+- `transport/session/src/pix/worker.rs:44-75`
+- `transport/session/src/manager.rs:1720-1723`
+- `transport/session/src/manager.rs:2333-2353`
+- `transport/session/src/manager.rs:2607-2675`
 
-Creating `notified()` does not register a waiter; registration happens only on the future's first poll. A state change between the final condition check and first poll can therefore drain no waker, after which the future parks indefinitely.
+`SessionPixSupervisorHandle::send_event()` and `send_action_result()` return `Err(())` when the capacity-64 command queue is full, but they do not poison the gate or initiate centralized session closure. Several manager producers merely log that error and continue.
 
-The replacement future also returns `Ready` whenever `registered == true`; it does not verify that `notify_waiters()` removed/woke its registration. Futures may be polled spuriously, so a second poll can complete without any notification.
+This can discard `SsaRequestSent`, action results, `CommitmentVerified`, `DepositConfirmed`, deposit-observer closure, recovery progress, fault totals, and terminal recovery events. A lost fault can delay enforcement; a lost valid lifecycle event can leave the supervisor in an earlier phase until it closes a healthy session on a timeout. The comment calling this behavior “fail-closed” is therefore inaccurate: returning an error is only fail-closed if every caller synchronously closes the session.
 
-Use a generation counter/event-listener style primitive that atomically observes a notification generation while registering. Add deterministic tests for notification before first poll, cancellation, waker replacement, spurious repoll, and release/poison racing with registration.
+**Required fix**
 
-### L-02 — Configuration validation is still incomplete
+- Define delivery behavior by event class: coalesce replaceable absolute snapshots, await bounded capacity where safe, or synchronously poison/close for non-coalescible events.
+- Ensure every `Full`/`Disconnected` path reaches centralized session closure rather than only logging.
+- Add a real capacity-exhaustion test. The new disconnected-channel test does not exercise `TrySendError::Full`.
 
-**What improved**
+### M-03 — Recovered SSA state is retained until session close
 
-- The tombstone/ack-window relationship is now checked.
-- Zero values and a 24-hour upper bound are checked.
-- `HoprTransport::new()` invokes cross-validation.
+**Affected code**
 
-**What remains**
+- `transport/session/src/pix/supervisor.rs:206-208`
+- `transport/session/src/manager.rs:2305-2414`
+- `transport/session/src/manager.rs:2623-2681`
 
-- Direct `SessionManager::new()` users bypass validation entirely.
-- `max_recovery_time.as_secs() + tombstone_retention_window.as_secs()` truncates subsecond precision and performs unchecked `u64` addition before the 24-hour cap is applied.
-- Validation uses a default reconstructor at the top-level call site rather than being tied to the component that owns both effective configurations.
+The new `SsaRetirementGuard` fixes the cancellation hole: aborting the action driver drops the guard and retires every tracked SSA. Normal recovery remains incomplete, however. Once a tombstone expires, `handle_deadline()` removes it from supervisor state without emitting an action that calls `retire_ssa()`. The retirement guard keeps every requested ID until the whole session closes. Completed `PixDepositObserver` abort handles are likewise left in the session map.
 
-Use checked `Duration` addition/comparison before integer conversion and validate at the session-manager/supervisor construction boundary. Add subsecond-boundary and extreme-duration tests.
+Long-lived, high-volume PIX sessions therefore accumulate reconstructor entries until their independent cache TTLs expire and retain completed observer handles for the session lifetime.
+
+**Required fix**
+
+- Emit an explicit per-SSA retirement action when the tombstone window expires and remove that ID from the guard after successful retirement.
+- Remove completed deposit-observer handles, or use ownership that does not retain completed handles.
+- Add a multi-cycle test that verifies old reconstructor and observer state is released while the session remains active.
+
+### L-02 — Invalid supervisor configuration is accepted
+
+**Affected code**
+
+- `transport/session/src/manager.rs:933-955`
+- `transport/session/src/pix/mod.rs:207-286`
+
+`validate_pix_supervision()` now uses checked `Duration` arithmetic and validates the required timing relationships. `SessionManager::start()` invokes it with the effective reconstructor configuration, but handles failure with `warn!` and continues initialization.
+
+Direct `SessionManager` users can therefore start PIX supervision with zero durations, inconsistent acknowledgement/tombstone windows, or counter TTLs shorter than the supervision horizon. These are rejected by the validator but still become active runtime settings.
+
+**Required fix**
+
+- Return the validation error from `start()` before mutating its `OnceLock` state.
+- Add a component-boundary test proving invalid PIX configuration fails startup and does not leave the manager partially started.
+
+## Test-quality gaps
+
+- `worker_terminates_when_all_command_senders_dropped` and `worker_terminates_when_supervisor_closes_after_event` only sleep; because `spawn_supervisor_worker()` exposes no task handle or completion signal, they do not assert that the worker exited.
+- `send_event_on_disconnected_channel_returns_error` covers disconnection, not queue saturation.
+- `invalid_shares_reports_absolute_totals_per_ssa` uses one peer; no retained test proves that interleaved invalid shares from two peers produce the cross-peer aggregate required by H-02.
+- `enforce_pix_rejects_non_pix_session` accepts a generic 15-second connection timeout as success, so unrelated routing/start-protocol hangs can satisfy the policy test.
+- The affected-crate test build emits one branch-local `unused_mut` warning at `transport/session/src/pix/worker.rs:450`.
 
 ## Verification performed
 
 ### Passed
 
-- `git diff --check origin/lukas/pix...HEAD`
-- `cargo nextest run --lib -p hopr-protocol-pix -p hopr-transport-session -p hopr-transport`
-  - 308 passed, 0 failed.
-- `cargo nextest run -p hopr-transport-session --test pix -j 1`
-  - 3 passed, 0 failed.
-- Isolated retry: `cargo nextest run -p hopr-lib --features testing --test transport_session_pix -j 1 -E 'test(=capture_n_hop_pix_session::case_2)'`
-  - 1 passed in 63.462 seconds.
-
-### Not green / inconclusive
-
+- `cargo check --workspace`
+- `cargo nextest run -p hopr-protocol-pix -p hopr-transport-session -p hopr-transport`
+  - 391 passed, 0 failed across 16 binaries.
 - `cargo nextest run -p hopr-lib --features testing --test transport_session_pix -j 1`
-  - `case_1` passed in 52.449 seconds.
-  - `case_2` timed out after 177.869 seconds.
-- Isolated `case_3` timed out after 178.082 seconds while repeatedly reporting that no three-hop path could be found in the channel graph.
+  - 6 passed, 0 failed in 387.393 seconds.
+  - Includes one-, two-, and three-hop PIX recovery, deposit timeout, enforced-PIX rejection, and recovery hard deadline.
+- Earlier focused runs also passed the protocol, supervisor, manager, session integration, and isolated downstream cases.
 
-The two-hop pass-on-retry and three-hop route-availability failure make this suite timing-sensitive. These runs do not prove that the branch caused the timeout, but they also do not provide a clean downstream verification result. The test uses a fixed propagation sleep instead of waiting for the required route to become observable.
+### Repository-wide feature note
 
-The previous report's downstream command omitted `--features testing`; without it, the test target does not compile because `hopr_lib::testing` is feature-gated.
-
-### Deterministic finding reproducers
-
-Three review-only tests were temporarily added, executed, and removed:
-
-- A waiter created before `notify_waiters()` returned `Pending` when first polled afterward.
-- A registered waiter returned `Ready` on a second poll without any notification.
-- Dropping every supervisor command sender did not terminate the worker within 100 ms. The hot loop also prevented task abortion/runtime shutdown, so the test process had to be killed by the 300-second command timeout.
-
-These probes directly reproduce H-04 and M-04; they are not retained as failing tests in the branch.
-
-### Warnings
-
-The library run emits five `unused_mut` warnings in `transport/session/src/pix/worker.rs` tests and one `dead_code` warning for `ServiceGate::remaining_budget`. The session integration test also uses the deprecated `UnverifiableShare` variant. New branch code should be warning-clean.
+`cargo check --workspace --all-targets --all-features` is not a supported aggregate configuration: it enables mutually exclusive `allocator-jemalloc`/`allocator-mimalloc` and crypto-suite features, causing pre-existing duplicate allocator/import errors outside this branch diff. The supported default workspace check is green.
 
 ## Required before approval
 
-1. Fix H-04 and prove worker termination on every terminal/disconnection path.
-2. Replace the notification primitive with one that cannot miss or invent wakes.
-3. Make queue overflow explicitly fail-closed/coalescing instead of dropping lifecycle events.
-4. Centralize cancellation-safe SSA retirement and cover every closure path plus tombstone expiry.
-5. Resolve/document the funding watermark semantics and finish component-boundary duration validation.
-6. Add the missing deterministic multi-peer, ordering, queue-saturation, and retained-writer tests.
-7. Make the downstream multi-hop PIX verification deterministic and green, and remove branch-introduced warnings.
+1. Make command-queue overflow explicitly fail-closed or safely coalescing, and prove it with a capacity-exhaustion test.
+2. Retire recovered SSA state at tombstone expiry and release completed observer handles during long-lived sessions.
+3. Reject invalid PIX supervision configuration at the `SessionManager` boundary without partially starting the manager.
+4. Strengthen the termination, cross-peer aggregation, and policy-rejection tests, and remove the branch-local warning.

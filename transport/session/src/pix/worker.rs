@@ -9,7 +9,7 @@
 
 use std::{sync::Arc, time::Instant};
 
-use crossfire::{AsyncRx, MAsyncTx, TrySendError, mpsc::Array};
+use crossfire::{AsyncRx, MAsyncTx, SendError, mpsc::Array};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_utils::runtime::prelude::spawn;
 
@@ -42,33 +42,27 @@ pub(crate) struct SessionPixSupervisorHandle {
 }
 
 impl SessionPixSupervisorHandle {
-    /// Send a PIX event to the supervisor.
+    /// Send a PIX event to the supervisor, awaiting capacity if the channel is
+    /// full.
     ///
-    /// Returns `Err` if the worker is no longer running or the channel is
-    /// full (fail-closed).
-    pub fn send_event(&self, ev: SessionPixEvent) -> Result<(), ()> {
-        match self.cmd_tx.try_send(WorkerCommand::Event(ev)) {
+    /// Returns `Err` if the worker is no longer running. Backpressures instead
+    /// of dropping events, so overflow cannot occur by construction.
+    pub async fn send_event(&self, ev: SessionPixEvent) -> Result<(), ()> {
+        match self.cmd_tx.send(WorkerCommand::Event(ev)).await {
             Ok(()) => Ok(()),
-            Err(TrySendError::Full(_)) => {
-                tracing::warn!("PIX supervisor command channel full, dropping event");
-                Err(())
-            }
-            Err(TrySendError::Disconnected(_)) => {
+            Err(SendError(_)) => {
                 tracing::warn!("PIX supervisor command channel closed");
                 Err(())
             }
         }
     }
 
-    /// Send an action result feedback to the supervisor.
-    pub fn send_action_result(&self, action: SessionPixAction, ok: bool) -> Result<(), ()> {
-        match self.cmd_tx.try_send(WorkerCommand::ActionResult { action, ok }) {
+    /// Send an action result feedback to the supervisor, awaiting capacity if
+    /// the channel is full.
+    pub async fn send_action_result(&self, action: SessionPixAction, ok: bool) -> Result<(), ()> {
+        match self.cmd_tx.send(WorkerCommand::ActionResult { action, ok }).await {
             Ok(()) => Ok(()),
-            Err(TrySendError::Full(_)) => {
-                tracing::warn!("PIX supervisor result channel full, dropping result");
-                Err(())
-            }
-            Err(TrySendError::Disconnected(_)) => {
+            Err(SendError(_)) => {
                 tracing::warn!("PIX supervisor result channel closed");
                 Err(())
             }
@@ -357,7 +351,7 @@ mod tests {
         // Send SsaRequestSent via the handle — the worker should process it
         // and produce no further actions (event is idempotent).
         let id = SsaId::new(p, SsaIndex::new(1).unwrap());
-        handle.send_event(SessionPixEvent::SsaRequestSent(id)).unwrap();
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.unwrap();
 
         // Give the worker time to process the event.
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -388,6 +382,7 @@ mod tests {
                 },
                 false,
             )
+            .await
             .unwrap();
 
         let close_action = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -412,7 +407,7 @@ mod tests {
 
         // Tell the worker the request was sent so the commitment deadline starts.
         let id = SsaId::new(p, SsaIndex::new(1).unwrap());
-        handle.send_event(SessionPixEvent::SsaRequestSent(id)).unwrap();
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.unwrap();
 
         // Wait for the commitment deadline to expire.
         let close_action = tokio::time::timeout(Duration::from_secs(2), action_rx.recv())
@@ -434,20 +429,28 @@ mod tests {
         let (handle, _action_rx) =
             spawn_supervisor_worker(default_cfg(), dims(), HoprPseudonym::random(), Instant::now());
 
-        // Drop the handle — cmd_tx is dropped, cmd_rx yields None.
+        // Clone the gate before dropping the handle so we can assert the worker
+        // poisoned it on exit.
+        let gate = handle.gate.clone();
+
+        // Drop the handle — last cmd_tx sender is dropped, cmd_rx yields None.
         drop(handle);
 
-        // If the worker spins, this would not terminate (or would deadlock
-        // the runtime). A short sleep and no assertion verifies no hang.
+        // Give the worker time to process the disconnect and poison the gate.
         tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert!(
+            gate.try_acquire_sync().is_err(),
+            "gate should be poisoned after all senders dropped"
+        );
     }
 
     #[tokio::test]
     async fn worker_terminates_when_supervisor_closes_after_event() {
         let mut cfg = default_cfg();
-        cfg.max_unverifiable_shares_per_ssa = 0; // First event closes.
+        cfg.max_ssa_delivery_time = Duration::from_millis(10);
         let p = HoprPseudonym::random();
-        let (handle, mut action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
+        let (handle, action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
 
         // Consume initial RequestSsa.
         let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
@@ -455,15 +458,23 @@ mod tests {
             .expect("timeout")
             .expect("action stream ended");
 
-        // Send an event that triggers close.
+        // Register the SSA so the commitment deadline starts.
         let id = SsaId::new(p, SsaIndex::new(1).unwrap());
-        let _ = handle.send_event(SessionPixEvent::UnverifiableShares {
-            ssa_id: id,
-            observed_total: 1,
-        });
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.unwrap();
 
-        // Worker should terminate after processing the event.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Deadline expires → worker closes.  The Close action proves the worker
+        // processed the event and ran the termination path.
+        let close_action = tokio::time::timeout(Duration::from_secs(2), action_rx.recv())
+            .await
+            .expect("timeout waiting for close action")
+            .expect("action stream ended before close");
+        assert!(
+            matches!(
+                close_action,
+                SessionPixAction::Close(SessionPixCloseReason::CommitmentTimeout)
+            ),
+            "expected Close due to commitment timeout, got {close_action:?}"
+        );
     }
 
     #[tokio::test]
@@ -479,7 +490,7 @@ mod tests {
 
         // send_event should fail because the worker already exited.
         let id = SsaId::new(p, SsaIndex::new(1).unwrap());
-        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).is_err());
+        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.is_err());
     }
 
     #[tokio::test]
@@ -495,7 +506,7 @@ mod tests {
         drop(cmd_rx);
 
         let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
-        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).is_err());
+        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.is_err());
         assert!(
             handle
                 .send_action_result(
@@ -506,6 +517,7 @@ mod tests {
                     },
                     true,
                 )
+                .await
                 .is_err()
         );
     }
