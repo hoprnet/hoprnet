@@ -49,7 +49,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{self, SessionManagerError, TransportSessionError},
-    pix::{ServiceGate, SessionPixSupervisorHandle, SupervisorConfig},
+    supervision::*,
     types::{
         ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
         SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
@@ -100,15 +100,14 @@ lazy_static::lazy_static! {
 }
 
 /// Map a `SessionPixCloseReason` to the public `ClosureReason`.
-fn pix_close_to_closure_reason(reason: crate::pix::SessionPixCloseReason) -> ClosureReason {
-    use crate::pix::SessionPixCloseReason::*;
+fn pix_close_to_closure_reason(reason: SessionPixCloseReason) -> ClosureReason {
+    use SessionPixCloseReason::*;
     match reason {
         CommitmentTimeout | DepositTimeout | DepositObserverClosed => ClosureReason::UnrealizedDeposit,
         RecoveryIdle
         | RecoveryDeadline
         | CounterRegression
         | TooManyUnverifiableShares
-        | DepositUnderfundedTimeout
         | SupervisorUnavailable
         | InvalidTransition
         | NoSsaRemaining => ClosureReason::PixFailure,
@@ -258,7 +257,7 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
 /// How long to wait for the supervisor to produce its initial
-/// [`RequestSsa`](crate::pix::SessionPixAction::RequestSsa) action.
+/// [`RequestSsa`](SessionPixAction::RequestSsa) action.
 ///
 /// The supervisor creates the action synchronously in the worker's first
 /// tick, so this is purely a safety guard in case of an internal stall.
@@ -976,7 +975,7 @@ where
         // permanently unstartable state with msg_sender already set.
         if let Some(pix) = &pix {
             let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
-            crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config())
+            validate_pix_supervision(&pix_cfg, pix.share_processor.config())
                 .map_err(|e| TransportSessionError::InvalidConfig(e.to_string()))?;
         }
 
@@ -1734,17 +1733,17 @@ where
         };
 
         let pix_ev = match &event {
-            HoprSessionInPixEvent::Progress(p) => crate::pix::SessionPixEvent::RecoveryProgress(*p),
+            HoprSessionInPixEvent::Progress(p) => SessionPixEvent::RecoveryProgress(*p),
             HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total } => {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_PIX_UNVERIFIABLE_SHARES.increment();
-                crate::pix::SessionPixEvent::UnverifiableShares {
+                SessionPixEvent::UnverifiableShares {
                     ssa_id: *ssa_id,
                     observed_total: *observed_total,
                 }
             }
-            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => crate::pix::SessionPixEvent::AlmostRecovered(*ssa_id),
-            HoprSessionInPixEvent::SsaRecovered(ssa_id) => crate::pix::SessionPixEvent::Recovered(*ssa_id),
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => SessionPixEvent::AlmostRecovered(*ssa_id),
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => SessionPixEvent::Recovered(*ssa_id),
         };
 
         handle.send_event(pix_ev).await.map_err(|_| {
@@ -2052,16 +2051,16 @@ where
         // BEFORE constructing the session, so the gate is populated before any
         // write reaches the egress adapter.
         let pix: Option<(
-            crate::pix::SessionPixSupervisorHandle,
+            SessionPixSupervisorHandle,
             SsaId<HoprPseudonym>,
-            crate::pix::ActionRx,
+            ActionRx,
         )> = if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             let params = SessionSsaParameters {
                 polys_per_ssa: client_polys_per_ssa,
                 shares_per_poly: client_shares_per_ssa,
             };
 
-            let dims = crate::pix::SsaDimensions {
+            let dims = SsaDimensions {
                 polys: params.polys_per_ssa,
                 threshold: params.shares_per_poly,
             };
@@ -2069,7 +2068,7 @@ where
             let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
 
             let (handle, action_rx) =
-                crate::pix::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
+                spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
 
             // Receive the initial RequestSsa action and send it synchronously.
             let initial_action = action_rx
@@ -2080,7 +2079,7 @@ where
                 .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("action driver closed prematurely")))?;
 
             let ssa_id = match &initial_action {
-                crate::pix::SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
+                SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
                 other => {
                     error!(?other, "unexpected initial action from supervisor");
                     return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
@@ -2098,7 +2097,7 @@ where
 
             // Notify supervisor that the request was sent.
             handle
-                .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                .send_event(SessionPixEvent::SsaRequestSent(ssa_id))
                 .await
                 .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
 
@@ -2365,12 +2364,12 @@ where
                         Err(_) => break, // sender dropped → close
                     };
                     match action {
-                        crate::pix::SessionPixAction::RequestSsa {
+                        SessionPixAction::RequestSsa {
                             ssa_id,
                             polys,
                             threshold,
                         } => {
-                            let action_key = crate::pix::SessionPixAction::RequestSsa {
+                            let action_key = SessionPixAction::RequestSsa {
                                 ssa_id,
                                 polys,
                                 threshold,
@@ -2380,7 +2379,7 @@ where
                                 let result = myself.send_ssa_request(session_id, &s, ssa_id.ssa_index()).await;
                                 if let Some(handle) = s.pix_supervisor.get()
                                     && handle
-                                        .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                                        .send_event(SessionPixEvent::SsaRequestSent(ssa_id))
                                         .await
                                         .is_err()
                                 {
@@ -2402,13 +2401,13 @@ where
                                 }
                             }
                         }
-                        crate::pix::SessionPixAction::ReleaseService => {
+                        SessionPixAction::ReleaseService => {
                             gate.release_service();
                         }
-                        crate::pix::SessionPixAction::ProgressNotification => {
+                        SessionPixAction::ProgressNotification => {
                             gate.notify_progress();
                         }
-                        crate::pix::SessionPixAction::RetireSsa(ssa_id) => {
+                        SessionPixAction::RetireSsa(ssa_id) => {
                             // Release the old SSA from the reconstructor and the
                             // retirement guard so per-SSA state does not accumulate.
                             if let Some(ref proc) = retirement.share_processor {
@@ -2422,7 +2421,7 @@ where
                                     .abort_one(&SessionHandles::PixDepositObserver(ssa_id.ssa_index()));
                             }
                         }
-                        crate::pix::SessionPixAction::Close(reason) => {
+                        SessionPixAction::Close(reason) => {
                             // Poison the gate so any parked writers get GateClosed.
                             gate.poison();
                             // Retire all tracked SSAs from the reconstructor.
@@ -2674,7 +2673,7 @@ where
             let expected_deposit = (!min_deposit.is_zero()).then_some(min_deposit);
             if let Some(handle) = session_slot.pix_supervisor.get()
                 && handle
-                    .send_event(crate::pix::SessionPixEvent::CommitmentVerified {
+                    .send_event(SessionPixEvent::CommitmentVerified {
                         ssa_id: commitment_ssa_id,
                         expected_deposit,
                     })
@@ -2717,7 +2716,7 @@ where
                                 // whether the accumulated amount is sufficient.
                                 if let Some(h) = pix_supervisor_for_observer.get()
                                     && h.send_event(
-                                        crate::pix::SessionPixEvent::DepositConfirmed {
+                                        SessionPixEvent::DepositConfirmed {
                                             ssa_id: ssa_id_for_observer,
                                             amount,
                                         },
@@ -2730,7 +2729,7 @@ where
                             Ok(None) => {
                                 error!(%session_id, "deposit channel closed without confirmation; check deposit address and funding");
                                 if let Some(h) = pix_supervisor_for_observer.get()
-                                    && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                    && h.send_event(SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
                                     )).await.is_err()
                                 {
@@ -2741,7 +2740,7 @@ where
                             Err(_) => {
                                 error!(%session_id, "deposit confirmation timed out; check deposit address and funding");
                                 if let Some(h) = pix_supervisor_for_observer.get()
-                                    && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                    && h.send_event(SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
                                     )).await.is_err()
                                 {

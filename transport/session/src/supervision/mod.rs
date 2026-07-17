@@ -1,8 +1,226 @@
-//! PIX supervisor module for incoming PIX-enabled sessions.
+//! PIX supervision for incoming PIX-enabled sessions.
 //!
-//! Contains the deterministic [`SessionPixSupervisor`] core, the [`ServiceGate`]
-//! for bounded predeposit egress, and the per-session actor that serializes
-//! lifecycle events.
+//! This module implements the **Exit-side** supervision logic for sessions
+//! using the Packet Information eXtension (PIX) protocol.  The Exit node
+//! runs a deterministic supervisor that tracks each *Secret Sharing Aggregate*
+//! (SSA) through a well-defined lifecycle, enforcing timeouts, deposit
+//! sufficiency, recovery progress, and fault tolerances.  Egress data
+//! packets are gated behind a concurrent [`ServiceGate`] that allows
+//! bounded predeposit service before funding and a ceiling-limited
+//! post-funding path.
+//!
+//! # Why supervision is needed
+//!
+//! PIX sessions use SSAs: cryptographic aggregates that distribute the
+//! cost of a deposit across many packets sent from the Entry to the Exit.
+//! Each SSA requires:
+//!
+//! 1. A **commitment** from the Entry (polynomial coefficients) that the
+//!    Exit can verify.
+//! 2. A **deposit** to an SSA-specific on-chain address before the Exit
+//!    fully trusts the SSA.
+//! 3. **Recovery** of the SSA shares from data packets as they arrive.
+//!
+//! Without supervision, a misbehaving or stalled Entry can hold a session
+//! slot indefinitely without ever funding or completing recovery — a
+//! resource-exhaustion vector.  The supervisor enforces hard per-SSA and
+//! per-session bounds so the Exit can reclaim resources deterministically.
+//!
+//! # Architecture
+//!
+//! The module is split into four components:
+//!
+//! | Component | File | Role |
+//! |---|---|---|
+//! | [`SessionPixSupervisor`] | [`supervisor`] | Pure state machine — no I/O, no async, no spawning.  Driven by explicit [`Instant`] timestamps and service-gate snapshots. |
+//! | [`ServiceGate`] | [`gate`] | Concurrent, lock-free egress gate.  Before funding: bounded predeposit budget.  After funding: ceiling on packets served without SSA recovery progress.  Callers park on a generation-counter waker. |
+//! | Worker loop | [`worker`] | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, and forwards supervisor actions to the caller. |
+//! | [`SlotNotify`] | [`notify`] | Runtime-agnostic multi-waker primitive.  Used by [`ServiceGate`] to park and wake callers without a tokio dependency. |
+//!
+//! ## The [`SessionPixSupervisor`] state machine
+//!
+//! The supervisor tracks each SSA through these phases:
+//!
+//! ```text
+//! RequestSsa  ──►  SsaRequestSent  ──►  AwaitingCommitment
+//!                                          │
+//!                                     CommitmentVerified
+//!                                          │
+//!                                      AwaitingDeposit
+//!                                          │
+//!                                     DepositConfirmed (≥ expected)
+//!                                          │
+//!                                        Recovering
+//!                                          ├── (idle re-arms when no service)
+//!                                          ├── hard deadline is immutable
+//!                                          └── progress resets idle timer
+//!                                          │
+//!                                     Recovered (tombstone phase)
+//!                                          │
+//!                                     tombstone expiry → RetireSsa
+//! ```
+//!
+//! **Key deadlines** (all configurable via [`SupervisorConfig`]):
+//!
+//! * **Commitment timeout** — time from `SsaRequestSent` to `CommitmentVerified`.
+//! * **Deposit timeout** — time from `CommitmentVerified` to a sufficient deposit.
+//! * **Recovery idle** — time without *useful progress* while service is being
+//!   consumed.  **Service-gated**: if no packets were served since the last
+//!   progress snapshot, the timer re-arms instead of closing (prevents a
+//!   slow-but-honest Entry from being disconnected).
+//! * **Recovery hard deadline** — absolute per-SSA backstop, never extended.
+//!   This is a resource guard (session slot + reconstructor memory), not a
+//!   liveliness mechanism.
+//!
+//! **Fault tracking** — the supervisor tracks unverifiable shares via the
+//! `UnverifiableShares` event (observed as absolute per-SSA totals that may
+//! arrive from multiple concurrent ack processing batches).  It charges only
+//! the delta from the maximum seen so far, preventing stale or out-of-order
+//! snapshots from double-counting.  Limits exist per-SSA and per-session.
+//!
+//! **Rolling SSAs** — to maintain continuity, the supervisor requests a
+//! *next* SSA when the current one is "almost recovered" (early threshold
+//! reached) or fully recovered.  It keeps at most two live SSAs in flight
+//! plus one in tombstone phase.
+//!
+//! ## The [`ServiceGate`] — egress gating
+//!
+//! Every egress data packet from the Exit back to the Entry must pass
+//! through the [`ServiceGate`] via [`acquire`](ServiceGate::acquire):
+//!
+//! ### Pre-funding (predeposit)
+//!
+//! Before the first deposit is confirmed, a provisional budget
+//! (`max_predeposit_packets`) allows the Entry to send a limited number
+//! of reply packets.  This protects against fully unfunded sessions while
+//! still allowing bidirectional traffic during the setup phase.  The budget
+//! is capped at `min(target_useful_shares - 1, max_predeposit_packets)`.
+//!
+//! When the budget is exhausted, `acquire` parks the caller on a
+//! [`SlotNotify`] future.  A concurrent [`release_service`](ServiceGate::release_service),
+//! [`notify_progress`](ServiceGate::notify_progress), or [`poison`](ServiceGate::poison)
+//! wakes all parkers.
+//!
+//! ### Post-funding (ceiling)
+//!
+//! Once the first deposit is confirmed and the supervisor emits
+//! [`ReleaseService`](SessionPixAction::ReleaseService), the gate flips
+//! to funded mode.  It then enforces `max_served_without_progress`: a
+//! ceiling on how many packets may be served between SSA recovery progress
+//! events, as a defense-in-depth backstop even when the supervisor's
+//! service-gated idle timer is alive.  Each [`ProgressNotification`](SessionPixAction::ProgressNotification)
+//! resets the ceiling by snapshotting the served counter as the new watermark.
+//!
+//! The gate is implemented with lock-free atomics and CAS loops.  It uses
+//! the generation-counter [`SlotNotify`] to avoid the two classic
+//! race conditions of waker-vector approaches:
+//!
+//! 1. **Latent wake** — notification between future creation and first
+//!    `poll()` is caught because the generation was captured at creation
+//!    time and compared on `poll()`.
+//! 2. **Spurious `Ready`** — a second `poll()` of an already-registered
+//!    future re-checks the generation; if unchanged it stays `Pending`.
+//!
+//! ## The Worker — bridging pure logic to async
+//!
+//! [`spawn_supervisor_worker`] creates the [`SessionPixSupervisor`],
+//! the [`ServiceGate`], and a bounded async command channel.  It returns
+//! a [`SessionPixSupervisorHandle`] (cloneable, for sending events) and an
+//! [`ActionRx`] receiver (for driving actions).
+//!
+//! The worker loop:
+//!
+//! 1. Reads the next deadline from the supervisor.
+//! 2. If the deadline has already expired, calls `handle_deadline` immediately.
+//! 3. Otherwise, waits on the command channel with a timeout set to the
+//!    remaining deadline duration.
+//! 4. On command received → calls `handle_event` or `action_result`.
+//! 5. On timeout → calls `handle_deadline`.
+//! 6. Forwards resulting actions to the action channel (non-blocking
+//!    `try_send`).
+//!
+//! **Coalescing** — `ProgressNotification` actions are coalescible: when
+//! the action channel is transiently full, they are dropped rather than
+//! blocking or failing the worker.  They are idempotent and the next
+//! notification will replace the missed one.
+//!
+//! All other actions (`RequestSsa`, `ReleaseService`, `RetireSsa`, `Close`)
+//! are non-coalescible — if they cannot be delivered, the channel is
+//! genuinely wedged and the worker fails the session.
+//!
+//! ## Integration with [`SessionManager`](crate::SessionManager)
+//!
+//! ### Exit side (incoming sessions)
+//!
+//! When `handle_incoming_session_initiation` processes a session request
+//! with `Capability::UsePIX`:
+//!
+//! 1. Validates the offered PIX parameters (polys, threshold, quota range).
+//! 2. Spawns the supervisor worker via `spawn_supervisor_worker` (this
+//!    emits the initial `RequestSsa` action and creates the gate).
+//! 3. Reads the initial action, calls `send_ssa_request` on the wire,
+//!    and notifies the supervisor of `SsaRequestSent`.
+//! 4. Stores the supervisor handle and gate in the session slot (via
+//!    `OnceLock`).
+//! 5. Constructs the [`HoprSession`] — the egress adapter acquires the gate
+//!    on every outgoing data packet.
+//! 6. After session publication, spawns the **action driver task** that
+//!    receives actions from `ActionRx` and executes them:
+//!
+//!    | Action | Driver behaviour |
+//!    |---|---|
+//!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor.  Tracks SSA in [`SsaRetirementGuard`] for Drop-safe cleanup. |
+//!    | `ReleaseService` | Calls `gate.release_service()` — flips to funded mode. |
+//!    | `ProgressNotification` | Calls `gate.notify_progress()` — resets ceiling watermark. |
+//!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
+//!    | `Close` | Poisons gate, retires all SSAs, publishes close metric, removes session slot. |
+//!
+//! 7. PIX protocol events from the packet pipeline arrive via
+//!    `dispatch_pix_event` and are forwarded to the supervisor as
+//!    `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`,
+//!    `AlmostRecovered`, or `Recovered`.
+//! 8. When a commitment becomes verifiable, a `PixDepositObserver` task
+//!    loops on deposit confirmations, forwarding each as
+//!    `DepositConfirmed` to the supervisor.
+//!
+//! ### Entry side (outgoing sessions)
+//!
+//! The Entry does **not** run a supervisor — the Exit is authoritative for
+//! lifecycle decisions.  The Entry creates a session slot when
+//! `new_session()` succeeds, but the slot's `pix_supervisor` and
+//! `pix_egress_gate` remain unpopulated.  On receiving an `SsaRequest`
+//! from the Exit, the Entry generates its client commitment via the
+//! share generator, sends the commitment messages, and emits
+//! `ReadyToDeposit` so the caller can fund the deposit address.
+//!
+//! ## Lifecycle sketch (Exit side)
+//!
+//! ```text
+//! Session Initiation (Entry→Exit, with UsePIX flag)
+//!     │
+//!     ▼
+//! handle_incoming_session_initiation
+//!     │  validate PIX params
+//!     │  spawn supervisor (emits initial RequestSsa)
+//!     │  send SsaRequest on the wire
+//!     │  install gate & handle in slot
+//!     │  construct HoprSession (egress adaptor acquires gate)
+//!     │  spawn action driver
+//!     ▼
+//! ┌────────────────────────────────────────────────────┐
+//! │  Ongoing lifecycle (concurrent)                    │
+//! │                                                    │
+//! │  Entry → CommitmentVerified  → supervisor          │
+//! │  Entry → DepositConfirmed    → supervisor (via     │
+//! │                                PixDepositObserver) │
+//! │  Packets → share_processor   → RecoveryProgress    │
+//! │  Action: ReleaseService      → gate.release_service│
+//! │  Action: ProgressNotification → gate.notify_progress│
+//! │  Action: RequestSsa (next)   → send on wire        │
+//! │  Action: RetireSsa           → reconstructor.retire│
+//! │  Action: Close               → poison + teardown   │
+//! └────────────────────────────────────────────────────┘
+//! ```
 
 use std::time::Duration;
 
@@ -192,9 +410,6 @@ pub enum SessionPixCloseReason {
     CommitmentTimeout,
     /// The deposit deadline expired without a sufficient deposit.
     DepositTimeout,
-    /// A confirmed deposit was below the expected amount and never topped up.
-    #[expect(dead_code, reason = "will be emitted by supervisor in deposit flow (Step 4)")]
-    DepositUnderfundedTimeout,
     /// The deposit observer channel closed without delivering a confirmation.
     DepositObserverClosed,
     /// Service was consumed but no useful progress was made — service-gated idle.
