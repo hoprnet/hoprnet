@@ -49,6 +49,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{self, SessionManagerError, TransportSessionError},
+    pix::{SupervisorConfig, gate::ServiceGate, worker::SessionPixSupervisorHandle},
     types::{
         ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
         SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
@@ -326,9 +327,9 @@ pub(crate) struct SessionSlot {
     ssa_params: Arc<OnceLock<SessionSsaParameters>>,
     // Handle to the PIX supervisor worker for this session.
     // Shared via OnceLock so it can be set after cache insertion.
-    pix_supervisor: Arc<OnceLock<crate::pix::worker::SessionPixSupervisorHandle>>,
+    pix_supervisor: Arc<OnceLock<SessionPixSupervisorHandle>>,
     // Egress gate shared with the supervisor; set when PIX is negotiated.
-    pix_egress_gate: Arc<OnceLock<Arc<crate::pix::gate::ServiceGate>>>,
+    pix_egress_gate: Arc<OnceLock<Arc<ServiceGate>>>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -415,59 +416,12 @@ pub struct IncomingSessionPixConfig {
     /// Default is 128 MB to 512 MB (inclusive).
     #[default(_code = "(134217728..=536870912)")]
     pub quota_range: std::ops::RangeInclusive<u64>,
-    /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
+    /// Configuration for the PIX session supervisor.
     ///
-    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
-    /// wait time because the Client has to be able to deliver its SSA commitment.
-    #[default(Duration::from_secs(20))]
-    pub max_ssa_delivery_time: Duration,
-    /// Maximum time to wait for the funds to be deposited in the SSA.
-    ///
-    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
-    /// wait time because the Client has to be able to deliver its SSA commitment.
-    ///
-    /// Default is 1 minute.
-    #[default(Duration::from_secs(60))]
-    pub max_deposit_wait: Duration,
-    /// Maximum idle time during recovery before the session is closed.
-    ///
-    /// This is the value passed to the supervisor as `max_recovery_idle`.
-    /// Default is 60 seconds.
-    #[default(Duration::from_secs(60))]
-    pub max_recovery_idle: Duration,
-    /// Maximum total time for recovery (hard deadline) before the session is closed.
-    ///
-    /// Default is 1 hour.
-    #[default(Duration::from_secs(3600))]
-    pub max_recovery_time: Duration,
-    /// Maximum number of unverifiable shares allowed per SSA before closing the session.
-    ///
-    /// Default is 3.
-    #[default(3)]
-    pub max_unverifiable_shares_per_ssa: u64,
-    /// Maximum number of unverifiable shares allowed per session (across all SSAs).
-    ///
-    /// Default is 10.
-    #[default(10)]
-    pub max_unverifiable_shares_per_session: u64,
-    /// Maximum number of packets that can be sent before the deposit is confirmed
-    /// (predeposit budget).
-    ///
-    /// Default is 1024.
-    #[default(1024)]
-    pub max_predeposit_packets: u64,
-    /// How long to retain tombstones for recovered SSAs.
-    ///
-    /// Must be >= the reconstructor's `max_ack_await_time`.
-    /// Default is 30 seconds.
-    #[default(Duration::from_secs(30))]
-    pub tombstone_retention_window: Duration,
-    /// Maximum packets served without SSA recovery progress before the gate
-    /// blocks further service (defense-in-depth backstop).
-    ///
-    /// Default is 256.
-    #[default(256)]
-    pub max_served_without_progress: u64,
+    /// Controls timeouts, unverifiable-share tolerances, predeposit budgets,
+    /// and tombstones for incoming PIX sessions.
+    #[default(_code = "SupervisorConfig::default()")]
+    pub supervisor_cfg: SupervisorConfig,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1021,17 +975,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         if let Some(pix) = pix {
-            let pix_cfg = crate::pix::SupervisorConfig {
-                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
-                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
-                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
-                max_recovery_time: self.cfg.pix_config.max_recovery_time,
-                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
-                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
-                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
-                max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
-                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
-            };
+            let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
             // Validate the PIX supervision config before committing to start.
             // Returning Err here prevents the manager from starting in a
             // partially-initialised state with invalid supervision settings.
@@ -2124,17 +2068,7 @@ where
                 threshold: params.shares_per_poly,
             };
 
-            let pix_cfg = crate::pix::SupervisorConfig {
-                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
-                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
-                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
-                max_recovery_time: self.cfg.pix_config.max_recovery_time,
-                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
-                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
-                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
-                max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
-                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
-            };
+            let pix_cfg = self.cfg.pix_config.supervisor_cfg.clone();
 
             let (handle, action_rx) =
                 crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
@@ -2740,7 +2674,7 @@ where
             // to the supervisor. This loops to support top-up deposits.
             let pix_supervisor_for_observer = session_slot.pix_supervisor.clone();
             let ssa_id_for_observer = commitment_ssa_id;
-            let max_deposit_wait = self.cfg.pix_config.max_deposit_wait;
+            let max_deposit_wait = self.cfg.pix_config.supervisor_cfg.max_deposit_wait;
             session_slot.abort_handles.lock().insert(
                 SessionHandles::PixDepositObserver(commitment_ssa_id.ssa_index()),
                 hopr_utils::spawn_as_abortable!(async move {
@@ -5140,7 +5074,10 @@ mod tests {
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
-                max_unverifiable_shares_per_session: 3,
+                supervisor_cfg: SupervisorConfig {
+                    max_unverifiable_shares_per_session: 3,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
@@ -5557,8 +5494,11 @@ mod tests {
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
-                max_deposit_wait: Duration::from_millis(50),
-                max_ssa_delivery_time: Duration::from_millis(20),
+                supervisor_cfg: SupervisorConfig {
+                    max_deposit_wait: Duration::from_millis(50),
+                    max_ssa_delivery_time: Duration::from_millis(20),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
@@ -5686,7 +5626,10 @@ mod tests {
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
                 pix_config: IncomingSessionPixConfig {
                     quota_range: 0..=10_000_000_000_000,
-                    max_deposit_wait: Duration::from_secs(1),
+                    supervisor_cfg: SupervisorConfig {
+                        max_deposit_wait: Duration::from_secs(1),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -5781,7 +5724,10 @@ mod tests {
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
-                max_unverifiable_shares_per_session: 0,
+                supervisor_cfg: SupervisorConfig {
+                    max_unverifiable_shares_per_session: 0,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
@@ -5874,8 +5820,11 @@ mod tests {
             idle_timeout: Duration::from_millis(100),
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
-                max_deposit_wait: Duration::from_secs(3600),
-                max_ssa_delivery_time: Duration::from_secs(3600),
+                supervisor_cfg: SupervisorConfig {
+                    max_deposit_wait: Duration::from_secs(3600),
+                    max_ssa_delivery_time: Duration::from_secs(3600),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()

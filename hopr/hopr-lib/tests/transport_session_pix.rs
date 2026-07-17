@@ -26,7 +26,7 @@ use {
         },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
-            transport::session::IncomingSessionPixConfig,
+            transport::session::{IncomingSessionPixConfig, SupervisorConfig},
             transport::{SessionCapability, SessionTarget},
         },
     },
@@ -88,8 +88,11 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             incoming_pix_config: Some(IncomingSessionPixConfig {
                 quota_range: 0..=100_000,
                 enforce_pix: false,
-                max_ssa_delivery_time: Duration::from_secs(10),
-                max_deposit_wait: Duration::from_secs(60),
+                supervisor_cfg: SupervisorConfig {
+                    max_ssa_delivery_time: Duration::from_secs(10),
+                    max_deposit_wait: Duration::from_secs(60),
+                    ..Default::default()
+                },
                 ..Default::default()
             }),
             idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
@@ -415,8 +418,11 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
         incoming_pix_config: Some(IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
-            max_ssa_delivery_time: Duration::from_secs(10),
-            max_deposit_wait: Duration::from_secs(5),
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(5),
+                ..Default::default()
+            },
             ..Default::default()
         }),
         idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
@@ -515,10 +521,13 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
         incoming_pix_config: Some(IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
-            max_ssa_delivery_time: Duration::from_secs(10),
-            max_deposit_wait: Duration::from_secs(60),
-            max_recovery_time: Duration::from_secs(5),
-            max_recovery_idle: Duration::from_secs(60),
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(5),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
             ..Default::default()
         }),
         idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
