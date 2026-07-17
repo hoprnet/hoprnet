@@ -103,7 +103,7 @@ pub(crate) fn spawn_supervisor_worker(
         dims.target_useful_shares().saturating_sub(1),
         cfg.max_predeposit_packets,
     );
-    let gate = ServiceGate::new(predeposit_budget);
+    let gate = ServiceGate::new(predeposit_budget, cfg.max_served_without_progress);
 
     let handle = SessionPixSupervisorHandle {
         cmd_tx,
@@ -272,6 +272,7 @@ mod tests {
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
             max_predeposit_packets: 1024,
+            max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
         }
     }

@@ -446,6 +446,12 @@ pub struct IncomingSessionPixConfig {
     /// Default is 30 seconds.
     #[default(Duration::from_secs(30))]
     pub tombstone_retention_window: Duration,
+    /// Maximum packets served without SSA recovery progress before the gate
+    /// blocks further service (defense-in-depth backstop).
+    ///
+    /// Default is 256.
+    #[default(256)]
+    pub max_served_without_progress: u64,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -2068,6 +2074,79 @@ where
             }
         });
 
+        // If PIX is active, set up the supervisor and install the egress gate
+        // BEFORE constructing the session, so the gate is populated before any
+        // write reaches the egress adapter.
+        let pix: Option<(
+            crate::pix::worker::SessionPixSupervisorHandle,
+            SsaId<HoprPseudonym>,
+            crate::pix::worker::ActionRx,
+        )> = if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            let params = SessionSsaParameters {
+                polys_per_ssa: client_polys_per_ssa,
+                shares_per_poly: client_shares_per_ssa,
+            };
+
+            let dims = crate::pix::SsaDimensions {
+                polys: params.polys_per_ssa,
+                threshold: params.shares_per_poly,
+            };
+
+            let pix_cfg = crate::pix::SupervisorConfig {
+                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
+                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
+                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
+                max_recovery_time: self.cfg.pix_config.max_recovery_time,
+                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
+                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
+                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
+                max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
+                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
+            };
+
+            let (handle, action_rx) =
+                crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
+
+            // Receive the initial RequestSsa action and send it synchronously.
+            let initial_action = action_rx
+                .recv()
+                .timeout(futures_time::time::Duration::from(INITIAL_SSA_REQUEST_TIMEOUT))
+                .await
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("timeout waiting for initial SSA request")))?
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("action driver closed prematurely")))?;
+
+            let ssa_id = match &initial_action {
+                crate::pix::SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
+                other => {
+                    error!(?other, "unexpected initial action from supervisor");
+                    return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
+                }
+            };
+
+            // Store params in slot first — send_ssa_request reads them.
+            let _ = slot.ssa_params.set(params);
+
+            // Send the SSA request message on the wire.
+            if let Err(e) = self.send_ssa_request(session_id, &slot, ssa_id.ssa_index()).await {
+                error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
+                return Err(e);
+            }
+
+            // Notify supervisor that the request was sent.
+            handle
+                .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
+
+            // Install the gate in the slot BEFORE session construction so the
+            // egress adapters inside HoprSession see a populated gate.
+            let _ = slot.pix_supervisor.set(handle.clone());
+            let _ = slot.pix_egress_gate.set(handle.gate.clone());
+
+            Some((handle, ssa_id, action_rx))
+        } else {
+            None
+        };
+
         let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
             // Because of SURB scarcity, control the egress rate of incoming sessions
             let egress_rate_control =
@@ -2286,68 +2365,9 @@ where
             Some(&slot.surb_mgmt),
         );
 
-        // If client requested PIX, and we support it
-        // (it was previously verified that the offered parameters are acceptable for us),
-        // then create the PIX supervisor and send the initial SSA commitment request.
-        // Defer slot_guard.commit() until after PIX setup succeeds.
-        if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
-            let params = SessionSsaParameters {
-                polys_per_ssa: client_polys_per_ssa,
-                shares_per_poly: client_shares_per_ssa,
-            };
-
-            let dims = crate::pix::SsaDimensions {
-                polys: params.polys_per_ssa,
-                threshold: params.shares_per_poly,
-            };
-
-            let pix_cfg = crate::pix::SupervisorConfig {
-                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
-                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
-                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
-                max_recovery_time: self.cfg.pix_config.max_recovery_time,
-                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
-                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
-                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
-                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
-            };
-
-            let (handle, action_rx) =
-                crate::pix::worker::spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
-
-            // Receive the initial RequestSsa action and send it synchronously.
-            let initial_action = action_rx
-                .recv()
-                .timeout(futures_time::time::Duration::from(INITIAL_SSA_REQUEST_TIMEOUT))
-                .await
-                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("timeout waiting for initial SSA request")))?
-                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("action driver closed prematurely")))?;
-
-            let ssa_id = match &initial_action {
-                crate::pix::SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
-                other => {
-                    error!(?other, "unexpected initial action from supervisor");
-                    return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
-                }
-            };
-
-            // Store params in slot first — send_ssa_request reads them.
-            let _ = slot.ssa_params.set(params);
-
-            // Send the SSA request message on the wire.
-            if let Err(e) = self.send_ssa_request(session_id, &slot, ssa_id.ssa_index()).await {
-                error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
-                return Err(e);
-            }
-
-            // Notify supervisor that the request was sent.
-            handle
-                .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
-                .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
-            let _ = slot.pix_supervisor.set(handle.clone());
-            let _ = slot.pix_egress_gate.set(handle.gate.clone());
-
-            // Spawn the action driver task.
+        // If PIX was set up before session construction, spawn the action
+        // driver task now (after the session is published).
+        if let Some((handle, ssa_id, action_rx)) = pix {
             let myself = self.clone();
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
@@ -2395,6 +2415,9 @@ where
                         }
                         crate::pix::SessionPixAction::ReleaseService => {
                             gate.release_service();
+                        }
+                        crate::pix::SessionPixAction::ProgressNotification => {
+                            gate.notify_progress();
                         }
                         crate::pix::SessionPixAction::Close(reason) => {
                             // Poison the gate so any parked writers get GateClosed.

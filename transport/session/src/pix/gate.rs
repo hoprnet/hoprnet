@@ -1,7 +1,8 @@
 //! [`ServiceGate`] — bounded predeposit egress gate for PIX sessions.
 //!
 //! Before funding, the gate enforces a provisional packet budget.
-//! After funding, it becomes a fast atomic counter.
+//! After funding, it enforces a ceiling on packets served without SSA
+//! recovery progress as a defense-in-depth backstop.
 //! On poisoning, all acquires fail permanently.
 
 use std::sync::{
@@ -18,16 +19,13 @@ pub(crate) struct GateClosed;
 
 /// Bounded predeposit service gate for a single PIX session.
 ///
-/// # Lock-free fast path
-///
-/// After funding, [`acquire`](Self::acquire) is a single `fetch_add` and
-/// `load` on atomics — no mutex, no channel round-trip.
-///
 /// # Parking
 ///
-/// Before funding, when the predeposit budget is exhausted, `acquire` parks
-/// the caller. On [`release_service`](Self::release_service) or
-/// [`poison`](Self::poison), all parked callers are woken.
+/// Before funding, when the predeposit budget is exhausted, [`acquire`](Self::acquire) parks
+/// the caller. After funding, when the served-without-progress ceiling is exceeded, it
+/// parks on the same mechanism.
+/// On [`release_service`](Self::release_service), [`notify_progress`](Self::notify_progress),
+/// or [`poison`](Self::poison), all parked callers are woken.
 pub(crate) struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
@@ -39,56 +37,82 @@ pub(crate) struct ServiceGate {
     poisoned: AtomicBool,
     /// Waker for parked writers.
     notify: SlotNotify,
+    /// Ceiling on packets served since last progress notification.
+    ceiling: AtomicU64,
+    /// Snapshot of `served` at last progress notification.
+    served_at_last_progress: AtomicU64,
 }
 
 impl ServiceGate {
-    /// Create a new gate with the given predeposit budget.
-    pub fn new(predeposit_budget: u64) -> Arc<Self> {
+    /// Create a new gate with the given predeposit budget and progress ceiling.
+    pub fn new(predeposit_budget: u64, max_served_without_progress: u64) -> Arc<Self> {
         Arc::new(Self {
             served: AtomicU64::new(0),
             remaining: AtomicU64::new(predeposit_budget),
             funded: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
             notify: SlotNotify::new(),
+            ceiling: AtomicU64::new(max_served_without_progress),
+            served_at_last_progress: AtomicU64::new(0),
         })
     }
 
     /// Acquire a service permit.
     ///
-    /// After funding or if the predeposit budget is not exhausted, this returns
-    /// immediately. Otherwise it parks until a permit becomes available or the
-    /// gate is poisoned.
+    /// After funding, enforces a ceiling on packets served without SSA recovery
+    /// progress (see [`max_served_without_progress`](Self::ceiling)). Parks on
+    /// [`SlotNotify`] when the ceiling or predeposit budget is exceeded.
     pub async fn acquire(self: &Arc<Self>) -> Result<(), GateClosed> {
-        // Fast path: already funded.
-        if self.funded.load(Ordering::Acquire) {
-            if self.poisoned.load(Ordering::Acquire) {
-                return Err(GateClosed);
-            }
-            self.served.fetch_add(1, Ordering::Relaxed);
-            return Ok(());
-        }
-
-        // Poisoned check before waiting.
         if self.poisoned.load(Ordering::Acquire) {
             return Err(GateClosed);
         }
 
-        // Try to consume from predeposit budget.
         loop {
             if self.poisoned.load(Ordering::Acquire) {
                 return Err(GateClosed);
             }
 
-            // If funded while we were waiting, take the fast path.
             if self.funded.load(Ordering::Acquire) {
-                self.served.fetch_add(1, Ordering::Relaxed);
-                return Ok(());
+                // Funded path: ceiling-checking CAS loop.
+                let served = self.served.load(Ordering::Acquire);
+                let base = self.served_at_last_progress.load(Ordering::Acquire);
+                if served.saturating_sub(base) >= self.ceiling.load(Ordering::Acquire) {
+                    // Ceiling exceeded — park.
+                    let notified = self.notify.notified();
+
+                    // Double-check after registering interest.
+                    if self.poisoned.load(Ordering::Acquire) {
+                        return Err(GateClosed);
+                    }
+                    if !self.funded.load(Ordering::Acquire) {
+                        continue;
+                    }
+                    let served2 = self.served.load(Ordering::Acquire);
+                    let base2 = self.served_at_last_progress.load(Ordering::Acquire);
+                    if served2.saturating_sub(base2) < self.ceiling.load(Ordering::Acquire) {
+                        // Progress happened while registering — retry.
+                        continue;
+                    }
+
+                    notified.await;
+                    continue;
+                }
+
+                if self
+                    .served
+                    .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    return Ok(());
+                }
+                // CAS failed — retry.
+                continue;
             }
 
+            // Not yet funded — try predeposit budget.
             let remaining = self.remaining.load(Ordering::Acquire);
 
             if remaining > 0 {
-                // Try to decrement.
                 if self
                     .remaining
                     .compare_exchange(remaining, remaining - 1, Ordering::AcqRel, Ordering::Relaxed)
@@ -97,7 +121,7 @@ impl ServiceGate {
                     self.served.fetch_add(1, Ordering::Relaxed);
                     return Ok(());
                 }
-                // CAS failed (concurrent decrement), retry.
+                // CAS failed — retry.
                 continue;
             }
 
@@ -117,14 +141,10 @@ impl ServiceGate {
                 return Err(GateClosed);
             }
             if self.funded.load(Ordering::Acquire) {
-                self.served.fetch_add(1, Ordering::Relaxed);
-                return Ok(());
+                // Re-enter the loop — the funded path handles ceiling checks.
+                continue;
             }
             if self.remaining.load(Ordering::Acquire) > 0 {
-                // Another thread may have released the gate or a
-                // deposit freed budget while we were registering.
-                // Drop the unused Notified (unpolled — clean) and
-                // retry the main loop.
                 continue;
             }
 
@@ -148,11 +168,20 @@ impl ServiceGate {
 
     /// Flip the funded flag and wake all parked writers.
     ///
-    /// Once funded, `acquire` no longer checks the predeposit budget and never
-    /// parks.
+    /// Once funded, `acquire` enforces the served-without-progress ceiling
+    /// instead of the predeposit budget.
     pub fn release_service(self: &Arc<Self>) {
         self.funded.store(true, Ordering::Release);
-        // Wake all parkers so they take the funded fast path.
+        // Wake all parkers — predeposit-parked writers re-enter and take the
+        // funded path, which checks the ceiling.
+        self.notify.notify_waiters();
+    }
+
+    /// Record SSA recovery progress: snapshots the served counter so the
+    /// ceiling reopens, and wakes any writers parked on the ceiling.
+    pub fn notify_progress(self: &Arc<Self>) {
+        self.served_at_last_progress
+            .store(self.served.load(Ordering::Acquire), Ordering::Release);
         self.notify.notify_waiters();
     }
 
@@ -164,18 +193,36 @@ impl ServiceGate {
         self.notify.notify_waiters();
     }
 
+    /// Return the remaining predeposit budget (for diagnostics).
+    #[cfg(test)]
+    pub fn remaining_budget(&self) -> u64 {
+        self.remaining.load(Ordering::Acquire)
+    }
+
     /// Non-blocking try-acquire for tests and sync-only callers.
     ///
     /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
-    /// exhausted, or `Err(())` if the gate is poisoned (session closing).
+    /// exhausted (and gate not yet funded) or the ceiling is exceeded (gate
+    /// funded), or `Err(())` if poisoned.
     #[cfg(test)]
     pub fn try_acquire_sync(&self) -> Result<bool, ()> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(());
         }
         if self.funded.load(Ordering::Acquire) {
-            self.served.fetch_add(1, Ordering::Relaxed);
-            return Ok(true);
+            let served = self.served.load(Ordering::Acquire);
+            let base = self.served_at_last_progress.load(Ordering::Acquire);
+            if served.saturating_sub(base) >= self.ceiling.load(Ordering::Acquire) {
+                return Ok(false);
+            }
+            if self
+                .served
+                .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                return Ok(true);
+            }
+            return Ok(false);
         }
         // Try to consume from predeposit budget (non-blocking CAS loop).
         loop {
@@ -205,18 +252,24 @@ mod tests {
 
     use super::*;
 
+    /// Helper: create a gate with a generous ceiling for tests that don't
+    /// care about the ceiling behavior.
+    fn gate_with_ceiling(predeposit: u64) -> Arc<ServiceGate> {
+        ServiceGate::new(predeposit, u64::MAX)
+    }
+
     #[tokio::test]
     async fn budget_is_min_of_target_minus_one_and_config_cap() {
-        // This test checks that the gate is constructed with the right budget.
-        let gate = ServiceGate::new(100);
+        let gate = ServiceGate::new(100, 256);
         assert_eq!(gate.remaining.load(Ordering::Acquire), 100);
+        assert_eq!(gate.ceiling.load(Ordering::Acquire), 256);
         assert!(!gate.funded.load(Ordering::Acquire));
         assert!(!gate.poisoned.load(Ordering::Acquire));
     }
 
     #[tokio::test]
     async fn acquire_succeeds_within_budget() {
-        let gate = ServiceGate::new(3);
+        let gate = gate_with_ceiling(3);
         for _ in 0..3 {
             gate.acquire().await.unwrap();
         }
@@ -225,34 +278,28 @@ mod tests {
 
     #[tokio::test]
     async fn acquire_parks_when_predeposit_budget_exhausted() {
-        let gate = ServiceGate::new(1);
+        let gate = gate_with_ceiling(1);
         gate.acquire().await.unwrap();
 
-        // Second acquire should park (budget exhausted).
         let gate_clone = gate.clone();
         let parked =
             tokio::spawn(async move { tokio::time::timeout(Duration::from_millis(200), gate_clone.acquire()).await });
 
-        // Should time out because no one wakes it.
         let result = parked.await.unwrap();
         assert!(result.is_err(), "expected timeout");
     }
 
     #[tokio::test]
     async fn release_service_wakes_parked_writers() {
-        let gate = ServiceGate::new(0); // No predeposit budget.
+        let gate = gate_with_ceiling(0); // No predeposit budget.
         let gate_clone = gate.clone();
 
         let parked = tokio::spawn(async move {
-            // This will park immediately.
             gate_clone.acquire().await.unwrap();
             42u32
         });
 
-        // Small delay to ensure the spawned task is parked.
         tokio::time::sleep(Duration::from_millis(20)).await;
-
-        // Release service — this should wake the parked writer.
         gate.release_service();
 
         let result = parked.await.unwrap();
@@ -261,20 +308,70 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn funded_gate_counts_and_never_parks() {
-        let gate = ServiceGate::new(0);
+    async fn funded_gate_surrenders_at_ceiling() {
+        let gate = ServiceGate::new(0, 10); // Ceiling of 10.
         gate.release_service();
 
-        // After funding, acquires never park.
-        for _ in 0..100 {
+        // Serve up to the ceiling.
+        for _ in 0..10 {
             gate.acquire().await.unwrap();
         }
-        assert_eq!(gate.served_total(), 100);
+
+        // 11th should park (ceiling exceeded).
+        let gate_clone = gate.clone();
+        let parked =
+            tokio::spawn(async move { tokio::time::timeout(Duration::from_millis(100), gate_clone.acquire()).await });
+        let result = parked.await.unwrap();
+        assert!(result.is_err(), "expected timeout due to ceiling");
+
+        assert_eq!(gate.served_total(), 10);
+    }
+
+    #[tokio::test]
+    async fn notify_progress_resets_ceiling() {
+        let gate = ServiceGate::new(0, 10);
+        gate.release_service();
+
+        for _ in 0..10 {
+            gate.acquire().await.unwrap();
+        }
+
+        // Progress resets the ceiling.
+        gate.notify_progress();
+
+        // Now serve another 10.
+        for _ in 0..10 {
+            gate.acquire().await.unwrap();
+        }
+        assert_eq!(gate.served_total(), 20);
+    }
+
+    #[tokio::test]
+    async fn notify_progress_wakes_ceiling_parked_writer() {
+        let gate = ServiceGate::new(0, 5);
+        gate.release_service();
+
+        for _ in 0..5 {
+            gate.acquire().await.unwrap();
+        }
+
+        let gate_clone = gate.clone();
+        let parked = tokio::spawn(async move {
+            gate_clone.acquire().await.unwrap();
+            42u32
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        gate.notify_progress();
+
+        let result = parked.await.unwrap();
+        assert_eq!(result, 42);
+        assert_eq!(gate.served_total(), 6);
     }
 
     #[tokio::test]
     async fn poison_errors_parked_and_future_acquires() {
-        let gate = ServiceGate::new(0); // No predeposit budget → will park.
+        let gate = gate_with_ceiling(0); // No predeposit budget → will park.
         let gate_clone = gate.clone();
 
         let parked = tokio::spawn(async move { gate_clone.acquire().await });
@@ -293,7 +390,7 @@ mod tests {
 
     #[tokio::test]
     async fn served_total_is_monotonic_under_concurrency() {
-        let gate = ServiceGate::new(1000);
+        let gate = gate_with_ceiling(1000);
         let mut handles = Vec::new();
 
         for _ in 0..10 {
@@ -314,7 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn try_acquire_sync_succeeds_within_budget() {
-        let gate = ServiceGate::new(5);
+        let gate = gate_with_ceiling(5);
         for _ in 0..5 {
             assert!(gate.try_acquire_sync().unwrap());
         }
@@ -323,7 +420,7 @@ mod tests {
 
     #[tokio::test]
     async fn try_acquire_sync_returns_false_when_budget_exhausted() {
-        let gate = ServiceGate::new(2);
+        let gate = gate_with_ceiling(2);
         assert!(gate.try_acquire_sync().unwrap());
         assert!(gate.try_acquire_sync().unwrap());
         assert!(!gate.try_acquire_sync().unwrap());
@@ -332,19 +429,61 @@ mod tests {
 
     #[tokio::test]
     async fn try_acquire_sync_succeeds_after_funding() {
-        let gate = ServiceGate::new(0);
-        // Exhausted predeposit budget.
-        assert!(!gate.try_acquire_sync().unwrap());
+        let gate = gate_with_ceiling(0);
 
+        assert!(!gate.try_acquire_sync().unwrap());
         gate.release_service();
         assert!(gate.try_acquire_sync().unwrap());
         assert_eq!(gate.served_total(), 1);
     }
 
     #[tokio::test]
+    async fn try_acquire_sync_honors_ceiling_after_funding() {
+        let gate = ServiceGate::new(0, 5);
+        gate.release_service();
+
+        for _ in 0..5 {
+            assert!(gate.try_acquire_sync().unwrap());
+        }
+        // 6th should hit the ceiling.
+        assert!(!gate.try_acquire_sync().unwrap());
+
+        // Progress resets it.
+        gate.notify_progress();
+        assert!(gate.try_acquire_sync().unwrap());
+    }
+
+    #[tokio::test]
     async fn try_acquire_sync_errors_when_poisoned() {
-        let gate = ServiceGate::new(10);
+        let gate = gate_with_ceiling(10);
         gate.poison();
         assert!(gate.try_acquire_sync().is_err());
+    }
+
+    #[tokio::test]
+    async fn ceiling_check_uses_saturating_sub_from_watermark() {
+        // Pre-serve some packets via predeposit, then fund and check ceiling
+        // starts fresh from the watermark, not from 0.
+        let gate = ServiceGate::new(50, 10);
+        for _ in 0..30 {
+            gate.acquire().await.unwrap();
+        }
+        assert_eq!(gate.served_total(), 30);
+
+        gate.release_service();
+        gate.notify_progress(); // Watermark = 30, ceiling = 10.
+        assert_eq!(gate.served_at_last_progress.load(Ordering::Acquire), 30);
+
+        for _ in 0..10 {
+            gate.acquire().await.unwrap();
+        }
+        assert_eq!(gate.served_total(), 40);
+
+        // 41st should hit ceiling (40 - 30 >= 10).
+        let gate_clone = gate.clone();
+        let parked =
+            tokio::spawn(async move { tokio::time::timeout(Duration::from_millis(50), gate_clone.acquire()).await });
+        let result = parked.await.unwrap();
+        assert!(result.is_err(), "expected timeout due to ceiling");
     }
 }
