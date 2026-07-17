@@ -1032,9 +1032,11 @@ where
                 max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
                 tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
             };
-            if let Err(e) = crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config()) {
-                warn!(%e, "PIX supervision config validation failed");
-            }
+            // Validate the PIX supervision config before committing to start.
+            // Returning Err here prevents the manager from starting in a
+            // partially-initialised state with invalid supervision settings.
+            crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config())
+                .map_err(|e| TransportSessionError::InvalidConfig(e.to_string()))?;
             self.pix_toolbox
                 .set(pix)
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -1803,7 +1805,7 @@ where
             }
         };
 
-        handle.send_event(pix_ev).map_err(|_| {
+        handle.send_event(pix_ev).await.map_err(|_| {
             error!(%session_id, "pix supervisor channel closed");
             TransportSessionError::Closed
         })?;
@@ -2165,6 +2167,7 @@ where
             // Notify supervisor that the request was sent.
             handle
                 .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                .await
                 .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
 
             // Install the gate in the slot BEFORE session construction so the
@@ -2435,12 +2438,13 @@ where
                                 if let Some(handle) = s.pix_supervisor.get()
                                     && handle
                                         .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                                        .await
                                         .is_err()
                                 {
                                     error!(%session_id, "failed to send SsaRequestSent to PIX supervisor");
                                 }
                                 if let Some(handle) = s.pix_supervisor.get()
-                                    && handle.send_action_result(action_key, result.is_ok()).is_err()
+                                    && handle.send_action_result(action_key, result.is_ok()).await.is_err()
                                 {
                                     error!(%session_id, "failed to send action result to PIX supervisor");
                                 }
@@ -2450,7 +2454,7 @@ where
                             } else {
                                 // Slot missing — supervisor must have already closed it.
                                 // Report failure so the supervisor can transition.
-                                if supervisor_handle.send_action_result(action_key, false).is_err() {
+                                if supervisor_handle.send_action_result(action_key, false).await.is_err() {
                                     error!(%session_id, "failed to report action result to closed PIX supervisor");
                                 }
                             }
@@ -2460,6 +2464,20 @@ where
                         }
                         crate::pix::SessionPixAction::ProgressNotification => {
                             gate.notify_progress();
+                        }
+                        crate::pix::SessionPixAction::RetireSsa(ssa_id) => {
+                            // Release the old SSA from the reconstructor and the
+                            // retirement guard so per-SSA state does not accumulate.
+                            if let Some(ref proc) = retirement.share_processor {
+                                proc.retire_ssa(&ssa_id);
+                            }
+                            retirement.ssas.retain(|id| id != &ssa_id);
+                            // Remove the corresponding deposit-observer handle.
+                            if let Some(slot) = myself.sessions.get(&session_id) {
+                                slot.abort_handles
+                                    .lock()
+                                    .abort_one(&SessionHandles::PixDepositObserver(ssa_id.ssa_index()));
+                            }
                         }
                         crate::pix::SessionPixAction::Close(reason) => {
                             // Poison the gate so any parked writers get GateClosed.
@@ -2712,6 +2730,7 @@ where
                         ssa_id: commitment_ssa_id,
                         expected_deposit: None,
                     })
+                    .await
                     .is_err()
             {
                 error!(%session_id, "failed to send CommitmentVerified to PIX supervisor");
@@ -2749,7 +2768,7 @@ where
                                             ssa_id: ssa_id_for_observer,
                                             amount,
                                         },
-                                    ).is_err()
+                                    ).await.is_err()
                                 {
                                     error!(%session_id, "failed to send DepositConfirmed to PIX supervisor");
                                     break;
@@ -2760,7 +2779,7 @@ where
                                 if let Some(h) = pix_supervisor_for_observer.get()
                                     && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
-                                    )).is_err()
+                                    )).await.is_err()
                                 {
                                     error!(%session_id, "failed to send DepositObserverClosed to PIX supervisor");
                                 }
@@ -2771,7 +2790,7 @@ where
                                 if let Some(h) = pix_supervisor_for_observer.get()
                                     && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
-                                    )).is_err()
+                                    )).await.is_err()
                                 {
                                     error!(%session_id, "failed to send DepositObserverClosed to PIX supervisor");
                                 }
@@ -5539,7 +5558,7 @@ mod tests {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
                 max_deposit_wait: Duration::from_millis(50),
-                max_ssa_delivery_time: Duration::ZERO,
+                max_ssa_delivery_time: Duration::from_millis(20),
                 ..Default::default()
             },
             ..Default::default()

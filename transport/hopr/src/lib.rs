@@ -956,7 +956,7 @@ where
         };
 
         smgr_start_res
-            .map_err(|_| HoprTransportError::Api("failed to start session manager".into()))?
+            .map_err(|e| HoprTransportError::Api(format!("failed to start session manager: {e}")))?
             .into_iter()
             .enumerate()
             .map(|(i, jh)| (HoprTransportProcess::SessionsManagement(i + 1), jh))

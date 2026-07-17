@@ -203,9 +203,19 @@ impl SessionPixSupervisor {
             i += 1;
         }
 
-        // Remove tombstones that have expired.
+        // Remove tombstones that have expired and emit RetireSsa so the
+        // reconstructor and observer state is released mid-session.
+        let retired_ids: Vec<SsaId<_>> = self
+            .ssas
+            .iter()
+            .filter(|ssa| matches!(ssa.phase, SsaPhase::Recovered { tombstone_until } if now >= tombstone_until))
+            .map(|ssa| ssa.ssa_id)
+            .collect();
         self.ssas
             .retain(|ssa| !matches!(ssa.phase, SsaPhase::Recovered { tombstone_until } if now >= tombstone_until));
+        for id in retired_ids {
+            actions.push(SessionPixAction::RetireSsa(id));
+        }
 
         // If no SSAs remain, close.
         if self.ssas.is_empty() && !self.closed {
@@ -1707,6 +1717,69 @@ mod tests {
         assert!(actions.is_empty(), "stale snapshot should be ignored, got: {actions:?}");
     }
 
+    #[test]
+    fn cross_peer_invalid_shares_accumulates_separately() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        // Advance the single SSA past request.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+
+        // First peer reports 3 invalid shares (absolute total).
+        sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 3,
+            },
+            now,
+            0,
+        );
+        assert_eq!(sup.session_invalid_total, 3);
+
+        // Second peer independently reports 5 invalid shares for the SAME SSA.
+        // The supervisor must observe the *maximum* per-SSA absolute count and
+        // charge the delta (5 - 3 = 2) as additional session-level faults.
+        sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 5,
+            },
+            now,
+            0,
+        );
+        assert_eq!(
+            sup.session_invalid_total, 5,
+            "cross-peer aggregate must track the max total"
+        );
+
+        // Third peer reports 7 — another delta of 2.
+        sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 7,
+            },
+            now,
+            0,
+        );
+        assert_eq!(sup.session_invalid_total, 7, "third peer delta must also be charged");
+
+        // Stale report from the first peer (3 < per_ssa_total 7) is ignored.
+        sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 3,
+            },
+            now,
+            0,
+        );
+        assert_eq!(
+            sup.session_invalid_total, 7,
+            "stale cross-peer snapshot must not regress the aggregate"
+        );
+    }
+
     // ---------------------------------------------------------------
     // AlmostRecovered / Recovered
     // ---------------------------------------------------------------
@@ -2035,13 +2108,21 @@ mod tests {
         assert!(actions.is_empty());
         assert_eq!(sup.ssas.len(), 1);
 
-        // After tombstone expires — removed.
+        // After tombstone expires — RetireSsa emitted, then Close because no SSAs remain.
         let actions = sup.handle_deadline(start + Duration::from_secs(11), 5);
-        assert_eq!(actions.len(), 1);
-        assert!(matches!(
-            actions[0],
-            SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)
-        ));
+        assert_eq!(actions.len(), 2, "expected RetireSsa + Close");
+        assert!(
+            matches!(&actions[0], SessionPixAction::RetireSsa(rid) if *rid == id),
+            "first action should be RetireSsa({id}), got {:?}",
+            actions[0]
+        );
+        assert!(
+            matches!(
+                actions[1],
+                SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)
+            ),
+            "second action should be Close"
+        );
     }
 
     #[test]

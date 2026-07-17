@@ -162,6 +162,10 @@ pub(crate) enum SessionPixAction {
     ProgressNotification,
     /// Close the session with the given reason.
     Close(SessionPixCloseReason),
+    /// Retire a previously-used SSA from the reconstructor (idempotent).
+    /// Emitted when an SSA's tombstone period expires so mid-session state
+    /// does not accumulate.
+    RetireSsa(SsaId<HoprPseudonym>),
 }
 
 // ---------------------------------------------------------------------------
