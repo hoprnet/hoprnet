@@ -34,8 +34,9 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
-    set_session_state,
+    self, PixSsaPhase, SessionLifecycleState, initialize_session_metrics, record_pix_close_reason,
+    remove_session_metrics_state, set_pix_current_ssa_phase, set_pix_gate_mode, set_pix_recovery_progress,
+    set_session_balancer_data, set_session_state,
 };
 use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
@@ -1660,7 +1661,13 @@ where
         };
 
         let pix_ev = match &event {
-            HoprSessionInPixEvent::Progress(p) => SessionPixEvent::RecoveryProgress(*p),
+            HoprSessionInPixEvent::Progress(p) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                if p.target_useful_shares > 0 {
+                    set_pix_recovery_progress(&session_id, p.useful_shares as f64 / p.target_useful_shares as f64);
+                }
+                SessionPixEvent::RecoveryProgress(*p)
+            }
             HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total } => {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_PIX_UNVERIFIABLE_SHARES.increment();
@@ -1670,7 +1677,11 @@ where
                 }
             }
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => SessionPixEvent::AlmostRecovered(*ssa_id),
-            HoprSessionInPixEvent::SsaRecovered(ssa_id) => SessionPixEvent::Recovered(*ssa_id),
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                set_pix_current_ssa_phase(&session_id, PixSsaPhase::Recovered);
+                SessionPixEvent::Recovered(*ssa_id)
+            }
         };
 
         handle.send_event(pix_ev).await.map_err(|_| {
@@ -2014,6 +2025,9 @@ where
                     .await
                     .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
 
+                #[cfg(all(feature = "telemetry", not(test)))]
+                set_pix_current_ssa_phase(&session_id, PixSsaPhase::AwaitingCommitment);
+
                 // Install the gate in the slot BEFORE session construction so the
                 // egress adapters inside HoprSession see a populated gate.
                 let _ = slot.pix_supervisor.set(handle.clone());
@@ -2312,6 +2326,11 @@ where
                         }
                         SessionPixAction::ReleaseService => {
                             gate.release_service();
+                            #[cfg(all(feature = "telemetry", not(test)))]
+                            {
+                                set_pix_gate_mode(&session_id, true);
+                                set_pix_current_ssa_phase(&session_id, PixSsaPhase::Recovering);
+                            }
                         }
                         SessionPixAction::ProgressNotification => {
                             gate.notify_progress();
@@ -2334,7 +2353,10 @@ where
                             retirement.retire_all();
                             let closure_reason = pix_close_to_closure_reason(reason);
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
+                            {
+                                METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
+                                record_pix_close_reason(&session_id, &reason);
+                            }
                             error!(%session_id, ?reason, "pix supervisor closed session");
                             if let Some(slot) = myself.sessions.remove(&session_id) {
                                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
@@ -2578,6 +2600,9 @@ where
             {
                 error!(%session_id, "failed to send CommitmentVerified to PIX supervisor");
             }
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            set_pix_current_ssa_phase(&session_id, PixSsaPhase::AwaitingDeposit);
 
             // Spawn the PixDepositObserver that forwards deposit confirmations
             // to the supervisor. This loops to support top-up deposits.
