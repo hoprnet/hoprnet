@@ -61,10 +61,10 @@ impl ServiceGate {
     pub async fn acquire(self: &Arc<Self>) -> Result<(), GateClosed> {
         // Fast path: already funded.
         if self.funded.load(Ordering::Acquire) {
-            self.served.fetch_add(1, Ordering::Relaxed);
             if self.poisoned.load(Ordering::Acquire) {
                 return Err(GateClosed);
             }
+            self.served.fetch_add(1, Ordering::Relaxed);
             return Ok(());
         }
 

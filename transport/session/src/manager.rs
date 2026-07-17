@@ -131,6 +131,11 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
         debug!("data tx channel closed on session");
     }
 
+    // Poison the egress gate so any parked writers get GateClosed.
+    if let Some(gate) = session_data.pix_egress_gate.get() {
+        gate.poison();
+    }
+
     // Terminate any additional tasks spawned by the Session
     session_data.abort_handles.lock().abort_all();
 
@@ -5761,10 +5766,11 @@ mod tests {
             mgr.active_sessions().is_empty(),
             "session should be evicted after idle timeout"
         );
-        // Note: eviction through the session cache calls close_session which aborts
-        // all tasks immediately. The gate is NOT explicitly poisoned in this path
-        // (gate.poison() happens inside the worker loop on supervisor-initiated closes).
-        // The session slot is simply removed from the cache.
+        // close_session now poisons the gate before aborting tasks.
+        assert!(
+            gate.try_acquire_sync().is_err(),
+            "gate should be poisoned after eviction"
+        );
 
         bob_sender.close_channel();
         let _ = bob_handle.await;

@@ -1106,6 +1106,9 @@ mod tests {
             "ssa_to_verifier_ids should exist"
         );
 
+        // Capture verifier IDs before retiring.
+        let spis: Vec<_> = reconstructor.ssa_to_verifier_ids.get(&ssa_id).unwrap();
+
         // Now retire the SSA
         reconstructor.retire_ssa(&ssa_id);
 
@@ -1113,6 +1116,14 @@ mod tests {
         assert!(reconstructor.ssa_builders.get(&ssa_id).is_none());
         assert!(reconstructor.ssa_counters.get(&ssa_id).is_none());
         assert!(reconstructor.ssa_to_verifier_ids.get(&ssa_id).is_none());
+
+        // Individual polynomial verifiers must also be cleaned up.
+        for spi in &spis {
+            assert!(
+                reconstructor.ssa_verifiers.get(spi).is_none(),
+                "verifier {spi:?} should have been retired"
+            );
+        }
 
         Ok(())
     }
@@ -1132,7 +1143,17 @@ mod tests {
             reconstructor.insert_coefficient_commitments(ssa_id, coeff as CoefficientIndex, poly_map.into_iter())?;
         }
 
+        // Capture verifier IDs before retiring.
+        let spis: Vec<_> = reconstructor.ssa_to_verifier_ids.get(&ssa_id).unwrap();
         reconstructor.retire_ssa(&ssa_id);
+
+        // Verifiers for the retired SSA must be cleaned up.
+        for spi in &spis {
+            assert!(
+                reconstructor.ssa_verifiers.get(spi).is_none(),
+                "verifier {spi:?} should have been retired"
+            );
+        }
 
         // Re-create a new SSA with a different index
         let ssa_id2 = SsaId::new(pseudonym, 2.try_into()?);
