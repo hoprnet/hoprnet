@@ -5,7 +5,7 @@
 //! `served_total: u64` sample from the [`ServiceGate`](super::gate::ServiceGate).
 //! No method sleeps, spawns, or performs I/O.
 
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
@@ -401,8 +401,13 @@ impl SessionPixSupervisor {
         let new_useful = progress.useful_shares;
 
         // Counter regression check.
+        //
+        // The relay-as-Exit pipeline processes acknowledgement batches with
+        // for_each_concurrent, so absolute progress snapshots from different
+        // batches can arrive out of order. Treat a stale snapshot as benign
+        // noise rather than a protocol violation.
         if new_useful < ssa.largest_useful_shares {
-            return vec![SessionPixAction::Close(SessionPixCloseReason::CounterRegression)];
+            return Vec::new();
         }
 
         // Equal snapshot: no-op.
@@ -429,20 +434,33 @@ impl SessionPixSupervisor {
             None => return Vec::new(),
         };
 
+        // If already recovered (e.g. a concurrent batch delivered Recovered
+        // before this AlmostRecovered), the next SSA is already requested —
+        // no-op.
+        if self.ssas[idx].is_terminal() {
+            return Vec::new();
+        }
+
         let next_requested = self.ssas[idx].next_requested;
         let phase = self.ssas[idx].phase;
 
         if next_requested {
             return Vec::new();
         }
-        self.ssas[idx].next_requested = true;
 
         match phase {
-            SsaPhase::Recovering => self.emit_request_next_ssa(now),
+            SsaPhase::Recovering => {
+                self.ssas[idx].next_requested = true;
+                self.emit_request_next_ssa(now)
+            }
             SsaPhase::AwaitingDeposit => {
+                self.ssas[idx].next_requested = true;
                 self.ssas[idx].next_request_pending_deposit = true;
                 Vec::new()
             }
+            // AwaitingCommitment or unknown phase: do not set next_requested.
+            // The next SSA will be requested when on_recovered transitions to
+            // the tombstone phase, which checks next_requested independently.
             _ => Vec::new(),
         }
     }
@@ -453,11 +471,22 @@ impl SessionPixSupervisor {
             None => return Vec::new(),
         };
 
+        // Guard against duplicate recovery events (possible with concurrent
+        // batch processing). If already recovered, this is a no-op.
+        if self.ssas[idx].is_terminal() {
+            return Vec::new();
+        }
+
         let next_requested = self.ssas[idx].next_requested;
 
         // Transition to tombstone.
         self.ssas[idx].phase = SsaPhase::Recovered {
-            tombstone_until: now.checked_add(self.cfg.tombstone_retention_window).unwrap_or(now),
+            tombstone_until: now
+                .checked_add(self.cfg.tombstone_retention_window)
+                // The config validation caps all durations below overflow,
+                // so checked_add should never fail in practice. Belt-and-
+                // suspenders fallback: ~1 year in the future.
+                .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
         };
         self.ssas[idx].commitment_deadline = None;
         self.ssas[idx].deposit_deadline = None;
@@ -487,9 +516,11 @@ impl SessionPixSupervisor {
 
         let per_ssa_total = self.ssas[idx].per_ssa_invalid_total;
 
-        // Counter regression.
+        // Counter regression (or stale snapshot from concurrent processing).
+        // With H-02's aggregate totals this should not happen in normal
+        // operation, but remain defensive against out-of-order delivery.
         if observed_total < per_ssa_total {
-            return vec![SessionPixAction::Close(SessionPixCloseReason::CounterRegression)];
+            return Vec::new();
         }
 
         let delta = observed_total - per_ssa_total;
@@ -1516,12 +1547,9 @@ mod tests {
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
         sup.handle_event(&SessionPixEvent::RecoveryProgress(make_progress(id, 10, 50, 1)), now, 0);
 
+        // Stale snapshot from concurrent processing is silently ignored.
         let actions = sup.handle_event(&SessionPixEvent::RecoveryProgress(make_progress(id, 5, 50, 1)), now, 0);
-        assert_eq!(actions.len(), 1);
-        assert!(matches!(
-            actions[0],
-            SessionPixAction::Close(SessionPixCloseReason::CounterRegression)
-        ));
+        assert!(actions.is_empty(), "stale snapshot should be ignored, got: {actions:?}");
     }
 
     #[test]
@@ -1643,6 +1671,7 @@ mod tests {
             now,
             0,
         );
+        // Stale snapshot from concurrent processing is silently ignored.
         let actions = sup.handle_event(
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
@@ -1651,11 +1680,7 @@ mod tests {
             now,
             0,
         );
-        assert_eq!(actions.len(), 1);
-        assert!(matches!(
-            actions[0],
-            SessionPixAction::Close(SessionPixCloseReason::CounterRegression)
-        ));
+        assert!(actions.is_empty(), "stale snapshot should be ignored, got: {actions:?}");
     }
 
     // ---------------------------------------------------------------

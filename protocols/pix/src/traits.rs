@@ -28,8 +28,9 @@ pub enum ShareResolution<P, A> {
     Progress(SsaRecoveryProgress<P>),
     /// Invalid (unverifiable) shares encountered for a given peer and SSA.
     ///
-    /// `observed_total` is the **absolute** count of invalid shares observed
-    /// for this (peer, SSA) pair so far (not a batch delta).
+    /// `observed_total` is the **cross-peer aggregate** count of invalid shares
+    /// observed for this SSA so far (not a batch delta). The `peer` field is
+    /// retained for attribution/telemetry; limit enforcement uses the aggregate.
     InvalidShares {
         peer: Box<OffchainPublicKey>,
         ssa_id: SsaId<P>,

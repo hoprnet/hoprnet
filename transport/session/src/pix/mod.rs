@@ -12,6 +12,7 @@ use hopr_protocol_pix::{SsaId, SsaReconstructorConfig, SsaRecoveryProgress};
 use crate::errors::TransportSessionError;
 
 pub(crate) mod gate;
+pub(crate) mod notify;
 pub(crate) mod supervisor;
 pub(crate) mod worker;
 
@@ -224,6 +225,14 @@ pub fn validate_pix_supervision(
             "max_recovery_idle must be >= max_ack_await_time".into(),
         ));
     }
+    // Documented invariant: tombstone must outlive the ack window.
+    if cfg.tombstone_retention_window < reconstructor_cfg.max_ack_await_time {
+        return Err(TransportSessionError::InvalidConfig(
+            "tombstone_retention_window must be >= max_ack_await_time (otherwise late acks arrive after the tombstone \
+             expires)"
+                .into(),
+        ));
+    }
     if cfg.max_recovery_idle >= reconstructor_cfg.incomplete_ssa_lifetime {
         return Err(TransportSessionError::InvalidConfig(
             "max_recovery_idle must be < incomplete_ssa_lifetime".into(),
@@ -235,6 +244,24 @@ pub fn validate_pix_supervision(
         return Err(TransportSessionError::InvalidConfig(
             "ssa_counter_lifetime must be > max_recovery_time + tombstone_retention_window".into(),
         ));
+    }
+    // Reject durations that would overflow the monotonic clock when used as
+    // deadlines. 24 h is a safe upper bound — no supervisor duration should
+    // ever be this large, and the cap prevents silent deadline loss via
+    // Instant::checked_add returning None.
+    const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
+    for (name, dur) in [
+        ("max_ssa_delivery_time", &cfg.max_ssa_delivery_time),
+        ("max_deposit_wait", &cfg.max_deposit_wait),
+        ("max_recovery_idle", &cfg.max_recovery_idle),
+        ("max_recovery_time", &cfg.max_recovery_time),
+        ("tombstone_retention_window", &cfg.tombstone_retention_window),
+    ] {
+        if *dur > MAX_SUPERVISOR_DURATION {
+            return Err(TransportSessionError::InvalidConfig(
+                format!("{name} ({dur:?}) must not exceed {MAX_SUPERVISOR_DURATION:?}").into(),
+            ));
+        }
     }
     Ok(())
 }

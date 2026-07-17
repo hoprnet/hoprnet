@@ -95,8 +95,11 @@ struct SsaCounterEntry {
     useful_shares: u64,
     target_useful_shares: u64,
     recovered_polynomials: u16,
+    /// Cross-peer aggregate invalid-share total for this SSA.
+    /// This is what gets emitted to the supervisor for limit enforcement.
+    invalid_total: u64,
     /// Per-peer invalid share totals for this SSA.
-    /// Values are absolute counts (not deltas).
+    /// Values are absolute counts (not deltas). Retained for attribution/telemetry.
     invalid_by_peer: HashMap<OffchainPublicKey, u64>,
 }
 
@@ -221,6 +224,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     fn record_invalid_share(&self, peer: &OffchainPublicKey, ssa_id: &SsaId<S::Pseudonym>) -> u64 {
         if let Some(entry) = self.ssa_counters.get(ssa_id) {
             let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            entry.invalid_total += 1;
             let count = entry.invalid_by_peer.entry(*peer).or_insert(0);
             *count += 1;
             return *count;
@@ -412,6 +416,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                         useful_shares: 0,
                         target_useful_shares: target,
                         recovered_polynomials: 0,
+                        invalid_total: 0,
                         invalid_by_peer: HashMap::new(),
                     })),
                 );
@@ -531,20 +536,23 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
         // Emit one InvalidShares per touched SSA where faults were observed
         for ssa_id in &invalid_ssas {
-            let abs_total = self
+            let aggregate_total = self
                 .ssa_counters
                 .get(ssa_id)
                 .map(|entry| {
                     let e = entry.lock().expect("ssa counter lock poisoned");
-                    e.invalid_by_peer.get(&peer).copied().unwrap_or(0)
+                    e.invalid_total
                 })
                 .unwrap_or(0);
             // Only emit if we have a positive count (should always be true here)
-            if abs_total > 0 {
+            if aggregate_total > 0 {
                 res.push(ShareResolution::InvalidShares {
                     peer: Box::new(peer),
                     ssa_id: *ssa_id,
-                    observed_total: abs_total,
+                    // Emit the cross-peer aggregate total so the supervisor
+                    // correctly tracks limit enforcement. The peer field is
+                    // retained for diagnostics/logging.
+                    observed_total: aggregate_total,
                 });
             }
         }
