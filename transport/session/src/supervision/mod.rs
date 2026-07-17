@@ -65,7 +65,8 @@
 //! * **Commitment timeout** — time from `SsaRequestSent` to `CommitmentVerified`.
 //! * **Deposit timeout** — time from `CommitmentVerified` to a sufficient deposit.
 //! * **Recovery idle** — time without *useful progress* while service is being
-//!   consumed.  **Service-gated**: if no packets were served since the last
+//!   consumed.
+//! **Service-gated**: if no packets were served since the last
 //!   progress snapshot, the timer re-arms instead of closing (prevents a
 //!   slow-but-honest Entry from being disconnected).
 //! * **Recovery hard deadline** — absolute per-SSA backstop, never extended.
