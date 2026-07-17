@@ -9,7 +9,7 @@
 
 use std::{sync::Arc, time::Instant};
 
-use crossfire::{AsyncRx, MAsyncTx, SendError, mpsc::Array};
+use crossfire::{AsyncRx, MAsyncTx, SendError, TrySendError, mpsc::Array};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_utils::runtime::prelude::spawn;
 
@@ -124,15 +124,6 @@ async fn worker_loop(
 ) {
     // Emit initial actions.
     if !send_actions(&initial_actions, &action_tx) {
-        supervisor = SessionPixSupervisor::new(
-            supervisor.cfg.clone(),
-            supervisor.dims,
-            supervisor.pseudonym,
-            Instant::now(),
-        )
-        .0;
-        let close_actions = supervisor.handle_deadline(Instant::now(), gate.served_total());
-        send_actions(&close_actions, &action_tx);
         gate.poison();
         return;
     }
@@ -243,14 +234,40 @@ async fn process_cmd(
 }
 
 /// Non-blocking forward of actions to the driver.
+///
+/// On `Disconnected`, the driver is gone — returns `false` so the caller
+/// can fail-close.
+///
+/// On `Full`:
+/// - **Coalescible** actions (`ProgressNotification`) are logged + skipped. They are idempotent and safe to drop — the
+///   next notification will replace them, and dropping here prevents transient load from killing a healthy session.
+/// - **Non-coalescible** actions (`Close`, `RequestSsa`, `RetireSsa`) are treated as fatal.  If these cannot be
+///   delivered the channel is genuinely wedged.
 fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
     for action in actions {
-        if action_tx.try_send(action.clone()).is_err() {
-            tracing::warn!(?action, "action driver disconnected or channel full");
-            return false;
+        match action_tx.try_send(action.clone()) {
+            Ok(()) => continue,
+            Err(TrySendError::Full(item)) => {
+                if is_coalescible(&item) {
+                    tracing::trace!(?action, "action channel full, dropping coalescible action");
+                    continue;
+                }
+                tracing::warn!(?action, "non-coalescible action dropped — channel full");
+                return false;
+            }
+            Err(TrySendError::Disconnected(_item)) => {
+                tracing::warn!(?action, "action driver disconnected");
+                return false;
+            }
         }
     }
     true
+}
+
+/// Returns `true` for actions that are safe to drop when the action channel
+/// is transiently full.
+fn is_coalescible(action: &SessionPixAction) -> bool {
+    matches!(action, SessionPixAction::ProgressNotification)
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +279,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_api::HoprBalance;
     use hopr_protocol_pix::{SsaId, SsaIndex};
 
     use super::*;
@@ -277,6 +295,7 @@ mod tests {
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
+            min_deposit: HoprBalance::new_base(0),
         }
     }
 
@@ -520,5 +539,69 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // PD-07: Command-channel backpressure
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn command_channel_backpressures_on_full() {
+        // Use a tiny channel (capacity 1) with no worker so events queue up.
+        let (cmd_tx, _cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(1);
+        let gate = ServiceGate::new(1, 256);
+        let handle = SessionPixSupervisorHandle {
+            cmd_tx,
+            gate: gate.clone(),
+        };
+
+        let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
+
+        // First send should succeed immediately.
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.unwrap();
+
+        // Second send should fail (channel full, no worker draining).
+        let result = tokio::time::timeout(
+            Duration::from_millis(50),
+            handle.send_event(SessionPixEvent::SsaRequestSent(id)),
+        )
+        .await;
+
+        // The send should be pending (not complete) since there's no worker
+        // to drain the channel. A timeout means it correctly backpressured.
+        assert!(result.is_err(), "send_event should backpressure when channel is full");
+    }
+
+    #[tokio::test]
+    async fn backpressure_releases_when_channel_drained() {
+        let (cmd_tx, cmd_rx) = crossfire::mpsc::bounded_async::<WorkerCommand>(1);
+        let gate = ServiceGate::new(1, 256);
+        let handle = SessionPixSupervisorHandle {
+            cmd_tx,
+            gate: gate.clone(),
+        };
+
+        let id = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
+
+        // Fill the channel.
+        handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.unwrap();
+
+        // Spawn a task that will send a second event and wait.
+        let parked = {
+            let handle = handle.clone();
+            tokio::spawn(async move { handle.send_event(SessionPixEvent::SsaRequestSent(id)).await })
+        };
+
+        // Give the parked send a moment to register.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        // Drain one item from the channel — the parked send should now complete.
+        let drained = cmd_rx.recv().await;
+        assert!(drained.is_ok(), "expected one command in the channel");
+
+        // The parked send should complete within a reasonable timeout.
+        let result = tokio::time::timeout(Duration::from_secs(1), parked).await;
+        assert!(result.is_ok(), "parked send should complete after channel is drained");
+        assert!(result.unwrap().is_ok(), "send should succeed");
     }
 }

@@ -203,6 +203,12 @@ impl SessionPixSupervisor {
             i += 1;
         }
 
+        // If the session is already closing, skip tombstone retirement.
+        // Whole-session teardown retires everything via the retirement guard.
+        if self.closed {
+            return actions;
+        }
+
         // Remove tombstones that have expired and emit RetireSsa so the
         // reconstructor and observer state is released mid-session.
         let retired_ids: Vec<SsaId<_>> = self
@@ -219,7 +225,7 @@ impl SessionPixSupervisor {
 
         // If no SSAs remain, close.
         if self.ssas.is_empty() && !self.closed {
-            actions.push(SessionPixAction::Close(SessionPixCloseReason::InvalidTransition));
+            actions.push(SessionPixAction::Close(SessionPixCloseReason::NoSsaRemaining));
             self.closed = true;
         }
 
@@ -630,9 +636,11 @@ impl SessionPixSupervisor {
             return vec![SessionPixAction::Close(close_reason)];
         }
 
-        // Remove this closing SSA.
+        // Remove this closing SSA and emit RetireSsa so the reconstructor
+        // releases its builder/verifier/counter state mid-session.
+        let retired = self.ssas[idx].ssa_id;
         self.ssas.remove(idx);
-        Vec::new()
+        vec![SessionPixAction::RetireSsa(retired)]
     }
 
     fn emit_request_next_ssa(&mut self, _now: Instant) -> Vec<SessionPixAction> {
@@ -733,6 +741,7 @@ mod tests {
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
+            min_deposit: HoprBalance::new_base(0),
         }
     }
 
@@ -1572,7 +1581,7 @@ mod tests {
     }
 
     #[test]
-    fn lower_snapshot_closes_as_counter_regression() {
+    fn lower_snapshot_is_ignored_as_stale() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
@@ -1582,6 +1591,8 @@ mod tests {
         sup.handle_event(&SessionPixEvent::RecoveryProgress(make_progress(id, 10, 50, 1)), now, 0);
 
         // Stale snapshot from concurrent processing is silently ignored.
+        // Close-on-regression was rejected because ack batches are processed
+        // with for_each_concurrent, so out-of-order arrival is possible.
         let actions = sup.handle_event(&SessionPixEvent::RecoveryProgress(make_progress(id, 5, 50, 1)), now, 0);
         assert!(actions.is_empty(), "stale snapshot should be ignored, got: {actions:?}");
     }
@@ -1690,7 +1701,7 @@ mod tests {
     }
 
     #[test]
-    fn decreasing_invalid_count_closes_as_counter_regression() {
+    fn decreasing_invalid_count_is_ignored_as_stale() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
@@ -1706,6 +1717,9 @@ mod tests {
             0,
         );
         // Stale snapshot from concurrent processing is silently ignored.
+        // Close-on-regression was rejected because ack batches are processed
+        // with for_each_concurrent, so out-of-order arrival is possible.  A
+        // fail-closed approach would be a self-inflicted DoS.
         let actions = sup.handle_event(
             &SessionPixEvent::UnverifiableShares {
                 ssa_id: id,
@@ -2119,7 +2133,7 @@ mod tests {
         assert!(
             matches!(
                 actions[1],
-                SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)
+                SessionPixAction::Close(SessionPixCloseReason::NoSsaRemaining)
             ),
             "second action should be Close"
         );
@@ -2160,10 +2174,15 @@ mod tests {
         // SSA 2 commitment deadline at start + 20s). The loop processes SSA 1 first
         // (RecoveryDeadline → removed), then SSA 2 (CommitmentTimeout → session close).
         let actions = sup.handle_deadline(start + Duration::from_secs(7200), 5);
-        assert_eq!(actions.len(), 1);
+        assert_eq!(actions.len(), 2, "expected RetireSsa(id1) + Close(RecoveryDeadline)");
+        assert!(
+            matches!(&actions[0], SessionPixAction::RetireSsa(rid) if *rid == id1),
+            "first action should be RetireSsa({id1}), got {:?}",
+            actions[0]
+        );
         // SSA 1 fails with RecoveryDeadline first, so that reason is surfaced.
         assert!(matches!(
-            actions[0],
+            actions[1],
             SessionPixAction::Close(SessionPixCloseReason::RecoveryDeadline)
         ));
         assert!(sup.closed);
