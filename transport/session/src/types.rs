@@ -109,10 +109,11 @@ pub struct AgreedSsaQuota {
 /// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
 #[derive(Debug)]
 pub enum HoprSessionOutPixEvent {
-    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the agreed data quota.
+    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
+    /// agreed data quota.
     ReadyToDeposit(AgreedSsaQuota),
-    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects funds to be
-    /// deposited.
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
+    /// funds to be deposited.
     ///
     /// The attached sender is used to deliver updates once the deposit is completed.
     DepositNeeded(
