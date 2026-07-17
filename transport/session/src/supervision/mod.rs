@@ -15,10 +15,8 @@
 //! cost of a deposit across many packets sent from the Entry to the Exit.
 //! Each SSA requires:
 //!
-//! 1. A **commitment** from the Entry (polynomial coefficients) that the
-//!    Exit can verify.
-//! 2. A **deposit** to an SSA-specific on-chain address before the Exit
-//!    fully trusts the SSA.
+//! 1. A **commitment** from the Entry (polynomial coefficients) that the Exit can verify.
+//! 2. A **deposit** to an SSA-specific on-chain address before the Exit fully trusts the SSA.
 //! 3. **Recovery** of the SSA shares from data packets as they arrive.
 //!
 //! Without supervision, a misbehaving or stalled Entry can hold a session
@@ -64,14 +62,12 @@
 //!
 //! * **Commitment timeout** — time from `SsaRequestSent` to `CommitmentVerified`.
 //! * **Deposit timeout** — time from `CommitmentVerified` to a sufficient deposit.
-//! * **Recovery idle** — time without *useful progress* while service is being
-//!   consumed.
+//! * **Recovery idle** — time without *useful progress* while service is being consumed.
 //! **Service-gated**: if no packets were served since the last
 //!   progress snapshot, the timer re-arms instead of closing (prevents a
 //!   slow-but-honest Entry from being disconnected).
-//! * **Recovery hard deadline** — absolute per-SSA backstop, never extended.
-//!   This is a resource guard (session slot + reconstructor memory), not a
-//!   liveliness mechanism.
+//! * **Recovery hard deadline** — absolute per-SSA backstop, never extended. This is a resource guard (session slot +
+//!   reconstructor memory), not a liveliness mechanism.
 //!
 //! **Fault tracking** — the supervisor tracks unverifiable shares via the
 //! `UnverifiableShares` event (observed as absolute per-SSA totals that may
@@ -116,11 +112,10 @@
 //! the generation-counter [`SlotNotify`] to avoid the two classic
 //! race conditions of waker-vector approaches:
 //!
-//! 1. **Latent wake** — notification between future creation and first
-//!    `poll()` is caught because the generation was captured at creation
-//!    time and compared on `poll()`.
-//! 2. **Spurious `Ready`** — a second `poll()` of an already-registered
-//!    future re-checks the generation; if unchanged it stays `Pending`.
+//! 1. **Latent wake** — notification between future creation and first `poll()` is caught because the generation was
+//!    captured at creation time and compared on `poll()`.
+//! 2. **Spurious `Ready`** — a second `poll()` of an already-registered future re-checks the generation; if unchanged
+//!    it stays `Pending`.
 //!
 //! ## The Worker — bridging pure logic to async
 //!
@@ -133,12 +128,10 @@
 //!
 //! 1. Reads the next deadline from the supervisor.
 //! 2. If the deadline has already expired, calls `handle_deadline` immediately.
-//! 3. Otherwise, waits on the command channel with a timeout set to the
-//!    remaining deadline duration.
+//! 3. Otherwise, waits on the command channel with a timeout set to the remaining deadline duration.
 //! 4. On command received → calls `handle_event` or `action_result`.
 //! 5. On timeout → calls `handle_deadline`.
-//! 6. Forwards resulting actions to the action channel (non-blocking
-//!    `try_send`).
+//! 6. Forwards resulting actions to the action channel (non-blocking `try_send`).
 //!
 //! **Coalescing** — `ProgressNotification` actions are coalescible: when
 //! the action channel is transiently full, they are dropped rather than
@@ -157,16 +150,13 @@
 //! with `Capability::UsePIX`:
 //!
 //! 1. Validates the offered PIX parameters (polys, threshold, quota range).
-//! 2. Spawns the supervisor worker via `spawn_supervisor_worker` (this
-//!    emits the initial `RequestSsa` action and creates the gate).
-//! 3. Reads the initial action, calls `send_ssa_request` on the wire,
-//!    and notifies the supervisor of `SsaRequestSent`.
-//! 4. Stores the supervisor handle and gate in the session slot (via
-//!    `OnceLock`).
-//! 5. Constructs the [`HoprSession`] — the egress adapter acquires the gate
-//!    on every outgoing data packet.
-//! 6. After session publication, spawns the **action driver task** that
-//!    receives actions from `ActionRx` and executes them:
+//! 2. Spawns the supervisor worker via `spawn_supervisor_worker` (this emits the initial `RequestSsa` action and
+//!    creates the gate).
+//! 3. Reads the initial action, calls `send_ssa_request` on the wire, and notifies the supervisor of `SsaRequestSent`.
+//! 4. Stores the supervisor handle and gate in the session slot (via `OnceLock`).
+//! 5. Constructs the [`HoprSession`] — the egress adapter acquires the gate on every outgoing data packet.
+//! 6. After session publication, spawns the **action driver task** that receives actions from `ActionRx` and executes
+//!    them:
 //!
 //!    | Action | Driver behaviour |
 //!    |---|---|
@@ -176,13 +166,10 @@
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
 //!    | `Close` | Poisons gate, retires all SSAs, publishes close metric, removes session slot. |
 //!
-//! 7. PIX protocol events from the packet pipeline arrive via
-//!    `dispatch_pix_event` and are forwarded to the supervisor as
-//!    `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`,
-//!    `AlmostRecovered`, or `Recovered`.
-//! 8. When a commitment becomes verifiable, a `PixDepositObserver` task
-//!    loops on deposit confirmations, forwarding each as
-//!    `DepositConfirmed` to the supervisor.
+//! 7. PIX protocol events from the packet pipeline arrive via `dispatch_pix_event` and are forwarded to the supervisor
+//!    as `SessionPixEvent::RecoveryProgress`, `UnverifiableShares`, `AlmostRecovered`, or `Recovered`.
+//! 8. When a commitment becomes verifiable, a `PixDepositObserver` task loops on deposit confirmations, forwarding each
+//!    as `DepositConfirmed` to the supervisor.
 //!
 //! ### Entry side (outgoing sessions)
 //!

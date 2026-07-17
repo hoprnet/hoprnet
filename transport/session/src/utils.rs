@@ -1,4 +1,10 @@
-use std::time::Duration;
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll, Waker},
+    time::Duration,
+};
 
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_api::types::internal::routing::DestinationRouting;
@@ -13,6 +19,100 @@ use crate::{
     errors::TransportSessionError,
     types::HoprStartProtocol,
 };
+
+/// Runtime-agnostic multi-waker notification primitive.
+///
+/// Uses a generation counter to detect notification events: [`notify_waiters`]
+/// bumps the generation, and [`notified`] futures capture the generation at
+/// creation time, preventing latent wake and spurious-Ready bugs.
+pub struct SlotNotify {
+    inner: parking_lot::Mutex<SlotNotifyInner>,
+}
+
+pub struct SlotNotifyInner {
+    wakers: Vec<(u64, Waker)>,
+    next_id: u64,
+    generation: u64,
+}
+
+impl SlotNotify {
+    pub const fn new() -> Self {
+        Self {
+            inner: parking_lot::Mutex::new(SlotNotifyInner {
+                wakers: Vec::new(),
+                next_id: 0,
+                generation: 0,
+            }),
+        }
+    }
+
+    /// Wake all parked waiters.
+    pub fn notify_waiters(&self) {
+        let mut inner = self.inner.lock();
+        inner.generation += 1;
+        for (_, waker) in inner.wakers.drain(..) {
+            waker.wake();
+        }
+    }
+
+    /// Return a future that completes the next time `notify_waiters` is called.
+    pub fn notified(self: &Arc<Self>) -> SlotNotifyFuture {
+        let generation = self.inner.lock().generation;
+        SlotNotifyFuture {
+            notify: self.clone(),
+            waker_id: 0,
+            registered: false,
+            gen_at_creation: generation,
+        }
+    }
+}
+
+/// Future returned by [`SlotNotify::notified`].
+///
+/// On cancellation (drop without completion), the registered waker is
+/// automatically removed from [`SlotNotify`] so stale entries are never
+/// left behind.
+pub(crate) struct SlotNotifyFuture {
+    notify: Arc<SlotNotify>,
+    waker_id: u64,
+    registered: bool,
+    gen_at_creation: u64,
+}
+
+impl Drop for SlotNotifyFuture {
+    fn drop(&mut self) {
+        if self.registered {
+            self.notify.inner.lock().wakers.retain(|(id, _)| *id != self.waker_id);
+        }
+    }
+}
+
+impl Future for SlotNotifyFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let this = self.get_mut();
+        let mut inner = this.notify.inner.lock();
+
+        if inner.generation != this.gen_at_creation {
+            return Poll::Ready(());
+        }
+
+        if this.registered {
+            // Spurious wake — update waker and stay Pending.
+            if let Some((_, w)) = inner.wakers.iter_mut().find(|(id, _)| *id == this.waker_id) {
+                *w = cx.waker().clone();
+            }
+            return Poll::Pending;
+        }
+
+        this.waker_id = inner.next_id;
+        inner.next_id += 1;
+        inner.wakers.push((this.waker_id, cx.waker().clone()));
+        this.registered = true;
+        Poll::Pending
+    }
+}
 
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
