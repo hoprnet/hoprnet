@@ -629,6 +629,94 @@ impl PixToolbox {
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
+///
+/// ## PIX (Proof-of-Incentive eXchange) Protocol Flow
+///
+/// When a Session is opened with the [`Capability::UsePIX`] flag, the following protocol
+/// runs between the Entry (initiator) and Exit (recipient) to provide on-chain payment
+/// guarantees for the data relayed through the Session.
+///
+/// ### 1. PIX Parameter Negotiation (Session Initiation)
+///
+/// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Secret Sharing
+/// Aggregation) parameters in the upper 32 bits of the `StartSession.additional_data` field:
+/// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
+/// many polynomials and shares each SSA will use, which together define the data quota per SSA.
+///
+/// On the Exit side, `check_pix_params` validates these parameters against:
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
+/// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
+/// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
+///
+/// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
+///
+/// ### 2. Exit SSA Request (`SsaRequest` → Entry)
+///
+/// Once the PIX parameters are accepted, the Exit calls `request_next_ssa`
+/// to create a new SSA commitment via the server-side [`SsaReconstructor`]. This produces an
+/// *Exit commitment* (a group element) that is sent back to the Entry as a
+/// [`SsaServerCommitmentMessage`].
+///
+/// The Exit also installs a *PIX kill switch* — a deadline (`max_deposit_wait` +
+/// `max_ssa_delivery_time`). If no deposit is observed before this deadline, the Session is
+/// closed with `ClosureReason::UnrealizedDeposit`.
+///
+/// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
+///
+/// Upon receiving the [`SsaServerCommitmentMessage`], the Entry's `handle_ssa_request`
+/// generates a *client commitment* using the shared [`SsaShareGenerator`] (which is also
+/// used by the packet pipeline to embed PIX shares into return-path SURBs). The client
+/// commitment is combined with the Exit commitment to derive the on-chain deposit address
+/// via [`HoprPixSpec::group_to_deposit_address`].
+///
+/// The Entry then sends one or more [`SsaClientCommitmentMessage`]s back to the Exit and
+/// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signalling that
+/// funds can be deposited at the computed address.
+///
+/// ### 4. Deposit Awaiting (Exit Side)
+///
+/// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
+/// coefficient commitments into the [`SsaReconstructor`], and extracts the deposit address.
+/// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
+/// [`AgreedSsaQuota`] and a channel to confirm the deposit.
+///
+/// A *deposit awaiter* task waits for the deposit confirmation. Once confirmed, the PIX
+/// kill switch is aborted. If the deposit times out, the kill switch closes the Session.
+///
+/// ### 5. SSA Collection, Recovery and Pipelining
+///
+/// As the Entry sends return-path SURBs during the Session, each SURB can carry a PIX
+/// share generated from the client's polynomial set. The Exit's [`SsaReconstructor`]
+/// collects these shares.
+///
+/// When the reconstructor reaches the *early recovery threshold* (≈85%), an
+/// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires, which triggers
+/// `request_next_ssa` for the next SSA index — pipelining the costly
+/// commitment exchange with the tail of share collection for the current SSA.
+///
+/// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the
+/// Exit to unlock and redeem the deposited funds. The deposit awaiter for the next SSA
+/// replaces the kill switch that was aborted for the previous one.
+///
+/// ### 6. Unverifiable Shares
+///
+/// If the reconstructor receives a share whose proof-of-possession cannot be verified
+/// against its polynomial commitment, an [`HoprSessionInPixEvent::UnverifiableShare`]
+/// event fires. After `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES` (3) such events, the
+/// Session is forcefully closed to prevent a malicious Entry from wasting the Exit's
+/// resources.
+///
+/// ### Configuring PIX at the Exit
+///
+/// The Exit configures PIX via [`IncomingSessionPixConfig`] within [`SessionManagerConfig`]:
+///
+/// - `enforce_pix` — reject Sessions without PIX (default: false).
+/// - `quota_range` — acceptable SSA quota in bytes (default: 128 MB–512 MB).
+/// - `max_ssa_delivery_time` — time to wait for SSA commitment delivery.
+/// - `max_deposit_wait` — time to wait for deposit confirmation.
+///
+/// The [`PixToolbox`] (holding the [`SsaShareGenerator`] and [`SsaReconstructor`]) must
+/// be provided via [`SessionManager::start`] for PIX to function.
 pub struct SessionManager<S> {
     // Keeps track of Session initiations requests on the Client side.
     session_initiations: SessionInitiationCache,
