@@ -88,6 +88,9 @@ harness = false
 name = "validation_bench"
 harness = false
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true, optional = true }
