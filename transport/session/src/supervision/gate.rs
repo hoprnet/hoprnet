@@ -119,6 +119,11 @@ impl ServiceGate {
             let remaining = self.remaining.load(Ordering::Acquire);
 
             if remaining > 0 {
+                // Re-check poison right before CAS so that a concurrent
+                // poison() is not missed between the entry check and here.
+                if self.poisoned.load(Ordering::Acquire) {
+                    return Err(GateClosed);
+                }
                 if self
                     .remaining
                     .compare_exchange(remaining, remaining - 1, Ordering::AcqRel, Ordering::Relaxed)

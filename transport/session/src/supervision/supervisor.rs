@@ -61,6 +61,11 @@ struct PerSsaState {
     // Overlap / deferred-request state.
     next_request_pending_deposit: bool,
     next_requested: bool,
+    /// Set when `Recovered` arrives before deposit confirms (i.e. during
+    /// `AwaitingCommitment` or `AwaitingDeposit`). Once deposit is confirmed
+    /// and the SSA enters `Recovering`, this flag triggers an immediate
+    /// tombstone transition — replaying the deferred `Recovered` event.
+    recovered_pending: bool,
 
     // Service gating.
     served_total_at_last_progress: u64,
@@ -83,6 +88,7 @@ impl PerSsaState {
             accumulated_deposit: HoprBalance::new_base(0),
             next_request_pending_deposit: false,
             next_requested: false,
+            recovered_pending: false,
             served_total_at_last_progress: 0,
         }
     }
@@ -225,7 +231,10 @@ impl SessionPixSupervisor {
 
         // If no SSAs remain, close.
         if self.ssas.is_empty() && !self.closed {
-            actions.push(SessionPixAction::Close(SessionPixCloseReason::NoSsaRemaining));
+            actions.push(SessionPixAction::Close(
+                self.first_failure_reason
+                    .unwrap_or(SessionPixCloseReason::NoSsaRemaining),
+            ));
             self.closed = true;
         }
 
@@ -266,6 +275,7 @@ impl SessionPixSupervisor {
 
         match action {
             SessionPixAction::RequestSsa { .. } if !ok => {
+                self.closed = true;
                 vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)]
             }
             SessionPixAction::Close(_) => {
@@ -363,6 +373,10 @@ impl SessionPixSupervisor {
         ssa.recovery_hard_deadline = now.checked_add(self.cfg.max_recovery_time);
         ssa.served_total_at_last_progress = served_total;
 
+        // If recovery completed before the deposit arrived, immediately
+        // tombstone the SSA — the Recovered event was deferred.
+        let recovered_pending = ssa.recovered_pending;
+
         let pending = ssa.next_request_pending_deposit;
         if pending {
             ssa.next_request_pending_deposit = false;
@@ -372,12 +386,19 @@ impl SessionPixSupervisor {
 
         let mut actions = Vec::new();
 
+        if recovered_pending {
+            actions.extend(self.perform_recovered_transition(idx, now));
+        }
+
         if !self.release_service_emitted {
             self.release_service_emitted = true;
             actions.push(SessionPixAction::ReleaseService);
         }
 
         if pending {
+            // When recovered_pending is also set, perform_recovered_transition
+            // won't emit RequestSsa (next_requested is already set by
+            // on_recovered), so emit it here.
             actions.extend(self.emit_request_next_ssa(now));
         }
 
@@ -481,10 +502,15 @@ impl SessionPixSupervisor {
                 self.ssas[idx].next_request_pending_deposit = true;
                 Vec::new()
             }
-            // AwaitingCommitment or unknown phase: do not set next_requested.
-            // The next SSA will be requested when on_recovered transitions to
-            // the tombstone phase, which checks next_requested independently.
-            _ => Vec::new(),
+            // AwaitingCommitment or unknown phase: the next SSA request will be
+            // triggered when the recovered transition fires (normal Recovering
+            // path or deferred replay via recovered_pending). Set the deferred
+            // flag so that commitment_verified can propagate it forward.
+            _ => {
+                self.ssas[idx].next_request_pending_deposit = true;
+                self.ssas[idx].next_requested = true;
+                Vec::new()
+            }
         }
     }
 
@@ -500,36 +526,58 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Only accept recovery completion from the Recovering phase.
-        // Recovered arriving in AwaitingCommitment or AwaitingDeposit
-        // means recovery outpaced commitment/deposit notification —
-        // ignore, the normal lifecycle transition will handle it when
-        // those events arrive.
         match self.ssas[idx].phase {
-            SsaPhase::Recovering => {}
-            _ => return Vec::new(),
+            SsaPhase::Recovering => {
+                // Normal path — transition to tombstone directly.
+                self.perform_recovered_transition(idx, now)
+            }
+            SsaPhase::AwaitingDeposit => {
+                // Recovery completed before deposit confirmed. Record the
+                // pending flag so that when the deposit arrives we replay
+                // the transition immediately after entering Recovering.
+                self.ssas[idx].recovered_pending = true;
+                // Also ensure the next SSA request is deferred — the
+                // eventual tombstone will emit it.
+                if !self.ssas[idx].next_requested {
+                    self.ssas[idx].next_request_pending_deposit = true;
+                    self.ssas[idx].next_requested = true;
+                }
+                Vec::new()
+            }
+            SsaPhase::AwaitingCommitment => {
+                // Recovery outpaced commitment verification. Same semantics
+                // as AwaitingDeposit: set pending flag so the transition
+                // replays once commitment and deposit have both arrived.
+                self.ssas[idx].recovered_pending = true;
+                Vec::new()
+            }
+            // Closing / already Recovered: handled by the terminal guard above.
+            _ => Vec::new(),
         }
+    }
 
+    /// Perform the terminal tombstone transition for a fully-recovered SSA.
+    /// Called from `on_recovered` (normal Recovering path) and replayed from
+    /// `on_deposit_confirmed`/`on_commitment_verified` when `recovered_pending`
+    /// was set earlier.
+    fn perform_recovered_transition(&mut self, idx: usize, now: Instant) -> Vec<SessionPixAction> {
         let next_requested = self.ssas[idx].next_requested;
 
         // Transition to tombstone.
         self.ssas[idx].phase = SsaPhase::Recovered {
             tombstone_until: now
                 .checked_add(self.cfg.tombstone_retention_window)
-                // The config validation caps all durations below overflow,
-                // so checked_add should never fail in practice. Belt-and-
-                // suspenders fallback: ~1 year in the future.
                 .unwrap_or_else(|| now + Duration::from_secs(86400 * 365)),
         };
         self.ssas[idx].commitment_deadline = None;
         self.ssas[idx].deposit_deadline = None;
         self.ssas[idx].recovery_idle_deadline = None;
         self.ssas[idx].recovery_hard_deadline = None;
+        self.ssas[idx].recovered_pending = false;
 
         let mut actions = Vec::new();
         if !next_requested {
             self.ssas[idx].next_requested = true;
-            // Dropping the borrow on ssas[index] before emit_request_next_ssa.
             actions.extend(self.emit_request_next_ssa(now));
         }
 
@@ -649,6 +697,7 @@ impl SessionPixSupervisor {
         let ssa_index = match SsaIndex::try_from(index) {
             Ok(i) => i,
             Err(_) => {
+                self.closed = true;
                 return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
             }
         };
@@ -2328,6 +2377,77 @@ mod tests {
         // Recovered arrives before DepositConfirmed — should be ignored.
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id), now, 0);
         assert!(actions.is_empty(), "recovered before deposit should be ignored");
+    }
+
+    /// A fully recovered and subsequently funded SSA must not lead to the
+    /// session being closed with `RecoveryIdle`. The `Recovered` event
+    /// arriving during `AwaitingDeposit` is deferred via `recovered_pending`
+    /// — once the deposit confirms and the SSA enters `Recovering`, the
+    /// deferred tombstone transition fires immediately, retiring the SSA
+    /// deadlines cleanly so the idle deadline can never fire.
+    #[test]
+    fn recovered_before_deposit_then_funded_session_survives() {
+        let p = pseudonym();
+        let start = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(2, 2), p, start);
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+
+        // Entry delivered all shares before the on-chain deposit confirmed.
+        // Recovered arrives while still AwaitingDeposit — deferred.
+        sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
+
+        // The deposit confirms — triggers deferred tombstone + RequestSsa.
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            10,
+        );
+        assert!(!sup.closed, "session must be alive after funding");
+
+        // The first SSA should have been tombstoned (not stuck in Recovering).
+        let ssa1_phase = sup.ssas.iter().find(|s| s.ssa_id == id).map(|s| &s.phase);
+        assert!(
+            matches!(ssa1_phase, Some(SsaPhase::Recovered { .. })),
+            "SSA 1 should be tombstoned, got {ssa1_phase:?}"
+        );
+
+        // A RequestSsa for the next SSA must have been emitted (so the
+        // driver can start the successor).
+        let next_id = ssa_id(p, 2);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::RequestSsa { ssa_id, .. } if *ssa_id == next_id)),
+            "expected RequestSsa for SSA 2, got actions: {actions:?}"
+        );
+
+        // The idle deadline fires well past max_recovery_idle. Since SSA 1
+        // is a tombstone (deadlines are None), it should not trigger any
+        // close. (No successor SSA state exists yet since the driver hasn't
+        // sent back SsaRequestSent, so the drain path would retire the
+        // tombstone and close with NoSsaRemaining — but that's a separate
+        // concern from the bug we're fixing: the supervisor must not close
+        // with RecoveryIdle.)
+        let deadline_actions = sup.handle_deadline(start + Duration::from_secs(61), 100);
+        assert!(
+            !deadline_actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle))),
+            "must not close with RecoveryIdle, got: {deadline_actions:?}"
+        );
     }
 
     #[test]

@@ -21,7 +21,7 @@ include = [
 ]
 
 [features]
-default = ["hashbrown"]
+default = ["hashbrown", "runtime-tokio"]
 all-benchmarks = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 telemetry = ["dep:auto_impl", "hopr-types/telemetry", "dep:lazy_static"]

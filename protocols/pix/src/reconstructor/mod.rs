@@ -129,7 +129,7 @@ pub struct SsaReconstructor<S: PixSpec> {
     pending_ack_keys: moka::sync::Cache<HalfKeyChallenge, (OffchainPublicKey, HalfKey)>,
     /// Dedicated TTL-only cache for per-SSA counters (no TTI).
     /// Counters survive builder/verifier eviction.
-    ssa_counters: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<std::sync::Mutex<SsaCounterEntry>>>,
+    ssa_counters: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaCounterEntry>>>,
     ssa_to_verifier_ids: SsaVerifierMap<S>,
     cfg: SsaReconstructorConfig,
 }
@@ -207,7 +207,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Updates the per-SSA counter for a useful share.
     fn record_useful_share(&self, ssa_id: &SsaId<S::Pseudonym>) {
         if let Some(entry) = self.ssa_counters.get(ssa_id) {
-            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            let mut entry = entry.lock();
             entry.useful_shares += 1;
         }
     }
@@ -215,27 +215,24 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Updates the per-SSA counter for a completed polynomial part.
     fn record_completed_part(&self, ssa_id: &SsaId<S::Pseudonym>) {
         if let Some(entry) = self.ssa_counters.get(ssa_id) {
-            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            let mut entry = entry.lock();
             entry.recovered_polynomials += 1;
         }
     }
 
-    /// Updates the per-peer invalid-share counter for an SSA and returns the absolute total.
-    fn record_invalid_share(&self, peer: &OffchainPublicKey, ssa_id: &SsaId<S::Pseudonym>) -> u64 {
+    /// Updates the per-peer invalid-share counter for an SSA.
+    fn record_invalid_share(&self, peer: &OffchainPublicKey, ssa_id: &SsaId<S::Pseudonym>) {
         if let Some(entry) = self.ssa_counters.get(ssa_id) {
-            let mut entry = entry.lock().expect("ssa counter lock poisoned");
+            let mut entry = entry.lock();
             entry.invalid_total += 1;
-            let count = entry.invalid_by_peer.entry(*peer).or_insert(0);
-            *count += 1;
-            return *count;
+            let _ = entry.invalid_by_peer.entry(*peer).and_modify(|c| *c += 1).or_insert(1);
         }
-        1
     }
 
     /// Returns a snapshot of current progress for the given SSA, if a counter entry exists.
     fn snapshot_progress(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<SsaRecoveryProgress<S::Pseudonym>> {
         let entry = self.ssa_counters.get(ssa_id)?;
-        let e = entry.lock().expect("ssa counter lock poisoned");
+        let e = entry.lock();
         Some(SsaRecoveryProgress {
             ssa_id: *ssa_id,
             useful_shares: e.useful_shares,
@@ -486,7 +483,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 // and re-commitment) is not clobbered — counters must survive across
                 // builder invalidation for the full TTL duration.
                 self.ssa_counters.get_with(ssa_id, || {
-                    std::sync::Arc::new(std::sync::Mutex::new(SsaCounterEntry {
+                    std::sync::Arc::new(parking_lot::Mutex::new(SsaCounterEntry {
                         useful_shares: 0,
                         target_useful_shares: target,
                         recovered_polynomials: 0,
@@ -614,7 +611,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 .ssa_counters
                 .get(ssa_id)
                 .map(|entry| {
-                    let e = entry.lock().expect("ssa counter lock poisoned");
+                    let e = entry.lock();
                     e.invalid_total
                 })
                 .unwrap_or(0);
@@ -1802,7 +1799,7 @@ mod tests {
 
         // Verify counter contents survived with recorded values
         let entry = reconstructor.ssa_counters.get(&ssa_id).unwrap();
-        let e = entry.lock().expect("lock");
+        let e = entry.lock();
         assert_eq!(
             e.useful_shares, 1,
             "recorded useful share must survive builder eviction"
