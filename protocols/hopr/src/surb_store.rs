@@ -404,4 +404,62 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn surb_ring_buffer_len_reflects_push_and_pop() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+        assert!(rb.is_empty());
+        assert_eq!(0, rb.len());
+
+        rb.push([([1u8; 8], 0)]);
+        assert!(!rb.is_empty());
+        assert_eq!(1, rb.len());
+
+        rb.push([([2u8; 8], 0)]);
+        assert_eq!(2, rb.len());
+
+        let _ = rb.pop_one();
+        assert_eq!(1, rb.len());
+
+        let _ = rb.pop_one();
+        assert!(rb.is_empty());
+        assert_eq!(0, rb.len());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_surb_count() -> anyhow::Result<()> {
+        use hopr_api::types::internal::prelude::HoprPseudonym;
+        use hopr_crypto_packet::prelude::HoprSurb;
+
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            rb_capacity: 100,
+            ..Default::default()
+        });
+        let pseudonym = HoprPseudonym::random();
+
+        // Unknown pseudonym returns 0
+        assert_eq!(0, store.surb_count(&pseudonym));
+
+        // Insert SURBs
+        let surbs: Vec<(HoprSurbId, HoprSurb)> = (0..5)
+            .map(|i| {
+                let id = HoprSurbId::new([i as u8; 8]);
+                (id, HoprSurb::random())
+            })
+            .collect();
+        store.insert_surbs(pseudonym, surbs);
+        assert_eq!(5, store.surb_count(&pseudonym));
+
+        // Pop one
+        let _found = store.find_surb(SurbMatcher::Pseudonym(pseudonym));
+        assert_eq!(4, store.surb_count(&pseudonym));
+
+        // Unknown pseudonym still returns 0
+        let other = HoprPseudonym::random();
+        assert_eq!(0, store.surb_count(&other));
+
+        Ok(())
+    }
 }

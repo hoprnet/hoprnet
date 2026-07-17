@@ -4,12 +4,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use hopr_protocol_pix::SsaIndex;
 use hopr_protocol_session::SessionMessageDiscriminants;
 
 pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
-use crate::{
-    Capability, HoprSessionConfig, SessionId, supervision::SessionPixCloseReason, types::SESSION_SOCKET_CAPACITY,
-};
+use crate::{Capability, HoprSessionConfig, SessionId, types::SESSION_SOCKET_CAPACITY};
 
 /// Wrapper type to implement SessionTelemetryTracker for SessionId (HoprPseudonym).
 /// This is needed to satisfy the orphan rule - we can only implement external traits
@@ -181,15 +180,10 @@ lazy_static::lazy_static! {
         "PIX egress gate mode: 0=predeposit, 1=funded",
         &["session_id"]
     ).unwrap();
-    static ref METRIC_SESSION_PIX_CLOSE_REASON_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
-        "hopr_session_pix_close_reason_total",
-        "PIX supervisor close reason by session",
-        &["session_id", "reason"]
-    ).unwrap();
     static ref METRIC_SESSION_PIX_CURRENT_SSA_PHASE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_pix_current_ssa_phase",
-        "Current PIX SSA phase: 0=AwaitingCommitment, 1=AwaitingDeposit, 2=Recovering, 3=Recovered",
-        &["session_id"]
+        "Current PIX SSA phase per SSA: 0=AwaitingCommitment, 1=AwaitingDeposit, 2=Recovering, 3=Recovered",
+        &["session_id", "ssa_index"]
     ).unwrap();
     static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_pix_recovery_progress",
@@ -303,12 +297,13 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     refresh_lifetime_metrics(&session_id, now, now, now);
 }
 
-pub fn remove_session_metrics_state(session_id: &SessionId) {
+pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
-    METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], 0.0);
-    METRIC_SESSION_PIX_CURRENT_SSA_PHASE.set(&[session_id_str], 0.0);
-    METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], 0.0);
+    if has_pix {
+        METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], 0.0);
+        METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], 0.0);
+    }
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
@@ -398,11 +393,6 @@ pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
     METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], if funded { 1.0 } else { 0.0 });
 }
 
-pub fn record_pix_close_reason(session_id: &SessionId, reason: &SessionPixCloseReason) {
-    let session_id_str: &str = session_id.as_ref();
-    METRIC_SESSION_PIX_CLOSE_REASON_TOTAL.increment(&[session_id_str, &reason.to_string()]);
-}
-
 /// Encodes the supervisor SSA phase as a numeric value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -413,9 +403,9 @@ pub enum PixSsaPhase {
     Recovered = 3,
 }
 
-pub fn set_pix_current_ssa_phase(session_id: &SessionId, phase: PixSsaPhase) {
+pub fn set_pix_current_ssa_phase(session_id: &SessionId, ssa_index: SsaIndex, phase: PixSsaPhase) {
     let session_id_str: &str = session_id.as_ref();
-    METRIC_SESSION_PIX_CURRENT_SSA_PHASE.set(&[session_id_str], phase as u8 as f64);
+    METRIC_SESSION_PIX_CURRENT_SSA_PHASE.set(&[session_id_str, &ssa_index.to_string()], phase as u8 as f64);
 }
 
 pub fn set_pix_recovery_progress(session_id: &SessionId, progress: f64) {

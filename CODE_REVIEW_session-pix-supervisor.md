@@ -13,7 +13,38 @@ drop-safe worker/driver teardown paths all hold up under tracing. Prior review r
 remain, both **confirmed with failing unit tests** (reproduced on this branch, then removed
 from the tree; the tests are embedded below).
 
-Findings are sorted by severity. Line numbers refer to the branch HEAD (`13af142125`).
+Findings are sorted by severity. Line numbers in the original findings refer to `13af142125`.
+
+---
+
+## Re-review (2026-07-17, branch HEAD `21c876cde4`)
+
+Two commits landed after the original review: `b3154a3af7` (per-session PIX supervisor
+telemetry) and `21c876cde4` (mitigations for the findings below, including committed
+regression tests for HIGH-1 and HIGH-2). Each fix was re-verified against the actual code, the
+full unit suites were re-run (`hopr-transport-session`: 192 passed, `hopr-protocol-pix`:
+34 passed), `cargo check -p hopr-protocol-session` / `-p hopr-transport-session` /
+`--features telemetry` all pass, and clippy is warning-only. Additionally, three scratch tests
+probing HIGH-1 event orderings _not_ covered by the committed regression test
+(`Recovered` before `CommitmentVerified`; `AlmostRecovered`+`Recovered` both before the
+deposit; `AlmostRecovered` before `CommitmentVerified`) all pass — the deferral logic holds
+the "exactly one successor request" invariant on every path.
+
+| Finding  | Status                   | Notes                                                                                                                                           |
+| -------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| HIGH-1   | ✅ Fixed                 | `recovered_pending` deferral + replay in `on_deposit_confirmed`; regression test committed; extra orderings verified                            |
+| HIGH-2   | ✅ Fixed                 | Params stored in `new_session`, bounds check + quota check restored; regression test committed. Residual: dims not compared exactly (see below) |
+| MEDIUM-1 | ❌ **Still open**        | Only comments changed; a user-held writer still hangs forever — **new failing test embedded below**                                             |
+| MEDIUM-2 | ✅ Fixed                 | `deposit_forwarded` flag → silent observer exit after first forwarded deposit                                                                   |
+| MEDIUM-3 | ✅ Fixed                 | `parking_lot::Mutex` swap; unused return of `record_invalid_share` dropped                                                                      |
+| MEDIUM-4 | ✅ Fixed (with residual) | Standalone checks pass; but the `default` feature addition is inert for workspace consumers (see below)                                         |
+| LOW-1    | ✅ Fixed                 | `first_failure_reason.unwrap_or(NoSsaRemaining)` in the drain path                                                                              |
+| LOW-2    | ✅ Fixed                 | `self.closed = true` latched in both branches                                                                                                   |
+| LOW-3    | ✅ Fixed                 | Pre-CAS poison re-check added to the predeposit path                                                                                            |
+| LOW-4    | ❌ Open                  | `on_ssa_request_sent` unchanged — still re-creates state for any untracked SSA id                                                               |
+| LOW-5    | ❌ Open                  | All four caches still capacity-bounded by `MAX_POLYS_PER_SSA + 1`                                                                               |
+| LOW-6    | 🆕 New                   | Per-session SSA-phase gauge conflates concurrent SSAs (telemetry commit)                                                                        |
+| LOW-7    | 🆕 New                   | Metrics lifecycle: PIX series created for non-PIX sessions; unbounded per-session close-reason counter labels                                   |
 
 ---
 
@@ -122,6 +153,23 @@ discarding them, and replay them when the phase catches up:
 
 The existing tests `recovered_before_commitment_is_ignored` / `recovered_before_deposit_is_ignored`
 only pin "no immediate action", so the replay behavior can be added without breaking them.
+
+> **Re-review status: ✅ Fixed in `21c876cde4`.** Implemented exactly as suggested:
+> `PerSsaState.recovered_pending` is set when `Recovered` arrives in `AwaitingCommitment`/
+> `AwaitingDeposit` (the flag survives `on_commitment_verified` untouched) and
+> `on_deposit_confirmed` replays it via the new `perform_recovered_transition`.
+> `on_almost_recovered`'s `AwaitingCommitment` arm now also defers the successor request.
+> Verified invariants: every site that sets `next_request_pending_deposit` also sets
+> `next_requested`, so the replay path and the `pending` path can never both emit
+> `RequestSsa` (no double successor); `on_deposit_confirmed` / `on_almost_recovered` are
+> guarded by phase / `is_terminal()`, so tombstones cannot be resurrected or trigger stray
+> requests. The regression test `recovered_before_deposit_then_funded_session_survives` is
+> committed and passes. During re-review three additional scratch tests confirmed the
+> orderings the committed test doesn't cover (`Recovered` before `CommitmentVerified`;
+> `AlmostRecovered`+`Recovered` before deposit; `AlmostRecovered` before
+> `CommitmentVerified`) all yield exactly one successor request and no `RecoveryIdle` close.
+> _Optional hardening:_ commit the `Recovered`-before-`CommitmentVerified` variant as a test,
+> since that deferral hop (flag surviving two phase transitions) is otherwise untested.
 
 ---
 
@@ -249,6 +297,25 @@ INFO ... generated client SSA commitment and deposit address ssa_index=1
    `check_pix_params`.
 4. Delete the dead `_negotiated_polys`/`_negotiated_shares` bindings.
 
+> **Re-review status: ✅ Fixed in `21c876cde4`.** All four points implemented:
+> `new_session` pre-populates the slot's `ssa_params` OnceLock with the offered params (shared
+> across both slot-construction sites), `handle_ssa_request` errors out when the lock is empty
+> ("PIX was not negotiated"), the `MAX_POLYS_PER_SSA` / `MAX_POLY_THRESHOLD` bounds check is in
+> place, and the dead bindings are gone. The regression test
+> `entry_rejects_exit_dictated_ssa_params` is committed and passes.
+>
+> **Residual (LOW): dims are still compared via the quota product, which is not injective.**
+> `pix_params_to_quota(polys, shares) = polys × shares × PAYLOAD_SIZE`
+> (`transport/session/src/types.rs:94`), so an Exit answering with _transposed_ dimensions
+> (e.g. offered 4×2, answered 2×4 — same product, within bounds) still passes. The quota the
+> Entry reports upward now comes from `our_params`, so the price can no longer be inflated —
+> the residual effect is only a dims mismatch between the Entry's generator and the Exit's
+> claimed reconstructor dims (share verification then fails Exit-side → recovery stalls →
+> session closes after the Entry deposited; griefing power a malicious Exit already has).
+> Since the offered dims are now stored in the slot, compare them exactly:
+> `our_params.polys_per_ssa != msg.polys_per_ssa() || our_params.shares_per_poly != msg.shares_per_poly()`
+> — strictly stronger and makes the quota comparison redundant.
+
 ---
 
 ## MEDIUM-1 — Egress writes against a poisoned gate hang forever instead of erroring; `CrossfireSinkError::GateClosed` is dead code
@@ -275,6 +342,114 @@ generic over `S::Error`, so either constrain `S::Error: From<GateClosed>`-style,
 egress sink in a fallible adapter closer to where the concrete sink type is known). At minimum,
 fix the comments and remove the dead enum variant so the actual behavior (hang until the caller
 drops the session in reaction to the closure notification) is documented truthfully.
+
+> **Re-review status: ❌ Still open** (`21c876cde4` changed only the comments). The behavior is
+> unchanged: a writer holding the `HoprSession` object parks forever on `pending()` after the
+> supervisor closes the session. Worse, the updated comments now claim _"they will hang on
+> `pending()` until the session teardown aborts their task"_ — which is only true for
+> manager-spawned pump tasks tracked in `abort_handles`; the user's own task holding the
+> session write half is never aborted by teardown. `CrossfireSinkError::GateClosed` was kept
+> as `#[allow(dead_code)]` instead of removed or used.
+>
+> **Failing test** (drop into `manager.rs`'s `mod tests`; fails on `21c876cde4` with
+> `write into a PIX-closed session must error out, got Err(Elapsed(()))` — the write+flush
+> never resolves and the 2 s timeout elapses):
+>
+> ```rust
+> /// A writer holding the session object must observe an error (not hang
+> /// forever) when the PIX supervisor closes the session and poisons the
+> /// egress gate. Currently the egress adapter parks on `pending()`, so a
+> /// one-way writer that never reads hangs indefinitely.
+> #[test_log::test(tokio::test)]
+> async fn writer_on_poisoned_gate_errors_out() -> anyhow::Result<()> {
+>     use futures::AsyncWriteExt;
+>     use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+>     use hopr_protocol_start::StartInitiation;
+>
+>     let ssa_gen_config = SsaGeneratorConfig {
+>         polynomials_per_ssa: 2,
+>         threshold: 2,
+>         surplus_shares: 1,
+>     };
+>
+>     let (pix_toolbox, _) = PixToolbox::new(
+>         SsaShareGenerator::new(ssa_gen_config).into(),
+>         SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+>     );
+>
+>     let mgr = SessionManager::new(SessionManagerConfig {
+>         pix_config: IncomingSessionPixConfig {
+>             quota_range: 0..=1024 * 1024 * 1024,
+>             supervisor_cfg: SupervisorConfig {
+>                 max_unverifiable_shares_per_session: 0,
+>                 ..Default::default()
+>             },
+>             ..Default::default()
+>         },
+>         ..Default::default()
+>     });
+>
+>     let mut bob_transport = MockMsgSender::new();
+>     bob_transport
+>         .expect_send_message()
+>         .returning(|_, _| Box::pin(async { Ok(()) }));
+>
+>     let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
+>     let (new_session_tx, mut new_session_rx) = futures::channel::mpsc::channel(1);
+>     mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+>
+>     let alice_pseudonym = HoprPseudonym::random();
+>     mgr.handle_incoming_session_initiation(
+>         alice_pseudonym,
+>         StartInitiation {
+>             challenge: MIN_CHALLENGE,
+>             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+>             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+>             additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+>         },
+>     )
+>     .await?;
+>
+>     // This is the session object the target/user task owns and writes into.
+>     let mut session = new_session_rx.next().await.expect("incoming session").session;
+>
+>     // Dispatch one unverifiable share → triggers close (max=0).
+>     let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
+>     mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+>         ssa_id,
+>         observed_total: 1,
+>     })
+>     .await?;
+>
+>     // Yield to let the action driver process the close.
+>     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+>     assert!(mgr.active_sessions().is_empty(), "session must be closed");
+>
+>     // A write + flush into the closed session must resolve with an error
+>     // within a bounded time; it must not park forever.
+>     let payload = vec![0xAB_u8; 4096];
+>     let res = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+>         session.write_all(&payload).await?;
+>         session.flush().await
+>     })
+>     .await;
+>
+>     assert!(
+>         matches!(res, Ok(Err(_))),
+>         "write into a PIX-closed session must error out, got {res:?}"
+>     );
+>
+>     Ok(())
+> }
+> ```
+>
+> Observed failure:
+>
+> ```
+> ERROR hopr_transport_session::manager: pix supervisor closed session ... reason=TooManyUnverifiableShares
+> thread '...' panicked at transport/session/src/manager.rs:
+> write into a PIX-closed session must error out, got Err(Elapsed(()))
+> ```
 
 ---
 
@@ -307,6 +482,15 @@ top-up payments are meant to be supported, arm the per-iteration timeout only wh
 accumulated amount is insufficient (or let the `RetireSsa` abort be the sole terminator and
 drop the timeout entirely once a deposit was seen).
 
+> **Re-review status: ✅ Fixed in `21c876cde4`** via the `deposit_forwarded` flag (first
+> mitigation option): after any forwarded deposit, the timeout branch exits with `debug!` and
+> no `DepositObserverClosed`. Two accepted consequences, both benign: (1) a top-up installment
+> arriving more than `max_deposit_wait` after the first is still unobserved — inherent to this
+> mitigation option; (2) when the _first_ deposit is below `min_deposit`, the observer now also
+> exits silently, but the supervisor's deposit deadline stays armed (`on_deposit_confirmed`
+> returns early on insufficiency without clearing it — verified), so the session still closes,
+> with `DepositTimeout` instead of `DepositObserverClosed`.
+
 ---
 
 ## MEDIUM-3 — `std::sync::Mutex` + `expect("lock poisoned")` in reconstructor counters (project-rule violation, poison-cascade panic)
@@ -325,6 +509,10 @@ pipeline crash. `record_invalid_share` also returns the per-peer count that no c
 
 **Suggested mitigation.** Use `parking_lot::Mutex` (no poisoning, matches surrounding code and
 project rules); drop the unused return value of `record_invalid_share`.
+
+> **Re-review status: ✅ Fixed in `21c876cde4`.** All lock sites converted to
+> `parking_lot::Mutex` (no `std::sync::Mutex` remains in the file) and the unused return value
+> of `record_invalid_share` was removed.
 
 ---
 
@@ -359,6 +547,19 @@ runtime-less builds, or make `hopr_utils::runtime::prelude::spawn` available run
 (which was the stated goal of the crossfire refactor), or add `runtime-tokio` to the crate's
 default features until the socket module is actually runtime-agnostic.
 
+> **Re-review status: ✅ Fixed in `21c876cde4`** (third mitigation option) — verified:
+> `cargo check -p hopr-protocol-session` and `cargo check -p hopr-transport-session` both pass.
+>
+> **Residual worth knowing:** the workspace root pins
+> `hopr-protocol-session = { ..., default-features = false }` (`Cargo.toml:209`), so the
+> `default = [..., "runtime-tokio"]` addition is **inert for every workspace consumer** — what
+> actually fixed `-p hopr-transport-session` is the explicit `"runtime-tokio"` added to its
+> dependency features in `transport/session/Cargo.toml`. The default addition only helps the
+> standalone check and external consumers using default features. The four unconditional
+> `spawn` call sites in `socket/` remain, so the crate is still not runtime-agnostic: any new
+> workspace consumer that doesn't (transitively) enable `runtime-tokio` will hit the same
+> compile break. Fine as a stopgap; the `#[cfg]`-gating of the spawn sites is still the real fix.
+
 ---
 
 ## LOW-1 — `handle_deadline`'s `NoSsaRemaining` close ignores `first_failure_reason`
@@ -372,6 +573,8 @@ later tombstones and expires → session closes reporting `NoSsaRemaining`, hidi
 cause (and the `hopr_session_pix_closures_total` metric is binned under the wrong reason).
 
 **Mitigation:** `actions.push(SessionPixAction::Close(self.first_failure_reason.unwrap_or(SessionPixCloseReason::NoSsaRemaining)))`.
+
+> **Re-review status: ✅ Fixed in `21c876cde4`** exactly as suggested.
 
 ---
 
@@ -389,6 +592,10 @@ the driver's feedback loop to latch `closed`.
 
 **Mitigation:** set `self.closed = true` whenever a `Close` action is emitted.
 
+> **Re-review status: ✅ Fixed in `21c876cde4`** — both the `SsaIndex::try_from` error branch
+> in `emit_request_next_ssa` and the `RequestSsa { ok: false }` branch in `action_result` now
+> latch `self.closed = true` before emitting `Close`.
+
 ---
 
 ## LOW-3 — `ServiceGate::acquire` predeposit path lacks the pre-CAS poison re-check the funded path has
@@ -399,6 +606,9 @@ The funded path re-checks `poisoned` immediately before the CAS ("so that a conc
 is not missed between the entry check and here"); the predeposit path does not, so a packet can
 be admitted after `poison()` returns. The documented at-most-one-straggler semantics arguably
 cover it, but the asymmetry is unintentional — add the same re-check before the predeposit CAS.
+
+> **Re-review status: ✅ Fixed in `21c876cde4`** — the predeposit path now has the same
+> pre-CAS `poisoned` re-check as the funded path.
 
 ---
 
@@ -417,6 +627,9 @@ this is latent — but the guard comment claims idempotency while actually being
 (track a small set/watermark of retired indices), or restrict acceptance to the index of the
 most recent `RequestSsa` action.
 
+> **Re-review status: ❌ Open** — `on_ssa_request_sent` is unchanged in `21c876cde4` (still
+> latent: the driver emits the event exactly once per request today).
+
 ---
 
 ## LOW-5 — Reconstructor counter caches are globally capacity-bounded by an unrelated constant
@@ -431,6 +644,73 @@ evicts counters for live sessions: progress snapshots stop (supervisor sees a st
 then only fall away via TTI). Not reachable at today's `maximum_sessions` defaults, but the
 bound should be derived from `maximum_sessions × 3` (2 live + 1 tombstone SSA per session) or
 passed in explicitly.
+
+> **Re-review status: ❌ Open** — all four caches in `21c876cde4` are still built with
+> `CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)`
+> (`protocols/pix/src/reconstructor/mod.rs:152-173`).
+
+---
+
+## LOW-6 (new, `b3154a3af7`) — `hopr_session_pix_current_ssa_phase` conflates concurrent SSAs and is wired from four unrelated call sites
+
+**Files:**
+
+- `transport/session/src/telemetry.rs:408-420` (`PixSsaPhase`, `set_pix_current_ssa_phase`)
+- `transport/session/src/manager.rs` — call sites: supervisor setup (`AwaitingCommitment`, first
+  SSA only), `handle_ssa_commit` (`AwaitingDeposit`, any SSA), the action driver's
+  `ReleaseService` arm (`Recovering`, fires **once per session**), `dispatch_pix_event`
+  (`Recovered`, any SSA)
+
+**Defect.** The gauge is keyed by `session_id` only, but a PIX session holds up to 2 live + 1
+tombstone SSAs concurrently (supervisor invariant). The four write sites each describe a
+_different_ SSA, so during normal SSA overlap the value flip-flops between phases of different
+SSAs: after SSA 1 recovers the gauge reads `Recovered (3)` while the active successor is mid
+`AwaitingDeposit`/`Recovering`; successor SSAs never produce `Recovering` at all (that value is
+only written from `ReleaseService`, which is emitted once per session for the first funding).
+The metric can't be used for the phase-monitoring purpose its name and help text suggest.
+
+**Suggested mitigation.** Either key the gauge additionally by `ssa_index` (and clear the
+series on `RetireSsa`), or derive the value in a single place — e.g. the action driver
+reporting "phase of the newest live SSA" from a supervisor snapshot — instead of scattering
+best-effort writes across four handlers.
+
+**Failing unit test:** not applicable — every call site is compiled out under
+`#[cfg(all(feature = "telemetry", not(test)))]`, so the behavior is untestable from unit tests
+by construction.
+
+---
+
+## LOW-7 (new, `b3154a3af7`) — metrics lifecycle: PIX series created for non-PIX sessions; per-session close-reason counter labels grow unboundedly
+
+**Files:**
+
+- `transport/session/src/telemetry.rs:306-311` (`remove_session_metrics_state`)
+- `transport/session/src/telemetry.rs:186-190` + `:398-401`
+  (`hopr_session_pix_close_reason_total` / `record_pix_close_reason`)
+
+**Defect.**
+
+1. `remove_session_metrics_state` unconditionally does `.set(&[session_id], 0.0)` on the three
+   new PIX gauges for **every** closing session. Setting a labeled gauge creates the series, so
+   every plain non-PIX session now spawns three `hopr_session_pix_*` series (value 0) at
+   teardown — cardinality pollution and misleading dashboards ("this session had a PIX gate in
+   predeposit mode").
+2. `hopr_session_pix_close_reason_total` is a `MultiCounter` keyed by `session_id × reason`.
+   Counters cannot be unregistered, so one series accumulates per closed PIX session for the
+   node's lifetime. Each session closes exactly once with exactly one reason, and the
+   aggregate `hopr_session_pix_closures_total` (by reason) plus the existing error-level log
+   line (with `session_id` and `reason`) already carry the same information.
+
+**Suggested mitigation.** Guard the PIX-gauge zeroing on the slot actually having PIX state
+(e.g. `pix_egress_gate.get().is_some()`); drop `hopr_session_pix_close_reason_total` in favor
+of the aggregate + log, or make it a per-session gauge that `remove_session_metrics_state`
+clears.
+
+**Failing unit test:** not applicable — same `cfg(not(test))` gating as LOW-6.
+
+**Nit (same commit):** `set_pix_recovery_progress(&session_id, …)` and
+`set_pix_current_ssa_phase(&session_id, …)` in `dispatch_pix_event` (manager.rs:1680, 1695)
+trigger clippy `needless_borrow`-family warnings under `--features telemetry`.
 
 ---
 
@@ -454,13 +734,33 @@ passed in explicitly.
 
 ## Reproduction commands
 
-```bash
-# after inserting the HIGH-1 test into supervisor.rs's test module:
-cargo nextest run -p hopr-transport-session --lib recovered_before_deposit_then_funded
+> **Re-review update:** the HIGH-1 and HIGH-2 tests are now **committed** (in `21c876cde4`) and
+> pass — they serve as regression tests. The MEDIUM-4 check passes. The only failing repro left
+> is MEDIUM-1:
 
-# after inserting the HIGH-2 test into manager.rs's test module:
+```bash
+# still-open MEDIUM-1 — after inserting the writer-hang test into manager.rs's test module:
+cargo nextest run -p hopr-transport-session --lib writer_on_poisoned_gate
+# fails with: write into a PIX-closed session must error out, got Err(Elapsed(()))
+
+# committed regression tests (now passing):
+cargo nextest run -p hopr-transport-session --lib recovered_before_deposit_then_funded
 cargo nextest run -p hopr-transport-session --lib entry_rejects_exit_dictated
 
-# MEDIUM-4 reproduces directly:
+# MEDIUM-4 (now passing):
 cargo check -p hopr-protocol-session
 ```
+
+## Re-review verification log (2026-07-17)
+
+- `cargo check -p hopr-protocol-session` ✅ (MEDIUM-4)
+- `cargo check -p hopr-transport-session` / `-p hopr-protocol-pix` ✅
+- `cargo check -p hopr-transport-session --features telemetry` ✅ (the new metric code is
+  `cfg(not(test))`-gated, so plain check/test builds never compile it)
+- `cargo nextest run --lib -p hopr-transport-session` → 192/192 ✅ (incl. both committed
+  regression tests)
+- `cargo nextest run --lib -p hopr-protocol-pix` → 34/34 ✅
+- `cargo clippy` on the three touched crates → warnings only (two introduced by
+  `b3154a3af7`, see LOW-7 nit)
+- Scratch tests (run, then removed): 3 extra HIGH-1 orderings ✅ pass; MEDIUM-1 writer-hang
+  test ❌ fails as documented above

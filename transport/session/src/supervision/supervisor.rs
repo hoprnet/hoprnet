@@ -117,6 +117,9 @@ pub struct SessionPixSupervisor {
     /// Tracks the first failure reason when multiple SSAs fail, so the
     /// earliest cause is used for the final `Close` action rather than the last.
     first_failure_reason: Option<SessionPixCloseReason>,
+    /// SSA indices that have been retired (closed and removed).
+    /// Prevents stale SsaRequestSent events from resurrecting closed SSAs.
+    retired_ssa_indices: Vec<SsaIndex>,
 }
 
 impl SessionPixSupervisor {
@@ -137,6 +140,7 @@ impl SessionPixSupervisor {
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
+            retired_ssa_indices: Vec::new(),
         };
 
         let actions = s.emit_request_next_ssa(now);
@@ -293,6 +297,11 @@ impl SessionPixSupervisor {
     fn on_ssa_request_sent(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
         // Guard: ignore if we already have state (idempotent).
         if self.find_ssa(ssa_id).is_some() {
+            return Vec::new();
+        }
+
+        // Guard: reject if this SSA index was already retired.
+        if self.retired_ssa_indices.contains(&ssa_id.ssa_index()) {
             return Vec::new();
         }
 
@@ -686,7 +695,10 @@ impl SessionPixSupervisor {
 
         // Remove this closing SSA and emit RetireSsa so the reconstructor
         // releases its builder/verifier/counter state mid-session.
+        // Record the retired index to prevent stale SsaRequestSent events
+        // from resurrecting it.
         let retired = self.ssas[idx].ssa_id;
+        self.retired_ssa_indices.push(retired.ssa_index());
         self.ssas.remove(idx);
         vec![SessionPixAction::RetireSsa(retired)]
     }

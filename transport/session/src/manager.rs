@@ -29,14 +29,14 @@ use hopr_protocol_start::{
     KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
     StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
-use hopr_utils::runtime::AbortableList;
+use hopr_utils::{network_types::crossfire_sink::CrossfireSinkError, runtime::AbortableList};
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, PixSsaPhase, SessionLifecycleState, initialize_session_metrics, record_pix_close_reason,
-    remove_session_metrics_state, set_pix_current_ssa_phase, set_pix_gate_mode, set_pix_recovery_progress,
-    set_session_balancer_data, set_session_state,
+    self, PixSsaPhase, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state,
+    set_pix_current_ssa_phase, set_pix_gate_mode, set_pix_recovery_progress, set_session_balancer_data,
+    set_session_state,
 };
 use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
@@ -120,7 +120,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     #[cfg(feature = "telemetry")]
     {
         set_session_state(&session_id, SessionLifecycleState::Closed);
-        remove_session_metrics_state(&session_id);
+        let has_pix = session_data.pix_egress_gate.get().is_some();
+        remove_session_metrics_state(&session_id, has_pix);
     }
 
     if reason != ClosureReason::EmptyRead {
@@ -128,9 +129,8 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
         debug!("data tx channel closed on session");
     }
 
-    // Poison the egress gate so any parked writers are unblocked
-    // (they will hang on `pending()` until the session teardown
-    // aborts their task).
+    // Poison the egress gate so gate-acquire errors propagate as sink errors
+    // through the egress pipeline, surfacing as io::Error to the session writer.
     if let Some(gate) = session_data.pix_egress_gate.get() {
         gate.poison();
     }
@@ -1692,7 +1692,7 @@ where
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => SessionPixEvent::AlmostRecovered(*ssa_id),
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
                 #[cfg(all(feature = "telemetry", not(test)))]
-                set_pix_current_ssa_phase(&session_id, PixSsaPhase::Recovered);
+                set_pix_current_ssa_phase(&session_id, ssa_id.ssa_index(), PixSsaPhase::Recovered);
                 SessionPixEvent::Recovered(*ssa_id)
             }
         };
@@ -2054,7 +2054,7 @@ where
                     .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
 
                 #[cfg(all(feature = "telemetry", not(test)))]
-                set_pix_current_ssa_phase(&session_id, PixSsaPhase::AwaitingCommitment);
+                set_pix_current_ssa_phase(&session_id, ssa_id.ssa_index(), PixSsaPhase::AwaitingCommitment);
 
                 // Install the gate in the slot BEFORE session construction so the
                 // egress adapters inside HoprSession see a populated gate.
@@ -2097,6 +2097,7 @@ where
                     // Sent packets = SURB consumption estimate
                     msg_sender
                         .clone()
+                        .sink_map_err(std::io::Error::other)
                         .with({
                             let gate = Arc::clone(&slot.pix_egress_gate);
                             let surb = surb_estimator_for_egress;
@@ -2105,19 +2106,17 @@ where
                                 let surb = surb.clone();
                                 Box::pin(async move {
                                     // Park while predeposit budget is exhausted;
-                                    // on poison, park forever — the task will be
-                                    // aborted by session teardown.
+                                    // on poison, surfacing the error via the sink.
                                     if let Some(g) = gate
                                         && g.acquire().await.is_err()
                                     {
-                                        // Gate poisoned — session is closing.
-                                        futures::future::pending::<()>().await;
+                                        return Err(std::io::Error::other(CrossfireSinkError::GateClosed));
                                     }
                                     // Each outgoing packet consumes one SURB
                                     surb.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                     #[cfg(feature = "telemetry")]
                                     telemetry::record_session_surb_consumed(&session_id, 1);
-                                    Ok::<_, S::Error>((routing, data))
+                                    Ok::<_, std::io::Error>((routing, data))
                                 })
                             }
                         })
@@ -2222,7 +2221,7 @@ where
                 reply_routing.clone(),
                 session_config(&self.cfg, session_req.capabilities.into()),
                 (
-                    msg_sender.clone().with({
+                    msg_sender.clone().sink_map_err(std::io::Error::other).with({
                         let gate = Arc::clone(&slot.pix_egress_gate);
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             let gate = gate.get().cloned();
@@ -2230,10 +2229,9 @@ where
                                 if let Some(g) = gate
                                     && g.acquire().await.is_err()
                                 {
-                                    // Gate poisoned — session is closing.
-                                    futures::future::pending::<()>().await;
+                                    return Err(std::io::Error::other(CrossfireSinkError::GateClosed));
                                 }
-                                Ok::<_, S::Error>((routing, data))
+                                Ok::<_, std::io::Error>((routing, data))
                             })
                         }
                     }),
@@ -2356,10 +2354,7 @@ where
                         SessionPixAction::ReleaseService => {
                             gate.release_service();
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            {
-                                set_pix_gate_mode(&session_id, true);
-                                set_pix_current_ssa_phase(&session_id, PixSsaPhase::Recovering);
-                            }
+                            set_pix_gate_mode(&session_id, true);
                         }
                         SessionPixAction::ProgressNotification => {
                             gate.notify_progress();
@@ -2384,10 +2379,7 @@ where
                             retirement.retire_all();
                             let closure_reason = pix_close_to_closure_reason(reason);
                             #[cfg(all(feature = "telemetry", not(test)))]
-                            {
-                                METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
-                                record_pix_close_reason(&session_id, &reason);
-                            }
+                            METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
                             error!(%session_id, ?reason, "pix supervisor closed session");
                             if let Some(slot) = myself.sessions.remove(&session_id) {
                                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
@@ -2635,7 +2627,7 @@ where
             }
 
             #[cfg(all(feature = "telemetry", not(test)))]
-            set_pix_current_ssa_phase(&session_id, PixSsaPhase::AwaitingDeposit);
+            set_pix_current_ssa_phase(&session_id, commitment_ssa_id.ssa_index(), PixSsaPhase::AwaitingDeposit);
 
             // Spawn the PixDepositObserver that forwards deposit confirmations
             // to the supervisor. This loops to support top-up deposits.
@@ -2800,14 +2792,14 @@ where
             .into());
         }
 
-        let quota_per_ssa = our_params.quota_per_ssa();
-        let server_quota = pix_params_to_quota(polys_per_ssa, shares_per_poly);
-        if quota_per_ssa != server_quota {
+        if our_params.polys_per_ssa != polys_per_ssa || our_params.shares_per_poly != shares_per_poly {
             return Err(SessionManagerError::Unacceptable(format!(
-                "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
+                "Exit sent mismatched PIX params: our ({}, {}), theirs ({}, {})",
+                our_params.polys_per_ssa, our_params.shares_per_poly, polys_per_ssa, shares_per_poly,
             ))
             .into());
         }
+        let quota_per_ssa = our_params.quota_per_ssa();
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
@@ -5937,6 +5929,92 @@ mod tests {
         assert!(
             result.is_err(),
             "Entry must reject Exit-dictated PIX params, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A writer holding the session object must observe an error (not hang
+    /// forever) when the PIX supervisor closes the session and poisons the
+    /// egress gate. Currently the egress adapter parks on `pending()`, so a
+    /// one-way writer that never reads hangs indefinitely.
+    #[test_log::test(tokio::test)]
+    async fn writer_on_poisoned_gate_errors_out() -> anyhow::Result<()> {
+        use futures::AsyncWriteExt;
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                supervisor_cfg: SupervisorConfig {
+                    max_unverifiable_shares_per_session: 0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, mut new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // This is the session object the target/user task owns and writes into.
+        let mut session = new_session_rx.next().await.expect("incoming session").session;
+
+        // Dispatch one unverifiable share → triggers close (max=0).
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+            ssa_id,
+            observed_total: 1,
+        })
+        .await?;
+
+        // Yield to let the action driver process the close.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(mgr.active_sessions().is_empty(), "session must be closed");
+
+        // A write + flush into the closed session must resolve with an error
+        // within a bounded time; it must not park forever.
+        let payload = vec![0xAB_u8; 4096];
+        let res = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            session.write_all(&payload).await?;
+            session.flush().await
+        })
+        .await;
+
+        assert!(
+            matches!(res, Ok(Err(_))),
+            "write into a PIX-closed session must error out, got {res:?}"
         );
 
         Ok(())

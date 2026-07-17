@@ -15,7 +15,6 @@ pub enum CrossfireSinkError {
     #[error("channel receiver disconnected")]
     Disconnected,
     /// The PIX service gate is poisoned (session closing).
-    #[allow(dead_code)]
     #[error("PIX service gate poisoned (session closing)")]
     GateClosed,
 }

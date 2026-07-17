@@ -84,6 +84,15 @@ pub struct SsaReconstructorConfig {
     #[default(7200)]
     #[validate(range(min = 60, max = 86400))]
     pub ssa_counter_lifetime_secs: u64,
+    /// Maximum number of concurrent sessions using this reconstructor.
+    ///
+    /// Used to size the per-SSA caches. Each session tracks at most 3 SSAs
+    /// concurrently (2 live + 1 tombstone).
+    ///
+    /// Default: 128.
+    #[default(128)]
+    #[validate(range(min = 1, max = 65535))]
+    pub max_concurrent_sessions: u16,
 }
 
 type EncryptedShareCache<S> =
@@ -165,11 +174,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Panics if the configuration fails validation.
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         cfg.validate().expect("invalid SsaReconstructorConfig");
+
+        // Size per-SSA caches based on max concurrent sessions (3 SSAs/session:
+        // 2 live + 1 tombstone). The per-polynomial and per-peer caches keep
+        // their own sizing derived from protocol constants.
+        let max_ssa_entries = (cfg.max_concurrent_sessions as u64) * 3;
+
         Self {
-            commitment_builder: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+            commitment_builder: moka::sync::CacheBuilder::new(max_ssa_entries)
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
-            ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+            ssa_builders: moka::sync::CacheBuilder::new(max_ssa_entries)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
             ssa_verifiers: moka::sync::CacheBuilder::new(MAX_CONCURRENT_SSA_CYCLES * (MAX_POLYS_PER_SSA as u64))
@@ -181,17 +196,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
                 .time_to_live(cfg.max_ack_await_time)
                 .build(),
-            ssa_counters: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
-                // Capacity is a generous per-SSA estimate. In practice the
-                // key domain is (max concurrent sessions × SSAs per session),
-                // which is far smaller than MAX_POLYS_PER_SSA (≈16k). The
-                // TTL-only eviction means counters survive builder/verifier
-                // eviction — they are never TTI-evicted while the session
-                // is live.
+            ssa_counters: moka::sync::CacheBuilder::new(max_ssa_entries)
                 .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
                 .build(),
-            ssa_to_verifier_ids: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
-                // Same generous sizing + TTL-only policy as ssa_counters.
+            ssa_to_verifier_ids: moka::sync::CacheBuilder::new(max_ssa_entries)
                 .time_to_live(std::time::Duration::from_secs(cfg.ssa_counter_lifetime_secs))
                 .build(),
             cfg,
