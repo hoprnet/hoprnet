@@ -584,8 +584,8 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     let _bg_handle = spawn_data_task(session, sd, Duration::from_secs(5));
 
     // Poll for session close.
-    for _ in 0..40 {
-        // max 20s polling (40 × 500ms)
+    for _ in 0..20 {
+        // max 10s polling (20 × 500ms)
         if session_died.load(Ordering::SeqCst) {
             tracing::info!("session closed detected via bg task");
             break;
@@ -679,7 +679,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
     let ip = IpOrHost::from_str(":0")?;
     let routing: hopr_lib::HopRouting = hops.try_into()?;
     let result = tokio::time::timeout(
-        Duration::from_secs(30),
+        Duration::from_secs(15),
         cluster.entry.inner().connect_to(
             cluster.exit.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
