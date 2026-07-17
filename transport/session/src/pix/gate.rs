@@ -170,8 +170,17 @@ impl ServiceGate {
     ///
     /// Once funded, `acquire` enforces the served-without-progress ceiling
     /// instead of the predeposit budget.
+    ///
+    /// Snapshots `served_total` into `served_at_last_progress` so the ceiling
+    /// check starts from the moment of funding and does not count predeposit
+    /// packets against the post-funding budget.
     pub fn release_service(self: &Arc<Self>) {
         self.funded.store(true, Ordering::Release);
+        // Snapshot the served counter at the moment of funding so the ceiling
+        // check does not count predeposit traffic against the post-funding
+        // max_served_without_progress budget.
+        self.served_at_last_progress
+            .store(self.served.load(Ordering::Acquire), Ordering::Release);
         // Wake all parkers — predeposit-parked writers re-enter and take the
         // funded path, which checks the ceiling.
         self.notify.notify_waiters();
@@ -479,5 +488,40 @@ mod tests {
             tokio::spawn(async move { tokio::time::timeout(Duration::from_millis(50), gate_clone.acquire()).await });
         let result = parked.await.unwrap();
         assert!(result.is_err(), "expected timeout due to ceiling");
+    }
+
+    // -------------------------------------------------------------------
+    // M-05: Funding watermark
+    // -------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn release_service_snapshots_served_total_as_watermark() {
+        let gate = ServiceGate::new(50, 5);
+        for _ in 0..10 {
+            gate.acquire().await.unwrap();
+        }
+        assert_eq!(gate.served_total(), 10);
+
+        // release_service must snapshot served_total into served_at_last_progress.
+        gate.release_service();
+        assert_eq!(gate.served_at_last_progress.load(Ordering::Acquire), 10);
+    }
+
+    #[tokio::test]
+    async fn release_service_after_ceiling_predeposit_unblocks_waiter() {
+        // predeposit = 100, ceiling = 10.
+        let gate = ServiceGate::new(100, 10);
+
+        // Consume 30 predeposit packets — more than the ceiling.
+        for _ in 0..30 {
+            gate.acquire().await.unwrap();
+        }
+        assert_eq!(gate.served_total(), 30);
+
+        // Funding snapshots served=30 into the watermark. The ceiling check
+        // then sees 30 - 30 = 0 < 10, so the waiter is unblocked.
+        gate.release_service();
+        gate.acquire().await.unwrap();
+        assert_eq!(gate.served_total(), 31);
     }
 }

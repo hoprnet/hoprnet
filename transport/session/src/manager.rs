@@ -151,8 +151,9 @@ pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1)
 
 /// Runtime-agnostic multi-waker notification primitive.
 ///
-/// Uses unique IDs per waiter so that dropping a future cleanly
-/// removes its waker from the vector — no waker leak on cancellation.
+/// Uses a generation counter to detect notification events: [`notify_waiters`]
+/// bumps the generation, and [`notified`] futures capture the generation at
+/// creation time, preventing latent wake and spurious-Ready bugs.
 struct SlotNotify {
     inner: parking_lot::Mutex<SlotNotifyInner>,
 }
@@ -160,6 +161,7 @@ struct SlotNotify {
 struct SlotNotifyInner {
     wakers: Vec<(u64, Waker)>,
     next_id: u64,
+    generation: u64,
 }
 
 impl SlotNotify {
@@ -168,23 +170,28 @@ impl SlotNotify {
             inner: parking_lot::Mutex::new(SlotNotifyInner {
                 wakers: Vec::new(),
                 next_id: 0,
+                generation: 0,
             }),
         }
     }
 
     /// Wake all parked waiters.
     fn notify_waiters(&self) {
-        for (_, waker) in self.inner.lock().wakers.drain(..) {
+        let mut inner = self.inner.lock();
+        inner.generation += 1;
+        for (_, waker) in inner.wakers.drain(..) {
             waker.wake();
         }
     }
 
     /// Return a future that completes the next time `notify_waiters` is called.
     fn notified(self: &Arc<Self>) -> SlotNotifyFuture {
+        let generation = self.inner.lock().generation;
         SlotNotifyFuture {
             notify: self.clone(),
             waker_id: 0,
             registered: false,
+            gen_at_creation: generation,
         }
     }
 }
@@ -198,6 +205,7 @@ struct SlotNotifyFuture {
     notify: Arc<SlotNotify>,
     waker_id: u64,
     registered: bool,
+    gen_at_creation: u64,
 }
 
 impl Drop for SlotNotifyFuture {
@@ -213,17 +221,25 @@ impl Future for SlotNotifyFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let this = self.get_mut();
-        if this.registered {
-            // Already registered — a wake means the waker was called.
-            Poll::Ready(())
-        } else {
-            let mut inner = this.notify.inner.lock();
-            this.waker_id = inner.next_id;
-            inner.next_id += 1;
-            inner.wakers.push((this.waker_id, cx.waker().clone()));
-            this.registered = true;
-            Poll::Pending
+        let mut inner = this.notify.inner.lock();
+
+        if inner.generation != this.gen_at_creation {
+            return Poll::Ready(());
         }
+
+        if this.registered {
+            // Spurious wake — update waker and stay Pending.
+            if let Some((_, w)) = inner.wakers.iter_mut().find(|(id, _)| *id == this.waker_id) {
+                *w = cx.waker().clone();
+            }
+            return Poll::Pending;
+        }
+
+        this.waker_id = inner.next_id;
+        inner.next_id += 1;
+        inner.wakers.push((this.waker_id, cx.waker().clone()));
+        this.registered = true;
+        Poll::Pending
     }
 }
 
@@ -1005,6 +1021,20 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         if let Some(pix) = pix {
+            let pix_cfg = crate::pix::SupervisorConfig {
+                max_ssa_delivery_time: self.cfg.pix_config.max_ssa_delivery_time,
+                max_deposit_wait: self.cfg.pix_config.max_deposit_wait,
+                max_recovery_idle: self.cfg.pix_config.max_recovery_idle,
+                max_recovery_time: self.cfg.pix_config.max_recovery_time,
+                max_unverifiable_shares_per_ssa: self.cfg.pix_config.max_unverifiable_shares_per_ssa,
+                max_unverifiable_shares_per_session: self.cfg.pix_config.max_unverifiable_shares_per_session,
+                max_predeposit_packets: self.cfg.pix_config.max_predeposit_packets,
+                max_served_without_progress: self.cfg.pix_config.max_served_without_progress,
+                tombstone_retention_window: self.cfg.pix_config.tombstone_retention_window,
+            };
+            if let Err(e) = crate::pix::validate_pix_supervision(&pix_cfg, pix.share_processor.config()) {
+                warn!(%e, "PIX supervision config validation failed");
+            }
             self.pix_toolbox
                 .set(pix)
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -2188,11 +2218,11 @@ where
                                     // Park while predeposit budget is exhausted;
                                     // on poison, park forever — the task will be
                                     // aborted by session teardown.
-                                    if let Some(g) = gate {
-                                        if g.acquire().await.is_err() {
-                                            // Gate poisoned — session is closing.
-                                            futures::future::pending::<()>().await;
-                                        }
+                                    if let Some(g) = gate
+                                        && g.acquire().await.is_err()
+                                    {
+                                        // Gate poisoned — session is closing.
+                                        futures::future::pending::<()>().await;
                                     }
                                     // Each outgoing packet consumes one SURB
                                     surb.consumed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -2297,11 +2327,11 @@ where
                         move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             let gate = gate.get().cloned();
                             Box::pin(async move {
-                                if let Some(g) = gate {
-                                    if g.acquire().await.is_err() {
-                                        // Gate poisoned — session is closing.
-                                        futures::future::pending::<()>().await;
-                                    }
+                                if let Some(g) = gate
+                                    && g.acquire().await.is_err()
+                                {
+                                    // Gate poisoned — session is closing.
+                                    futures::future::pending::<()>().await;
                                 }
                                 Ok::<_, S::Error>((routing, data))
                             })
@@ -2374,10 +2404,14 @@ where
             let supervisor_handle = handle.clone();
             let pix_toolbox_for_driver = self.pix_toolbox.get().cloned();
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
-                // Track requested SSAs so they can be retired on close.
-                // Seed with the initial SSA (implicitly requested by
-                // supervisor construction) so it gets retired on close.
-                let mut tracked_ssas: Vec<SsaId<HoprPseudonym>> = vec![ssa_id];
+                // Track requested SSAs via a Drop-guarded wrapper so they are
+                // retired from the reconstructor even when the task is aborted.
+                // Seed with the initial SSA (implicitly requested by supervisor
+                // construction) so it gets retired on close.
+                let mut retirement = SsaRetirementGuard {
+                    ssas: vec![ssa_id],
+                    share_processor: pix_toolbox_for_driver.clone().map(|tb| tb.share_processor.clone()),
+                };
 
                 loop {
                     let action = match action_rx.recv().await {
@@ -2398,19 +2432,27 @@ where
                             // Look up the session slot and send the request.
                             if let Some(s) = myself.sessions.get(&session_id) {
                                 let result = myself.send_ssa_request(session_id, &s, ssa_id.ssa_index()).await;
-                                if let Some(handle) = s.pix_supervisor.get() {
-                                    let _ = handle.send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id));
+                                if let Some(handle) = s.pix_supervisor.get()
+                                    && handle
+                                        .send_event(crate::pix::SessionPixEvent::SsaRequestSent(ssa_id))
+                                        .is_err()
+                                {
+                                    error!(%session_id, "failed to send SsaRequestSent to PIX supervisor");
                                 }
-                                if let Some(handle) = s.pix_supervisor.get() {
-                                    let _ = handle.send_action_result(action_key, result.is_ok());
+                                if let Some(handle) = s.pix_supervisor.get()
+                                    && handle.send_action_result(action_key, result.is_ok()).is_err()
+                                {
+                                    error!(%session_id, "failed to send action result to PIX supervisor");
                                 }
                                 if result.is_ok() {
-                                    tracked_ssas.push(ssa_id);
+                                    retirement.ssas.push(ssa_id);
                                 }
                             } else {
                                 // Slot missing — supervisor must have already closed it.
                                 // Report failure so the supervisor can transition.
-                                let _ = supervisor_handle.send_action_result(action_key, false);
+                                if supervisor_handle.send_action_result(action_key, false).is_err() {
+                                    error!(%session_id, "failed to report action result to closed PIX supervisor");
+                                }
                             }
                         }
                         crate::pix::SessionPixAction::ReleaseService => {
@@ -2423,11 +2465,7 @@ where
                             // Poison the gate so any parked writers get GateClosed.
                             gate.poison();
                             // Retire all tracked SSAs from the reconstructor.
-                            if let Some(ref toolbox) = pix_toolbox_for_driver {
-                                for ssa_id in &tracked_ssas {
-                                    toolbox.share_processor.retire_ssa(ssa_id);
-                                }
-                            }
+                            retirement.retire_all();
                             let closure_reason = pix_close_to_closure_reason(reason);
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_PIX_CLOSURES.increment(&[&reason.to_string()]);
@@ -2444,11 +2482,7 @@ where
                 // Poison the gate so any parked writers get GateClosed.
                 gate.poison();
                 // Retire all tracked SSAs from the reconstructor.
-                if let Some(ref toolbox) = pix_toolbox_for_driver {
-                    for ssa_id in &tracked_ssas {
-                        toolbox.share_processor.retire_ssa(ssa_id);
-                    }
-                }
+                retirement.retire_all();
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_PIX_CLOSURES.increment(&["PixFailure"]);
                 if let Some(slot) = myself.sessions.remove(&session_id) {
@@ -2456,6 +2490,31 @@ where
                     close_session(session_id, slot, ClosureReason::PixFailure);
                 }
             });
+
+            /// Drop-guarded wrapper that retires tracked SSAs from the reconstructor,
+            /// ensuring cleanup even when the task is aborted by `spawn_as_abortable!`.
+            struct SsaRetirementGuard {
+                ssas: Vec<SsaId<HoprPseudonym>>,
+                share_processor: Option<Arc<SsaReconstructor<HoprPixSpec>>>,
+            }
+
+            impl SsaRetirementGuard {
+                /// Explicitly retire all tracked SSAs (called on Close and normal exit).
+                fn retire_all(&mut self) {
+                    if let Some(ref proc) = self.share_processor {
+                        for ssa_id in &self.ssas {
+                            proc.retire_ssa(ssa_id);
+                        }
+                        self.ssas.clear();
+                    }
+                }
+            }
+
+            impl Drop for SsaRetirementGuard {
+                fn drop(&mut self) {
+                    self.retire_all();
+                }
+            }
 
             slot_for_driver
                 .abort_handles
@@ -2647,11 +2706,15 @@ where
             // Notify the supervisor that the commitment is verifiable.
             // On the Exit side we do not know the expected deposit amount, so
             // pass None (any amount accepted by the supervisor).
-            if let Some(handle) = session_slot.pix_supervisor.get() {
-                let _ = handle.send_event(crate::pix::SessionPixEvent::CommitmentVerified {
-                    ssa_id: commitment_ssa_id,
-                    expected_deposit: None,
-                });
+            if let Some(handle) = session_slot.pix_supervisor.get()
+                && handle
+                    .send_event(crate::pix::SessionPixEvent::CommitmentVerified {
+                        ssa_id: commitment_ssa_id,
+                        expected_deposit: None,
+                    })
+                    .is_err()
+            {
+                error!(%session_id, "failed to send CommitmentVerified to PIX supervisor");
             }
 
             // Spawn the PixDepositObserver that forwards deposit confirmations
@@ -2680,30 +2743,37 @@ where
                             Ok(Some(((..), amount))) => {
                                 // Forward every deposit — the supervisor decides
                                 // whether the accumulated amount is sufficient.
-                                if let Some(h) = pix_supervisor_for_observer.get() {
-                                    let _ = h.send_event(
+                                if let Some(h) = pix_supervisor_for_observer.get()
+                                    && h.send_event(
                                         crate::pix::SessionPixEvent::DepositConfirmed {
                                             ssa_id: ssa_id_for_observer,
                                             amount,
                                         },
-                                    );
+                                    ).is_err()
+                                {
+                                    error!(%session_id, "failed to send DepositConfirmed to PIX supervisor");
+                                    break;
                                 }
                             }
                             Ok(None) => {
                                 error!(%session_id, "deposit channel closed without confirmation; check deposit address and funding");
-                                if let Some(h) = pix_supervisor_for_observer.get() {
-                                    let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                if let Some(h) = pix_supervisor_for_observer.get()
+                                    && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
-                                    ));
+                                    )).is_err()
+                                {
+                                    error!(%session_id, "failed to send DepositObserverClosed to PIX supervisor");
                                 }
                                 break;
                             }
                             Err(_) => {
                                 error!(%session_id, "deposit confirmation timed out; check deposit address and funding");
-                                if let Some(h) = pix_supervisor_for_observer.get() {
-                                    let _ = h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
+                                if let Some(h) = pix_supervisor_for_observer.get()
+                                    && h.send_event(crate::pix::SessionPixEvent::DepositObserverClosed(
                                         ssa_id_for_observer,
-                                    ));
+                                    )).is_err()
+                                {
+                                    error!(%session_id, "failed to send DepositObserverClosed to PIX supervisor");
                                 }
                                 break;
                             }
