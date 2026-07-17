@@ -27,8 +27,8 @@ type CmdTx = MAsyncTx<CmdChannel>;
 type CmdRx = AsyncRx<CmdChannel>;
 
 type ActionChannel = Array<SessionPixAction>;
-pub(crate) type ActionTx = MAsyncTx<ActionChannel>;
-pub(crate) type ActionRx = AsyncRx<ActionChannel>;
+pub type ActionTx = MAsyncTx<ActionChannel>;
+pub type ActionRx = AsyncRx<ActionChannel>;
 
 // ---------------------------------------------------------------------------
 // SessionPixSupervisorHandle
@@ -36,7 +36,7 @@ pub(crate) type ActionRx = AsyncRx<ActionChannel>;
 
 /// Cloneable handle to a running [`SessionPixWorker`].
 #[derive(Clone)]
-pub(crate) struct SessionPixSupervisorHandle {
+pub struct SessionPixSupervisorHandle {
     cmd_tx: CmdTx,
     pub(crate) gate: Arc<ServiceGate>,
 }
@@ -74,7 +74,7 @@ impl SessionPixSupervisorHandle {
 // WorkerCommand
 // ---------------------------------------------------------------------------
 
-pub(crate) enum WorkerCommand {
+pub enum WorkerCommand {
     Event(SessionPixEvent),
     ActionResult { action: SessionPixAction, ok: bool },
 }
@@ -84,7 +84,7 @@ pub(crate) enum WorkerCommand {
 // ---------------------------------------------------------------------------
 
 /// Spawn a supervisor worker and return its handle and action driver receiver.
-pub(crate) fn spawn_supervisor_worker(
+pub fn spawn_supervisor_worker(
     cfg: SupervisorConfig,
     dims: SsaDimensions,
     pseudonym: hopr_api::types::internal::prelude::HoprPseudonym,
