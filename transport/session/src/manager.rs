@@ -2417,17 +2417,10 @@ where
     }
 }
 
-// Test helpers live in `src/test_helpers.rs`.  Re-export so `manager::SendMsg` etc.
-// are available to code that imports from `manager` (e.g. the in-module unit tests).
-#[cfg(test)]
-pub use crate::test_helpers::MsgSender as MockMsgSender;
-#[cfg(test)]
-pub use crate::test_helpers::mock_packet_planning;
-
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, anyhow};
-    use futures::{AsyncWriteExt, channel::mpsc::UnboundedSender, pin_mut};
+    use futures::{AsyncWriteExt, channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut};
     use hopr_api::types::{
         crypto::{keypairs::ChainKeypair, prelude::Keypair},
         crypto_random::Randomizable,
@@ -2441,8 +2434,6 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    // Import helpers from the top-level test_helpers module
-    use crate::test_helpers::{msg_type, start_msg_match};
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
 
     #[test]
@@ -4892,8 +4883,6 @@ mod tests {
         };
         use hopr_protocol_start::StartInitiation;
 
-        use crate::test_helpers::MsgSender;
-
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -4913,7 +4902,7 @@ mod tests {
             ..Default::default()
         });
 
-        let mut bob_transport = MsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
@@ -5027,8 +5016,6 @@ mod tests {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
-        use crate::test_helpers::MsgSender;
-
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -5051,7 +5038,7 @@ mod tests {
             ..Default::default()
         });
 
-        let mut bob_transport = MsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
         // handle_incoming_session_initiation sends SessionEstablished + SsaRequest (2 messages).
         bob_transport
             .expect_send_message()
