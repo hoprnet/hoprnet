@@ -4149,7 +4149,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-protocol-pix",
  "hopr-ticket-manager",
- "hopr-types",
  "hopr-utils",
  "humantime-serde",
  "lazy_static",

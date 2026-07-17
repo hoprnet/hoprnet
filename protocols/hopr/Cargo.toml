@@ -57,7 +57,6 @@ validator = { workspace = true }
 hopr-api = { workspace = true, features = ["chain", "types-random", "tickets"] }
 hopr-crypto-packet = { workspace = true }
 hopr-protocol-pix = { workspace = true }
-hopr-types = { workspace = true }
 hopr-utils = { workspace = true, features = ["parallelize", "platform"] }
 hopr-ticket-manager = { workspace = true }
 

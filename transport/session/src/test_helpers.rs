@@ -287,7 +287,7 @@ impl<'a> Expect<'a> {
 
 /// Drains messages from `sender` into the provided [`MsgSender`] mock.
 ///
-/// Returns the tx half (to pass to [`SessionManager::start`]) and a [`JoinHandle`]
+/// Returns the tx half (to pass to [`crate::manager::SessionManager::start`]) and a [`tokio::task::JoinHandle`]
 /// that must be awaited after the test to ensure all messages are dispatched.
 pub fn mock_packet_planning(
     sender: MsgSender,
