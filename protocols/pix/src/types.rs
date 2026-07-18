@@ -655,4 +655,68 @@ mod tests {
         assert_eq!(share_1, share_2);
         Ok(())
     }
+
+    #[test]
+    fn debug_redaction_partial_ssa_share() {
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let share = PartialSsaShare::<TestSpec>(scalar.to_repr());
+        let debug = format!("{:?}", share);
+        assert!(debug.contains("PartialSsaShare"));
+        // The scalar repr should not appear in Debug output
+        let scalar_hex = const_hex::encode(scalar.to_repr());
+        assert!(
+            !debug.contains(&scalar_hex),
+            "PartialSsaShare Debug must redact the scalar value"
+        );
+    }
+
+    #[test]
+    fn debug_redaction_generated_share() {
+        use crate::tests::TestSpec;
+
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let share = PartialSsaShare::<TestSpec>(scalar.to_repr());
+        let id = SsaPolynomialId::new(
+            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(), 1.try_into().unwrap()),
+            0,
+        );
+        let generated = GeneratedShare { id, share };
+        let debug = format!("{:?}", generated);
+
+        // Must include the public ID field
+        assert!(debug.contains("GeneratedShare"));
+        assert!(debug.contains("id"));
+
+        // Must NOT include the secret share field value
+        let scalar_hex = const_hex::encode(scalar.to_repr());
+        assert!(
+            !debug.contains(&scalar_hex),
+            "GeneratedShare Debug must redact the share scalar"
+        );
+    }
+
+    #[test]
+    fn debug_redaction_recovered_ssa() {
+        use hopr_types::crypto::keypairs::Keypair;
+        use hopr_types::crypto::prelude::ChainKeypair;
+
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
+        let dummy_key = ChainKeypair::random();
+        let recovered = RecoveredSsa {
+            ssa_id,
+            ssa: dummy_key,
+        };
+        let debug = format!("{:?}", recovered);
+
+        // Must include the public ssa_id field
+        assert!(debug.contains("RecoveredSsa"));
+        assert!(debug.contains("ssa_id"));
+
+        // Must NOT include the secret private key material
+        assert!(
+            !debug.contains("secret_key"),
+            "RecoveredSsa Debug must redact the ssa private key"
+        );
+    }
 }

@@ -158,3 +158,34 @@ pub trait EntryShareGenerator<S: PixSpec> {
         ssa_index: SsaIndex,
     ) -> Result<SsaCommitment<S>, Self::Error>;
 }
+
+#[cfg(test)]
+mod tests {
+    use hopr_types::crypto::keypairs::Keypair;
+    use hopr_types::crypto::prelude::{ChainKeypair, SimplePseudonym};
+    use hopr_types::crypto_random::Randomizable;
+
+    use super::*;
+
+    #[test]
+    fn debug_redaction_share_resolution_recovered_ssa() {
+        // ShareResolution::RecoveredSsa wraps RecoveredSsa; the nested Debug
+        // must preserve the secret redaction.
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
+        let dummy_key = ChainKeypair::random();
+        let recovered = RecoveredSsa {
+            ssa_id,
+            ssa: dummy_key,
+        };
+        let resolution = ShareResolution::RecoveredSsa(recovered);
+        let debug = format!("{:?}", resolution);
+
+        assert!(debug.contains("RecoveredSsa"));
+        // The outer tuple wraps the inner RecoveredSsa Debug, which redacts ssa
+        assert!(
+            !debug.contains("secret_key"),
+            "ShareResolution::RecoveredSsa Debug must preserve nested secret redaction"
+        );
+    }
+}
