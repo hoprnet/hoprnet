@@ -170,17 +170,20 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
         let (mut rd, mut wr) = session.split();
         loop {
             let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
-            if let Err(e) = wr.write_all(&msg).await {
-                tracing::warn!(%e, "bg write_all failed");
-                break;
-            }
-            if let Err(e) = wr.flush().await {
-                tracing::warn!(%e, "bg flush failed");
-                break;
-            }
-            let mut echoed = vec![0u8; 32];
-            if rd.read_exact(&mut echoed).await.is_err() {
-                break;
+            let result = tokio::time::timeout(Duration::from_secs(10), async {
+                wr.write_all(&msg).await?;
+                wr.flush().await?;
+                let mut echoed = vec![0u8; 32];
+                rd.read_exact(&mut echoed).await?;
+                anyhow::Ok(echoed)
+            })
+            .await;
+            match result {
+                Ok(Ok(_echoed)) => {}
+                Ok(Err(e)) | Err(_) => {
+                    tracing::warn!("bg task failed: {e:?}");
+                    break;
+                }
             }
         }
         tracing::info!("bg task exited");

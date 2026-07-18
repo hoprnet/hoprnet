@@ -26,7 +26,7 @@ strategy-auto-funding = []
 strategy-auto-redeeming = []
 strategy-closure-finalizer = []
 strategy-channel-lifecycle = []
-strategy-pix = []
+strategy-pix = ["dep:redb"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -48,6 +48,7 @@ hopr-api = { workspace = true, features = ["node", "serde"] }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
+redb = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
@@ -61,6 +62,7 @@ hopr-chain-connector = { workspace = true, features = [
 hopr-api = { workspace = true, features = ["types-random"] }
 insta = { workspace = true }
 mockall = { workspace = true }
+tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 

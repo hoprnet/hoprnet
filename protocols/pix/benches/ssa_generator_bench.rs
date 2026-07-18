@@ -87,33 +87,30 @@ fn bench_next_share(c: &mut Criterion) {
 
     let pseudonym = SimplePseudonym::random();
 
-    let mut index = SsaIndex::MIN;
     // Benchmark does not depend on polynomials_per_ssa
     for &threshold in &THRESHOLDS {
-        let cfg = SsaGeneratorConfig {
-            threshold,
-            polynomials_per_ssa: 2048,
-            ..Default::default()
-        };
-        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-        // Prime the generator with an initial commitment, so the first iteration
-        // has a polynomial to draw from.
-        generator.new_ssa_commitment(&pseudonym, index).unwrap();
-        index = index.checked_add(1).unwrap();
-
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("t{threshold}_p2048")),
             &threshold,
             |b, _| {
-                // `next_share` mutates internal state, consuming one share per call,
-                // and requires that `msg` is unique for a given pseudonym. We use
-                // `iter_custom` so that whenever the underlying SSA gets exhausted
-                // (i.e. `next_share` yields `None`), we can transparently re-commit
-                // a new SSA without polluting the measured time.
+                let mut index = SsaIndex::MIN;
                 let mut counter: u64 = 0;
+
                 b.iter_custom(|iters| {
                     let mut total = std::time::Duration::ZERO;
+
                     for _ in 0..iters {
+                        // Create a fresh generator per iteration so that cache
+                        // pressure does not grow across the run.
+                        let cfg = SsaGeneratorConfig {
+                            threshold,
+                            polynomials_per_ssa: 2048,
+                            ..Default::default()
+                        };
+                        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+                        generator.new_ssa_commitment(&pseudonym, index).unwrap();
+                        index = index.checked_add(1).unwrap();
+
                         let x = counter.to_be_bytes();
                         counter = counter.wrapping_add(1);
 
@@ -121,14 +118,7 @@ fn bench_next_share(c: &mut Criterion) {
                         let res = generator.next_share(&pseudonym, &x).unwrap();
                         total += start.elapsed();
 
-                        if res.is_none() {
-                            // Refill the SSA pool outside of the measured region.
-                            // This intentionally "wastes" any remaining shares from
-                            // the previous SSA (there are none at this point) and
-                            // ensures subsequent iterations have shares available.
-                            generator.new_ssa_commitment(&pseudonym, index).unwrap();
-                            index = index.checked_add(1).unwrap();
-                        }
+                        debug_assert!(res.is_some(), "freshly-committed generator should produce a share");
                     }
                     total
                 });

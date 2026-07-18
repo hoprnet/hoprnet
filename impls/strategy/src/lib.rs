@@ -54,4 +54,6 @@ pub mod channel_lifecycle;
 pub mod errors;
 #[cfg(feature = "strategy-pix")]
 pub mod non_anonymous_pix;
+#[cfg(feature = "strategy-pix")]
+pub mod pix_recovery_store;
 pub mod strategy;

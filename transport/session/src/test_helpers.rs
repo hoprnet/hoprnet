@@ -171,10 +171,10 @@ impl Drop for MsgSender {
     fn drop(&mut self) {
         // Only the last reference to the inner state validates expectations
         // so that all clones share the same counter.
-        let inner = match std::sync::Arc::try_unwrap(self.inner.clone()) {
-            Ok(inner) => inner.into_inner(),
-            Err(_) => return,
-        };
+        if std::sync::Arc::strong_count(&self.inner) != 1 {
+            return; // not the last reference
+        }
+        let inner = self.inner.lock();
         let mut errors = Vec::new();
         for (i, e) in inner.expectations.iter().enumerate() {
             match &e.times {

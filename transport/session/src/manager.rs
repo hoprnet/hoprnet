@@ -1681,6 +1681,15 @@ where
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
                 )))?;
+                // Skip stale events from a previous SSA cycle (late arrivals after
+                // SsaAlmostRecovered advanced the current index).
+                if ssa_id.ssa_index().get() < state.current_index.load(std::sync::atomic::Ordering::Relaxed) {
+                    trace!(
+                        %session_id, event_ssa_index = %ssa_id.ssa_index(),
+                        "ignoring unverifiable share from stale SSA cycle"
+                    );
+                    return Ok(());
+                }
                 let num_errors = state.increment_errors();
                 trace!(%session_id, ssa_index = %ssa_id.ssa_index(), num_errors, "encountered unverifiable share in session with pix");
 
