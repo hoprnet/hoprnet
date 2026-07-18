@@ -106,7 +106,7 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     /// Creates a new share generator with the provided configuration.
     ///
     /// # Panics
-    /// Panics if the configuration fails validation (e.g. zero polynomials, out-of-range threshold).
+    /// Panics if the configuration fails validation.
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
         cfg.validate().expect("invalid SsaGeneratorConfig");
         Self {

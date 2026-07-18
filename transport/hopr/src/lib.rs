@@ -727,6 +727,10 @@ where
         // client commitments are generated, and the Exit's `new_exit_commitment`
         // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
         // a subset of what the global generator covers, so one generator suffices.
+        //
+        // SAFETY: SsaGeneratorConfig fields come from PixGlobalConfig which is
+        // validated via #[validate(nested)] before this code runs, so the
+        // constructor's validate().expect() cannot panic.
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,
@@ -759,6 +763,9 @@ where
         let pix_toolbox = match (role, exit_ack_share) {
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+                    // SAFETY: Default values (max_awaiting_acks=10_000_000,
+                    // early_recovery_threshold=0.85) are within validated range,
+                    // so the constructor's validate().expect() cannot panic.
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
@@ -860,6 +867,7 @@ where
                 // A relay that also acts as an Exit (has exit_ack_share) needs
                 // a full PixToolbox to handle the PIX handshake.
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+                    // SAFETY: Default config values are within validated range.
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
@@ -954,6 +962,7 @@ where
                 // No SSA reconstruction needed on Entry — forward events to the
                 // PIX event broadcast so subscribers (e.g. tests) see them.
                 let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+                    // SAFETY: Default config values are within validated range.
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);

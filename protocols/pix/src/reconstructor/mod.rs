@@ -103,6 +103,10 @@ impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
 }
 
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
+    /// Creates a new SSA reconstructor from the given configuration.
+    ///
+    /// # Panics
+    /// Panics if the configuration fails validation.
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         cfg.validate().expect("invalid SsaReconstructorConfig");
         Self {
