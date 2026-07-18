@@ -161,14 +161,13 @@ enum SessionHandles {
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
     /// Cumulative count of unverifiable PIX shares across all SSA cycles.
-    /// Errors from stale (already advanced) SSA indices are ignored to prevent
-    /// double-counting late arrivals.
     ///
-    /// Uses `Mutex` rather than `AtomicUsize` because the increment is
-    /// conditional on `current_index` — both the stale check and the write
-    /// must be atomic as a single operation (a concurrent `increment_index`
-    /// could otherwise advance the index between the check and the increment).
-    num_errors: Arc<parking_lot::Mutex<usize>>,
+    /// The session closes once the *total* number of unverifiable shares across
+    /// all SSA cycles exceeds `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
+    /// `AtomicUsize` is safe here because duplicates are already rejected by the
+    /// moka cache (keyed by `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by
+    /// share identifier), so no share triggers two errors.
+    num_errors: Arc<std::sync::atomic::AtomicUsize>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
 }
@@ -184,18 +183,11 @@ impl SessionSsaState {
         }
     }
 
-    /// Record an error for the given SSA index.
+    /// Record an unverifiable share error.
     ///
-    /// Returns the cumulative error count across all SSA cycles. Errors for
-    /// stale indices (lower than the current) are silently ignored to avoid
-    /// re-counting late-arriving events after the SSA has advanced.
-    pub fn increment_errors(&self, ssa_index: u32) -> usize {
-        let mut guard = self.num_errors.lock();
-        if ssa_index < self.current_index.load(std::sync::atomic::Ordering::Relaxed) {
-            return *guard;
-        }
-        *guard += 1;
-        *guard
+    /// Returns the cumulative error count after this increment.
+    pub fn increment_errors(&self) -> usize {
+        self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
     }
 
     pub fn increment_index(&self) -> SsaIndex {
@@ -217,7 +209,7 @@ impl std::fmt::Debug for SessionSsaState {
                 "current_index",
                 &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
             )
-            .field("num_errors", &self.num_errors.lock())
+            .field("num_errors", &self.num_errors.load(std::sync::atomic::Ordering::Relaxed))
             .field("polys_per_ssa", &self.polys_per_ssa)
             .field("shares_per_poly", &self.shares_per_poly)
             .finish()
@@ -1142,6 +1134,14 @@ where
                     SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
                 );
             }
+            // PIX shares are delivered via return-path SURBs — a 0-hop return path
+            // means there is no SURB mechanism, so PIX is impossible.
+            if cfg.return_path_options.count_hops() == 0 {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "UsePIX requested with 0-hop return path — PIX requires at least 1 return hop for SURB delivery"
+                ))
+                .into());
+            }
             // Validate dimensions are within protocol limits
             if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
             {
@@ -1669,7 +1669,7 @@ where
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
                 )))?;
-                let num_errors = state.increment_errors(ssa_id.ssa_index().get());
+                let num_errors = state.increment_errors();
                 trace!(%session_id, ssa_index = %ssa_id.ssa_index(), num_errors, "encountered unverifiable share in session with pix");
 
                 if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(session_id) {
