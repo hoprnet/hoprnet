@@ -160,10 +160,10 @@ enum SessionHandles {
 #[derive(Clone)]
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
-    /// Per-SSA-index error counts. Tracked independently so that errors from
-    /// a previous SSA cycle do not spill into the current one, which would give
-    /// a false closure signal.
-    current_ssa_errors: Arc<parking_lot::Mutex<std::collections::HashMap<u32, usize>>>,
+    /// Cumulative count of unverifiable PIX shares across all SSA cycles.
+    /// Errors from stale (already advanced) SSA indices are ignored to prevent
+    /// double-counting late arrivals.
+    num_errors: Arc<parking_lot::Mutex<usize>>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
 }
@@ -173,21 +173,24 @@ impl SessionSsaState {
         Self {
             // SSA index starts from 1, not 0.
             current_index: std::sync::atomic::AtomicU32::new(1).into(),
-            current_ssa_errors: Default::default(),
+            num_errors: Default::default(),
             polys_per_ssa,
             shares_per_poly,
         }
     }
 
-    /// Record an error for the given SSA index. Returns the **total** error
-    /// count for that index. Errors for indices other than the current one are
-    /// still tracked (for diagnostics) but the returned count is the caller's
-    /// view for closure decisions.
+    /// Record an error for the given SSA index.
+    ///
+    /// Returns the cumulative error count across all SSA cycles. Errors for
+    /// stale indices (lower than the current) are silently ignored to avoid
+    /// re-counting late-arriving events after the SSA has advanced.
     pub fn increment_errors(&self, ssa_index: u32) -> usize {
-        let mut guard = self.current_ssa_errors.lock();
-        let entry = guard.entry(ssa_index).or_insert(0);
-        *entry += 1;
-        *entry
+        let mut guard = self.num_errors.lock();
+        if ssa_index < self.current_index.load(std::sync::atomic::Ordering::Relaxed) {
+            return *guard;
+        }
+        *guard += 1;
+        *guard
     }
 
     pub fn increment_index(&self) -> SsaIndex {
@@ -209,7 +212,7 @@ impl std::fmt::Debug for SessionSsaState {
                 "current_index",
                 &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
             )
-            .field("current_ssa_errors", &self.current_ssa_errors.lock())
+            .field("num_errors", &self.num_errors.lock())
             .field("polys_per_ssa", &self.polys_per_ssa)
             .field("shares_per_poly", &self.shares_per_poly)
             .finish()
