@@ -160,7 +160,10 @@ enum SessionHandles {
 #[derive(Clone)]
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
-    num_errors: Arc<std::sync::atomic::AtomicUsize>,
+    /// Per-SSA-index error counts. Tracked independently so that errors from
+    /// a previous SSA cycle do not spill into the current one, which would give
+    /// a false closure signal.
+    current_ssa_errors: Arc<parking_lot::Mutex<std::collections::HashMap<u32, usize>>>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
 }
@@ -170,23 +173,29 @@ impl SessionSsaState {
         Self {
             // SSA index starts from 1, not 0.
             current_index: std::sync::atomic::AtomicU32::new(1).into(),
-            num_errors: Default::default(),
+            current_ssa_errors: Default::default(),
             polys_per_ssa,
             shares_per_poly,
         }
     }
 
-    pub fn increment_errors(&self) -> usize {
-        self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
+    /// Record an error for the given SSA index. Returns the **total** error
+    /// count for that index. Errors for indices other than the current one are
+    /// still tracked (for diagnostics) but the returned count is the caller's
+    /// view for closure decisions.
+    pub fn increment_errors(&self, ssa_index: u32) -> usize {
+        let mut guard = self.current_ssa_errors.lock();
+        let entry = guard.entry(ssa_index).or_insert(0);
+        *entry += 1;
+        *entry
     }
 
     pub fn increment_index(&self) -> SsaIndex {
-        // Errors reset with new SSA index
-        self.num_errors.store(0, std::sync::atomic::Ordering::Relaxed);
         SsaIndex::new(self.current_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
             .expect("ssa index cannot become 0 when incremented")
     }
 
+    /// Returns the current SSA index value.
     #[inline]
     pub const fn quota_per_ssa(&self) -> SsaQuota {
         pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
@@ -201,8 +210,8 @@ impl std::fmt::Debug for SessionSsaState {
                 &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
             )
             .field(
-                "num_errors",
-                &self.num_errors.load(std::sync::atomic::Ordering::Relaxed),
+                "current_ssa_errors",
+                &self.current_ssa_errors.lock(),
             )
             .field("polys_per_ssa", &self.polys_per_ssa)
             .field("shares_per_poly", &self.shares_per_poly)
@@ -1635,16 +1644,13 @@ where
             // SSA fully recovered — the next SSA request was already triggered by
             // SsaAlmostRecovered. Deposit-key processing is handled in the upper layer.
             HoprSessionInPixEvent::SsaRecovered(_) => {}
-            HoprSessionInPixEvent::UnverifiableShare(_) => {
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
                 )))?;
-                let num_errors = state.increment_errors();
-                trace!(%session_id, num_errors, "encountered unverifiable share in session with pix");
+                let num_errors = state.increment_errors(ssa_id.ssa_index().get());
+                trace!(%session_id, ssa_index = %ssa_id.ssa_index(), num_errors, "encountered unverifiable share in session with pix");
 
-                // The PIX shares can come from different polynomials, so we can only
-                // see the total number of unverifiable shares and make the Session closure
-                // decision based on that.
                 if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(session_id) {
                     error!(%session_id, "closed session due to too many unverifiable shares");
                 }
@@ -1783,7 +1789,7 @@ where
             );
 
             let in_quota_range = self.cfg.pix_config.quota_range.contains(&quota_per_ssa);
-            let valid_polys = polys_per_ssa <= MAX_POLYS_PER_SSA;
+            let valid_polys = (1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa);
             let valid_shares = (2_u16..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa);
             (in_quota_range && valid_polys && valid_shares).then_some((polys_per_ssa, shares_per_ssa))
         } else if self.cfg.pix_config.enforce_pix {
@@ -1933,10 +1939,11 @@ where
 
             // The Session request carries a "hint" as additional data telling what
             // the Session initiator has configured as its target buffer size in the Balancer.
-            let target_surb_buffer_size = if session_req.additional_data > 0 {
-                session_req
-                    .additional_data
-                    .min(self.cfg.maximum_surb_buffer_size as u64)
+            // The lower 32 bits contain the SURB target; the upper 32 bits carry PIX
+            // parameters and must be masked out.
+            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            let target_surb_buffer_size = if surb_target > 0 {
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
                 self.cfg.initial_return_session_egress_rate as u64
                     * self

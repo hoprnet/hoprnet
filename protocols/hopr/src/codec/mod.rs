@@ -576,6 +576,10 @@ mod tests {
                 }
             } else {
                 // Gap phase — no PIX share
+                assert!(
+                    out_packet.encrypted_pix_share.is_none(),
+                    "unexpected PIX share during gap at message #{i}"
+                );
                 no_share_indices.push(i);
 
                 // At the last message of this gap, set up the next commitment

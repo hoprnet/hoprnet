@@ -444,8 +444,8 @@ fn create_surb_for_path<
     );
 
     tracing::debug!(
-        "first relayer solution: {:?}",
-        first_relayer_solution.map(|s| s.to_hex())
+        has_first_relayer_solution = first_relayer_solution.is_some(),
+        "prepared return-path PoR data"
     );
 
     let (mut surb, (surb_id, ro)) = create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(

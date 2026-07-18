@@ -63,7 +63,14 @@ impl hopr_api::node::HoprSessionServer for SessionCaptureServer {
     type Session = IncomingSession;
 
     async fn process(&self, session: IncomingSession) -> Result<(), HoprLibError> {
-        self.captured.lock().unwrap().replace(session);
+        {
+            let mut captured = self.captured.lock().unwrap();
+            if captured.is_some() {
+                // Preserve the first session — ignore subsequent ones
+                return Ok(());
+            }
+            captured.replace(session);
+        }
         tracing::debug!("SessionCaptureServer captured incoming session");
         // Keep the future alive to stop the session from being dropped
         let () = futures::future::pending().await;

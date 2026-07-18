@@ -14,7 +14,7 @@ use crate::{
 /// an encrypted PIX share.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Debug, Clone, strum::EnumTryAs)]
+#[derive(Clone, strum::EnumTryAs)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),
@@ -36,6 +36,16 @@ impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
 }
 
 impl<P: Eq, A> Eq for ShareResolution<P, A> {}
+
+impl<P: std::fmt::Debug, A> std::fmt::Debug for ShareResolution<P, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RecoveredSsa(ssa) => f.debug_tuple("RecoveredSsa").field(ssa).finish(),
+            Self::AlmostRecoveredSsa(id) => f.debug_tuple("AlmostRecoveredSsa").field(id).finish(),
+            Self::InvalidShare(key, id) => f.debug_tuple("InvalidShare").field(key).field(id).finish(),
+        }
+    }
+}
 
 impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

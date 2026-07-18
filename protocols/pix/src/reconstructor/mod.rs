@@ -203,7 +203,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         polys_per_ssa: usize,
         shares_per_poly: usize,
     ) -> Result<PixGroup<S>, Self::Error> {
-        if polys_per_ssa > MAX_POLYS_PER_SSA as usize || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly) {
+        if !(1..=MAX_POLYS_PER_SSA as usize).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly) {
             return Err(PixError::InvalidInput);
         }
 

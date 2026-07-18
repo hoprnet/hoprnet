@@ -157,8 +157,14 @@ impl<P: std::fmt::Display> std::fmt::Display for SsaPolynomialId<P> {
 /// [`nonce`](TaggedEncryptedPartialSsaShare).
 ///
 /// See [`TaggedEncryptedPartialSsaShare`] and [`EncryptedPartialSsaShare`] for more details.
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Default, Hash, PartialEq, Eq)]
 pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
+
+impl<S: PixSpec> std::fmt::Debug for PartialSsaShare<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartialSsaShare").finish_non_exhaustive()
+    }
+}
 
 impl<S: PixSpec> PartialSsaShare<S> {
     /// Encrypts this partial SSA share using the given acknowledgement [`HalfKey`].
@@ -425,12 +431,20 @@ impl<S: PixSpec + Copy, P: Copy, T: Copy> Copy for TaggedEncryptedPartialSsaShar
 }
 
 /// Contains a generated share from a specific previously committed SSA.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct GeneratedShare<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     /// ID of the polynomial corresponding to the partial SSA share.
     pub id: SsaPolynomialId<P>,
     /// Generated partial SSA share.
     pub share: PartialSsaShare<S>,
+}
+
+impl<S: PixSpec, P: std::fmt::Debug> std::fmt::Debug for GeneratedShare<S, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GeneratedShare")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<S: PixSpec> GeneratedShare<S, S::Pseudonym> {
@@ -536,12 +550,20 @@ impl<P, A> SsaCommitmentState<P, A> {
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct RecoveredSsa<P, A> {
     /// ID of the SSA that was recovered.
     pub ssa_id: SsaId<P>,
     /// Recovered secret scalar (private key corresponding to the SSA deposit address).
     pub ssa: A,
+}
+
+impl<P: std::fmt::Debug, A> std::fmt::Debug for RecoveredSsa<P, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecoveredSsa")
+            .field("ssa_id", &self.ssa_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<P: PartialEq, A> PartialEq for RecoveredSsa<P, A> {

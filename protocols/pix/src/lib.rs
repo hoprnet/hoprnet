@@ -89,9 +89,15 @@ where
     type AddressPrivateKey: Clone + Send + Sync + 'static;
 
     /// Context data used to derive the SSA encryption key.
-    const KEY_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE";
+    const KEY_DERIVATION_CONTEXT: &'static str = "HASH_SSA_POLY_SHARE";
     /// Domain separator used to derive the X value of a share.
-    const HASH_SCALAR_DERIVATION_CONTEXT: &str = "HASH_SSA_POLY_SHARE_SCALAR";
+    const HASH_SCALAR_DERIVATION_CONTEXT: &'static str = "HASH_SSA_POLY_SHARE_SCALAR";
+
+    /// Stable, protocol-versioned hash-to-scalar suite identifier used for
+    /// domain separation. This must be a fixed string — deriving it dynamically
+    /// from Debug output would break wire compatibility when dependency versions
+    /// change formatting.
+    const HASH_TO_SCALAR_SUITE_ID: &'static [u8];
 
     /// Performs conversion of the given `spi` and `msg` into [`PixScalar`] of this spec.
     fn msg_to_scalar(
@@ -109,12 +115,7 @@ where
                 spi.poly_index().to_be_bytes().as_ref(),
             ],
             &[
-                format!(
-                    "{:?}_XMD:{:?}_SSWU_RO_",
-                    Self::Curve::default(),
-                    Self::Digest::default()
-                )
-                .as_bytes(),
+                Self::HASH_TO_SCALAR_SUITE_ID,
                 Self::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
             ],
         )
@@ -192,12 +193,16 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
 
     /// Converts this verifier into a tuple containing the [`SsaPolynomialId`] and the serialized polynomial
     /// coefficient commitments.
+    ///
+    /// The generator (first entry) is omitted by position. The remaining entries are all coefficient
+    /// commitments regardless of their value, because a coefficient commitment equal to the generator
+    /// validly represents scalar coefficient 1.
     pub fn into_serializable_commitments(self) -> (SsaPolynomialId<S::Pseudonym>, Vec<PixGroupRepr<S>>) {
         (
             self.spi,
             self.poly_commitment
                 .into_iter()
-                .filter(|s| s.0 != PixGroup::<S>::generator()) // Generator is typically the first entry
+                .skip(1) // Omit the structural generator at index 0 by position
                 .map(|c| c.to_bytes())
                 .collect(),
         )
@@ -206,6 +211,8 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
     /// Tries to create a new verifier from [`SsaPolynomialId`] and serialized polynomial coefficient commitments.
     ///
     /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
+    /// All received commitments are deserialized without value-based filtering — a coefficient commitment
+    /// equal to the generator validly represents scalar coefficient 1 and must be preserved.
     pub fn from_serializable_commitments(
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
@@ -221,11 +228,6 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
                     })
                     .map(ShareVerifierGroup::<PixGroup<S>>::from)
                     .ok_or(errors::PixError::InvalidInput)
-            })
-            .filter(|res: &errors::Result<ShareVerifierGroup<PixGroup<S>>, S::Pseudonym>| {
-                // Explicitly filter out the generator, because we're adding it later.
-                // It is therefore allowed for the generator not to be present in the commitments.
-                res.is_err() || res.as_ref().is_ok_and(|e| e.0 != PixGroup::<S>::generator())
             });
 
         // Re-add the generator as the first entry
@@ -321,6 +323,8 @@ pub(crate) mod tests {
         type DepositAddress = Address;
         type Digest = hopr_types::crypto::primitives::Sha3_256;
         type Pseudonym = SimplePseudonym;
+
+        const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:SHA3-256_SSWU_RO_";
 
         fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
             PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
@@ -426,7 +430,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn from_serializable_commitments_must_reject_all_generator() {
+    fn from_serializable_commitments_roundtrip_generator_valued_coefficients() -> errors::Result<(), <TestSpec as PixSpec>::Pseudonym> {
         let spi = SsaPolynomialId::new(
             SsaId::new(
                 SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
@@ -435,8 +439,12 @@ pub(crate) mod tests {
             1,
         );
         // A polynomial whose coefficient commitments are all the generator point:
-        // the filter removes every one and the result collapses to length 1.
+        // these must round-trip correctly since generator-valued coefficients are
+        // legitimate (they represent scalar coefficient 1).
         let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
-        assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator).is_err());
+        let verifier = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi.clone(), all_generator)?;
+        let (_, serialized) = verifier.into_serializable_commitments();
+        assert_eq!(serialized.len(), 10, "all generator-valued coefficients must be preserved");
+        Ok(())
     }
 }
