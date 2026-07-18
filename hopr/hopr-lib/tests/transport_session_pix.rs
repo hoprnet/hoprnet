@@ -188,23 +188,22 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
 
     // ── Observe PIX event cycles ──────────────────────────────────────────
     let target_cycles = 3u32;
-    let mut new_deposit_count = 0u32;
-    let mut pk_recovered_count = 0u32;
-    let mut completed_ssa_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
-    let mut pk_recovered_ssa_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut new_deposit_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut deposit_received_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut pk_recovered_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
 
     loop {
         tokio::select! {
             Some(event) = entry_events.next() => {
                 match event {
                     PixEvent::NewDepositAddress(data) => {
-                        new_deposit_count += 1;
-                        tracing::info!(
-                            new_deposit_count,
-                            id = ?data.id,
-                            quota = data.quota,
-                            "Entry: NewDepositAddress"
+                        assert!(
+                            !new_deposit_ids.contains(&data.id),
+                            "duplicate NewDepositAddress for same SSA — expected distinct cycles, got {:?}",
+                            data.id,
                         );
+                        new_deposit_ids.push(data.id);
+                        tracing::info!(id = ?data.id, quota = data.quota, "Entry: NewDepositAddress");
                     }
                     other => {
                         anyhow::bail!("unexpected Entry PixEvent: {other:?}");
@@ -214,11 +213,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             Some(event) = exit_events.next() => {
                 match event {
                     PixEvent::DepositAddressReceived(data) => {
-                        tracing::info!(
-                            id = ?data.id,
-                            quota = data.quota,
-                            "Exit: DepositAddressReceived"
-                        );
+                        tracing::info!(id = ?data.id, quota = data.quota, "Exit: DepositAddressReceived");
                         // Signal deposit immediately to abort the kill switch
                         if let Some(mut notifier) = data.deposit_updated {
                             notifier
@@ -227,16 +222,16 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                                 .context("failed to signal deposit via notifier")?;
                             tracing::info!(id = ?data.id, "deposit signaled");
                         }
+                        deposit_received_ids.push(data.id);
                     }
                     PixEvent::PrivateKeyRecovered(data) => {
                         assert!(
-                            !pk_recovered_ssa_ids.contains(&data.id),
+                            !pk_recovered_ids.contains(&data.id),
                             "duplicate PrivateKeyRecovered for same SSA — expected distinct cycles, got {:?}",
                             data.id,
                         );
-                        pk_recovered_ssa_ids.push(data.id);
-                        pk_recovered_count += 1;
-                        tracing::info!(pk_recovered_count, id = ?data.id, "Exit: PrivateKeyRecovered");
+                        pk_recovered_ids.push(data.id);
+                        tracing::info!(count = pk_recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
                     }
                     other => {
                         anyhow::bail!("unexpected Exit PixEvent: {other:?}");
@@ -245,20 +240,25 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             }
         }
 
-        if pk_recovered_count >= target_cycles {
+        if pk_recovered_ids.len() as u32 >= target_cycles {
             tracing::info!(target_cycles, "all PIX cycles completed");
             break;
         }
     }
 
-    // ── Assert minimum event counts ───────────────────────────────────────
+    // ── Assert lifecycle SSA ID correlation ───────────────────────────────
+    // Every completed SSA cycle must pass through all three lifecycle stages
+    // with the same ID: Entry generates a deposit address → Exit observes it
+    // → Exit recovers the private key.
+    let completed = new_deposit_ids
+        .iter()
+        .filter(|id| deposit_received_ids.contains(id) && pk_recovered_ids.contains(id))
+        .count();
     assert!(
-        new_deposit_count >= target_cycles,
-        "expected at least {target_cycles} NewDepositAddress on Entry, got {new_deposit_count}"
-    );
-    assert_eq!(
-        pk_recovered_count, target_cycles,
-        "expected {target_cycles} PrivateKeyRecovered on Exit, got {pk_recovered_count}"
+        completed >= target_cycles as usize,
+        "expected at least {target_cycles} fully correlated SSA cycles (ID seen in: NewDepositAddress, \
+         DepositAddressReceived, AND PrivateKeyRecovered), got {completed}. new_deposit_ids={new_deposit_ids:?}, \
+         deposit_received_ids={deposit_received_ids:?}, pk_recovered_ids={pk_recovered_ids:?}",
     );
 
     // ── Stop background data task ─────────────────────────────────────────

@@ -588,7 +588,7 @@ where
                         + size_of::<hopr_protocol_pix::SsaIndex>()
                         + size_of::<hopr_protocol_pix::CoefficientIndex>()
                         + size_of::<hopr_protocol_pix::PolynomialIndex>();
-                    while coefficient_commitments.len() < num_polys as usize {
+                    for _ in 0..num_polys {
                         // Still needs to be space left for Session ID at the end of commitments
                         if data.len()
                             <= next_offset
@@ -610,7 +610,9 @@ where
                                 .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
                         next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
 
-                        coefficient_commitments.insert(index, commitment);
+                        if coefficient_commitments.insert(index, commitment).is_some() {
+                            return Err(StartProtocolError::DuplicateCommitment);
+                        }
                     }
 
                     StartProtocol::SsaCommit(SsaClientCommitmentMessage {
@@ -640,7 +642,7 @@ where
                     next_offset += size_of::<u16>();
 
                     let mut commitments = std::collections::BTreeMap::new();
-                    while commitments.len() < num_commitments as usize {
+                    for _ in 0..num_commitments {
                         if data.len()
                             <= next_offset
                                 + size_of::<hopr_protocol_pix::SsaIndex>()
@@ -663,7 +665,9 @@ where
                                 .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
                         next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
 
-                        commitments.insert(ssa_index, commitment);
+                        if commitments.insert(ssa_index, commitment).is_some() {
+                            return Err(StartProtocolError::DuplicateCommitment);
+                        }
                     }
 
                     StartProtocol::SsaRequest(SsaServerCommitmentMessage {

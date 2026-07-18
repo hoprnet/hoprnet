@@ -518,7 +518,9 @@ impl<T: Hash + Eq> AbortableList<T> {
     /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn extend_from(&mut self, mut other: AbortableList<T>) {
         for (k, v) in other.0.drain(..) {
-            self.insert(k, v);
+            if let Some(old_task) = self.0.insert(k, v) {
+                old_task.abort_task();
+            }
         }
     }
 
@@ -530,7 +532,9 @@ impl<T: Hash + Eq> AbortableList<T> {
     /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn flat_map_extend_from<U>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
         for (k, v) in other.0.drain(..).map(|(k, v)| (key_map(k), v)) {
-            self.insert(k, v)
+            if let Some(old_task) = self.0.insert(k, v) {
+                old_task.abort_task();
+            }
         }
     }
 }

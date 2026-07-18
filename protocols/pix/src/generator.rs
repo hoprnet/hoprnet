@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 #[cfg(feature = "rayon")]
 use hopr_utils::parallelize::cpu::rayon::prelude::*;
+use validator::Validate;
 use vsss_rs::{
     DefaultShare, IdentifierPrimeField, Polynomial, Share, ShareElement, ShareVerifierGroup,
     elliptic_curve::{Field, Group, PrimeField, group::GroupEncoding, rand_core::CryptoRng},
@@ -76,9 +77,9 @@ fn new_polynomial_with_verifier<S: PixSpec>(
 pub struct SsaGeneratorConfig {
     /// The number of polynomials to generate per SSA commitment.
     ///
-    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 2 and [`MAX_POLYS_PER_SSA`].
+    /// Default is [`DEFAULT_POLYS_PER_SSA`], must be between 1 and [`MAX_POLYS_PER_SSA`].
     #[default(DEFAULT_POLYS_PER_SSA)]
-    #[validate(range(min = 2, max = MAX_POLYS_PER_SSA))]
+    #[validate(range(min = 1, max = MAX_POLYS_PER_SSA))]
     pub polynomials_per_ssa: u16,
     /// Minimum number of shares required to reconstruct each SSA polynomial.
     ///
@@ -88,9 +89,9 @@ pub struct SsaGeneratorConfig {
     pub threshold: u16,
     /// Additional number of shares to generate beyond the threshold for redundancy.
     ///
-    /// Default is 20, must be between 1 and 100.
+    /// Default is 20, must be between 0 and 4096.
     #[default(20)]
-    #[validate(range(min = 1, max = 100))]
+    #[validate(range(min = 0, max = 4096))]
     pub surplus_shares: usize,
 }
 
@@ -103,7 +104,11 @@ pub struct SsaShareGenerator<S: PixSpec> {
 
 impl<S: PixSpec> SsaShareGenerator<S> {
     /// Creates a new share generator with the provided configuration.
+    ///
+    /// # Panics
+    /// Panics if the configuration fails validation (e.g. zero polynomials, out-of-range threshold).
     pub fn new(cfg: SsaGeneratorConfig) -> Self {
+        cfg.validate().expect("invalid SsaGeneratorConfig");
         Self {
             polynomials: moka::sync::CacheBuilder::default()
                 .initial_capacity(100_000)

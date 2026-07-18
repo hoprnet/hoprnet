@@ -96,17 +96,25 @@ impl Expectation {
     }
 }
 
+struct MsgSenderInner {
+    expectations: Vec<Expectation>,
+    call_count: usize,
+}
+
 /// An expectation-based mock of [`SendMsg`].
+///
+/// Clones share the same mutable state — expectations and call counts
+/// are kept in an `Arc` so that all clones (e.g. the instance passed
+/// into a spawned task) observe the same calls and consume the same
+/// expectation slots.
 pub struct MsgSender {
-    expectations: parking_lot::Mutex<Vec<Expectation>>,
-    call_count: parking_lot::Mutex<usize>,
+    inner: std::sync::Arc<parking_lot::Mutex<MsgSenderInner>>,
 }
 
 impl Clone for MsgSender {
     fn clone(&self) -> Self {
         Self {
-            expectations: parking_lot::Mutex::new(self.expectations.lock().iter().cloned().collect()),
-            call_count: parking_lot::Mutex::new(*self.call_count.lock()),
+            inner: std::sync::Arc::clone(&self.inner),
         }
     }
 }
@@ -132,8 +140,10 @@ impl std::fmt::Debug for MsgSender {
 impl MsgSender {
     pub fn new() -> Self {
         Self {
-            expectations: parking_lot::Mutex::new(Vec::new()),
-            call_count: parking_lot::Mutex::new(0),
+            inner: std::sync::Arc::new(parking_lot::Mutex::new(MsgSenderInner {
+                expectations: Vec::new(),
+                call_count: 0,
+            })),
         }
     }
 
@@ -147,7 +157,7 @@ impl MsgSender {
     }
 
     fn add_expectation(&self, expectation: Expectation) {
-        self.expectations.lock().push(expectation);
+        self.inner.lock().expectations.push(expectation);
     }
 }
 
@@ -159,8 +169,14 @@ impl Default for MsgSender {
 
 impl Drop for MsgSender {
     fn drop(&mut self) {
+        // Only the last reference to the inner state validates expectations
+        // so that all clones share the same counter.
+        let inner = match std::sync::Arc::try_unwrap(self.inner.clone()) {
+            Ok(inner) => inner.into_inner(),
+            Err(_) => return,
+        };
         let mut errors = Vec::new();
-        for (i, e) in self.expectations.lock().iter().enumerate() {
+        for (i, e) in inner.expectations.iter().enumerate() {
             match &e.times {
                 Times::Exact(n) if e.times_remaining > 0 => {
                     errors.push(format!(
@@ -186,13 +202,10 @@ impl Drop for MsgSender {
 #[async_trait::async_trait]
 impl SendMsg for MsgSender {
     async fn send_message(&self, routing: DestinationRouting, data: ApplicationDataOut) -> errors::Result<()> {
-        {
-            let mut count = self.call_count.lock();
-            *count += 1;
-        }
-
         let response = {
-            let mut guard = self.expectations.lock();
+            let mut guard = self.inner.lock();
+            guard.call_count += 1;
+            let call_count = guard.call_count;
 
             // Find the expectation to handle this call:
             // 1. rposition finds the LAST Exact expectation that still has remaining calls. This ensures Exact
@@ -200,18 +213,18 @@ impl SendMsg for MsgSender {
             //    overflow calls.
             // 2. If no Exact matches, position finds the first AtLeast whose minimum is met.
             // 3. If neither finds anything, the call is unexpected.
-            let call_count = *self.call_count.lock();
             let idx = guard
+                .expectations
                 .iter()
                 .rposition(|e| matches!(&e.times, Times::Exact(_)) && e.times_remaining > 0)
                 .or_else(|| {
-                    guard.iter().position(|e| match &e.times {
+                    guard.expectations.iter().position(|e| match &e.times {
                         Times::Exact(_) => false,
                         Times::AtLeast(n) => call_count >= *n,
                     })
                 })
                 .expect("send_message called but no expectations match this call");
-            let exp = &mut guard[idx];
+            let exp = &mut guard.expectations[idx];
             match &exp.times {
                 Times::Exact(_) => {
                     if exp.times_remaining == 0 {

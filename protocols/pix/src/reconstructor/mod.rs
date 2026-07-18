@@ -9,6 +9,7 @@ use hopr_types::{
     internal::prelude::Acknowledgement,
 };
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
+use validator::Validate;
 
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
@@ -103,6 +104,7 @@ impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
 
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
+        cfg.validate().expect("invalid SsaReconstructorConfig");
         Self {
             commitment_builder: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_commitment_lifetime)

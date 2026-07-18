@@ -19,33 +19,20 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
 
     for &threshold in &THRESHOLDS {
         for &polynomials_per_ssa in &POLYNOMIALS {
-            let cfg = SsaGeneratorConfig {
-                threshold,
-                polynomials_per_ssa,
-                ..Default::default()
-            };
-            let generator = SsaShareGenerator::<TestSpec>::new(cfg);
-
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{threshold}_p{polynomials_per_ssa}")),
                 &(threshold, polynomials_per_ssa),
                 |b, _| {
-                    // A fresh, random pseudonym is generated for every iteration in the
-                    // untimed setup closure. This matters: committing repeatedly for the
-                    // *same* pseudonym takes `new_ssa_commitment`'s "append to existing
-                    // entry" branch, which pushes another `p` polynomials onto that
-                    // pseudonym's queue on every call. Because `next_share` is never
-                    // invoked here, that queue would never drain and would grow without
-                    // bound *inside the measured region*, polluting the timing with
-                    // ever-growing allocation/reallocation cost (and eventually leaking
-                    // gigabytes of live scalars). Using a distinct pseudonym per
-                    // iteration keeps every call on the constant-cost "fresh entry"
-                    // branch, which is exactly the operation we want to measure. The
-                    // returned commitment is handed back so it is dropped outside the
-                    // timed region and cannot be optimized away.
                     b.iter_batched(
-                        SimplePseudonym::random,
-                        |pseudonym| generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap(),
+                        || {
+                            let cfg = SsaGeneratorConfig {
+                                threshold,
+                                polynomials_per_ssa,
+                                ..Default::default()
+                            };
+                            (SsaShareGenerator::<TestSpec>::new(cfg), SimplePseudonym::random())
+                        },
+                        |(generator, pseudonym)| generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap(),
                         BatchSize::SmallInput,
                     );
                 },
