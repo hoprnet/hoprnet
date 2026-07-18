@@ -183,7 +183,7 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_SESSION_PIX_CURRENT_SSA_PHASE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
         "hopr_session_pix_current_ssa_phase",
-        "Current PIX SSA phase per SSA: 0=AwaitingCommitment, 1=AwaitingDeposit, 2=Recovering, 3=Recovered",
+        "Current PIX SSA phase per SSA: 0=AwaitingCommitment, 1=AwaitingDeposit, 3=Recovered",
         &["session_id", "ssa_index"]
     ).unwrap();
     static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
