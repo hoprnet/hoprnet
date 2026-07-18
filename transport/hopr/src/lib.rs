@@ -330,7 +330,10 @@ where
 
         // Cross-validate PIX supervisor config against the reconstructor config.
         let pix_cfg = cfg.incoming_session_pix_config.supervisor_cfg.clone();
-        let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig::default();
+        let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig {
+            max_concurrent_sessions: cfg.incoming_session_pix_config.max_concurrent_sessions,
+            ..Default::default()
+        };
         validate_pix_supervision(&pix_cfg, &reconstructor_cfg)
             .map_err(|e| HoprTransportError::Api(format!("PIX supervision config validation failed: {e}")))?;
 

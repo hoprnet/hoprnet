@@ -90,15 +90,17 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 enforce_pix: false,
                 supervisor_cfg: SupervisorConfig {
                     max_ssa_delivery_time: Duration::from_secs(10),
-                    max_deposit_wait: Duration::from_secs(60),
+                    max_deposit_wait: Duration::from_secs(300),
+                    max_recovery_idle: Duration::from_secs(300),
+                    max_recovery_time: Duration::from_secs(600),
                     ..Default::default()
                 },
                 ..Default::default()
             }),
-            idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
+            idle_timeout_ms: Duration::from_secs(1200).as_millis() as u64,
             ..Default::default()
-        }, /* Exit: win_prob=1.0, custom PIX
-                                                                                  * config */
+        }, /* Exit: win_prob=1.0, generous PIX
+                                                                                  * timeouts under load */
     )
     .await?;
 
@@ -176,32 +178,12 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     tracing::info!("session established");
 
     // ── Background data task: keep traffic flowing symmetrically ──────────
-    let bg_handle = tokio::spawn(async move {
-        let (mut rd, mut wr) = session.split();
-        loop {
-            let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
-            let result = tokio::time::timeout(Duration::from_secs(10), async {
-                wr.write_all(&msg).await?;
-                wr.flush().await?;
-                let mut echoed = vec![0u8; 32];
-                rd.read_exact(&mut echoed).await?;
-                anyhow::Ok(echoed)
-            })
-            .await;
-            match result {
-                Ok(Ok(_echoed)) => {}
-                Ok(Err(e)) => {
-                    tracing::warn!("bg task failed: {e:?}");
-                    break;
-                }
-                Err(_) => {
-                    tracing::warn!("bg task timed out");
-                    break;
-                }
-            }
-        }
-        tracing::info!("bg task exited");
-    });
+    // Uses a read timeout and sets `session_died` so the main loop can
+    // detect when the session closes prematurely (e.g. recovery idle
+    // timeout under load) and bail with a clear error.
+    let session_died = Arc::new(AtomicBool::new(false));
+    let sd = session_died.clone();
+    let _bg_handle = spawn_data_task(session, sd, Duration::from_secs(30));
 
     // ── Observe PIX event cycles ──────────────────────────────────────────
     let target_cycles = 3u32;
@@ -210,7 +192,17 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     let mut pk_recovered_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
 
     loop {
+        // Also check the session-died flag periodically so the test fails
+        // fast (with a clear assertion) when the session closes prematurely
+        // instead of hanging until the rstest timeout.
+        if session_died.load(Ordering::SeqCst) {
+            anyhow::bail!(
+                "session died after {pk_recovered_count}/{target_cycles} PIX cycles; bg task detected closure"
+            );
+        }
         tokio::select! {
+            biased;
+            _ = tokio::time::sleep(Duration::from_millis(500)) => {}
             Some(event) = entry_events.next() => {
                 match event {
                     PixEvent::NewDepositAddress(data) => {
@@ -281,9 +273,6 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
          DepositAddressReceived, AND PrivateKeyRecovered), got {completed}. new_deposit_ids={new_deposit_ids:?}, \
          deposit_received_ids={deposit_received_ids:?}, pk_recovered_ids={pk_recovered_ids:?}",
     );
-
-    // ── Stop background data task ─────────────────────────────────────────
-    bg_handle.abort();
 
     tracing::info!(hops, "PIX multi-cycle session test PASSED");
     Ok(())

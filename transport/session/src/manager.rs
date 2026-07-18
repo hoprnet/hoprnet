@@ -34,10 +34,11 @@ use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    self, PixSsaPhase, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state,
-    set_pix_current_ssa_phase, set_pix_gate_mode, set_pix_recovery_progress, set_session_balancer_data,
+    self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
+#[cfg(all(feature = "telemetry", not(test)))]
+use crate::telemetry::{PixSsaPhase, set_pix_current_ssa_phase, set_pix_gate_mode, set_pix_recovery_progress};
 use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
     SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
@@ -329,6 +330,15 @@ pub struct IncomingSessionPixConfig {
     /// and tombstones for incoming PIX sessions.
     #[default(_code = "SupervisorConfig::default()")]
     pub supervisor_cfg: SupervisorConfig,
+    /// Maximum number of concurrent sessions expected on this Exit node.
+    ///
+    /// Used to size per-SSA caches in the SSA reconstructor (each session
+    /// tracks at most 3 SSAs concurrently). Should match
+    /// [`SessionManagerConfig::maximum_sessions`].
+    ///
+    /// Default: 10_000.
+    #[default(10_000)]
+    pub max_concurrent_sessions: u16,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1664,7 +1674,9 @@ where
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
         let session_id = event.pseudonym();
         let Some(slot) = self.sessions.get(event.pseudonym()) else {
-            error!(%session_id, "trying to dispatch pix event on a non-existing session");
+            // Late PIX events for a just-closed session are benign —
+            // the 30-second ack window produces expected traffic.
+            debug!(%session_id, "trying to dispatch pix event on a non-existing session");
             return Err(SessionManagerError::NonExistingSession.into());
         };
 
@@ -1677,7 +1689,11 @@ where
             HoprSessionInPixEvent::Progress(p) => {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 if p.target_useful_shares > 0 {
-                    set_pix_recovery_progress(&session_id, p.useful_shares as f64 / p.target_useful_shares as f64);
+                    set_pix_recovery_progress(
+                        session_id,
+                        p.ssa_id.ssa_index(),
+                        p.useful_shares as f64 / p.target_useful_shares as f64,
+                    );
                 }
                 SessionPixEvent::RecoveryProgress(*p)
             }
@@ -1692,7 +1708,7 @@ where
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => SessionPixEvent::AlmostRecovered(*ssa_id),
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
                 #[cfg(all(feature = "telemetry", not(test)))]
-                set_pix_current_ssa_phase(&session_id, ssa_id.ssa_index(), PixSsaPhase::Recovered);
+                set_pix_current_ssa_phase(session_id, ssa_id.ssa_index(), PixSsaPhase::Recovered);
                 SessionPixEvent::Recovered(*ssa_id)
             }
         };
@@ -2327,7 +2343,10 @@ where
                             // Look up the session slot and send the request.
                             if let Some(s) = myself.sessions.get(&session_id) {
                                 let result = myself.send_ssa_request(session_id, &s, ssa_id.ssa_index()).await;
-                                if let Some(handle) = s.pix_supervisor.get()
+                                let send_ok = result.is_ok();
+                                // Only register the SSA as sent if the wire write succeeded.
+                                if send_ok
+                                    && let Some(handle) = s.pix_supervisor.get()
                                     && handle
                                         .send_event(SessionPixEvent::SsaRequestSent(ssa_id))
                                         .await
@@ -2336,12 +2355,13 @@ where
                                     error!(%session_id, "failed to send SsaRequestSent to PIX supervisor");
                                 }
                                 if let Some(handle) = s.pix_supervisor.get()
-                                    && handle.send_action_result(action_key, result.is_ok()).await.is_err()
+                                    && handle.send_action_result(action_key, send_ok).await.is_err()
                                 {
                                     error!(%session_id, "failed to send action result to PIX supervisor");
                                 }
-                                if let Ok(guard) = result {
-                                    retirement.guards.push(guard);
+                                if send_ok {
+                                    // SAFETY: checked by send_ok above.
+                                    retirement.guards.push(result.unwrap());
                                 }
                             } else {
                                 // Slot missing — supervisor must have already closed it.
@@ -2372,8 +2392,8 @@ where
                         }
                         SessionPixAction::Close(reason) => {
                             // Poison the gate so any parked writers are
-                            // unblocked (they hang on pending() until the
-                            // session task is aborted).
+                            // unblocked with an io::Error (GateClosed),
+                            // rather than hanging on pending().
                             gate.poison();
                             // Retire all tracked SSAs from the reconstructor.
                             retirement.retire_all();
@@ -2391,8 +2411,8 @@ where
                 }
                 // action channel closed: supervisor worker died.
                 // Poison the gate so any parked writers are
-                // unblocked (they hang on pending() until the
-                // session task is aborted).
+                // unblocked with an io::Error (GateClosed),
+                // rather than hanging on pending().
                 gate.poison();
                 // Retire all tracked SSAs from the reconstructor.
                 retirement.retire_all();
@@ -5936,8 +5956,9 @@ mod tests {
 
     /// A writer holding the session object must observe an error (not hang
     /// forever) when the PIX supervisor closes the session and poisons the
-    /// egress gate. Currently the egress adapter parks on `pending()`, so a
-    /// one-way writer that never reads hangs indefinitely.
+    /// egress gate. Previously the egress adapter parked on `pending()`, so a
+    /// one-way writer that never read hung indefinitely. Now gate poison
+    /// surfaces an io::Error via GateClosed.
     #[test_log::test(tokio::test)]
     async fn writer_on_poisoned_gate_errors_out() -> anyhow::Result<()> {
         use futures::AsyncWriteExt;

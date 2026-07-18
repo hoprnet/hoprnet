@@ -358,16 +358,11 @@ pub const SWARM_N: usize = 9;
 ///
 /// Coverage instrumentation adds ~2-3x overhead, so we double the timeout
 /// when running under `cargo llvm-cov` (which sets `cfg(coverage)`).
-///
-/// Even non-coverage runs set 8 minutes because `#[serial]` tests within
-/// the same binary queue behind each other.  A binary with ~6 serial tests
-/// totaling ~280 s of wall-clock can cause the last test to fire the rstest
-/// timeout before acquiring the serial mutex.
 #[allow(unexpected_cfgs)]
 pub const TEST_GLOBAL_TIMEOUT: Duration = if cfg!(coverage) {
-    Duration::from_mins(16)
-} else {
     Duration::from_mins(8)
+} else {
+    Duration::from_mins(4)
 };
 
 lazy_static::lazy_static! {

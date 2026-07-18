@@ -330,6 +330,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 /// This is a move-only type (no `Clone`, no `Copy`) to maintain single-ownership
 /// of the commitment lifecycle.
 #[must_use = "SsaCommitmentGuard does nothing if unused — the SSA will be immediately retired"]
+#[allow(clippy::type_complexity)]
 pub struct SsaCommitmentGuard<S: PixSpec + Clone>(Option<(Arc<SsaReconstructor<S>>, SsaId<S::Pseudonym>)>);
 
 impl<S: PixSpec + Clone> std::fmt::Debug for SsaCommitmentGuard<S> {
@@ -381,6 +382,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// transfer it to a permanent owner (e.g., the PIX action driver's retirement guard).
     ///
     /// On duplicate, returns [`PixError::DuplicateCommitment`] — no guard is created.
+    #[allow(clippy::type_complexity)]
     pub fn new_guarded_exit_commitment(
         self: &Arc<Self>,
         id: SsaId<S::Pseudonym>,

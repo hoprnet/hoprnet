@@ -192,7 +192,7 @@ vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
 hopr-api = "1.15.0"
 hopr-types = { version = "2.0.0", features = ["use-bindings"] }
-hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
+hopr-utils = { version = "0.4.0", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.5.0", path = "crypto/packet", default-features = false, features = [
@@ -204,7 +204,7 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "4.8.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
 ] }
-hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-features = false, features = [
+hopr-protocol-pix = { version = "0.2.0", path = "protocols/pix", default-features = false, features = [
   "rayon",
 ] }
 hopr-protocol-session = { version = "1.2.3", path = "protocols/session", default-features = false }
