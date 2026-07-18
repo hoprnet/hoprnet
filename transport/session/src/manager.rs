@@ -5336,4 +5336,43 @@ mod tests {
 
         Ok(())
     }
+
+    /// Verifies that `new_session` rejects `UsePIX` when the return path has 0 hops
+    /// (no SURB mechanism to deliver PIX shares).
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_with_zero_return_hops() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // new_session must not send any message — it should fail before that.
+        transport
+            .expect_send_message()
+            .times(0)
+            .returning(|_, _| futures::future::ok(()).boxed());
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None)?;
+
+        let dst: Address = (&ChainKeypair::random()).into();
+        let result = mgr
+            .new_session(
+                dst,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    return_path_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+                    pix_ssa_quota: Some((2, 2)),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "new_session with UsePIX and 0-hop return should fail"
+        );
+
+        Ok(())
+    }
 }
