@@ -1128,35 +1128,41 @@ where
         }
 
         // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data
-        if cfg.capabilities.contains(Capability::UsePIX)
-            && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
-        {
-            // Validate that PIX toolbox is available before advertising UsePIX
-            if self.pix_toolbox.get().is_none() {
-                return Err(
-                    SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
-                );
-            }
-            // PIX shares are delivered via return-path SURBs — a 0-hop return path
-            // means there is no SURB mechanism, so PIX is impossible.
+        if cfg.capabilities.contains(Capability::UsePIX) {
+            // PIX requires at least 1 intermediate hop on the return path so that PIX
+            // shares can be encrypted with the first relayer's ticket-challenge solution
+            // (`HalfKey`) and delivered via return-path SURBs. With 0 intermediate hops
+            // (a direct Exit→Entry SURB), there is no relayer to provide the challenge
+            // solution, so shares are never embedded — the ongoing PIX share delivery
+            // mechanism is dead and the Exit's quota is never replenished.
             if cfg.return_path_options.count_hops() == 0 {
                 return Err(SessionManagerError::Other(anyhow!(
-                    "UsePIX requested with 0-hop return path — PIX requires at least 1 return hop for SURB delivery"
+                    "UsePIX requires at least 1 intermediate hop on the return path, got 0"
                 ))
                 .into());
             }
-            // Validate dimensions are within protocol limits
-            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
-            {
-                return Err(SessionManagerError::Other(anyhow!(
-                    "invalid PIX dimensions: polys={}, shares={}",
-                    polys_per_ssa,
-                    shares_per_ssa,
-                ))
-                .into());
+
+            if let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota {
+                // Validate that PIX toolbox is available before advertising UsePIX
+                if self.pix_toolbox.get().is_none() {
+                    return Err(
+                        SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
+                    );
+                }
+                // Validate dimensions are within protocol limits
+                if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa)
+                    || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+                {
+                    return Err(SessionManagerError::Other(anyhow!(
+                        "invalid PIX dimensions: polys={}, shares={}",
+                        polys_per_ssa,
+                        shares_per_ssa,
+                    ))
+                    .into());
+                }
+                let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
+                additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
             }
-            let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
-            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }
 
         // Prepare the session initiation message in the Start protocol
@@ -4376,6 +4382,55 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that `new_session` rejects `UsePIX` when the return path has 0 intermediate hops.
+    ///
+    /// PIX shares are encrypted with the first relayer's ticket-challenge solution and carried
+    /// in return-path SURBs. With 0 intermediate hops (a direct Exit→Entry SURB), there is no
+    /// relayer to provide the challenge solution, so shares are never embedded — the ongoing
+    /// PIX share delivery mechanism is dead and the Exit's quota is never replenished.
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_with_zero_return_hops() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect_send_message should NOT fire.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None)?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    pix_ssa_quota: Some((2, 2)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(0.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("UsePIX requires at least 1 intermediate hop on the return path"),
+            "expected return-path guard error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        sender.close_channel();
+        let _ = _handle.await;
+        Ok(())
+    }
+
     // ---------------------------------------------------------------------------
     // PIX protocol tests
     // ---------------------------------------------------------------------------
@@ -5336,42 +5391,6 @@ mod tests {
 
         bob_sender.close_channel();
         let _ = bob_handle.await;
-
-        Ok(())
-    }
-
-    /// Verifies that `new_session` rejects `UsePIX` when the return path has 0 hops
-    /// (no SURB mechanism to deliver PIX shares).
-    #[test_log::test(tokio::test)]
-    async fn new_session_rejects_usepix_with_zero_return_hops() -> anyhow::Result<()> {
-        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default());
-
-        let mut transport = MockMsgSender::new();
-        // new_session must not send any message — it should fail before that.
-        transport
-            .expect_send_message()
-            .times(0)
-            .returning(|_, _| futures::future::ok(()).boxed());
-        let (sender, _handle) = mock_packet_planning(transport);
-        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
-        mgr.start(sender.clone(), new_session_tx, None)?;
-
-        let dst: Address = (&ChainKeypair::random()).into();
-        let result = mgr
-            .new_session(
-                dst,
-                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                SessionClientConfig {
-                    capabilities: Capability::UsePIX.into(),
-                    return_path_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
-                    pix_ssa_quota: Some((2, 2)),
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        assert!(result.is_err(), "new_session with UsePIX and 0-hop return should fail");
 
         Ok(())
     }

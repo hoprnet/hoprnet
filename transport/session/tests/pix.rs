@@ -7,7 +7,10 @@ use futures::{AsyncWriteExt, StreamExt, pin_mut};
 use hopr_api::types::{
     crypto::{keypairs::ChainKeypair, prelude::Keypair},
     crypto_random::Randomizable,
-    internal::{prelude::HoprPseudonym, routing::SurbMatcher},
+    internal::{
+        prelude::HoprPseudonym,
+        routing::{RoutingOptions, SurbMatcher},
+    },
     primitive::prelude::Address,
 };
 use hopr_protocol_app::v1::ApplicationData;
@@ -254,6 +257,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
                     pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
             ),
