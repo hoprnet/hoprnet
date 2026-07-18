@@ -376,7 +376,11 @@ where
                 let total_coeff_commit_len = (size_of::<hopr_protocol_pix::PolynomialIndex>() + size_of::<G>())
                     * commit.coefficient_commitments.len();
 
-                let avail_space = data.spare_capacity_mut().len() - session_id.len();
+                // Remaining payload budget: the final `out` buffer contains
+                // version (1) + disc (1) + data_len (2) + data contents = 4 + data.len(),
+                // which must fit within PAYLOAD_SIZE.  Check using explicit arithmetic
+                // rather than Vec::spare_capacity_mut() which reflects pre-allocation.
+                let avail_space = ApplicationData::PAYLOAD_SIZE.saturating_sub(4 + data.len() + session_id.len());
                 if commit.coefficient_commitments.is_empty() || total_coeff_commit_len > avail_space {
                     return Err(StartProtocolError::NumberOfCommitments);
                 }
@@ -404,7 +408,11 @@ where
 
                 let required_size = (size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<G>()) * req.commitments.len();
 
-                let avail_space = data.spare_capacity_mut().len() - session_id.len();
+                // Remaining payload budget: the final `out` buffer contains
+                // version (1) + disc (1) + data_len (2) + data contents = 4 + data.len(),
+                // which must fit within PAYLOAD_SIZE.  Check using explicit arithmetic
+                // rather than Vec::spare_capacity_mut() which reflects pre-allocation.
+                let avail_space = ApplicationData::PAYLOAD_SIZE.saturating_sub(4 + data.len() + session_id.len());
                 if req.commitments.is_empty() || required_size > avail_space {
                     return Err(StartProtocolError::NumberOfCommitments);
                 }
@@ -460,7 +468,7 @@ where
         ) as usize;
         let data_offset = 2 + size_of::<u16>();
 
-        if data.len() < data_offset + len {
+        if data.len() != data_offset + len {
             return Err(StartProtocolError::InvalidLength);
         }
 

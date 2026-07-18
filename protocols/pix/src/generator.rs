@@ -88,8 +88,9 @@ pub struct SsaGeneratorConfig {
     pub threshold: u16,
     /// Additional number of shares to generate beyond the threshold for redundancy.
     ///
-    /// Default is 20.
+    /// Default is 20, must be between 1 and 100.
     #[default(20)]
+    #[validate(range(min = 1, max = 100))]
     pub surplus_shares: usize,
 }
 

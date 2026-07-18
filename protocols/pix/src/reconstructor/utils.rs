@@ -190,11 +190,16 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             return Err(errors::PixError::InvalidInput);
         }
 
+        // Collect and validate all items before mutating state (transactional).
+        let mut validated: Vec<(PolynomialIndex, PixGroupRepr<S>)> = Vec::new();
         for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
             if polynomial_index >= self.num_polys as PolynomialIndex {
                 return Err(errors::PixError::InvalidInput);
             }
+            validated.push((polynomial_index, polynomial_coeff_commitment));
+        }
 
+        for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
             polynomial.entry(coeff_index).or_insert(polynomial_coeff_commitment);
         }

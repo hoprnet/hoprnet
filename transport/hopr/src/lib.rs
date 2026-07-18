@@ -721,6 +721,12 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        // The SSA generator is dimensioned from the global PIX config (not per
+        // session) because `handle_ssa_request` (SessionManager) validates that the
+        // Exit's negotiated quota matches the session's `pix_ssa_quota` before any
+        // client commitments are generated, and the Exit's `new_exit_commitment`
+        // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
+        // a subset of what the global generator covers, so one generator suffices.
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,

@@ -68,6 +68,8 @@ struct Expectation {
     times: Times,
     /// Only used when `times` is `Exact` — counts remaining calls.
     times_remaining: usize,
+    /// Tracks actual matched calls for `AtLeast` expectations; validated on Drop.
+    matched_calls: usize,
 }
 
 impl Expectation {
@@ -89,6 +91,7 @@ impl Expectation {
             factory,
             times,
             times_remaining,
+            matched_calls: 0,
         }
     }
 }
@@ -115,6 +118,7 @@ impl Clone for Expectation {
             factory: std::sync::Arc::clone(&self.factory),
             times: self.times.clone(),
             times_remaining: self.times_remaining,
+            matched_calls: self.matched_calls,
         }
     }
 }
@@ -155,12 +159,26 @@ impl Default for MsgSender {
 
 impl Drop for MsgSender {
     fn drop(&mut self) {
-        let times_left: usize = self.expectations.lock().iter().map(|e| e.times_remaining).sum();
-        if times_left > 0 {
-            panic!(
-                "MsgSender expectations not fulfilled: {} call(s) still expected",
-                times_left
-            );
+        let mut errors = Vec::new();
+        for (i, e) in self.expectations.lock().iter().enumerate() {
+            match &e.times {
+                Times::Exact(n) if e.times_remaining > 0 => {
+                    errors.push(format!(
+                        "expectation[{}]: expected {} more call(s)",
+                        i, e.times_remaining
+                    ));
+                }
+                Times::AtLeast(n) if e.matched_calls < *n => {
+                    errors.push(format!(
+                        "expectation[{}]: expected at least {} call(s), got {}",
+                        i, n, e.matched_calls
+                    ));
+                }
+                _ => {}
+            }
+        }
+        if !errors.is_empty() {
+            panic!("MsgSender expectations not fulfilled:\n  {}", errors.join("\n  "));
         }
     }
 }
@@ -194,7 +212,7 @@ impl SendMsg for MsgSender {
                 })
                 .expect("send_message called but no expectations match this call");
             let exp = &mut guard[idx];
-            let times_left = match &exp.times {
+            match &exp.times {
                 Times::Exact(_) => {
                     if exp.times_remaining == 0 {
                         panic!(
@@ -202,19 +220,23 @@ impl SendMsg for MsgSender {
                             idx
                         );
                     }
+                    // Check matcher BEFORE mutating state so a failing matcher
+                    // does not consume the call slot (Thread 38).
+                    if !(exp.matcher)(&routing, &data) {
+                        panic!("send_message called with arguments that do not match the expectation");
+                    }
                     exp.times_remaining -= 1;
-                    exp.times_remaining
                 }
                 Times::AtLeast(n) => {
                     if call_count < *n {
                         panic!("send_message called {} times but at least {} expected", call_count, n);
                     }
-                    0
+                    if !(exp.matcher)(&routing, &data) {
+                        panic!("send_message called with arguments that do not match the expectation");
+                    }
+                    exp.matched_calls += 1;
                 }
             };
-            if times_left > 0 && !(exp.matcher)(&routing, &data) {
-                panic!("send_message called with arguments that do not match the expectation");
-            }
             (exp.factory)(routing, data)
         };
 
