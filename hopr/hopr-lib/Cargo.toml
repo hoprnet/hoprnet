@@ -30,6 +30,10 @@ name = "chain_operations-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "session_integration_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "stress_cluster-size3"
 required-features = ["testing"]
 
@@ -47,6 +51,10 @@ required-features = ["testing"]
 
 [[test]]
 name = "transport_session-size3"
+required-features = ["testing"]
+
+[[test]]
+name = "transport_session_pix"
 required-features = ["testing"]
 
 [[test]]

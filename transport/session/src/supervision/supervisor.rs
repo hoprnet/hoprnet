@@ -120,10 +120,6 @@ pub struct SessionPixSupervisor {
     /// SSA indices that have been retired (closed and removed).
     /// Prevents stale SsaRequestSent events from resurrecting closed SSAs.
     retired_ssa_indices: Vec<SsaIndex>,
-    /// Number of SSA requests in flight (RequestSsa sent, but no
-    /// SsaRequestSent ack yet). Prevents premature session close when
-    /// a successor request is still on the wire.
-    pending_requests: usize,
 }
 
 impl SessionPixSupervisor {
@@ -145,7 +141,6 @@ impl SessionPixSupervisor {
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
             retired_ssa_indices: Vec::new(),
-            pending_requests: 0,
         };
 
         let actions = s.emit_request_next_ssa(now);
@@ -240,11 +235,11 @@ impl SessionPixSupervisor {
         }
 
         // If no SSAs remain, close.
-        // Note: pending_requests is intentionally not checked here — the
-        // tombstone retention window provides sufficient backstop, and the
-        // successor request may still be in the action channel (not yet on
-        // the wire). The theoretical LOW-12 hole (>30 s transport stall) is
-        // a LOW-severity edge case that does not warrant blocking normal
+        // Note: a successor request may still be in flight here (RequestSsa
+        // emitted, SsaRequestSent not yet observed) — intentionally not
+        // tracked. The tombstone retention window is the backstop; a request
+        // delayed beyond it (>30 s transport stall on an otherwise healthy
+        // session) is theoretical and does not warrant blocking normal
         // tombstone expiry.
         if self.ssas.is_empty() && !self.closed {
             actions.push(SessionPixAction::Close(
@@ -307,9 +302,6 @@ impl SessionPixSupervisor {
     // ------------------------------------------------------------------
 
     fn on_ssa_request_sent(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
-        // Acknowledge the in-flight request (matched to emit_request_next_ssa's increment).
-        self.pending_requests = self.pending_requests.saturating_sub(1);
-
         // Guard: ignore if we already have state (idempotent).
         if self.find_ssa(ssa_id).is_some() {
             return Vec::new();
@@ -738,7 +730,6 @@ impl SessionPixSupervisor {
         }
 
         let ssa_id = SsaId::new(self.pseudonym, ssa_index);
-        self.pending_requests += 1;
         vec![SessionPixAction::RequestSsa {
             ssa_id,
             polys: self.dims.polys,

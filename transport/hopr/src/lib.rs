@@ -1284,11 +1284,22 @@ async fn share_resolution_to_pix_event(
     resolution: HoprShareResolution,
     smgr: Arc<HoprSessionManager>,
 ) -> Option<PixEvent> {
+    // Late PIX events for a just-closed session (bounded by the 30 s ack
+    // window) are expected traffic and already debug-logged by
+    // `dispatch_pix_event` — only unexpected dispatch failures are errors.
+    fn is_closed_session(error: &TransportSessionError) -> bool {
+        matches!(
+            error,
+            TransportSessionError::Manager(SessionManagerError::NonExistingSession)
+        )
+    }
+
     match resolution {
         ShareResolution::RecoveredSsa(ssa_recovery_event) => {
             if let Err(error) = smgr
                 .dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_recovery_event.ssa_id))
                 .await
+                && !is_closed_session(&error)
             {
                 tracing::error!(%error, "failed to dispatch SSA recovery PIX event to the SessionManager");
             }
@@ -1298,6 +1309,7 @@ async fn share_resolution_to_pix_event(
             if let Err(error) = smgr
                 .dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
                 .await
+                && !is_closed_session(&error)
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch early SSA recovery event to the SessionManager");
             }
@@ -1312,13 +1324,16 @@ async fn share_resolution_to_pix_event(
             if let Err(error) = smgr
                 .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
                 .await
+                && !is_closed_session(&error)
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
             None
         }
         ShareResolution::Progress(p) => {
-            if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::Progress(p)).await {
+            if let Err(error) = smgr.dispatch_pix_event(HoprSessionInPixEvent::Progress(p)).await
+                && !is_closed_session(&error)
+            {
                 tracing::error!(%error, "failed to dispatch PIX progress event to the SessionManager");
             }
             None
