@@ -489,6 +489,110 @@ mod tests {
     }
 
     #[test]
+    fn reconstructor_rejects_duplicate_share_via_different_challenges() -> anyhow::Result<()> {
+        // Use the generator pipeline to create real ECC-valid shares.
+        // 1 poly, threshold=2 → need 2 shares per polynomial to reconstruct.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Generate 2 distinct shares, encrypt under different challenges
+        let mut first_share_msg: Option<[u8; 20]> = None;
+        let mut second_share_msg: Option<[u8; 20]> = None;
+        for _ in 0..2 {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            if let Some(share) = generator.next_share(&pseudonym, &msg)? {
+                let ack = HalfKey::random();
+                let ack_challenge = ack.to_challenge()?;
+                let enc_share = share.share.encrypt(&share.id, &ack)?;
+                reconstructor.insert_encrypted_share(
+                    peer.public(),
+                    ack_challenge,
+                    TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+                )?;
+
+                let resolution = reconstructor.process_verified_ack(
+                    ack,
+                    ack_challenge,
+                    reconstructor
+                        .awaiting_acks
+                        .get(peer.public())
+                        .as_ref()
+                        .ok_or(anyhow::anyhow!("missing peer"))?,
+                )?;
+                match resolution {
+                    ProcessedAckResult::NoProgress | ProcessedAckResult::EarlyRecovery(_) => {
+                        // First share reached early threshold; store the msg for duplication
+                        if first_share_msg.is_none() {
+                            first_share_msg = Some(msg);
+                        }
+                        if let ProcessedAckResult::EarlyRecovery(id) = resolution {
+                            assert_eq!(id, ssa_id);
+                        }
+                    }
+                    ProcessedAckResult::FullRecovery(recovered) => {
+                        assert_eq!(recovered.ssa_id, ssa_id);
+                        second_share_msg = Some(msg);
+                    }
+                }
+            }
+        }
+
+        assert!(second_share_msg.is_some(), "second share should trigger full recovery");
+        let dup_msg = first_share_msg.expect("first share msg must be set");
+
+        // Now re-insert the FIRST share via a different ack challenge — simulating
+        // the same share arriving through a redundant relay path.
+        let generator2 = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let _ = generator2.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let Some(dup_share) = generator2.next_share(&pseudonym, &dup_msg)? else {
+            anyhow::bail!("expected share for duplicate msg");
+        };
+        let dup_ack = HalfKey::random();
+        let dup_challenge = dup_ack.to_challenge()?;
+        let dup_enc_share = dup_share.share.encrypt(&dup_share.id, &dup_ack)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            dup_challenge,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &dup_msg, dup_enc_share)?,
+        )?;
+
+        // Processing the duplicate share must not error — the reconstructor
+        // already recovered the SSA, so duplicate shares are silently ignored.
+        let dup_resolution = reconstructor.process_verified_ack(
+            dup_ack,
+            dup_challenge,
+            reconstructor
+                .awaiting_acks
+                .get(peer.public())
+                .as_ref()
+                .ok_or(anyhow::anyhow!("missing peer"))?,
+        )?;
+        assert!(
+            matches!(dup_resolution, ProcessedAckResult::NoProgress),
+            "duplicate share must return NoProgress"
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn reconstructor_must_not_accept_empty_encrypted_share() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
