@@ -189,6 +189,13 @@ impl<S: PixSpec> AsRef<<PixScalar<S> as PrimeField>::Repr> for PartialSsaShare<S
     }
 }
 
+impl<S: PixSpec> PartialSsaShare<S> {
+    #[doc(hidden)]
+    pub fn as_mut_inner(&mut self) -> &mut <PixScalar<S> as PrimeField>::Repr {
+        &mut self.0
+    }
+}
+
 fn derive_ssa_encryption_key<S: PixSpec>(
     spi: &SsaPolynomialId<S::Pseudonym>,
     ack: &HalfKey,

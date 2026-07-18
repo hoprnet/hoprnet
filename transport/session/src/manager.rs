@@ -1,4 +1,6 @@
 use std::{
+    collections::HashMap,
+    mem,
     pin::Pin,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
@@ -15,6 +17,7 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
+use hopr_api::types::primitive::balance::HoprBalance;
 use hopr_crypto_packet::{
     HoprPixSpec,
     prelude::{HoprPacket, HoprPixGroupElement},
@@ -41,6 +44,7 @@ use crate::telemetry::{
 use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
     SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    drain::SurbDrainConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
@@ -114,7 +118,12 @@ fn pix_close_to_closure_reason(reason: SessionPixCloseReason) -> ClosureReason {
 }
 
 #[tracing::instrument(level = "debug", skip(session_data))]
-fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+fn close_session_internal(
+    session_id: SessionId,
+    session_data: SessionSlot,
+    reason: ClosureReason,
+    pix_reason: Option<SessionPixCloseReason>,
+) {
     debug!("closing session");
 
     #[cfg(feature = "telemetry")]
@@ -140,6 +149,51 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(all(feature = "telemetry", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
+}
+
+/// Thin wrapper for non-PIX callers.
+fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+    close_session_internal(session_id, session_data, reason, None)
+}
+
+/// Extract PIX guards from a slot and offer them to the drainer.
+/// Guards are either handed over (drainer takes ownership) or dropped here (→ retire_ssa).
+fn handle_pix_drain_offer<S>(
+    drainer: &OnceLock<Option<crate::drain::SurbDrainer<S>>>,
+    session_id: SessionId,
+    slot: &SessionSlot,
+    reason: ClosureReason,
+    pix_reason: Option<SessionPixCloseReason>,
+) where
+    S: futures::Sink<(DestinationRouting, hopr_protocol_app::v1::ApplicationDataOut)> + Clone + Unpin + Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    let guards: Vec<_> = slot.pix_ssa_guards.lock().drain(..).collect();
+    if guards.is_empty() {
+        return;
+    }
+    let mut funding = mem::take(&mut *slot.pix_funding.lock());
+
+    if let Some(drainer) = drainer.get().and_then(|d| d.as_ref()) {
+        let ssas = guards
+            .into_iter()
+            .map(|guard| crate::drain::SsaHandover {
+                funded: funding
+                    .remove(&guard.ssa_id().ssa_index())
+                    .unwrap_or_default(),
+                guard,
+            })
+            .collect();
+        drainer.offer(crate::drain::ClosedSessionOffer {
+            session_id,
+            routing: slot.routing_opts.clone(),
+            closure_reason: reason,
+            pix_close_reason: pix_reason,
+            ssas,
+        });
+    }
+    // If no drainer is available, `guards` were already drained from the slot
+    // and dropped above, triggering retire_ssa.
 }
 
 fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
@@ -237,6 +291,13 @@ pub(crate) struct SessionSlot {
     pix_supervisor: Arc<OnceLock<SessionPixSupervisorHandle>>,
     // Egress gate shared with the supervisor; set when PIX is negotiated.
     pix_egress_gate: Arc<OnceLock<Arc<ServiceGate>>>,
+    // PIX SSA commitment guards — moved into the slot so close_session_internal
+    // can take them out and drop them (triggering retire_ssa) before aborting
+    // the driver task.
+    pix_ssa_guards: Arc<parking_lot::Mutex<Vec<SsaCommitmentGuard<HoprPixSpec>>>>,
+    // Accumulated confirmed deposit amounts per SSA index.
+    // Populated by the deposit observer, consumed by the drainer.
+    pix_funding: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprBalance>>>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -329,6 +390,12 @@ pub struct IncomingSessionPixConfig {
     /// and tombstones for incoming PIX sessions.
     #[default(_code = "SupervisorConfig::default()")]
     pub supervisor_cfg: SupervisorConfig,
+    /// Configuration for the post-closure SURB drainer.
+    ///
+    /// When enabled, the Exit will drain unused SURBs on closed PIX sessions
+    /// to recover additional SSA shares.
+    #[default(_code = "SurbDrainConfig::default()")]
+    pub drain_cfg: SurbDrainConfig,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -460,9 +527,9 @@ type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(
 /// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
 #[derive(Clone)]
 pub struct PixToolbox {
-    share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
-    share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
-    pix_events: crossfire::MTx<crossfire::mpsc::Array<HoprSessionOutPixEvent>>,
+    pub share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+    pub share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
+    pub(crate) pix_events: crossfire::MTx<crossfire::mpsc::Array<HoprSessionOutPixEvent>>,
 }
 
 impl PixToolbox {
@@ -755,6 +822,8 @@ pub struct SessionManager<S> {
     slot_notify: SlotNotify,
     msg_sender: Arc<OnceLock<S>>,
     pix_toolbox: OnceLock<PixToolbox>,
+    /// Post-closure SURB drainer.  Populated in `start()` if drain is enabled.
+    drainer: Arc<OnceLock<Option<crate::drain::SurbDrainer<S>>>>,
     cfg: SessionManagerConfig,
 }
 
@@ -770,6 +839,7 @@ impl<S> Clone for SessionManager<S> {
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
             slot_notify: self.slot_notify.clone(),
+            drainer: self.drainer.clone(),
         }
     }
 }
@@ -850,6 +920,8 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
+        let drainer: Arc<OnceLock<Option<crate::drain::SurbDrainer<S>>>> = Default::default();
+        let drainer_for_listener = drainer.clone();
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
@@ -868,6 +940,13 @@ where
                     moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
                         trace!(?session_id, ?reason, "session evicted from the cache");
                         active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
+                        handle_pix_drain_offer(
+                            &drainer_for_listener,
+                            *session_id.as_ref(),
+                            &entry,
+                            ClosureReason::Eviction,
+                            None,
+                        );
                         close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
                     }
                     _ => {}
@@ -875,6 +954,7 @@ where
                 .build(),
             slot_notify: SlotNotify::new(),
             pix_toolbox: OnceLock::new(),
+            drainer,
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
@@ -957,6 +1037,13 @@ where
                         // other party.
                         if let Some(session_data) = myself.sessions.remove(&session_id) {
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
+                            handle_pix_drain_offer(
+                                &myself.drainer,
+                                session_id,
+                                &session_data,
+                                closure_reason,
+                                None,
+                            );
                             close_session(session_id, session_data, closure_reason);
                         } else {
                             // Do not treat this as an error
@@ -1030,6 +1117,52 @@ where
         );
 
         Ok(vec![ah_closure_notifications, ah_session_expiration, ah_start_protocol])
+    }
+
+    /// Enable the post-closure SURB drainer.
+    ///
+    /// Must be called after [`start()`](SessionManager::start). The caller provides
+    /// closures for querying SURB counts and the current packet price — both are
+    /// owned by the transport layer (SurbStore and chain API respectively).
+    ///
+    /// Returns an error if the drainer was already enabled or if PIX was not
+    /// initialized (no [`PixToolbox`] was provided to [`start()`](SessionManager::start)).
+    pub fn enable_drainer(
+        &self,
+        surb_count: Arc<dyn Fn(&HoprPseudonym) -> usize + Send + Sync>,
+        packet_price: Arc<dyn Fn() -> HoprBalance + Send + Sync>,
+    ) -> errors::Result<()> {
+        let pix = self
+            .pix_toolbox
+            .get()
+            .ok_or(SessionManagerError::NotStarted)?;
+        let msg_sender = self
+            .msg_sender
+            .get()
+            .ok_or(SessionManagerError::NotStarted)?
+            .clone();
+
+        let drainer = crate::drain::SurbDrainer::new(
+            self.cfg.pix_config.drain_cfg,
+            msg_sender,
+            pix.share_processor.clone(),
+            surb_count,
+            packet_price,
+        );
+
+        Ok(self
+            .drainer
+            .set(Some(drainer))
+            .map_err(|_| SessionManagerError::AlreadyStarted)?)
+    }
+
+    /// Subscribe to drain outcomes (one per offer, finished or skipped).
+    ///
+    /// Returns `None` if the drainer has not been enabled.
+    pub fn drain_outcome_rx(
+        &self,
+    ) -> Option<crossfire::AsyncRx<crossfire::mpsc::List<crate::drain::DrainOutcome>>> {
+        self.drainer.get().and_then(|d| d.as_ref())?.outcome_rx()
     }
 
     /// Check if [`start`](SessionManager::start) has been called and the instance is running.
@@ -1339,6 +1472,8 @@ where
                                 ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
+                                pix_ssa_guards: Default::default(),
+                                pix_funding: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1421,6 +1556,8 @@ where
                                 ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
+                                pix_ssa_guards: Default::default(),
+                                pix_funding: Default::default(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1596,6 +1733,7 @@ where
     pub fn close_session(&self, id: &SessionId) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
+            handle_pix_drain_offer(&self.drainer, *id, &slot, ClosureReason::Eviction, None);
             close_session(*id, slot, ClosureReason::Eviction);
             true
         } else {
@@ -1664,6 +1802,10 @@ where
     pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
         let session_id = event.pseudonym();
         let Some(slot) = self.sessions.get(event.pseudonym()) else {
+            // Session already closed — try the drainer (post-closure event forwarding).
+            if let Some(d) = self.drainer.get().and_then(|o| o.as_ref()) {
+                d.deliver_event(&event);
+            }
             error!(%session_id, "trying to dispatch pix event on a non-existing session");
             return Err(SessionManagerError::NonExistingSession.into());
         };
@@ -1945,6 +2087,8 @@ where
             ssa_params: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            pix_ssa_guards: Default::default(),
+            pix_funding: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -2286,13 +2430,12 @@ where
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
             let supervisor_handle = handle.clone();
+            // Push the initial guard into the slot so close_session_internal
+            // can take it out and drop it (triggering retire_ssa) before
+            // aborting the driver.
+            slot_for_driver.pix_ssa_guards.lock().push(initial_guard);
+
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
-                // Owned collection of SsaCommitmentGuards — each guard calls
-                // retire_ssa on drop, so clearing the vec or dropping it
-                // handles cleanup automatically.
-                let mut retirement = SsaRetirementGuard {
-                    guards: vec![initial_guard],
-                };
 
                 loop {
                     let action = match action_rx.recv().await {
@@ -2327,7 +2470,7 @@ where
                                     error!(%session_id, "failed to send action result to PIX supervisor");
                                 }
                                 if let Ok(guard) = result {
-                                    retirement.guards.push(guard);
+                                    slot_for_driver.pix_ssa_guards.lock().push(guard);
                                 }
                             } else {
                                 // Slot missing — supervisor must have already closed it.
@@ -2351,7 +2494,9 @@ where
                         SessionPixAction::RetireSsa(ssa_id) => {
                             // Release the old SSA by dropping its guard — the guard's
                             // Drop calls retire_ssa on the reconstructor automatically.
-                            retirement.guards.retain(|g| *g.ssa_id() != ssa_id);
+                            slot_for_driver.pix_ssa_guards.lock().retain(|g| *g.ssa_id() != ssa_id);
+                            // Clear the accumulated funding for this SSA.
+                            slot_for_driver.pix_funding.lock().remove(&ssa_id.ssa_index());
                             // Remove the corresponding deposit-observer handle.
                             if let Some(slot) = myself.sessions.get(&session_id) {
                                 slot.abort_handles
@@ -2364,8 +2509,6 @@ where
                             // unblocked (they hang on pending() until the
                             // session task is aborted).
                             gate.poison();
-                            // Retire all tracked SSAs from the reconstructor.
-                            retirement.retire_all();
                             let closure_reason = pix_close_to_closure_reason(reason);
                             #[cfg(all(feature = "telemetry", not(test)))]
                             {
@@ -2375,7 +2518,14 @@ where
                             error!(%session_id, ?reason, "pix supervisor closed session");
                             if let Some(slot) = myself.sessions.remove(&session_id) {
                                 myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                                close_session(session_id, slot, closure_reason);
+                                handle_pix_drain_offer(
+                                    &myself.drainer,
+                                    session_id,
+                                    &slot,
+                                    closure_reason,
+                                    Some(reason),
+                                );
+                                close_session_internal(session_id, slot, closure_reason, Some(reason));
                             }
                             return;
                         }
@@ -2386,30 +2536,20 @@ where
                 // unblocked (they hang on pending() until the
                 // session task is aborted).
                 gate.poison();
-                // Retire all tracked SSAs from the reconstructor.
-                retirement.retire_all();
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_PIX_CLOSURES.increment(&["PixFailure"]);
                 if let Some(slot) = myself.sessions.remove(&session_id) {
                     myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                    close_session(session_id, slot, ClosureReason::PixFailure);
+                    handle_pix_drain_offer(
+                        &myself.drainer,
+                        session_id,
+                        &slot,
+                        ClosureReason::PixFailure,
+                        None,
+                    );
+                    close_session_internal(session_id, slot, ClosureReason::PixFailure, None);
                 }
             });
-
-            /// Owned collection of [`SsaCommitmentGuard`]s for the PIX action driver.
-            ///
-            /// Each guard calls [`SsaReconstructor::retire_ssa`] on drop, so simply
-            /// clearing the vec or letting it drop handles cleanup automatically.
-            struct SsaRetirementGuard {
-                guards: Vec<SsaCommitmentGuard<HoprPixSpec>>,
-            }
-
-            impl SsaRetirementGuard {
-                /// Explicitly retire all tracked SSAs by clearing the guard vec.
-                fn retire_all(&mut self) {
-                    self.guards.clear();
-                }
-            }
 
             slot_for_driver
                 .abort_handles
@@ -2624,6 +2764,7 @@ where
             // Spawn the PixDepositObserver that forwards deposit confirmations
             // to the supervisor. This loops to support top-up deposits.
             let pix_supervisor_for_observer = session_slot.pix_supervisor.clone();
+            let pix_funding_for_observer = session_slot.pix_funding.clone();
             let ssa_id_for_observer = commitment_ssa_id;
             let max_deposit_wait = self.cfg.pix_config.supervisor_cfg.max_deposit_wait;
             session_slot.abort_handles.lock().insert(
@@ -2651,6 +2792,12 @@ where
                             .await;
                         match result {
                             Ok(Some(((..), amount))) => {
+                                // Accumulate the confirmed deposit into the slot's
+                                // funding ledger (consumed by the drainer).
+                                {
+                                    let mut funding = pix_funding_for_observer.lock();
+                                    *funding.entry(ssa_id_for_observer.ssa_index()).or_default() += amount;
+                                }
                                 // Forward every deposit — the supervisor decides
                                 // whether the accumulated amount is sufficient.
                                 if let Some(h) = pix_supervisor_for_observer.get()
@@ -3007,6 +3154,8 @@ mod tests {
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_funding: Default::default(),
+                pix_ssa_guards: Default::default(),
             },
         );
 
@@ -4410,6 +4559,8 @@ mod tests {
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_funding: Default::default(),
+                pix_ssa_guards: Default::default(),
             },
         );
 
@@ -4512,6 +4663,8 @@ mod tests {
                 ssa_params: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_funding: Default::default(),
+                pix_ssa_guards: Default::default(),
             },
         );
 
@@ -5850,6 +6003,8 @@ mod tests {
                 ssa_params,
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                pix_funding: Default::default(),
+                pix_ssa_guards: Default::default(),
             },
         );
 

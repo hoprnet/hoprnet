@@ -238,6 +238,14 @@ impl SurbStore for MemorySurbStore {
             .push(surbs)
     }
 
+    #[tracing::instrument(skip_all, level = "trace", fields(?pseudonym), ret)]
+    fn surb_count(&self, pseudonym: &HoprPseudonym) -> usize {
+        self.surbs_per_pseudonym
+            .get(pseudonym)
+            .map(|rb| rb.len())
+            .unwrap_or(0)
+    }
+
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         let opener_lifetime = self.cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME);
@@ -302,6 +310,16 @@ impl<S> SurbRingBuffer<S> {
         let mut rb = self.0.lock();
         rb.extend(surbs);
         rb.len()
+    }
+
+    /// Returns the number of SURBs currently in the ring buffer (non-destructive).
+    pub fn len(&self) -> usize {
+        self.0.lock().len()
+    }
+
+    /// Returns true if the ring buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Pop the latest SURB and its IDs from the RB.
@@ -402,6 +420,43 @@ mod tests {
                 .id
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_len_reflects_push_and_pop() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+        assert!(rb.is_empty());
+        assert_eq!(0, rb.len());
+
+        rb.push([([1u8; 8], 0)]);
+        assert!(!rb.is_empty());
+        assert_eq!(1, rb.len());
+
+        rb.push([([2u8; 8], 0)]);
+        assert_eq!(2, rb.len());
+
+        let _ = rb.pop_one();
+        assert_eq!(1, rb.len());
+
+        let _ = rb.pop_one();
+        assert!(rb.is_empty());
+        assert_eq!(0, rb.len());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_surb_count_unknown() -> anyhow::Result<()> {
+        use hopr_api::types::crypto_random::Randomizable;
+
+        let store = MemorySurbStore::new(SurbStoreConfig {
+            rb_capacity: 100,
+            ..Default::default()
+        });
+        // Unknown pseudonym returns 0
+        let pseudonym = HoprPseudonym::random();
+        assert_eq!(0, store.surb_count(&pseudonym));
         Ok(())
     }
 }

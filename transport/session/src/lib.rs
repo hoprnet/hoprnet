@@ -8,6 +8,7 @@
 //! This crate implements [RFC-0007](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
 
 pub(crate) mod balancer;
+pub mod drain;
 pub mod errors;
 mod manager;
 pub(crate) mod supervision;
@@ -25,6 +26,7 @@ pub use manager::{
     SessionManagerConfig,
 };
 pub use supervision::{SupervisorConfig, validate_pix_supervision};
+pub use drain::validate_pix_drain;
 pub mod test_helpers;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};

@@ -12,6 +12,7 @@ edition.workspace = true
 
 [features]
 default = ["rayon"]
+test-utils = []
 rayon = ["hopr-utils/parallelize-rayon"]
 serde = [
   "dep:elliptic-curve-tools",

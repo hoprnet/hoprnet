@@ -83,6 +83,14 @@ pub struct SsaReconstructorConfig {
 type EncryptedShareCache<S> =
     moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, <S as PixSpec>::Pseudonym, PixScalar<S>>>;
 
+/// Progress + fault snapshot for drain-eligibility decisions.
+pub struct SsaDrainSnapshot<P> {
+    /// Current recovery progress for the SSA.
+    pub progress: SsaRecoveryProgress<P>,
+    /// Absolute total of invalid shares observed for this SSA (cumulative).
+    pub invalid_total: u64,
+}
+
 /// Per-SSA counter entry tracked in the dedicated TTL-only cache.
 /// Counters are absolute — they represent the total observed so far for this SSA.
 struct SsaCounterEntry {
@@ -218,6 +226,23 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             useful_shares: e.useful_shares,
             target_useful_shares: e.target_useful_shares,
             recovered_polynomials: e.recovered_polynomials,
+        })
+    }
+
+    /// Returns a combined progress + fault snapshot for drain-eligibility decisions.
+    ///
+    /// Returns `None` if no counter entry exists (e.g. after [`retire_ssa`](SsaReconstructor::retire_ssa)).
+    pub fn drain_snapshot(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<SsaDrainSnapshot<S::Pseudonym>> {
+        let entry = self.ssa_counters.get(ssa_id)?;
+        let e = entry.lock();
+        Some(SsaDrainSnapshot {
+            progress: SsaRecoveryProgress {
+                ssa_id: *ssa_id,
+                useful_shares: e.useful_shares,
+                target_useful_shares: e.target_useful_shares,
+                recovered_polynomials: e.recovered_polynomials,
+            },
+            invalid_total: e.invalid_total,
         })
     }
 

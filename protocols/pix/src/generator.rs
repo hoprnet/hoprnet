@@ -91,6 +91,11 @@ pub struct SsaGeneratorConfig {
     /// Default is 20.
     #[default(20)]
     pub surplus_shares: usize,
+    /// When enabled, every generated share is corrupted (one byte XORed) so that
+    /// Feldman verification at the Exit fails. Intended for integration tests.
+    #[cfg(feature = "test-utils")]
+    #[default(false)]
+    pub corrupt_shares: bool,
 }
 
 /// Generator for Session Stealth Address (SSA) shares distributed over Single Use Reply Blocks (SURBs).
@@ -152,9 +157,20 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                         return Err(errors::PixError::InvalidInput);
                     }
 
-                    return Ok(Some(GeneratedShare {
-                        id: poly.spi,
-                        share: poly.next_share(x),
+                    return Ok(Some({
+                        let mut share = poly.next_share(x);
+
+                        #[cfg(feature = "test-utils")]
+                        if self.cfg.corrupt_shares {
+                            if let Some(byte) = share.as_mut_inner().first_mut() {
+                                *byte ^= 0xFF;
+                            }
+                        }
+
+                        GeneratedShare {
+                            id: poly.spi,
+                            share,
+                        }
                     }));
                 }
                 // If we replaced VecDeque with a lock-free alternative, we could remove

@@ -59,7 +59,7 @@ use hopr_api::{
 pub use hopr_crypto_packet::HoprPixSpec;
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::MemorySurbStore;
+use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_protocol_pix::RecoveredSsa;
 use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, PixSpec, ShareResolution, SsaReconstructorConfig};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
@@ -112,7 +112,10 @@ use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
     node::{PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
-    types::internal::routing::DestinationRouting,
+    types::{
+        internal::routing::DestinationRouting,
+        primitive::balance::HoprBalance,
+    },
 };
 use hopr_crypto_packet::HoprShareResolution;
 
@@ -330,9 +333,12 @@ where
 
         // Cross-validate PIX supervisor config against the reconstructor config.
         let pix_cfg = cfg.incoming_session_pix_config.supervisor_cfg.clone();
+        let drain_cfg = cfg.incoming_session_pix_config.drain_cfg;
         let reconstructor_cfg = hopr_protocol_pix::SsaReconstructorConfig::default();
         validate_pix_supervision(&pix_cfg, &reconstructor_cfg)
             .map_err(|e| HoprTransportError::Api(format!("PIX supervision config validation failed: {e}")))?;
+        hopr_transport_session::validate_pix_drain(&drain_cfg, &reconstructor_cfg)
+            .map_err(|e| HoprTransportError::Api(format!("PIX drain config validation failed: {e}")))?;
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -944,6 +950,25 @@ where
             .for_each(|(k, v)| {
                 processes.insert(k, v);
             });
+
+        // ── SURB drainer (Exit only) ──────────────────────────────────────
+        // Only Exit nodes with PIX enabled construct a drainer.
+        if role == protocol::NodeType::Exit {
+            let surb_count: Arc<dyn Fn(&HoprPseudonym) -> usize + Send + Sync> = {
+                let store = self.path_planner.surb_store.clone();
+                Arc::new(move |p| store.surb_count(p))
+            };
+            // Conservative fixed packet price (one ticket per drain packet).
+            // In a production deployment the chain API's minimum ticket price
+            // would be used; HoprBalance::new_base(1) makes the economic gate
+            // effectively a no-op until a real price source is wired.
+            let packet_price: Arc<dyn Fn() -> HoprBalance + Send + Sync> =
+                Arc::new(|| HoprBalance::new_base(1));
+            self.smgr
+                .enable_drainer(surb_count, packet_price)
+                .map_err(|e| HoprTransportError::Api(format!("failed to enable drainer: {e}")))?;
+        }
+
         // -- periodic counter flush
         let flush_counters = self.counters.clone();
         let flush_graph = self.graph.clone();

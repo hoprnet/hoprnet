@@ -37,6 +37,12 @@ pub trait SurbStore {
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener);
 
+    /// Returns the number of SURBs currently stored for the given pseudonym.
+    ///
+    /// This is a non-destructive operation — unlike [`find_surb`](SurbStore::find_surb),
+    /// it does not consume or mutate the stored SURBs.
+    fn surb_count(&self, pseudonym: &HoprPseudonym) -> usize;
+
     /// Tries to find a [`ReplyOpener`] given the [`sender_id`](HoprSenderId).
     ///
     /// This is done by the sending side of the original packet when the reply to that
