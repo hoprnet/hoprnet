@@ -209,7 +209,10 @@ impl std::fmt::Debug for SessionSsaState {
                 "current_index",
                 &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
             )
-            .field("num_errors", &self.num_errors.load(std::sync::atomic::Ordering::Relaxed))
+            .field(
+                "num_errors",
+                &self.num_errors.load(std::sync::atomic::Ordering::Relaxed),
+            )
             .field("polys_per_ssa", &self.polys_per_ssa)
             .field("shares_per_poly", &self.shares_per_poly)
             .finish()
@@ -5368,10 +5371,7 @@ mod tests {
             )
             .await;
 
-        assert!(
-            result.is_err(),
-            "new_session with UsePIX and 0-hop return should fail"
-        );
+        assert!(result.is_err(), "new_session with UsePIX and 0-hop return should fail");
 
         Ok(())
     }
