@@ -1682,8 +1682,10 @@ where
                     "cannot register unverified share on a session without pix state"
                 )))?;
                 // Skip stale events from a previous SSA cycle (late arrivals after
-                // SsaAlmostRecovered advanced the current index).
-                if ssa_id.ssa_index().get() < state.current_index.load(std::sync::atomic::Ordering::Relaxed) {
+                // SsaAlmostRecovered advanced the current index).  current_index is
+                // the *next* index to allocate (pre-incremented via fetch_add), so
+                // the active cycle's index is current_index - 1.
+                if ssa_id.ssa_index().get() < state.current_index.load(std::sync::atomic::Ordering::Relaxed).saturating_sub(1) {
                     trace!(
                         %session_id, event_ssa_index = %ssa_id.ssa_index(),
                         "ignoring unverifiable share from stale SSA cycle"
