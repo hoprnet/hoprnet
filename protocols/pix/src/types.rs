@@ -677,7 +677,10 @@ mod tests {
         let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
         let share = PartialSsaShare::<TestSpec>(scalar.to_repr());
         let id = SsaPolynomialId::new(
-            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(), 1.try_into().unwrap()),
+            SsaId::new(
+                SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
+                1.try_into().unwrap(),
+            ),
             0,
         );
         let generated = GeneratedShare { id, share };
@@ -697,16 +700,12 @@ mod tests {
 
     #[test]
     fn debug_redaction_recovered_ssa() {
-        use hopr_types::crypto::keypairs::Keypair;
-        use hopr_types::crypto::prelude::ChainKeypair;
+        use hopr_types::crypto::{keypairs::Keypair, prelude::ChainKeypair};
 
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
         let dummy_key = ChainKeypair::random();
-        let recovered = RecoveredSsa {
-            ssa_id,
-            ssa: dummy_key,
-        };
+        let recovered = RecoveredSsa { ssa_id, ssa: dummy_key };
         let debug = format!("{:?}", recovered);
 
         // Must include the public ssa_id field

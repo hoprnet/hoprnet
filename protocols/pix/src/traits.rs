@@ -161,9 +161,13 @@ pub trait EntryShareGenerator<S: PixSpec> {
 
 #[cfg(test)]
 mod tests {
-    use hopr_types::crypto::keypairs::Keypair;
-    use hopr_types::crypto::prelude::{ChainKeypair, SimplePseudonym};
-    use hopr_types::crypto_random::Randomizable;
+    use hopr_types::{
+        crypto::{
+            keypairs::Keypair,
+            prelude::{ChainKeypair, SimplePseudonym},
+        },
+        crypto_random::Randomizable,
+    };
 
     use super::*;
 
@@ -174,10 +178,7 @@ mod tests {
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
         let dummy_key = ChainKeypair::random();
-        let recovered = RecoveredSsa {
-            ssa_id,
-            ssa: dummy_key,
-        };
+        let recovered = RecoveredSsa { ssa_id, ssa: dummy_key };
         let resolution = ShareResolution::RecoveredSsa(recovered);
         let debug = format!("{:?}", resolution);
 
