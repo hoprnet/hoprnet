@@ -179,14 +179,16 @@ mod tests {
         let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
         let dummy_key = ChainKeypair::random();
         let recovered = RecoveredSsa { ssa_id, ssa: dummy_key };
+        let recovered_debug = format!("{:?}", recovered);
         let resolution = ShareResolution::RecoveredSsa(recovered);
         let debug = format!("{:?}", resolution);
 
         assert!(debug.contains("RecoveredSsa"));
         // The outer tuple wraps the inner RecoveredSsa Debug, which redacts ssa
-        assert!(
-            !debug.contains("secret_key"),
-            "ShareResolution::RecoveredSsa Debug must preserve nested secret redaction"
+        assert_eq!(
+            debug,
+            format!("RecoveredSsa({recovered_debug})"),
+            "ShareResolution::RecoveredSsa Debug must perfectly delegate to RecoveredSsa Debug"
         );
     }
 }

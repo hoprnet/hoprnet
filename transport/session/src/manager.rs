@@ -1093,20 +1093,6 @@ where
             crossfire::AsyncRx<crossfire::mpsc::One<_>>,
         ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
 
-        let (challenge, _) = insert_into_next_slot(
-            &self.session_initiations,
-            |ch| {
-                if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_api::types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
-                } else {
-                    hopr_api::types::crypto_random::random_integer(MIN_CHALLENGE, None)
-                }
-            },
-            |_| tx_initiation_done,
-            Some(self.cfg.maximum_sessions as u64),
-        )
-        .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
-
         let current_ssa_state = Arc::new(OnceLock::new());
 
         let mut additional_data = 0_u64;
@@ -1127,7 +1113,9 @@ where
                 .min(u32::MAX as u64);
         }
 
-        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data
+        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // Run these validations BEFORE reserving the initiation challenge slot so that a
+        // repeated invalid request cannot exhaust all challenge slots.
         if cfg.capabilities.contains(Capability::UsePIX) {
             // PIX requires at least 1 intermediate hop on the return path so that PIX
             // shares can be encrypted with the first relayer's ticket-challenge solution
@@ -1142,28 +1130,43 @@ where
                 .into());
             }
 
-            if let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota {
-                // Validate that PIX toolbox is available before advertising UsePIX
-                if self.pix_toolbox.get().is_none() {
-                    return Err(
-                        SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
-                    );
-                }
-                // Validate dimensions are within protocol limits
-                if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa)
-                    || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
-                {
-                    return Err(SessionManagerError::Other(anyhow!(
-                        "invalid PIX dimensions: polys={}, shares={}",
-                        polys_per_ssa,
-                        shares_per_ssa,
-                    ))
-                    .into());
-                }
-                let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
-                additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
+            let (polys_per_ssa, shares_per_ssa) = cfg
+                .pix_ssa_quota
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
+
+            // Validate that PIX toolbox is available before advertising UsePIX
+            if self.pix_toolbox.get().is_none() {
+                return Err(
+                    SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
+                );
             }
+            // Validate dimensions are within protocol limits
+            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+            {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "invalid PIX dimensions: polys={}, shares={}",
+                    polys_per_ssa,
+                    shares_per_ssa,
+                ))
+                .into());
+            }
+            let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
+            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }
+
+        let (challenge, _) = insert_into_next_slot(
+            &self.session_initiations,
+            |ch| {
+                if let Some(challenge) = ch {
+                    ((challenge + 1) % hopr_api::types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                } else {
+                    hopr_api::types::crypto_random::random_integer(MIN_CHALLENGE, None)
+                }
+            },
+            |_| tx_initiation_done,
+            Some(self.cfg.maximum_sessions as u64),
+        )
+        .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
@@ -4425,6 +4428,12 @@ mod tests {
         );
 
         assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when UsePIX is rejected"
+        );
 
         sender.close_channel();
         let _ = _handle.await;

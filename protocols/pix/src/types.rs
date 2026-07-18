@@ -663,10 +663,9 @@ mod tests {
         let debug = format!("{:?}", share);
         assert!(debug.contains("PartialSsaShare"));
         // The scalar repr should not appear in Debug output
-        let scalar_hex = const_hex::encode(scalar.to_repr());
-        assert!(
-            !debug.contains(&scalar_hex),
-            "PartialSsaShare Debug must redact the scalar value"
+        assert_eq!(
+            debug, "PartialSsaShare { .. }",
+            "PartialSsaShare Debug must exactly match the redacted format"
         );
     }
 
@@ -690,11 +689,10 @@ mod tests {
         assert!(debug.contains("GeneratedShare"));
         assert!(debug.contains("id"));
 
-        // Must NOT include the secret share field value
-        let scalar_hex = const_hex::encode(scalar.to_repr());
+        // Must NOT include the secret share field
         assert!(
-            !debug.contains(&scalar_hex),
-            "GeneratedShare Debug must redact the share scalar"
+            !debug.contains("share:"),
+            "GeneratedShare Debug must omit the share field entirely"
         );
     }
 
@@ -712,10 +710,10 @@ mod tests {
         assert!(debug.contains("RecoveredSsa"));
         assert!(debug.contains("ssa_id"));
 
-        // Must NOT include the secret private key material
+        // Must NOT include the secret ssa field
         assert!(
-            !debug.contains("secret_key"),
-            "RecoveredSsa Debug must redact the ssa private key"
+            !debug.contains("ssa:"),
+            "RecoveredSsa Debug must omit the ssa field entirely"
         );
     }
 }

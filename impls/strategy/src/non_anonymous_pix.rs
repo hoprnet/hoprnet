@@ -114,27 +114,13 @@ where
                 tracing::info!(?deposit_address_recv, "deposit address received");
 
                 let target_deposit = self.cfg.price_per_byte * deposit_address_recv.quota;
+                let pix_id = deposit_address_recv.id;
+                let deposit_updated = deposit_address_recv.deposit_updated;
                 let node_clone = self.node.clone();
+                let node_clone_for_initial = self.node.clone();
                 let deposit_addr: Address = deposit_address_recv.address.try_into()?;
 
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
-
-                // Check balance immediately before entering the interval loop to avoid
-                // the sub-second first-poll delay inherent to stream::interval.
-                let initial_balance = node_clone
-                    .chain_api()
-                    .balance(deposit_addr)
-                    .await
-                    .map_err(StrategyError::other)?;
-                if initial_balance >= target_deposit {
-                    if let Some(mut notifier) = deposit_address_recv.deposit_updated {
-                        notifier
-                            .send((deposit_address_recv.id, initial_balance))
-                            .await
-                            .map_err(StrategyError::other)?;
-                    }
-                    return Ok(());
-                }
 
                 let mut stream = futures_time::stream::interval(
                     futures_time::time::Duration::from(max_tracking_time / 10).max(Duration::from_secs(1).into()),
@@ -155,13 +141,27 @@ where
                 tracing::info!(%target_deposit, ?max_tracking_time, "tracking until deposit");
                 hopr_utils::runtime::prelude::spawn(
                     async move {
-                        let result = stream.try_next().await?;
-                        match (result, deposit_address_recv.deposit_updated) {
-                            (Some(deposit), Some(mut notifier)) => notifier
-                                .send((deposit_address_recv.id, deposit))
-                                .await
-                                .map_err(StrategyError::other),
-                            _ => Err(StrategyError::other(anyhow::anyhow!("deposit tracking not available"))),
+                        // Check balance immediately (first poll) to avoid the sub-second
+                        // first-poll delay inherent to stream::interval. Both the immediate
+                        // check and the interval polling are inside the timeout guard so a
+                        // stalled RPC does not block event handling indefinitely.
+                        let immediate = node_clone_for_initial
+                            .chain_api()
+                            .balance(deposit_addr)
+                            .await
+                            .ok()
+                            .filter(|b| *b >= target_deposit);
+
+                        let deposit = match (immediate, stream.try_next().await) {
+                            (Some(balance), _) => balance,
+                            (None, Ok(Some(balance))) => balance,
+                            _ => return Err(StrategyError::other(anyhow::anyhow!("deposit tracking not available"))),
+                        };
+
+                        if let Some(mut notifier) = deposit_updated {
+                            notifier.send((pix_id, deposit)).await.map_err(StrategyError::other)
+                        } else {
+                            Ok(())
                         }
                     }
                     .timeout(futures_time::time::Duration::from(max_tracking_time))
@@ -294,7 +294,7 @@ mod tests {
         },
         node::{
             ActionableEvent, ActionableEventDiscriminant, ComponentStatus, ComponentStatusReporter, EventWaitResult,
-            HasChainApi, NodeOnchainIdentity, PixDepositAddress, PixDepositAddressReceived, PixEvent,
+            HasChainApi, NodeOnchainIdentity, PixDepositAddressReceived, PixEvent,
         },
         types::{
             crypto::{keypairs::Keypair, prelude::ChainKeypair},
