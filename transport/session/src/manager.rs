@@ -163,6 +163,11 @@ struct SessionSsaState {
     /// Cumulative count of unverifiable PIX shares across all SSA cycles.
     /// Errors from stale (already advanced) SSA indices are ignored to prevent
     /// double-counting late arrivals.
+    ///
+    /// Uses `Mutex` rather than `AtomicUsize` because the increment is
+    /// conditional on `current_index` — both the stale check and the write
+    /// must be atomic as a single operation (a concurrent `increment_index`
+    /// could otherwise advance the index between the check and the increment).
     num_errors: Arc<parking_lot::Mutex<usize>>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
