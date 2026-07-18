@@ -190,7 +190,8 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     let target_cycles = 3u32;
     let mut new_deposit_count = 0u32;
     let mut pk_recovered_count = 0u32;
-    let mut completed_ssa_ids: Vec<hopr_api::types::internal::protocol::HoprPseudonym> = Vec::new();
+    let mut completed_ssa_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut pk_recovered_ssa_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
 
     loop {
         tokio::select! {
@@ -204,12 +205,6 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                             quota = data.quota,
                             "Entry: NewDepositAddress"
                         );
-                        assert!(
-                            !completed_ssa_ids.contains(&data.id.0),
-                            "duplicate SSA pseudonym detected — expected distinct cycles, got {:?}",
-                            data.id.0,
-                        );
-                        completed_ssa_ids.push(data.id.0);
                     }
                     other => {
                         anyhow::bail!("unexpected Entry PixEvent: {other:?}");
@@ -234,6 +229,12 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         }
                     }
                     PixEvent::PrivateKeyRecovered(data) => {
+                        assert!(
+                            !pk_recovered_ssa_ids.contains(&data.id),
+                            "duplicate PrivateKeyRecovered for same SSA — expected distinct cycles, got {:?}",
+                            data.id,
+                        );
+                        pk_recovered_ssa_ids.push(data.id);
                         pk_recovered_count += 1;
                         tracing::info!(pk_recovered_count, id = ?data.id, "Exit: PrivateKeyRecovered");
                     }
