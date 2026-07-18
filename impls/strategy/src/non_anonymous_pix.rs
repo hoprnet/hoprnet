@@ -41,6 +41,10 @@ pub struct NonAnonymousPixStrategyConfig {
     /// path before withdrawing (Exit role).  `None` means in-memory only (Entry role).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pix_recovery_db_path: Option<std::path::PathBuf>,
+    /// Password from which the encryption key for the recovery store is derived
+    /// (via scrypt).  Required when [`pix_recovery_db_path`] is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pix_recovery_password: Option<String>,
 }
 
 /// Builder for [`NonAnonymousPixStrategy`].
@@ -68,7 +72,10 @@ impl NonAnonymousPixStrategy {
             .cfg
             .pix_recovery_db_path
             .as_ref()
-            .map(|path| crate::pix_recovery_store::PixRecoveryStore::open(path).expect("PixRecoveryStore::open"));
+            .zip(self.cfg.pix_recovery_password.as_ref())
+            .map(|(path, password)| {
+                crate::pix_recovery_store::PixRecoveryStore::open(path, password).expect("PixRecoveryStore::open")
+            });
 
         Box::new(NonAnonymousPixStrategyInner {
             cfg: self.cfg,
@@ -201,11 +208,11 @@ where
 
                 // Exit-side persistence: write to redb before withdrawing so the key
                 // survives crashes and can be replayed on restart.
-                if let Some(ref store) = self.recovery_store {
-                    if let Err(error) = store.insert(&private_key_recovered.id, &private_key_recovered.secret) {
-                        tracing::error!(%error, ?private_key_recovered.id, "failed to persist recovered key");
-                        return Err(StrategyError::other(error));
-                    }
+                if let Some(ref store) = self.recovery_store
+                    && let Err(error) = store.insert(&private_key_recovered.id, &private_key_recovered.secret)
+                {
+                    tracing::error!(%error, ?private_key_recovered.id, "failed to persist recovered key");
+                    return Err(StrategyError::other(error));
                 }
 
                 let chain_key =
@@ -532,6 +539,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: StdDuration::from_secs(5),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -608,6 +616,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -689,6 +698,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -759,6 +769,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -811,6 +822,7 @@ mod tests {
             max_ssa_allocation: HoprBalance::new_base(100),
             max_deposit_tracking_time: std::time::Duration::from_secs(60),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
         assert!(cfg.validate().is_ok(), "default config should pass validation");
     }
@@ -840,6 +852,7 @@ mod tests {
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 pix_recovery_db_path: None,
+                pix_recovery_password: None,
             },
             Duration::from_secs(60),
         )
@@ -883,6 +896,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
+            pix_recovery_password: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -954,6 +968,7 @@ mod tests {
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 pix_recovery_db_path: Some(db_path.clone()),
+                pix_recovery_password: Some("test-password".into()),
             },
             Duration::from_secs(60),
         )
@@ -1002,9 +1017,13 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
             pix_recovery_db_path: Some(db_path.clone()),
+            pix_recovery_password: Some("test-password".into()),
         };
 
-        let recovery_store = Some(crate::pix_recovery_store::PixRecoveryStore::open(&db_path)?);
+        let recovery_store = Some(crate::pix_recovery_store::PixRecoveryStore::open(
+            &db_path,
+            "test-password",
+        )?);
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg: cfg.clone(),
@@ -1034,7 +1053,7 @@ mod tests {
         // Drop the strategy so the redb file lock is released, then re-open to verify persistence.
         drop(strategy);
 
-        let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path)?;
+        let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path, "test-password")?;
         assert!(
             store.contains(&event_id).unwrap(),
             "key should be persisted to recovery store"

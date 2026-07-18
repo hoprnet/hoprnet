@@ -1,30 +1,93 @@
-//! Persistent store for Exit-side [`PixEvent::PrivateKeyRecovered`] events.
+//! Persistent encrypted store for Exit-side [`PixEvent::PrivateKeyRecovered`] events.
 //!
-//! Recovered private keys are written to a `redb` database before the
-//! withdrawal transaction is submitted.  On node restart the store is
-//! iterated and any entry whose on-chain balance is still non-zero is
-//! reprocessed, providing crash recovery.
+//! # Encryption scheme
+//!
+//! ```text
+//! Config password  ──→  scrypt(password, static_salt)  ──→  256-bit key
+//!                                                                  │
+//!                                               ┌──────────────────┤
+//!                                               │                  │
+//!                                               ▼                  ▼
+//! PixAddressId  ──→  encode_key(id)  ──→  first 12 bytes     ChaCha20Poly1305
+//!                                           = deterministic       │
+//!                                             nonce per entry      │
+//!                                                                  │
+//!                                       Plaintext (32 bytes)  ──→  │
+//!                                       Ciphertext (48 bytes)  ←───┘
+//! ```
+//!
+//! **Key derivation.**  When the store is opened, the config-supplied password
+//! is fed through scrypt (RFC 7914) with recommended parameters (log₂_N = 17,
+//! r = 8, p = 1) and a **static application salt** (`b"hopr-pix-recovery-v1"`).
+//! Static salt is acceptable here because the derived key is used for
+//! *local-disk encryption*, not password verification — the secrecy rests on
+//! the password itself.
+//!
+//! **Per-entry nonce.**  The [`PixAddressId`] (10-byte pseudonym + 4-byte
+//! SSA index) doubles as the database key and as the source of a deterministic
+//! 12-byte nonce (first 12 bytes of the encoded key).  Since each `PixAddressId`
+//! is unique, the nonce is unique — no per-entry random IV needs to be stored.
+//!
+//! **Authenticated encryption.**  Each 32-byte private key is encrypted with
+//! ChaCha20Poly1305 (RFC 8439).  The 16-byte authentication tag is appended,
+//! producing a 48-byte stored value.  Any tampering with the stored ciphertext
+//! (bit flips, truncation, etc.) is detected on decryption and reported as
+//! [`PixRecoveryStoreError::Decryption`].
+//!
+//! **Same plaintext, different IDs → different ciphertexts.**  Because the
+//! nonce changes with every `PixAddressId`, even identical private keys produce
+//! distinct ciphertexts under the same encryption key.
+//!
+//! ## Threat model
+//!
+//! This protects against an attacker who obtains read-only access to the
+//! database file (e.g. via a filesystem backup, exfiltration, or stolen disk).
+//! Without the config password they cannot derive the encryption key, and
+//! without the key they cannot decrypt any entry.
+//!
+//! It does **not** protect against:
+//! - An attacker who also has the config (the password comes from the same config file).
+//! - An attacker who can execute code as the node process (they can read the derived key from process memory).
+//! - Side-channel or fault-analysis attacks.
+//!
+//! ## Recovery on restart
+//!
+//! On node restart the store is iterated and any entry whose on-chain balance
+//! is still non-zero is reprocessed, providing crash recovery.
 //!
 //! The store is only opened in the Exit role (when
-//! [`NonAnonymousPixStrategyConfig::pix_recovery_db_path`] is set).
+//! [`NonAnonymousPixStrategyConfig::pix_recovery_db_path`] and
+//! [`NonAnonymousPixStrategyConfig::pix_recovery_password`] are both set).
 
 use std::{num::NonZeroU32, path::Path, sync::Arc};
 
+use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, Nonce, aead::Aead};
 use hopr_api::{
     node::{PixAddressId, PixDepositSecret},
     types::internal::prelude::HoprPseudonym,
 };
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use scrypt::{Params as ScryptParams, scrypt};
 
 // Key = pseudonym (10 bytes) + ssa_index (4 bytes)
 const KEY_SIZE: usize = 10 + 4;
 
-const PIX_RECOVERED_KEYS: TableDefinition<[u8; KEY_SIZE], [u8; 32]> = TableDefinition::new("pix_recovered_keys");
+// Ciphertext = plaintext (32 bytes) + Poly1305 tag (16 bytes)
+const VALUE_SIZE: usize = 32 + 16;
 
-/// Persistent recovery key store backed by `redb`.
+const PIX_RECOVERED_KEYS: TableDefinition<[u8; KEY_SIZE], [u8; VALUE_SIZE]> =
+    TableDefinition::new("pix_recovered_keys");
+
+/// Application-specific salt for scrypt.  Since the derived key is used for
+/// local-disk encryption (not password storage), a static salt is sufficient —
+/// the secrecy depends on the password, not the salt.
+const PIX_KDF_SALT: &[u8] = b"hopr-pix-recovery-v1";
+
+/// Persistent encrypted recovery key store backed by `redb`.
 #[derive(Clone)]
 pub struct PixRecoveryStore {
     db: Arc<Database>,
+    encryption_key: [u8; 32],
 }
 
 /// Errors from the PIX recovery store.
@@ -34,6 +97,10 @@ pub enum PixRecoveryStoreError {
     Database(#[from] redb::Error),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("encryption error")]
+    Encryption,
+    #[error("decryption error")]
+    Decryption,
 }
 
 impl From<redb::DatabaseError> for PixRecoveryStoreError {
@@ -66,8 +133,9 @@ impl From<redb::CommitError> for PixRecoveryStoreError {
     }
 }
 
-// ── Key encoding ─────────────────────────────────────────────────────────────
-// Key = 32 bytes HoprPseudonym + 4 bytes big-endian NonZeroU32 → 36 bytes.
+// ── Key / nonce encoding ───────────────────────────────────────────────────
+// Key: 10 bytes HoprPseudonym + 4 bytes big-endian NonZeroU32 → 14 bytes.
+// Nonce: first 12 bytes of the encoded key (10 pseudonym + 2 SSA index).
 
 fn encode_key(id: &PixAddressId) -> [u8; KEY_SIZE] {
     let (pseudonym, ssa_index) = id;
@@ -88,9 +156,61 @@ fn decode_key(bytes: &[u8; KEY_SIZE]) -> PixAddressId {
     (pseudonym, ssa_index)
 }
 
+fn derive_nonce(id: &PixAddressId) -> Nonce {
+    let encoded = encode_key(id);
+    // First 12 bytes of the unique DB key → deterministic nonce.
+    *Nonce::from_slice(&encoded[..12])
+}
+
+fn derive_key(password: &str) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    #[allow(deprecated)]
+    scrypt(
+        password.as_bytes(),
+        PIX_KDF_SALT,
+        &ScryptParams::recommended(),
+        &mut key,
+    )
+    .expect("scrypt with 32-byte output must succeed");
+    key
+}
+
+// ── Encryption helpers ─────────────────────────────────────────────────────
+
+fn encrypt(key: &[u8; 32], id: &PixAddressId, plaintext: &[u8; 32]) -> Result<[u8; VALUE_SIZE], PixRecoveryStoreError> {
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
+    let nonce = derive_nonce(id);
+    let ciphertext = cipher
+        .encrypt(&nonce, plaintext.as_ref())
+        .map_err(|_| PixRecoveryStoreError::Encryption)?;
+    // ChaCha20Poly1305 output = plaintext_len + 16-byte tag
+    Ok(ciphertext
+        .as_slice()
+        .try_into()
+        .expect("ChaCha20Poly1305 ciphertext is 48 bytes"))
+}
+
+fn decrypt(
+    key: &[u8; 32],
+    id: &PixAddressId,
+    ciphertext: &[u8; VALUE_SIZE],
+) -> Result<[u8; 32], PixRecoveryStoreError> {
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
+    let nonce = derive_nonce(id);
+    let plaintext = cipher
+        .decrypt(&nonce, ciphertext.as_ref())
+        .map_err(|_| PixRecoveryStoreError::Decryption)?;
+    Ok(plaintext
+        .as_slice()
+        .try_into()
+        .expect("ChaCha20Poly1305 plaintext is 32 bytes"))
+}
+
 impl PixRecoveryStore {
-    /// Open (or create) the `redb` database at `path`.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, PixRecoveryStoreError> {
+    /// Open (or create) the `redb` database at `path` with encryption key derived from `password`.
+    pub fn open(path: impl AsRef<Path>, password: &str) -> Result<Self, PixRecoveryStoreError> {
+        let encryption_key = derive_key(password);
+
         if let Some(parent) = path.as_ref().parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -101,7 +221,10 @@ impl PixRecoveryStore {
             write_tx.open_table(PIX_RECOVERED_KEYS)?;
             write_tx.commit()?;
         }
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            db: Arc::new(db),
+            encryption_key,
+        })
     }
 
     /// Check whether a key has already been persisted.
@@ -112,22 +235,23 @@ impl PixRecoveryStore {
         Ok(table.get(key)?.is_some())
     }
 
-    /// Insert a recovered key.  Returns `true` if the entry was newly inserted,
-    /// `false` if the key was already present.
+    /// Insert an encrypted recovered key.  Returns `true` if the entry was newly
+    /// inserted, `false` if the key was already present.
     pub fn insert(&self, id: &PixAddressId, secret: &PixDepositSecret) -> Result<bool, PixRecoveryStoreError> {
         let key = encode_key(id);
-        // SecretValue<U32> is 32 bytes — convert to fixed-size array
-        let value: [u8; 32] = secret.0.as_ref().try_into().expect("PixDepositSecret is 32 bytes");
+        let plaintext: [u8; 32] = secret.0.as_ref().try_into().expect("PixDepositSecret is 32 bytes");
+        let ciphertext = encrypt(&self.encryption_key, id, &plaintext)?;
+
         let write_tx = self.db.begin_write()?;
         let was_inserted = {
             let mut table = write_tx.open_table(PIX_RECOVERED_KEYS)?;
-            table.insert(key, value)?.is_none()
+            table.insert(key, ciphertext)?.is_none()
         };
         write_tx.commit()?;
         Ok(was_inserted)
     }
 
-    /// Iterate all stored `(id, secret)` pairs, collected into a `Vec`.
+    /// Iterate all stored `(id, secret)` pairs, decrypting each entry.
     ///
     /// On startup the caller uses this to find entries whose on-chain balance
     /// is still non-zero and re-submit the withdrawal.
@@ -138,8 +262,9 @@ impl PixRecoveryStore {
         for result in table.iter()? {
             let (key_bytes, value_bytes) = result?;
             let id = decode_key(&key_bytes.value());
-            let secret_bytes: [u8; 32] = value_bytes.value();
-            let secret = PixDepositSecret(secret_bytes.into());
+            let ciphertext: [u8; VALUE_SIZE] = value_bytes.value();
+            let plaintext = decrypt(&self.encryption_key, &id, &ciphertext)?;
+            let secret = PixDepositSecret(plaintext.into());
             results.push((id, secret));
         }
         Ok(results)
@@ -152,6 +277,8 @@ mod tests {
 
     use super::*;
 
+    const TEST_PASSWORD: &str = "test-password-for-unit-tests";
+
     fn make_id(index: u32) -> PixAddressId {
         (HoprPseudonym::random(), NonZeroU32::new(index).unwrap())
     }
@@ -162,7 +289,7 @@ mod tests {
 
     fn open_temp_store() -> (PixRecoveryStore, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let store = PixRecoveryStore::open(dir.path().join("pix_recovery.db")).unwrap();
+        let store = PixRecoveryStore::open(dir.path().join("pix_recovery.db"), TEST_PASSWORD).unwrap();
         (store, dir)
     }
 
@@ -176,7 +303,7 @@ mod tests {
     fn test_open_with_missing_parent_creates_directories() {
         let dir = tempfile::tempdir().unwrap();
         let nested = dir.path().join("a").join("b").join("pix.db");
-        let store = PixRecoveryStore::open(&nested).unwrap();
+        let store = PixRecoveryStore::open(&nested, TEST_PASSWORD).unwrap();
         assert!(nested.exists());
         drop(store); // must not panic when dropped
     }
@@ -233,7 +360,6 @@ mod tests {
         let entries = store.iter().unwrap();
         assert_eq!(entries.len(), 2);
 
-        // Verify both entries are present with correct data (order not guaranteed).
         assert!(
             entries
                 .iter()
@@ -256,12 +382,12 @@ mod tests {
 
         // Write and close.
         {
-            let store = PixRecoveryStore::open(&path).unwrap();
+            let store = PixRecoveryStore::open(&path, TEST_PASSWORD).unwrap();
             store.insert(&id, &secret).unwrap();
         }
 
-        // Re-open and verify.
-        let store = PixRecoveryStore::open(&path).unwrap();
+        // Re-open with same password and verify.
+        let store = PixRecoveryStore::open(&path, TEST_PASSWORD).unwrap();
         assert!(store.contains(&id).unwrap());
         let entries = store.iter().unwrap();
         assert_eq!(entries.len(), 1);
@@ -270,9 +396,33 @@ mod tests {
     }
 
     #[test]
+    fn test_reopen_with_wrong_password_fails_decryption() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pix.db");
+
+        let id = make_id(7);
+        let secret = make_secret(0x77);
+
+        // Write with password A.
+        {
+            let store = PixRecoveryStore::open(&path, "password-a").unwrap();
+            store.insert(&id, &secret).unwrap();
+        }
+
+        // Re-open with password B → iteration must fail decryption.
+        let store = PixRecoveryStore::open(&path, "password-b").unwrap();
+        assert!(store.contains(&id).unwrap(), "key should still be present");
+        let result = store.iter();
+        assert!(result.is_err(), "iter must fail with wrong password");
+        assert!(
+            matches!(result.unwrap_err(), PixRecoveryStoreError::Decryption),
+            "expected Decryption error"
+        );
+    }
+
+    #[test]
     fn test_key_uniqueness_per_pseudonym_and_index() {
         let (store, _dir) = open_temp_store();
-        // Same pseudonym, different SSA indices → distinct entries.
         let pseudo = HoprPseudonym::random();
         let id_a = (pseudo, NonZeroU32::new(1).unwrap());
         let id_b = (pseudo, NonZeroU32::new(2).unwrap());
@@ -284,5 +434,76 @@ mod tests {
         assert!(store.contains(&id_a).unwrap());
         assert!(store.contains(&id_b).unwrap());
         assert_eq!(store.iter().unwrap().len(), 2);
+    }
+
+    // ── Encryption-specific tests ──────────────────────────────────────────
+
+    /// Helper: read the raw stored bytes for a given ID without decrypting.
+    fn raw_stored_value(store: &PixRecoveryStore, id: &PixAddressId) -> Option<[u8; VALUE_SIZE]> {
+        let key = encode_key(id);
+        let read_tx = store.db.begin_read().unwrap();
+        let table = read_tx.open_table(PIX_RECOVERED_KEYS).unwrap();
+        table.get(key).unwrap().map(|g| g.value())
+    }
+
+    #[test]
+    fn test_encrypted_ciphertext_differs_from_plaintext() {
+        let (store, _dir) = open_temp_store();
+        let id = make_id(1);
+        let secret = make_secret(0xaa);
+        assert!(store.insert(&id, &secret).unwrap());
+
+        let stored = raw_stored_value(&store, &id).expect("should be present");
+        assert_ne!(
+            stored.as_slice(),
+            secret.0.as_ref(),
+            "ciphertext must differ from plaintext"
+        );
+    }
+
+    #[test]
+    fn test_same_plaintext_different_id_yields_different_ciphertext() {
+        let (store, _dir) = open_temp_store();
+        let id1 = make_id(1);
+        let id2 = make_id(2);
+        let secret = make_secret(0xaa);
+
+        assert!(store.insert(&id1, &secret).unwrap());
+        assert!(store.insert(&id2, &secret).unwrap());
+
+        let c1 = raw_stored_value(&store, &id1).expect("entry 1");
+        let c2 = raw_stored_value(&store, &id2).expect("entry 2");
+        assert_ne!(
+            c1, c2,
+            "same plaintext under different IDs must produce different ciphertexts"
+        );
+    }
+
+    #[test]
+    fn test_tampered_ciphertext_fails_decryption() {
+        let (store, _dir) = open_temp_store();
+        let id = make_id(1);
+        let secret = make_secret(0xaa);
+        assert!(store.insert(&id, &secret).unwrap());
+
+        // Read, tamper one byte of the ciphertext, write back directly.
+        let mut corrupted = raw_stored_value(&store, &id).expect("should be present");
+        corrupted[0] ^= 0xff; // flip all bits in the first byte
+
+        // Write the corrupted ciphertext directly via raw redb.
+        let key = encode_key(&id);
+        let write_tx = store.db.begin_write().unwrap();
+        {
+            let mut table = write_tx.open_table(PIX_RECOVERED_KEYS).unwrap();
+            table.insert(key, corrupted).unwrap();
+        }
+        write_tx.commit().unwrap();
+
+        // iter() must detect the tampered AEAD tag and fail.
+        let result = store.iter();
+        assert!(
+            matches!(result, Err(PixRecoveryStoreError::Decryption)),
+            "tampered ciphertext must fail decryption"
+        );
     }
 }

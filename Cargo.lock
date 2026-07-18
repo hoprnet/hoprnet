@@ -4279,6 +4279,7 @@ version = "0.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chacha20poly1305",
  "chrono",
  "dashmap",
  "futures",
@@ -4296,6 +4297,7 @@ dependencies = [
  "multiaddr",
  "parking_lot",
  "redb",
+ "scrypt",
  "serde",
  "serde_with",
  "smart-default",
