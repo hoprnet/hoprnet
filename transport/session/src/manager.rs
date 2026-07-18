@@ -1128,6 +1128,22 @@ where
         if cfg.capabilities.contains(Capability::UsePIX)
             && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
         {
+            // Validate that PIX toolbox is available before advertising UsePIX
+            if self.pix_toolbox.get().is_none() {
+                return Err(
+                    SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
+                );
+            }
+            // Validate dimensions are within protocol limits
+            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+            {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "invalid PIX dimensions: polys={}, shares={}",
+                    polys_per_ssa,
+                    shares_per_ssa,
+                ))
+                .into());
+            }
             let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
             additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }

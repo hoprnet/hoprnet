@@ -300,14 +300,28 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         .map_err(|e| anyhow::anyhow!("timeout: {e}"))?
         .ok_or(anyhow::anyhow!("alice must get a pix event"))?;
 
-    assert!(matches!(alice_session_event, HoprSessionOutPixEvent::ReadyToDeposit(_)));
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_quota) = &alice_session_event else {
+        panic!("expected ReadyToDeposit, got {alice_session_event:?}");
+    };
 
     let bob_session_event = tokio_time::timeout(Duration::from_secs(2), pix_bob_rx.next())
         .await
         .map_err(|e| anyhow::anyhow!("timeout: {e}"))?
         .ok_or(anyhow::anyhow!("bob must get a pix event"))?;
 
-    assert!(matches!(bob_session_event, HoprSessionOutPixEvent::DepositNeeded(..)));
+    let HoprSessionOutPixEvent::DepositNeeded(bob_quota, _) = &bob_session_event else {
+        panic!("expected DepositNeeded, got {bob_session_event:?}");
+    };
+
+    // Both peers must agree on the same SSA parameters
+    assert_eq!(
+        alice_quota.ssa_id, bob_quota.ssa_id,
+        "Entry and Exit must agree on SSA ID"
+    );
+    assert_eq!(
+        alice_quota.quota_per_ssa, bob_quota.quota_per_ssa,
+        "Entry and Exit must agree on SSA quota"
+    );
 
     tokio::time::sleep(Duration::from_millis(100)).await;
     alice_session.close().await?;
