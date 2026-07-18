@@ -180,8 +180,12 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             .await;
             match result {
                 Ok(Ok(_echoed)) => {}
-                Ok(Err(e)) | Err(_) => {
+                Ok(Err(e)) => {
                     tracing::warn!("bg task failed: {e:?}");
+                    break;
+                }
+                Err(_) => {
+                    tracing::warn!("bg task timed out");
                     break;
                 }
             }
