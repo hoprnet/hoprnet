@@ -208,15 +208,14 @@ impl SendMsg for MsgSender {
             let call_count = guard.call_count;
 
             // Find the expectation to handle this call:
-            // 1. rposition finds the LAST Exact expectation that still has remaining calls. This ensures Exact
-            //    expectations are consumed in registration order while AtLeast expectations silently absorb any
-            //    overflow calls.
-            // 2. If no Exact matches, position finds the first AtLeast whose minimum is met.
+            // 1. `position` finds the FIRST Exact expectation that still has remaining calls. This ensures Exact
+            //    expectations are consumed in FIFO registration order.
+            // 2. If no Exact matches, `position` finds the first AtLeast whose minimum is met.
             // 3. If neither finds anything, the call is unexpected.
             let idx = guard
                 .expectations
                 .iter()
-                .rposition(|e| matches!(&e.times, Times::Exact(_)) && e.times_remaining > 0)
+                .position(|e| matches!(&e.times, Times::Exact(_)) && e.times_remaining > 0)
                 .or_else(|| {
                     guard.expectations.iter().position(|e| match &e.times {
                         Times::Exact(_) => false,
