@@ -129,8 +129,8 @@ async fn verify_session_echo(
         entry_session.read_exact(&mut echoed).await?;
         anyhow::Ok(())
     })
-        .await
-        .with_context(|| format!("{label}: echo round-trip timeout"))??;
+    .await
+    .with_context(|| format!("{label}: echo round-trip timeout"))??;
     assert_eq!(&msg[..], &echoed[..], "{label}: echo mismatch");
 
     tracing::info!("{label}: echo verified");

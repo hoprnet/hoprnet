@@ -209,10 +209,7 @@ impl std::fmt::Debug for SessionSsaState {
                 "current_index",
                 &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
             )
-            .field(
-                "current_ssa_errors",
-                &self.current_ssa_errors.lock(),
-            )
+            .field("current_ssa_errors", &self.current_ssa_errors.lock())
             .field("polys_per_ssa", &self.polys_per_ssa)
             .field("shares_per_poly", &self.shares_per_poly)
             .finish()

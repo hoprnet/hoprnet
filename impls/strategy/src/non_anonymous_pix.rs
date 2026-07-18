@@ -119,6 +119,23 @@ where
 
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
 
+                // Check balance immediately before entering the interval loop to avoid
+                // the sub-second first-poll delay inherent to stream::interval.
+                let initial_balance = node_clone
+                    .chain_api()
+                    .balance(deposit_addr)
+                    .await
+                    .map_err(StrategyError::other)?;
+                if initial_balance >= target_deposit {
+                    if let Some(mut notifier) = deposit_address_recv.deposit_updated {
+                        notifier
+                            .send((deposit_address_recv.id, initial_balance))
+                            .await
+                            .map_err(StrategyError::other)?;
+                    }
+                    return Ok(());
+                }
+
                 let mut stream = futures_time::stream::interval(
                     futures_time::time::Duration::from(max_tracking_time / 10).max(Duration::from_secs(1).into()),
                 )

@@ -125,12 +125,17 @@ impl Strategy for MultiStrategy {
                     tracing::warn!(%e, "sub-strategy failed");
                 }
             }
+
+            Ok(())
         }
 
         #[cfg(not(feature = "runtime-tokio"))]
-        let _ = strategies;
-
-        Ok(())
+        {
+            let _ = strategies;
+            Err(crate::errors::StrategyError::Other(anyhow::anyhow!(
+                "MultiStrategy requires runtime-tokio feature to execute sub-strategies"
+            )))
+        }
     }
 }
 

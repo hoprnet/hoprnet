@@ -217,18 +217,16 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self, S::Pseudonym> {
-        let recv_commitments = poly_commitments
-            .into_iter()
-            .map(|c| {
-                Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
-                    .filter(|pt| {
-                        // Reject points outside the prime-order subgroup. Baby JubJub has
-                        // cofactor 8, so small-order points can pass the on-curve check.
-                        bool::from(pt.is_torsion_free())
-                    })
-                    .map(ShareVerifierGroup::<PixGroup<S>>::from)
-                    .ok_or(errors::PixError::InvalidInput)
-            });
+        let recv_commitments = poly_commitments.into_iter().map(|c| {
+            Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
+                .filter(|pt| {
+                    // Reject points outside the prime-order subgroup. Baby JubJub has
+                    // cofactor 8, so small-order points can pass the on-curve check.
+                    bool::from(pt.is_torsion_free())
+                })
+                .map(ShareVerifierGroup::<PixGroup<S>>::from)
+                .ok_or(errors::PixError::InvalidInput)
+        });
 
         // Re-add the generator as the first entry
         let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
@@ -430,7 +428,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn from_serializable_commitments_roundtrip_generator_valued_coefficients() -> errors::Result<(), <TestSpec as PixSpec>::Pseudonym> {
+    fn from_serializable_commitments_roundtrip_generator_valued_coefficients()
+    -> errors::Result<(), <TestSpec as PixSpec>::Pseudonym> {
         let spi = SsaPolynomialId::new(
             SsaId::new(
                 SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
@@ -444,7 +443,11 @@ pub(crate) mod tests {
         let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
         let verifier = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi.clone(), all_generator)?;
         let (_, serialized) = verifier.into_serializable_commitments();
-        assert_eq!(serialized.len(), 10, "all generator-valued coefficients must be preserved");
+        assert_eq!(
+            serialized.len(),
+            10,
+            "all generator-valued coefficients must be preserved"
+        );
         Ok(())
     }
 }
