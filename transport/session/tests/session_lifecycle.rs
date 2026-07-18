@@ -631,7 +631,7 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
             start_msg_match(
                 data,
                 |msg| matches!(msg, HoprStartProtocol::KeepAlive(ka) if ka.session_id == alice_pseudonym),
-            ) && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
+            ) && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_keepalive.clone();
@@ -660,7 +660,7 @@ async fn session_manager_should_send_keep_alive_when_ping_session_is_called() ->
             .try_as_segment()
             .expect("must be a segment")
             .is_terminating()
-                && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
+                && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
         })
         .returning(move |_, data| {
             let bob_mgr = bob_mgr_for_alice_seg.clone();

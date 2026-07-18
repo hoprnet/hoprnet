@@ -5,14 +5,11 @@ This skill provides instructions for running code coverage analysis using `cargo
 ## Quick Reference
 
 ```bash
-# Set working directory first
-cargo set-working-directory -p hopr-transport-session
-
-# Run coverage for a specific crate
-cargo llvm-cov --package <crate> --lib --bins --tests
+# Run coverage for a specific crate using nextest (preferred)
+cargo llvm-cov nextest --package <crate> --lib --bins
 
 # Get LCOV output for per-file analysis
-cargo llvm-cov --package <crate> --lib --bins --tests --lcov --output-path /tmp/coverage.lcov
+cargo llvm-cov nextest --package <crate> --lib --bins --lcov --output-path /tmp/coverage.lcov
 ```
 
 ## Detailed Workflow
@@ -44,21 +41,20 @@ cargo build --package <crate>
 Basic command for a specific package:
 
 ```bash
-cargo llvm-cov --package hopr-transport-session --lib --bins --tests
+cargo llvm-cov nextest --package hopr-transport-session --lib --bins
 ```
 
 Flags:
 
 - `--lib`: Include library code
 - `--bins`: Include binaries
-- `--tests`: Include test code
 
 ### 4. Generate LCOV for Per-File Analysis
 
 To get per-file coverage breakdown, generate LCOV format:
 
 ```bash
-cargo llvm-cov --package <crate> --lib --bins --tests --lcov --output-path /tmp/coverage.lcov
+cargo llvm-cov nextest --package <crate> --lib --bins --lcov --output-path /tmp/coverage.lcov
 ```
 
 ### 5. Parse Results
@@ -76,7 +72,7 @@ with open('/tmp/coverage.lcov', 'r') as f:
         line = line.strip()
         if line.startswith('SF:'):
             path = line[3:]
-            filename = path.split('/')[-1]
+            filename = path
             current_file = filename
             if current_file not in files_data:
                 files_data[current_file] = {'covered': 0, 'total': 0}

@@ -121,13 +121,16 @@ async fn verify_session_echo(
     label: &str,
 ) -> anyhow::Result<()> {
     let msg: [u8; 32] = hopr_lib::api::types::crypto_random::random_bytes();
-    entry_session.write_all(&msg).await?;
-    entry_session.flush().await?;
 
     let mut echoed = vec![0u8; 32];
-    tokio::time::timeout(Duration::from_secs(10), entry_session.read_exact(&mut echoed))
-        .await
-        .with_context(|| format!("{label}: echo read timeout"))??;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        entry_session.write_all(&msg).await?;
+        entry_session.flush().await?;
+        entry_session.read_exact(&mut echoed).await?;
+        anyhow::Ok(())
+    })
+    .await
+    .with_context(|| format!("{label}: echo round-trip timeout"))??;
     assert_eq!(&msg[..], &echoed[..], "{label}: echo mismatch");
 
     tracing::info!("{label}: echo verified");

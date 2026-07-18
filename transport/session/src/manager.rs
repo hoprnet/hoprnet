@@ -160,6 +160,13 @@ enum SessionHandles {
 #[derive(Clone)]
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
+    /// Cumulative count of unverifiable PIX shares across all SSA cycles.
+    ///
+    /// The session closes once the *total* number of unverifiable shares across
+    /// all SSA cycles exceeds `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
+    /// `AtomicUsize` is safe here because duplicates are already rejected by the
+    /// moka cache (keyed by `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by
+    /// share identifier), so no share triggers two errors.
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
@@ -176,17 +183,19 @@ impl SessionSsaState {
         }
     }
 
+    /// Record an unverifiable share error.
+    ///
+    /// Returns the cumulative error count after this increment.
     pub fn increment_errors(&self) -> usize {
         self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
     }
 
     pub fn increment_index(&self) -> SsaIndex {
-        // Errors reset with new SSA index
-        self.num_errors.store(0, std::sync::atomic::Ordering::Relaxed);
         SsaIndex::new(self.current_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
             .expect("ssa index cannot become 0 when incremented")
     }
 
+    /// Returns the current SSA index value.
     #[inline]
     pub const fn quota_per_ssa(&self) -> SsaQuota {
         pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
@@ -1084,20 +1093,6 @@ where
             crossfire::AsyncRx<crossfire::mpsc::One<_>>,
         ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
 
-        let (challenge, _) = insert_into_next_slot(
-            &self.session_initiations,
-            |ch| {
-                if let Some(challenge) = ch {
-                    ((challenge + 1) % hopr_api::types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
-                } else {
-                    hopr_api::types::crypto_random::random_integer(MIN_CHALLENGE, None)
-                }
-            },
-            |_| tx_initiation_done,
-            Some(self.cfg.maximum_sessions as u64),
-        )
-        .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
-
         let current_ssa_state = Arc::new(OnceLock::new());
 
         let mut additional_data = 0_u64;
@@ -1118,13 +1113,60 @@ where
                 .min(u32::MAX as u64);
         }
 
-        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data
-        if cfg.capabilities.contains(Capability::UsePIX)
-            && let Some((polys_per_ssa, shares_per_ssa)) = cfg.pix_ssa_quota
-        {
+        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // Run these validations BEFORE reserving the initiation challenge slot so that a
+        // repeated invalid request cannot exhaust all challenge slots.
+        if cfg.capabilities.contains(Capability::UsePIX) {
+            // PIX requires at least 1 intermediate hop on the return path so that PIX
+            // shares can be encrypted with the first relayer's ticket-challenge solution
+            // (`HalfKey`) and delivered via return-path SURBs. With 0 intermediate hops
+            // (a direct Exit→Entry SURB), there is no relayer to provide the challenge
+            // solution, so shares are never embedded — the ongoing PIX share delivery
+            // mechanism is dead and the Exit's quota is never replenished.
+            if cfg.return_path_options.count_hops() == 0 {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "UsePIX requires at least 1 intermediate hop on the return path, got 0"
+                ))
+                .into());
+            }
+
+            let (polys_per_ssa, shares_per_ssa) = cfg
+                .pix_ssa_quota
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
+
+            // Validate that PIX toolbox is available before advertising UsePIX
+            if self.pix_toolbox.get().is_none() {
+                return Err(
+                    SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
+                );
+            }
+            // Validate dimensions are within protocol limits
+            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+            {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "invalid PIX dimensions: polys={}, shares={}",
+                    polys_per_ssa,
+                    shares_per_ssa,
+                ))
+                .into());
+            }
             let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
             additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }
+
+        let (challenge, _) = insert_into_next_slot(
+            &self.session_initiations,
+            |ch| {
+                if let Some(challenge) = ch {
+                    ((challenge + 1) % hopr_api::types::crypto_random::MAX_RANDOM_INTEGER).max(MIN_CHALLENGE)
+                } else {
+                    hopr_api::types::crypto_random::random_integer(MIN_CHALLENGE, None)
+                }
+            },
+            |_| tx_initiation_done,
+            Some(self.cfg.maximum_sessions as u64),
+        )
+        .ok_or(SessionManagerError::NoChallengeSlots)?; // almost impossible with u64
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
@@ -1635,16 +1677,13 @@ where
             // SSA fully recovered — the next SSA request was already triggered by
             // SsaAlmostRecovered. Deposit-key processing is handled in the upper layer.
             HoprSessionInPixEvent::SsaRecovered(_) => {}
-            HoprSessionInPixEvent::UnverifiableShare(_) => {
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
                 )))?;
                 let num_errors = state.increment_errors();
-                trace!(%session_id, num_errors, "encountered unverifiable share in session with pix");
+                trace!(%session_id, ssa_index = %ssa_id.ssa_index(), num_errors, "encountered unverifiable share in session with pix");
 
-                // The PIX shares can come from different polynomials, so we can only
-                // see the total number of unverifiable shares and make the Session closure
-                // decision based on that.
                 if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(session_id) {
                     error!(%session_id, "closed session due to too many unverifiable shares");
                 }
@@ -1783,7 +1822,7 @@ where
             );
 
             let in_quota_range = self.cfg.pix_config.quota_range.contains(&quota_per_ssa);
-            let valid_polys = polys_per_ssa <= MAX_POLYS_PER_SSA;
+            let valid_polys = (1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa);
             let valid_shares = (2_u16..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa);
             (in_quota_range && valid_polys && valid_shares).then_some((polys_per_ssa, shares_per_ssa))
         } else if self.cfg.pix_config.enforce_pix {
@@ -1933,10 +1972,11 @@ where
 
             // The Session request carries a "hint" as additional data telling what
             // the Session initiator has configured as its target buffer size in the Balancer.
-            let target_surb_buffer_size = if session_req.additional_data > 0 {
-                session_req
-                    .additional_data
-                    .min(self.cfg.maximum_surb_buffer_size as u64)
+            // The lower 32 bits contain the SURB target; the upper 32 bits carry PIX
+            // parameters and must be masked out.
+            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            let target_surb_buffer_size = if surb_target > 0 {
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
                 self.cfg.initial_return_session_egress_rate as u64
                     * self
@@ -4342,6 +4382,61 @@ mod tests {
         sender.close_channel();
         let _ = _handle.await;
 
+        Ok(())
+    }
+
+    /// Verifies that `new_session` rejects `UsePIX` when the return path has 0 intermediate hops.
+    ///
+    /// PIX shares are encrypted with the first relayer's ticket-challenge solution and carried
+    /// in return-path SURBs. With 0 intermediate hops (a direct Exit→Entry SURB), there is no
+    /// relayer to provide the challenge solution, so shares are never embedded — the ongoing
+    /// PIX share delivery mechanism is dead and the Exit's quota is never replenished.
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_with_zero_return_hops() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect_send_message should NOT fire.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None)?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    pix_ssa_quota: Some((2, 2)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(0.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("UsePIX requires at least 1 intermediate hop on the return path"),
+            "expected return-path guard error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when UsePIX is rejected"
+        );
+
+        sender.close_channel();
+        let _ = _handle.await;
         Ok(())
     }
 

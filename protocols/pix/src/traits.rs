@@ -14,7 +14,7 @@ use crate::{
 /// an encrypted PIX share.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Debug, Clone, strum::EnumTryAs)]
+#[derive(Clone, strum::EnumTryAs)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),
@@ -36,6 +36,16 @@ impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
 }
 
 impl<P: Eq, A> Eq for ShareResolution<P, A> {}
+
+impl<P: std::fmt::Debug, A> std::fmt::Debug for ShareResolution<P, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RecoveredSsa(ssa) => f.debug_tuple("RecoveredSsa").field(ssa).finish(),
+            Self::AlmostRecoveredSsa(id) => f.debug_tuple("AlmostRecoveredSsa").field(id).finish(),
+            Self::InvalidShare(key, id) => f.debug_tuple("InvalidShare").field(key).field(id).finish(),
+        }
+    }
+}
 
 impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -147,4 +157,38 @@ pub trait EntryShareGenerator<S: PixSpec> {
         pseudonym: &S::Pseudonym,
         ssa_index: SsaIndex,
     ) -> Result<SsaCommitment<S>, Self::Error>;
+}
+
+#[cfg(test)]
+mod tests {
+    use hopr_types::{
+        crypto::{
+            keypairs::Keypair,
+            prelude::{ChainKeypair, SimplePseudonym},
+        },
+        crypto_random::Randomizable,
+    };
+
+    use super::*;
+
+    #[test]
+    fn debug_redaction_share_resolution_recovered_ssa() {
+        // ShareResolution::RecoveredSsa wraps RecoveredSsa; the nested Debug
+        // must preserve the secret redaction.
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
+        let dummy_key = ChainKeypair::random();
+        let recovered = RecoveredSsa { ssa_id, ssa: dummy_key };
+        let recovered_debug = format!("{:?}", recovered);
+        let resolution = ShareResolution::RecoveredSsa(recovered);
+        let debug = format!("{:?}", resolution);
+
+        assert!(debug.contains("RecoveredSsa"));
+        // The outer tuple wraps the inner RecoveredSsa Debug, which redacts ssa
+        assert_eq!(
+            debug,
+            format!("RecoveredSsa({recovered_debug})"),
+            "ShareResolution::RecoveredSsa Debug must perfectly delegate to RecoveredSsa Debug"
+        );
+    }
 }

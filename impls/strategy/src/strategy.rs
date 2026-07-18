@@ -67,9 +67,7 @@ impl Display for MultiStrategy {
 #[async_trait]
 impl Strategy for MultiStrategy {
     async fn run(&mut self) -> Result<()> {
-        #[cfg(feature = "runtime-tokio")]
         use futures::StreamExt as _;
-        #[cfg(feature = "runtime-tokio")]
         use hopr_utils::runtime::prelude::{AbortHandle, abortable, spawn};
 
         let strategies = std::mem::take(&mut self.strategies);
@@ -83,52 +81,46 @@ impl Strategy for MultiStrategy {
         // Spawn each sub-strategy as an abortable task.
         // Keeping all AbortHandles in a RAII guard ensures every sub-task is cancelled
         // when MultiStrategy is dropped (graceful shutdown).
-        #[cfg(feature = "runtime-tokio")]
-        {
-            let mut join_handles = Vec::new();
-            let mut abort_handles: Vec<AbortHandle> = Vec::new();
-            for mut s in strategies {
-                let proc = hopr_utils::runtime::diagnostics::instrument(
-                    async move { s.run().await },
-                    "multi_strategy_sub_task",
-                    module_path!(),
-                    file!(),
-                    line!(),
-                );
-                let (proc, abort_handle) = abortable(proc);
-                join_handles.push(spawn(proc));
-                abort_handles.push(abort_handle);
-            }
+        let mut join_handles = Vec::new();
+        let mut abort_handles: Vec<AbortHandle> = Vec::new();
+        for mut s in strategies {
+            let proc = hopr_utils::runtime::diagnostics::instrument(
+                async move { s.run().await },
+                "multi_strategy_sub_task",
+                module_path!(),
+                file!(),
+                line!(),
+            );
+            let (proc, abort_handle) = abortable(proc);
+            join_handles.push(spawn(proc));
+            abort_handles.push(abort_handle);
+        }
 
-            struct AbortGuard(Vec<AbortHandle>);
-            impl Drop for AbortGuard {
-                fn drop(&mut self) {
-                    for h in &self.0 {
-                        h.abort();
-                    }
-                }
-            }
-            let _guard = AbortGuard(abort_handles);
-
-            // Process completions as they arrive. Sub-strategies are fully isolated:
-            // a failure in one is logged but does not affect the others.
-            let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
-
-            while let Some(join_result) = pending.next().await {
-                let strategy_result = match join_result {
-                    Err(e) => Err(crate::errors::StrategyError::Other(e.into())),
-                    Ok(Ok(result)) => result,
-                    Ok(Err(_aborted)) => continue, // aborted by the guard — expected during shutdown
-                };
-
-                if let Err(e) = strategy_result {
-                    tracing::warn!(%e, "sub-strategy failed");
+        struct AbortGuard(Vec<AbortHandle>);
+        impl Drop for AbortGuard {
+            fn drop(&mut self) {
+                for h in &self.0 {
+                    h.abort();
                 }
             }
         }
+        let _guard = AbortGuard(abort_handles);
 
-        #[cfg(not(feature = "runtime-tokio"))]
-        let _ = strategies;
+        // Process completions as they arrive. Sub-strategies are fully isolated:
+        // a failure in one is logged but does not affect the others.
+        let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
+
+        while let Some(join_result) = pending.next().await {
+            let strategy_result = match join_result {
+                Err(e) => Err(crate::errors::StrategyError::Other(e.into())),
+                Ok(Ok(result)) => result,
+                Ok(Err(_aborted)) => continue, // aborted by the guard — expected during shutdown
+            };
+
+            if let Err(e) = strategy_result {
+                tracing::warn!(%e, "sub-strategy failed");
+            }
+        }
 
         Ok(())
     }

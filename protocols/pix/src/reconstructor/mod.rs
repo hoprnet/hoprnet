@@ -203,7 +203,9 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         polys_per_ssa: usize,
         shares_per_poly: usize,
     ) -> Result<PixGroup<S>, Self::Error> {
-        if polys_per_ssa > MAX_POLYS_PER_SSA as usize || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly) {
+        if !(1..=MAX_POLYS_PER_SSA as usize).contains(&polys_per_ssa)
+            || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly)
+        {
             return Err(PixError::InvalidInput);
         }
 
@@ -376,6 +378,48 @@ mod tests {
     };
 
     #[test]
+    fn reconstructor_rejects_invalid_exit_commitment_inputs() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+        let make_ssa_id = || SsaId::new(SimplePseudonym::random(), 1.try_into().unwrap());
+
+        // polys_per_ssa == 0
+        assert!(matches!(
+            reconstructor.new_exit_commitment(make_ssa_id(), 0, 2),
+            Err(PixError::InvalidInput)
+        ));
+
+        // polys_per_ssa exceeds MAX
+        assert!(matches!(
+            reconstructor.new_exit_commitment(make_ssa_id(), MAX_POLYS_PER_SSA as usize + 1, 2),
+            Err(PixError::InvalidInput)
+        ));
+
+        // shares_per_poly == 0
+        assert!(matches!(
+            reconstructor.new_exit_commitment(make_ssa_id(), 2, 0),
+            Err(PixError::InvalidInput)
+        ));
+
+        // shares_per_poly == 1 (below minimum of 2)
+        assert!(matches!(
+            reconstructor.new_exit_commitment(make_ssa_id(), 2, 1),
+            Err(PixError::InvalidInput)
+        ));
+
+        // shares_per_poly exceeds MAX
+        assert!(matches!(
+            reconstructor.new_exit_commitment(make_ssa_id(), 2, MAX_POLY_THRESHOLD as usize + 1),
+            Err(PixError::InvalidInput)
+        ));
+
+        // Valid inputs still work
+        assert!(reconstructor.new_exit_commitment(make_ssa_id(), 2, 2).is_ok());
+
+        Ok(())
+    }
+
+    #[test]
     fn reconstructor_invalid_commitment_inputs() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
@@ -482,6 +526,118 @@ mod tests {
                 .ok_or(anyhow::anyhow!("missing peer"))?,
         );
         assert!(matches!(result, Err(PixError::MissingVerifier)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn reconstructor_rejects_duplicate_share_via_different_challenges() -> anyhow::Result<()> {
+        // 1 poly, threshold=2 → need 2 shares per polynomial to reconstruct.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into()?);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // --- Step 1: Generate the first share ---
+        let msg1: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        let Some(first) = generator.next_share(&pseudonym, &msg1)? else {
+            anyhow::bail!("expected first share");
+        };
+        // Clone the PartialSsaShare so we can re-encrypt it as a duplicate later
+        let first_share = first.share.clone();
+        let ack1 = HalfKey::random();
+        let challenge1 = ack1.to_challenge()?;
+        let enc1 = first.share.encrypt(&first.id, &ack1)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge1,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg1, enc1)?,
+        )?;
+
+        // --- Step 2: Re-encrypt the SAME share under a different challenge (true duplicate) ---
+        // The PartialSsaShare retains the same scalar value and derives the same identifier
+        // (X-coordinate) from msg1, so it will be recognised as a duplicate at share-insertion time.
+        let dup_ack = HalfKey::random();
+        let dup_challenge = dup_ack.to_challenge()?;
+        let enc_dup = first_share.encrypt(&first.id, &dup_ack)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            dup_challenge,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg1, enc_dup)?,
+        )?;
+
+        // --- Step 3: Process the first ack — share accepted, not yet complete ---
+        let resolution1 = reconstructor.process_verified_ack(
+            ack1,
+            challenge1,
+            reconstructor
+                .awaiting_acks
+                .get(peer.public())
+                .as_ref()
+                .ok_or(anyhow::anyhow!("missing peer"))?,
+        )?;
+        assert!(
+            matches!(resolution1, ProcessedAckResult::NoProgress),
+            "first share should not yet complete the SSA"
+        );
+
+        // --- Step 4: Process the duplicate ---
+        // The SsaPartBuilder has 1/2 shares. The duplicate share has the same identifier
+        // (same X-coordinate from msg1), so it hits the
+        // `any(|s| s.identifier == share.identifier)` check in SsaPartBuilder::add_share
+        // and returns Ok(None), which surfaces as NoProgress.
+        let resolution_dup = reconstructor.process_verified_ack(
+            dup_ack,
+            dup_challenge,
+            reconstructor
+                .awaiting_acks
+                .get(peer.public())
+                .as_ref()
+                .ok_or(anyhow::anyhow!("missing peer"))?,
+        )?;
+        assert!(
+            matches!(resolution_dup, ProcessedAckResult::NoProgress),
+            "duplicate share must return NoProgress during active reconstruction"
+        );
+
+        // --- Step 5: Generate and process the second distinct share ---
+        let msg2: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        let Some(second) = generator.next_share(&pseudonym, &msg2)? else {
+            anyhow::bail!("expected second share");
+        };
+        let ack2 = HalfKey::random();
+        let challenge2 = ack2.to_challenge()?;
+        let enc2 = second.share.encrypt(&second.id, &ack2)?;
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge2,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg2, enc2)?,
+        )?;
+
+        let resolution2 = reconstructor.process_verified_ack(
+            ack2,
+            challenge2,
+            reconstructor
+                .awaiting_acks
+                .get(peer.public())
+                .as_ref()
+                .ok_or(anyhow::anyhow!("missing peer"))?,
+        )?;
+        assert!(
+            matches!(resolution2, ProcessedAckResult::FullRecovery(ref r) if r.ssa_id == ssa_id),
+            "second unique share should complete SSA reconstruction"
+        );
 
         Ok(())
     }

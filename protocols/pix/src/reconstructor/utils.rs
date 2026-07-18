@@ -99,7 +99,16 @@ impl<S: PixSpec> SsaPartBuilder<S> {
 
         let share = into_completed_share(msg, &share)?;
 
+        // Reject duplicate shares — same identifier means the same X-coordinate,
+        // which contributes no new information and can cause premature combination
+        // attempts that will persistently fail.
+        // Check this before verification to avoid expensive elliptic curve MSMs for redundant shares.
+        if self.shares.iter().any(|s| s.identifier == share.identifier) {
+            return Ok(None);
+        }
+
         self.verifier.verify_completed_share(&share)?;
+
         self.shares.push(share);
 
         if self.shares.len() >= self.verifier.min_shares() {

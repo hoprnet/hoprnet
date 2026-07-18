@@ -157,8 +157,14 @@ impl<P: std::fmt::Display> std::fmt::Display for SsaPolynomialId<P> {
 /// [`nonce`](TaggedEncryptedPartialSsaShare).
 ///
 /// See [`TaggedEncryptedPartialSsaShare`] and [`EncryptedPartialSsaShare`] for more details.
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Default, Hash, PartialEq, Eq)]
 pub struct PartialSsaShare<S: PixSpec>(pub(crate) <PixScalar<S> as PrimeField>::Repr);
+
+impl<S: PixSpec> std::fmt::Debug for PartialSsaShare<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartialSsaShare").finish_non_exhaustive()
+    }
+}
 
 impl<S: PixSpec> PartialSsaShare<S> {
     /// Encrypts this partial SSA share using the given acknowledgement [`HalfKey`].
@@ -425,12 +431,20 @@ impl<S: PixSpec + Copy, P: Copy, T: Copy> Copy for TaggedEncryptedPartialSsaShar
 }
 
 /// Contains a generated share from a specific previously committed SSA.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct GeneratedShare<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     /// ID of the polynomial corresponding to the partial SSA share.
     pub id: SsaPolynomialId<P>,
     /// Generated partial SSA share.
     pub share: PartialSsaShare<S>,
+}
+
+impl<S: PixSpec, P: std::fmt::Debug> std::fmt::Debug for GeneratedShare<S, P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GeneratedShare")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<S: PixSpec> GeneratedShare<S, S::Pseudonym> {
@@ -536,12 +550,20 @@ impl<P, A> SsaCommitmentState<P, A> {
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct RecoveredSsa<P, A> {
     /// ID of the SSA that was recovered.
     pub ssa_id: SsaId<P>,
     /// Recovered secret scalar (private key corresponding to the SSA deposit address).
     pub ssa: A,
+}
+
+impl<P: std::fmt::Debug, A> std::fmt::Debug for RecoveredSsa<P, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecoveredSsa")
+            .field("ssa_id", &self.ssa_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<P: PartialEq, A> PartialEq for RecoveredSsa<P, A> {
@@ -632,5 +654,66 @@ mod tests {
 
         assert_eq!(share_1, share_2);
         Ok(())
+    }
+
+    #[test]
+    fn debug_redaction_partial_ssa_share() {
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let share = PartialSsaShare::<TestSpec>(scalar.to_repr());
+        let debug = format!("{:?}", share);
+        assert!(debug.contains("PartialSsaShare"));
+        // The scalar repr should not appear in Debug output
+        assert_eq!(
+            debug, "PartialSsaShare { .. }",
+            "PartialSsaShare Debug must exactly match the redacted format"
+        );
+    }
+
+    #[test]
+    fn debug_redaction_generated_share() {
+        use crate::tests::TestSpec;
+
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let share = PartialSsaShare::<TestSpec>(scalar.to_repr());
+        let id = SsaPolynomialId::new(
+            SsaId::new(
+                SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
+                1.try_into().unwrap(),
+            ),
+            0,
+        );
+        let generated = GeneratedShare { id, share };
+        let debug = format!("{:?}", generated);
+
+        // Must include the public ID field
+        assert!(debug.contains("GeneratedShare"));
+        assert!(debug.contains("id"));
+
+        // Must NOT include the secret share field
+        assert!(
+            !debug.contains("share:"),
+            "GeneratedShare Debug must omit the share field entirely"
+        );
+    }
+
+    #[test]
+    fn debug_redaction_recovered_ssa() {
+        use hopr_types::crypto::{keypairs::Keypair, prelude::ChainKeypair};
+
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, 1.try_into().unwrap());
+        let dummy_key = ChainKeypair::random();
+        let recovered = RecoveredSsa { ssa_id, ssa: dummy_key };
+        let debug = format!("{:?}", recovered);
+
+        // Must include the public ssa_id field
+        assert!(debug.contains("RecoveredSsa"));
+        assert!(debug.contains("ssa_id"));
+
+        // Must NOT include the secret ssa field
+        assert!(
+            !debug.contains("ssa:"),
+            "RecoveredSsa Debug must omit the ssa field entirely"
+        );
     }
 }
