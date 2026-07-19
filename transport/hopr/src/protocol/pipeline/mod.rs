@@ -912,7 +912,11 @@ where
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
-                (node_type == NodeType::Exit).then(|| exit_ack_proc.clone()),
+                // Pass exit_ack_proc to any node that has an outgoing packet pipeline
+                // (Relay, Exit, or Relay+Exit). Entry nodes never have a processor.
+                // The Option inside already guards absent processors (e.g. pure Relay
+                // without PIX uses a no-op), so this is safe to pass unconditionally.
+                (node_type != NodeType::Entry).then(|| exit_ack_proc.clone()),
                 wire_out.clone(),
                 counters.clone(),
                 output_concurrency
