@@ -1532,26 +1532,8 @@ where
 
         info!(%session_id, ?current_ssa_state, %exit_commitment, "generated exit commitment");
 
-        // Construct and send the Exit SSA commitment request message
-        // The parameters were previously verified to be acceptable.
-        let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
-            session_id,
-            current_ssa_state.polys_per_ssa,
-            current_ssa_state.shares_per_poly,
-            [(ssa_index, exit_commitment)],
-        ));
-
-        send_via_msg_sender(
-            &mut msg_sender,
-            slot.routing_opts.clone(),
-            data,
-            "session SSA commitment request message",
-        )
-        .await
-        .map_err(TransportSessionError::packet_sending)?;
-
-        // Set up a kill switch on the Session that has to be removed
-        // once the deposit to the SSA has been made.
+        // Set up a kill switch before sending the SSA request so there is no
+        // window where the commitment is in flight but no timeout is installed.
         let session_cache = self.sessions.clone();
         let active_sessions_clone = self.active_sessions.clone();
         let session_deadline = std::time::Instant::now()
@@ -1572,6 +1554,24 @@ where
             )),
         );
         info!(%session_id, "pix session deposit timeout set");
+
+        // Construct and send the Exit SSA commitment request message
+        // The parameters were previously verified to be acceptable.
+        let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            current_ssa_state.polys_per_ssa,
+            current_ssa_state.shares_per_poly,
+            [(ssa_index, exit_commitment)],
+        ));
+
+        send_via_msg_sender(
+            &mut msg_sender,
+            slot.routing_opts.clone(),
+            data,
+            "session SSA commitment request message",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
 
         Ok(())
     }
