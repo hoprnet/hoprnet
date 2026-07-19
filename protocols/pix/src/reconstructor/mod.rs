@@ -11,6 +11,11 @@ use hopr_types::{
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use validator::Validate;
 
+/// Maximum number of concurrent SSA cycles (current + pipelined + sessions) that
+/// can have verifiers in flight before eviction. Past this, late shares from slower
+/// cycles get `MissingVerifier` and are silently lost.
+const MAX_CONCURRENT_SSA_CYCLES: u64 = 8;
+
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
     PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState,
@@ -116,7 +121,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
-            ssa_verifiers: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA as u64) * 4)
+            ssa_verifiers: moka::sync::CacheBuilder::new(MAX_CONCURRENT_SSA_CYCLES * (MAX_POLYS_PER_SSA as u64))
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
