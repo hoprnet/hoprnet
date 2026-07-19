@@ -260,6 +260,21 @@ impl PixRecoveryStore {
         Ok(was_inserted)
     }
 
+    /// Remove an entry from the store.
+    pub fn remove(&self, id: &PixAddressId) -> Result<bool, PixRecoveryStoreError> {
+        let key = encode_key(id);
+        if !self.contains(id)? {
+            return Ok(false);
+        }
+        let write_tx = self.db.begin_write()?;
+        let was_removed = {
+            let mut table = write_tx.open_table(PIX_RECOVERED_KEYS)?;
+            table.remove(key)?.is_some()
+        };
+        write_tx.commit()?;
+        Ok(was_removed)
+    }
+
     /// Iterate all stored `(id, secret)` pairs, decrypting each entry.
     ///
     /// On startup the caller uses this to find entries whose on-chain balance

@@ -41,10 +41,12 @@ pub struct NonAnonymousPixStrategyConfig {
     /// path before withdrawing (Exit role).  `None` means in-memory only (Entry role).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pix_recovery_db_path: Option<std::path::PathBuf>,
-    /// Password from which the encryption key for the recovery store is derived
-    /// (via scrypt).  Required when [`pix_recovery_db_path`] is set.
+    /// Environment variable holding the password from which the encryption key for
+    /// the recovery store is derived (via scrypt).  Required when
+    /// [`pix_recovery_db_path`] is set.  The variable is resolved at build time
+    /// so the password never appears in config dumps, logs, or serialized output.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pix_recovery_password: Option<String>,
+    pub pix_recovery_password_env: Option<String>,
 }
 
 /// Builder for [`NonAnonymousPixStrategy`].
@@ -64,31 +66,38 @@ impl NonAnonymousPixStrategy {
     }
 
     /// Wire in a node and return a running-ready strategy.
-    pub fn build<N>(self, node: Arc<N>) -> Box<dyn StrategyTrait + Send>
+    /// Returns [`StrategyError::CriteriaNotSatisfied`] when only one of
+    /// `pix_recovery_db_path` / `pix_recovery_password_env` is set.
+    pub fn build<N>(self, node: Arc<N>) -> crate::errors::Result<Box<dyn StrategyTrait + Send>>
     where
         N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
     {
-        assert!(
-            self.cfg.pix_recovery_db_path.is_some() == self.cfg.pix_recovery_password.is_some(),
-            "pix_recovery_db_path and pix_recovery_password must be both set or both unset"
-        );
+        if self.cfg.pix_recovery_db_path.is_some() != self.cfg.pix_recovery_password_env.is_some() {
+            return Err(StrategyError::CriteriaNotSatisfied);
+        }
 
         let recovery_store = self
             .cfg
             .pix_recovery_db_path
             .as_ref()
-            .zip(self.cfg.pix_recovery_password.as_ref())
-            .map(|(path, password)| {
-                crate::pix_recovery_store::PixRecoveryStore::open(path, password).expect("PixRecoveryStore::open")
-            });
+            .zip(self.cfg.pix_recovery_password_env.as_ref())
+            .map(|(path, password_env)| {
+                let password = std::env::var(password_env).map_err(|_| {
+                    StrategyError::Other(anyhow::anyhow!(
+                        "environment variable {password_env} must be set when PIX recovery persistence is enabled"
+                    ))
+                })?;
+                crate::pix_recovery_store::PixRecoveryStore::open(path, &password).map_err(StrategyError::other)
+            })
+            .transpose()?;
 
-        Box::new(NonAnonymousPixStrategyInner {
+        Ok(Box::new(NonAnonymousPixStrategyInner {
             cfg: self.cfg,
             interval: self.interval,
             node,
             recovery_store,
             processed_deposits: HashSet::new(),
-        })
+        }))
     }
 }
 
@@ -122,7 +131,7 @@ where
                 tracing::info!(?new_deposit_address, "new deposit address");
 
                 // Entry-side dedup: skip duplicates within the same strategy lifetime.
-                if !self.processed_deposits.insert(new_deposit_address.id) {
+                if self.processed_deposits.contains(&new_deposit_address.id) {
                     tracing::warn!(id = ?new_deposit_address.id, "duplicate NewDepositAddress event, skipping");
                     return Ok(());
                 }
@@ -144,6 +153,10 @@ where
                     tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed");
                     return Err(StrategyError::other(error));
                 }
+
+                // Mark completed only after the withdrawal succeeds so a transient
+                // failure doesn't permanently poison this ID.
+                self.processed_deposits.insert(new_deposit_address.id);
                 tracing::info!(%target_deposit, ?new_deposit_address, "deposit successful");
             }
             PixEvent::DepositAddressReceived(deposit_address_recv) => {
@@ -188,10 +201,17 @@ where
                             .ok()
                             .filter(|b| *b >= target_deposit);
 
-                        let deposit = match (immediate, stream.try_next().await) {
-                            (Some(balance), _) => balance,
-                            (None, Ok(Some(balance))) => balance,
-                            _ => return Err(StrategyError::other(anyhow::anyhow!("deposit tracking not available"))),
+                        let deposit = if let Some(balance) = immediate {
+                            balance
+                        } else {
+                            match stream.try_next().await {
+                                Ok(Some(balance)) => balance,
+                                _ => {
+                                    return Err(StrategyError::other(anyhow::anyhow!(
+                                        "deposit tracking not available"
+                                    )));
+                                }
+                            }
                         };
 
                         if let Some(mut notifier) = deposit_updated {
@@ -240,6 +260,14 @@ where
                     .map_err(StrategyError::other)?
                     .await
                     .map_err(StrategyError::other)?;
+
+                // Delete the entry now that the deposit has been withdrawn, so the
+                // recovery store doesn't accumulate entries unboundedly over time.
+                if let Some(ref store) = self.recovery_store
+                    && let Err(error) = store.remove(&private_key_recovered.id)
+                {
+                    tracing::warn!(%error, ?private_key_recovered.id, "failed to remove recovered key from store");
+                }
 
                 tracing::info!(%recovered_balance, address = %chain_key.public().to_address(),  "deposit withdrawn");
             }
@@ -415,6 +443,8 @@ mod tests {
 
     use super::*;
 
+    const TEST_PASSWORD_ENV: &str = "HOPRD_TEST_PIX_RECOVERY_PASSWORD";
+
     lazy_static::lazy_static! {
         static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
@@ -544,7 +574,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: StdDuration::from_secs(5),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -621,7 +651,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -703,7 +733,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -774,7 +804,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -827,7 +857,7 @@ mod tests {
             max_ssa_allocation: HoprBalance::new_base(100),
             max_deposit_tracking_time: std::time::Duration::from_secs(60),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
         assert!(cfg.validate().is_ok(), "default config should pass validation");
     }
@@ -857,11 +887,11 @@ mod tests {
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 pix_recovery_db_path: None,
-                pix_recovery_password: None,
+                pix_recovery_password_env: None,
             },
             Duration::from_secs(60),
         )
-        .build(node);
+        .build(node)?;
 
         assert_eq!(strategy.to_string(), "non_anonymous_pix");
         fn assert_send<T: Send>(_: T) {}
@@ -901,7 +931,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
             pix_recovery_db_path: None,
-            pix_recovery_password: None,
+            pix_recovery_password_env: None,
         };
 
         let mut strategy = NonAnonymousPixStrategyInner {
@@ -952,6 +982,11 @@ mod tests {
         let dir = tempfile::tempdir().context("tempdir")?;
         let db_path = dir.path().join("pix_recovery.db");
 
+        // SAFETY: set_var is unsafe in concurrent contexts, but #[tokio::test] runs
+        // on a multi-threaded runtime.  This is acceptable because the env var is
+        // unique to this test (no other test reads/writes it) and setting is idempotent.
+        unsafe { std::env::set_var(TEST_PASSWORD_ENV, "test-password") };
+
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
                 &[&*ALICE, &*BOB],
@@ -973,11 +1008,11 @@ mod tests {
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 pix_recovery_db_path: Some(db_path.clone()),
-                pix_recovery_password: Some("test-password".into()),
+                pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
             Duration::from_secs(60),
         )
-        .build(node);
+        .build(node)?;
 
         assert!(db_path.exists(), "recovery db should be created on build");
         assert_eq!(strategy.to_string(), "non_anonymous_pix");
@@ -1022,7 +1057,7 @@ mod tests {
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
             pix_recovery_db_path: Some(db_path.clone()),
-            pix_recovery_password: Some("test-password".into()),
+            pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
         };
 
         let recovery_store = Some(crate::pix_recovery_store::PixRecoveryStore::open(
@@ -1055,13 +1090,14 @@ mod tests {
             "recovered balance should be zero after withdrawal"
         );
 
-        // Drop the strategy so the redb file lock is released, then re-open to verify persistence.
+        // Withdrawal was successful — the key should have been removed from the store.
+        // Drop the strategy so the redb file lock is released, then re-open to verify cleanup.
         drop(strategy);
 
         let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path, "test-password")?;
         assert!(
-            store.contains(&event_id).unwrap(),
-            "key should be persisted to recovery store"
+            !store.contains(&event_id).unwrap(),
+            "key should be removed from recovery store after successful withdrawal"
         );
 
         Ok(())
