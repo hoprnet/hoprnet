@@ -88,6 +88,12 @@ pub struct SsaReconstructor<S: PixSpec> {
     ssa_verifiers:
         moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaPartBuilder<S>>>>,
     awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
+    /// Cache of ack keys whose verifier was not yet available.
+    /// `HalfKeyChallenge → (OffchainPublicKey, HalfKey)`. When a verified ack hits
+    /// `MissingVerifier`, it is stored here so subsequent `acknowledge_shares` calls can
+    /// retry once the verifier arrives. Tied to `max_ack_await_time` in line with the
+    /// awaiting_acks TTL.
+    pending_ack_keys: moka::sync::Cache<HalfKeyChallenge, (OffchainPublicKey, HalfKey)>,
     cfg: SsaReconstructorConfig,
 }
 
@@ -127,6 +133,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
                 .time_to_idle(cfg.max_ack_await_time)
                 .build(),
+            pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
+                .time_to_live(cfg.max_ack_await_time)
+                .build(),
             cfg,
         }
     }
@@ -143,7 +152,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         ack_challenge: HalfKeyChallenge,
         awaiting_ack_from_peer: &moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S>>,
     ) -> Result<ProcessedAckResult<S>, PixError<S::Pseudonym>> {
-        let Some(share) = awaiting_ack_from_peer.remove(&ack_challenge) else {
+        let Some(share) = awaiting_ack_from_peer.get(&ack_challenge) else {
             tracing::trace!(?ack_challenge, "received ack for unknown share");
             return Ok(ProcessedAckResult::NoProgress);
         };
@@ -151,6 +160,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
+
+        // Verifier confirmed — safe to remove the share from the pending cache.
+        awaiting_ack_from_peer.remove(&ack_challenge);
 
         // The share cannot be empty at this point because we prevent empty share insertions
         let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
@@ -342,6 +354,46 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
         // Feed output into HashSet, that deduplicates
         let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
+
+        // Drain pending retries from previous calls — the verifier may have
+        // been inserted since the last acknowledge_shares invocation.
+        let stashed: Vec<(HalfKeyChallenge, HalfKey)> = self
+            .pending_ack_keys
+            .iter()
+            .filter_map(|challenge_ack| {
+                let (challenge, stashed_peer, ack) = (challenge_ack.0.as_ref(), &challenge_ack.1.0, &challenge_ack.1.1);
+                (*stashed_peer == peer).then(|| (*challenge, *ack))
+            })
+            .collect();
+        for (challenge, ack) in &stashed {
+            if !awaiting_ack_from_peer.contains_key(challenge) {
+                // Share was already consumed (e.g. by the main loop in a prior call).
+                self.pending_ack_keys.invalidate(challenge);
+                continue;
+            }
+            match self.process_verified_ack(*ack, *challenge, &awaiting_ack_from_peer) {
+                Ok(ProcessedAckResult::FullRecovery(ssa)) => {
+                    self.pending_ack_keys.invalidate(challenge);
+                    res.insert(ShareResolution::RecoveredSsa(ssa));
+                }
+                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
+                    self.pending_ack_keys.invalidate(challenge);
+                    res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
+                }
+                Ok(ProcessedAckResult::NoProgress) => {
+                    self.pending_ack_keys.invalidate(challenge);
+                }
+                Err(PixError::MissingVerifier) => {
+                    // Verifier still not available — leave in pending_ack_keys for the next call.
+                    tracing::trace!(%peer, "verifier not yet available, share retained in pending cache");
+                }
+                Err(_) => {
+                    // Permanent failure — don't retry.
+                    self.pending_ack_keys.invalidate(challenge);
+                }
+            }
+        }
+
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
                 Ok(ProcessedAckResult::FullRecovery(ssa)) => {
@@ -358,6 +410,12 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                         peer.into(),
                         SsaId::new(pseudonym, ssa_index),
                     ));
+                }
+                Err(PixError::MissingVerifier) => {
+                    // Share retained in awaiting_acks (process_verified_ack now uses .get()).
+                    // Stash the ack so a subsequent call can retry once the verifier arrives.
+                    tracing::trace!(%peer, "verifier not yet available, stashing ack for retry");
+                    self.pending_ack_keys.insert(ack_challenge, (peer, ack));
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");

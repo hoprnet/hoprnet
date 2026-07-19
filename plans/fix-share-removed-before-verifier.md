@@ -50,49 +50,60 @@ On `MissingVerifier`, the share stays in `awaiting_ack_from_peer` and can be pic
 the next call to `acknowledge_shares` (same ack arrives again) or when the verifier
 insertion hooks into the awaiting-ack cache (see step 2).
 
-### 2. Drain parked shares when verifiers are inserted
+### 2. Persistent retry cache for acks that hit `MissingVerifier`
 
-In `insert_coefficient_commitments`, when `CommitmentResult::Completed(...)` produces new
-`ssa_reconstructors`, also scan `self.awaiting_acks` for shares whose
-`ssa_polynomial_id()` matches the newly inserted verifiers, and **synchronously process
-them**.
+Add a `pending_ack_keys` cache on `SsaReconstructor` that stores `HalfKeyChallenge → HalfKey`
+pairs for acks that encountered `MissingVerifier`. This cache has a TTL matching
+`max_ack_await_time` so stale entries eventually expire.
 
-Pseudo-code (inserted at `reconstructor/mod.rs:284`, after inserting verifiers):
+At the beginning of each `acknowledge_shares` call, drain this cache: for each entry, look up
+the share in `awaiting_acks` (which still holds it thanks to the ordering fix), check if the
+verifier now exists in `ssa_verifiers`, and if so, process it via `process_verified_ack`. On
+success the share is consumed from `awaiting_acks` and the entry removed from
+`pending_ack_keys`; on continued `MissingVerifier` the entry stays in the cache for the next
+call.
 
 ```rust
-for ssa_reconstructor in &ssa_reconstructors {
-    let spi = ssa_reconstructor.verifier.spi;
-    self.ssa_verifiers.insert(spi, Arc::new(Mutex::new(ssa_reconstructor)));
+// On SsaReconstructor:
+pending_ack_keys: moka::sync::Cache<HalfKeyChallenge, HalfKey>,
 
-    // Drain any shares that arrived before this verifier was ready.
-    // Iterate all peers' inner caches to find shares matching this SPI.
-    let mut to_process: Vec<(OffchainPublicKey, HalfKeyChallenge)> = Vec::new();
-    for peer_list in self.awaiting_acks.iter() {
-        let (peer, inner) = peer_list.pair();
-        for entry in inner.iter() {
-            let (challenge, share) = entry.pair();
-            if share.ssa_polynomial_id() == Some(spi) {
-                to_process.push((*peer, *challenge));
+// In acknowledge_shares, before the main loop:
+let mut pending_resolutions: Vec<ShareResolution<...>> = Vec::new();
+self.pending_ack_keys.iter().for_each(|entry| {
+    let (challenge, ack) = entry.pair();
+    if let Some(peer_cache) = self.awaiting_acks.get(&peer_key) {
+        if peer_cache.contains_key(challenge) {
+            if let Ok(spi_entry) = peer_cache.get(challenge) {
+                if let Ok(spi) = spi_entry.ssa_polynomial_id() {
+                    if self.ssa_verifiers.contains_key(&spi) {
+                        match self.process_verified_ack(*ack, *challenge, &peer_cache) {
+                            Ok(result) => {
+                                self.pending_ack_keys.invalidate(challenge);
+                                // collect into pending_resolutions
+                            }
+                            Err(PixError::MissingVerifier) => { /* leave in cache */ }
+                            Err(other) => {
+                                self.pending_ack_keys.invalidate(challenge);
+                                tracing::error!(...);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-    // Process each parked share inline (decrypt, add to verifier).
-    for (peer, challenge) in to_process {
-        // Remove from inner cache, decrypt, add to verifier...
-        // Returns any ShareResolution produced.
-    }
-}
+});
 ```
 
-**Implementation notes:**
+**Why this is better than a Vec:**
 
-- The inner `EncryptedShareCache` supports iteration via `moka::sync::Cache::iter()`.
-- The iteration happens _after_ the verifier is in `ssa_verifiers`, so `process_verified_ack`
-  can be reused (delegated to for each parked share).
-- The result of processing a parked share (e.g. `FullRecovery`, `AlmostRecoveredSsa`) can
-  be appended to the `res: SsaCommitmentState` returned by `insert_coefficient_commitments`,
-  or returned via a new field. The caller (`acknowledge_shares` or the `insert_coefficient_commitments`
-  caller) needs to handle any newly discovered SSA resolutions.
+- The cache lives across `acknowledge_shares` calls — if the verifier arrives in between,
+  the next invocation picks up the pending ack.
+- TTL-based expiry prevents unbounded growth if the verifier never arrives.
+- No changes needed to `insert_coefficient_commitments` — it only needs to insert verifiers
+  into `ssa_verifiers` as it already does.
+- Combined with the ordering fix, a share can survive multiple `MissingVerifier` hits across
+  separate batches of acks before eventually being processed or expiring.
 
 ### 3. Adjust error handling in `acknowledge_shares`
 
@@ -113,18 +124,22 @@ This downgrades from `tracing::error!()` (which makes it look like a bug) to `tr
 ### What share lifetime looks like after the fix
 
 ```
-ack arrives via acknowledge_shares
-  → process_verified_ack called
-    → .get() keeps share in awaiting_acks
-    → verifier lookup: MissingVerifier!
-    → return error (share still in cache)
-    ↓ (time passes)
-SsaCommit arrives → insert_coefficient_commitments
-  → CommitmentResult::Completed
-    → verifiers inserted into ssa_verifiers
-    → self.awaiting_acks scanned for matching SPI
-    → matching share found → decrypted → added to verifier
-    → FullRecovery or EarlyRecovery emitted
+acknowledge_shares called (call #1)
+  → drain pending_ack_keys cache — any leftovers from previous call
+  → main loop over incoming acks
+    → process_verified_ack
+      → .get() keeps share in awaiting_acks
+      → verifier lookup: MissingVerifier!
+      → insert (challenge, ack) into pending_ack_keys, share stays in awaiting_acks
+  ↓ (call returns, pending_ack_keys persists on SsaReconstructor)
+  ↓ (time passes — insert_coefficient_commitments inserts the verifier)
+acknowledge_shares called (call #2)
+  → drain pending_ack_keys cache
+    → (challenge, ack) found in pending_ack_keys
+    → awaiting_acks still has the share (.get(), never removed)
+    → ssa_verifiers has the verifier now
+    → process_verified_ack → .remove() from awaiting_acks → decrypt → add share
+    → invalidate from pending_ack_keys
 ```
 
 ### Out of scope for this plan
@@ -142,7 +157,6 @@ SsaCommit arrives → insert_coefficient_commitments
 
 ## Files to modify
 
-| File                                                   | Changes                                                                                                                                                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `protocols/pix/src/reconstructor/mod.rs`               | `process_verified_ack`: `.get()` → `.remove()` ordering; `insert_coefficient_commitments`: drain parked shares on `Completed`; `acknowledge_shares`: downgrade `MissingVerifier` log level |
-| `protocols/pix/src/reconstructor/mod.rs` (return type) | May need to extend `SsaCommitmentState` or the return of `insert_coefficient_commitments` to surface extra `ShareResolution`s from drained shares                                          |
+| File                                     | Changes                                                                                                                                                                                                                                |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocols/pix/src/reconstructor/mod.rs` | Add `pending_ack_keys` cache field to `SsaReconstructor`; `process_verified_ack`: `.get()` → `.remove()` ordering; `acknowledge_shares`: drain `pending_ack_keys` before main loop, insert on `MissingVerifier`, downgrade to `trace!` |
