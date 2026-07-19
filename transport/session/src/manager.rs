@@ -2618,17 +2618,15 @@ mod tests {
         sender: MockMsgSender,
     ) -> (
         UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
-        tokio::task::JoinHandle<()>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
     ) {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let handle = tokio::task::spawn(async move {
             pin_mut!(rx);
             while let Some((routing, data)) = rx.next().await {
-                sender
-                    .send_message(routing, data)
-                    .await
-                    .expect("send message must not fail in mock");
+                sender.send_message(routing, data).await?;
             }
+            Ok(())
         });
         (tx, handle)
     }
@@ -2822,7 +2820,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         alice_sender.close_channel();
-        let _ = alice_handle.await;
+        alice_handle.await??;
 
         Ok(())
     }
@@ -2942,7 +2940,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -2996,7 +2994,7 @@ mod tests {
 
         // Cleanup
         sender.close_channel();
-        let _ = handle.await;
+        handle.await??;
 
         Ok(())
     }
@@ -3322,8 +3320,8 @@ mod tests {
         // Cleanup: close senders and await handles
         alice_sender.close_channel();
         bob_sender.close_channel();
-        let _ = alice_handle.await;
-        let _ = bob_handle.await;
+        alice_handle.await??;
+        bob_handle.await??;
 
         Ok(())
     }
@@ -3414,7 +3412,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3453,7 +3451,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3517,7 +3515,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3555,7 +3553,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3593,7 +3591,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3673,7 +3671,7 @@ mod tests {
         }
 
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
         Ok(())
     }
 
@@ -3752,7 +3750,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3825,7 +3823,7 @@ mod tests {
         ));
 
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
         Ok(())
     }
 
@@ -3979,7 +3977,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -4040,7 +4038,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -4395,7 +4393,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -4451,7 +4449,7 @@ mod tests {
         );
 
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
         Ok(())
     }
 
@@ -4530,7 +4528,7 @@ mod tests {
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
         Ok(())
     }
 
@@ -4600,7 +4598,7 @@ mod tests {
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
         Ok(())
     }
 
@@ -4684,7 +4682,7 @@ mod tests {
             .await;
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         assert!(result.is_err());
         assert!(matches!(
@@ -4781,7 +4779,7 @@ mod tests {
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
         Ok(())
     }
 
@@ -4867,7 +4865,7 @@ mod tests {
             .await?;
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         assert_eq!(
             sent_ssa_requests.lock().unwrap().len(),
@@ -4957,7 +4955,7 @@ mod tests {
             .await?;
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         assert_eq!(
             sent_ssa_requests.lock().unwrap().len(),
@@ -5045,7 +5043,7 @@ mod tests {
             .await;
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         assert!(result.is_err());
         assert!(matches!(
@@ -5188,7 +5186,7 @@ mod tests {
         assert_eq!(quota.quota_per_ssa, pix_params_to_quota(2, 2));
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         Ok(())
     }
@@ -5279,7 +5277,7 @@ mod tests {
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         Ok(())
     }
@@ -5414,7 +5412,7 @@ mod tests {
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
-        let _ = bob_handle.await;
+        bob_handle.await??;
 
         Ok(())
     }

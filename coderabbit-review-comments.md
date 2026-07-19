@@ -14,10 +14,10 @@
 
 | # | File | Line | Severity | Description | Status |
 |---|------|------|----------|-------------|--------|
-| 1 | `hopr/hopr-lib/src/testing/fixtures.rs` | 722 | 🟠 Major | **Bound startup readiness.** No readiness check before returning from `build_role_cluster`. | No reply yet |
-| 2 | `impls/strategy/src/strategy.rs` | 73 | 🟠 Major | **Discard strategies on error.** Without `runtime-tokio`, the drain drops all sub-strategies then reports success. | Outdated (code changed) |
-| 3 | `protocols/pix/src/reconstructor/mod.rs` | 124 | 🟠 Major | **Bound caches by global protocol state, not per-SSA constants.** At max polynomial count, `ssa_verifiers` retains only four complete SSA sets. | No reply yet |
-| 4 | `transport/session/src/test_helpers.rs` | 341 | 🟠 Major | **Return dispatch failures, don't hide them.** `mock_packet_planning` returns `JoinHandle<()>`, swallowing send failures. CodeRabbit rejected the "documented" justification. | Needs code fix |
+| 1 | `hopr/hopr-lib/src/testing/fixtures.rs` | 722 | 🟠 Major | **Move env var override out of runtime setup.** `set_var` after tokio runtime started violates safety precondition. | **Fixed.** Moved to module-level `std::sync::Once` that fires before any async context. Both `cluster_fixture` and `build_role_cluster` use it. |
+| 2 | `impls/strategy/src/strategy.rs` | 73 | 🟠 Major | **Discard strategies on error.** Without `runtime-tokio`, the drain drops all sub-strategies then reports success. | **Fixed.** `runtime-tokio` is now unconditional in `[dependencies]`, so the silent-drain path can't exist. Resolving. |
+| 3 | `protocols/pix/src/reconstructor/mod.rs` | 124 | 🟠 Major | **Bound caches by global protocol state, not per-SSA constants.** At max polynomial count, `ssa_verifiers` retains only four complete SSA sets. | Still open |
+| 4 | `transport/session/src/test_helpers.rs` | 341 | 🟠 Major | **Return dispatch failures, don't hide them.** `mock_packet_planning` returns `JoinHandle<()>`, swallowing send failures. CodeRabbit rejected the "documented" justification. | **Fixed.** `mock_packet_planning` now returns `JoinHandle<anyhow::Result<()>>` and propagates errors via `?`. All 20+ callers updated to `handle.await??`. |
 
 ---
 

@@ -346,8 +346,8 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     // Cleanup: close senders and await handles
     alice_sender.close_channel();
     bob_sender.close_channel();
-    let _ = alice_handle.await;
-    let _ = bob_handle.await;
+    alice_handle.await??;
+    bob_handle.await??;
 
     Ok(())
 }
@@ -389,7 +389,7 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     ));
 
     sender.close_channel();
-    let _ = handle.await;
+    handle.await??;
 
     Ok(())
 }
@@ -488,8 +488,8 @@ async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
 
     alice_sender.close_channel();
     bob_sender.close_channel();
-    let _ = alice_handle.await;
-    let _ = bob_handle.await;
+    alice_handle.await??;
+    bob_handle.await??;
 
     Ok(())
 }

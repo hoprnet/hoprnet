@@ -327,16 +327,14 @@ pub fn mock_packet_planning(
     sender: MsgSender,
 ) -> (
     futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
-    tokio::task::JoinHandle<()>,
+    tokio::task::JoinHandle<anyhow::Result<()>>,
 ) {
     let (tx, mut rx) = futures::channel::mpsc::unbounded();
     let handle = tokio::task::spawn(async move {
         while let Some((routing, data)) = rx.next().await {
-            sender
-                .send_message(routing, data)
-                .await
-                .expect("send message must not fail in mock");
+            sender.send_message(routing, data).await?;
         }
+        Ok(())
     });
     (tx, handle)
 }

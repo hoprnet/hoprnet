@@ -409,6 +409,10 @@ pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
+/// Set the mixer delay range to a low value so tests don't stall on mixing latency.
+/// Must be called before any tokio runtime is created (safe via `Once`).
+static INIT_TEST_ENV: std::sync::Once = std::sync::Once::new();
+
 /// Per-node configuration for test clusters.
 #[derive(Debug, Clone)]
 pub struct TestNodeConfig {
@@ -528,9 +532,15 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
         panic!("{size} must be between 1 and {SWARM_N}");
     }
 
-    // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
-    // SAFETY: called once before any threads are spawned for this cluster.
-    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+    // Reduce mixer delay range so tests don't stall on mixing latency.
+    // SAFETY: `Once` guarantees this runs only once, before any async context.
+    INIT_TEST_ENV.call_once(|| {
+        // Safety: `Once` ensures single execution in a context where no
+        // tokio runtime has been started yet (cluster_fixture runs before
+        // any async block, and build_role_cluster's sub-tasks create their
+        // own runtimes after spawning).
+        unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+    });
 
     let chain_client = build_blokli_client();
 
@@ -718,8 +728,13 @@ pub async fn build_role_cluster(
         anyhow::bail!("total cluster size {total_size} must be between 3 and {SWARM_N}");
     }
 
-    // Reduce mixer delay range
-    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+    // Reduce mixer delay range so tests don't stall on mixing latency.
+    INIT_TEST_ENV.call_once(|| {
+        // Safety: `Once` ensures single execution in a context where no
+        // tokio runtime has been started yet (build_role_cluster spawns
+        // threads with their own runtimes afterwards).
+        unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
+    });
 
     let chain_client = build_blokli_client();
 
