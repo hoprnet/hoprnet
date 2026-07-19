@@ -142,6 +142,10 @@ impl PartialHoprPacket {
                 // Create SURBs if some return paths were specified
                 // Possibly makes little sense to parallelize this iterator via rayon,
                 // as in most cases the number of return paths is 1.
+                // TODO: PIX shares consumed here (via create_surb_for_path → next_share) are
+                // not rolled back on later fallible operations (ticket signing, encoding).
+                // This is intentional: the EntryShareGenerator emits surplus shares to absorb
+                // such packet-loss events, so the budget impact is bounded and expected.
                 let (surbs, openers): (Vec<_>, Vec<_>) = key_data
                     .zip(return_paths)
                     .zip(receiver_data.into_sequence())
