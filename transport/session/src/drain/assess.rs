@@ -1,3 +1,29 @@
+//! Precondition evaluation for closed-session drain offers.
+//!
+//! A pure-function assessment pipeline that determines whether a closed
+//! PIX session is worth draining.  No I/O, no side effects — fully
+//! unit-testable.
+//!
+//! # Assessment pipeline (in order)
+//!
+//! 1. **Enabled** — drainer must be enabled in config.
+//! 2. **Concurrency** — must not exceed `max_concurrent_drains`.
+//! 3. **Fault close** — sessions closed due to unverifiable shares, counter
+//!    regression, or invalid transitions are never drained (the SSA is
+//!    already compromised).
+//! 4. **Funded SSAs** — at least one SSA must have `funded > 0`.
+//! 5. **Deficit** — among funded SSAs, at least one must need more useful
+//!    shares (`useful < target`).  Already-recovered SSAs are skipped.
+//! 6. **Economic gate** — the total on-chain deposit must cover the expected
+//!    ticket cost at `packet_price` × `cost_safety_factor`.
+//! 7. **SURB sufficiency** — at least `total_deficit` SURBs must be available.
+//! 8. **Budget** — final `max_packets` is `min(surb_count, deficit + slack,
+//!    floor(deposit / packet_price))`.
+//!
+//! If all gates pass, returns [`DrainVerdict::Drain`] with the per-SSA
+//! deficits and the packet budget.  The first failing gate short-circuits
+//! with the corresponding [`SkipReason`].
+
 use hopr_api::types::primitive::{balance::HoprBalance, primitives::U256};
 use hopr_protocol_pix::SsaDrainSnapshot;
 

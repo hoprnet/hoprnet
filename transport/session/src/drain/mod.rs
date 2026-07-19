@@ -10,6 +10,8 @@
 //!
 //! # Architecture
 //!
+//! ## Component model
+//!
 //! The [`SurbDrainer`] is a standalone component (no dependency on
 //! [`SessionManager`](crate::SessionManager)).  It owns:
 //!
@@ -23,6 +25,34 @@
 //! The [`SessionManager`](crate::SessionManager) hands over closed-session
 //! material via [`offer`](SurbDrainer::offer) and forwards post-closure
 //! PIX events via [`deliver_event`](SurbDrainer::deliver_event).
+//!
+//! ## Sub-module responsibilities
+//!
+//! | Module | Responsibility |
+//! |---|---|
+//! | [`assess`] | Pure-function precondition evaluation: disabled → concurrency → fault-close → funded+deficit → economic gate → SURB sufficiency → budget. Emits a [`DrainVerdict::Drain`] with parameters or [`DrainVerdict::Skip`] with the reason. |
+//! | [`task`] | Rate-limited async drain loop: send KeepAlive → drain PIX events → poll reconstructor snapshots → abort on unverifiable share → emit outcome. |
+//! | [`config`] | Tunable parameters: rate limits, timeouts, concurrency cap, safety factor. |
+//!
+//! ## Safety invariants
+//!
+//! * The drain loop in [`task::run_drain`] has zero tolerance for unverifiable
+//!   shares: a single delta between the baseline `invalid_total` and the
+//!   reconstructor snapshot aborts the drain immediately.  This is safe because
+//!   unverifiable shares indicate either a malicious relay or a bug, and
+//!   continuing would waste SURBs on an unrecoverable SSA.
+//! * The `ack_grace` duration is validated against
+//!   `SsaReconstructorConfig::max_ack_await_time` at construction
+//!   ([`validate_pix_drain`]): if the drain gives up before the reconstructor
+//!   would, honest late acks could be discarded and the drain would report
+//!   `NoProgress` unnecessarily.
+//!
+//! ## Design rationale
+//!
+//! See the project planning document for the full design rationale, rejected
+//! alternatives (e.g. integrating the drain loop into the session supervisor),
+//! and open questions around multi-hop SSAs:
+//! [`PLAN_pix-surb-drain.md`](https://github.com/hoprnet/hoprnet/blob/lukas/pix-surb-drain/PLAN_pix-surb-drain.md).
 
 mod assess;
 mod config;

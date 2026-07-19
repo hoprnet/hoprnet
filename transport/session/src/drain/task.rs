@@ -1,3 +1,53 @@
+//! Rate-limited async drain tasks for closed PIX sessions.
+//!
+//! Each drain task is an async loop that sends KeepAlive packets into
+//! leftover SURBs and watches the [`SsaReconstructor`] for recovered shares.
+//! Tasks are spawned by [`super::SurbDrainer::offer`] and aborted by
+//! [`super::SurbDrainer::shutdown`].
+//!
+//! # Drain loop lifecycle
+//!
+//! The core loop at [`run_drain`] proceeds as follows:
+//!
+//! 1. **Check stop conditions** (top of each iteration):
+//!    - Abort requested → [`DrainStopReason::Shutdown`]
+//!    - Deadline passed → [`DrainStopReason::DeadlineReached`]
+//!    - Packet budget exhausted → [`DrainStopReason::BudgetExhausted`]
+//!    - No SURBs left → [`DrainStopReason::SurbsExhausted`]
+//! 2. **Drain PIX events** — non-blocking read of
+//!    [`DrainEvent::SsaRecovered`] forwarded from the reconstructor.
+//! 3. **Poll reconstructor snapshots** — check each SSA target's
+//!    `useful_shares` and `invalid_total`:
+//!    - If `invalid_total > baseline_invalid` → abort immediately with
+//!      [`DrainStopReason::UnverifiableShare`] (zero-tolerance).
+//!    - If `useful_shares >= target` → mark SSA recovered.
+//!    - If progress was made → reset the ack-grace timer.
+//! 4. **All recovered?** → [`DrainStopReason::AllRecovered`].
+//! 5. **Ack grace expired?** → [`DrainStopReason::NoProgress`].
+//! 6. **Send one KeepAlive** via the message sink, then rate-limit.
+//!
+//! # Safety invariants
+//!
+//! * **Zero-tolerance on unverifiable shares**: The baseline `invalid_total`
+//!   is captured before the loop starts.  Any increase means at least one
+//!   relay sent back an acknowledgement whose share failed Feldman
+//!   verification.  This could indicate a malicious relay or a corrupted
+//!   SSA commitment; continuing would waste SURBs on an unrecoverable SSA.
+//! * **RAII guard ownership**: Each [`SsaCommitmentGuard`] is held inside
+//!   a [`SsaDrainTarget`].  When the loop exits (any reason) the targets
+//!   vector is explicitly dropped, which calls `retire_ssa` on each guard.
+//!   This ensures the SSA builder is cleaned up even on abort or panic.
+//! * **Rate limiting**: The async `sleep` after each successful send prevents
+//!   flooding the local message sink.  The rate is controlled by
+//!   [`SurbDrainConfig::drain_rate_packets_per_sec`].
+//!
+//! # Thread safety
+//!
+//! The `event_rx` channel is used to forward PIX recovery events from the
+//! reconstructor callback (which may fire on any task) to this drain task.
+//! The reconstructor snapshot poll in step 3 runs synchronously in the drain
+//! task and holds no lock across the snapshot call.
+
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -79,6 +129,16 @@ pub(crate) fn spawn_drain_task(
     DrainTaskHandle { abort_handle, event_tx }
 }
 
+/// Core async drain loop for a single closed session.
+///
+/// Runs the drain lifecycle described in the [module-level documentation](self):
+/// sends KeepAlive packets into leftover SURBs, polls the reconstructor for
+/// share progress, and aborts on unverifiable shares or grace-period expiry.
+///
+/// # Panics
+///
+/// Does not panic.  All errors from the message sink are logged and the
+/// loop continues; only a terminal stop condition ends it.
 #[allow(clippy::too_many_arguments)]
 async fn run_drain(
     mut msg_sender: impl Sink<
