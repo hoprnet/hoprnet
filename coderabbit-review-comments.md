@@ -45,7 +45,7 @@
 | --- | --------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 8   | 179-195   | 🟠 Major | **Verification failures tracked globally, not per-`SsaIndex`.** `SessionSsaState::increment_errors()` uses a single `num_errors` atomic. `SsaAlmostRecovered` resets the counter while the current SSA still has shares in flight. Late failures become attributed to the next SSA cycle.                |
 | 9   | 1500-1575 | 🟠 Major | **Kill-switch armed after SSA request is sent.** The SSA request (containing `ssa_index` and `exit_commitment`) is sent at line 1547 before the deposit-timeout kill switch is registered at line 1557. If the message is sent but the kill-switch setup fails, there's a window with no enforcement.    |
-| 10  | 2466-2486 | 🟠 Major | **PIX dimensions compared by product only.** `quota_per_ssa()` comparison via `pix_params_to_quota` means different parameter pairs with the same product pass (e.g. `(2,6)` and `(3,4)`). The `_negotiated_polys` and `_negotiated_shares` are extracted but prefixed with `_` — not actually compared. |
+| 10  | 2466-2486 | ~~🟠 Major~~ | **Fixed (intentional).** The Entry optimizes for parallelism (`num_polys`) vs compute-per-poly (`threshold`). Only the product matters for the Exit — different dimensions with same quota are valid. Removed the unused variable bindings. |
 
 ## `transport/hopr/src/lib.rs`
 

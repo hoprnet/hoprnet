@@ -2481,10 +2481,6 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        // Read the negotiated PIX params before the for loop (which partially moves msg)
-        let _negotiated_polys = msg.polys_per_ssa();
-        let _negotiated_shares = msg.shares_per_poly();
-
         // The server can theoretically send multiple SSA commitments
         // asking us to make the equal number of client commitments and deposits.
         // The server is authoritative in giving the ssa_index, the client only verifies if it's monotonic.
