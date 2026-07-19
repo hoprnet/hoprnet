@@ -88,8 +88,7 @@
 ## Critical Unresolved Issues
 
 1. **`reconstructor/mod.rs:135-149`** — Share permanently lost when verifier isn't ready yet (plan exists)
-2. **`manager.rs:2466`** — PIX dimensions compared by product only; unrecoverable session on parameter collision
-3. **`transport/hopr/src/lib.rs:833-848`** — PIX events silently dropped on sink error (tracked in #8236)
-4. **`test_helpers.rs:326-341`** — Dispatch failures hidden in test mocks
-5. **`hopr/hopr-lib/src/builder.rs:433-435`** — Lossy broadcast drops lifecycle events
-6. **`pipeline/mod.rs:909-916`** — Dual-role Relay+Exit loses outgoing PIX shares
+2. **`transport/hopr/src/lib.rs:833-848`** — PIX events silently dropped on sink error (tracked in #8236)
+3. **`test_helpers.rs:326-341`** — Dispatch failures hidden in test mocks
+4. **`hopr/hopr-lib/src/builder.rs:433-435`** — Lossy broadcast drops lifecycle events
+5. **`pipeline/mod.rs:909-916`** — Dual-role Relay+Exit loses outgoing PIX shares
