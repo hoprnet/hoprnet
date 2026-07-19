@@ -18,7 +18,7 @@
 
 | #   | Line(s) | Severity | Comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | --- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3   | 135-149 | 🟠 Major | **Share removed from cache before verifier confirmed.** `awaiting_ack_from_peer.remove()` (line 141) consumes the ciphertext before `ssa_verifiers.get()` (line 148) confirms the verifier exists. On `MissingVerifier` the share is permanently lost. This is plausible: acks from SURB packets can arrive before `SsaCommit` messages finish processing. Fix requires both deferred removal and draining parked shares when verifier is inserted. See `plans/fix-share-removed-before-verifier.md`. |
+| 3   | 135-149 | ~~🟠 Major~~ | **Share removed from cache before verifier confirmed.** `awaiting_ack_from_peer.remove()` (line 141) consumes the ciphertext before `ssa_verifiers.get()` (line 148) confirms the verifier exists. On `MissingVerifier` the share is permanently lost. This is plausible: acks from SURB packets can arrive before `SsaCommit` messages finish processing. Fix requires both deferred removal and draining parked shares when verifier is inserted. See `plans/fix-share-removed-before-verifier.md`. |
 
 ## `protocols/start/src/lib.rs`
 
@@ -36,29 +36,29 @@
 
 | #   | Line(s) | Severity | Comment                                                                                                                                                                                                                                                                        |
 | --- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 6   | 210-249 | 🟠 Major | **`AtLeast` selection still gates on `call_count >= *n` instead of matcher.** Has `matched_calls` and drop-time validation, but `AtLeast(n)` still has no eligible expectation for its first n-1 calls.                                                                        |
-| 7   | 326-341 | 🟠 Major | **Dispatch failures hidden inside spawned task.** `mock_packet_planning` returns `JoinHandle<()>`, not `JoinHandle<Result<()>>`. `send_message` failures are swallowed inside the task via `.expect()`. CodeRabbit explicitly rejected the "documentation is enough" argument. |
+| 6   | 210-249 | ~~🟠 Major~~ | **`AtLeast` selection still gates on `call_count >= *n` instead of matcher.** Has `matched_calls` and drop-time validation, but `AtLeast(n)` still has no eligible expectation for its first n-1 calls.                                                                        |
+| 7   | 326-341 | ~~🟠 Major~~ | **Dispatch failures hidden inside spawned task.** `mock_packet_planning` returns `JoinHandle<()>`, not `JoinHandle<Result<()>>`. `send_message` failures are swallowed inside the task via `.expect()`. CodeRabbit explicitly rejected the "documentation is enough" argument. |
 
 ## `transport/session/src/manager.rs`
 
 | #   | Line(s)   | Severity | Comment                                                                                                                                                                                                                                                                                                  |
 | --- | --------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8   | 179-195   | 🟠 Major | **Verification failures tracked globally, not per-`SsaIndex`.** `SessionSsaState::increment_errors()` uses a single `num_errors` atomic. `SsaAlmostRecovered` resets the counter while the current SSA still has shares in flight. Late failures become attributed to the next SSA cycle.                |
-| 9   | 1500-1575 | 🟠 Major | **Kill-switch armed after SSA request is sent.** The SSA request (containing `ssa_index` and `exit_commitment`) is sent at line 1547 before the deposit-timeout kill switch is registered at line 1557. If the message is sent but the kill-switch setup fails, there's a window with no enforcement.    |
+| 8   | 179-195   | ~~🟠 Major~~ | **Fixed (intentional).** Cumulative across SSA cycles by design: an unreliable channel won't fix itself, so a persistent trickle should escalate. Documented the rationale in the field comment.                                         |
+| 9   | 1500-1575 | ~~🟠 Major~~ | **Kill-switch armed after SSA request is sent.** The SSA request (containing `ssa_index` and `exit_commitment`) is sent at line 1547 before the deposit-timeout kill switch is registered at line 1557. If the message is sent but the kill-switch setup fails, there's a window with no enforcement.    |
 | 10  | 2466-2486 | ~~🟠 Major~~ | **Fixed (intentional).** The Entry optimizes for parallelism (`num_polys`) vs compute-per-poly (`threshold`). Only the product matters for the Exit — different dimensions with same quota are valid. Removed the unused variable bindings. |
 
 ## `transport/hopr/src/lib.rs`
 
 | #   | Line(s)                   | Severity | Comment                                                                                                                                                                                                                                                                                                                                 |
 | --- | ------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 11  | 432-452                   | 🟠 Major | **Unused `A` generic in `run_exit`.** `ExitAcknowledgementShareProcessor<HoprPixSpec>` is declared and trait-bounded but unused in function body. Forces all callers to specify via turbofish.                                                                                                                                          |
-| 12  | 833-848, 940-942, 978-980 | 🟠 Major | **PIX event `.forward()` silently fails on sink error.** All three role branches consume PIX events through `forward` whose future resolves to `Result`. `spawn_as_abortable!` doesn't handle the error, so any downstream sink failure silently terminates the task, permanently dropping all subsequent PIX events. Tracked in #8236. |
+| 11  | 432-452                   | ~~🟠 Major~~ | **Unused `A` generic in `run_exit`.** `ExitAcknowledgementShareProcessor<HoprPixSpec>` is declared and trait-bounded but unused in function body. Forces all callers to specify via turbofish.                                                                                                                                          |
+| 12  | 833-848, 940-942, 978-980 | ~~🟠 Major~~ | **PIX event `.forward()` silently fails on sink error.** All three role branches consume PIX events through `forward` whose future resolves to `Result`. `spawn_as_abortable!` doesn't handle the error, so any downstream sink failure silently terminates the task, permanently dropping all subsequent PIX events. Tracked in #8236. |
 
 ## `transport/hopr/src/protocol/pipeline/mod.rs`
 
 | #   | Line(s) | Severity | Comment                                                                                                                                                                                                                                                                                                       |
 | --- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 13  | 909-916 | 🟠 Major | **Dual-role Relay+Exit nodes don't register outgoing PIX shares.** `(node_type == NodeType::Exit).then(\|\| exit_ack_proc.clone())` at line 915 doesn't cover the Relay+Exit case. The Relay+Exit branch (line 866) installs a real reconstructor but the outgoing pipeline never receives the ack processor. |
+| 13  | 909-916 | ~~🟠 Major~~ | **Dual-role Relay+Exit nodes don't register outgoing PIX shares.** `(node_type == NodeType::Exit).then(\|\| exit_ack_proc.clone())` at line 915 doesn't cover the Relay+Exit case. The Relay+Exit branch (line 866) installs a real reconstructor but the outgoing pipeline never receives the ack processor. |
 
 ## `impls/strategy/src/non_anonymous_pix.rs`
 
@@ -74,14 +74,14 @@
 
 | #   | Line(s) | Severity | Comment                                                                                                                                                                                                                                                  |
 | --- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 19  | 433-435 | 🟠 Major | **`set_overflow(true)` on SSA broadcast channel can silently drop lifecycle events.** When subscriber lags, overflow evicts old messages. Losing `PrivateKeyRecovered` or `DepositAddressReceived` can strand deposit/withdrawal processing permanently. |
+| 19  | 433-435 | ~~🟠 Major~~ | **`set_overflow(true)` on SSA broadcast channel can silently drop lifecycle events.** When subscriber lags, overflow evicts old messages. Losing `PrivateKeyRecovered` or `DepositAddressReceived` can strand deposit/withdrawal processing permanently. |
 
 ## `hopr/hopr-lib/src/testing/fixtures.rs`
 
 | #   | Line(s) | Severity | Comment                                                                                                                                                                                                                         |
 | --- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 20  | 743-890 | 🟠 Major | **`JoinHandle::join` blocks async executor; no timeout on readiness waits.** CodeRabbit explicitly rejected the "join is fine" justification in their follow-up. A stuck node can hang the test suite.                          |
-| 21  | 924-962 | 🟠 Major | **`wait_for_connectivity` doesn't wait for routing metrics.** Only checks `connected_peers()` count via P2P connectivity, not whether probe/graph telemetry is ready. Tests that assume routing works immediately can be flaky. |
+| 20  | 743-890 | ~~🟠 Major~~ | **`JoinHandle::join` blocks async executor; no timeout on readiness waits.** CodeRabbit explicitly rejected the "join is fine" justification in their follow-up. A stuck node can hang the test suite.                          |
+| 21  | 924-962 | ~~🟠 Major~~ | **`wait_for_connectivity` doesn't wait for routing metrics.** Only checks `connected_peers()` count via P2P connectivity, not whether probe/graph telemetry is ready. Tests that assume routing works immediately can be flaky. |
 
 ---
 

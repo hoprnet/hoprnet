@@ -160,10 +160,13 @@ enum SessionHandles {
 #[derive(Clone)]
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
-    /// Cumulative count of unverifiable PIX shares across all SSA cycles.
+    /// Cumulative count of unverifiable PIX shares across all SSA cycles (intentional).
     ///
-    /// The session closes once the *total* number of unverifiable shares across
-    /// all SSA cycles exceeds `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
+    /// This is *not* reset per SSA cycle: a steady trickle of 1 error per cycle
+    /// should still escalate to session closure, since an unreliable channel is
+    /// unlikely to improve on its own. The session closes once the *total* number
+    /// of unverifiable shares across all SSA cycles exceeds
+    /// `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
     /// `AtomicUsize` is safe here because duplicates are already rejected by the
     /// moka cache (keyed by `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by
     /// share identifier), so no share triggers two errors.
