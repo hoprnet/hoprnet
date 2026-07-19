@@ -305,6 +305,10 @@ where
                         };
 
                     if balance.is_zero() {
+                        // Already swept in a prior run; drop the stale secret.
+                        if let Err(error) = store.remove(&id) {
+                            tracing::warn!(%error, ?id, "failed to remove zero-balance entry from store");
+                        }
                         continue;
                     }
 
@@ -324,6 +328,8 @@ where
                     };
                     if let Err(error) = withdraw_fut.await {
                         tracing::error!(%error, ?id, "recovery replay withdrawal failed");
+                    } else if let Err(error) = store.remove(&id) {
+                        tracing::warn!(%error, ?id, "failed to remove replayed key from store");
                     }
                 }
                 Err(error) => {
@@ -1098,6 +1104,220 @@ mod tests {
         assert!(
             !store.contains(&event_id).unwrap(),
             "key should be removed from recovery store after successful withdrawal"
+        );
+
+        Ok(())
+    }
+
+    /// `replay_pending_recoveries` with a zero-balance entry — the entry is removed
+    /// from the store and no withdrawal is attempted.
+    #[test_log::test(tokio::test)]
+    async fn test_replay_zero_balance_removes_entry() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("tempdir")?;
+        let db_path = dir.path().join("pix_recovery.db");
+
+        let recovered_kp = ChainKeypair::from_secret(&hex!(
+            "a111a08c3c2d47f89df2c6d3e5e7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4cc"
+        ))
+        .expect("recovered keypair should be valid");
+        let recovered_address = recovered_kp.public().to_address();
+
+        let price_per_byte = HoprBalance::new_base(1);
+        let max_ssa_allocation = HoprBalance::new_base(100);
+
+        // Balance is zero — entry should be cleaned up, not withdrawn.
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::zero(),
+            )
+            .with_balances([(recovered_address, HoprBalance::zero())])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let chain_connector = Arc::new(chain_connector);
+
+        let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path, "test-password")?;
+
+        let entry_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
+        store.insert(
+            &entry_id,
+            &hopr_api::node::PixDepositSecret(recovered_kp.secret().clone()),
+        )?;
+
+        assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
+
+        let strategy = NonAnonymousPixStrategyInner {
+            cfg: NonAnonymousPixStrategyConfig {
+                price_per_byte,
+                max_ssa_allocation,
+                max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                pix_recovery_db_path: Some(db_path.clone()),
+                pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
+            },
+            interval: Duration::from_secs(60),
+            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            recovery_store: None, // not needed for the test — we pass store directly
+            processed_deposits: HashSet::new(),
+        };
+
+        // No need to call on_tick or register a safe — balance is zero so replay
+        // won't attempt a withdrawal.
+        strategy.replay_pending_recoveries(&store).await;
+
+        // Zero-balance entry should have been removed.
+        assert!(
+            !store.contains(&entry_id).unwrap(),
+            "zero-balance entry should be removed from recovery store after replay"
+        );
+
+        Ok(())
+    }
+
+    /// `replay_pending_recoveries` with a non-zero-balance entry — the withdrawal
+    /// succeeds and the entry is removed from the store.
+    #[test_log::test(tokio::test)]
+    async fn test_replay_with_non_zero_balance_withdraws_and_removes_entry() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("tempdir")?;
+        let db_path = dir.path().join("pix_recovery.db");
+
+        let recovered_kp = ChainKeypair::from_secret(&hex!(
+            "b222b08c3c2d47f89df2c6d3e5e7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4cc"
+        ))
+        .expect("recovered keypair should be valid");
+        let recovered_address = recovered_kp.public().to_address();
+
+        let price_per_byte = HoprBalance::new_base(1);
+        let max_ssa_allocation = HoprBalance::new_base(100);
+        let recovered_balance = HoprBalance::new_base(50);
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                false,
+                XDaiBalance::new_base(1),
+                recovered_balance,
+            )
+            .with_balances([(recovered_address, recovered_balance)])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
+        let chain_connector = Arc::new(chain_connector);
+
+        let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path, "test-password")?;
+
+        let entry_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
+        store.insert(
+            &entry_id,
+            &hopr_api::node::PixDepositSecret(recovered_kp.secret().clone()),
+        )?;
+
+        assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
+
+        let strategy = NonAnonymousPixStrategyInner {
+            cfg: NonAnonymousPixStrategyConfig {
+                price_per_byte,
+                max_ssa_allocation,
+                max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                pix_recovery_db_path: Some(db_path.clone()),
+                pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
+            },
+            interval: Duration::from_secs(60),
+            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            recovery_store: None,
+            processed_deposits: HashSet::new(),
+        };
+
+        strategy.replay_pending_recoveries(&store).await;
+
+        // Entry should have been removed after successful withdrawal.
+        assert!(
+            !store.contains(&entry_id).unwrap(),
+            "entry should be removed from recovery store after successful replay withdrawal"
+        );
+
+        // Verify the recovered address balance was drained.
+        let recovered_balance_after = strategy.get_balance(recovered_address).await?;
+        assert_eq!(
+            recovered_balance_after,
+            HoprBalance::zero(),
+            "recovered address balance should be zero after replay withdrawal"
+        );
+
+        Ok(())
+    }
+
+    /// `replay_pending_recoveries` skips entries whose on-chain balance query fails —
+    /// the entry is preserved in the store for a future retry.
+    #[test_log::test(tokio::test)]
+    async fn test_replay_with_balance_query_failure_preserves_entry() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("tempdir")?;
+        let db_path = dir.path().join("pix_recovery.db");
+
+        let recovered_kp = ChainKeypair::from_secret(&hex!(
+            "c333c08c3c2d47f89df2c6d3e5e7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4cc"
+        ))
+        .expect("recovered keypair should be valid");
+
+        let price_per_byte = HoprBalance::new_base(1);
+        let max_ssa_allocation = HoprBalance::new_base(100);
+
+        // Omit the recovered address from generated accounts — the blokli RPC will
+        // fail to look it up, simulating a transient balance query failure.
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let chain_connector = Arc::new(chain_connector);
+
+        let store = crate::pix_recovery_store::PixRecoveryStore::open(&db_path, "test-password")?;
+
+        let entry_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
+        store.insert(
+            &entry_id,
+            &hopr_api::node::PixDepositSecret(recovered_kp.secret().clone()),
+        )?;
+
+        assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
+
+        let strategy = NonAnonymousPixStrategyInner {
+            cfg: NonAnonymousPixStrategyConfig {
+                price_per_byte,
+                max_ssa_allocation,
+                max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                pix_recovery_db_path: Some(db_path.clone()),
+                pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
+            },
+            interval: Duration::from_secs(60),
+            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            recovery_store: None,
+            processed_deposits: HashSet::new(),
+        };
+
+        strategy.replay_pending_recoveries(&store).await;
+
+        // Balance query failed — entry should still be present for a future retry.
+        assert!(
+            store.contains(&entry_id).unwrap(),
+            "entry should remain in recovery store after balance query failure"
         );
 
         Ok(())

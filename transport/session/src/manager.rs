@@ -659,9 +659,9 @@ impl PixToolbox {
 /// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
-/// - The Exit only checks the product of the number of polynomials and the threshold, so
-/// the Entry can set the individual parameters so that they better fit its computing power.
-/// The computation is easily parallelizable in the number of polynomials, but not in threshold.
+/// - The Exit only checks the product of the number of polynomials and the threshold, so the Entry can set the
+///   individual parameters so that they better fit its computing power. The computation is easily parallelizable in the
+///   number of polynomials, but not in threshold.
 ///
 /// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
 ///

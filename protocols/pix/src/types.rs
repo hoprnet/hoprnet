@@ -690,13 +690,10 @@ mod tests {
         assert!(debug.contains("id"));
 
         // Must NOT include the secret share field — only the public id
-        assert!(
-            debug.starts_with("GeneratedShare { id: "),
-            "GeneratedShare Debug must start with 'GeneratedShare {{ id: ...' got: {debug}"
-        );
-        assert!(
-            debug.ends_with(".. }"),
-            "GeneratedShare Debug must end with '.. }}' (finish_non_exhaustive), got: {debug}"
+        assert_eq!(
+            debug,
+            format!("GeneratedShare {{ id: {:?}, .. }}", id),
+            "GeneratedShare Debug must expose only the id field"
         );
     }
 
@@ -715,13 +712,10 @@ mod tests {
         assert!(debug.contains("ssa_id"));
 
         // Must NOT include the secret ssa field — only the public ssa_id
-        assert!(
-            debug.starts_with("RecoveredSsa { ssa_id: "),
-            "RecoveredSsa Debug must start with 'RecoveredSsa {{ ssa_id: ...' got: {debug}"
-        );
-        assert!(
-            debug.ends_with(".. }"),
-            "RecoveredSsa Debug must end with '.. }}' (finish_non_exhaustive), got: {debug}"
+        assert_eq!(
+            debug,
+            format!("RecoveredSsa {{ ssa_id: {:?}, .. }}", ssa_id),
+            "RecoveredSsa Debug must expose only the ssa_id field"
         );
     }
 }

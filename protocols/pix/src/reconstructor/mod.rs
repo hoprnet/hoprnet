@@ -362,7 +362,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             .iter()
             .filter_map(|challenge_ack| {
                 let (challenge, stashed_peer, ack) = (challenge_ack.0.as_ref(), &challenge_ack.1.0, &challenge_ack.1.1);
-                (*stashed_peer == peer).then(|| (*challenge, *ack))
+                (*stashed_peer == peer).then_some((*challenge, *ack))
             })
             .collect();
         for (challenge, ack) in &stashed {
