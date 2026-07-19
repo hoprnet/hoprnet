@@ -50,6 +50,10 @@ name = "transport_session-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_session_pix"
+required-features = ["testing"]
+
+[[test]]
 name = "transport_tickets"
 required-features = ["testing"]
 
@@ -92,6 +96,7 @@ testing = [
   "session-server",
   "session-client",
   "runtime-tokio",
+  "hopr-transport/test-utils",
   "dep:hex-literal",
   "dep:rand",
   "dep:rstest",
@@ -114,6 +119,7 @@ testing = [
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 async-broadcast = { workspace = true }
+crossfire = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 cfg_eval = { workspace = true, optional = true }
 const_format = { workspace = true }

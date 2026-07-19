@@ -407,6 +407,7 @@ fn bench_acknowledge_shares_full_ssa(c: &mut Criterion) {
             threshold: t,
             polynomials_per_ssa: polys,
             surplus_shares: 0,
+            ..Default::default()
         };
 
         // Sanity check (outside the timed loop) that this configuration really recovers a full

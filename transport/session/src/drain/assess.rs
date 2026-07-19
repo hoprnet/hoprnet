@@ -1,13 +1,7 @@
-use hopr_api::types::primitive::{
-    balance::HoprBalance,
-    primitives::U256,
-};
+use hopr_api::types::primitive::{balance::HoprBalance, primitives::U256};
 use hopr_protocol_pix::SsaDrainSnapshot;
 
-use super::{
-    ClosedSessionOffer, SsaHandover, SurbDrainConfig,
-    SkipReason,
-};
+use super::{ClosedSessionOffer, SkipReason, SsaHandover, SurbDrainConfig};
 use crate::supervision::SessionPixCloseReason;
 
 /// Verdict returned by [`evaluate_offer`].
@@ -78,12 +72,15 @@ pub fn evaluate_offer(
         .iter()
         .enumerate()
         .filter_map(|(i, ssa)| {
-            let deficit = snapshots.get(i).and_then(|snap| {
-                let snap = snap.as_ref()?;
-                let target = snap.progress.target_useful_shares;
-                let useful = snap.progress.useful_shares;
-                (useful < target).then_some(target - useful)
-            }).unwrap_or(0);
+            let deficit = snapshots
+                .get(i)
+                .and_then(|snap| {
+                    let snap = snap.as_ref()?;
+                    let target = snap.progress.target_useful_shares;
+                    let useful = snap.progress.useful_shares;
+                    (useful < target).then_some(target - useful)
+                })
+                .unwrap_or(0);
 
             if ssa.funded > HoprBalance::zero() && deficit > 0 {
                 Some((i, ssa, deficit))
@@ -106,7 +103,9 @@ pub fn evaluate_offer(
     // Economic gate: the deposit must cover the drain cost.
     // All arithmetic on HoprBalance is implicitly saturating (U256 backing).
     let total_deficit: u64 = candidates.iter().map(|(_, _, d)| d).sum();
-    let total_funded: HoprBalance = candidates.iter().fold(HoprBalance::zero(), |acc, (_, s, _)| acc + s.funded);
+    let total_funded: HoprBalance = candidates
+        .iter()
+        .fold(HoprBalance::zero(), |acc, (_, s, _)| acc + s.funded);
 
     // Compute required = cost_per_packet * total_deficit * safety_factor / 100
     // using U256 arithmetic to avoid the need for Balance::Div.
@@ -149,8 +148,5 @@ pub fn evaluate_offer(
         })
         .collect();
 
-    DrainVerdict::Drain(DrainParams {
-        max_packets,
-        deficits,
-    })
+    DrainVerdict::Drain(DrainParams { max_packets, deficits })
 }

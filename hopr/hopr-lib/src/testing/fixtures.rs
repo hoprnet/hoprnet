@@ -422,6 +422,10 @@ pub struct TestNodeConfig {
     /// When set, configures the transport-level SsaShareGenerator dimensions.
     /// Must match the dimensions used in pix_ssa_quota for PIX sessions.
     pub pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
+    /// When set on the Entry node, generated PIX shares are corrupted so they fail
+    /// Feldman verification at the Exit. Requires `test-utils` feature.
+    #[cfg(feature = "testing")]
+    pub corrupt_pix_shares: bool,
 }
 
 impl Default for TestNodeConfig {
@@ -431,6 +435,8 @@ impl Default for TestNodeConfig {
             incoming_pix_config: None,
             idle_timeout_ms: 2500,
             pix_global_config: None,
+            #[cfg(feature = "testing")]
+            corrupt_pix_shares: false,
         }
     }
 }
@@ -442,6 +448,8 @@ impl TestNodeConfig {
             incoming_pix_config: None,
             idle_timeout_ms: 2500,
             pix_global_config: None,
+            #[cfg(feature = "testing")]
+            corrupt_pix_shares: false,
         }
     }
 }
@@ -785,13 +793,20 @@ pub async fn build_role_cluster(
 
                     let connector = std::sync::Arc::new(connector);
 
+                    let mut pix_global_config = cfg.pix_global_config.clone();
+                    #[cfg(feature = "testing")]
+                    if cfg.corrupt_pix_shares {
+                        let inner = pix_global_config.get_or_insert(Default::default());
+                        inner.corrupt_shares = true;
+                    }
+
                     let config = create_hopr_instance_config(
                         3001 + i as u16,
                         safes[i],
                         cfg.win_prob,
                         cfg.incoming_pix_config,
                         cfg.idle_timeout_ms,
-                        cfg.pix_global_config,
+                        pix_global_config,
                     );
 
                     let prober = Some(hopr_ct_full_network::ProberConfig {

@@ -15,9 +15,8 @@ use hopr_api::types::{
         prelude::HoprPseudonym,
         routing::{DestinationRouting, RoutingOptions},
     },
-    primitive::prelude::Address,
+    primitive::{balance::HoprBalance, prelude::Address},
 };
-use hopr_api::types::primitive::balance::HoprBalance;
 use hopr_crypto_packet::{
     HoprPixSpec,
     prelude::{HoprPacket, HoprPixGroupElement},
@@ -44,13 +43,13 @@ use crate::telemetry::{
 use crate::{
     AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
     SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
-    drain::SurbDrainConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
+    drain::SurbDrainConfig,
     errors::{self, SessionManagerError, TransportSessionError},
     supervision::*,
     types::{
@@ -178,9 +177,7 @@ fn handle_pix_drain_offer<S>(
         let ssas = guards
             .into_iter()
             .map(|guard| crate::drain::SsaHandover {
-                funded: funding
-                    .remove(&guard.ssa_id().ssa_index())
-                    .unwrap_or_default(),
+                funded: funding.remove(&guard.ssa_id().ssa_index()).unwrap_or_default(),
                 guard,
             })
             .collect();
@@ -1037,13 +1034,7 @@ where
                         // other party.
                         if let Some(session_data) = myself.sessions.remove(&session_id) {
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                            handle_pix_drain_offer(
-                                &myself.drainer,
-                                session_id,
-                                &session_data,
-                                closure_reason,
-                                None,
-                            );
+                            handle_pix_drain_offer(&myself.drainer, session_id, &session_data, closure_reason, None);
                             close_session(session_id, session_data, closure_reason);
                         } else {
                             // Do not treat this as an error
@@ -1132,15 +1123,8 @@ where
         surb_count: Arc<dyn Fn(&HoprPseudonym) -> usize + Send + Sync>,
         packet_price: Arc<dyn Fn() -> HoprBalance + Send + Sync>,
     ) -> errors::Result<()> {
-        let pix = self
-            .pix_toolbox
-            .get()
-            .ok_or(SessionManagerError::NotStarted)?;
-        let msg_sender = self
-            .msg_sender
-            .get()
-            .ok_or(SessionManagerError::NotStarted)?
-            .clone();
+        let pix = self.pix_toolbox.get().ok_or(SessionManagerError::NotStarted)?;
+        let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?.clone();
 
         let drainer = crate::drain::SurbDrainer::new(
             self.cfg.pix_config.drain_cfg,
@@ -1159,9 +1143,7 @@ where
     /// Subscribe to drain outcomes (one per offer, finished or skipped).
     ///
     /// Returns `None` if the drainer has not been enabled.
-    pub fn drain_outcome_rx(
-        &self,
-    ) -> Option<crossfire::AsyncRx<crossfire::mpsc::List<crate::drain::DrainOutcome>>> {
+    pub fn drain_outcome_rx(&self) -> Option<crossfire::AsyncRx<crossfire::mpsc::List<crate::drain::DrainOutcome>>> {
         self.drainer.get().and_then(|d| d.as_ref())?.outcome_rx()
     }
 
@@ -2436,7 +2418,6 @@ where
             slot_for_driver.pix_ssa_guards.lock().push(initial_guard);
 
             let ah_action_driver = hopr_utils::spawn_as_abortable!(async move {
-
                 loop {
                     let action = match action_rx.recv().await {
                         Ok(a) => a,
@@ -2540,13 +2521,7 @@ where
                 METRIC_PIX_CLOSURES.increment(&["PixFailure"]);
                 if let Some(slot) = myself.sessions.remove(&session_id) {
                     myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
-                    handle_pix_drain_offer(
-                        &myself.drainer,
-                        session_id,
-                        &slot,
-                        ClosureReason::PixFailure,
-                        None,
-                    );
+                    handle_pix_drain_offer(&myself.drainer, session_id, &slot, ClosureReason::PixFailure, None);
                     close_session_internal(session_id, slot, ClosureReason::PixFailure, None);
                 }
             });
@@ -5040,6 +5015,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
         let ssa_rec_config = SsaReconstructorConfig::default();
 
@@ -5135,6 +5111,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5232,6 +5209,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5323,6 +5301,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5417,6 +5396,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, pix_events_rx) = PixToolbox::new(
@@ -5550,6 +5530,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5682,6 +5663,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
@@ -5781,6 +5763,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5875,6 +5858,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let (pix_toolbox, _) = PixToolbox::new(
@@ -5967,6 +5951,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         };
 
         let reconstructor: Arc<SsaReconstructor<HoprPixSpec>> =

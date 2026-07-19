@@ -51,6 +51,7 @@ serde = [
   "hopr-transport-mixer/serde",
   "hopr-transport-tag-allocator/serde",
 ]
+test-utils = ["hopr-protocol-pix/test-utils"]
 
 
 [dependencies]

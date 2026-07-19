@@ -15,7 +15,6 @@ use hopr_protocol_start::KeepAliveMessage;
 use tracing::{error, info, warn};
 
 use super::{ClosedSessionOffer, DrainOutcome, DrainResult, DrainStopReason, SurbDrainConfig};
-
 use crate::HoprStartProtocol;
 
 /// Handle to a running drain task.
@@ -46,12 +45,12 @@ struct SsaDrainTarget {
 /// and event forwarding.
 pub(crate) fn spawn_drain_task(
     msg_sender: impl Sink<
-            (DestinationRouting, hopr_protocol_app::v1::ApplicationDataOut),
-            Error = impl std::error::Error + Send + Sync + 'static,
-        > + Clone
-        + Unpin
-        + Send
-        + 'static,
+        (DestinationRouting, hopr_protocol_app::v1::ApplicationDataOut),
+        Error = impl std::error::Error + Send + Sync + 'static,
+    > + Clone
+    + Unpin
+    + Send
+    + 'static,
     cfg: SurbDrainConfig,
     offer: ClosedSessionOffer,
     surb_count: Arc<dyn Fn(&HoprPseudonym) -> usize + Send + Sync>,
@@ -77,18 +76,15 @@ pub(crate) fn spawn_drain_task(
         abort_handle.clone(),
     ));
 
-    DrainTaskHandle {
-        abort_handle,
-        event_tx,
-    }
+    DrainTaskHandle { abort_handle, event_tx }
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn run_drain(
     mut msg_sender: impl Sink<
-            (DestinationRouting, hopr_protocol_app::v1::ApplicationDataOut),
-            Error = impl std::error::Error + Send + Sync + 'static,
-        > + Unpin,
+        (DestinationRouting, hopr_protocol_app::v1::ApplicationDataOut),
+        Error = impl std::error::Error + Send + Sync + 'static,
+    > + Unpin,
     cfg: SurbDrainConfig,
     offer: ClosedSessionOffer,
     surb_count: Arc<dyn Fn(&HoprPseudonym) -> usize + Send + Sync>,
@@ -229,10 +225,8 @@ async fn run_drain(
             Ok(Ok(())) => {
                 sent += 1;
                 // Small rate-limit delay to avoid flooding.
-                futures_time::task::sleep(
-                    Duration::from_millis(1000 / cfg.drain_rate_packets_per_sec as u64).into(),
-                )
-                .await;
+                futures_time::task::sleep(Duration::from_millis(1000 / cfg.drain_rate_packets_per_sec as u64).into())
+                    .await;
             }
             Ok(Err(e)) => {
                 warn!(%session_id, error = %e, "drain send failed");

@@ -30,25 +30,24 @@ mod task;
 
 use std::sync::Arc;
 
+pub use assess::evaluate_offer;
+pub use config::SurbDrainConfig;
 use futures::Sink;
 use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
     primitive::balance::HoprBalance,
 };
 use hopr_crypto_packet::HoprPixSpec;
-use hopr_protocol_pix::{SsaCommitmentGuard, SsaReconstructor};
+use hopr_protocol_pix::{SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig};
 use hopr_utils::runtime::AbortableList;
 use parking_lot::Mutex;
 use tracing::info;
 
-pub use assess::evaluate_offer;
-pub use config::SurbDrainConfig;
-
-use hopr_protocol_pix::SsaReconstructorConfig;
-use crate::errors::TransportSessionError;
-
-use crate::types::{ClosureReason, SessionId};
-use crate::supervision::SessionPixCloseReason;
+use crate::{
+    errors::TransportSessionError,
+    supervision::SessionPixCloseReason,
+    types::{ClosureReason, SessionId},
+};
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -213,7 +212,14 @@ where
         let surb_count = (self.surb_count)(&offer.session_id.into());
         let packet_price = (self.packet_price)();
 
-        let verdict = evaluate_offer(&self.cfg, &offer, snapshots.as_slice(), surb_count, packet_price, active);
+        let verdict = evaluate_offer(
+            &self.cfg,
+            &offer,
+            snapshots.as_slice(),
+            surb_count,
+            packet_price,
+            active,
+        );
 
         match verdict {
             assess::DrainVerdict::Drain(params) => {
@@ -317,7 +323,9 @@ pub fn validate_pix_drain(
         return Ok(());
     }
     if cfg.max_drain_time.is_zero() {
-        return Err(TransportSessionError::InvalidConfig("max_drain_time must be non-zero".into()));
+        return Err(TransportSessionError::InvalidConfig(
+            "max_drain_time must be non-zero".into(),
+        ));
     }
     if cfg.max_drain_time > MAX_DURATION {
         return Err(TransportSessionError::InvalidConfig(
@@ -335,10 +343,14 @@ pub fn validate_pix_drain(
         ));
     }
     if cfg.ack_grace.is_zero() {
-        return Err(TransportSessionError::InvalidConfig("ack_grace must be non-zero".into()));
+        return Err(TransportSessionError::InvalidConfig(
+            "ack_grace must be non-zero".into(),
+        ));
     }
     if cfg.ack_grace > MAX_DURATION {
-        return Err(TransportSessionError::InvalidConfig("ack_grace must not exceed 24 hours".into()));
+        return Err(TransportSessionError::InvalidConfig(
+            "ack_grace must not exceed 24 hours".into(),
+        ));
     }
     if cfg.ack_grace < reconstructor_cfg.max_ack_await_time {
         return Err(TransportSessionError::InvalidConfig(

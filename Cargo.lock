@@ -3992,6 +3992,7 @@ version = "1.5.0"
 dependencies = [
  "anyhow",
  "bimap",
+ "cfg-if",
  "const-hex",
  "criterion",
  "flagset",
@@ -4061,6 +4062,7 @@ dependencies = [
  "backon",
  "cfg_eval",
  "const_format",
+ "crossfire",
  "futures",
  "futures-concurrency",
  "futures-time",

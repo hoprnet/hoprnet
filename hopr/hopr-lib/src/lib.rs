@@ -377,6 +377,14 @@ where
         self.transport_api.graph()
     }
 
+    /// Subscribe to drain outcomes (one per closed-session offer).
+    pub fn drain_outcome_rx(
+        &self,
+    ) -> Option<crossfire::AsyncRx<crossfire::mpsc::List<crate::exports::transport::session::drain::DrainOutcome>>>
+    {
+        self.transport_api.drain_outcome_rx()
+    }
+
     #[cfg(feature = "session-client")]
     fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if HoprNodeOperations::status(self) == state {

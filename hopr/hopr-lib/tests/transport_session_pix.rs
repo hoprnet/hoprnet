@@ -10,6 +10,8 @@
 //!   4. [Exit]  `PrivateKeyRecovered` — quota exhausted, key recovered
 //!   → SessionManager requests next SSA → goto 1
 
+#[cfg(feature = "session-client")]
+use hopr_lib::testing::fixtures::RoleClusterGuard;
 use hopr_lib::testing::fixtures::{
     MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster, chain_propagation_delay,
 };
@@ -702,5 +704,652 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
     }
 
     tracing::info!("enforce PIX rejection test PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Drain test infrastructure
+// =========================================================================
+
+use hopr_lib::{
+    exports::transport::session::{
+        SurbBalancerConfig,
+        drain::{DrainOutcome, DrainResult, DrainStopReason, SkipReason, SurbDrainConfig},
+    },
+    testing::hopr::TestedHopr,
+};
+
+/// Spawn a one-way UDP sink that binds a local socket, receives but never
+/// replies.  Returns the bound `SocketAddr` and a handle that can be aborted.
+fn spawn_one_way_sink() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+    let bind_addr: std::net::SocketAddr = "127.0.0.1:0".parse().unwrap();
+    let socket = std::net::UdpSocket::bind(bind_addr).unwrap();
+    let addr = socket.local_addr().unwrap();
+    socket.set_nonblocking(true).unwrap();
+    let handle = tokio::spawn(async move {
+        let mut buf = vec![0u8; 2048];
+        let socket = tokio::net::UdpSocket::from_std(socket).unwrap();
+        loop {
+            if socket.recv_from(&mut buf).await.is_err() {
+                break;
+            }
+        }
+    });
+    (addr, handle)
+}
+
+/// Wait for a drain outcome matching the given predicate on the exit's drain
+/// stream.  The exit node must have `SurbDrainConfig::enabled = true`.
+async fn expect_drain_outcome(
+    exit: &TestedHopr<()>,
+    predicate: impl Fn(&DrainOutcome) -> bool,
+    timeout: Duration,
+) -> anyhow::Result<DrainOutcome> {
+    use futures::StreamExt;
+    let rx = exit
+        .inner()
+        .drain_outcome_rx()
+        .context("drain_outcome_rx returned None — drainer not active")?;
+    let mut stream = rx.into_stream();
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            anyhow::bail!("timed out waiting for drain outcome");
+        }
+        match tokio::time::timeout(remaining, stream.next()).await {
+            Ok(Some(outcome)) if predicate(&outcome) => return Ok(outcome),
+            Ok(Some(_)) => continue,
+            Ok(None) => anyhow::bail!("drain outcome stream ended"),
+            Err(_) => anyhow::bail!("timed out waiting for drain outcome"),
+        }
+    }
+}
+
+/// Wait for `PrivateKeyRecovered` on the given PixEvent stream.
+async fn expect_key_recovered(
+    exit_events: &mut (impl futures::Stream<Item = PixEvent> + Unpin + Send),
+    timeout: Duration,
+) -> anyhow::Result<()> {
+    use futures::StreamExt;
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            anyhow::bail!("timed out waiting for PrivateKeyRecovered");
+        }
+        match tokio::time::timeout(remaining, exit_events.next()).await {
+            Ok(Some(PixEvent::PrivateKeyRecovered(_))) => return Ok(()),
+            Ok(Some(_)) => continue,
+            Ok(None) => anyhow::bail!("PixEvent stream ended"),
+            Err(_) => anyhow::bail!("timed out waiting for PrivateKeyRecovered"),
+        }
+    }
+}
+
+/// Assert no PrivateKeyRecovered within the given window.
+async fn assert_no_key_recovered(
+    exit_events: &mut (impl futures::Stream<Item = PixEvent> + Unpin + Send),
+    window: Duration,
+) {
+    use futures::StreamExt;
+    tokio::select! {
+        biased;
+        Some(PixEvent::PrivateKeyRecovered(data)) = exit_events.next() => {
+            panic!("unexpected PrivateKeyRecovered during silence window: {data:?}");
+        }
+        _ = tokio::time::sleep(window) => {}
+    }
+}
+
+/// Helper: signal deposit via `DepositAddressReceived` and return once the
+/// notifier has been sent.  This consumes events so the caller gets a fresh
+/// subscription afterwards.
+async fn signal_deposit(
+    exit_events: &mut (impl futures::Stream<Item = PixEvent> + Unpin + Send),
+    amount: HoprBalance,
+) -> anyhow::Result<()> {
+    use futures::StreamExt;
+    loop {
+        match exit_events.next().await {
+            Some(PixEvent::DepositAddressReceived(data)) => {
+                tracing::info!(id = ?data.id, ?amount, "DepositAddressReceived, signaling");
+                if let Some(mut notifier) = data.deposit_updated {
+                    notifier.send((data.id, amount)).await?;
+                }
+                return Ok(());
+            }
+            Some(PixEvent::NewDepositAddress(data)) => {
+                tracing::info!(id = ?data.id, "NewDepositAddress (ignored)");
+            }
+            Some(other) => {
+                tracing::warn!("unexpected event in signal_deposit: {other:?}");
+            }
+            None => anyhow::bail!("PixEvent stream ended before DepositAddressReceived"),
+        }
+    }
+}
+
+/// Connect to the Exit with a session that tunnels to a one-way UDP sink.
+/// Entry-side SURB preloading is configured to 64.
+async fn connect_to_sink(
+    cluster: &RoleClusterGuard,
+    sink_addr: std::net::SocketAddr,
+) -> anyhow::Result<hopr_lib::exports::transport::HoprSession> {
+    let ip = IpOrHost::from_str(&format!("0.0.0.0:{}", sink_addr.port()))?;
+    let (session, _) = cluster
+        .entry
+        .inner()
+        .connect_to(
+            cluster.exit.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            HoprSessionClientConfig {
+                forward_path: 1usize.try_into()?,
+                return_path: 1usize.try_into()?,
+                capabilities: (SessionCapability::Segmentation
+                    | SessionCapability::NoRateControl
+                    | SessionCapability::UsePIX)
+                    .into(),
+                pseudonym: None,
+                surb_management: Some(SurbBalancerConfig {
+                    target_surb_buffer_size: 64,
+                    max_surbs_per_sec: 100,
+                    ..Default::default()
+                }),
+                always_max_out_surbs: false,
+                pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
+            },
+        )
+        .await?;
+    Ok(session)
+}
+
+// =========================================================================
+//  Test T1: Drain recovers deposit after Entry close (happy path)
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Verifies that after the Entry drops the session, the Exit's drainer
+/// consumes leftover SURBs, recovers the SSA, and emits PrivateKeyRecovered
+/// followed by DrainFinished(AllRecovered).
+async fn drain_recovers_deposit_after_entry_close(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    let cluster = setup_one_hop_cluster(TestNodeConfig {
+        win_prob: 1.0,
+        incoming_pix_config: Some(IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(10),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
+            drain_cfg: SurbDrainConfig {
+                enabled: true,
+                max_drain_time: Duration::from_secs(60),
+                ack_grace: Duration::from_secs(30),
+                drain_rate_packets_per_sec: 50,
+                cost_safety_factor: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+        ..Default::default()
+    })
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let session = connect_to_sink(&cluster, _sink_addr).await?;
+    tracing::info!("T1: session established");
+
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1_000_000)).await?;
+
+    // Allow deposit confirmation to propagate before dropping the session.
+    // Without this wait, the deposit channel may close unconfirmed, leaving
+    // no funded SSA for the drainer to recover.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Drop the session at Entry.
+    // The Exit supervisor will close via the hard deadline (max_recovery_time).
+    drop(session);
+    tracing::info!("T1: session dropped at Entry");
+
+    // Wait for the supervisor's hard deadline to fire and the drain to complete.
+    // Expect PrivateKeyRecovered from the drain.
+    expect_key_recovered(&mut exit_events, Duration::from_secs(60)).await?;
+    tracing::info!("T1: PrivateKeyRecovered received");
+
+    // Expect DrainFinished(AllRecovered).
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Finished(DrainStopReason::AllRecovered)),
+        Duration::from_secs(60),
+    )
+    .await?;
+    tracing::info!(packets = outcome.packets_sent, "T1: drain AllRecovered");
+    assert!(outcome.ssas_recovered >= 1, "at least one SSA recovered");
+
+    tracing::info!("T1 drain happy path PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Test T2: Drain after supervisor close (RecoveryDeadline)
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Verifies that when the supervisor closes with RecoveryDeadline (benign),
+/// the drainer still recovers the deposit.
+async fn drain_after_supervisor_close(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    let cluster = setup_one_hop_cluster(TestNodeConfig {
+        win_prob: 1.0,
+        incoming_pix_config: Some(IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(5),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
+            drain_cfg: SurbDrainConfig {
+                enabled: true,
+                max_drain_time: Duration::from_secs(60),
+                ack_grace: Duration::from_secs(30),
+                drain_rate_packets_per_sec: 50,
+                cost_safety_factor: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+        ..Default::default()
+    })
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let _session = connect_to_sink(&cluster, _sink_addr).await?;
+    tracing::info!("T2: session established");
+
+    // Signal deposit, then let session sit idle — the hard deadline fires.
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1_000_000)).await?;
+
+    tracing::info!("T2: waiting for supervisor hard deadline...");
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    // Supervisor has closed the session.  Handover arrived at the drainer.
+    drop(_session); // also drop Entry side
+    tracing::info!("T2: session dropped at Entry");
+
+    // The drainer should now recover.
+    expect_key_recovered(&mut exit_events, Duration::from_secs(60)).await?;
+    tracing::info!("T2: PrivateKeyRecovered received");
+
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Finished(DrainStopReason::AllRecovered)),
+        Duration::from_secs(60),
+    )
+    .await?;
+    tracing::info!(packets = outcome.packets_sent, "T2: drain AllRecovered");
+    assert!(outcome.ssas_recovered >= 1, "at least one SSA recovered");
+
+    tracing::info!("T2 drain after supervisor close PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Test T3: Drain stops on first unverifiable share (zero tolerance)
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Entry generates corrupted PIX shares.  The session closes cleanly (one-way
+/// sink means no shares are verified during the session, so no fault close).
+/// Post-closure drain hits the first corrupted share and stops immediately.
+async fn drain_stops_on_unverifiable_share(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    // Build the cluster ourselves so the Entry has corrupt_pix_shares.
+    let cluster = build_role_cluster(
+        TestNodeConfig {
+            win_prob: 1.0,
+            corrupt_pix_shares: true,
+            pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
+                num_ssa_parts: PIX_POLYS as usize,
+                ssa_part_size: PIX_SHARES as usize,
+                additional_shares: 2,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops],
+        TestNodeConfig {
+            win_prob: 1.0,
+            incoming_pix_config: Some(IncomingSessionPixConfig {
+                quota_range: 0..=100_000,
+                enforce_pix: false,
+                supervisor_cfg: SupervisorConfig {
+                    max_ssa_delivery_time: Duration::from_secs(10),
+                    max_deposit_wait: Duration::from_secs(60),
+                    max_recovery_time: Duration::from_secs(10),
+                    max_recovery_idle: Duration::from_secs(60),
+                    ..Default::default()
+                },
+                drain_cfg: SurbDrainConfig {
+                    enabled: true,
+                    max_drain_time: Duration::from_secs(60),
+                    ack_grace: Duration::from_secs(30),
+                    drain_rate_packets_per_sec: 50,
+                    cost_safety_factor: 1.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
+    macro_rules! open_chan {
+        ($from:expr, $to:expr) => {{
+            IncentiveChannelOperations::open_channel(&*$from.instance, $to.instance.identity().node_address, funding)
+                .await
+                .context("opening channel must succeed")?;
+        }};
+    }
+    open_chan!(cluster.entry, cluster.relays[0]);
+    open_chan!(cluster.relays[0], cluster.exit);
+    open_chan!(cluster.exit, cluster.relays[0]);
+    open_chan!(cluster.relays[0], cluster.entry);
+    let chain_info = cluster.chain_client.query_chain_info().await?;
+    tokio::time::sleep(chain_propagation_delay(&chain_info) * 6).await;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let session = connect_to_sink(&cluster, _sink_addr).await?;
+    tracing::info!("T3: session established with corrupted shares");
+
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1_000_000)).await?;
+
+    // Allow deposit confirmation to propagate before dropping the session
+    // (same race as T1 — the deposit observer has a 100ms initial delay).
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Drop the session at Entry — clean close since no shares were verified.
+    drop(session);
+    tracing::info!("T3: session dropped at Entry");
+
+    // Expect DrainFinished(UnverifiableShare).
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Finished(DrainStopReason::UnverifiableShare)),
+        Duration::from_secs(60),
+    )
+    .await?;
+    tracing::info!(packets = outcome.packets_sent, "T3: drain UnverifiableShare");
+    assert_eq!(outcome.ssas_recovered, 0, "no SSA recovered with corrupted shares");
+
+    assert_no_key_recovered(&mut exit_events, Duration::from_secs(15)).await;
+    tracing::info!("T3: confirmed no PrivateKeyRecovered");
+
+    tracing::info!("T3 drain unverifiable share PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Test T4: Drain skipped when uneconomical
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// The deposit (1 base unit) is far below the ticket cost needed to drain the
+/// deficit.  The drain should be skipped with UneconomicalDeposit.
+async fn drain_skipped_when_uneconomical(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    let cluster = setup_one_hop_cluster(TestNodeConfig {
+        win_prob: 1.0,
+        incoming_pix_config: Some(IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(10),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
+            drain_cfg: SurbDrainConfig {
+                enabled: true,
+                max_drain_time: Duration::from_secs(60),
+                ack_grace: Duration::from_secs(30),
+                drain_rate_packets_per_sec: 50,
+                cost_safety_factor: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+        ..Default::default()
+    })
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let session = connect_to_sink(&cluster, _sink_addr).await?;
+    tracing::info!("T4: session established");
+
+    // Signal a tiny deposit (1 base unit — far below price × deficit).
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1)).await?;
+
+    // Allow deposit confirmation to propagate before dropping the session
+    // (same race as T1 — the deposit observer has a 100ms initial delay).
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Drop the session at Entry. The Exit supervisor will close via the
+    // hard deadline (max_recovery_time).
+    drop(session);
+    tracing::info!("T4: session dropped at Entry");
+
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Skipped(SkipReason::UneconomicalDeposit)),
+        Duration::from_secs(30),
+    )
+    .await?;
+    tracing::info!(packets = outcome.packets_sent, "T4: drain skipped");
+    assert_eq!(outcome.packets_sent, 0, "no packets sent for skipped drain");
+
+    assert_no_key_recovered(&mut exit_events, Duration::from_secs(10)).await;
+
+    tracing::info!("T4 uneconomical drain PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Test T5: Drain skipped on insufficient SURBs
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// No SURB management and no data writes after establishment — only the
+/// handful of initiation-time SURBs exist (≪ 16).  Drain should be
+/// skipped with InsufficientSurbs.
+async fn drain_skipped_on_insufficient_surbs(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    let cluster = setup_one_hop_cluster(TestNodeConfig {
+        win_prob: 1.0,
+        incoming_pix_config: Some(IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(10),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
+            drain_cfg: SurbDrainConfig {
+                enabled: true,
+                max_drain_time: Duration::from_secs(60),
+                ack_grace: Duration::from_secs(30),
+                drain_rate_packets_per_sec: 50,
+                cost_safety_factor: 1.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+        ..Default::default()
+    })
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    // Establish session with NO surb_management — no SURB preloading.
+    let ip = IpOrHost::from_str(&format!("0.0.0.0:{}", _sink_addr.port()))?;
+    let session = {
+        let (session, _) = cluster
+            .entry
+            .inner()
+            .connect_to(
+                cluster.exit.address(),
+                SessionTarget::UdpStream(SealedHost::Plain(ip)),
+                HoprSessionClientConfig {
+                    forward_path: 1usize.try_into()?,
+                    return_path: 1usize.try_into()?,
+                    capabilities: (SessionCapability::Segmentation
+                        | SessionCapability::NoRateControl
+                        | SessionCapability::UsePIX)
+                        .into(),
+                    pseudonym: None,
+                    surb_management: None,
+                    always_max_out_surbs: false,
+                    pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
+                },
+            )
+            .await?;
+        session
+    };
+    tracing::info!("T5: session established without SURB preloading");
+
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1_000_000)).await?;
+
+    // Allow deposit confirmation to propagate before dropping the session.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Drop the session at Entry. The Exit supervisor will close via the
+    // hard deadline (max_recovery_time).
+    drop(session);
+    tracing::info!("T5: session dropped at Entry");
+
+    // Expect DrainFinished(Skipped(InsufficientSurbs)).
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Skipped(SkipReason::InsufficientSurbs)),
+        Duration::from_secs(30),
+    )
+    .await?;
+    tracing::info!(packets = outcome.packets_sent, "T5: drain skipped");
+    assert_eq!(outcome.packets_sent, 0, "no packets sent for skipped drain");
+
+    assert_no_key_recovered(&mut exit_events, Duration::from_secs(10)).await;
+
+    tracing::info!("T5 insufficient SURBs drain PASSED");
+    Ok(())
+}
+
+// =========================================================================
+//  Test T6: Drain disabled is inert
+// =========================================================================
+
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+/// Drain is disabled by default.  Verifies that no drain activity and no
+/// post-closure recovery occurs — pinning today's behaviour.
+async fn drain_disabled_is_inert(#[case] hops: usize) -> anyhow::Result<()> {
+    let (_sink_addr, _sink_handle) = spawn_one_way_sink();
+
+    // No drain_cfg — SurbDrainConfig defaults to enabled=false.
+    let cluster = setup_one_hop_cluster(TestNodeConfig {
+        win_prob: 1.0,
+        incoming_pix_config: Some(IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervisor_cfg: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                max_recovery_time: Duration::from_secs(10),
+                max_recovery_idle: Duration::from_secs(60),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        idle_timeout_ms: Duration::from_secs(120).as_millis() as u64,
+        ..Default::default()
+    })
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+    let session = connect_to_sink(&cluster, _sink_addr).await?;
+    tracing::info!("T6: session established");
+
+    signal_deposit(&mut exit_events, HoprBalance::new_base(1_000_000)).await?;
+
+    // Drop the session at Entry. The Exit supervisor will close via the
+    // hard deadline (max_recovery_time).
+    drop(session);
+    tracing::info!("T6: session dropped at Entry");
+
+    // The drainer is always constructed when PIX is configured, but with
+    // enabled=false it should skip all offers immediately.
+    let outcome = expect_drain_outcome(
+        &cluster.exit,
+        |o| matches!(&o.result, DrainResult::Skipped(SkipReason::Disabled)),
+        Duration::from_secs(30),
+    )
+    .await?;
+    tracing::info!(?outcome.result, "T6: drain outcome");
+    assert_eq!(outcome.packets_sent, 0);
+
+    assert_no_key_recovered(&mut exit_events, Duration::from_secs(10)).await;
+    tracing::info!("confirmed no recovery with drain disabled");
+
+    tracing::info!("T6 drain disabled PASSED");
     Ok(())
 }

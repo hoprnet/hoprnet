@@ -996,6 +996,7 @@ mod tests {
             polynomials_per_ssa: 2048,
             threshold: 64,
             surplus_shares: 0,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();

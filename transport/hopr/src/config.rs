@@ -199,6 +199,14 @@ pub struct PixGlobalConfig {
     #[validate(range(min = 0, max = 4096))]
     #[default(64)]
     pub additional_shares: usize,
+
+    /// When set, generated shares are corrupted (XOR one byte) so they fail
+    /// Feldman verification. For testing only.
+    ///
+    /// Default is false.
+    #[cfg(feature = "test-utils")]
+    #[default(false)]
+    pub corrupt_shares: bool,
 }
 
 /// Configuration of the HOPR packet pipeline.

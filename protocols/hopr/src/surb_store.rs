@@ -240,10 +240,7 @@ impl SurbStore for MemorySurbStore {
 
     #[tracing::instrument(skip_all, level = "trace", fields(?pseudonym), ret)]
     fn surb_count(&self, pseudonym: &HoprPseudonym) -> usize {
-        self.surbs_per_pseudonym
-            .get(pseudonym)
-            .map(|rb| rb.len())
-            .unwrap_or(0)
+        self.surbs_per_pseudonym.get(pseudonym).map(|rb| rb.len()).unwrap_or(0)
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id))]

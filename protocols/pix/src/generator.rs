@@ -93,7 +93,6 @@ pub struct SsaGeneratorConfig {
     pub surplus_shares: usize,
     /// When enabled, every generated share is corrupted (one byte XORed) so that
     /// Feldman verification at the Exit fails. Intended for integration tests.
-    #[cfg(feature = "test-utils")]
     #[default(false)]
     pub corrupt_shares: bool,
 }
@@ -167,10 +166,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                             }
                         }
 
-                        GeneratedShare {
-                            id: poly.spi,
-                            share,
-                        }
+                        GeneratedShare { id: poly.spi, share }
                     }));
                 }
                 // If we replaced VecDeque with a lock-free alternative, we could remove
@@ -342,6 +338,7 @@ mod tests {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
+            ..Default::default()
         });
 
         let p1 = SimplePseudonym::random();
@@ -378,6 +375,7 @@ mod tests {
             polynomials_per_ssa: 3,
             threshold: 3,
             surplus_shares: 1,
+            ..Default::default()
         });
 
         let p1 = SimplePseudonym::random();
@@ -414,6 +412,7 @@ mod tests {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
+            ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 
@@ -444,6 +443,7 @@ mod tests {
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 2,
+            ..Default::default()
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
 

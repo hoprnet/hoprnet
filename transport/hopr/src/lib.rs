@@ -112,10 +112,7 @@ use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
     node::{PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
-    types::{
-        internal::routing::DestinationRouting,
-        primitive::balance::HoprBalance,
-    },
+    types::{internal::routing::DestinationRouting, primitive::balance::HoprBalance},
 };
 use hopr_crypto_packet::HoprShareResolution;
 
@@ -740,6 +737,9 @@ where
                 polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,
                 threshold: self.cfg.pix.ssa_part_size as u16,
                 surplus_shares: self.cfg.pix.additional_shares,
+                #[cfg(feature = "test-utils")]
+                corrupt_shares: self.cfg.pix.corrupt_shares,
+                ..Default::default()
             },
         ));
 
@@ -962,8 +962,7 @@ where
             // In a production deployment the chain API's minimum ticket price
             // would be used; HoprBalance::new_base(1) makes the economic gate
             // effectively a no-op until a real price source is wired.
-            let packet_price: Arc<dyn Fn() -> HoprBalance + Send + Sync> =
-                Arc::new(|| HoprBalance::new_base(1));
+            let packet_price: Arc<dyn Fn() -> HoprBalance + Send + Sync> = Arc::new(|| HoprBalance::new_base(1));
             self.smgr
                 .enable_drainer(surb_count, packet_price)
                 .map_err(|e| HoprTransportError::Api(format!("failed to enable drainer: {e}")))?;
@@ -1181,6 +1180,15 @@ where
     /// Returns a reference to the network graph.
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// Subscribe to drain outcomes (one per closed-session offer).
+    ///
+    /// Returns `None` if the drainer is not enabled (e.g. non-Exit node).
+    pub fn drain_outcome_rx(
+        &self,
+    ) -> Option<crossfire::AsyncRx<crossfire::mpsc::List<hopr_transport_session::drain::DrainOutcome>>> {
+        self.smgr.drain_outcome_rx()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -1450,6 +1458,7 @@ mod pix_recovery_event_tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
+            ..Default::default()
         };
         let generator = SsaShareGenerator::<HoprPixSpec>::new(cfg);
         let reconstructor = SsaReconstructor::<HoprPixSpec>::new(SsaReconstructorConfig {

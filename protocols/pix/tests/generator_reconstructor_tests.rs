@@ -21,6 +21,7 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
         polynomials_per_ssa: 10,
         threshold: 10,
         surplus_shares: 0,
+        ..Default::default()
     });
 
     let pseudonym = SimplePseudonym::random();
@@ -138,6 +139,7 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
         polynomials_per_ssa: 10,
         threshold: 10,
         surplus_shares: 0,
+        ..Default::default()
     });
 
     let pseudonym = SimplePseudonym::random();

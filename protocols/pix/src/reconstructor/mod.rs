@@ -875,6 +875,7 @@ mod tests {
             polynomials_per_ssa: 4,
             threshold: 4,
             surplus_shares: 0,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1047,6 +1048,7 @@ mod tests {
             polynomials_per_ssa: 3,
             threshold: 2,
             surplus_shares: 0,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1126,12 +1128,11 @@ mod tests {
     #[test]
     fn duplicate_share_is_not_useful() -> anyhow::Result<()> {
         // 2 polys, threshold=2, surplus=0 → 4 shares total when fully drawn.
-        // Insert: poly0:share1, poly0:share1 (duplicate), poly1:share1.
-        // useful_shares must be 2 (the duplicate does not count).
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1217,6 +1218,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1282,6 +1284,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1356,6 +1359,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 1,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();
@@ -1440,6 +1444,7 @@ mod tests {
             polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
+            ..Default::default()
         });
 
         let pseudonym = SimplePseudonym::random();

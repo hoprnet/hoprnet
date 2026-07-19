@@ -65,6 +65,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         polynomials_per_ssa: 64,
         threshold: 64,
         surplus_shares: 16,
+        ..Default::default()
     };
 
     let expected_ssa_commits = {

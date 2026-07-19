@@ -18,6 +18,7 @@ mod types;
 mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
+pub use drain::validate_pix_drain;
 use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::AcknowledgementMode;
 pub use hopr_utils::network_types::types::*;
@@ -26,7 +27,6 @@ pub use manager::{
     SessionManagerConfig,
 };
 pub use supervision::{SupervisorConfig, validate_pix_supervision};
-pub use drain::validate_pix_drain;
 pub mod test_helpers;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
