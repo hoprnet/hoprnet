@@ -144,6 +144,7 @@ pub struct SsaReconstructor<S: PixSpec> {
 }
 
 /// Result of processing a single verified acknowledgement in the SSA reconstructor.
+#[derive(Debug)]
 enum ProcessedAckResult<S: PixSpec> {
     /// No matching encrypted share found (ack for unknown challenge).
     NoProgress,
@@ -947,37 +948,29 @@ mod tests {
         )?;
 
         // --- Step 3: Process the first ack — share accepted, not yet complete ---
-        let resolution1 = reconstructor.process_verified_ack(
-            ack1,
-            challenge1,
-            reconstructor
-                .awaiting_acks
-                .get(peer.public())
-                .as_ref()
-                .ok_or(anyhow::anyhow!("missing peer"))?,
-        )?;
+        let inner_cache = reconstructor
+            .awaiting_acks
+            .get(peer.public())
+            .ok_or_else(|| anyhow::anyhow!("missing peer"))?;
+        let resolution1 = reconstructor.process_verified_ack(peer.public(), ack1, challenge1, &inner_cache)?;
         assert!(
-            matches!(resolution1, ProcessedAckResult::NoProgress),
-            "first share should not yet complete the SSA"
+            matches!(resolution1, ProcessedAckResult::UsefulShare(s) if s == ssa_id),
+            "first share should be useful but not yet complete the SSA: got {resolution1:?}"
         );
 
         // --- Step 4: Process the duplicate ---
         // The SsaPartBuilder has 1/2 shares. The duplicate share has the same identifier
         // (same X-coordinate from msg1), so it hits the
         // `any(|s| s.identifier == share.identifier)` check in SsaPartBuilder::add_share
-        // and returns Ok(None), which surfaces as NoProgress.
-        let resolution_dup = reconstructor.process_verified_ack(
-            dup_ack,
-            dup_challenge,
-            reconstructor
-                .awaiting_acks
-                .get(peer.public())
-                .as_ref()
-                .ok_or(anyhow::anyhow!("missing peer"))?,
-        )?;
+        // and returns Duplicate.
+        let inner_cache = reconstructor
+            .awaiting_acks
+            .get(peer.public())
+            .ok_or_else(|| anyhow::anyhow!("missing peer"))?;
+        let resolution_dup = reconstructor.process_verified_ack(peer.public(), dup_ack, dup_challenge, &inner_cache)?;
         assert!(
-            matches!(resolution_dup, ProcessedAckResult::NoProgress),
-            "duplicate share must return NoProgress during active reconstruction"
+            matches!(resolution_dup, ProcessedAckResult::Duplicate),
+            "duplicate share must return Duplicate: got {resolution_dup:?}"
         );
 
         // --- Step 5: Generate and process the second distinct share ---
@@ -994,15 +987,11 @@ mod tests {
             TaggedEncryptedPartialSsaShare::new(pseudonym, &msg2, enc2)?,
         )?;
 
-        let resolution2 = reconstructor.process_verified_ack(
-            ack2,
-            challenge2,
-            reconstructor
-                .awaiting_acks
-                .get(peer.public())
-                .as_ref()
-                .ok_or(anyhow::anyhow!("missing peer"))?,
-        )?;
+        let inner_cache = reconstructor
+            .awaiting_acks
+            .get(peer.public())
+            .ok_or_else(|| anyhow::anyhow!("missing peer"))?;
+        let resolution2 = reconstructor.process_verified_ack(peer.public(), ack2, challenge2, &inner_cache)?;
         assert!(
             matches!(resolution2, ProcessedAckResult::FullRecovery(ref r) if r.ssa_id == ssa_id),
             "second unique share should complete SSA reconstruction"
