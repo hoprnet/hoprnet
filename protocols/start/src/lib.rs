@@ -189,7 +189,7 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
             - StartProtocol::<I, (), (), G>::START_HEADER_SIZE)
             / (size_of::<hopr_protocol_pix::SsaIndex>()
                 + StartProtocol::<I, (), (), G>::PIX_COEFF_COMMITMENT_REPR_SIZE))
-        .max(1);
+            .max(1);
 
         // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
         // guarantee that the resulting messages are ordered by coefficient index, making sure the

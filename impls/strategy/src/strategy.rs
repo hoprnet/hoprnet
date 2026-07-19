@@ -187,6 +187,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_multi_strategy_sub_failure_does_not_propagate() -> anyhow::Result<()> {
         // A failing sub-strategy is isolated: the MultiStrategy still returns Ok.
@@ -195,6 +196,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_multi_strategy_accepts_external_strategy() -> anyhow::Result<()> {
         // Demonstrates that any impl Strategy can be composed without modifying hopr-strategy.
