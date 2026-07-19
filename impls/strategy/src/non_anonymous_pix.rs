@@ -68,6 +68,11 @@ impl NonAnonymousPixStrategy {
     where
         N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
     {
+        assert!(
+            self.cfg.pix_recovery_db_path.is_some() == self.cfg.pix_recovery_password.is_some(),
+            "pix_recovery_db_path and pix_recovery_password must be both set or both unset"
+        );
+
         let recovery_store = self
             .cfg
             .pix_recovery_db_path

@@ -247,7 +247,11 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             }
         }
 
-        if pk_recovered_ids.len() as u32 >= target_cycles {
+        let completed = new_deposit_ids
+            .iter()
+            .filter(|id| deposit_received_ids.contains(id) && pk_recovered_ids.contains(id))
+            .count();
+        if completed >= target_cycles as usize {
             tracing::info!(target_cycles, "all PIX cycles completed");
             break;
         }

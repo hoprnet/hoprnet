@@ -44,7 +44,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true, features = ["node", "serde"] }
+hopr-api = { workspace = true, features = ["node", "serde", "types-random"] }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }

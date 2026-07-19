@@ -471,81 +471,78 @@ where
         if data.len() != data_offset + len {
             return Err(StartProtocolError::InvalidLength);
         }
+        let body = &data[data_offset..data_offset + len];
 
         Ok(
             match StartProtocolDiscriminants::from_repr(disc).ok_or(StartProtocolError::UnknownMessage)? {
                 StartProtocolDiscriminants::StartSession => {
-                    if data.len() <= data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>() {
+                    if body.len() < size_of::<StartChallenge>() + 1 + size_of::<u64>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
                     StartProtocol::StartSession(StartInitiation {
                         challenge: StartChallenge::from_be_bytes(
-                            data[data_offset..data_offset + size_of::<StartChallenge>()]
+                            body[..size_of::<StartChallenge>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.challenge".into()))?,
                         ),
-                        capabilities: data[data_offset + size_of::<StartChallenge>()]
+                        capabilities: body[size_of::<StartChallenge>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("init.capabilities".into()))?,
                         additional_data: u64::from_be_bytes(
-                            data[data_offset + size_of::<StartChallenge>() + 1
-                                ..data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>()]
+                            body[size_of::<StartChallenge>() + 1..size_of::<StartChallenge>() + 1 + size_of::<u64>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.additional_data".into()))?,
                         ),
-                        target: serde_cbor_2::from_slice(
-                            &data[data_offset + size_of::<StartChallenge>() + 1 + size_of::<u64>()..],
-                        )?,
+                        target: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>() + 1 + size_of::<u64>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
-                    if data.len() <= data_offset + size_of::<StartChallenge>() {
+                    if body.len() < size_of::<StartChallenge>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: StartChallenge::from_be_bytes(
-                            data[data_offset..data_offset + size_of::<StartChallenge>()]
+                            body[..size_of::<StartChallenge>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[data_offset + size_of::<StartChallenge>()..])?,
+                        session_id: serde_cbor_2::from_slice(&body[size_of::<StartChallenge>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
-                    if data.len() < data_offset + size_of::<StartChallenge>() + 1 {
+                    if body.len() < size_of::<StartChallenge>() + 1 {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionError(StartErrorType {
                         challenge: StartChallenge::from_be_bytes(
-                            data[data_offset..data_offset + size_of::<StartChallenge>()]
+                            body[..size_of::<StartChallenge>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("err.challenge".into()))?,
                         ),
-                        reason: StartErrorReason::from_repr(data[data_offset + size_of::<StartChallenge>()])
+                        reason: StartErrorReason::from_repr(body[size_of::<StartChallenge>()])
                             .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
-                    if data.len() < data_offset + 1 + size_of::<u64>() {
+                    if body.len() < 1 + size_of::<u64>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: KeepAliveFlags::new(data[data_offset])
+                        flags: KeepAliveFlags::new(body[0])
                             .map_err(|_| StartProtocolError::ParseError("ka.flags".into()))?,
                         additional_data: u64::from_be_bytes(
-                            data[data_offset + 1..data_offset + 1 + size_of::<u64>()]
+                            body[1..1 + size_of::<u64>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ka.additional_data".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u64>()..])?,
+                        session_id: serde_cbor_2::from_slice(&body[1 + size_of::<u64>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SsaCommit => {
-                    if data.len()
-                        <= data_offset
-                            + size_of::<hopr_protocol_pix::SsaIndex>()
+                    if body.len()
+                        <= size_of::<hopr_protocol_pix::SsaIndex>()
                             + size_of::<hopr_protocol_pix::CoefficientIndex>()
                             + 2 * size_of::<hopr_protocol_pix::PolynomialIndex>()
                             + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
@@ -554,43 +551,40 @@ where
                     }
 
                     let ssa: hopr_protocol_pix::SsaIndex = hopr_protocol_pix::RawSsaIndex::from_be_bytes(
-                        data[data_offset..data_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                        body[..size_of::<hopr_protocol_pix::SsaIndex>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
                     )
                     .try_into()
                     .map_err(|_| StartProtocolError::ParseError("ssa_index is 0".into()))?;
                     let coefficient_index = hopr_protocol_pix::CoefficientIndex::from_be_bytes(
-                        data[data_offset + size_of::<hopr_protocol_pix::SsaIndex>()
-                            ..data_offset
-                                + size_of::<hopr_protocol_pix::SsaIndex>()
+                        body[size_of::<hopr_protocol_pix::SsaIndex>()
+                            ..size_of::<hopr_protocol_pix::SsaIndex>()
                                 + size_of::<hopr_protocol_pix::CoefficientIndex>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("coefficient_index".into()))?,
                     );
-                    let num_polys = hopr_protocol_pix::PolynomialIndex::from_be_bytes(
-                        data[data_offset
-                            + size_of::<hopr_protocol_pix::SsaIndex>()
-                            + size_of::<hopr_protocol_pix::CoefficientIndex>()
-                            ..data_offset
-                                + size_of::<hopr_protocol_pix::SsaIndex>()
+                    let num_polys =
+                        hopr_protocol_pix::PolynomialIndex::from_be_bytes(
+                            body[size_of::<hopr_protocol_pix::SsaIndex>()
                                 + size_of::<hopr_protocol_pix::CoefficientIndex>()
-                                + size_of::<hopr_protocol_pix::PolynomialIndex>()]
-                            .try_into()
-                            .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
-                    );
+                                ..size_of::<hopr_protocol_pix::SsaIndex>()
+                                    + size_of::<hopr_protocol_pix::CoefficientIndex>()
+                                    + size_of::<hopr_protocol_pix::PolynomialIndex>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
+                        );
                     if num_polys == 0 || num_polys > MAX_POLYS_PER_SSA {
                         return Err(StartProtocolError::NumberOfCommitments);
                     }
 
                     let mut coefficient_commitments = std::collections::HashMap::with_capacity(num_polys as usize);
-                    let mut next_offset = data_offset
-                        + size_of::<hopr_protocol_pix::SsaIndex>()
+                    let mut next_offset = size_of::<hopr_protocol_pix::SsaIndex>()
                         + size_of::<hopr_protocol_pix::CoefficientIndex>()
                         + size_of::<hopr_protocol_pix::PolynomialIndex>();
                     for _ in 0..num_polys {
                         // Still needs to be space left for Session ID at the end of commitments
-                        if data.len()
+                        if body.len()
                             <= next_offset
                                 + size_of::<hopr_protocol_pix::PolynomialIndex>()
                                 + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
@@ -599,14 +593,14 @@ where
                         }
 
                         let index = hopr_protocol_pix::PolynomialIndex::from_be_bytes(
-                            data[next_offset..next_offset + size_of::<hopr_protocol_pix::PolynomialIndex>()]
+                            body[next_offset..next_offset + size_of::<hopr_protocol_pix::PolynomialIndex>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("polynomial_index".into()))?,
                         );
                         next_offset += size_of::<hopr_protocol_pix::PolynomialIndex>();
 
                         let commitment =
-                            G::try_from(&data[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
+                            G::try_from(&body[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
                                 .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
                         next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
 
@@ -616,34 +610,37 @@ where
                     }
 
                     StartProtocol::SsaCommit(SsaClientCommitmentMessage {
-                        session_id: serde_cbor_2::from_slice(&data[next_offset..])?,
+                        session_id: serde_cbor_2::from_slice(&body[next_offset..])?,
                         ssa_index: ssa,
                         coefficient_index,
                         coefficient_commitments,
                     })
                 }
                 StartProtocolDiscriminants::SsaRequest => {
-                    if data.len() <= data_offset + size_of::<u32>() + size_of::<u16>() {
+                    if body.len() <= size_of::<u32>() + size_of::<u16>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
                     let params = u32::from_be_bytes(
-                        data[data_offset..data_offset + size_of::<u32>()]
+                        body[..size_of::<u32>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("params".into()))?,
                     );
-                    let mut next_offset = data_offset + size_of::<u32>();
+                    let mut next_offset = size_of::<u32>();
 
                     let num_commitments = u16::from_be_bytes(
-                        data[next_offset..next_offset + size_of::<u16>()]
+                        body[next_offset..next_offset + size_of::<u16>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("num_commitments".into()))?,
                     );
+                    if num_commitments == 0 || num_commitments > MAX_POLYS_PER_SSA {
+                        return Err(StartProtocolError::NumberOfCommitments);
+                    }
                     next_offset += size_of::<u16>();
 
                     let mut commitments = std::collections::BTreeMap::new();
                     for _ in 0..num_commitments {
-                        if data.len()
+                        if body.len()
                             <= next_offset
                                 + size_of::<hopr_protocol_pix::SsaIndex>()
                                 + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
@@ -652,7 +649,7 @@ where
                         }
 
                         let ssa_index: hopr_protocol_pix::SsaIndex = hopr_protocol_pix::RawSsaIndex::from_be_bytes(
-                            data[next_offset..next_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
+                            body[next_offset..next_offset + size_of::<hopr_protocol_pix::SsaIndex>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ssa_index".into()))?,
                         )
@@ -661,7 +658,7 @@ where
                         next_offset += size_of::<hopr_protocol_pix::SsaIndex>();
 
                         let commitment =
-                            G::try_from(&data[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
+                            G::try_from(&body[next_offset..next_offset + Self::PIX_COEFF_COMMITMENT_REPR_SIZE])
                                 .map_err(|_| StartProtocolError::ParseError("commitment".into()))?;
                         next_offset += Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
 
@@ -671,7 +668,7 @@ where
                     }
 
                     StartProtocol::SsaRequest(SsaServerCommitmentMessage {
-                        session_id: serde_cbor_2::from_slice(&data[next_offset..])?,
+                        session_id: serde_cbor_2::from_slice(&body[next_offset..])?,
                         params,
                         commitments,
                     })
