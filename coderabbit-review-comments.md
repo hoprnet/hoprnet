@@ -24,7 +24,7 @@
 
 | #   | Line(s) | Severity   | Comment                                                                                                                                                                                                                |
 | --- | ------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4   | 188-190 | 🔵 Trivial | **Commitments-per-message calculation uses `size_of::<G>()`.** Functionally equivalent to `PIX_COEFF_COMMITMENT_REPR_SIZE` in practice but should use the named constant for consistency with the encode/decode paths. |
+| 4   | 188-190 | ~~🔵 Trivial~~ | **Fixed.** Replaced `size_of::<G>()` with `Self::PIX_COEFF_COMMITMENT_REPR_SIZE` for consistency with encode/decode paths. |
 
 ## `protocols/hopr/src/codec/mod.rs`
 
@@ -93,4 +93,3 @@
 4. **`test_helpers.rs:326-341`** — Dispatch failures hidden in test mocks
 5. **`hopr/hopr-lib/src/builder.rs:433-435`** — Lossy broadcast drops lifecycle events
 6. **`pipeline/mod.rs:909-916`** — Dual-role Relay+Exit loses outgoing PIX shares
-7. **`manager.rs:179-195`** — Per-SSAIndex error tracking missing

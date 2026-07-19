@@ -187,7 +187,8 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
         // message header), guaranteeing that every produced message encodes successfully.
         let max_commitments_per_message = ((ApplicationData::PAYLOAD_SIZE
             - StartProtocol::<I, (), (), G>::START_HEADER_SIZE)
-            / (size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<G>()))
+            / (size_of::<hopr_protocol_pix::SsaIndex>()
+                + StartProtocol::<I, (), (), G>::PIX_COEFF_COMMITMENT_REPR_SIZE))
         .max(1);
 
         // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
