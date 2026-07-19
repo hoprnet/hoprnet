@@ -134,6 +134,12 @@ SsaCommit arrives → insert_coefficient_commitments
   would simplify future designs but changing it now is a larger refactor than warranted.
 - Per-`SsaIndex` error tracking in `SessionManager` (separate CodeRabbit finding).
 
+## Acceptance criteria
+
+- The regression test `reconstructor_missing_verifier_destroys_share` must pass (asserts share survives `MissingVerifier`).
+- Pre-existing tests must continue to pass: `cargo test -p hopr-protocol-pix --lib`
+- No changes to public API types unless the drain-on-insert step requires it.
+
 ## Files to modify
 
 | File                                                   | Changes                                                                                                                                                                                    |

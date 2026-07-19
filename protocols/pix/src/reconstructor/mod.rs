@@ -498,6 +498,70 @@ mod tests {
     }
 
     #[test]
+    fn reconstructor_missing_verifier_destroys_share() -> anyhow::Result<()> {
+        // Regression test for the share-loss race:
+        // When `process_verified_ack` encounters MissingVerifier, the share must
+        // NOT be removed from the awaiting_acks cache — it should remain available
+        // for a later retry when the verifier arrives.
+        //
+        // Current buggy behavior: `awaiting_ack_from_peer.remove()` at the top of
+        // `process_verified_ack` consumes the share before the verifier lookup,
+        // so MissingVerifier silently destroys it. This assertion will fail until
+        // the ordering is fixed (use .get() first, .remove() after verifier is confirmed).
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+
+        let ack_key = HalfKey::random();
+        let challenge = ack_key.to_challenge()?;
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+
+        let partial_share = PartialSsaShare::default().encrypt(&spi, &ack_key)?;
+        let peer = OffchainKeypair::random();
+        let nonce = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut hopr_types::crypto_random::rng());
+
+        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
+
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge,
+            TaggedEncryptedPartialSsaShare {
+                pseudonym: *spi.pseudonym(),
+                nonce,
+                partial_share,
+            },
+        )?;
+
+        // Verify the share exists before processing
+        let peer_cache = reconstructor.awaiting_acks.get(peer.public());
+        assert!(peer_cache.is_some(), "share must be inserted before processing");
+        assert!(
+            peer_cache.as_ref().unwrap().contains_key(&challenge),
+            "share must be present in the peer cache before processing"
+        );
+
+        // Process the ack — this should return MissingVerifier
+        let peer_cache_ref = reconstructor.awaiting_acks.get(peer.public()).unwrap();
+        let result = reconstructor.process_verified_ack(ack_key, challenge, &peer_cache_ref);
+        assert!(matches!(result, Err(PixError::MissingVerifier)));
+
+        // The share MUST NOT be destroyed by the MissingVerifier error.
+        // BUG: the current code uses .remove() before checking the verifier,
+        // so this assertion will fail, demonstrating the regression.
+        let peer_cache_after = reconstructor.awaiting_acks.get(peer.public());
+        assert!(
+            peer_cache_after.is_some(),
+            "BUG: share was permanently removed despite MissingVerifier"
+        );
+        assert!(
+            peer_cache_after.as_ref().unwrap().contains_key(&challenge),
+            "BUG: share was permanently removed despite MissingVerifier"
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn reconstructor_missing_verifier() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
