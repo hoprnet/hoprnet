@@ -44,7 +44,7 @@ use hopr_api::{
     tickets::{TicketFactory, TicketManagement},
     types::{chain::chain_events::ChainEvent, internal::prelude::ChannelDirection, primitive::prelude::Address},
 };
-use hopr_transport::{HoprTransport, IncomingSession, protocol::NopExitAcknowledgementShareProcessor};
+use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
     network_types::{addr::is_public_address, crossfire_sink::bounded_sink_channel},
     runtime::{AbortableList, prelude::spawn},
@@ -804,7 +804,7 @@ macro_rules! impl_build_methods {
             tracing::info!("starting transport for exit node");
             let (socket, transport_processes) = pre
                 .transport_api
-                .run_exit::<TFact, Ct, NopExitAcknowledgementShareProcessor, _>(
+                .run_exit::<TFact, Ct, _>(
                     pre.cover_traffic,
                     pre.network,
                     pre.network_process,

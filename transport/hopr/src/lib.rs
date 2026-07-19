@@ -61,7 +61,7 @@ use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
 pub use hopr_protocol_pix::RecoveredSsa;
-use hopr_protocol_pix::{ExitAcknowledgementShareProcessor, PixSpec, ShareResolution};
+use hopr_protocol_pix::{PixSpec, ShareResolution};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -429,7 +429,7 @@ where
     ///
     /// The Exit nodes also work with the PIX protocol, so they process incoming acknowledgements
     /// to decrypt PIX shares.
-    pub async fn run_exit<TFact, Ct, A, PixEvt>(
+    pub async fn run_exit<TFact, Ct, PixEvt>(
         &self,
         cover_traffic: Ct,
         network: Net,
@@ -447,7 +447,6 @@ where
     where
         Ct: ProbingTrafficGeneration + CoverTrafficGeneration + Send + Sync + 'static,
         TFact: TicketFactory + Clone + Send + Sync + 'static,
-        A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
         PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
         PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
     {

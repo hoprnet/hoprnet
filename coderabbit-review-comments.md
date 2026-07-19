@@ -9,10 +9,10 @@
 
 ## `crypto/packet/src/packet.rs`
 
-| #   | Line(s)                   | Severity   | Comment                                                                                                                                                                                                                                                                    |
-| --- | ------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 145-156, 467-478, 526-535 | ~~🟠 Major~~ | **Fixed.** Added TODO comment documenting the intentionality. The EntryShareGenerator emits surplus shares to absorb such packet-loss events, so the budget impact is bounded and expected. |
-| 2   | 746-789                   | 🔵 Trivial | **No test exercising non-empty PIX share path.** `create_packet` helper creates a generator but never calls `new_ssa_commitment`, so `next_share` always returns `None`. The `Some(enc_share)` encryption/decryption path is untested.                                     |
+| #   | Line(s)                   | Severity       | Comment                                                                                                                                                                                     |
+| --- | ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 145-156, 467-478, 526-535 | ~~🟠 Major~~   | **Fixed.** Added TODO comment documenting the intentionality. The EntryShareGenerator emits surplus shares to absorb such packet-loss events, so the budget impact is bounded and expected. |
+| 2   | 746-789                   | ~~🔵 Trivial~~ | **Fixed.** Already covered by codec tests which seed the generator and verify the full encrypt/decrypt path. The `create_packet` helper is a convenience for non-PIX tests.                 |
 
 ## `protocols/pix/src/reconstructor/mod.rs`
 
@@ -28,9 +28,9 @@
 
 ## `protocols/hopr/src/codec/mod.rs`
 
-| #   | Line(s) | Severity | Comment                                                                                                                                                                                                   |
-| --- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5   | 598     | 🟡 Minor | **No assertion that gap packets contain no PIX share.** `no_share_indices` is populated from `pos_in_segment`, not from inspecting `out_packet.encrypted_pix_share`. Missing encoder-contract validation. |
+| #   | Line(s) | Severity     | Comment                                                                                                                                                                                                          |
+| --- | ------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5   | 598     | ~~🟡 Minor~~ | **Fixed.** False positive. The test already asserts `encrypted_pix_share.is_none()` on line 579-581. `no_share_indices` is just positional bookkeeping — the real validation is against the actual packet field. |
 
 ## `transport/session/src/test_helpers.rs`
 
@@ -62,13 +62,13 @@
 
 ## `impls/strategy/src/non_anonymous_pix.rs`
 
-| #   | Line(s) | Severity     | Comment                                                                                                                                     |
-| --- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| 14  | 44-47   | ~~🟠 Major~~ | **Fixed.** Field renamed to `pix_recovery_password_env` (env var name, not the password). Password resolved at build time from the environment — never in config output.                                                               |
-| 15  | 71-83   | ~~🟠 Major~~ | **Fixed.** `build()` returns `Result`; `assert!` replaced with early `Err`; store open error propagated instead of `.expect()`.             |
-| 16  | 112-146 | ~~🟠 Major~~ | **Fixed.** `processed_deposits.insert()` moved to after the withdrawal succeeds.                                                            |
-| 17  | 175-194 | ~~🟡 Minor~~ | **Fixed.** `if let Some(balance) = immediate { ... } else { stream.try_next() ... }` — stream never polled when immediate balance suffices. |
-| 18  | 211-244 | ~~🟠 Major~~ | **Fixed.** Added `PixRecoveryStore::remove()`, called after successful withdrawal.                                                          |
+| #   | Line(s) | Severity     | Comment                                                                                                                                                                  |
+| --- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 14  | 44-47   | ~~🟠 Major~~ | **Fixed.** Field renamed to `pix_recovery_password_env` (env var name, not the password). Password resolved at build time from the environment — never in config output. |
+| 15  | 71-83   | ~~🟠 Major~~ | **Fixed.** `build()` returns `Result`; `assert!` replaced with early `Err`; store open error propagated instead of `.expect()`.                                          |
+| 16  | 112-146 | ~~🟠 Major~~ | **Fixed.** `processed_deposits.insert()` moved to after the withdrawal succeeds.                                                                                         |
+| 17  | 175-194 | ~~🟡 Minor~~ | **Fixed.** `if let Some(balance) = immediate { ... } else { stream.try_next() ... }` — stream never polled when immediate balance suffices.                              |
+| 18  | 211-244 | ~~🟠 Major~~ | **Fixed.** Added `PixRecoveryStore::remove()`, called after successful withdrawal.                                                                                       |
 
 ## `hopr/hopr-lib/src/builder.rs`
 
