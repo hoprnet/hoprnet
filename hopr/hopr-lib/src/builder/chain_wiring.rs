@@ -14,6 +14,15 @@ use hopr_api::{
 use hopr_transport::{NeighborTelemetry, PathTelemetry};
 use parking_lot::RwLock;
 
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_CHANNELS_COUNT: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_channels_count",
+        "Number of open channels of the node per direction",
+        &["direction"]
+    ).unwrap();
+}
+
 /// Processes chain events and records them as graph updates.
 ///
 /// Drives the chain-to-graph edge of the topology pipeline: converts incoming on-chain
@@ -36,6 +45,15 @@ pub(super) async fn process_chain_events<C, G>(
     G: NetworkGraphUpdate + Send + Sync + 'static,
 {
     pin_mut!(events);
+
+    // Tracks the node's currently-open channel IDs per direction so `hopr_channels_count`
+    // can be maintained incrementally from channel events. The initial on-chain state is
+    // replayed as `ChannelOpened` events by the state-sync subscription at startup, so the
+    // sets are seeded correctly without an explicit query. Set operations are idempotent,
+    // making this robust to duplicated events.
+    #[cfg(all(feature = "telemetry", not(test)))]
+    let (mut incoming_open, mut outgoing_open) = (std::collections::HashSet::new(), std::collections::HashSet::new());
+
     while let Some(chain_event) = events.next().await {
         tracing::debug!(event = %chain_event, "processing chain event");
         match chain_event {
@@ -66,6 +84,28 @@ pub(super) async fn process_chain_events<C, G>(
             | ChainEvent::ChannelBalanceDecreased(channel, _) => {
                 let src_addr = channel.source;
                 let dst_addr = channel.destination;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                {
+                    let channel_id = *channel.get_id();
+                    let is_open = matches!(channel.status, ChannelStatus::Open);
+                    if src_addr == own_chain_addr {
+                        if is_open {
+                            outgoing_open.insert(channel_id);
+                        } else {
+                            outgoing_open.remove(&channel_id);
+                        }
+                        METRIC_CHANNELS_COUNT.set(&["outgoing"], outgoing_open.len() as f64);
+                    } else if dst_addr == own_chain_addr {
+                        if is_open {
+                            incoming_open.insert(channel_id);
+                        } else {
+                            incoming_open.remove(&channel_id);
+                        }
+                        METRIC_CHANNELS_COUNT.set(&["incoming"], incoming_open.len() as f64);
+                    }
+                }
+
                 let reader = chain_reader.clone();
                 let keys = hopr_utils::runtime::prelude::spawn_blocking(move || {
                     let resolve = |addr: Address| {
