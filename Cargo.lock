@@ -3936,7 +3936,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "assertables",
@@ -4288,7 +4288,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "anyhow",
  "async-trait",
