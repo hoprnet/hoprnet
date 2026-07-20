@@ -3,7 +3,7 @@ name = "graph-timelapse"
 version = "0.1.0"
 description = "Generate timelapse GIFs of HOPR path activation and edge heatmaps from node logs"
 requires-python = ">=3.14.6"
-dependencies = ["pillow>=12.2.0", "playwright>=1.61.0"]
+dependencies = ["pillow>=12.3.0", "playwright>=1.61.0"]
 
 [project.scripts]
 graph-timelapse = "graph_timelapse.main:main"
