@@ -64,6 +64,20 @@ lazy_static::lazy_static! {
         "Number of different ticket validation errors encountered during packet processing",
         &["type"]
     ).unwrap();
+    static ref METRIC_RECEIVED_ACKS: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_protocol_ack_received_count",
+        "Number of received acknowledgements",
+        &["valid"]
+    ).unwrap();
+    static ref METRIC_SENT_ACKS: hopr_api::types::telemetry::SimpleCounter = hopr_api::types::telemetry::SimpleCounter::new(
+        "hopr_protocol_ack_sent_count",
+        "Number of sent message acknowledgements"
+    ).unwrap();
+    static ref METRIC_TICKETS_COUNT: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_tickets_count",
+        "Number of tickets by type (winning, losing, rejected)",
+        &["type"]
+    ).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -284,6 +298,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         {
                             METRIC_VALIDATION_ERRORS.increment(&[error.kind.as_ref()]);
                             METRIC_PACKET_REJECTED_COUNT.increment(&["invalid_ticket"]);
+                            METRIC_TICKETS_COUNT.increment(&["rejected"]);
                         }
 
                         None
@@ -522,6 +537,8 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                     let c = acks.chunks(MAX_ACKNOWLEDGEMENTS_BATCH_SIZE).map(|c| c.to_vec()).collect::<Vec<_>>();
                     for ack_chunk in c {
                         let encoder = encoder.clone();
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        let ack_chunk_len = ack_chunk.len() as u64;
                         match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || encoder.encode_acknowledgements(&ack_chunk, &destination), "ack_encode").await {
                             Ok(Ok(ack_packet)) => {
                                 wire_outgoing
@@ -530,6 +547,9 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                                     .unwrap_or_else(|error| {
                                         tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
                                     });
+
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_SENT_ACKS.increment_by(ack_chunk_len);
                             }
                             Ok(Err(error)) => tracing::error!(%error, "failed to encode acknowledgements"),
                             Err(error) => tracing::error!(%error, "parallel processing of the outgoing acknowledgements failed"),
@@ -663,11 +683,21 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                         let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
                             ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
                                 tracing::trace!("received ack for a winning ticket");
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                {
+                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                    METRIC_TICKETS_COUNT.increment(&["winning"]);
+                                }
                                 Some(Ok(TicketEvent::WinningTicket(redeemable_ticket)))
                             }
                             ResolvedAcknowledgement::RelayingLoss(_) => {
                                 // Losing tickets are not getting accounted for anywhere.
                                 tracing::trace!("received ack for a losing ticket");
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                {
+                                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                                    METRIC_TICKETS_COUNT.increment(&["losing"]);
+                                }
                                 None
                             }
                         });

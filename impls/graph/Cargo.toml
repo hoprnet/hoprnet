@@ -1,7 +1,7 @@
 [package]
 name = "hopr-network-graph"
 description = "Implementation of the HOPR network graph"
-version = "0.3.0"
+version = "0.3.1"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -27,11 +27,13 @@ default = ["petgraph"]
 all-benchmarks = []
 petgraph = ["dep:petgraph", "dep:indexmap", "dep:rand"]
 graph-api = ["petgraph"]
+telemetry = ["hopr-api/types-telemetry"]
 
 [dependencies]
 anyhow = { workspace = true }
 bimap = { workspace = true }
 futures = { workspace = true }
+lazy_static = { workspace = true }
 indexmap = { workspace = true, optional = true, features = ["rayon"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, optional = true, features = ["rayon"] }
