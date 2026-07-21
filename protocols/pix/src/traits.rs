@@ -76,6 +76,18 @@ pub type ShareResolutions<S> = Vec<ShareResolution<<S as PixSpec>::Pseudonym, <S
 pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     type Error: std::error::Error + Send + Sync + 'static;
 
+    /// Returns `true` if the peer has pending encrypted shares awaiting an acknowledgement.
+    ///
+    /// This is a cheap, non-blocking check used by the pipeline to avoid spawning a
+    /// blocking thread-pool task for `acknowledge_shares` when there are no pending shares
+    /// for the peer. Implementations should return `false` when no shares are pending.
+    ///
+    /// The default implementation returns `true` for safety — callers must still handle
+    /// the case where `acknowledge_shares` returns no results.
+    fn has_pending_shares(&self, _peer: &OffchainPublicKey) -> bool {
+        true
+    }
+
     /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
     fn new_exit_commitment(
         &self,
