@@ -671,14 +671,26 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
             let mut ssa_evt = recovered_ssa.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
+                if acks.is_empty() {
+                    return;
+                }
+
+                // Spawn both independent blocking operations before awaiting either,
+                // so they can run concurrently on the thread pool.
                 let ack_clone = acks.clone();
-                // Process ticket acknowledgements
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || ticket_proc.acknowledge_tickets(peer, ack_clone),
                     "ack_decode",
-                )
-                .await
-                {
+                );
+                let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    move || exit_proc.acknowledge_shares(peer, acks),
+                    "exit_ack_decode",
+                );
+
+                let (ticket_result, exit_result) = futures::future::join(ticket_fut, exit_fut).await;
+
+                // Process ticket acknowledgements
+                match ticket_result {
                     Ok(Ok(resolutions)) if !resolutions.is_empty() => {
                         let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
                             ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
@@ -726,12 +738,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                 // Process PIX share acknowledgements.
                 // Relays that also act as Exit nodes process encrypted PIX shares
                 // embedded in return-path SURBs when they receive acknowledgements.
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || exit_proc.acknowledge_shares(peer, acks),
-                    "exit_ack_decode",
-                )
-                .await
-                {
+                match exit_result {
                     Ok(Ok(ssa_priv_keys)) => {
                         if let Err(error) = ssa_evt
                             .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
