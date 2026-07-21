@@ -747,13 +747,16 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                 // Process PIX share acknowledgements (skipped when no pending shares).
                 if let Some(result) = exit_result {
                     match result {
-                        Ok(Ok(ssa_priv_keys)) => {
+                        Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
                             if let Err(error) = ssa_evt
                                 .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
                                 .await
                             {
                                 tracing::error!(%peer, %error, "failed to send pix resolution");
                             }
+                        }
+                        Ok(Ok(_)) => {
+                            tracing::trace!(%peer, "empty pix share resolution batch");
                         }
                         Ok(Err(error)) => {
                             tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
