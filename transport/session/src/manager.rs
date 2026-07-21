@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     pin::Pin,
     sync::{Arc, Mutex, OnceLock, atomic::Ordering},
     time::Duration,
@@ -740,10 +741,11 @@ pub struct SessionManager<S> {
     msg_sender: Arc<OnceLock<S>>,
     pix_toolbox: OnceLock<PixToolbox>,
     cfg: SessionManagerConfig,
-    /// Notified whenever a new session slot is allocated. Lets message handlers that
-    /// arrive before the slot insertion completes (e.g. SsaRequest vs SessionEstablished)
-    /// await the slot once instead of busy-looping with sleeps.
-    slot_allocated: Arc<Mutex<Vec<oneshot::Sender<()>>>>,
+    /// Per-SessionId waiters notified when a new session slot is allocated. Lets message
+    /// handlers that arrive before the slot insertion completes (e.g. SsaRequest vs
+    /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
+    /// Keyed by SessionId so that only waiters for the relevant session are woken.
+    slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -866,7 +868,7 @@ where
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
             cfg,
-            slot_allocated: Arc::new(Mutex::new(Vec::new())),
+            slot_allocated: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -1071,9 +1073,16 @@ where
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
                 // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
-                // is now available. Drain all pending senders; dropping them resolves the
-                // corresponding receivers.
-                self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
+                // is now available. Drain only the senders registered for this SessionId;
+                // dropping them resolves the corresponding receivers.
+                if let Some(waiters) = self
+                    .slot_allocated
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&session_id)
+                {
+                    drop(waiters);
+                }
                 // take_guard borrows self, so the guard stores the counter clone separately.
                 Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
             }
@@ -1822,7 +1831,10 @@ where
             current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
-        self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.slot_allocated
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&session_id);
     }
 
     /// Like [`pre_populate_session`](SessionManager::pre_populate_session) but also returns the
@@ -1846,7 +1858,10 @@ where
             current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
-        self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.slot_allocated
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&session_id);
         session_rx
     }
 
@@ -2474,25 +2489,54 @@ where
         // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
         // has finished allocating the session slot, since both SessionEstablished and SsaRequest
         // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
-        // Instead of busy-looping, await the allocation notification once and retry.
+        // Instead of busy-looping, await the allocation notification for this specific SessionId.
         let session_slot = {
+            use std::collections::hash_map::Entry;
             let session_id = msg.session_id;
-            if let Some(slot) = self.sessions.get(&session_id) {
-                slot
-            } else {
-                // Wait for the slot allocation to complete (notified by allocate_session_slot).
-                // Using timeout to avoid waiting indefinitely if the slot never arrives.
-                let (tx, rx) = oneshot::channel::<()>();
-                self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).push(tx);
-                let slot = rx
-                    .timeout(futures_time::time::Duration::from(Duration::from_millis(1000)))
-                    .await
-                    .ok()
-                    .and_then(|_| self.sessions.get(&session_id));
+            loop {
+                // Optimistic cache check
+                if let Some(slot) = self.sessions.get(&session_id) {
+                    break slot;
+                }
 
-                match slot {
-                    Some(slot) => slot,
-                    None => {
+                // Register a waiter under the lock, then recheck the cache to avoid the
+                // TOCTOU race between the initial cache check and waiter registration.
+                let (tx, rx) = oneshot::channel::<()>();
+                {
+                    let mut map = self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner());
+                    // Recheck while holding the lock: the slot may have been inserted
+                    // between the optimistic check and now. If so, don't register.
+                    if self.sessions.get(&session_id).is_some() {
+                        drop(map);
+                        continue;
+                    }
+                    map.entry(session_id).or_default().push(tx);
+                }
+
+                let timeout = futures_time::time::Duration::from(Duration::from_millis(1000));
+                match rx.timeout(timeout).await {
+                    Ok(Ok(())) => {
+                        // Notified — recheck the cache
+                        continue;
+                    }
+                    _ => {
+                        // Timeout or the sender was dropped (cancelled). Clean up our
+                        // waiter entry to avoid unbounded accumulation in the map.
+                        let mut map = self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Entry::Occupied(mut e) = map.entry(session_id) {
+                            e.get_mut().retain(|w| !w.is_canceled());
+                            if e.get().is_empty() {
+                                e.remove();
+                            }
+                        }
+                        drop(map);
+
+                        // Final cache recheck before giving up — the slot might have
+                        // been inserted while we were cleaning up.
+                        if let Some(slot) = self.sessions.get(&session_id) {
+                            break slot;
+                        }
+
                         error!(%session_id, "session slot not found after awaiting allocation");
                         return Err(SessionManagerError::NonExistingSession.into());
                     }
