@@ -40,6 +40,12 @@ pub struct SsaReconstructorConfig {
     /// Default is 30 minutes.
     #[default(std::time::Duration::from_secs(1800))]
     pub unused_verifier_lifetime: std::time::Duration,
+    /// Maximum number of peers that can be tracked simultaneously with unacknowledged shares.
+    ///
+    /// Default is 2000, minimum is 10.
+    #[validate(range(min = 10))]
+    #[default(2000)]
+    pub max_tracked_peers: usize,
     /// Maximum number of awaited acknowledgements to extract a single share.
     ///
     /// Default is 10 000 000, must be at least 10 000.
@@ -131,10 +137,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_verifiers: moka::sync::CacheBuilder::new(MAX_CONCURRENT_SSA_CYCLES * (MAX_POLYS_PER_SSA as u64))
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
-            awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_awaiting_acks as u64)
+            awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
                 .build(),
-            pending_ack_keys: moka::sync::CacheBuilder::new(MAX_CONCURRENT_SSA_CYCLES)
+            pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
                 .build(),
             cfg,
