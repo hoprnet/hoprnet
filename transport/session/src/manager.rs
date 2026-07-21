@@ -1,11 +1,11 @@
 use std::{
     pin::Pin,
-    sync::{Arc, OnceLock, atomic::Ordering},
+    sync::{Arc, Mutex, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
 use anyhow::anyhow;
-use futures::{FutureExt, Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
+use futures::{FutureExt, Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -740,6 +740,10 @@ pub struct SessionManager<S> {
     msg_sender: Arc<OnceLock<S>>,
     pix_toolbox: OnceLock<PixToolbox>,
     cfg: SessionManagerConfig,
+    /// Notified whenever a new session slot is allocated. Lets message handlers that
+    /// arrive before the slot insertion completes (e.g. SsaRequest vs SessionEstablished)
+    /// await the slot once instead of busy-looping with sleeps.
+    slot_allocated: Arc<Mutex<Vec<oneshot::Sender<()>>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -753,6 +757,7 @@ impl<S> Clone for SessionManager<S> {
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
+            slot_allocated: Arc::clone(&self.slot_allocated),
         }
     }
 }
@@ -861,6 +866,7 @@ where
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
             cfg,
+            slot_allocated: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -1064,6 +1070,10 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
+                // is now available. Drain all pending senders; dropping them resolves the
+                // corresponding receivers.
+                self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 // take_guard borrows self, so the guard stores the counter clone separately.
                 Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
             }
@@ -1674,7 +1684,25 @@ where
         match event {
             // When the early recovery threshold is reached, issue a new SSA server request
             // to pipeline deposit preparation with the last ~15% of share collection.
-            HoprSessionInPixEvent::SsaAlmostRecovered(_) => {
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => {
+                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
+                    "cannot process SsaAlmostRecovered on a session without pix state"
+                )))?;
+                // Validate that the event's SsaId matches the active cycle.  current_index is
+                // the *next* index to allocate (pre-incremented via fetch_add), so the active
+                // cycle's index is current_index - 1.
+                if ssa_id.ssa_index().get()
+                    != state
+                        .current_index
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .saturating_sub(1)
+                {
+                    trace!(
+                        %session_id, event_ssa_index = %ssa_id.ssa_index(),
+                        "ignoring SsaAlmostRecovered from stale SSA cycle"
+                    );
+                    return Ok(());
+                }
                 self.request_next_ssa(*session_id, slot).await?;
             }
             // SSA fully recovered — the next SSA request was already triggered by
@@ -1794,6 +1822,7 @@ where
             current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
+        self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     /// Like [`pre_populate_session`](SessionManager::pre_populate_session) but also returns the
@@ -1817,6 +1846,7 @@ where
             current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
+        self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).clear();
         session_rx
     }
 
@@ -2441,23 +2471,32 @@ where
             return Err(SessionManagerError::NonExistingSession.into());
         }
 
-        // The SsaRequest can arrive before new_session() has finished allocating the
-        // session slot, since both SessionEstablished and SsaRequest are sent by the Exit
-        // back-to-back and processed concurrently by the Start protocol handler.
-        // Retry briefly to give the slot time to be registered.
+        // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
+        // has finished allocating the session slot, since both SessionEstablished and SsaRequest
+        // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
+        // Instead of busy-looping, await the allocation notification once and retry.
         let session_slot = {
-            let mut retries = 0u32;
             let session_id = msg.session_id;
-            loop {
-                if let Some(slot) = self.sessions.get(&session_id) {
-                    break slot;
+            if let Some(slot) = self.sessions.get(&session_id) {
+                slot
+            } else {
+                // Wait for the slot allocation to complete (notified by allocate_session_slot).
+                // Using timeout to avoid waiting indefinitely if the slot never arrives.
+                let (tx, rx) = oneshot::channel::<()>();
+                self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner()).push(tx);
+                let slot = rx
+                    .timeout(futures_time::time::Duration::from(Duration::from_millis(1000)))
+                    .await
+                    .ok()
+                    .and_then(|_| self.sessions.get(&session_id));
+
+                match slot {
+                    Some(slot) => slot,
+                    None => {
+                        error!(%session_id, "session slot not found after awaiting allocation");
+                        return Err(SessionManagerError::NonExistingSession.into());
+                    }
                 }
-                retries += 1;
-                if retries > 50 {
-                    error!(%session_id, "session slot not found after retries");
-                    return Err(SessionManagerError::NonExistingSession.into());
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             }
         };
 
@@ -2472,8 +2511,9 @@ where
             );
         };
 
-        // We (Entry) offered some quota in the Session Initiation message, the Exit has accepted it,
-        // but could have still replaced it with a different one from its range.
+        // The Entry enforces that the Exit's SSA parameters match exactly the quota we offered
+        // in the Session Initiation message.  Negotiation (accepting an Exit-chosen quota within
+        // our bounds) is not implemented, so any mismatch is rejected.
         let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
         if quota_per_ssa != server_quota {
             return Err(SessionManagerError::Unacceptable(format!(
@@ -4871,6 +4911,104 @@ mod tests {
             sent_ssa_requests.lock().unwrap().len(),
             2,
             "expected exactly 2 SsaRequest messages (one at init, one after SsaAlmostRecovered)"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that a stale `SsaAlmostRecovered` event from a previous SSA cycle is silently
+    /// ignored and does NOT trigger a duplicate `request_next_ssa`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager starts with PIX; process Alice's session initiation (1 SsaRequest at init).
+    /// 2. Dispatch `SsaAlmostRecovered(ssa_id)` — matches active cycle, triggers a second SsaRequest.
+    /// 3. Dispatch the *same* `SsaAlmostRecovered(ssa_id)` again — now stale (index advanced in step 2), must be
+    ///    silently ignored.
+    /// 4. Assert exactly 2 SsaRequest messages total (init + step 2, no duplicate from step 3).
+    #[test_log::test(tokio::test)]
+    async fn exit_ignores_stale_ssa_almost_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // 3 messages: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after first
+        // SsaAlmostRecovered (3). The stale dispatch must not trigger a fourth message.
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+
+        // First dispatch — matches the active cycle index (1 = current_index - 1).
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        // Second dispatch — same ssa_id, but request_next_ssa in step 2 advanced the
+        // current_index, so this is now stale and must be silently ignored.
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (init + first AlmostRecovered), stale event must not trigger a \
+             third"
         );
 
         Ok(())

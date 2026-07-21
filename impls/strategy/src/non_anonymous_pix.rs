@@ -170,21 +170,31 @@ where
                 let deposit_addr: Address = deposit_address_recv.address.try_into()?;
 
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
+                let target_for_filter = target_deposit;
 
                 let mut stream = futures_time::stream::interval(
                     futures_time::time::Duration::from(max_tracking_time / 10).max(Duration::from_secs(1).into()),
                 )
                 .then(move |_| {
                     let node_clone = node_clone.clone();
+                    async move { node_clone.chain_api().balance(deposit_addr).await }
+                })
+                .filter_map(move |result| {
+                    let target = target_for_filter;
                     async move {
-                        node_clone
-                            .chain_api()
-                            .balance(deposit_addr)
-                            .map_err(StrategyError::other)
-                            .await
+                        match result {
+                            Ok(balance) if balance >= target => Some(balance),
+                            Ok(_) => {
+                                // Still below target — keep polling.
+                                None
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, %target, "deposit balance poll failed");
+                                None
+                            }
+                        }
                     }
                 })
-                .try_skip_while(move |balance| futures::future::ok(balance < &target_deposit))
                 .boxed();
 
                 tracing::info!(%target_deposit, ?max_tracking_time, "tracking until deposit");
@@ -204,11 +214,12 @@ where
                         let deposit = if let Some(balance) = immediate {
                             balance
                         } else {
-                            match stream.try_next().await {
-                                Ok(Some(balance)) => balance,
-                                _ => {
+                            match stream.next().await {
+                                Some(balance) => balance,
+                                None => {
+                                    // Stream exhausted without reaching the target deposit.
                                     return Err(StrategyError::other(anyhow::anyhow!(
-                                        "deposit tracking not available"
+                                        "deposit tracking exhausted without reaching target {target_deposit}"
                                     )));
                                 }
                             }
@@ -253,23 +264,32 @@ where
                     .map_err(StrategyError::other)?;
                 tracing::info!(%recovered_balance, address = %chain_key.public().to_address(), "recovered deposit balance");
 
-                self.node
-                    .chain_api()
-                    .withdraw_from_signer(&chain_key, recovered_balance, &safe_address)
-                    .await
-                    .map_err(StrategyError::other)?
-                    .await
-                    .map_err(StrategyError::other)?;
+                if recovered_balance.is_zero() {
+                    // Already swept; just clean up the store entry.
+                    if let Some(ref store) = self.recovery_store
+                        && let Err(error) = store.remove(&private_key_recovered.id)
+                    {
+                        tracing::warn!(%error, ?private_key_recovered.id, "failed to remove zero-balance entry from store");
+                    }
+                } else {
+                    self.node
+                        .chain_api()
+                        .withdraw_from_signer(&chain_key, recovered_balance, &safe_address)
+                        .await
+                        .map_err(StrategyError::other)?
+                        .await
+                        .map_err(StrategyError::other)?;
 
-                // Delete the entry now that the deposit has been withdrawn, so the
-                // recovery store doesn't accumulate entries unboundedly over time.
-                if let Some(ref store) = self.recovery_store
-                    && let Err(error) = store.remove(&private_key_recovered.id)
-                {
-                    tracing::warn!(%error, ?private_key_recovered.id, "failed to remove recovered key from store");
+                    // Delete the entry now that the deposit has been withdrawn, so the
+                    // recovery store doesn't accumulate entries unboundedly over time.
+                    if let Some(ref store) = self.recovery_store
+                        && let Err(error) = store.remove(&private_key_recovered.id)
+                    {
+                        tracing::warn!(%error, ?private_key_recovered.id, "failed to remove recovered key from store");
+                    }
+
+                    tracing::info!(%recovered_balance, address = %chain_key.public().to_address(),  "deposit withdrawn");
                 }
-
-                tracing::info!(%recovered_balance, address = %chain_key.public().to_address(),  "deposit withdrawn");
             }
         }
 
