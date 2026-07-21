@@ -675,19 +675,23 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                     return;
                 }
 
-                // Process ticket acknowledgements (always run).
-                let ack_clone = acks.clone();
-                let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || ticket_proc.acknowledge_tickets(peer, ack_clone),
-                    "ack_decode",
-                );
+                // Ticket processing always runs — every ack batch on a relay is checked
+                // against pending tickets even when none are expected.
+                // Unlike exit shares below, there is no has_pending_tickets shortcut:
+                // the acknowledge_tickets call itself does the lookup internally, so a
+                // separate check would just duplicate the work.
 
-                // Process PIX share acknowledgements only when the peer has pending shares.
-                // Relays that also act as Exit nodes process encrypted PIX shares
-                // embedded in return-path SURBs when they receive acknowledgements.
-                // When both are needed, spawn the exit future before awaiting tickets
-                // so they can run concurrently on the thread pool.
+                // When the peer has pending PIX shares (relay is also an Exit for this peer):
+                // clone acks for the ticket future and move the original into the exit future,
+                // then run both concurrently on the thread pool via join.
+                // When there are no pending shares, avoid the clone and move acks directly into
+                // the ticket future — a single blocking spawn, no concurrent join needed.
                 let (ticket_result, exit_result) = if exit_proc.has_pending_shares(&peer) {
+                    let ack_clone = acks.clone();
+                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, ack_clone),
+                        "ack_decode",
+                    );
                     let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                         move || exit_proc.acknowledge_shares(peer, acks),
                         "exit_ack_decode",
@@ -695,6 +699,10 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                     let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
                     (t_r, Some(e_r))
                 } else {
+                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, acks),
+                        "ack_decode",
+                    );
                     let t_r = ticket_fut.await;
                     (t_r, None)
                 };
