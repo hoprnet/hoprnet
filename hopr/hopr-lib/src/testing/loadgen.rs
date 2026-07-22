@@ -44,7 +44,7 @@ use anyhow::Context;
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use rand::{RngExt, SeedableRng, rngs::StdRng, seq::SliceRandom};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 use super::{
     fixtures::{ClusterGuard, chain_propagation_delay},
@@ -59,7 +59,7 @@ use crate::api::types::primitive::prelude::HoprBalance;
 pub struct ThroughputSample {
     /// Wall time since the workload started.
     pub elapsed: Duration,
-    /// Bytes delivered (echoed back and confirmed) during this window.
+    /// Bytes written into the pipeline during this window.
     pub window_bytes: u64,
     /// Throughput for this window in MB/s.
     pub mbps: f64,
@@ -70,7 +70,7 @@ pub struct ThroughputSample {
 pub struct StressReport {
     /// Per-window throughput samples, in chronological order.
     pub samples: Vec<ThroughputSample>,
-    /// Total bytes confirmed delivered across all sessions.
+    /// Total bytes written into the forward pipeline (src→relay→dst) across all sessions.
     pub total_bytes_delivered: u64,
     /// Wall-clock duration of the workload phase, excluding channel/session setup.
     pub duration: Duration,
@@ -108,10 +108,11 @@ impl StressReport {
 /// Configuration for [`run_stress`].
 #[derive(Debug, Clone)]
 pub struct StressConfig {
-    /// Total bytes to deliver before stopping.
+    /// Total bytes to write into the pipeline before stopping.
     ///
-    /// Counted when the echo is confirmed readable on the sender side, so this
-    /// measures completed round-trips through the full HOPR pipeline.
+    /// Counted when each `write_all` + `flush` cycle completes on the sender side.
+    /// Measures the forward path (src→relay→dst) throughput; the return path is
+    /// not read back because sessions require SURBs for bidirectional flow.
     pub total_bytes: u64,
 
     /// Number of concurrent 1-hop sessions to maintain.
@@ -316,7 +317,13 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         }
     });
 
-    // Worker tasks: one per session. Each loops: write → flush → read echo → count.
+    // Worker tasks: one per session. Each loops: write → flush → count.
+    //
+    // Reading the echo back requires SURBs on the exit node (DestinationRouting::Return),
+    // which the default create_session config does not supply. Cluster tests only exercise
+    // the forward path (src→relay→dst). Throughput is measured as bytes written into the
+    // pipeline — sufficient to saturate and profile SPHINX encoding, ticket creation, the
+    // relay, and the mixer.
     let msg_size_range = cfg.msg_size_range.clone();
     let seed = cfg.seed;
     let worker_handles: Vec<_> = sessions
@@ -336,10 +343,7 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
                     session.write_all(&payload).await.context("write_all")?;
                     session.flush().await.context("flush")?;
 
-                    let mut echo = vec![0u8; msg_size];
-                    session.read_exact(&mut echo).await.context("read_exact")?;
-
-                    // Count bytes after echo confirms delivery end-to-end.
+                    // Count bytes written into the pipeline (forward path only).
                     let prev = delivered.fetch_add(msg_size as u64, Ordering::Relaxed);
                     if prev + msg_size as u64 >= total_target {
                         break;
