@@ -230,7 +230,7 @@ impl ClusterGuard {
                     return_path,
                     capabilities: Default::default(),
                     pseudonym: None,
-                    surb_management: None,
+                    surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
                 },
             )
@@ -409,6 +409,20 @@ pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
+/// Outgoing win probability for stress test nodes (0.1% — realistic for a production network).
+///
+/// At this probability each winning ticket is worth `ticket_price / STRESS_WIN_PROB = 2000 wxHOPR`.
+/// Expected wins per 7811 packets (5 MB) ≈ 7.8, so the channel only needs to reserve ~15 600 wxHOPR
+/// in total — well within the `STRESS_INITIAL_SAFE_TOKEN` channel budget.
+pub const STRESS_WIN_PROB: f64 = 0.001;
+
+/// Safe balance seeded for each stress-test node (1 M wxHOPR).
+///
+/// Stress runs open large channels (100 000 wxHOPR each) to accommodate the high face-value
+/// tickets created by `STRESS_WIN_PROB`.  The production fixture (`INITIAL_SAFE_TOKEN = 1 000`)
+/// is intentionally kept small so balance-assertion tests stay meaningful.
+pub const STRESS_INITIAL_SAFE_TOKEN: u64 = 1_000_000;
+
 /// Per-node configuration for test clusters.
 #[derive(Debug, Clone, Copy)]
 pub struct TestNodeConfig {
@@ -442,6 +456,14 @@ fn alternating_configs(n: usize) -> Vec<TestNodeConfig> {
 }
 
 pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
+    build_blokli_client_impl(INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB)
+}
+
+fn build_stress_blokli_client() -> BlokliTestClient<FullStateEmulator> {
+    build_blokli_client_impl(STRESS_INITIAL_SAFE_TOKEN, STRESS_WIN_PROB)
+}
+
+fn build_blokli_client_impl(initial_safe_token: u64, min_win_prob: f64) -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
         .with_hopr_network_chain_info("anvil-localhost")
         .with_balances(
@@ -462,7 +484,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
         .with_balances(
             NODE_SAFES_MODULES
                 .iter()
-                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(INITIAL_SAFE_TOKEN))),
+                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(initial_safe_token))),
         )
         .with_safe_allowances(
             NODE_SAFES_MODULES
@@ -478,7 +500,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
                 deployer: chain_key.public().to_address(),
             },
         ))
-        .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
+        .with_minimum_win_prob(WinningProbability::try_from(min_win_prob).unwrap())
         .with_ticket_price(HoprBalance::new_base(1))
         .with_closure_grace_period(Duration::from_secs(1))
         .build_dynamic_client(Address::default()) // Placeholder module address, to be filled in later
@@ -503,18 +525,46 @@ pub fn size_5_cluster_fixture() -> ClusterGuard {
     cluster_fixture(alternating_configs(5))
 }
 
+/// Creates a stress-test cluster with `n` nodes each configured with `win_prob`.
+///
+/// Unlike [`cluster_fixture`], this uses a dedicated chain client seeded with
+/// [`STRESS_INITIAL_SAFE_TOKEN`] (1 M wxHOPR per safe) and a network-level minimum
+/// win probability of [`STRESS_WIN_PROB`] so that each channel can sustain the high
+/// face-value tickets that very low win-probability produces without exhausting
+/// before the workload completes.
+pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
+    cluster_fixture_inner(
+        vec![TestNodeConfig::with_probability(win_prob); n],
+        build_stress_blokli_client(),
+    )
+}
+
 #[fixture]
 pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    cluster_fixture_inner(configs, build_blokli_client())
+}
+
+fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     let size = configs.len();
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
 
+    // Initialize the global Rayon thread pool for SPHINX crypto operations.
+    // Without this, pool_thread_count() returns 0 and all pool-based concurrency
+    // limits (output_concurrency, input_concurrency, encode headroom) fall back to
+    // avail_parallelism * 8, allowing SURB bursts to flood Rayon and starve data.
+    // Using avail_parallelism / 2 so Rayon and Tokio don't compete for every core.
+    // Ignores the error: returns Err when the pool is already initialised (serial
+    // test runs), which is fine — pool_thread_count() already has the correct value.
+    let rayon_threads = std::thread::available_parallelism()
+        .map(|n| (n.get() / 2).max(1))
+        .unwrap_or(4);
+    let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
+
     // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
     // SAFETY: called once before any threads are spawned for this cluster.
     unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
-
-    let chain_client = build_blokli_client();
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();

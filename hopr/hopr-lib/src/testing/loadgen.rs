@@ -110,6 +110,24 @@ pub struct StressReport {
     /// the Rayon encode future exceeded its 150 ms budget — a direct sign of pool saturation
     /// on the encode path.
     pub encode_timeout_drops: u64,
+    /// Packets dispatched to the session manager but dropped because no matching session
+    /// slot was found (UnknownData path — the session may have been torn down or the ID
+    /// mismatched).
+    pub session_unknown_data_drops: u64,
+    /// Packets that reached dispatch_message but matched neither session protocol tag nor
+    /// any session application tag — fell through to the "unrelated" path without being
+    /// counted as a drop. Non-zero indicates packets reaching the session manager but
+    /// being silently discarded as "not session data".
+    pub session_unrelated_dispatches: u64,
+    /// Cumulative count of packets that entered the routing resolution stage (all nodes combined).
+    pub routing_resolution_attempts: u64,
+    /// Cumulative count of packets that failed routing resolution (dropped before encoding).
+    pub routing_resolution_failures: u64,
+    /// Cumulative count of packets that entered the SPHINX encode stage (spawn_encode_blocking called).
+    pub encode_stage_entries: u64,
+    /// Cumulative count of calls to `smgr.dispatch_message` in `SessionsManagement(0)`.
+    /// Zero means data never reached the session manager (stuck in pipeline buffers or dropped earlier).
+    pub dispatch_message_calls: u64,
 }
 
 impl StressReport {
@@ -181,8 +199,17 @@ impl StressReport {
             self.peak_encode_outstanding, self.peak_decode_outstanding,
         );
         println!(
-            "  Drops: encode_timeout {}  decode_timeout {}  session_inbox {}",
+            "  Drops: encode_timeout {}  decode_timeout {}  session_inbox {}  unknown_session {}  unrelated_dispatch {}",
             self.encode_timeout_drops, self.decode_timeout_drops, self.session_inbox_drops,
+            self.session_unknown_data_drops, self.session_unrelated_dispatches,
+        );
+        println!(
+            "  Route: attempts {}  failures {}  encode_stage_entries {}",
+            self.routing_resolution_attempts, self.routing_resolution_failures, self.encode_stage_entries,
+        );
+        println!(
+            "  Dispatch: dispatch_message_calls {}",
+            self.dispatch_message_calls,
         );
     }
 }
@@ -319,7 +346,12 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     );
     anyhow::ensure!(!cfg.msg_size_range.is_empty(), "msg_size_range must be non-empty");
 
-    let funding: HoprBalance = "100 wxHOPR".parse().context("parsing channel funding amount")?;
+    // 100 000 wxHOPR per channel covers the face value of tickets issued at
+    // STRESS_WIN_PROB (0.001): ticket_amount = 2 / 0.001 = 2 000 wxHOPR each.
+    // Expected wins across a 5 MB run (~7 811 packets) ≈ 7.8, consuming ~15 600 wxHOPR —
+    // well within budget.  The STRESS_INITIAL_SAFE_TOKEN (1 M wxHOPR) ensures each node safe
+    // can fund its share of the channel mesh without running dry.
+    let funding: HoprBalance = "100000 wxHOPR".parse().context("parsing channel funding amount")?;
 
     // ── 1. Full directed channel mesh ─────────────────────────────────────────
 
@@ -383,6 +415,12 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let baseline_decode_drops = hopr_utils::parallelize::cpu::decode_timeout_drop_count() as u64;
     let baseline_encode_drops = hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64;
     let baseline_inbox_drops = hopr_utils::parallelize::session_inbox_drop_count() as u64;
+    let baseline_unknown_drops = hopr_utils::parallelize::session_unknown_data_drop_count() as u64;
+    let baseline_routing_attempts = hopr_utils::parallelize::routing_resolution_attempt_count() as u64;
+    let baseline_routing_failures = hopr_utils::parallelize::routing_resolution_failure_count() as u64;
+    let baseline_encode_stage_entries = hopr_utils::parallelize::encode_stage_entry_count() as u64;
+    let baseline_unrelated = hopr_utils::parallelize::session_unrelated_dispatch_count() as u64;
+    let baseline_dispatch_calls = hopr_utils::parallelize::dispatch_message_call_count() as u64;
 
     // Sampler task: records a ThroughputSample every `sample_interval`.
     // Tracks both sent bytes (written into the pipeline) and received bytes
@@ -585,6 +623,18 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64 - baseline_encode_drops;
     let session_inbox_drops =
         hopr_utils::parallelize::session_inbox_drop_count() as u64 - baseline_inbox_drops;
+    let session_unknown_data_drops =
+        hopr_utils::parallelize::session_unknown_data_drop_count() as u64 - baseline_unknown_drops;
+    let session_unrelated_dispatches =
+        hopr_utils::parallelize::session_unrelated_dispatch_count() as u64 - baseline_unrelated;
+    let dispatch_message_calls =
+        hopr_utils::parallelize::dispatch_message_call_count() as u64 - baseline_dispatch_calls;
+    let routing_resolution_attempts =
+        hopr_utils::parallelize::routing_resolution_attempt_count() as u64 - baseline_routing_attempts;
+    let routing_resolution_failures =
+        hopr_utils::parallelize::routing_resolution_failure_count() as u64 - baseline_routing_failures;
+    let encode_stage_entries =
+        hopr_utils::parallelize::encode_stage_entry_count() as u64 - baseline_encode_stage_entries;
 
     Ok(StressReport {
         samples,
@@ -599,5 +649,11 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         decode_timeout_drops,
         session_inbox_drops,
         encode_timeout_drops,
+        session_unknown_data_drops,
+        session_unrelated_dispatches,
+        routing_resolution_attempts,
+        routing_resolution_failures,
+        encode_stage_entries,
+        dispatch_message_calls,
     })
 }

@@ -1,13 +1,19 @@
 // Reference cluster stress tests for the session-client feature.
 #![cfg(feature = "session-client")]
 
+use std::time::Duration;
+
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{
     api::types::primitive::prelude::HoprBalance,
     testing::{
-        fixtures::{TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture},
+        fixtures::{
+            STRESS_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
+            stress_cluster_fixture,
+        },
         hopr::ChannelGuard,
+        loadgen::{StressConfig, run_stress},
     },
 };
 use rstest::*;
@@ -127,6 +133,47 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
             .map(|g| async move { g.try_close_channels_all_channels().await }),
     )
     .await?;
+
+    Ok(())
+}
+
+/// Sends 5 MB through a single 1-hop session, prints the throughput series, and
+/// validates that every byte is received by the destination EchoServer.
+///
+/// This is the primary diagnostic test for the encode/delivery pipeline with SURB
+/// management enabled.  Running with a 3-node cluster keeps bootstrap time under
+/// the 6-minute test timeout even on slow CI machines.
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[ignore = "slow: requires ~60s cluster bootstrap; run with --run-ignored"]
+async fn three_node_cluster_5mb_single_session() -> anyhow::Result<()> {
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, 3);
+
+    let cfg = StressConfig {
+        total_bytes: 5 * 1024 * 1024,
+        routes: 1,
+        msg_size_range: 4096..=32768,
+        sample_interval: Duration::from_millis(500),
+        seed: 42,
+    };
+
+    let report = run_stress(&cluster, &cfg).await?;
+
+    report.print_series();
+
+    anyhow::ensure!(
+        report.total_bytes_delivered >= cfg.total_bytes,
+        "delivered {} bytes, expected at least {}",
+        report.total_bytes_delivered,
+        cfg.total_bytes,
+    );
+    anyhow::ensure!(!report.samples.is_empty(), "no throughput samples recorded");
+    anyhow::ensure!(
+        report.samples.iter().any(|s| s.recv_window_bytes > 0),
+        "no bytes received at destination — pipeline delivered nothing"
+    );
 
     Ok(())
 }

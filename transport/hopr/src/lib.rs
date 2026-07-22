@@ -635,6 +635,8 @@ where
                 move |(unresolved, mut data)| {
                     let path_planner = path_planner.clone();
                     async move {
+                        hopr_utils::parallelize::ROUTING_RESOLUTION_ATTEMPTS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         trace!(?unresolved, "resolving routing for packet");
                         match path_planner
                             .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
@@ -668,6 +670,8 @@ where
                                 Some((resolved, data))
                             }
                             Err(error) => {
+                                hopr_utils::parallelize::ROUTING_RESOLUTION_FAILURES
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 error!(%error, "failed to resolve routing");
                                 None
                             }
@@ -810,6 +814,8 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
+                        hopr_utils::parallelize::DISPATCH_MESSAGE_CALLS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
                             Ok(DispatchResult::Processed) => {
                                 tracing::trace!("message dispatch completed");
