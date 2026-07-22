@@ -33,10 +33,10 @@ pub(crate) async fn wait_for_funds<R: ChainValues>(
                     tracing::info!("node is funded");
                     return Ok(());
                 } else {
-                    tracing::warn!("still unfunded, trying again soon");
+                    tracing::info!("still unfunded, trying again soon");
                 }
             }
-            Err(error) => tracing::error!(%error, "failed to fetch balance from the chain"),
+            Err(error) => tracing::warn!(%error, "failed to fetch balance from the chain"),
         }
 
         hopr_utils::runtime::prelude::sleep(current_delay).await;

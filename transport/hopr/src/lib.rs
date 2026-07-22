@@ -528,7 +528,7 @@ where
                 mix_rx
                     .fold(wire_msg_tx, |mut sink, item| async move {
                         if sink.send(item).await.is_err() {
-                            tracing::error!(
+                            tracing::debug!(
                                 task = %HoprTransportProcess::MixerForwarder,
                                 "wire sink dropped — discarding mixed packet"
                             );
@@ -597,7 +597,7 @@ where
             futures::future::ready(if let Ok(data) = ApplicationData::new(cover_traffic_tag, data) {
                 Some((routing, ApplicationDataOut::with_no_packet_info(data)))
             } else {
-                tracing::error!("failed to construct cover traffic packet");
+                tracing::debug!("failed to construct cover traffic packet");
                 None
             })
         });
@@ -827,7 +827,7 @@ where
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {
-                            tracing::error!(
+                            tracing::debug!(
                                 task = %HoprTransportProcess::SessionsManagement(0),
                                 "incoming-data channel disconnected — dropping unrelated packet; \
                                  HoprSocket must be consumed or drained by the caller"

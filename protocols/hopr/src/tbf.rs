@@ -32,7 +32,7 @@ impl TagBloomFilter {
     /// Puts a packet tag into the Bloom filter
     pub fn set(&mut self, tag: &PacketTag) {
         if self.count == self.capacity {
-            tracing::warn!("maximum number of items in the Bloom filter reached!");
+            tracing::debug!("maximum number of items in the Bloom filter reached!");
             self.bloom.clear();
             self.count = 0;
         }
@@ -60,7 +60,7 @@ impl TagBloomFilter {
             let is_present = self.bloom.check(tag);
             if !is_present {
                 // There cannot be false negatives, so we can reset the filter
-                tracing::warn!("maximum number of items in the Bloom filter reached!");
+                tracing::debug!("maximum number of items in the Bloom filter reached!");
                 self.bloom.clear();
                 self.bloom.set(tag);
                 self.count = 1;

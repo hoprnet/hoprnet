@@ -296,7 +296,7 @@ where
 
         // Run the first scan immediately at startup without waiting for the initial interval.
         if let Err(e) = self.on_tick().await {
-            tracing::error!(%e, "auto-funding tick failed");
+            tracing::warn!(%e, "auto-funding tick failed");
         }
 
         let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
@@ -313,7 +313,7 @@ where
             match event {
                 Event::Tick => {
                     if let Err(e) = self.on_tick().await {
-                        tracing::error!(%e, "auto-funding tick failed");
+                        tracing::warn!(%e, "auto-funding tick failed");
                     }
                 }
                 Event::Actionable(ev) => match *ev {

@@ -51,7 +51,7 @@ use human_bandwidth::re::bandwidth::Bandwidth;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::net::TcpListener;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -479,7 +479,7 @@ impl SessionPool {
                             Ok(())
                         }
                         Err(error) => {
-                            error!(%error, num_session = i, "failed to establish session for pool");
+                            warn!(%error, num_session = i, "failed to establish session for pool");
                             Err(anyhow!("failed to establish session #{i} in pool to {dst}: {error}"))
                         }
                     }
@@ -505,7 +505,7 @@ impl SessionPool {
                             for configurator in &configurators {
                                 if let Err(error) = configurator.ping().await {
                                     let id = *configurator.id();
-                                    error!(%error, session_id = %id, "session in pool is not alive, will remove");
+                                    debug!(%error, session_id = %id, "session in pool is not alive, will remove");
                                     dead_ids.push(id);
                                 }
                             }
@@ -617,7 +617,7 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
                             error!(?bind_host, "no more client slots available at listener");
                             use tokio::io::AsyncWriteExt;
                             if let Err(error) = stream.shutdown().await {
-                                error!(%error, ?sock_addr, "failed to shutdown TCP connection");
+                                debug!(%error, ?sock_addr, "failed to shutdown TCP connection");
                             }
                             return;
                         }
@@ -633,7 +633,7 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
                                 match factory.create_session(destination, target, data).await {
                                     Ok((s, c)) => (s, c),
                                     Err(error) => {
-                                        error!(%error, "failed to establish session");
+                                        warn!(%error, "failed to establish session");
                                         return;
                                     }
                                 }
@@ -673,7 +673,7 @@ pub async fn create_tcp_client_binding<T: SessionFactory>(
                             ),
                         );
                     }
-                    Err(error) => error!(%error, "failed to accept connection"),
+                    Err(error) => warn!(%error, "failed to accept connection"),
                 }
             }
         })

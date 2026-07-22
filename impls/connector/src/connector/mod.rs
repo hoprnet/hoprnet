@@ -220,7 +220,7 @@ where
 
         let server_health = self.client.query_health().await?;
         if !server_health.eq_ignore_ascii_case("OK") {
-            tracing::error!(server_health, "blokli server not healthy");
+            tracing::warn!(server_health, "blokli server not healthy");
             return Err(ConnectorError::ServerNotHealthy);
         }
 
@@ -547,7 +547,7 @@ where
                 }
                 Err(_) => {
                     abort_handle.abort();
-                    tracing::error!(min_accounts, min_channels, "connection timeout when syncing");
+                    tracing::warn!(min_accounts, min_channels, "connection timeout when syncing");
                     Err(ConnectorError::ConnectionTimeout)
                 }
             })

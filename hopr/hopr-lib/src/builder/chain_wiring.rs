@@ -73,7 +73,7 @@ pub(super) async fn process_chain_events<C, G>(
                     )
                     .entered();
                     if let Err(e) = tx.try_send((peer_id, multiaddrs.to_vec())) {
-                        tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
+                        tracing::warn!(%e, "peer-discovery channel full or closed; announcement dropped");
                     }
                 }
             }

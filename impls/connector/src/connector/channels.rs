@@ -42,11 +42,11 @@ where
                 {
                     Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
                     Ok(Err(error)) => {
-                        tracing::error!(%error, %channel_id, "backend error when looking up channel");
+                        tracing::warn!(%error, %channel_id, "backend error when looking up channel");
                         None
                     }
                     Err(error) => {
-                        tracing::error!(%error, %channel_id, "join error when looking up channel");
+                        tracing::warn!(%error, %channel_id, "join error when looking up channel");
                         None
                     }
                 }
@@ -62,7 +62,7 @@ async fn channel_by_id_async<B: Backend + Send + Sync + 'static>(
 ) -> Result<Option<ChannelEntry>, ConnectorError> {
     Ok(hopr_utils::runtime::prelude::spawn_blocking(move || {
         channel_by_id.try_get_with_by_ref(&channel_id, || {
-            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            tracing::debug!(%channel_id, "cache miss on channel_by_id");
             backend.get_channel_by_id(&channel_id).map_err(ConnectorError::backend)
         })
     })
@@ -92,7 +92,7 @@ where
         Ok(self
             .channel_by_parties
             .try_get_with(ChannelParties::new(src, dst), || {
-                tracing::warn!(%src, %dst, "cache miss on channel_by_parties");
+                tracing::debug!(%src, %dst, "cache miss on channel_by_parties");
                 let channel_id = generate_channel_id(&src, &dst);
                 self.backend
                     .get_channel_by_id(&channel_id)
@@ -104,7 +104,7 @@ where
         self.check_connection_state()?;
 
         Ok(self.channel_by_id.try_get_with_by_ref(channel_id, || {
-            tracing::warn!(%channel_id, "cache miss on channel_by_id");
+            tracing::debug!(%channel_id, "cache miss on channel_by_id");
             self.backend
                 .get_channel_by_id(channel_id)
                 .map_err(ConnectorError::backend)

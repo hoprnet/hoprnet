@@ -133,15 +133,15 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                             Some((packet.next_hop.into(), packet.data))
                         }
                         Ok(Ok(Err(error))) => {
-                            tracing::error!(%error, "outgoing packet could not be encoded");
+                            tracing::debug!(%error, "outgoing packet could not be encoded");
                             None
                         }
                         Ok(Err(error)) => {
-                            tracing::error!(%error, "parallel processing of the outgoing packet failed");
+                            tracing::debug!(%error, "parallel processing of the outgoing packet failed");
                             None
                         }
                         Err(error) => {
-                            tracing::error!(%error, "timeout while processing the outgoing packet");
+                            tracing::debug!(%error, "timeout while processing the outgoing packet");
                             None
                         }
                     }
@@ -156,7 +156,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
         .await;
 
     if let Err(error) = res {
-        tracing::error!(
+        tracing::warn!(
             task = "transport (protocol - msg egress)",
             %error,
             "long-running background task finished with error"
@@ -238,7 +238,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .send((*sender, None))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
+                                tracing::warn!(%error, "failed to send ack to the egress queue");
                             });
 
                         #[cfg(all(feature = "telemetry", not(test)))]
@@ -251,14 +251,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                         if let Err(error) = ticket_events_reject
                             .send(TicketEvent::RejectedTicket(error.ticket, error.issuer))
                             .await {
-                            tracing::error!(%error, "failed to notify invalid ticket rejection");
+                            tracing::debug!(%error, "failed to notify invalid ticket rejection");
                         }
                         // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
                             .send((*sender, None))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
+                                tracing::warn!(%error, "failed to send ack to the egress queue");
                             });
 
                         #[cfg(all(feature = "telemetry", not(test)))]
@@ -276,7 +276,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     },
                     Err(_) => {
                         // If we cannot decode the packet within the time limit, just drop it
-                        tracing::error!(
+                        tracing::debug!(
                             %peer,
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
@@ -310,7 +310,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .send((previous_hop, received_acks))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
+                                tracing::warn!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
                             });
 
                         // We do not acknowledge back acknowledgements.
@@ -335,7 +335,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .send((previous_hop, Some(ack_key)))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
+                                tracing::warn!(%error, "failed to send ack to the egress queue");
                             });
 
                         #[cfg(all(feature = "telemetry", not(test)))]
@@ -389,7 +389,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                                 METRIC_PACKET_COUNT.increment(&["forwarded"]);
                             }
                             Err(error) => {
-                                tracing::error!(%error, "failed to forward a packet to the transport layer");
+                                tracing::warn!(%error, "failed to forward a packet to the transport layer");
                                 return None;
                             }
                         }
@@ -400,7 +400,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             .send((previous_hop, Some(ack_key_prev_hop)))
                             .await
                             .unwrap_or_else(|error| {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
+                                tracing::warn!(%error, "failed to send ack to the egress queue");
                             });
 
                         None
@@ -512,7 +512,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                                     .feed((ack_packet.next_hop.into(), ack_packet.data))
                                     .await
                                     .unwrap_or_else(|error| {
-                                        tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
+                                        tracing::warn!(%error, "failed to forward an acknowledgement to the transport layer");
                                     });
 
                                 #[cfg(all(feature = "telemetry", not(test)))]
@@ -523,7 +523,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                         }
                     }
                     if let Err(error) = wire_outgoing.flush().await {
-                        tracing::error!(%error, "failed to flush acknowledgements batch to the transport layer");
+                        tracing::warn!(%error, "failed to flush acknowledgements batch to the transport layer");
                     }
                     tracing::trace!("acknowledgements out");
                 }.instrument(tracing::debug_span!("outgoing_ack_batch", peer = destination.to_peerid_str()))
@@ -611,7 +611,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
 
                         // All acknowledgements that resulted in winning tickets go upstream
                         if let Err(error) = ticket_evt.send_all(&mut futures::stream::iter(resolutions_iter)).await {
-                            tracing::error!(%error, "failed to notify ticket resolutions");
+                            tracing::debug!(%error, "failed to notify ticket resolutions");
                         }
                     }
                     Ok(Ok(_)) => {
@@ -626,7 +626,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
                         tracing::error!(%error, "failed to acknowledge ticket");
                     }
                     Err(error) => {
-                        tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
+                        tracing::warn!(%error, "parallel processing of the incoming acknowledgements failed")
                     }
                 }
             }

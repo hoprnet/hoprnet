@@ -301,7 +301,7 @@ where
                 verified.and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
             })
             .filter_map(|res| {
-                res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                res.inspect_err(|error| tracing::debug!(%error, "failed to process acknowledgement"))
                     .ok()
             })
             .collect::<Vec<_>>()
@@ -317,7 +317,7 @@ where
                     .and_then(|verified| Ok((*verified.ack_key_share(), verified.ack_key_share().to_challenge()?)))
             })
             .filter_map(|res| {
-                res.inspect_err(|error| tracing::error!(%error, "failed to process acknowledgement"))
+                res.inspect_err(|error| tracing::debug!(%error, "failed to process acknowledgement"))
                     .ok()
             })
             .collect::<Vec<_>>()
@@ -342,13 +342,13 @@ where
             {
                 Ok(Some(channel)) => {
                     if channel.channel_epoch != unack_ticket.verified_ticket().channel_epoch {
-                        tracing::error!(%unack_ticket, "received acknowledgement for ticket issued in a different epoch");
+                        tracing::debug!(%unack_ticket, "received acknowledgement for ticket issued in a different epoch");
                         continue;
                     }
                     channel
                 }
                 Ok(None) => {
-                    tracing::error!(%unack_ticket, "received acknowledgement for ticket issued for unknown channel");
+                    tracing::debug!(%unack_ticket, "received acknowledgement for ticket issued for unknown channel");
                     continue;
                 }
                 Err(error) => {
@@ -374,7 +374,7 @@ where
                 // which is a lengthy operation and should not be done for
                 // bogus unacknowledged tickets
                 let Ok(ack_ticket) = unack_ticket.acknowledge(&half_key) else {
-                    tracing::error!(%unack_ticket, "failed to acknowledge ticket");
+                    tracing::debug!(%unack_ticket, "failed to acknowledge ticket");
                     return None;
                 };
 

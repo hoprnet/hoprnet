@@ -122,7 +122,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                 this.inner.as_mut().poll_next(cx)
             } else {
                 // This essentially forces the incomplete frames to be expired
-                tracing::warn!("reassembler has reached its capacity");
+                tracing::debug!("reassembler has reached its capacity");
                 Poll::Pending
             };
 

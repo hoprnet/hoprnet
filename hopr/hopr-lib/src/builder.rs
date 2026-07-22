@@ -750,7 +750,7 @@ macro_rules! impl_build_methods {
                             tracing::error!(%error, "failed to insert incoming ticket");
                         }
                         if let Err(error) = new_ticket_tx.try_broadcast(event) {
-                            tracing::error!(%error, "failed to broadcast ticket event");
+                            tracing::debug!(%error, "failed to broadcast ticket event");
                         }
                         futures::future::ready(())
                     })

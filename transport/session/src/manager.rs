@@ -573,11 +573,11 @@ where
         .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
         .await
         .map_err(|_| {
-            error!("timeout sending {error_context}");
+            warn!("timeout sending {error_context}");
             TransportSessionError::Timeout
         })?
         .map_err(|error| {
-            error!(%error, "failed to send {error_context}");
+            warn!(%error, "failed to send {error_context}");
             SessionManagerError::other(error)
         })?;
     Ok(())
@@ -944,7 +944,7 @@ where
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
                                 .try_send((session_id, reason))
-                                .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
+                                .inspect_err(|error| debug!(%session_id, %error, "failed to notify session closure"));
                         })
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
@@ -1173,7 +1173,7 @@ where
             }
             Err(_) => {
                 // Timeout waiting for a session establishment
-                error!(challenge, "session initiation attempt timed out");
+                warn!(challenge, "session initiation attempt timed out");
 
                 #[cfg(all(feature = "telemetry", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&["timeout"]);
@@ -1301,7 +1301,7 @@ where
                 start_protocol_tx
                     .try_send((pseudonym, HoprStartProtocol::try_from(in_data.data)?))
                     .map_err(|error| {
-                        error!(%error, "failed to send Start protocol message to processing task");
+                        warn!(%error, "failed to send Start protocol message to processing task");
                         SessionManagerError::other(error)
                     })?;
             } else {
@@ -1328,7 +1328,7 @@ where
                         DispatchResult::Processed
                     })
                     .map_err(|error| {
-                        error!(%session_id, %error, "failed to dispatch session data");
+                        warn!(%session_id, %error, "failed to dispatch session data");
                         SessionManagerError::other(error)
                     })?)
             } else {
@@ -1460,7 +1460,7 @@ where
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
-                error!(%session_id, %error, %reason, "failed to notify session closure");
+                debug!(%session_id, %error, %reason, "failed to notify session closure");
             }
         });
 
@@ -1610,11 +1610,11 @@ where
         .await
         {
             Err(_) => {
-                error!(%session_id, "timeout to notify about new incoming session");
+                warn!(%session_id, "timeout to notify about new incoming session");
                 return Err(TransportSessionError::Timeout);
             }
             Ok(Err(error)) => {
-                error!(%session_id, %error, "failed to notify about new incoming session");
+                debug!(%session_id, %error, "failed to notify about new incoming session");
                 return Err(SessionManagerError::other(error).into());
             }
             _ => {}
@@ -1664,7 +1664,7 @@ where
         let session_id = est.session_id;
         if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
-                error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
+                warn!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
             }
             debug!(?session_id, challenge, "session establishment complete");
@@ -1684,7 +1684,7 @@ where
         // and just discard the initiation attempt and pass on the error.
         if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge) {
             if let Err(error) = tx_est.try_send(Err(error_type)) {
-                error!(%error, ?error_type, "could not send session error message");
+                debug!(%error, ?error_type, "could not send session error message");
                 return Err(SessionManagerError::other(error).into());
             }
             error!(
