@@ -46,7 +46,10 @@ use hopr_api::{
 };
 use hopr_transport::{HoprTransport, IncomingSession};
 use hopr_utils::{
-    network_types::{addr::is_public_address, crossfire_sink::bounded_sink_channel},
+    network_types::{
+        addr::is_public_address,
+        crossfire_sink::{CrossfireSink, bounded_sink_channel},
+    },
     runtime::{AbortableList, prelude::spawn},
 };
 use validator::Validate;
@@ -77,7 +80,7 @@ lazy_static::lazy_static! {
 const PEER_DISCOVERY_CHANNEL_CAPACITY: usize = 2048;
 
 type PeerDiscoveryRx =
-    Arc<parking_lot::Mutex<Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
+    Arc<parking_lot::Mutex<Option<futures::stream::BoxStream<'static, (hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>>>>;
 
 /// Type-erased factory closure producing `T` from a [`BuildCtx`] reference.
 type Factory<T> = Box<dyn FnOnce(&BuildCtx) -> T + Send>;
@@ -99,7 +102,7 @@ impl BuildCtx {
     /// Take the peer-discovery receiver. Returns `Some` on the first call, `None` afterwards.
     pub fn take_peer_discovery_rx(
         &self,
-    ) -> Option<futures::channel::mpsc::Receiver<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
+    ) -> Option<futures::stream::BoxStream<'static, (hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>> {
         self.peer_discovery_rx.lock().take()
     }
 }
@@ -131,10 +134,8 @@ pub struct HoprBuilderWithIdentity {
 impl HoprBuilderWithIdentity {
     /// Sets the node configuration and produces the configured builder.
     pub fn with_config(self, cfg: HoprLibConfig) -> HoprBuilderConfigured {
-        let (peer_discovery_tx, peer_discovery_rx) = futures::channel::mpsc::channel::<(
-            hopr_api::PeerId,
-            Vec<hopr_api::Multiaddr>,
-        )>(PEER_DISCOVERY_CHANNEL_CAPACITY);
+        let (peer_discovery_tx, peer_discovery_rx) =
+            bounded_sink_channel::<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>(PEER_DISCOVERY_CHANNEL_CAPACITY);
         HoprBuilderConfigured {
             ctx: BuildCtx {
                 chain_key: self.chain_key,
@@ -170,7 +171,7 @@ pub struct HoprBuilderConfigured<Chain = (), Graph = (), Net = (), Ct = ()> {
     graph_factory: Option<Factory<Graph>>,
     network_factory: Option<AsyncFactory<Result<(Net, BoxedProcessFn), HoprLibError>>>,
     ct_factory: Option<Factory<Ct>>,
-    peer_discovery_tx: futures::channel::mpsc::Sender<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
+    peer_discovery_tx: CrossfireSink<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)>,
 }
 
 impl<Chain, Graph, Net, Ct> HoprBuilderConfigured<Chain, Graph, Net, Ct> {
