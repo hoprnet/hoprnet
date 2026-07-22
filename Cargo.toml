@@ -250,6 +250,15 @@ debug = 2
 split-debuginfo = "off"
 strip = false
 
+# CPU profiling profile — release performance with full DWARF symbols.
+# Use with `cargo flamegraph --profile profiling` (Linux) or the pprof
+# in-process feature (`--features profiling`).  Mirrors [profile.memprof]
+# which is used for allocation profiling.
+[profile.profiling]
+inherits = "release"
+debug = 2
+strip = false
+
 # make insta snapshots faster
 [profile.dev.package]
 insta.opt-level = 3
