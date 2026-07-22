@@ -118,7 +118,10 @@ pub struct FundingConfig {
     pub stop_when_unfunded: bool,
 
     /// Number of paid downstream relay hops assumed when sizing the channel
-    /// stake.  Must be ≥ 1.  Default: 3 (the protocol maximum).
+    /// stake.  Must be ≥ 1 and ≤ [`RoutingOptions::MAX_INTERMEDIATE_HOPS`][routing] (3).
+    /// Default: 3.
+    ///
+    /// [routing]: hopr_api::types::internal::routing::RoutingOptions
     #[default = 3]
     #[validate(range(min = 1, max = 3))]
     pub assumed_hops: u32,
