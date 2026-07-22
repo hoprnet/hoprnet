@@ -451,6 +451,8 @@ impl MultiObjectiveSelectorConfig {
 
 #[cfg(test)]
 mod config_tests {
+    use anyhow::Context as _;
+
     use super::*;
 
     #[test]
@@ -490,55 +492,56 @@ mod config_tests {
     const PRICE_WEI: u128 = 10_000_000_000_000_000;
 
     #[test]
-    fn zero_capacity_returns_zero() {
+    fn zero_capacity_returns_zero() -> anyhow::Result<()> {
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).unwrap();
-        assert_eq!(
-            capacity_to_balance(ByteSize::b(0), price, wp, 3),
-            HoprBalance::zero()
-        );
+        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
+        assert_eq!(capacity_to_balance(ByteSize::b(0), price, wp, 3), HoprBalance::zero());
+        Ok(())
     }
 
     #[test]
-    fn exact_packet_count_win_prob_one() {
+    fn exact_packet_count_win_prob_one() -> anyhow::Result<()> {
         // capacity = 10 × PAYLOAD_SIZE → exactly 10 packets
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
         let result = capacity_to_balance(capacity, price, wp, 3);
         // expected: PRICE_WEI * 10 packets * 3 hops / 1.0
         let expected = balance_from_wei(PRICE_WEI * 10 * 3);
         assert_eq!(result, expected, "exact 10 packets, win_prob=1.0");
+        Ok(())
     }
 
     #[test]
-    fn half_win_prob_doubles_funding() {
+    fn half_win_prob_doubles_funding() -> anyhow::Result<()> {
         // win_prob = 0.5 → face-value doubles vs. win_prob = 1.0
         let price = balance_from_wei(PRICE_WEI);
-        let wp_full = WinningProbability::try_from(1.0f64).unwrap();
-        let wp_half = WinningProbability::try_from(0.5f64).unwrap();
+        let wp_full = WinningProbability::try_from(1.0f64).context("create wp_full")?;
+        let wp_half = WinningProbability::try_from(0.5f64).context("create wp_half")?;
         let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
         let full = capacity_to_balance(capacity, price, wp_full, 3);
         let half = capacity_to_balance(capacity, price, wp_half, 3);
         // half should be approximately double full
         let ratio = half.amount().low_u128() as f64 / full.amount().low_u128() as f64;
         assert!((ratio - 2.0).abs() < 0.01, "ratio={ratio}");
+        Ok(())
     }
 
     #[test]
-    fn sub_packet_capacity_rounds_up_to_one_packet() {
+    fn sub_packet_capacity_rounds_up_to_one_packet() -> anyhow::Result<()> {
         // 1 byte → ceil(1 / PAYLOAD_SIZE) = 1 packet
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let result = capacity_to_balance(ByteSize::b(1), price, wp, 1);
         let expected = balance_from_wei(PRICE_WEI * 1 * 1);
         assert_eq!(result, expected, "1 byte rounds up to 1 packet");
+        Ok(())
     }
 
     #[test]
-    fn assumed_hops_scales_linearly() {
+    fn assumed_hops_scales_linearly() -> anyhow::Result<()> {
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let capacity = ByteSize::b(HoprPacket::PAYLOAD_SIZE as u64);
         let h1 = capacity_to_balance(capacity, price, wp, 1);
         let h3 = capacity_to_balance(capacity, price, wp, 3);
@@ -547,15 +550,16 @@ mod config_tests {
             h1.amount().saturating_mul(U256::from(3u64)),
             "3 hops should be 3× 1 hop"
         );
+        Ok(())
     }
 
     // ── FundingConfig::resolve ───────────────────────────────────────────────
 
     #[test]
-    fn resolve_maps_all_four_fields() {
+    fn resolve_maps_all_four_fields() -> anyhow::Result<()> {
         let cfg = FundingConfig::default();
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let resolved = cfg.resolve(price, wp);
 
         // Each resolved balance must match what capacity_to_balance produces independently.
@@ -575,6 +579,7 @@ mod config_tests {
             resolved.min_safe_balance_required,
             capacity_to_balance(cfg.min_safe_capacity_required, price, wp, cfg.assumed_hops)
         );
+        Ok(())
     }
 
     // ── FundingConfig validation & defaults ─────────────────────────────────
@@ -602,7 +607,7 @@ mod config_tests {
     // ── Serde round-trip ─────────────────────────────────────────────────────
 
     #[test]
-    fn funding_config_serde_roundtrip() {
+    fn funding_config_serde_roundtrip() -> anyhow::Result<()> {
         // ByteSize serializes to human-readable strings ("5 GiB", "512 MiB", etc.).
         // Use exact IEC multiples so serialize → deserialize is lossless.
         let cfg = FundingConfig {
@@ -613,9 +618,10 @@ mod config_tests {
             stop_when_unfunded: false,
             assumed_hops: 2,
         };
-        let json = serde_json::to_string(&cfg).expect("serialize");
-        let back: FundingConfig = serde_json::from_str(&json).expect("deserialize");
+        let json = serde_json::to_string(&cfg).context("serialize")?;
+        let back: FundingConfig = serde_json::from_str(&json).context("deserialize")?;
         assert_eq!(cfg, back);
+        Ok(())
     }
 }
 

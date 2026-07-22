@@ -14,7 +14,7 @@ use hopr_api::{
     PeerId,
     chain::{
         AccountSelector, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
-        ChainWriteChannelOperations, ChannelSelector, SafeSelector, WinningProbability,
+        ChainWriteChannelOperations, ChannelSelector, SafeSelector,
     },
     graph::{
         EdgeImmediateProtocolObservable as _, EdgeLinkObservable as _, EdgeObservableRead as _, NetworkGraphView as _,
@@ -445,28 +445,29 @@ where
 
         // Fetch ticket economics once per tick.  Both values are needed for
         // the capacity-to-wxHOPR conversion and for the proactive-funding drain
-        // estimate.  A missing ticket price means we cannot compute a safe
-        // channel stake; in that case `funding` resolves to zero balances and
-        // the fund/open passes are effectively skipped via `stop_when_unfunded`.
-        let ticket_price = chain
-            .minimum_ticket_price()
-            .await
-            .unwrap_or_else(|e| {
-                warn!(%e, "channel-lifecycle: minimum_ticket_price unavailable, using zero");
-                HoprBalance::zero()
-            });
+        // estimate.  When either value is unavailable the fund and open passes
+        // are skipped; close and finalize still run.
+        let ticket_price = chain.minimum_ticket_price().await.unwrap_or_else(|e| {
+            warn!(%e, "channel-lifecycle: minimum_ticket_price unavailable, using zero");
+            HoprBalance::zero()
+        });
         let min_ticket_price_wei = ticket_price.amount().low_u128() as f64;
 
-        let win_prob = chain
-            .minimum_incoming_ticket_win_prob()
-            .await
-            .unwrap_or_else(|e| {
-                warn!(%e, "channel-lifecycle: minimum_incoming_ticket_win_prob unavailable, using ALWAYS");
-                WinningProbability::ALWAYS
-            });
+        let win_prob = match chain.minimum_incoming_ticket_win_prob().await {
+            Ok(wp) => Some(wp),
+            Err(e) => {
+                warn!(%e, "channel-lifecycle: minimum_incoming_ticket_win_prob unavailable, skipping fund/open passes");
+                None
+            }
+        };
 
         // Resolve data-capacity config fields to wxHOPR amounts for this tick.
-        let funding = self.cfg.funding.resolve(ticket_price, win_prob);
+        // `None` when win_prob is unavailable; fund/open passes are skipped.
+        let funding = win_prob.map(|wp| self.cfg.funding.resolve(ticket_price, wp));
+
+        // Share resolved economics with the event-driven funding handler so it
+        // can reuse per-tick values rather than issuing fresh chain RPC calls.
+        *self.last_resolved_funding.lock() = funding;
 
         let peer_addr_map = self.peer_addr_map(chain).await?;
 
@@ -501,42 +502,46 @@ where
         let mut safe_remaining = safe_balance;
 
         // ── 2. Fund pass ─────────────────────────────────────────────────────
-        if safe_balance >= funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
-            for ch in &open_channels {
-                if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                let needs_topup = ch.balance <= funding.lower_balance_threshold;
-                let needs_proactive = self.proactive_fund_needed(
-                    ch,
-                    &prev_observations,
-                    est_tx_secs,
-                    min_ticket_price_wei,
-                    funding.lower_balance_threshold,
-                );
+        if let Some(funding) = funding {
+            if safe_balance >= funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
+                for ch in &open_channels {
+                    if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
+                        continue;
+                    }
+                    let needs_topup = ch.balance <= funding.lower_balance_threshold;
+                    let needs_proactive = self.proactive_fund_needed(
+                        ch,
+                        &prev_observations,
+                        est_tx_secs,
+                        min_ticket_price_wei,
+                        funding.lower_balance_threshold,
+                    );
 
-                if needs_topup || needs_proactive {
-                    let reason = if needs_topup {
-                        "below_lower_threshold"
-                    } else {
-                        "proactive_drain"
-                    };
-                    debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
-                    if safe_remaining < funding.topup_balance {
-                        debug!("channel-lifecycle: safe balance exhausted in fund pass");
-                        break;
-                    }
-                    if self.try_fund_channel(ch, funding.topup_balance) {
-                        safe_remaining -= funding.topup_balance;
+                    if needs_topup || needs_proactive {
+                        let reason = if needs_topup {
+                            "below_lower_threshold"
+                        } else {
+                            "proactive_drain"
+                        };
+                        debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
+                        if safe_remaining < funding.topup_balance {
+                            debug!("channel-lifecycle: safe balance exhausted in fund pass");
+                            break;
+                        }
+                        if self.try_fund_channel(ch, funding.topup_balance) {
+                            safe_remaining -= funding.topup_balance;
+                        }
                     }
                 }
+            } else {
+                debug!(
+                    safe = %safe_balance,
+                    min_required = %funding.min_safe_balance_required,
+                    "channel-lifecycle: fund pass skipped: safe below minimum"
+                );
             }
         } else {
-            debug!(
-                safe = %safe_balance,
-                min_required = %funding.min_safe_balance_required,
-                "channel-lifecycle: fund pass skipped: safe below minimum"
-            );
+            debug!("channel-lifecycle: fund pass skipped: ticket economics unavailable");
         }
 
         // ── Selector context ─────────────────────────────────────────────────
@@ -751,6 +756,11 @@ where
         if deficit == 0 {
             return Ok(());
         }
+
+        let Some(funding) = funding else {
+            debug!("channel-lifecycle: open pass skipped: ticket economics unavailable");
+            return Ok(());
+        };
 
         if self.cfg.funding.stop_when_unfunded && safe_remaining < funding.initial_balance {
             debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
@@ -1049,8 +1059,7 @@ mod tests {
     // `super` here is `pipeline`; `super::super` is `channel_lifecycle`.
     // Private items (ChannelLifecycleStrategyInner) are accessible from descendant modules.
     use super::super::ChannelLifecycleStrategyInner;
-    use super::super::*;
-    use super::super::config::ResolvedFunding;
+    use super::super::{config::ResolvedFunding, *};
 
     /// Build a [`ResolvedFunding`] directly from wxHOPR amounts for use in
     /// `try_open_channel` unit tests that bypass the pipeline.
@@ -1601,6 +1610,7 @@ mod tests {
                 last_observed: Arc::new(DashMap::new()),
                 peer_ticket_activity: Arc::new(DashMap::new()),
                 peer_addr_cache: Arc::new(Mutex::new(None)),
+                last_resolved_funding: Arc::new(Mutex::new(None)),
             }
         }
 
@@ -1726,6 +1736,7 @@ mod tests {
                 last_observed: Arc::new(DashMap::new()),
                 peer_ticket_activity: Arc::new(DashMap::new()),
                 peer_addr_cache: Arc::new(Mutex::new(None)),
+                last_resolved_funding: Arc::new(Mutex::new(None)),
             };
             old.close_in_flight.insert(*ch_close.get_id());
             old.finalize_in_flight.insert(*ch_close.get_id());
@@ -1748,6 +1759,7 @@ mod tests {
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
             peer_addr_cache: Arc::new(Mutex::new(None)),
+            last_resolved_funding: Arc::new(Mutex::new(None)),
         };
 
         assert!(fresh.close_in_flight.is_empty());
@@ -1819,6 +1831,7 @@ mod tests {
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
             peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+            last_resolved_funding: Arc::new(parking_lot::Mutex::new(None)),
         }
     }
 
@@ -2122,9 +2135,8 @@ mod tests {
 
         assert_eq!(
             funded.balance, expected_topup,
-            "after fund pass the channel balance must equal \
-             capacity_to_balance(1 byte, 1 wxHOPR, 1.0, 3 hops) = {expected_topup}; \
-             got {}; channels: {channels:?}",
+            "after fund pass the channel balance must equal capacity_to_balance(1 byte, 1 wxHOPR, 1.0, 3 hops) = \
+             {expected_topup}; got {}; channels: {channels:?}",
             funded.balance
         );
 
