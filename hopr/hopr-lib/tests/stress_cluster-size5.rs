@@ -36,10 +36,12 @@ async fn five_node_cluster_should_sustain_throughput_over_1hop_sessions() -> any
 
     let cfg = StressConfig {
         total_bytes: 5 * 1024 * 1024, // 5 MB — completes well inside TEST_GLOBAL_TIMEOUT
+        hops: 1,
         routes: 2,
         msg_size_range: 4096..=32768,
         sample_interval: Duration::from_millis(500),
         seed: 42,
+        ..StressConfig::default()
     };
 
     let report = run_stress(&cluster, &cfg).await?;
