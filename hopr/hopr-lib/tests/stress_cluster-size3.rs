@@ -184,6 +184,7 @@ async fn hop_mb_matrix(#[case] hops: usize, #[case] mb: u64) -> anyhow::Result<(
         msg_size_range: 4096..=32768,
         sample_interval: Duration::from_millis(500),
         seed: 42,
+        ..StressConfig::default()
     };
 
     let report = run_stress(&cluster, &cfg).await?;

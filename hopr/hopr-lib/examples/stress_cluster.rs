@@ -162,6 +162,7 @@ fn main() -> anyhow::Result<()> {
         seed: args.seed,
         msg_size_range: 4096..=65536, // 4 KB – 64 KB: realistic HOPR session messages
         sample_interval: Duration::from_millis(500),
+        ..StressConfig::default()
     };
 
     // Build the async runtime *after* cluster startup so its thread pool does

@@ -4267,7 +4267,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.32.0"
+version = "0.33.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4283,6 +4283,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
+ "futures-timer",
  "halfbrown",
  "hex-literal",
  "hopr-api",
@@ -4308,6 +4309,8 @@ dependencies = [
  "parking_lot",
  "pcap-file",
  "proc-macro-regex",
+ "rand 0.10.2",
+ "rand_distr",
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",

@@ -5,7 +5,7 @@ pub use hopr_transport::{
     TagAllocatorConfig,
     config::{
         HoprPacketPipelineConfig, HoprProtocolConfig, HostConfig, HostType, MixerConfig, ProbeConfig,
-        SessionGlobalConfig, TransportConfig, looks_like_domain,
+        SessionGlobalConfig, TransitLatencyConfig, TransportConfig, looks_like_domain,
     },
 };
 use validator::{Validate, ValidationError};

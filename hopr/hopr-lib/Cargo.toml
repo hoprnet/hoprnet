@@ -56,6 +56,10 @@ required-features = ["testing"]
 name = "stress_cluster-size5"
 required-features = ["testing"]
 
+[[test]]
+name = "stress_cluster-matrix"
+required-features = ["testing"]
+
 [[example]]
 name = "stress_cluster"
 required-features = ["testing"]

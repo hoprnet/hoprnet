@@ -50,7 +50,10 @@ use super::{
     fixtures::{ClusterGuard, chain_propagation_delay},
     hopr::ChannelGuard,
 };
-use crate::api::types::primitive::prelude::HoprBalance;
+use crate::{
+    SessionCapabilities, SessionCapability, SurbBalancerConfig,
+    api::types::primitive::prelude::HoprBalance,
+};
 
 // ── Throughput reporting ─────────────────────────────────────────────────────
 
@@ -76,6 +79,10 @@ pub struct StressReport {
     pub samples: Vec<ThroughputSample>,
     /// Number of intermediate relay hops used in this run (mirrors [`StressConfig::hops`]).
     pub hops: usize,
+    /// Human-readable label describing the run's key parameters (hops, write strategy,
+    /// rate control, SURB config).  Printed in the `print_series` header for easy
+    /// comparison between OFAT variants.
+    pub label: String,
     /// Total application bytes written into the pipeline across all sessions.
     pub total_bytes_delivered: u64,
     /// Total bytes confirmed received by destination EchoServers (delta from run start).
@@ -136,10 +143,7 @@ impl StressReport {
     /// Prints the per-window throughput series and a detailed summary to stdout.
     pub fn print_series(&self) {
         let total_mb = self.total_bytes_delivered as f64 / (1024.0 * 1024.0);
-        println!(
-            "\n=== {}-hop · {:.0} MB ===",
-            self.hops, total_mb,
-        );
+        println!("\n=== {} · {:.0} MB ===", self.label, total_mb);
         println!(
             "  {:>8}  {:>12}  {:>12}  {:>10}",
             "time(s)", "sent MB/s", "recv MB/s", "in-flight"
@@ -223,6 +227,44 @@ impl StressReport {
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
+/// Strategy controlling how each session worker writes data into the pipeline.
+///
+/// The choice between `Continuous` and `Batched` controls whether the Rayon encode
+/// pool is given breathing room between bursts — which is the key variable for
+/// measuring encode-timeout silent drops.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WriteStrategy {
+    /// Write messages back-to-back as fast as the sink accepts them.
+    ///
+    /// Stresses the 150 ms encode budget: if the Rayon pool saturates, encode
+    /// futures time out and packets are silently dropped (visible as loss in the
+    /// report).  This is the baseline that matches the edge-client's behaviour.
+    #[default]
+    Continuous,
+    /// Write `batch_bytes` of data per burst, then sleep `pause` before the next burst.
+    ///
+    /// Gives the encode pool time to drain between bursts, reducing encode-timeout
+    /// drops at the cost of lower peak throughput.  Compare against `Continuous` to
+    /// quantify the drop penalty of aggressive bulk writes.
+    Batched {
+        /// Total bytes per burst (rounded down to the nearest message boundary).
+        batch_bytes: usize,
+        /// Sleep duration between bursts.
+        pause: Duration,
+    },
+}
+
+impl std::fmt::Display for WriteStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WriteStrategy::Continuous => write!(f, "continuous"),
+            WriteStrategy::Batched { batch_bytes, pause } => {
+                write!(f, "batched({}B,{}ms)", batch_bytes, pause.as_millis())
+            }
+        }
+    }
+}
+
 /// Configuration for [`run_stress`].
 #[derive(Debug, Clone)]
 pub struct StressConfig {
@@ -259,6 +301,31 @@ pub struct StressConfig {
 
     /// Seed for route selection, giving reproducible traffic patterns across runs.
     pub seed: u64,
+
+    /// Write strategy for workload tasks.
+    ///
+    /// `Continuous` (default) writes back-to-back — matching the edge-client and stressing
+    /// the encode pool.  `Batched` inserts pauses between bursts to allow the pool to drain,
+    /// which reduces encode-timeout drops at the cost of peak throughput.
+    pub write_strategy: WriteStrategy,
+
+    /// SURB balancer configuration for each session.
+    ///
+    /// `Some(cfg)` enables the SURB balancer; `None` disables it.
+    /// Default: `Some(SurbBalancerConfig::default())` (target 7000, max 5000/s) — matching
+    /// the production fixture and enabling the exit-side egress rate limiter warm-up.
+    pub surb_config: Option<SurbBalancerConfig>,
+
+    /// Whether to apply exit-side egress rate control on each session.
+    ///
+    /// `true` (default) leaves capabilities at their default (empty) so the Exit's
+    /// SURB-based rate limiter (10 pkt/s cold-start, then balancer-scaled) is active.
+    /// `false` sets `SessionCapability::NoRateControl`, disabling the limiter entirely.
+    ///
+    /// The rate limiter exists so the Exit never sends replies faster than the initiator
+    /// supplies SURBs.  Disabling it reveals the maximum pipeline throughput without the
+    /// cold-start throttle — useful for isolating whether the limiter is the bottleneck.
+    pub rate_control: bool,
 }
 
 impl Default for StressConfig {
@@ -270,6 +337,9 @@ impl Default for StressConfig {
             msg_size_range: 4096..=65536, // 4 KB – 64 KB
             sample_interval: Duration::from_millis(500),
             seed: 42,
+            write_strategy: WriteStrategy::Continuous,
+            surb_config: Some(SurbBalancerConfig::default()),
+            rate_control: true,
         }
     }
 }
@@ -442,12 +512,20 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
 
     // ── 3. Session establishment ──────────────────────────────────────────────
 
+    // Build session capabilities from config.
+    // `rate_control = false` → set NoRateControl to bypass the 10 pkt/s cold-start limiter.
+    let capabilities: SessionCapabilities = if cfg.rate_control {
+        Default::default() // empty = limiter active (production default)
+    } else {
+        SessionCapability::NoRateControl.into()
+    };
+
     let mut sessions = Vec::with_capacity(routes.len());
     for path_indices in routes {
         tracing::info!(?path_indices, "opening session");
         let path: Vec<&_> = path_indices.iter().map(|&i| &cluster[i]).collect();
         let session = cluster
-            .create_session(&path)
+            .create_session_with(&path, capabilities, cfg.surb_config.clone())
             .await
             .context("opening session")?;
         sessions.push(session);
@@ -534,6 +612,7 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     // never reach the EchoServer and are not counted in any throughput figure.
     let msg_size_range = cfg.msg_size_range.clone();
     let seed = cfg.seed;
+    let write_strategy = cfg.write_strategy;
     let worker_handles: Vec<_> = sessions
         .into_iter()
         .enumerate()
@@ -543,8 +622,26 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
             tokio::spawn(async move {
                 // Each worker uses a distinct seed so write sizes differ per session.
                 let mut rng = StdRng::seed_from_u64(seed.wrapping_add(idx as u64 + 1));
+
+                // Batched strategy: track how many bytes remain in the current burst.
+                let mut batch_remaining: usize = match write_strategy {
+                    WriteStrategy::Batched { batch_bytes, .. } => batch_bytes,
+                    WriteStrategy::Continuous => usize::MAX,
+                };
+
                 loop {
                     let msg_size = rng.random_range(msg_size_range.clone());
+
+                    // Batched: if this write would exhaust the burst quota, sleep first.
+                    if let WriteStrategy::Batched { batch_bytes, pause } = write_strategy {
+                        if msg_size > batch_remaining {
+                            session.flush().await.context("flush (batch pause)")?;
+                            tokio::time::sleep(pause).await;
+                            batch_remaining = batch_bytes;
+                        }
+                        batch_remaining = batch_remaining.saturating_sub(msg_size);
+                    }
+
                     // Payload: sequential bytes — content is irrelevant; HOPR encrypts it.
                     let payload: Vec<u8> = (0..msg_size).map(|i| (i % 256) as u8).collect();
 
@@ -566,10 +663,21 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         })
         .collect();
 
+    let label = {
+        let surb_target = cfg
+            .surb_config
+            .as_ref()
+            .map(|s| format!("surb={}", s.target_surb_buffer_size))
+            .unwrap_or_else(|| "surb=off".to_owned());
+        let rate = if cfg.rate_control { "rate=on" } else { "rate=off" };
+        format!("{}-hop · {} · {} · {}", cfg.hops, cfg.write_strategy, rate, surb_target)
+    };
+
     tracing::info!(
         total_mb = cfg.total_bytes / (1024 * 1024),
         hops = cfg.hops,
         sessions = cfg.routes,
+        %label,
         "workload started"
     );
 
@@ -696,6 +804,7 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     Ok(StressReport {
         samples,
         hops: cfg.hops,
+        label,
         total_bytes_delivered,
         total_bytes_received,
         duration: workload_duration,

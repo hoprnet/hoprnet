@@ -19,7 +19,7 @@ use tracing::info;
 #[allow(deprecated)]
 use crate::HoprSessionClientExplicitPathConfig;
 use crate::{
-    HopRouting, HoprSessionClientConfig, SurbBalancerConfig,
+    HopRouting, HoprSessionClientConfig, SessionCapabilities, SurbBalancerConfig,
     api::{
         network::NetworkView,
         node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
@@ -36,6 +36,7 @@ use crate::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{HoprSession, SessionTarget},
     },
+    config::TransitLatencyConfig,
     testing::{
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
@@ -162,6 +163,22 @@ impl ClusterGuard {
     ///
     /// Channels must already be open before calling this method.
     pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
+        self.create_session_with(path, Default::default(), Some(SurbBalancerConfig::default()))
+            .await
+    }
+
+    /// Create a session with explicit capability and SURB-management configuration.
+    ///
+    /// `capabilities` controls session-level flags such as `SessionCapability::NoRateControl`.
+    /// `surb_management` sets the SURB balancer config (`None` disables the balancer).
+    ///
+    /// Channels must already be open before calling this method.
+    pub async fn create_session_with(
+        &self,
+        path: &[&TestedHopr],
+        capabilities: SessionCapabilities,
+        surb_management: Option<SurbBalancerConfig>,
+    ) -> anyhow::Result<HoprSession> {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let chain_info = self.chain_client.query_chain_info().await?;
@@ -181,9 +198,9 @@ impl ClusterGuard {
                 HoprSessionClientConfig {
                     forward_path: routing,
                     return_path: routing,
-                    capabilities: Default::default(),
+                    capabilities,
                     pseudonym: None,
-                    surb_management: Some(SurbBalancerConfig::default()),
+                    surb_management,
                     always_max_out_surbs: false,
                 },
             )
@@ -433,17 +450,29 @@ pub const STRESS_INITIAL_SAFE_TOKEN: u64 = 20_000_000;
 pub struct TestNodeConfig {
     /// Outgoing winning probability for this node.
     pub win_prob: f64,
+    /// Optional simulated transit latency for this node's packet forwarder.
+    ///
+    /// When `Some`, each packet forwarded by this node is held for a
+    /// Gaussian-jittered FIFO delay (see [`TransitLatencyConfig`]) — simulating
+    /// WAN-link latency in a local cluster.  `None` (the default) means no extra delay.
+    pub transit_latency: Option<TransitLatencyConfig>,
 }
 
 impl Default for TestNodeConfig {
     fn default() -> Self {
-        Self { win_prob: 1.0 }
+        Self {
+            win_prob: 1.0,
+            transit_latency: None,
+        }
     }
 }
 
 impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
-        Self { win_prob }
+        Self {
+            win_prob,
+            transit_latency: None,
+        }
     }
 }
 
@@ -544,6 +573,22 @@ pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
     )
 }
 
+/// Creates a stress-test cluster with simulated transit latency on every node.
+///
+/// Identical to [`stress_cluster_fixture`] but sets `transit_latency` on every
+/// node so the packet forwarder injects a Gaussian-jittered FIFO delay — simulating
+/// a WAN link (e.g. mean=50ms, std_dev=5ms) in a local cluster.
+pub fn stress_cluster_fixture_with_latency(win_prob: f64, n: usize, latency: TransitLatencyConfig) -> ClusterGuard {
+    let configs = vec![
+        TestNodeConfig {
+            win_prob,
+            transit_latency: Some(latency),
+        };
+        n
+    ];
+    cluster_fixture_inner(configs, build_stress_blokli_client())
+}
+
 #[fixture]
 pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: Vec<TestNodeConfig>) -> ClusterGuard {
     cluster_fixture_inner(configs, build_blokli_client())
@@ -567,10 +612,6 @@ fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestC
         .unwrap_or(4);
     let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
 
-    // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
-    // SAFETY: called once before any threads are spawned for this cluster.
-    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
-
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();
     let offchain_keys = NODE_OFFCHAIN_KEYS[0..size].to_vec();
@@ -592,6 +633,7 @@ fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestC
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
             let win_prob = configs[i].win_prob;
+            let transit_latency = configs[i].transit_latency;
             let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
@@ -633,7 +675,7 @@ fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestC
 
                     let connector = std::sync::Arc::new(connector);
 
-                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
+                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob, transit_latency);
 
                     let instance = crate::testing::wiring::build_full_with_chain(
                         &onchain_keys[i],
