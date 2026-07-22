@@ -59,10 +59,14 @@ use crate::api::types::primitive::prelude::HoprBalance;
 pub struct ThroughputSample {
     /// Wall time since the workload started.
     pub elapsed: Duration,
-    /// Bytes written into the pipeline during this window.
+    /// Bytes written into the send pipeline during this window.
     pub window_bytes: u64,
-    /// Throughput for this window in MB/s.
+    /// Send throughput for this window in MB/s.
     pub mbps: f64,
+    /// Bytes confirmed received by destination EchoServers during this window.
+    pub recv_window_bytes: u64,
+    /// Receive throughput for this window in MB/s.
+    pub recv_mbps: f64,
 }
 
 /// Result of a completed stress run.
@@ -72,33 +76,51 @@ pub struct StressReport {
     pub samples: Vec<ThroughputSample>,
     /// Total bytes written into the forward pipeline (src→relay→dst) across all sessions.
     pub total_bytes_delivered: u64,
+    /// Total bytes confirmed received by destination EchoServers.
+    pub total_bytes_received: u64,
     /// Wall-clock duration of the workload phase, excluding channel/session setup.
     pub duration: Duration,
-    /// Mean throughput in MB/s averaged across all sample windows.
+    /// Mean send throughput in MB/s averaged across all sample windows.
     pub mean_mbps: f64,
+    /// Mean receive throughput in MB/s averaged across all sample windows.
+    pub mean_recv_mbps: f64,
 }
 
 impl StressReport {
     /// Prints the per-window throughput series and a summary line to stdout.
     pub fn print_series(&self) {
-        println!("\n  {:>8}  {:>12}  {:>14}", "time(s)", "window MB/s", "cumulative");
-        println!("  {}", "─".repeat(38));
-        let mut cumulative = 0u64;
+        println!(
+            "\n  {:>8}  {:>12}  {:>12}  {:>10}",
+            "time(s)", "sent MB/s", "recv MB/s", "in-flight"
+        );
+        println!("  {}", "─".repeat(52));
+        let mut cum_sent = 0u64;
+        let mut cum_recv = 0u64;
         for s in &self.samples {
-            cumulative += s.window_bytes;
+            cum_sent += s.window_bytes;
+            cum_recv += s.recv_window_bytes;
+            let in_flight = cum_sent.saturating_sub(cum_recv);
             println!(
-                "  {:>8.2}  {:>12.3}  {:>14}",
+                "  {:>8.2}  {:>12.3}  {:>12.3}  {:>10}",
                 s.elapsed.as_secs_f64(),
                 s.mbps,
-                bytesize::ByteSize(cumulative),
+                s.recv_mbps,
+                bytesize::ByteSize(in_flight),
             );
         }
-        println!("  {}", "─".repeat(38));
+        println!("  {}", "─".repeat(52));
+        let in_flight = self.total_bytes_delivered.saturating_sub(self.total_bytes_received);
         println!(
-            "  Total: {} in {:.2}s — mean {:.3} MB/s",
+            "  Sent:  {} in {:.2}s — mean {:.3} MB/s",
             bytesize::ByteSize(self.total_bytes_delivered),
             self.duration.as_secs_f64(),
             self.mean_mbps,
+        );
+        println!(
+            "  Recv:  {} — mean {:.3} MB/s  (in-flight: {})",
+            bytesize::ByteSize(self.total_bytes_received),
+            self.mean_recv_mbps,
+            bytesize::ByteSize(in_flight),
         );
     }
 }
@@ -294,25 +316,36 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let sample_interval = cfg.sample_interval;
 
     // Sampler task: records a ThroughputSample every `sample_interval`.
+    // Tracks both sent bytes (written into the pipeline) and received bytes
+    // (confirmed arrived at destination EchoServers).
     let (sample_tx, mut sample_rx) = tokio::sync::mpsc::unbounded_channel::<ThroughputSample>();
     let sampler_delivered = Arc::clone(&delivered);
+    let sampler_received = Arc::clone(&cluster.echo_received);
     let workload_start = tokio::time::Instant::now();
     let sampler = tokio::spawn(async move {
         let mut ticker = tokio::time::interval(sample_interval);
         ticker.tick().await; // skip the first immediate (t=0) tick
-        let mut last_bytes = 0u64;
+        let mut last_sent = 0u64;
+        let mut last_recv = 0u64;
         loop {
             ticker.tick().await;
-            let current = sampler_delivered.load(Ordering::Relaxed);
-            let window_bytes = current - last_bytes;
-            last_bytes = current;
+            let sent = sampler_delivered.load(Ordering::Relaxed);
+            let recv = sampler_received.load(Ordering::Relaxed);
+            let window_bytes = sent - last_sent;
+            let recv_window_bytes = recv - last_recv;
+            last_sent = sent;
+            last_recv = recv;
             let elapsed = workload_start.elapsed();
-            let mbps = (window_bytes as f64 / (1024.0 * 1024.0)) / sample_interval.as_secs_f64();
+            let secs = sample_interval.as_secs_f64();
+            let mbps = (window_bytes as f64 / (1024.0 * 1024.0)) / secs;
+            let recv_mbps = (recv_window_bytes as f64 / (1024.0 * 1024.0)) / secs;
             // Ignore send errors — they happen only if the receiver is dropped.
             let _ = sample_tx.send(ThroughputSample {
                 elapsed,
                 window_bytes,
                 mbps,
+                recv_window_bytes,
+                recv_mbps,
             });
         }
     });
@@ -349,7 +382,11 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
                         break;
                     }
                 }
-                anyhow::Ok(())
+                // Return the session to keep it alive through the drain phase.
+                // Dropping here would send a close signal to the destination, which
+                // would abort the EchoServer read loop while in-flight packets are
+                // still traversing the mixer and relay.
+                anyhow::Ok(session)
             })
         })
         .collect();
@@ -360,21 +397,61 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         "workload started"
     );
 
+    // Collect finished sessions back so they stay open during the drain phase.
+    let mut live_sessions = Vec::with_capacity(worker_handles.len());
     for handle in worker_handles {
-        handle
+        let session = handle
             .await
             .context("worker task panicked")?
             .context("worker task error")?;
+        live_sessions.push(session);
     }
 
     let workload_duration = workload_start.elapsed();
 
     tracing::info!(
         elapsed_secs = workload_duration.as_secs_f64(),
-        "workload finished — stopping sampler"
+        "workload finished — draining receive pipeline"
     );
 
-    // Abort the sampler (it loops forever; abort is the clean shutdown).
+    // ── Drain phase ───────────────────────────────────────────────────────────
+    // After all sends complete the HOPR pipeline (mixer + relay) continues
+    // delivering packets to the destination EchoServers.  Keep the sampler
+    // running until every sent byte has been received, or until 5 s elapses
+    // with no progress (indicating packet loss or a pipeline stall).
+    let total_target_recv = cfg.total_bytes;
+    let mut last_recv = cluster.echo_received.load(Ordering::Relaxed);
+    let mut stall_elapsed = Duration::ZERO;
+    let stall_limit = Duration::from_secs(5);
+    loop {
+        tokio::time::sleep(sample_interval).await;
+        let received = cluster.echo_received.load(Ordering::Relaxed);
+        if received >= total_target_recv {
+            break;
+        }
+        if received > last_recv {
+            // Progress — reset the stall clock.
+            last_recv = received;
+            stall_elapsed = Duration::ZERO;
+        } else {
+            stall_elapsed += sample_interval;
+            if stall_elapsed >= stall_limit {
+                tracing::warn!(
+                    received,
+                    total_target_recv,
+                    "drain stalled for {}s — assuming packet loss",
+                    stall_limit.as_secs()
+                );
+                break;
+            }
+        }
+    }
+
+    // Sessions are no longer needed — drop them now to cleanly close the
+    // destination EchoServer sessions before we tear down the channels.
+    drop(live_sessions);
+
+    // Stop the sampler now that the receive side has drained (or timed out).
     sampler.abort();
     let _ = sampler.await; // JoinError::Cancelled is expected and ignored
 
@@ -397,16 +474,24 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     // ── Report ────────────────────────────────────────────────────────────────
 
     let total_bytes_delivered = delivered.load(Ordering::Relaxed);
+    let total_bytes_received = cluster.echo_received.load(Ordering::Relaxed);
     let mean_mbps = if samples.is_empty() {
         (total_bytes_delivered as f64 / (1024.0 * 1024.0)) / workload_duration.as_secs_f64()
     } else {
         samples.iter().map(|s| s.mbps).sum::<f64>() / samples.len() as f64
     };
+    let mean_recv_mbps = if samples.is_empty() {
+        (total_bytes_received as f64 / (1024.0 * 1024.0)) / workload_duration.as_secs_f64()
+    } else {
+        samples.iter().map(|s| s.recv_mbps).sum::<f64>() / samples.len() as f64
+    };
 
     Ok(StressReport {
         samples,
         total_bytes_delivered,
+        total_bytes_received,
         duration: workload_duration,
         mean_mbps,
+        mean_recv_mbps,
     })
 }
