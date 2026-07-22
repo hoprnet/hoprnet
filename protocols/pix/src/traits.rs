@@ -88,6 +88,16 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         true
     }
 
+    /// Returns `true` if the given error is an expected "not for us" skip (e.g. no
+    /// acknowledgements from the peer were expected), so the caller can log it at a
+    /// lower severity.
+    ///
+    /// The default implementation returns `false`. Implementations with a concrete
+    /// error type should override this to identify expected error variants.
+    fn is_expected_error(&self, _error: &Self::Error) -> bool {
+        false
+    }
+
     /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
     fn new_exit_commitment(
         &self,

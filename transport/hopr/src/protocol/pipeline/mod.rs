@@ -686,6 +686,8 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                 // then run both concurrently on the thread pool via join.
                 // When there are no pending shares, avoid the clone and move acks directly into
                 // the ticket future — a single blocking spawn, no concurrent join needed.
+                // Clone before the `if` so it stays alive for `is_expected_error` after the join.
+                let exit_proc_for_spawn = exit_proc.clone();
                 let (ticket_result, exit_result) = if exit_proc.has_pending_shares(&peer) {
                     let ack_clone = acks.clone();
                     let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
@@ -693,7 +695,7 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                         "ack_decode",
                     );
                     let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                        move || exit_proc.acknowledge_shares(peer, acks),
+                        move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
                         "exit_ack_decode",
                     );
                     let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
@@ -766,8 +768,11 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
                         Ok(Ok(_)) => {
                             tracing::trace!(%peer, "empty pix share resolution batch");
                         }
-                        Ok(Err(error)) => {
+                        Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
                             tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(%peer, %error, "pix share acknowledgement failed");
                         }
                         Err(error) => {
                             tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")

@@ -233,6 +233,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         self.awaiting_acks.contains_key(peer)
     }
 
+    fn is_expected_error(&self, error: &Self::Error) -> bool {
+        matches!(error, PixError::UnexpectedShare)
+    }
+
     fn new_exit_commitment(
         &self,
         id: SsaId<S::Pseudonym>,
