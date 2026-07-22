@@ -134,7 +134,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         // attempts that will persistently fail.
         // Check this before verification to avoid expensive elliptic curve MSMs for redundant shares.
         if self.shares.iter().any(|s| s.identifier == share.identifier) {
-            return Ok(None);
+            return Ok(AddShareOutcome::Duplicate);
         }
 
         self.verifier.verify_completed_share(&share)?;

@@ -31,6 +31,7 @@ capture = ["dep:pcap-file"]
 telemetry = [
   "serde",
   "hopr-api/types-telemetry",
+  "hopr-network-graph/telemetry",
   "hopr-protocol-hopr/telemetry",
   "hopr-transport-session/telemetry",
   "hopr-utils/network-types-telemetry",

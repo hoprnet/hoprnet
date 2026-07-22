@@ -98,6 +98,13 @@ pub struct SsaReconstructorConfig {
 type EncryptedShareCache<S> =
     moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, <S as PixSpec>::Pseudonym, PixScalar<S>>>;
 
+/// Per-peer cache of pending ack keys whose verifier was not yet available.
+///
+/// Keyed by `HalfKeyChallenge`, stores the `HalfKey` for retry once the
+/// verifier arrives.  Tied to `max_ack_await_time` in line with the
+/// `awaiting_acks` TTL.
+type PendingAckPerPeerCache = moka::sync::Cache<HalfKeyChallenge, HalfKey>;
+
 /// Per-SSA counter entry tracked in the dedicated TTL-only cache.
 /// Counters are absolute — they represent the total observed so far for this SSA.
 struct SsaCounterEntry {
@@ -131,11 +138,11 @@ pub struct SsaReconstructor<S: PixSpec> {
         moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaPartBuilder<S>>>>,
     awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
     /// Cache of ack keys whose verifier was not yet available.
-    /// `HalfKeyChallenge → (OffchainPublicKey, HalfKey)`. When a verified ack hits
+    /// `OffchainPublicKey → PendingAckPerPeerCache`. When a verified ack hits
     /// `MissingVerifier`, it is stashed here so subsequent `acknowledge_shares` calls can
     /// retry once the verifier arrives. Tied to `max_ack_await_time` in line with the
     /// awaiting_acks TTL.
-    pending_ack_keys: moka::sync::Cache<HalfKeyChallenge, (OffchainPublicKey, HalfKey)>,
+    pending_ack_keys: moka::sync::Cache<OffchainPublicKey, PendingAckPerPeerCache>,
     /// Dedicated TTL-only cache for per-SSA counters (no TTI).
     /// Counters survive builder/verifier eviction.
     ssa_counters: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaCounterEntry>>>,
@@ -551,6 +558,43 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::UnexpectedShare);
         };
 
+        // Drain pending retries from previous calls — the verifier may have
+        // been inserted since the last acknowledge_shares invocation.
+        if let Some(per_peer) = self.pending_ack_keys.get(&peer) {
+            let stashed: Vec<(HalfKeyChallenge, HalfKey)> = per_peer.iter().map(|entry| (*entry.0, entry.1)).collect();
+            for (challenge, ack) in &stashed {
+                if !awaiting_ack_from_peer.contains_key(challenge) {
+                    // Share was already consumed (e.g. by the main loop in a prior call).
+                    per_peer.invalidate(challenge);
+                    continue;
+                }
+                match self.process_verified_ack(&peer, *ack, *challenge, &awaiting_ack_from_peer) {
+                    Ok(ProcessedAckResult::FullRecovery(_)) => {
+                        per_peer.invalidate(challenge);
+                    }
+                    Ok(ProcessedAckResult::EarlyRecovery(_)) => {
+                        per_peer.invalidate(challenge);
+                    }
+                    Ok(_) => {
+                        // NoProgress, Duplicate, Surplus, PolynomialPartComplete
+                        per_peer.invalidate(challenge);
+                    }
+                    Err(PixError::MissingVerifier) => {
+                        // Verifier still not available — leave in pending_ack_keys
+                        tracing::trace!(%peer, "verifier not yet available, share retained in pending cache");
+                    }
+                    Err(_) => {
+                        // Permanent failure — don't retry.
+                        per_peer.invalidate(challenge);
+                    }
+                }
+            }
+            // Clean up empty per-peer entries
+            if per_peer.weighted_size() == 0 {
+                self.pending_ack_keys.invalidate(&peer);
+            }
+        }
+
         // Ordered aggregation per SSA: collect terminal events for each touched SSA,
         // using IndexSet for deterministic first-seen ordering.
         let mut progress_touched: IndexSet<SsaId<S::Pseudonym>> = IndexSet::new();
@@ -596,7 +640,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     // Share retained in awaiting_acks (process_verified_ack now uses .get()).
                     // Stash the ack so a subsequent call can retry once the verifier arrives.
                     tracing::trace!(%peer, "verifier not yet available, stashing ack for retry");
-                    self.pending_ack_keys.insert(ack_challenge, (peer, ack));
+                    self.pending_ack_keys
+                        .get_with(peer, || {
+                            moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64).build()
+                        })
+                        .insert(ack_challenge, ack);
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
@@ -836,7 +884,7 @@ mod tests {
 
         // Process the ack — this should return MissingVerifier
         let peer_cache_ref = reconstructor.awaiting_acks.get(peer.public()).unwrap();
-        let result = reconstructor.process_verified_ack(ack_key, challenge, &peer_cache_ref);
+        let result = reconstructor.process_verified_ack(peer.public(), ack_key, challenge, &peer_cache_ref);
         assert!(matches!(result, Err(PixError::MissingVerifier)));
 
         // The share MUST NOT be destroyed by the MissingVerifier error.
@@ -1806,6 +1854,52 @@ mod tests {
         assert_eq!(
             e.recovered_polynomials, 1,
             "recorded completed part must survive builder eviction"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn pending_ack_cache_isolates_stashed_acks_by_peer() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+
+        let ack_a = HalfKey::random();
+        let challenge_a = ack_a.to_challenge()?;
+        let peer_a = OffchainKeypair::random();
+
+        let ack_b = HalfKey::random();
+        let challenge_b = ack_b.to_challenge()?;
+        let peer_b = OffchainKeypair::random();
+
+        reconstructor
+            .pending_ack_keys
+            .get_with(*peer_a.public(), || moka::sync::CacheBuilder::new(8).build())
+            .insert(challenge_a, ack_a);
+        reconstructor
+            .pending_ack_keys
+            .get_with(*peer_b.public(), || moka::sync::CacheBuilder::new(8).build())
+            .insert(challenge_b, ack_b);
+
+        let cache_a = reconstructor.pending_ack_keys.get(peer_a.public()).unwrap();
+        assert!(cache_a.contains_key(&challenge_a), "peer_a should have its stash");
+        assert!(!cache_a.contains_key(&challenge_b), "peer_a must not see peer_b's stash");
+
+        let cache_b = reconstructor.pending_ack_keys.get(peer_b.public()).unwrap();
+        assert!(cache_b.contains_key(&challenge_b), "peer_b should have its stash");
+        assert!(!cache_b.contains_key(&challenge_a), "peer_b must not see peer_a's stash");
+
+        reconstructor
+            .pending_ack_keys
+            .get(peer_a.public())
+            .unwrap()
+            .invalidate(&challenge_a);
+        assert!(
+            reconstructor.pending_ack_keys.get(peer_a.public()).unwrap().weighted_size() == 0,
+            "peer_a cache should be empty after invalidate"
+        );
+        assert!(
+            reconstructor.pending_ack_keys.get(peer_b.public()).unwrap().contains_key(&challenge_b),
+            "peer_b's stash must survive peer_a's invalidation"
         );
 
         Ok(())

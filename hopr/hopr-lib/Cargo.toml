@@ -67,6 +67,7 @@ capture = ["hopr-transport/capture"]
 default = []
 telemetry = [
   "hopr-transport/telemetry",
+  "hopr-network-graph?/telemetry",
   "hopr-api/types-telemetry",
   "hopr-utils/telemetry",
 ]
