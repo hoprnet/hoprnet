@@ -1,6 +1,11 @@
 use std::{collections::HashSet, time::Duration};
 
-use hopr_api::types::primitive::prelude::{Address, HoprBalance};
+use bytesize::ByteSize;
+use hopr_api::{
+    chain::WinningProbability,
+    types::primitive::prelude::{Address, HoprBalance, U256, UnitaryFloatOps},
+};
+use hopr_crypto_packet::prelude::HoprPacket;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
@@ -71,35 +76,131 @@ pub struct EligibilityConfig {
     pub blocklist: HashSet<Address>,
 }
 
-/// Initial and top-up balances for channel funding.
-#[serde_as]
+/// Initial and top-up capacities for channel funding expressed as human-readable
+/// data volumes.
+///
+/// The strategy converts each capacity to a wxHOPR amount at runtime using the
+/// live on-chain ticket price and winning probability via [`FundingConfig::resolve`].
+///
+/// **Conversion formula** (RFC-0005 §3.2):
+/// ```text
+/// packets     = ceil(capacity_bytes / HoprPacket::PAYLOAD_SIZE)
+/// funding_wei = ticket_price_wei × packets × assumed_hops / win_prob
+/// ```
+/// `assumed_hops` is the number of paid downstream relay hops.  Defaulting to 3
+/// (the protocol maximum) ensures the channel is never under-funded when paths
+/// use the full relay depth.
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct FundingConfig {
-    /// Balance when opening a new channel.  Default: 1 wxHOPR.
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(HoprBalance::new_base(1))]
-    pub initial_balance: HoprBalance,
+    /// Data volume a newly opened channel's stake should be able to carry.
+    /// Default: 1 GiB.
+    #[default(ByteSize::gib(1))]
+    pub initial_capacity: ByteSize,
 
-    /// Amount added when topping up an underfunded channel.  Default: 1 wxHOPR.
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(HoprBalance::new_base(1))]
-    pub topup_balance: HoprBalance,
+    /// Data volume added to a channel's stake when it is topped up.
+    /// Default: 1 GiB.
+    #[default(ByteSize::gib(1))]
+    pub topup_capacity: ByteSize,
 
-    /// Channel balance below which a top-up is triggered.  Default: 1 wxHOPR.
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(HoprBalance::new_base(1))]
-    pub lower_balance_threshold: HoprBalance,
+    /// The channel balance (expressed as data capacity) below which a top-up is
+    /// triggered.  Default: 128 MiB.
+    #[default(ByteSize::mib(128))]
+    pub lower_capacity_threshold: ByteSize,
 
-    /// Minimum safe balance required before opening or funding any channel.
-    /// Default: 1 wxHOPR.
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(HoprBalance::new_base(1))]
-    pub min_safe_balance_required: HoprBalance,
+    /// Minimum safe balance (expressed as data capacity) required before the
+    /// strategy opens or funds any channel.  Default: 1 GiB.
+    #[default(ByteSize::gib(1))]
+    pub min_safe_capacity_required: ByteSize,
 
     /// When `true` the fund and open passes are skipped entirely if the safe
-    /// balance is below `min_safe_balance_required`.  Default: true.
+    /// balance is below `min_safe_capacity_required`.  Default: true.
     #[default = true]
     pub stop_when_unfunded: bool,
+
+    /// Number of paid downstream relay hops assumed when sizing the channel
+    /// stake.  Must be ≥ 1.  Default: 3 (the protocol maximum).
+    #[default = 3]
+    #[validate(range(min = 1))]
+    pub assumed_hops: u32,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capacity → wxHOPR conversion
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// wxHOPR amounts resolved from [`FundingConfig`] at the current ticket
+/// economics.  Computed once per pipeline tick and threaded through the fund,
+/// open, and close-decision paths.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ResolvedFunding {
+    /// Initial balance when opening a new channel.
+    pub initial_balance: HoprBalance,
+    /// Amount added when topping up an underfunded channel.
+    pub topup_balance: HoprBalance,
+    /// Channel balance below which a top-up is triggered.
+    pub lower_balance_threshold: HoprBalance,
+    /// Minimum safe balance required before opening or funding any channel.
+    pub min_safe_balance_required: HoprBalance,
+}
+
+/// Convert a data `capacity` to a wxHOPR balance using the live ticket economics.
+///
+/// The formula matches the ticket-issuance math in `HoprTicketFactory`:
+/// ```text
+/// packets     = ceil(capacity_bytes / HoprPacket::PAYLOAD_SIZE)
+/// funding_wei = ticket_price_wei × packets × hops / win_prob
+/// ```
+/// Returns [`HoprBalance::zero`] for zero capacity.
+/// Falls back to a `win_prob`-independent estimate (`price × packets × hops`)
+/// when `win_prob` is zero or converting it to f64 would produce a non-positive
+/// value, to avoid dividing by zero.
+pub(crate) fn capacity_to_balance(
+    capacity: ByteSize,
+    price: HoprBalance,
+    win_prob: WinningProbability,
+    hops: u32,
+) -> HoprBalance {
+    let bytes = capacity.as_u64();
+    if bytes == 0 {
+        return HoprBalance::zero();
+    }
+
+    // ceil(bytes / PAYLOAD_SIZE)
+    let payload = HoprPacket::PAYLOAD_SIZE as u64;
+    let packets = bytes.div_ceil(payload);
+
+    // ticket_price_wei × packets × hops — saturating; overflow becomes u128::MAX
+    let wei_base = price
+        .amount()
+        .saturating_mul(U256::from(packets))
+        .saturating_mul(U256::from(hops));
+
+    // Divide by win_prob (≤ 1.0); fall back to no division if prob is degenerate.
+    let wp: f64 = win_prob.into();
+    let wei = if wp > 0.0 {
+        match wei_base.div_f64(wp) {
+            Ok(v) => v,
+            Err(_) => wei_base, // degenerate: return undiscounted value
+        }
+    } else {
+        wei_base
+    };
+
+    HoprBalance::from(wei)
+}
+
+impl FundingConfig {
+    /// Resolve all data-capacity fields to wxHOPR amounts at the given ticket
+    /// economics.  Called once per pipeline tick.
+    pub(crate) fn resolve(&self, price: HoprBalance, win_prob: WinningProbability) -> ResolvedFunding {
+        let hops = self.assumed_hops;
+        ResolvedFunding {
+            initial_balance: capacity_to_balance(self.initial_capacity, price, win_prob, hops),
+            topup_balance: capacity_to_balance(self.topup_capacity, price, win_prob, hops),
+            lower_balance_threshold: capacity_to_balance(self.lower_capacity_threshold, price, win_prob, hops),
+            min_safe_balance_required: capacity_to_balance(self.min_safe_capacity_required, price, win_prob, hops),
+        }
+    }
 }
 
 /// Configuration for proactive (predictive) channel funding.
@@ -375,6 +476,146 @@ mod config_tests {
         cfg.weights.trust_ack = 0.9;
         cfg.weights.trust_ticket = 0.9; // sum = 2.7
         assert!(cfg.validate_trust_weights().is_err());
+    }
+
+    // ── capacity_to_balance unit tests ──────────────────────────────────────
+
+    /// Helper: build a `HoprBalance` from raw wei as u128.
+    fn balance_from_wei(wei: u128) -> HoprBalance {
+        HoprBalance::from(U256::from(wei))
+    }
+
+    /// Helper: HOPR ticket price of 0.01 wxHOPR expressed in wei.
+    /// 0.01 × 10^18 = 10_000_000_000_000_000
+    const PRICE_WEI: u128 = 10_000_000_000_000_000;
+
+    #[test]
+    fn zero_capacity_returns_zero() {
+        let price = balance_from_wei(PRICE_WEI);
+        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        assert_eq!(
+            capacity_to_balance(ByteSize::b(0), price, wp, 3),
+            HoprBalance::zero()
+        );
+    }
+
+    #[test]
+    fn exact_packet_count_win_prob_one() {
+        // capacity = 10 × PAYLOAD_SIZE → exactly 10 packets
+        let price = balance_from_wei(PRICE_WEI);
+        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
+        let result = capacity_to_balance(capacity, price, wp, 3);
+        // expected: PRICE_WEI * 10 packets * 3 hops / 1.0
+        let expected = balance_from_wei(PRICE_WEI * 10 * 3);
+        assert_eq!(result, expected, "exact 10 packets, win_prob=1.0");
+    }
+
+    #[test]
+    fn half_win_prob_doubles_funding() {
+        // win_prob = 0.5 → face-value doubles vs. win_prob = 1.0
+        let price = balance_from_wei(PRICE_WEI);
+        let wp_full = WinningProbability::try_from(1.0f64).unwrap();
+        let wp_half = WinningProbability::try_from(0.5f64).unwrap();
+        let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
+        let full = capacity_to_balance(capacity, price, wp_full, 3);
+        let half = capacity_to_balance(capacity, price, wp_half, 3);
+        // half should be approximately double full
+        let ratio = half.amount().low_u128() as f64 / full.amount().low_u128() as f64;
+        assert!((ratio - 2.0).abs() < 0.01, "ratio={ratio}");
+    }
+
+    #[test]
+    fn sub_packet_capacity_rounds_up_to_one_packet() {
+        // 1 byte → ceil(1 / PAYLOAD_SIZE) = 1 packet
+        let price = balance_from_wei(PRICE_WEI);
+        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let result = capacity_to_balance(ByteSize::b(1), price, wp, 1);
+        let expected = balance_from_wei(PRICE_WEI * 1 * 1);
+        assert_eq!(result, expected, "1 byte rounds up to 1 packet");
+    }
+
+    #[test]
+    fn assumed_hops_scales_linearly() {
+        let price = balance_from_wei(PRICE_WEI);
+        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let capacity = ByteSize::b(HoprPacket::PAYLOAD_SIZE as u64);
+        let h1 = capacity_to_balance(capacity, price, wp, 1);
+        let h3 = capacity_to_balance(capacity, price, wp, 3);
+        assert_eq!(
+            h3.amount(),
+            h1.amount().saturating_mul(U256::from(3u64)),
+            "3 hops should be 3× 1 hop"
+        );
+    }
+
+    // ── FundingConfig::resolve ───────────────────────────────────────────────
+
+    #[test]
+    fn resolve_maps_all_four_fields() {
+        let cfg = FundingConfig::default();
+        let price = balance_from_wei(PRICE_WEI);
+        let wp = WinningProbability::try_from(1.0f64).unwrap();
+        let resolved = cfg.resolve(price, wp);
+
+        // Each resolved balance must match what capacity_to_balance produces independently.
+        assert_eq!(
+            resolved.initial_balance,
+            capacity_to_balance(cfg.initial_capacity, price, wp, cfg.assumed_hops)
+        );
+        assert_eq!(
+            resolved.topup_balance,
+            capacity_to_balance(cfg.topup_capacity, price, wp, cfg.assumed_hops)
+        );
+        assert_eq!(
+            resolved.lower_balance_threshold,
+            capacity_to_balance(cfg.lower_capacity_threshold, price, wp, cfg.assumed_hops)
+        );
+        assert_eq!(
+            resolved.min_safe_balance_required,
+            capacity_to_balance(cfg.min_safe_capacity_required, price, wp, cfg.assumed_hops)
+        );
+    }
+
+    // ── FundingConfig validation & defaults ─────────────────────────────────
+
+    #[test]
+    fn default_config_passes_validation() {
+        use validator::Validate as _;
+        let cfg = FundingConfig::default();
+        assert!(cfg.validate().is_ok(), "default FundingConfig should be valid");
+    }
+
+    #[test]
+    fn assumed_hops_zero_is_rejected() {
+        use validator::Validate as _;
+        let mut cfg = FundingConfig::default();
+        cfg.assumed_hops = 0;
+        assert!(cfg.validate().is_err(), "assumed_hops = 0 must be rejected");
+    }
+
+    #[test]
+    fn default_assumed_hops_is_three() {
+        assert_eq!(FundingConfig::default().assumed_hops, 3);
+    }
+
+    // ── Serde round-trip ─────────────────────────────────────────────────────
+
+    #[test]
+    fn funding_config_serde_roundtrip() {
+        // ByteSize serializes to human-readable strings ("5 GiB", "512 MiB", etc.).
+        // Use exact IEC multiples so serialize → deserialize is lossless.
+        let cfg = FundingConfig {
+            initial_capacity: ByteSize::gib(5),
+            topup_capacity: ByteSize::mib(512),
+            lower_capacity_threshold: ByteSize::mib(128),
+            min_safe_capacity_required: ByteSize::gib(2),
+            stop_when_unfunded: false,
+            assumed_hops: 2,
+        };
+        let json = serde_json::to_string(&cfg).expect("serialize");
+        let back: FundingConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cfg, back);
     }
 }
 

@@ -6,12 +6,12 @@ use std::time::Instant;
 use hopr_api::{
     chain::{
         ChainReadAccountOperations, ChainReadChannelOperations, ChainReadSafeOperations, ChainValues,
-        ChainWriteChannelOperations,
+        ChainWriteChannelOperations, WinningProbability,
     },
     node::{ActionableEventSource, HasChainApi, HasGraphView, HasNetworkView},
     types::{
         internal::prelude::{ChannelDirection, ChannelEntry, ChannelStatus},
-        primitive::prelude::Address,
+        primitive::prelude::{Address, HoprBalance},
     },
 };
 use tracing::{debug, info};
@@ -55,10 +55,28 @@ where
                 at: Instant::now(),
             });
 
-        if ch.balance <= self.cfg.funding.lower_balance_threshold {
+        // Resolve the funding thresholds from the current ticket economics.
+        let chain = self.node.chain_api();
+        let price = chain
+            .minimum_ticket_price()
+            .await
+            .unwrap_or_else(|e| {
+                debug!(%e, "channel-lifecycle: event-driven funding: ticket price unavailable, using zero");
+                HoprBalance::zero()
+            });
+        let win_prob = chain
+            .minimum_incoming_ticket_win_prob()
+            .await
+            .unwrap_or_else(|e| {
+                debug!(%e, "channel-lifecycle: event-driven funding: win_prob unavailable, using ALWAYS");
+                WinningProbability::ALWAYS
+            });
+        let funding = self.cfg.funding.resolve(price, win_prob);
+
+        if ch.balance <= funding.lower_balance_threshold {
             match self.safe_balance_budget().await {
-                Ok(budget) if budget >= self.cfg.funding.topup_balance => {
-                    self.try_fund_channel(&ch, self.cfg.funding.topup_balance);
+                Ok(budget) if budget >= funding.topup_balance => {
+                    self.try_fund_channel(&ch, funding.topup_balance);
                 }
                 Ok(budget) => {
                     debug!(%ch, %budget, "channel-lifecycle: event-driven funding skipped: safe too low");
