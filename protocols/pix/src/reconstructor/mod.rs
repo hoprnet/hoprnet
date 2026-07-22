@@ -48,8 +48,10 @@ pub struct SsaReconstructorConfig {
     pub max_tracked_peers: usize,
     /// Maximum number of awaited acknowledgements to extract a single share.
     ///
-    /// Default is 10 000 000, must be at least 10 000.
-    #[default(10_000_000)]
+    /// This corresponds to the maximum number of unacknowledged HOPR packets awaiting acknowledgement.
+    ///
+    /// Default is 1 000 000, must be at least 10 000.
+    #[default(1_000_000)]
     #[validate(range(min = 10000))]
     pub max_awaiting_acks: usize,
     /// Maximum time an acknowledgement can be awaited before it is discarded.
@@ -427,7 +429,9 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     // Stash the ack so a subsequent call can retry once the verifier arrives.
                     tracing::trace!(%peer, "verifier not yet available, stashing ack for retry");
                     self.pending_ack_keys
-                        .get_with(peer, || moka::sync::CacheBuilder::new(8).build())
+                        .get_with(peer, || {
+                            moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64).build()
+                        })
                         .insert(ack_challenge, ack);
                 }
                 Err(error) => {
