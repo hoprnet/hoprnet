@@ -172,7 +172,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         // Both verifier and builder confirmed present — refresh the builder TTL so it
         // doesn't expire while shares for other polynomials keep the verifier alive.
-        self.ssa_builders
+        // Hold the Arc so we don't need a redundant cache lookup after add_share.
+        let builder = self
+            .ssa_builders
             .get(spi.as_ref())
             .ok_or(PixError::MissingSsaCommitment)?;
 
@@ -199,11 +201,6 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             }
             Err(e) => return Err(e),
         };
-
-        let builder = self
-            .ssa_builders
-            .get(spi.as_ref())
-            .ok_or(PixError::MissingSsaCommitment)?;
 
         let mut builder_guard = builder.lock();
         let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
