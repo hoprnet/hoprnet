@@ -87,7 +87,7 @@ pub struct StressReport {
 }
 
 impl StressReport {
-    /// Prints the per-window throughput series and a summary line to stdout.
+    /// Prints the per-window throughput series and a detailed summary to stdout.
     pub fn print_series(&self) {
         println!(
             "\n  {:>8}  {:>12}  {:>12}  {:>10}",
@@ -109,18 +109,36 @@ impl StressReport {
             );
         }
         println!("  {}", "─".repeat(52));
+
+        // Derived stats
         let in_flight = self.total_bytes_delivered.saturating_sub(self.total_bytes_received);
+        let loss_pct = if self.total_bytes_delivered > 0 {
+            (in_flight as f64 / self.total_bytes_delivered as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Peak throughput (highest non-zero window)
+        let peak_send = self.samples.iter().map(|s| s.mbps).fold(0.0f64, f64::max);
+        let peak_recv = self.samples.iter().map(|s| s.recv_mbps).fold(0.0f64, f64::max);
+
         println!(
-            "  Sent:  {} in {:.2}s — mean {:.3} MB/s",
+            "  Sent:  {} in {:.2}s — mean {:.3} MB/s  peak {:.3} MB/s",
             bytesize::ByteSize(self.total_bytes_delivered),
             self.duration.as_secs_f64(),
             self.mean_mbps,
+            peak_send,
         );
         println!(
-            "  Recv:  {} — mean {:.3} MB/s  (in-flight: {})",
+            "  Recv:  {} — mean {:.3} MB/s  peak {:.3} MB/s",
             bytesize::ByteSize(self.total_bytes_received),
             self.mean_recv_mbps,
+            peak_recv,
+        );
+        println!(
+            "  Loss:  {} ({:.2}%)  [packets dropped or still in pipeline at drain timeout]",
             bytesize::ByteSize(in_flight),
+            loss_pct,
         );
     }
 }
@@ -133,8 +151,11 @@ pub struct StressConfig {
     /// Total bytes to write into the pipeline before stopping.
     ///
     /// Counted when each `write_all` + `flush` cycle completes on the sender side.
-    /// Measures the forward path (src→relay→dst) throughput; the return path is
-    /// not read back because sessions require SURBs for bidirectional flow.
+    /// Measures the forward path (src→relay→dst); the return path is not read back
+    /// because sessions do not provision SURBs for bidirectional flow.
+    /// Delivery at the destination is tracked via [`ClusterGuard::echo_received`].
+    ///
+    /// [`ClusterGuard::echo_received`]: super::fixtures::ClusterGuard::echo_received
     pub total_bytes: u64,
 
     /// Number of concurrent 1-hop sessions to maintain.
@@ -352,11 +373,11 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
 
     // Worker tasks: one per session. Each loops: write → flush → count.
     //
-    // Reading the echo back requires SURBs on the exit node (DestinationRouting::Return),
-    // which the default create_session config does not supply. Cluster tests only exercise
-    // the forward path (src→relay→dst). Throughput is measured as bytes written into the
-    // pipeline — sufficient to saturate and profile SPHINX encoding, ticket creation, the
-    // relay, and the mixer.
+    // The EchoServer at the destination counts bytes received on the forward path
+    // (src→relay→dst) without echoing them back.  Echoing requires SURBs on the
+    // exit node (DestinationRouting::Return), which are not provisioned here.
+    // Forward throughput is sufficient to saturate SPHINX encoding, ticket
+    // creation, the relay, and the mixer — the primary profiling targets.
     let msg_size_range = cfg.msg_size_range.clone();
     let seed = cfg.seed;
     let worker_handles: Vec<_> = sessions
