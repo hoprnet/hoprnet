@@ -35,6 +35,24 @@ const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
+/// Number of Rayon threads kept permanently free for outgoing packet encode (SURB generation).
+/// The ingress decode concurrency default is `pool_thread_count - ENCODE_RESERVED_THREADS` so
+/// that heavy download traffic cannot starve the upload/SURB replenishment path.
+const ENCODE_RESERVED_THREADS: usize = 2;
+
+/// Ingress gate sampler interval.
+const INGRESS_GATE_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Artificial per-packet delay injected into `wire_in` when the Rayon pool is detected as
+/// congested. 20 ms keeps the decode queue from growing while still allowing acks and keep-alive
+/// SURB packets to drain through at a reasonable pace.
+const INGRESS_THROTTLE_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
+
+/// Pool outstanding-task watermark factor: the gate trips when
+/// `outstanding_tasks > pool_thread_count * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
+/// A factor of 3 gives one full pool worth of headroom above the cap.
+const INGRESS_POOL_HIGH_WATERMARK_FACTOR: usize = 3;
+
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
@@ -88,6 +106,32 @@ pub enum PacketPipelineProcesses {
     AckIn,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
+    #[strum(to_string = "HOPR [msg] - ingress gate")]
+    IngressGateSampler,
+}
+
+/// Monitors the shared Rayon pool and sets `pool_congested` when outstanding tasks exceed
+/// `high_watermark`. The ingress pipeline checks this flag and adds a brief per-packet delay
+/// so that the encode/SURB-generation path always has threads available.
+async fn run_ingress_gate_sampler(
+    pool_congested: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    high_watermark: usize,
+) {
+    loop {
+        hopr_utils::runtime::prelude::sleep(INGRESS_GATE_SAMPLE_INTERVAL).await;
+        let outstanding = hopr_utils::parallelize::cpu::outstanding_tasks();
+        let is_congested = outstanding > high_watermark;
+        let was_congested = pool_congested.swap(is_congested, std::sync::atomic::Ordering::Relaxed);
+        if was_congested != is_congested {
+            tracing::debug!(
+                outstanding,
+                high_watermark,
+                is_congested,
+                "ingress gate state changed — {} throttle on incoming packets",
+                if is_congested { "applying" } else { "removing" },
+            );
+        }
+    }
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
@@ -746,8 +790,9 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
-    // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
+    // `avail_concurrency` is used as a deep ready-queue for the encode (egress) path where deep
+    // queuing is harmless, and as a fallback when the Rayon pool has not been initialised yet.
+    // Zero is normalised to 1 to prevent deadlock (0 concurrent tasks = no work done ever).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
         .map(|n| n.get())
@@ -756,7 +801,41 @@ where
         * 8;
 
     let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
-    let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+
+    // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
+    // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
+    // Without this cap the FIFO pool fills up with decode work under heavy download traffic and
+    // SURB replenishment starves, slowly collapsing the session's download throughput.
+    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
+    let default_input_concurrency = if pool_threads > ENCODE_RESERVED_THREADS {
+        pool_threads - ENCODE_RESERVED_THREADS
+    } else if pool_threads > 0 {
+        1 // pool is tiny but initialised — leave at least 1 decode slot
+    } else {
+        avail_concurrency // pool not initialised yet; fall back to the old behaviour
+    };
+    let input_concurrency = cfg
+        .input_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(default_input_concurrency);
+
+    // --- Ingress gate (safety-net backpressure) ---
+    // A background sampler monitors the Rayon pool's outstanding task count. When the pool is
+    // congested (outstanding > pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR), it sets
+    // `pool_congested = true` and the `wire_in` stream inserts a brief per-packet delay so the
+    // encode path always gets CPU time. The gate is fully transparent when the pool is healthy.
+    let pool_congested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let gate_reader = pool_congested.clone();
+    let high_watermark = pool_threads.max(1) * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
+    let wire_in = wire_in.then(move |(peer, data)| {
+        let congested = gate_reader.load(std::sync::atomic::Ordering::Relaxed);
+        async move {
+            if congested {
+                hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
+            }
+            (peer, data)
+        }
+    });
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
@@ -839,6 +918,11 @@ where
             );
         }
     }
+
+    processes.insert(
+        PacketPipelineProcesses::IngressGateSampler,
+        hopr_utils::spawn_as_abortable!(run_ingress_gate_sampler(pool_congested, high_watermark).in_current_span()),
+    );
 
     processes
 }

@@ -187,7 +187,7 @@ validator = { version = "0.20.0", features = ["derive"] }
 
 hopr-api = "1.15.0"
 hopr-types = { version = "2.0.0", features = ["use-bindings"] }
-hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
+hopr-utils = { version = "0.3.1", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
