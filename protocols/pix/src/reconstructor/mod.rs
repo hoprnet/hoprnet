@@ -170,15 +170,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
-        // Both verifier and builder confirmed present — refresh the builder TTL so it
-        // doesn't expire while shares for other polynomials keep the verifier alive.
-        // Hold the Arc so we don't need a redundant cache lookup after add_share.
+        // Guard: confirm the builder exists (and refresh its idle TTL) before consuming
+        // the share. The builder has a shorter TTL (10 min) than the verifier (30 min),
+        // so acks for other polynomials can keep the verifier alive long after the
+        // builder has expired — without this guard, the recovered part would be dropped
+        // with no retry path. Hold the Arc to skip a redundant cache lookup later.
         let builder = self
             .ssa_builders
             .get(spi.as_ref())
             .ok_or(PixError::MissingSsaCommitment)?;
 
-        // Verifier and builder confirmed — safe to remove the share from the pending cache.
+        // Verifier and builder confirmed — safe to consume the share.
         awaiting_ack_from_peer.remove(&ack_challenge);
 
         // The share cannot be empty at this point because we prevent empty share insertions
