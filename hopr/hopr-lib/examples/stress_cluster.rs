@@ -48,7 +48,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use hopr_lib::testing::{
-    fixtures::{TestNodeConfig, cluster_fixture},
+    fixtures::{STRESS_WIN_PROB, stress_cluster_fixture},
     loadgen::{ProfilerGuard, StressConfig, run_stress},
 };
 
@@ -148,7 +148,7 @@ fn main() -> anyhow::Result<()> {
     // cluster_fixture is a blocking call that waits for full-mesh connectivity
     // before returning.  Call it from the main thread before creating the async
     // runtime so we don't block a runtime thread.
-    let cluster = cluster_fixture(vec![TestNodeConfig::default(); args.nodes]);
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, args.nodes);
 
     eprintln!("→ Cluster ready.  Opening channels and sessions…");
 
