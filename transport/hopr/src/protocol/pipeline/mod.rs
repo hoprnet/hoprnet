@@ -40,9 +40,6 @@ const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_m
 /// that heavy download traffic cannot starve the upload/SURB replenishment path.
 const ENCODE_RESERVED_THREADS: usize = 2;
 
-/// Ingress gate sampler interval.
-const INGRESS_GATE_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
-
 /// Artificial per-packet delay injected into `wire_in` when the Rayon pool is detected as
 /// congested. 20 ms keeps the decode queue from growing while still allowing acks and keep-alive
 /// SURB packets to drain through at a reasonable pace.
@@ -106,32 +103,6 @@ pub enum PacketPipelineProcesses {
     AckIn,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-    #[strum(to_string = "HOPR [msg] - ingress gate")]
-    IngressGateSampler,
-}
-
-/// Monitors the shared Rayon pool and sets `pool_congested` when outstanding tasks exceed
-/// `high_watermark`. The ingress pipeline checks this flag and adds a brief per-packet delay
-/// so that the encode/SURB-generation path always has threads available.
-async fn run_ingress_gate_sampler(
-    pool_congested: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    high_watermark: usize,
-) {
-    loop {
-        hopr_utils::runtime::prelude::sleep(INGRESS_GATE_SAMPLE_INTERVAL).await;
-        let outstanding = hopr_utils::parallelize::cpu::outstanding_tasks();
-        let is_congested = outstanding > high_watermark;
-        let was_congested = pool_congested.swap(is_congested, std::sync::atomic::Ordering::Relaxed);
-        if was_congested != is_congested {
-            tracing::debug!(
-                outstanding,
-                high_watermark,
-                is_congested,
-                "ingress gate state changed — {} throttle on incoming packets",
-                if is_congested { "applying" } else { "removing" },
-            );
-        }
-    }
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
@@ -820,21 +791,15 @@ where
         .unwrap_or(default_input_concurrency);
 
     // --- Ingress gate (safety-net backpressure) ---
-    // A background sampler monitors the Rayon pool's outstanding task count. When the pool is
-    // congested (outstanding > pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR), it sets
-    // `pool_congested = true` and the `wire_in` stream inserts a brief per-packet delay so the
-    // encode path always gets CPU time. The gate is fully transparent when the pool is healthy.
-    let pool_congested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let gate_reader = pool_congested.clone();
+    // outstanding_tasks() is a single atomic load, so checking it per-packet is cheaper than
+    // maintaining a sampler task + shared AtomicBool. The delay is only incurred when the pool is
+    // actually congested, which is also when packets arrive fastest.
     let high_watermark = pool_threads.max(1) * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
-    let wire_in = wire_in.then(move |(peer, data)| {
-        let congested = gate_reader.load(std::sync::atomic::Ordering::Relaxed);
-        async move {
-            if congested {
-                hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
-            }
-            (peer, data)
+    let wire_in = wire_in.then(move |(peer, data)| async move {
+        if hopr_utils::parallelize::cpu::outstanding_tasks() > high_watermark {
+            hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
         }
+        (peer, data)
     });
 
     processes.insert(
@@ -918,11 +883,6 @@ where
             );
         }
     }
-
-    processes.insert(
-        PacketPipelineProcesses::IngressGateSampler,
-        hopr_utils::spawn_as_abortable!(run_ingress_gate_sampler(pool_congested, high_watermark).in_current_span()),
-    );
 
     processes
 }
