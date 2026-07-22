@@ -177,3 +177,41 @@ async fn three_node_cluster_5mb_single_session() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Same as `three_node_cluster_5mb_single_session` but with 15 MB to verify that
+/// throughput holds at higher sustained load (channel balance should not be exhausted
+/// at 0.001 win probability with 100 000 wxHOPR funding).
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[ignore = "slow: requires ~60s cluster bootstrap; run with --run-ignored"]
+async fn three_node_cluster_15mb_single_session() -> anyhow::Result<()> {
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, 3);
+
+    let cfg = StressConfig {
+        total_bytes: 15 * 1024 * 1024,
+        routes: 1,
+        msg_size_range: 4096..=32768,
+        sample_interval: Duration::from_millis(500),
+        seed: 42,
+    };
+
+    let report = run_stress(&cluster, &cfg).await?;
+
+    report.print_series();
+
+    anyhow::ensure!(
+        report.total_bytes_delivered >= cfg.total_bytes,
+        "delivered {} bytes, expected at least {}",
+        report.total_bytes_delivered,
+        cfg.total_bytes,
+    );
+    anyhow::ensure!(!report.samples.is_empty(), "no throughput samples recorded");
+    anyhow::ensure!(
+        report.samples.iter().any(|s| s.recv_window_bytes > 0),
+        "no bytes received at destination — pipeline delivered nothing"
+    );
+
+    Ok(())
+}
