@@ -99,17 +99,17 @@ pub struct FundingConfig {
 
     /// Data volume added to a channel's stake when it is topped up.
     /// Default: 1 GiB.
-    #[default(ByteSize::gib(1))]
+    #[default(ByteSize::mib(512))]
     pub topup_capacity: ByteSize,
 
     /// The channel balance (expressed as data capacity) below which a top-up is
     /// triggered.  Default: 128 MiB.
-    #[default(ByteSize::mib(128))]
+    #[default(ByteSize::mib(512))]
     pub lower_capacity_threshold: ByteSize,
 
     /// Minimum safe balance (expressed as data capacity) required before the
     /// strategy opens or funds any channel.  Default: 1 GiB.
-    #[default(ByteSize::gib(1))]
+    #[default(ByteSize::mib(512))]
     pub min_safe_capacity_required: ByteSize,
 
     /// When `true` the fund and open passes are skipped entirely if the safe
@@ -120,7 +120,7 @@ pub struct FundingConfig {
     /// Number of paid downstream relay hops assumed when sizing the channel
     /// stake.  Must be ≥ 1.  Default: 3 (the protocol maximum).
     #[default = 3]
-    #[validate(range(min = 1))]
+    #[validate(range(min = 1, max = 3))]
     pub assumed_hops: u32,
 }
 
@@ -169,7 +169,7 @@ pub(crate) fn capacity_to_balance(
     let payload = HoprPacket::PAYLOAD_SIZE as u64;
     let packets = bytes.div_ceil(payload);
 
-    // ticket_price_wei × packets × hops — saturating; overflow becomes u128::MAX
+    // ticket_price_wei × packets × hops — saturating; overflow becomes U256::MAX
     let wei_base = price
         .amount()
         .saturating_mul(U256::from(packets))

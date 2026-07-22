@@ -63,9 +63,9 @@ where
 
         if ch.balance < funding.lower_balance_threshold {
             match self.safe_balance_budget().await {
-                Ok(budget) if budget >= funding.topup_balance => {
-                    self.try_fund_channel(&ch, funding.topup_balance);
-                }
+Ok(budget) if funding.topup_balance != HoprBalance::zero() && budget >= funding.topup_balance => {
+    self.try_fund_channel(&ch, funding.topup_balance);
+}
                 Ok(budget) => {
                     tracing::debug!(%ch, %budget, "channel-lifecycle: event-driven funding skipped: safe too low");
                 }
