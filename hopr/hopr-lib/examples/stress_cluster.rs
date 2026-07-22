@@ -55,7 +55,7 @@ use hopr_lib::testing::{
 // ── Argument parsing ──────────────────────────────────────────────────────────
 
 struct Args {
-    nodes: usize,
+    hops: usize,
     total_bytes: u64,
     routes: usize,
     seed: u64,
@@ -65,7 +65,7 @@ struct Args {
 impl Args {
     fn parse() -> anyhow::Result<Self> {
         let mut iter = std::env::args().skip(1);
-        let mut nodes = 5usize;
+        let mut hops = 1usize;
         let mut mb = 100u64;
         let mut routes = 4usize;
         let mut seed = 42u64;
@@ -75,17 +75,19 @@ impl Args {
             match flag.as_str() {
                 "--help" | "-h" => {
                     eprintln!(
-                        "Usage: stress_cluster [--nodes N] [--mb N] [--routes N] [--seed N] [--out PATH]\n\
+                        "Usage: stress_cluster [--hops N] [--mb N] [--routes N] [--seed N] [--out PATH]\n\
                          \n\
-                         --nodes N    Cluster size, 2–9          (default: 5)\n\
+                         --hops N     Relay hops per path, 1–3   (default: 1)\n\
                          --mb N       Megabytes to deliver        (default: 100)\n\
-                         --routes N   Concurrent 1-hop sessions   (default: 4)\n\
+                         --routes N   Concurrent sessions          (default: 4)\n\
                          --seed N     RNG seed                    (default: 42)\n\
-                         --out PATH   Write flame graph SVG here  (profiling feature only)"
+                         --out PATH   Write flame graph SVG here  (profiling feature only)\n\
+                         \n\
+                         Cluster size is set automatically to hops + 2."
                     );
                     std::process::exit(0);
                 }
-                "--nodes" => nodes = next_usize(&mut iter, "--nodes")?,
+                "--hops" => hops = next_usize(&mut iter, "--hops")?,
                 "--mb" => mb = next_u64(&mut iter, "--mb")?,
                 "--routes" => routes = next_usize(&mut iter, "--routes")?,
                 "--seed" => seed = next_u64(&mut iter, "--seed")?,
@@ -98,7 +100,7 @@ impl Args {
         }
 
         Ok(Args {
-            nodes,
+            hops,
             total_bytes: mb * 1024 * 1024,
             routes,
             seed,
@@ -122,10 +124,11 @@ fn next_u64(iter: &mut impl Iterator<Item = String>, flag: &str) -> anyhow::Resu
 fn main() -> anyhow::Result<()> {
     let args = Args::parse()?;
     anyhow::ensure!(
-        (2..=9).contains(&args.nodes),
-        "--nodes must be between 2 and 9, got {}",
-        args.nodes,
+        (1..=3).contains(&args.hops),
+        "--hops must be between 1 and 3, got {}",
+        args.hops,
     );
+    let n_nodes = args.hops + 2;
 
     // Initialize the Rayon thread pool for SPHINX crypto operations before any
     // HOPR nodes start.  Without this, pool_thread_count() returns 0 and all
@@ -140,19 +143,20 @@ fn main() -> anyhow::Result<()> {
     let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
 
     eprintln!(
-        "→ Starting {}-node cluster — full-mesh connectivity can take ~100 s for 3 nodes,\n  longer for larger \
-         clusters. Please wait…",
-        args.nodes
+        "→ Starting {n_nodes}-node cluster ({}-hop) — full-mesh connectivity can take ~100 s for 3 nodes,\n  \
+         longer for larger clusters. Please wait…",
+        args.hops
     );
 
-    // cluster_fixture is a blocking call that waits for full-mesh connectivity
-    // before returning.  Call it from the main thread before creating the async
-    // runtime so we don't block a runtime thread.
-    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, args.nodes);
+    // stress_cluster_fixture is a blocking call that waits for full-mesh
+    // connectivity before returning.  Call it from the main thread before
+    // creating the async runtime so we don't block a runtime thread.
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, n_nodes);
 
     eprintln!("→ Cluster ready.  Opening channels and sessions…");
 
     let cfg = StressConfig {
+        hops: args.hops,
         total_bytes: args.total_bytes,
         routes: args.routes,
         seed: args.seed,
@@ -163,7 +167,7 @@ fn main() -> anyhow::Result<()> {
     // Build the async runtime *after* cluster startup so its thread pool does
     // not compete with node bootstrap.
     let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(4.max(args.nodes * 2))
+        .worker_threads(4.max(n_nodes * 2))
         .enable_all()
         .build()?;
 
@@ -173,9 +177,10 @@ fn main() -> anyhow::Result<()> {
     let profiler = ProfilerGuard::start(1000)?;
 
     eprintln!(
-        "→ Sending {} MB across {} 1-hop session(s) (seed={})…",
+        "→ Sending {} MB across {} {}-hop session(s) (seed={})…",
         args.total_bytes / (1024 * 1024),
         args.routes,
+        args.hops,
         args.seed,
     );
 
