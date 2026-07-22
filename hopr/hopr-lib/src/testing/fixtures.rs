@@ -58,6 +58,9 @@ pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client:
 pub struct ClusterGuard {
     pub cluster: Vec<TestedHopr>,
     pub chain_client: BlokliTestClient<FullStateEmulator>,
+    /// Aggregate bytes received by all EchoServer sessions across every cluster node.
+    /// Incremented progressively as bytes arrive — suitable for throughput sampling.
+    pub echo_received: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::ops::Deref for ClusterGuard {
@@ -524,6 +527,9 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
         })
         .collect::<Vec<_>>();
 
+    // Shared counter: all EchoServer instances across all nodes write to this.
+    let echo_received = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+
     // Setup nodes
     let cluster: Vec<TestedHopr> = (0..size)
         .map(|i| {
@@ -531,6 +537,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
             let win_prob = configs[i].win_prob;
+            let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
                 .clone()
@@ -582,7 +589,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                             ..Default::default()
                         }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
-                        EchoServer::new(),
+                        EchoServer::with_counter(echo_counter),
                     )
                     .await?;
 
@@ -632,7 +639,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
     info!(swarm_size, "CLUSTER STARTED");
 
-    ClusterGuard { cluster, chain_client }
+    ClusterGuard { cluster, chain_client, echo_received }
 }
 
 async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
