@@ -124,7 +124,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                 let encoder = encoder.clone();
                 let counters = counters.clone();
                 async move {
-                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                         move || {
                             encoder.encode_packet(
                                 data.data.to_bytes(),
@@ -157,6 +157,8 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                         }
                         Err(error) => {
                             tracing::error!(%error, "timeout while processing the outgoing packet");
+                            hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             None
                         }
                     }
@@ -228,7 +230,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             tracing::trace!(%peer, "protocol message in");
 
             async move {
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || decoder.decode(peer, data), "packet_decode")
+                match hopr_utils::parallelize::cpu::spawn_decode_blocking(move || decoder.decode(peer, data), "packet_decode")
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(Ok(packet))) => {
@@ -296,6 +298,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
+                        hopr_utils::parallelize::cpu::DECODE_TIMEOUT_DROPS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_PACKET_DECODE_TIMEOUTS.increment();

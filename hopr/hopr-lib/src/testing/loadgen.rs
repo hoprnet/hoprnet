@@ -35,7 +35,7 @@ use std::{
     ops::RangeInclusive,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -84,6 +84,32 @@ pub struct StressReport {
     pub mean_mbps: f64,
     /// Mean receive throughput in MB/s averaged across all sample windows.
     pub mean_recv_mbps: f64,
+    /// Theoretical SURB keep-alive overhead in MB/s per session (infrastructure traffic,
+    /// not counted in throughput above — invisible at the session layer, carried entirely
+    /// inside the SPHINX packet payload fields separate from application data).
+    ///
+    /// Computed as: `max_surbs_per_sec ÷ MAX_SURBS_IN_PACKET × SPHINX_packet_size`.
+    /// With defaults: 5000 ÷ 2 × 1461 B ≈ 3.48 MB/s per session.
+    pub surb_overhead_mbps_per_session: f64,
+    /// Peak simultaneous encode (packet_encode + SURB generation) tasks in the Rayon pool
+    /// observed during the workload phase.
+    pub peak_encode_outstanding: usize,
+    /// Peak simultaneous decode (packet_decode) tasks in the Rayon pool observed during
+    /// the workload phase.
+    pub peak_decode_outstanding: usize,
+    /// Decode timeout drops that occurred during the workload phase (delta from baseline).
+    /// Each unit is one incoming packet that was discarded because Rayon did not return
+    /// the decoded result within `PACKET_DECODING_TIMEOUT` (150 ms).
+    pub decode_timeout_drops: u64,
+    /// Session inbox drops that occurred during the workload phase (delta from baseline).
+    /// Each unit is one packet that was decoded successfully but could not be forwarded
+    /// to the session because the per-session bounded inbox was full.
+    pub session_inbox_drops: u64,
+    /// Encode timeout drops that occurred during the workload phase (delta from baseline).
+    /// Each unit is one outgoing packet (data or SURB keep-alive) that was dropped because
+    /// the Rayon encode future exceeded its 150 ms budget — a direct sign of pool saturation
+    /// on the encode path.
+    pub encode_timeout_drops: u64,
 }
 
 impl StressReport {
@@ -140,6 +166,24 @@ impl StressReport {
             bytesize::ByteSize(in_flight),
             loss_pct,
         );
+        let surb_total_mb = self.surb_overhead_mbps_per_session * self.duration.as_secs_f64();
+        println!(
+            "  SURB:  ~{:.2} MB/s per session (infrastructure overhead — not counted above)",
+            self.surb_overhead_mbps_per_session,
+        );
+        println!(
+            "         ~{:.1} MB theoretical keep-alive traffic over {:.2}s",
+            surb_total_mb,
+            self.duration.as_secs_f64(),
+        );
+        println!(
+            "  Pool:  encode peak {} tasks  decode peak {} tasks",
+            self.peak_encode_outstanding, self.peak_decode_outstanding,
+        );
+        println!(
+            "  Drops: encode_timeout {}  decode_timeout {}  session_inbox {}",
+            self.encode_timeout_drops, self.decode_timeout_drops, self.session_inbox_drops,
+        );
     }
 }
 
@@ -148,12 +192,11 @@ impl StressReport {
 /// Configuration for [`run_stress`].
 #[derive(Debug, Clone)]
 pub struct StressConfig {
-    /// Total bytes to write into the pipeline before stopping.
+    /// Total application bytes to write into the pipeline before stopping.
     ///
     /// Counted when each `write_all` + `flush` cycle completes on the sender side.
-    /// Measures the forward path (src→relay→dst); the return path is not read back
-    /// because sessions do not provision SURBs for bidirectional flow.
     /// Delivery at the destination is tracked via [`ClusterGuard::echo_received`].
+    /// SURB keep-alive traffic (infrastructure overhead) is excluded from all statistics.
     ///
     /// [`ClusterGuard::echo_received`]: super::fixtures::ClusterGuard::echo_received
     pub total_bytes: u64,
@@ -336,12 +379,22 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let total_target = cfg.total_bytes;
     let sample_interval = cfg.sample_interval;
 
+    // Baseline counters before the workload starts so we can compute deltas.
+    let baseline_decode_drops = hopr_utils::parallelize::cpu::decode_timeout_drop_count() as u64;
+    let baseline_encode_drops = hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64;
+    let baseline_inbox_drops = hopr_utils::parallelize::session_inbox_drop_count() as u64;
+
     // Sampler task: records a ThroughputSample every `sample_interval`.
     // Tracks both sent bytes (written into the pipeline) and received bytes
     // (confirmed arrived at destination EchoServers).
+    // Also tracks peak Rayon encode/decode outstanding tasks for pool diagnostics.
     let (sample_tx, mut sample_rx) = tokio::sync::mpsc::unbounded_channel::<ThroughputSample>();
     let sampler_delivered = Arc::clone(&delivered);
     let sampler_received = Arc::clone(&cluster.echo_received);
+    let peak_encode = Arc::new(AtomicUsize::new(0));
+    let peak_decode = Arc::new(AtomicUsize::new(0));
+    let sampler_peak_encode = Arc::clone(&peak_encode);
+    let sampler_peak_decode = Arc::clone(&peak_decode);
     let workload_start = tokio::time::Instant::now();
     let sampler = tokio::spawn(async move {
         let mut ticker = tokio::time::interval(sample_interval);
@@ -360,6 +413,17 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
             let secs = sample_interval.as_secs_f64();
             let mbps = (window_bytes as f64 / (1024.0 * 1024.0)) / secs;
             let recv_mbps = (recv_window_bytes as f64 / (1024.0 * 1024.0)) / secs;
+
+            // Track peak Rayon encode/decode outstanding tasks.
+            sampler_peak_encode.fetch_max(
+                hopr_utils::parallelize::cpu::encode_outstanding_tasks(),
+                Ordering::Relaxed,
+            );
+            sampler_peak_decode.fetch_max(
+                hopr_utils::parallelize::cpu::decode_outstanding_tasks(),
+                Ordering::Relaxed,
+            );
+
             // Ignore send errors — they happen only if the receiver is dropped.
             let _ = sample_tx.send(ThroughputSample {
                 elapsed,
@@ -373,11 +437,10 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
 
     // Worker tasks: one per session. Each loops: write → flush → count.
     //
-    // The EchoServer at the destination counts bytes received on the forward path
-    // (src→relay→dst) without echoing them back.  Echoing requires SURBs on the
-    // exit node (DestinationRouting::Return), which are not provisioned here.
-    // Forward throughput is sufficient to saturate SPHINX encoding, ticket
-    // creation, the relay, and the mixer — the primary profiling targets.
+    // The EchoServer at the destination counts application bytes received on the forward
+    // path (src→relay→dst).  SURB keep-alive packets (infrastructure traffic carrying
+    // SURBs in the SPHINX payload field) are transparent at the session layer — they
+    // never reach the EchoServer and are not counted in any throughput figure.
     let msg_size_range = cfg.msg_size_range.clone();
     let seed = cfg.seed;
     let worker_handles: Vec<_> = sessions
@@ -507,6 +570,22 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         samples.iter().map(|s| s.recv_mbps).sum::<f64>() / samples.len() as f64
     };
 
+    // Theoretical SURB keep-alive overhead (infrastructure, not counted in throughput).
+    // SurbBalancerConfig::default(): max_surbs_per_sec = 5000, MAX_SURBS_IN_PACKET = 2.
+    // Each keep-alive is a full SPHINX packet = 1461 bytes (422 header + 1039 payload).
+    const MAX_SURBS_IN_PACKET: f64 = 2.0;
+    const SPHINX_PKT_BYTES: f64 = 1461.0;
+    const MAX_SURBS_PER_SEC: f64 = 5000.0;
+    let surb_overhead_mbps_per_session =
+        (MAX_SURBS_PER_SEC / MAX_SURBS_IN_PACKET * SPHINX_PKT_BYTES) / (1024.0 * 1024.0);
+
+    let decode_timeout_drops =
+        hopr_utils::parallelize::cpu::decode_timeout_drop_count() as u64 - baseline_decode_drops;
+    let encode_timeout_drops =
+        hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64 - baseline_encode_drops;
+    let session_inbox_drops =
+        hopr_utils::parallelize::session_inbox_drop_count() as u64 - baseline_inbox_drops;
+
     Ok(StressReport {
         samples,
         total_bytes_delivered,
@@ -514,5 +593,11 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         duration: workload_duration,
         mean_mbps,
         mean_recv_mbps,
+        surb_overhead_mbps_per_session,
+        peak_encode_outstanding: peak_encode.load(Ordering::Relaxed),
+        peak_decode_outstanding: peak_decode.load(Ordering::Relaxed),
+        decode_timeout_drops,
+        session_inbox_drops,
+        encode_timeout_drops,
     })
 }

@@ -19,7 +19,7 @@ use tracing::info;
 #[allow(deprecated)]
 use crate::HoprSessionClientExplicitPathConfig;
 use crate::{
-    HopRouting, HoprSessionClientConfig,
+    HopRouting, HoprSessionClientConfig, SurbBalancerConfig,
     api::{
         network::NetworkView,
         node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
@@ -183,7 +183,7 @@ impl ClusterGuard {
                     return_path: routing,
                     capabilities: Default::default(),
                     pseudonym: None,
-                    surb_management: None,
+                    surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
                 },
             )
