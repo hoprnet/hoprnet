@@ -1329,6 +1329,7 @@ where
                     })
                     .map_err(|error| {
                         error!(%session_id, %error, "failed to dispatch session data");
+                        crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         SessionManagerError::other(error)
                     })?)
             } else {
