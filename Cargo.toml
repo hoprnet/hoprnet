@@ -60,44 +60,124 @@ order = [
 ]
 
 [workspace.dependencies]
+ahash = "0.8.12"
 anyhow = "1.0.103"
-arrayvec = "0.7.8"
+aquamarine = "0.6.0"
+arrayvec = { version = "0.7.7" }
+assertables = "10.1.0"
 async-broadcast = "0.7.2"
+async_channel_io = "0.3.0"
+async-lock = "3.4.2"
 async-trait = "0.1.89"
+asynchronous-codec = { version = "0.7.0" }
+atomic_enum = "0.3.0"
+auto_impl = "1.3.0"
 backon = { version = "1.6.0", default-features = false }
+base64 = "0.22.1"
+bimap = "0.6.3"
+bitvec = "1.1.1"
+blokli-client = "0.30.0"
+bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.4.0", features = ["serde"] }
+bytes = "1.12.0"
+cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
+chrono = { version = "0.4.45", default-features = false, features = [
+  "std",
+  "clock",
+] }
+clap = { version = "4.6.1", features = ["derive", "env", "string"] }
 const_format = "0.2.36"
+const-hex = "1.19.1"
+criterion = { version = "0.8.2", default-features = false, features = [
+  "cargo_bench_support",
+  "async_tokio",
+] }
+crossfire = { version = "3.1.18", default-features = false }
+dashmap = { version = "6.2.1", features = ["inline"] }
+flagset = "0.4.7"
+flume = { version = "0.12.0", default-features = false, features = ["async"] }
 futures = { version = "0.3.32", default-features = false, features = [
   "std",
   "async-await",
 ] }
 futures-concurrency = "7.7.1"
 futures-time = "3.1.0"
+futures-timer = "3.0.4"
+halfbrown = "0.4.0"
+hashbrown = "0.17.1"
 hex-literal = "1.1.0"
+hickory-resolver = { version = "0.26.1", default-features = false, features = [
+  "system-config",
+] }
+human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humantime-serde = "1.1.1"
+indexmap = { version = "2.14.0" }
 insta = { version = "1.48.0", features = ["yaml", "redactions"] }
 lazy_static = "1.5.0"
+libc = "0.2" # intentionally minor-pinned
+libp2p = { version = "0.56.0", default-features = false }
+libp2p-identity = { version = "0.2.14", features = [
+  "peerid",
+  "ed25519",
+  "rand",
+] }
+libp2p-stream = { version = "0.4.0-alpha" }
+mimalloc = { version = "0.1.52", default-features = false, features = [
+  "secure",
+] }
+mockall = "0.15.0"
+moka = { version = "0.12.15", features = ["future", "sync"] }
+more-asserts = "0.3.1"
+multiaddr = "0.18.2"
 oas3 = "0.22.0"
 opentelemetry-prometheus-text-exporter = { version = "0.3" }
 opentelemetry_sdk = { version = "0.32" }
+parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
+pcap-file = "2.0.0"
+petgraph = { version = "0.8.3", default-features = false, features = [
+  "std",
+  "serde-1",
+  "rayon",
+] }
+pid = "4.0.0"
+pin-project = "1.1.13"
+postcard = { version = "1.1.3", default-features = false, features = ["alloc"] }
+proc-macro-regex = "~1.1.0"
+quinn-udp = { version = "0.6.1", default-features = false }
 rand = { version = "0.10.1", features = ["thread_rng"] }
+rand_distr = "0.6.0"
+rayon = "1.12.0"
+redb = "4.1.0"
+ringbuffer = "0.16.0"
 rstest = { version = "0.26.1" }
+rust-stream-ext-concurrent = "2.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_bytes = "0.11.19"
+serde_cbor_2 = "0.13.0"
+serde_json = "1.0.150"
+serde_repr = "0.1.20"
 serde-saphyr = "0.0.28"
 serde_with = { version = "3.21.0", features = ["base64"] }
 serial_test = "3.5.0"
+smallvec = "1.15.2"
 smart-default = "0.7.1"
+socket2 = "0.6.4"
 strum = { version = "0.28.0", features = ["derive"] }
+subtle = "2.6.1"
+temp-env = "0.3.6"
+tempfile = "3.27.0"
 test-log = { version = "0.2.21", features = ["trace"] }
 thiserror = "2.0.18"
+tikv-jemallocator = "0.7.0"
 tokio = { version = "1.52.3", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
 ] }
+tokio-retry = "0.3.2"
+tokio-stream = { version = "0.1.18", features = ["net"] }
 tokio-util = { version = "0.7.18", default-features = false, features = [
   "codec",
   "compat",
@@ -106,11 +186,25 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
 hopr-api = "1.15.0"
+hopr-types = { version = "2.0.0", features = ["use-bindings"] }
 hopr-utils = { version = "0.3.1", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
+
+hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
+  "ed25519",
+] }
+hopr-lib = { version = "4.0.2-rc.5", path = "hopr/hopr-lib", default-features = false }
+hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
+hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
+hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
+hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
 hopr-transport = { version = "0.32.0", path = "transport/hopr", default-features = false }
+hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
+hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
+hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
+hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.22.0", path = "impls/connector" }
 
 # referential implementations
