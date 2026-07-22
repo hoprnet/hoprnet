@@ -170,7 +170,13 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
 
-        // Verifier confirmed — safe to remove the share from the pending cache.
+        // Both verifier and builder confirmed present — refresh the builder TTL so it
+        // doesn't expire while shares for other polynomials keep the verifier alive.
+        self.ssa_builders
+            .get(spi.as_ref())
+            .ok_or(PixError::MissingSsaCommitment)?;
+
+        // Verifier and builder confirmed — safe to remove the share from the pending cache.
         awaiting_ack_from_peer.remove(&ack_challenge);
 
         // The share cannot be empty at this point because we prevent empty share insertions
