@@ -794,7 +794,8 @@ where
     // outstanding_tasks() is a single atomic load, so checking it per-packet is cheaper than
     // maintaining a sampler task + shared AtomicBool. The delay is only incurred when the pool is
     // actually congested, which is also when packets arrive fastest.
-    let high_watermark = pool_threads.max(1) * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
+    let effective_pool = if pool_threads > 0 { pool_threads } else { avail_concurrency.max(1) };
+    let high_watermark = effective_pool * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
     let wire_in = wire_in.then(move |(peer, data)| async move {
         if hopr_utils::parallelize::cpu::outstanding_tasks() > high_watermark {
             hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
