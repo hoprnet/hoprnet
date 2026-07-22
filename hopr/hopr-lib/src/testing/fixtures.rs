@@ -416,12 +416,17 @@ pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 /// in total — well within the `STRESS_INITIAL_SAFE_TOKEN` channel budget.
 pub const STRESS_WIN_PROB: f64 = 0.001;
 
-/// Safe balance seeded for each stress-test node (1 M wxHOPR).
+/// Safe balance seeded for each stress-test node (20 M wxHOPR).
 ///
-/// Stress runs open large channels (100 000 wxHOPR each) to accommodate the high face-value
-/// tickets created by `STRESS_WIN_PROB`.  The production fixture (`INITIAL_SAFE_TOKEN = 1 000`)
-/// is intentionally kept small so balance-assertion tests stay meaningful.
-pub const STRESS_INITIAL_SAFE_TOKEN: u64 = 1_000_000;
+/// Stress runs open 1 M wxHOPR channels to cover both data tickets AND SURB echo
+/// tickets on the return path.  For a 100 MB run at `STRESS_WIN_PROB = 0.001`:
+///   • ~175 000 data packets → 175 expected wins × 2 000 wxHOPR ≈ 350 000 wxHOPR forward
+///   • ~175 000 SURB echo packets on return path → same 350 000 wxHOPR return
+/// Per channel budget needed ≈ 700 000 wxHOPR; 1 M gives ~1.4× margin.
+/// A 5-node full-mesh cluster needs 4 outgoing channels × 1 M = 4 M per safe;
+/// the 20 M balance gives 5× headroom for path-selection variability and overhead.
+/// The production fixture (`INITIAL_SAFE_TOKEN = 1 000`) stays small for assertion tests.
+pub const STRESS_INITIAL_SAFE_TOKEN: u64 = 20_000_000;
 
 /// Per-node configuration for test clusters.
 #[derive(Debug, Clone, Copy)]

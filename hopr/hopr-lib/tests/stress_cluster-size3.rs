@@ -137,22 +137,49 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Sends 5 MB through a single 1-hop session, prints the throughput series, and
-/// validates that every byte is received by the destination EchoServer.
+/// Parametric throughput matrix: 1/2/3 hops × 5/20/100 MB.
 ///
-/// This is the primary diagnostic test for the encode/delivery pipeline with SURB
-/// management enabled.  Running with a 3-node cluster keeps bootstrap time under
-/// the 6-minute test timeout even on slow CI machines.
+/// Each case boots its own cluster of `hops + 2` nodes, opens a full directed
+/// channel mesh (1 M wxHOPR per channel to cover both data and SURB return-path
+/// tickets at `STRESS_WIN_PROB = 0.001`), then streams the target volume through
+/// a single session and validates zero packet loss.
+///
+/// Run all 9 cases with:
+/// ```sh
+/// cargo nextest run -p hopr-lib --features session-client \
+///     --test 'stress_cluster-size3' -j 1 --run-ignored all -- --nocapture
+/// ```
+///
+/// Run a single case (e.g. 2-hop / 20 MB, case index 5):
+/// ```sh
+/// cargo nextest run -p hopr-lib --features session-client \
+///     --test 'stress_cluster-size3' -j 1 --run-ignored all \
+///     -- 'hop_mb_matrix::case_5' --nocapture
+/// ```
 #[rstest]
+// 1-hop: src → relay → dst  (3 nodes)
+#[case(1,   5)]
+#[case(1,  20)]
+#[case(1, 100)]
+// 2-hop: src → r1 → r2 → dst  (4 nodes)
+#[case(2,   5)]
+#[case(2,  20)]
+#[case(2, 100)]
+// 3-hop: src → r1 → r2 → r3 → dst  (5 nodes)
+#[case(3,   5)]
+#[case(3,  20)]
+#[case(3, 100)]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[ignore = "slow: requires ~60s cluster bootstrap; run with --run-ignored"]
-async fn three_node_cluster_5mb_single_session() -> anyhow::Result<()> {
-    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, 3);
+#[ignore = "slow: requires cluster bootstrap (60–120 s); run with --run-ignored"]
+async fn hop_mb_matrix(#[case] hops: usize, #[case] mb: u64) -> anyhow::Result<()> {
+    let n_nodes = hops + 2;
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, n_nodes);
 
     let cfg = StressConfig {
-        total_bytes: 5 * 1024 * 1024,
+        hops,
+        total_bytes: mb * 1024 * 1024,
         routes: 1,
         msg_size_range: 4096..=32768,
         sample_interval: Duration::from_millis(500),
@@ -160,45 +187,6 @@ async fn three_node_cluster_5mb_single_session() -> anyhow::Result<()> {
     };
 
     let report = run_stress(&cluster, &cfg).await?;
-
-    report.print_series();
-
-    anyhow::ensure!(
-        report.total_bytes_delivered >= cfg.total_bytes,
-        "delivered {} bytes, expected at least {}",
-        report.total_bytes_delivered,
-        cfg.total_bytes,
-    );
-    anyhow::ensure!(!report.samples.is_empty(), "no throughput samples recorded");
-    anyhow::ensure!(
-        report.samples.iter().any(|s| s.recv_window_bytes > 0),
-        "no bytes received at destination — pipeline delivered nothing"
-    );
-
-    Ok(())
-}
-
-/// Same as `three_node_cluster_5mb_single_session` but with 15 MB to verify that
-/// throughput holds at higher sustained load (channel balance should not be exhausted
-/// at 0.001 win probability with 100 000 wxHOPR funding).
-#[rstest]
-#[test_log::test(tokio::test)]
-#[timeout(TEST_GLOBAL_TIMEOUT)]
-#[serial]
-#[ignore = "slow: requires ~60s cluster bootstrap; run with --run-ignored"]
-async fn three_node_cluster_15mb_single_session() -> anyhow::Result<()> {
-    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, 3);
-
-    let cfg = StressConfig {
-        total_bytes: 15 * 1024 * 1024,
-        routes: 1,
-        msg_size_range: 4096..=32768,
-        sample_interval: Duration::from_millis(500),
-        seed: 42,
-    };
-
-    let report = run_stress(&cluster, &cfg).await?;
-
     report.print_series();
 
     anyhow::ensure!(
