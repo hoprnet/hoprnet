@@ -127,6 +127,18 @@ fn main() -> anyhow::Result<()> {
         args.nodes,
     );
 
+    // Initialize the Rayon thread pool for SPHINX crypto operations before any
+    // HOPR nodes start.  Without this, pool_thread_count() returns 0 and all
+    // pool-based concurrency limits fall back to avail_parallelism * 8, allowing
+    // SURB bursts to flood Rayon and starve data-packet encoding.
+    let rayon_threads = std::thread::available_parallelism()
+        .map(|n| (n.get() / 2).max(1))
+        .unwrap_or(4);
+    // Ignore the error: returns Err if the pool was already initialized (e.g.
+    // by a framework that ran before main); in that case pool_thread_count()
+    // was already set by the prior initialiser, so this is a no-op.
+    let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
+
     eprintln!(
         "→ Starting {}-node cluster — full-mesh connectivity can take ~100 s for 3 nodes,\n  longer for larger \
          clusters. Please wait…",
