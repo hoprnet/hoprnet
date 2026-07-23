@@ -1,4 +1,4 @@
-// Reference cluster stress tests for the session-client feature.
+// 3-node cluster throughput reference tests (real QUIC transport, mock Blokli chain).
 #![cfg(feature = "session-client")]
 
 use std::time::Duration;

@@ -1,12 +1,10 @@
-mod bench_stubs;
-#[path = "../tests/protocol/common/mod.rs"]
-mod common;
-
 use std::{str::FromStr, time::Duration};
 
-use bench_stubs::{StubChainApi, StubPathResolver};
 use bytes::Bytes;
-use common::{PEERS, PEERS_CHAIN, random_packets_of_count};
+use hopr_transport::testing::{
+    harness::{PEERS, PEERS_CHAIN, random_packets_of_count},
+    stubs::{StubChainApi, StubPathResolver},
+};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{
     SinkExt, StreamExt,

@@ -22,6 +22,10 @@ pub mod errors;
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
 pub mod protocol;
+/// Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
+/// Enabled by the `testing` feature; every item is a zero-cost no-op stub when absent.
+#[cfg(feature = "testing")]
+pub mod testing;
 
 mod multiaddrs;
 

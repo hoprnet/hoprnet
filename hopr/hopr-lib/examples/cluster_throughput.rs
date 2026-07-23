@@ -1,36 +1,42 @@
-//! Profileable local-cluster throughput stress runner.
+//! Multi-node cluster throughput profiling runner.
 //!
-//! Spins up a local cluster of HOPR nodes against the mock chain, pushes a
-//! configurable volume of bulk 1-hop traffic across random `src → relay → dst`
-//! triples, then prints a per-window throughput series so you can see whether
-//! delivery rate climbs, holds steady, or degrades under saturation.
+//! Spins up a real-QUIC local cluster of HOPR nodes against a **mock Blokli
+//! chain**, then drives a configurable number of concurrent sessions to
+//! saturation and prints a per-window throughput series.  The *measured subject*
+//! is the concurrent packet pipelines (SPHINX encode/decode, mixer, relay
+//! forwarding, SURB balancing, session layer).  The chain is emulated
+//! in-process; an optional Gaussian latency shim can simulate WAN conditions.
+//!
+//! Cluster size is set automatically: `hops + 2` nodes (minimum 3).  Bootstrap
+//! takes ~60–120 s while the full mesh establishes real libp2p/QUIC connectivity
+//! and probe warmup completes.
 //!
 //! # Usage
 //!
 //! ```sh
-//! # Basic run (5 nodes, 100 MB, no flame graph):
-//! cargo run --features testing --example stress_cluster -- --nodes 5 --mb 100
+//! # Basic run (3 nodes / 1 hop, 20 MB, no flame graph):
+//! cargo run --features testing --example cluster_throughput -- --hops 1 --mb 20
 //!
 //! # With in-process flame graph (pprof, works on macOS + Linux, no sudo):
 //! cargo run --profile profiling \
 //!     --features testing,profiling \
-//!     --example stress_cluster \
-//!     -- --nodes 5 --mb 100 --out flame.svg
+//!     --example cluster_throughput \
+//!     -- --hops 1 --mb 20 --out flame.svg
 //!
 //! # Linux external flamegraph via perf (no pprof dep needed):
 //! cargo flamegraph --profile profiling \
 //!     --features testing \
-//!     --example stress_cluster \
-//!     -- --nodes 5 --mb 100
+//!     --example cluster_throughput \
+//!     -- --hops 1 --mb 20
 //! ```
 //!
 //! # Flags
 //!
 //! | Flag | Default | Description |
 //! |------|---------|-------------|
-//! | `--nodes N` | `5` | Cluster size (2–9). |
+//! | `--hops N` | `1` | Relay hops per path (1–3); cluster size = hops + 2. |
 //! | `--mb N` | `100` | Megabytes to deliver before stopping. |
-//! | `--routes N` | `4` | Concurrent 1-hop sessions. |
+//! | `--routes N` | `4` | Concurrent sessions (independent pipelines). |
 //! | `--seed N` | `42` | RNG seed for reproducible route selection. |
 //! | `--out PATH` | — | Write flame graph SVG here (`profiling` feature only). |
 //! | `--help` | — | Print usage and exit. |
