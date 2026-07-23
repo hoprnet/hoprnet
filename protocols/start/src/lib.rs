@@ -399,7 +399,7 @@ where
                 data.extend_from_slice(&num_polys.to_be_bytes());
 
                 let session_id = serde_cbor_2::to_vec(&commit.session_id)?;
-                let total_coeff_commit_len = (size_of::<hopr_protocol_pix::PolynomialIndex>() + size_of::<G>())
+                let total_coeff_commit_len = (size_of::<hopr_protocol_pix::PolynomialIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE)
                     * commit.coefficient_commitments.len();
 
                 // Remaining payload budget: the final `out` buffer contains
@@ -413,7 +413,9 @@ where
 
                 for (index, commitment) in commit.coefficient_commitments {
                     let commitment_repr = commitment.as_ref();
-                    debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
+                    if commitment_repr.len() != Self::PIX_COEFF_COMMITMENT_REPR_SIZE {
+                        return Err(StartProtocolError::ParseError("commitment_repr_size".into()));
+                    }
 
                     // Prepending 16-bit representation of the polynomial index
                     // will possibly consume less space than putting an entire 1024-bit bitmap
@@ -432,7 +434,7 @@ where
 
                 let session_id = serde_cbor_2::to_vec(&req.session_id)?;
 
-                let required_size = (size_of::<hopr_protocol_pix::SsaIndex>() + size_of::<G>()) * req.commitments.len();
+                let required_size = (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE) * req.commitments.len();
 
                 // Remaining payload budget: the final `out` buffer contains
                 // version (1) + disc (1) + data_len (2) + data contents = 4 + data.len(),
@@ -445,7 +447,9 @@ where
 
                 for (ssa_index, commitment) in req.commitments {
                     let commitment_repr = commitment.as_ref();
-                    debug_assert_eq!(commitment_repr.len(), Self::PIX_COEFF_COMMITMENT_REPR_SIZE);
+                    if commitment_repr.len() != Self::PIX_COEFF_COMMITMENT_REPR_SIZE {
+                        return Err(StartProtocolError::ParseError("commitment_repr_size".into()));
+                    }
 
                     data.extend_from_slice(&ssa_index.get().to_be_bytes());
                     data.extend_from_slice(commitment_repr);
