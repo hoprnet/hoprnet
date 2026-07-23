@@ -503,7 +503,9 @@ where
 
         // ── 2. Fund pass ─────────────────────────────────────────────────────
         if let Some(funding) = funding {
-            if safe_balance >= funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
+            if funding.topup_balance.is_zero() {
+                debug!("channel-lifecycle: fund pass skipped: resolved topup is zero");
+            } else if safe_balance >= funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
                 for ch in &open_channels {
                     if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
                         continue;
@@ -761,6 +763,11 @@ where
             debug!("channel-lifecycle: open pass skipped: ticket economics unavailable");
             return Ok(());
         };
+
+        if funding.initial_balance.is_zero() {
+            debug!("channel-lifecycle: open pass skipped: resolved initial balance is zero");
+            return Ok(());
+        }
 
         if self.cfg.funding.stop_when_unfunded && safe_remaining < funding.initial_balance {
             debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
