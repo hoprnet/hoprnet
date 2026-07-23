@@ -1,7 +1,7 @@
 [package]
 name = "hopr-strategy"
 description = "Contains implementations of different HOPR strategies"
-version = "0.19.2"
+version = "0.20.0"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -42,7 +42,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+bytesize = { workspace = true }
 hopr-api = { workspace = true, features = ["node", "serde"] }
+hopr-crypto-packet = { workspace = true }
 hopr-utils = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
@@ -59,6 +61,7 @@ hopr-chain-connector = { workspace = true, features = [
 hopr-api = { workspace = true, features = ["types-random"] }
 insta = { workspace = true }
 mockall = { workspace = true }
+serde_json = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 

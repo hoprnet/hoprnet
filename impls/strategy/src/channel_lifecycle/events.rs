@@ -14,7 +14,6 @@ use hopr_api::{
         primitive::prelude::Address,
     },
 };
-use tracing::{debug, info};
 
 use super::{ChannelLifecycleStrategyInner, ChannelObservation};
 
@@ -55,13 +54,23 @@ where
                 at: Instant::now(),
             });
 
-        if ch.balance <= self.cfg.funding.lower_balance_threshold {
+        // Reuse the economics resolved by the most-recent pipeline tick rather
+        // than issuing fresh chain RPC calls on every balance-decrease event.
+        // The block bounds the lock guard's lifetime so the mutex is released
+        // before any async work; `funding` is a plain copy of the inner value.
+        let resolved = { *self.last_resolved_funding.lock() };
+        let Some(funding) = resolved else {
+            tracing::debug!(%ch, "channel-lifecycle: event-driven funding skipped: no tick-resolved economics yet");
+            return;
+        };
+
+        if ch.balance < funding.lower_balance_threshold {
             match self.safe_balance_budget().await {
-                Ok(budget) if budget >= self.cfg.funding.topup_balance => {
-                    self.try_fund_channel(&ch, self.cfg.funding.topup_balance);
+                Ok(budget) if !funding.topup_balance.is_zero() && budget >= funding.topup_balance => {
+                    self.try_fund_channel(&ch, funding.topup_balance);
                 }
                 Ok(budget) => {
-                    debug!(%ch, %budget, "channel-lifecycle: event-driven funding skipped: safe too low");
+                    tracing::debug!(%ch, %budget, "channel-lifecycle: event-driven funding skipped: safe too low");
                 }
                 Err(e) => {
                     tracing::warn!(%ch, %e, "channel-lifecycle: event-driven funding: could not fetch safe balance");
@@ -75,17 +84,17 @@ where
         self.last_observed.entry(*ch.get_id()).and_modify(|obs| {
             obs.balance = ch.balance;
         });
-        info!(%ch, "channel-lifecycle: channel balance increased");
+        tracing::info!(%ch, "channel-lifecycle: channel balance increased");
     }
 
     pub(super) fn on_channel_opened(&self, ch: ChannelEntry) {
         self.open_in_flight.remove(&ch.destination);
-        info!(%ch, "channel-lifecycle: channel opened");
+        tracing::info!(%ch, "channel-lifecycle: channel opened");
     }
 
     pub(super) fn on_channel_closure_initiated(&self, ch: ChannelEntry) {
         self.close_in_flight.remove(ch.get_id());
-        info!(%ch, "channel-lifecycle: channel closure initiated");
+        tracing::info!(%ch, "channel-lifecycle: channel closure initiated");
     }
 
     /// Starts the peer cooldown so the channel is not immediately re-opened.
@@ -95,7 +104,7 @@ where
         self.peer_ticket_activity.remove(&ch.destination);
         let until = Instant::now() + self.cfg.population.peer_reopen_cooldown;
         self.cooldown.insert(ch.destination, until);
-        info!(%ch, "channel-lifecycle: channel closed");
+        tracing::info!(%ch, "channel-lifecycle: channel closed");
     }
 
     /// Records ticket activity for the proactive drain-rate estimate.
