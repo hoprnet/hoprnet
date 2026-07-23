@@ -32,11 +32,11 @@ use crate::{
             primitive::prelude::{Address, HoprBalance, XDaiBalance},
         },
     },
+    config::TransitLatencyConfig,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{HoprSession, SessionTarget},
     },
-    config::TransitLatencyConfig,
     testing::{
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance_config},
@@ -594,7 +594,10 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
     cluster_fixture_inner(configs, build_blokli_client())
 }
 
-fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+fn cluster_fixture_inner(
+    configs: Vec<TestNodeConfig>,
+    chain_client: BlokliTestClient<FullStateEmulator>,
+) -> ClusterGuard {
     let size = configs.len();
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
@@ -736,7 +739,11 @@ fn cluster_fixture_inner(configs: Vec<TestNodeConfig>, chain_client: BlokliTestC
 
     info!(swarm_size, "CLUSTER STARTED");
 
-    ClusterGuard { cluster, chain_client, echo_received }
+    ClusterGuard {
+        cluster,
+        chain_client,
+        echo_received,
+    }
 }
 
 async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {

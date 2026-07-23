@@ -158,16 +158,16 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
 /// ```
 #[rstest]
 // 1-hop: src → relay → dst  (3 nodes)
-#[case(1,   5)]
-#[case(1,  20)]
+#[case(1, 5)]
+#[case(1, 20)]
 #[case(1, 100)]
 // 2-hop: src → r1 → r2 → dst  (4 nodes)
-#[case(2,   5)]
-#[case(2,  20)]
+#[case(2, 5)]
+#[case(2, 20)]
 #[case(2, 100)]
 // 3-hop: src → r1 → r2 → r3 → dst  (5 nodes)
-#[case(3,   5)]
-#[case(3,  20)]
+#[case(3, 5)]
+#[case(3, 20)]
 #[case(3, 100)]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]

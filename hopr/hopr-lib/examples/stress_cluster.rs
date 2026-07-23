@@ -143,8 +143,8 @@ fn main() -> anyhow::Result<()> {
     let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
 
     eprintln!(
-        "→ Starting {n_nodes}-node cluster ({}-hop) — full-mesh connectivity can take ~100 s for 3 nodes,\n  \
-         longer for larger clusters. Please wait…",
+        "→ Starting {n_nodes}-node cluster ({}-hop) — full-mesh connectivity can take ~100 s for 3 nodes,\n  longer \
+         for larger clusters. Please wait…",
         args.hops
     );
 

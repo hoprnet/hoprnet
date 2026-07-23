@@ -50,10 +50,7 @@ use super::{
     fixtures::{ClusterGuard, chain_propagation_delay},
     hopr::ChannelGuard,
 };
-use crate::{
-    SessionCapabilities, SessionCapability, SurbBalancerConfig,
-    api::types::primitive::prelude::HoprBalance,
-};
+use crate::{SessionCapabilities, SessionCapability, SurbBalancerConfig, api::types::primitive::prelude::HoprBalance};
 
 // ── Throughput reporting ─────────────────────────────────────────────────────
 
@@ -210,18 +207,19 @@ impl StressReport {
             self.peak_encode_outstanding, self.peak_decode_outstanding,
         );
         println!(
-            "  Drops: encode_timeout {}  decode_timeout {}  session_inbox {}  unknown_session {}  unrelated_dispatch {}",
-            self.encode_timeout_drops, self.decode_timeout_drops, self.session_inbox_drops,
-            self.session_unknown_data_drops, self.session_unrelated_dispatches,
+            "  Drops: encode_timeout {}  decode_timeout {}  session_inbox {}  unknown_session {}  unrelated_dispatch \
+             {}",
+            self.encode_timeout_drops,
+            self.decode_timeout_drops,
+            self.session_inbox_drops,
+            self.session_unknown_data_drops,
+            self.session_unrelated_dispatches,
         );
         println!(
             "  Route: attempts {}  failures {}  encode_stage_entries {}",
             self.routing_resolution_attempts, self.routing_resolution_failures, self.encode_stage_entries,
         );
-        println!(
-            "  Dispatch: dispatch_message_calls {}",
-            self.dispatch_message_calls,
-        );
+        println!("  Dispatch: dispatch_message_calls {}", self.dispatch_message_calls,);
     }
 }
 

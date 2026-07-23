@@ -790,7 +790,10 @@ where
     } else {
         avail_concurrency
     };
-    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(default_output_concurrency);
+    let output_concurrency = cfg
+        .output_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(default_output_concurrency);
 
     // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
     // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
