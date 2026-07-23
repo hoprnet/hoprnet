@@ -884,6 +884,8 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     ) -> Result<Vec<HoprShareResolution>, Self::Error> {
         Ok(Vec::with_capacity(0))
     }
+
+    fn retire_ssa(&self, _: &SsaId<HoprPseudonym>) {}
 }
 
 // NOTE: `PixScalar<HoprPixSpec>` normalizes to `HoprPixScalar` (i.e.

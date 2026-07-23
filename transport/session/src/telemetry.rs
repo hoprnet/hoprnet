@@ -4,6 +4,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(all(feature = "telemetry", not(test)))]
+use hopr_protocol_pix::SsaIndex;
 use hopr_protocol_session::SessionMessageDiscriminants;
 
 pub use crate::balancer::{AtomicSurbFlowEstimator, BalancerStateValues};
@@ -174,6 +176,21 @@ lazy_static::lazy_static! {
         "Whether SURB refill is currently configured for a session (1 or 0)",
         &["session_id"]
     ).unwrap();
+    static ref METRIC_SESSION_PIX_GATE_MODE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_gate_mode",
+        "PIX egress gate mode: 0=predeposit, 1=funded",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_CURRENT_SSA_PHASE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_current_ssa_phase",
+        "Current PIX SSA phase per SSA: 0=AwaitingCommitment, 1=AwaitingDeposit, 3=Recovered",
+        &["session_id", "ssa_index"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_recovery_progress",
+        "PIX SSA recovery progress as a ratio (0.0–1.0) of useful shares to target",
+        &["session_id", "ssa_index"]
+    ).unwrap();
     static ref METRIC_SESSION_TRANSPORT_BYTES_IN_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
         "hopr_session_transport_bytes_in_total",
         "Session ingress bytes",
@@ -281,9 +298,14 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     refresh_lifetime_metrics(&session_id, now, now, now);
 }
 
-pub fn remove_session_metrics_state(session_id: &SessionId) {
+pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
+    if has_pix {
+        METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], 0.0);
+        // METRIC_SESSION_PIX_RECOVERY_PROGRESS is keyed by (session_id, ssa_index)
+        // and cannot be reset to 0 here without tracking all SSA indices per session.
+    }
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
@@ -366,6 +388,34 @@ pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[session_id_str], by);
     touch_session_activity(session_id);
+}
+
+#[cfg(all(feature = "telemetry", not(test)))]
+pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], if funded { 1.0 } else { 0.0 });
+}
+
+/// Encodes the supervisor SSA phase as a numeric value.
+#[cfg(all(feature = "telemetry", not(test)))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PixSsaPhase {
+    AwaitingCommitment = 0,
+    AwaitingDeposit = 1,
+    Recovered = 3,
+}
+
+#[cfg(all(feature = "telemetry", not(test)))]
+pub fn set_pix_current_ssa_phase(session_id: &SessionId, ssa_index: SsaIndex, phase: PixSsaPhase) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_CURRENT_SSA_PHASE.set(&[session_id_str, &ssa_index.to_string()], phase as u8 as f64);
+}
+
+#[cfg(all(feature = "telemetry", not(test)))]
+pub fn set_pix_recovery_progress(session_id: &SessionId, ssa_index: SsaIndex, progress: f64) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str, &ssa_index.to_string()], progress.clamp(0.0, 1.0));
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {

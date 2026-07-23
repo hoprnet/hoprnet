@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod errors;
 mod manager;
+pub(crate) mod supervision;
 #[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
@@ -23,6 +24,7 @@ pub use manager::{
     DispatchResult, IncomingSessionPixConfig, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
     SessionManagerConfig,
 };
+pub use supervision::{SupervisorConfig, validate_pix_supervision};
 pub mod test_helpers;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};

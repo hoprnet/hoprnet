@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-pix"
-version = "0.1.0"
+version = "0.2.0"
 description = "Protocol for Incentivizing eXit nodes (PIX) as specified in HOPR RFC-0012"
 license = "GPL-3.0-only"
 homepage.workspace = true
@@ -42,6 +42,7 @@ vsss-rs = { workspace = true, features = [
 
 hopr-utils = { workspace = true }
 hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
+indexmap.workspace = true
 
 [dev-dependencies]
 anyhow = { workspace = true }

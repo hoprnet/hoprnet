@@ -110,14 +110,24 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
 
     let one_ack = acks.remove(0);
 
-    assert!(reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty());
+    // 99 shares processed: with early_recovery_threshold=1.0, no early event
+    // but Progress snapshot is always emitted
+    let first_res = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+    assert!(
+        !first_res.is_empty(),
+        "expected non-empty result with Progress snapshot"
+    );
+    assert!(
+        first_res.iter().any(|r| matches!(r, ShareResolution::Progress(_))),
+        "expected Progress snapshot in partial result"
+    );
 
     let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
     assert!(!res.is_empty());
 
-    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
+    assert!(res.iter().any(|r| matches!(r, ShareResolution::RecoveredSsa(res)
         if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
-    ));
+    )));
 
     Ok(())
 }
@@ -171,14 +181,21 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
 
     let one_ack = acks.remove(0);
 
-    assert!(reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty());
+    // 99 of 100 shares: always emits Progress snapshot.
+    // With early_recovery_threshold=1.0 and 9/10 polys done, no early event.
+    let partial_res = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+    assert!(!partial_res.is_empty(), "expected Progress in partial result");
+    assert!(
+        partial_res.iter().any(|r| matches!(r, ShareResolution::Progress(_))),
+        "expected Progress snapshot"
+    );
 
     let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
     assert!(!res.is_empty());
 
-    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
+    assert!(res.iter().any(|r| matches!(r, ShareResolution::RecoveredSsa(res)
         if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
-    ));
+    )));
 
     Ok(())
 }

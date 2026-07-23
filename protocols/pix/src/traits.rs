@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use hopr_types::{
     crypto::prelude::{HalfKeyChallenge, OffchainPublicKey},
     internal::prelude::Acknowledgement,
@@ -7,57 +5,37 @@ use hopr_types::{
 
 use crate::{
     CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
+    SsaCommitmentState, SsaId, SsaIndex, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
 };
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
 /// an encrypted PIX share.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
-#[derive(Clone, strum::EnumTryAs)]
+///
+/// ## Equality semantics
+///
+/// [`Progress`] and [`InvalidShares`] carry absolute counters and are never
+/// deduplicated — the reconstructor emits at most one of each per (peer, SSA) per
+/// batch, so derive-based `PartialEq`/`Eq`/`Hash` is fine.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumTryAs)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),
     /// The early recovery threshold was reached (SSA almost complete).
     AlmostRecoveredSsa(SsaId<P>),
-    /// An invalid share was encountered.
-    InvalidShare(Box<OffchainPublicKey>, SsaId<P>),
-}
-
-impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::RecoveredSsa(a), Self::RecoveredSsa(b)) => a == b,
-            (Self::AlmostRecoveredSsa(a), Self::AlmostRecoveredSsa(b)) => a == b,
-            (Self::InvalidShare(k1, id1), Self::InvalidShare(k2, id2)) => k1 == k2 && id1 == id2,
-            _ => false,
-        }
-    }
-}
-
-impl<P: Eq, A> Eq for ShareResolution<P, A> {}
-
-impl<P: std::fmt::Debug, A> std::fmt::Debug for ShareResolution<P, A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RecoveredSsa(ssa) => f.debug_tuple("RecoveredSsa").field(ssa).finish(),
-            Self::AlmostRecoveredSsa(id) => f.debug_tuple("AlmostRecoveredSsa").field(id).finish(),
-            Self::InvalidShare(key, id) => f.debug_tuple("InvalidShare").field(key).field(id).finish(),
-        }
-    }
-}
-
-impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            Self::RecoveredSsa(recovered) => recovered.hash(state),
-            Self::AlmostRecoveredSsa(id) => id.hash(state),
-            Self::InvalidShare(k, id) => {
-                k.hash(state);
-                id.hash(state);
-            }
-        }
-    }
+    /// Absolute per-SSA recovery progress after processing this batch.
+    Progress(SsaRecoveryProgress<P>),
+    /// Invalid (unverifiable) shares encountered for a given peer and SSA.
+    ///
+    /// `observed_total` is the **cross-peer aggregate** count of invalid shares
+    /// observed for this SSA so far (not a batch delta). The `peer` field is
+    /// retained for attribution/telemetry; limit enforcement uses the aggregate.
+    InvalidShares {
+        peer: Box<OffchainPublicKey>,
+        ssa_id: SsaId<P>,
+        observed_total: u64,
+    },
 }
 
 /// Type alias for a collection of [`ShareResolution`]s.
@@ -153,6 +131,13 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         peer: OffchainPublicKey,
         acks: Vec<Acknowledgement>,
     ) -> Result<ShareResolutions<S>, Self::Error>;
+
+    /// Retires (invalidates) all internal state for the given `ssa_id`.
+    ///
+    /// Removes the SSA commitment builder, all polynomial verifiers, and the
+    /// per-SSA counter entry. Idempotent — calling twice or for an unknown SSA
+    /// is a no-op.
+    fn retire_ssa(&self, ssa_id: &SsaId<S::Pseudonym>);
 }
 
 #[auto_impl::auto_impl(&, Arc, Box)]

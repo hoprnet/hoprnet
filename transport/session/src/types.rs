@@ -130,8 +130,15 @@ pub enum HoprSessionInPixEvent {
     /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
     /// for an SSA — the next SSA request can be made.
     SsaAlmostRecovered(SsaId<HoprPseudonym>),
-    /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
-    UnverifiableShare(SsaId<HoprPseudonym>),
+    /// Reports absolute SSA recovery progress.
+    Progress(hopr_protocol_pix::SsaRecoveryProgress<HoprPseudonym>),
+    /// Reports unverifiable shares with an absolute per-SSA total count.
+    UnverifiableShares {
+        /// SSA identifier.
+        ssa_id: SsaId<HoprPseudonym>,
+        /// Absolute count of unverifiable shares observed so far for this SSA.
+        observed_total: u64,
+    },
 }
 
 impl HoprSessionInPixEvent {
@@ -140,7 +147,8 @@ impl HoprSessionInPixEvent {
         match self {
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
-            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::Progress(p) => p.ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShares { ssa_id, .. } => ssa_id.pseudonym(),
         }
     }
 }
@@ -176,6 +184,8 @@ pub enum ClosureReason {
     Eviction,
     /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
     UnrealizedDeposit,
+    /// Session closed due to a PIX protocol failure (recovery timeout, excessive faults, etc.).
+    PixFailure,
 }
 
 /// Helper trait to allow Box aliasing
@@ -555,6 +565,8 @@ mod tests {
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
+            ClosureReason::UnrealizedDeposit,
+            ClosureReason::PixFailure,
         ];
         insta::assert_debug_snapshot!(reasons);
     }

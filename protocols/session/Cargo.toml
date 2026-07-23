@@ -1,7 +1,7 @@
 [package]
 name = "hopr-protocol-session"
 description = "Contains implementation of Session protocol according to HOPR RFC-0008"
-version = "1.2.2"
+version = "1.2.3"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -21,7 +21,7 @@ include = [
 ]
 
 [features]
-default = ["hashbrown"]
+default = ["hashbrown", "runtime-tokio"]
 all-benchmarks = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 telemetry = ["dep:auto_impl", "hopr-types/telemetry", "dep:lazy_static"]
@@ -59,7 +59,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 
-hopr-utils = { workspace = true, features = ["runtime-tokio", "network-types"] }
+hopr-utils = { workspace = true, features = ["network-types"] }
 hopr-crypto-packet = { workspace = true }
 hopr-types = { workspace = true, features = ["primitive", "random"] }
 

@@ -445,18 +445,21 @@ mod tests {
             )?;
 
             // Once enough shares have been received, the receiver can recover the SSA
+            let recovered: Vec<_> = resolutions
+                .iter()
+                .filter_map(|r| r.clone().try_as_recovered_ssa())
+                .collect();
             if i == recovery_at {
-                assert_eq!(1, resolutions.len());
-                let recovered_ssa = resolutions[0]
-                    .clone()
-                    .try_as_recovered_ssa()
-                    .ok_or(anyhow::anyhow!("share resolution is not recovered ssa"))?;
-                assert_eq!(recovered_ssa.ssa_id, ssa_id);
+                assert_eq!(
+                    1,
+                    recovered.len(),
+                    "expected exactly 1 RecoveredSsa at #{i}, got {recovered:?}"
+                );
+                assert_eq!(recovered[0].ssa_id, ssa_id);
             } else {
-                // Other resolution possibilities should not happen at this point
                 assert!(
-                    resolutions.is_empty(),
-                    "no resolutions must be present at #{i}: {resolutions:?}"
+                    recovered.is_empty(),
+                    "no RecoveredSsa expected at #{i}, got {recovered:?}"
                 );
             }
 
@@ -569,10 +572,11 @@ mod tests {
                 )?;
 
                 for resolution in resolutions {
-                    let recovered = resolution
-                        .try_as_recovered_ssa()
-                        .ok_or(anyhow::anyhow!("share resolution is not recovered ssa at #{i}"))?;
-                    recovered_ssa_ids.push(recovered.ssa_id);
+                    if let Some(recovered) = resolution.try_as_recovered_ssa() {
+                        recovered_ssa_ids.push(recovered.ssa_id);
+                    }
+                    // Progress events are expected from the reconstructor but are
+                    // not terminal — only RecoveredSsa counts.
                 }
             } else {
                 // Gap phase — no PIX share

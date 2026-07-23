@@ -29,12 +29,12 @@ mod traits;
 mod types;
 
 pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
-pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
+pub use reconstructor::{SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RawSsaIndex,
     RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare,
+    SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
 };
 pub use vsss_rs::elliptic_curve::{
     Group,
