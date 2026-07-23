@@ -56,7 +56,10 @@ where
 
         // Reuse the economics resolved by the most-recent pipeline tick rather
         // than issuing fresh chain RPC calls on every balance-decrease event.
-        let Some(funding) = *self.last_resolved_funding.lock() else {
+        // The block bounds the lock guard's lifetime so the mutex is released
+        // before any async work; `funding` is a plain copy of the inner value.
+        let resolved = { *self.last_resolved_funding.lock() };
+        let Some(funding) = resolved else {
             tracing::debug!(%ch, "channel-lifecycle: event-driven funding skipped: no tick-resolved economics yet");
             return;
         };
