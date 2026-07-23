@@ -414,14 +414,19 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
-    let message_count = 20;
+    // Use enough messages that P(zero wins at 20% win prob) is negligible (0.8^50 ≈ 1.4e-5).
+    let message_count = 50;
 
     let ticket_price = src
         .inner()
         .get_ticket_price()
         .await
         .context("failed to get ticket price")?;
-    let funding_amount = ticket_price.mul(message_count + 2 + PROBING_OVERHEAD);
+    // Each ticket's face value is ticket_price / win_prob (5× for 20% win prob).
+    // Divide by win_prob so the channel capacity covers (message_count + overhead) tickets.
+    let funding_amount = ticket_price
+        .mul(message_count + 2 + PROBING_OVERHEAD)
+        .div_f64(MINIMUM_INCOMING_WIN_PROB)?;
 
     let [_fw_channel, _bw_channel, _telemetry_channel]: [ChannelGuard; 3] = cluster_fixture
         .open_channels(&[&[src, mid, dst], &[dst, mid, src], &[src, dst]], funding_amount)
