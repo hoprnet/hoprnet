@@ -24,8 +24,7 @@ pub fn session_inbox_drop_count() -> usize {
 
 /// Cumulative count of data packets dropped because no matching session slot was
 /// found in the session manager (`UnknownData` / unestablished-session path).
-pub static SESSION_UNKNOWN_DATA_DROPS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static SESSION_UNKNOWN_DATA_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative UnknownData drop count.
 #[inline]
@@ -35,8 +34,7 @@ pub fn session_unknown_data_drop_count() -> usize {
 
 /// Cumulative count of data packets dispatched as "unrelated" — reached dispatch_message
 /// but matched neither the session protocol tag nor any session application tag.
-pub static SESSION_UNRELATED_DATA_DISPATCHES: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static SESSION_UNRELATED_DATA_DISPATCHES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative unrelated dispatch count.
 #[inline]
@@ -45,8 +43,7 @@ pub fn session_unrelated_dispatch_count() -> usize {
 }
 
 /// Cumulative count of packets that failed path/routing resolution before encoding.
-pub static ROUTING_RESOLUTION_FAILURES: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static ROUTING_RESOLUTION_FAILURES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative routing resolution failure count.
 #[inline]
@@ -55,8 +52,7 @@ pub fn routing_resolution_failure_count() -> usize {
 }
 
 /// Cumulative count of packets that successfully entered the routing resolution stage.
-pub static ROUTING_RESOLUTION_ATTEMPTS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static ROUTING_RESOLUTION_ATTEMPTS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative routing resolution attempt count.
 #[inline]
@@ -65,8 +61,7 @@ pub fn routing_resolution_attempt_count() -> usize {
 }
 
 /// Cumulative count of packets that entered the SPHINX encode stage (spawn_encode_blocking called).
-pub static ENCODE_STAGE_ENTRIES: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static ENCODE_STAGE_ENTRIES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative encode stage entry count.
 #[inline]
@@ -76,8 +71,7 @@ pub fn encode_stage_entry_count() -> usize {
 
 /// Cumulative count of calls to `smgr.dispatch_message` in SessionsManagement(0).
 /// Non-zero means packets are reaching the session manager dispatcher.
-pub static DISPATCH_MESSAGE_CALLS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static DISPATCH_MESSAGE_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative dispatch_message call count.
 #[inline]
@@ -87,8 +81,7 @@ pub fn dispatch_message_call_count() -> usize {
 
 /// Cumulative count of packets dropped by `forward_to_timeout(app_incoming)` at the ingress
 /// pipeline because `tx_from_protocol` was full for longer than `QUEUE_SEND_TIMEOUT` (50 ms).
-pub static APP_INCOMING_TIMEOUT_DROPS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+pub static APP_INCOMING_TIMEOUT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Returns the cumulative app-incoming timeout drop count.
 #[inline]

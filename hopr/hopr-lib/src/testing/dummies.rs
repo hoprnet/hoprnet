@@ -1,4 +1,7 @@
-use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 use futures::AsyncReadExt as _;
 use hopr_transport::IncomingSession;
@@ -23,7 +26,9 @@ impl EchoServer {
 
     /// Attach a shared receive-byte counter (used by the stress harness sampler).
     pub fn with_counter(counter: Arc<AtomicU64>) -> Self {
-        Self { received_bytes: Some(counter) }
+        Self {
+            received_bytes: Some(counter),
+        }
     }
 }
 

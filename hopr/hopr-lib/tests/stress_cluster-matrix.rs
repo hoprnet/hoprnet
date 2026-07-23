@@ -24,10 +24,7 @@ use hopr_lib::{
     SurbBalancerConfig,
     config::TransitLatencyConfig,
     testing::{
-        fixtures::{
-            STRESS_WIN_PROB, TEST_GLOBAL_TIMEOUT, stress_cluster_fixture,
-            stress_cluster_fixture_with_latency,
-        },
+        fixtures::{STRESS_WIN_PROB, TEST_GLOBAL_TIMEOUT, stress_cluster_fixture, stress_cluster_fixture_with_latency},
         loadgen::{StressConfig, WriteStrategy, run_stress},
     },
 };
@@ -160,7 +157,7 @@ async fn write_batching_matrix(#[case] hops: usize, #[case] strategy: WriteStrat
 
 #[rstest]
 #[case(1, 7000, 5000)] // default
-#[case(1, 1000, 500)]  // reduced
+#[case(1, 1000, 500)] // reduced
 #[case(2, 7000, 5000)]
 #[case(2, 1000, 500)]
 #[case(3, 7000, 5000)]
@@ -169,11 +166,7 @@ async fn write_batching_matrix(#[case] hops: usize, #[case] strategy: WriteStrat
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[ignore = "slow: requires cluster bootstrap (60–120 s); run with --run-ignored"]
-async fn surb_buffer_matrix(
-    #[case] hops: usize,
-    #[case] target: u64,
-    #[case] max_per_sec: u64,
-) -> anyhow::Result<()> {
+async fn surb_buffer_matrix(#[case] hops: usize, #[case] target: u64, #[case] max_per_sec: u64) -> anyhow::Result<()> {
     let n_nodes = hops + 2;
     let cluster = stress_cluster_fixture(STRESS_WIN_PROB, n_nodes);
 
@@ -224,7 +217,7 @@ async fn surb_buffer_matrix(
 // larger because SURB round-trips are longer.
 
 #[rstest]
-#[case(1, true)]  // limiter on  (production default)
+#[case(1, true)] // limiter on  (production default)
 #[case(1, false)] // limiter off (NoRateControl)
 #[case(2, true)]
 #[case(2, false)]

@@ -124,8 +124,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                 let encoder = encoder.clone();
                 let counters = counters.clone();
                 async move {
-                    hopr_utils::parallelize::ENCODE_STAGE_ENTRIES
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    hopr_utils::parallelize::ENCODE_STAGE_ENTRIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                         move || {
                             encoder.encode_packet(
@@ -790,7 +789,10 @@ where
     } else {
         avail_concurrency
     };
-    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(default_output_concurrency);
+    let output_concurrency = cfg
+        .output_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(default_output_concurrency);
 
     // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
     // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.

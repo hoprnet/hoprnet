@@ -151,7 +151,10 @@ validator = { workspace = true }
 
 bytesize = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
-pprof = { version = "0.14", features = ["flamegraph", "frame-pointer"], optional = true }
+pprof = { version = "0.14", features = [
+  "flamegraph",
+  "frame-pointer",
+], optional = true }
 rand = { workspace = true, optional = true, features = ["std_rng"] }
 rstest = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
