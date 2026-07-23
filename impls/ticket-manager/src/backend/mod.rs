@@ -100,6 +100,9 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
                 .entry(ticket.verified_ticket().channel_epoch)
                 .or_default()
                 .sub_assign(ticket.verified_ticket().amount);
+            // Keep current_epoch consistent with what remains in the queue after the pop.
+            // If the queue still has tickets, they share the same epoch; if empty, reset to None.
+            self.current_epoch = self.queue.peek()?.map(|t| t.verified_ticket().channel_epoch);
         }
         Ok(ticket)
     }
