@@ -14,7 +14,7 @@
 use std::time::Duration;
 
 use hopr_lib::testing::{
-    fixtures::{TEST_GLOBAL_TIMEOUT, TestNodeConfig, cluster_fixture},
+    fixtures::{STRESS_WIN_PROB, TEST_GLOBAL_TIMEOUT, stress_cluster_fixture},
     loadgen::{StressConfig, run_stress},
 };
 use rstest::*;
@@ -32,7 +32,9 @@ use serial_test::serial;
 #[serial]
 #[ignore = "slow: requires ~100 s cluster bootstrap; run with --run-ignored"]
 async fn five_node_cluster_should_sustain_throughput_over_1hop_sessions() -> anyhow::Result<()> {
-    let cluster = cluster_fixture(vec![TestNodeConfig::default(); 5]);
+    // stress_cluster_fixture provides 20 M wxHOPR safe balances and STRESS_WIN_PROB,
+    // which are required to fund the 1 M wxHOPR channels opened by run_stress.
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, 5);
 
     let cfg = StressConfig {
         total_bytes: 5 * 1024 * 1024, // 5 MB — completes well inside TEST_GLOBAL_TIMEOUT
