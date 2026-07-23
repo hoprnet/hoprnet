@@ -194,6 +194,14 @@ impl SessionSsaState {
         self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
     }
 
+    /// Returns the current index without consuming it.
+    ///
+    /// Use this to inspect the next index before fallible operations;
+    /// call [`increment_index`](Self::increment_index) to commit *after* they succeed.
+    pub fn peek_index(&self) -> SsaIndex {
+        SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
+    }
+
     pub fn increment_index(&self) -> SsaIndex {
         SsaIndex::new(self.current_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
             .expect("ssa index cannot become 0 when incremented")
@@ -1527,7 +1535,9 @@ where
             "cannot request new ssa on a session without pix state"
         )))?;
 
-        let ssa_index = current_ssa_state.increment_index();
+        // Peek at the next SSA index *before* fallible operations so that a failed
+        // commitment generation or send does not permanently consume it.
+        let ssa_index = current_ssa_state.peek_index();
 
         // TODO: based on the offered quota, the Exit can decide here whether to ask for more than just one SSA
         // commitment
@@ -1591,6 +1601,9 @@ where
         )
         .await
         .map_err(TransportSessionError::packet_sending)?;
+
+        // All fallible steps succeeded — commit the index advance.
+        current_ssa_state.increment_index();
 
         Ok(())
     }
