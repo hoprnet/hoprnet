@@ -510,7 +510,7 @@ pub struct SessionGlobalConfig {
 
     /// Maximum number of Sessions that can be managed by the Session manager.
     ///
-    /// Default is 1000, minimum is 2, maximum is 100 000.
+    /// Default is 100, minimum is 2, maximum is 100 000.
     #[validate(range(min = 2, max = 100_000))]
     #[default(default_max_managed_sessions())]
     #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]

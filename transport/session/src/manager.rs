@@ -1744,8 +1744,9 @@ where
                     "cannot process SsaAlmostRecovered on a session without pix state"
                 )))?;
                 // Validate that the event's SsaId matches the active cycle.  current_index is
-                // the *next* index to allocate (pre-incremented via fetch_add), so the active
-                // cycle's index is current_index - 1.
+                // the *next* index to allocate; `request_next_ssa` peeks it and only increments
+                // (via `increment_index`) after the SsaRequest send succeeds, so once a cycle is
+                // in flight the active cycle's index is current_index - 1.
                 if ssa_id.ssa_index().get()
                     != state
                         .current_index
@@ -1769,8 +1770,9 @@ where
                 )))?;
                 // Skip stale events from a previous SSA cycle (late arrivals after
                 // SsaAlmostRecovered advanced the current index).  current_index is
-                // the *next* index to allocate (pre-incremented via fetch_add), so
-                // the active cycle's index is current_index - 1.
+                // the *next* index to allocate; `request_next_ssa` peeks it and only increments
+                // (via `increment_index`) after the SsaRequest send succeeds, so the active
+                // cycle's index is current_index - 1.
                 if ssa_id.ssa_index().get()
                     != state
                         .current_index
@@ -2629,6 +2631,16 @@ where
         // The Entry enforces that the Exit's SSA parameters match exactly the quota we offered
         // in the Session Initiation message.  Negotiation (accepting an Exit-chosen quota within
         // our bounds) is not implemented, so any mismatch is rejected.
+        //
+        // Comparing only the scalar quota is intentional and sufficient, even though
+        // `pix_params_to_quota` (`polys * shares * PAYLOAD_SIZE`) is not injective in
+        // `(polys, shares)`: the quota (product) is the negotiated contract, and the Exit does
+        // not pick the dimensions independently.  Its reconstructor (`new_exit_commitment`) and
+        // the `SsaRequest` params it echoes here both derive from the same `current_ssa_state`,
+        // seeded from the dimensions *we* offered (see `check_pix_params`).  The Exit therefore
+        // always sends back the exact `(polys, shares)` it will reconstruct with, so a matching
+        // quota implies matching dimensions.  A same-product-but-different-shape request could
+        // only come from an Exit running modified code, which would merely break its own recovery.
         let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
         if quota_per_ssa != server_quota {
             return Err(SessionManagerError::Unacceptable(format!(
@@ -2641,7 +2653,17 @@ where
 
         // The server can theoretically send multiple SSA commitments
         // asking us to make the equal number of client commitments and deposits.
-        // The server is authoritative in giving the ssa_index, the client only verifies if it's monotonic.
+        //
+        // The server is authoritative in giving the ssa_index; the client only verifies that it is
+        // strictly monotonic. That monotonicity is enforced inside `new_ssa_commitment` below, which
+        // rejects any `ssa_index` that is `<=` the last one generated for this pseudonym with
+        // `PixError::InvalidInput` (see `SsaShareGenerator::new_ssa_commitment`). Because that call
+        // happens *before* the deposit address is derived and `ReadyToDeposit` is emitted, a stale,
+        // duplicate, or out-of-order `SsaRequest` cannot cause a second deposit — the whole message is
+        // rejected first. The per-pseudonym baseline lives in the generator's `polynomials` cache
+        // (30-min idle TTL, refreshed on every use), so it persists for the life of an active session.
+        // Gaps (an index strictly greater than the last, but not the immediate successor) are allowed
+        // by design, since the Exit may advance by more than one SSA at a time.
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
 

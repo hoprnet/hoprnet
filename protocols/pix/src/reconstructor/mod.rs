@@ -582,16 +582,16 @@ mod tests {
     }
 
     #[test]
-    fn reconstructor_missing_verifier_destroys_share() -> anyhow::Result<()> {
+    fn reconstructor_missing_verifier_retains_share() -> anyhow::Result<()> {
         // Regression test for the share-loss race:
         // When `process_verified_ack` encounters MissingVerifier, the share must
         // NOT be removed from the awaiting_acks cache — it should remain available
         // for a later retry when the verifier arrives.
         //
-        // Current buggy behavior: `awaiting_ack_from_peer.remove()` at the top of
-        // `process_verified_ack` consumes the share before the verifier lookup,
-        // so MissingVerifier silently destroys it. This assertion will fail until
-        // the ordering is fixed (use .get() first, .remove() after verifier is confirmed).
+        // The implementation guarantees this: `process_verified_ack` looks the share
+        // up with `.get()` and only `.remove()`s it after the verifier lookup
+        // succeeds, so a MissingVerifier error leaves the share in place. This test
+        // asserts that retention.
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
         let ack_key = HalfKey::random();
@@ -629,17 +629,17 @@ mod tests {
         let result = reconstructor.process_verified_ack(ack_key, challenge, &peer_cache_ref);
         assert!(matches!(result, Err(PixError::MissingVerifier)));
 
-        // The share MUST NOT be destroyed by the MissingVerifier error.
-        // BUG: the current code uses .remove() before checking the verifier,
-        // so this assertion will fail, demonstrating the regression.
+        // The share MUST NOT be destroyed by the MissingVerifier error: the
+        // implementation only removes it after the verifier lookup succeeds, so it
+        // stays available for a later retry.
         let peer_cache_after = reconstructor.awaiting_acks.get(peer.public());
         assert!(
             peer_cache_after.is_some(),
-            "BUG: share was permanently removed despite MissingVerifier"
+            "share must be retained after MissingVerifier"
         );
         assert!(
             peer_cache_after.as_ref().unwrap().contains_key(&challenge),
-            "BUG: share was permanently removed despite MissingVerifier"
+            "share must be retained after MissingVerifier"
         );
 
         Ok(())
