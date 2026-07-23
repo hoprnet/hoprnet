@@ -44,7 +44,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+bytesize = { workspace = true }
 hopr-api = { workspace = true, features = ["node", "serde", "types-random"] }
+hopr-crypto-packet = { workspace = true }
 hopr-utils = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
@@ -64,6 +66,7 @@ hopr-chain-connector = { workspace = true, features = [
 hopr-api = { workspace = true, features = ["types-random"] }
 insta = { workspace = true }
 mockall = { workspace = true }
+serde_json = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }

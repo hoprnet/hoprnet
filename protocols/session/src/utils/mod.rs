@@ -26,8 +26,13 @@ impl<T> std::fmt::Debug for RingBufferProducer<T> {
 }
 
 impl<T> RingBufferProducer<T> {
-    pub fn push(&mut self, item: T) {
-        self.0.lock().enqueue(item);
+    /// Pushes `item` into the ring buffer, returning `true` if there was capacity and `false`
+    /// if the buffer was already full and an existing entry was overwritten.
+    pub fn push(&mut self, item: T) -> bool {
+        let mut rb = self.0.lock();
+        let had_capacity = !rb.is_full();
+        rb.enqueue(item);
+        had_capacity
     }
 }
 
@@ -162,6 +167,14 @@ mod tests {
     use hex_literal::hex;
 
     use super::*;
+
+    #[test]
+    fn ring_buffer_producer_push_returns_false_when_overwriting() {
+        let (mut tx, _rx) = searchable_ringbuffer::<u32>(2);
+        assert!(tx.push(1));
+        assert!(tx.push(2));
+        assert!(!tx.push(3)); // buffer was full; oldest entry overwritten
+    }
 
     #[test]
     fn segment_should_split_data_correctly() -> anyhow::Result<()> {
