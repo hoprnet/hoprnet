@@ -262,7 +262,11 @@ pub mod tests {
         for _ in 0..10 {
             assert_eq!(queue.cached_unrealized_value(), expected_value);
         }
-        assert_eq!(peek_count.load(Ordering::Relaxed), 0, "peek called during cached_unrealized_value");
+        assert_eq!(
+            peek_count.load(Ordering::Relaxed),
+            0,
+            "peek called during cached_unrealized_value"
+        );
 
         Ok(())
     }
