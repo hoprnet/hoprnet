@@ -188,6 +188,16 @@ impl<Q: TicketQueue> UnrealizedValue for CachedQueueMap<Q> {
             // when a new winning ticket has been added, redeemed or neglected, all of which are fairly rare operations.
             let queue = ticket_queue.queue.read();
 
+            if min_index.is_none() {
+                // Fast path: the current epoch and its aggregated value are tracked in memory
+                // by `ValueCachedQueue`. No peek() call needed — avoids a redb read transaction
+                // on the hot per-packet decode path (decoder.rs:validate_and_replace_ticket).
+                return Ok(Some(queue.0.cached_unrealized_value()));
+            }
+
+            // Slow path: a minimum index was given, so we must peek to learn the current epoch
+            // and then do a full scan via total_value.
+            //
             // Get the epoch of the first extractable ticket in the queue.
             // The ticket insertion takes care that there are no tickets
             // with epochs other than the current epoch.
