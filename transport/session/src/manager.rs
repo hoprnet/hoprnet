@@ -665,8 +665,8 @@ impl PixToolbox {
 /// many polynomials and shares each SSA will use, which together define the data quota per SSA.
 ///
 /// Before encoding, the Entry validates that the requested dimensions match the installed
-/// [`SsaShareGenerator`]'s configured [`SsaGeneratorConfig::polynomials_per_ssa`] and
-/// [`SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
+/// [`SsaShareGenerator`]'s configured [`hopr_protocol_pix::SsaGeneratorConfig::polynomials_per_ssa`] and
+/// [`hopr_protocol_pix::SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
 /// for return-path SURBs operates at the same dimensions advertised to the Exit — a
 /// mismatch would let the session proceed with incompatible share parameters. The
 /// validation runs before the initiation challenge slot is reserved, so repeated
