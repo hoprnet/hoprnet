@@ -424,7 +424,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.frame_size)
+            .sequencer(cfg.frame_timeout, cfg.capacity)
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
