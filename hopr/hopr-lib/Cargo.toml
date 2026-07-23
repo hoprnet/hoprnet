@@ -208,4 +208,3 @@ hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 # humantime-serde: used via serde attribute macros, not a direct import.
 # pprof: used only behind #[cfg(feature = "profiling")], which machete may not scan.
 ignored = ["humantime-serde", "pprof"]
-
