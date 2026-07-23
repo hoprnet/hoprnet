@@ -4249,7 +4249,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4506,7 +4506,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-utils"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "arrayvec",

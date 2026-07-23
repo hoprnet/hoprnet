@@ -879,7 +879,18 @@ where
                     .filter_map(move |(pseudonym, data)| {
                         hopr_utils::parallelize::DISPATCH_MESSAGE_CALLS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
+                        // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
+                        // try_send); it never blocks. However, the crossfire stream that feeds
+                        // this loop does not participate in tokio's cooperative budget, so
+                        // `future::ready` — which is always Poll::Ready — would let this task
+                        // monopolize its worker thread under a saturated inbound queue (Processed
+                        // items are filtered to None before the fold's tx.send().await, the only
+                        // other suspension point on the hot path). Calling consume_budget() here
+                        // integrates this loop into tokio's coop scheduler: it is a cheap
+                        // thread-local decrement on the fast path and only actually yields
+                        // (~every 128 polls) when the budget is exhausted, giving co-located
+                        // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
+                        let result = match smgr.dispatch_message(pseudonym, data) {
                             Ok(DispatchResult::Processed) => {
                                 tracing::trace!("message dispatch completed");
                                 None
@@ -892,7 +903,11 @@ where
                                 tracing::error!(%error, "error while dispatching packet in the session manager");
                                 None
                             }
-                        })
+                        };
+                        async move {
+                            hopr_utils::runtime::prelude::consume_budget().await;
+                            result
+                        }
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {
@@ -1186,5 +1201,92 @@ where
 
     async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
         self.network_observed_multiaddresses(key).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    };
+
+    use futures::StreamExt;
+    use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+
+    /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
+    /// the tokio worker thread under a continuously saturated inbound stream.
+    ///
+    /// ### Background
+    ///
+    /// The inbound dispatch loop (`transport/hopr/src/lib.rs`) drives:
+    ///
+    /// ```text
+    /// rx_from_protocol (crossfire, no coop budget)
+    ///   → filter_stream
+    ///   → filter_map(sync dispatch_message + consume_budget().await)
+    ///   → fold(tx.send().await)          ← only fires for Unrelated items
+    /// ```
+    ///
+    /// On the `Processed` hot path (common case), items become `None` and are filtered
+    /// out before the `fold`'s `tx.send().await`, so the only suspension point is the
+    /// `consume_budget()` call inside `filter_map`.
+    ///
+    /// ### What this test proves
+    ///
+    /// On a `current_thread` runtime (single worker, fully cooperative scheduling) a tight
+    /// stream loop that never returns `Poll::Pending` starves every other spawned task until
+    /// the stream is drained.  By replacing `future::ready(result)` with an `async` block
+    /// that calls `consume_budget().await` before returning, we give the scheduler a chance
+    /// to preempt the loop every ≈128 polls.  The "canary" task — a plain `yield_now` loop —
+    /// *must* make forward progress while the dispatch stream is draining for the fix to be
+    /// considered effective.
+    ///
+    /// Reverting the `consume_budget().await` to `future::ready(result)` will make this
+    /// test fail: the canary will never be scheduled and its counter will remain 0.
+    #[tokio::test(flavor = "current_thread")]
+    async fn sessions_management_dispatch_loop_yields_to_scheduler() {
+        // N large enough to trigger ≥1 genuine yield (budget = 128 per reset).
+        const N: usize = 1_000;
+
+        // Canary: counts how many times it was scheduled during the dispatch run.
+        let counter = Arc::new(AtomicU64::new(0));
+        let counter_clone = counter.clone();
+        let canary = spawn(async move {
+            loop {
+                yield_now().await;
+                counter_clone.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+
+        // Dispatch loop — same shape as the fixed SessionsManagement(0) hot path:
+        //   sync compute → consume_budget().await → None (Processed path)
+        let unrelated_count = futures::stream::iter(0..N)
+            .filter_map(|_item| {
+                // Dispatch result computed synchronously (no clone); budget consumed async.
+                let result: Option<()> = None; // every item is "Processed"
+                async move {
+                    consume_budget().await;
+                    result
+                }
+            })
+            .fold(0u64, |acc, _| async move { acc + 1 })
+            .await;
+
+        assert_eq!(unrelated_count, 0, "all Processed items should be filtered out by filter_map");
+
+        // The canary must have been scheduled at least once while the dispatch loop ran.
+        // If consume_budget() is removed and future::ready() is used instead, the loop
+        // never returns Poll::Pending on the current_thread executor and this assertion fails.
+        let progress = counter.load(Ordering::Relaxed);
+        assert!(
+            progress > 0,
+            "canary task made no forward progress during the {N}-item dispatch run \
+             (counter = {progress}); the dispatch loop is monopolizing the executor thread — \
+             ensure filter_map returns `async move {{ consume_budget().await; result }}` \
+             rather than `future::ready(result)`"
+        );
+
+        canary.abort();
     }
 }
