@@ -1902,6 +1902,80 @@ mod tests {
         Ok(())
     }
 
+    /// try_open_channel: channel is PendingToClose (deadline in the future).
+    /// Expected: no open tx submitted; open_in_flight cleared; on-chain channel unchanged.
+    #[tokio::test]
+    async fn open_pass_defers_open_when_pending_to_close() -> anyhow::Result<()> {
+        let initial_balance = HoprBalance::from(10_u32);
+        // Closure deadline is 10 minutes in the future — genuinely pending-close, not overdue.
+        let closure_deadline = std::time::SystemTime::now() + Duration::from_secs(600);
+
+        let existing_channel = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(5_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::PendingToClose(closure_deadline))
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([existing_channel])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            funding: FundingConfig {
+                initial_balance,
+                min_safe_balance_required: HoprBalance::from(1_u32),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
+
+        let result = inner.try_open_channel(*ALICE, initial_balance);
+
+        // The PendingToClose guard must fire: no tx, in-flight marker cleared.
+        assert!(
+            result.is_none(),
+            "try_open_channel must return None when channel is PendingToClose"
+        );
+        assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
+        assert!(inner.fund_in_flight.is_empty(), "fund_in_flight must be empty");
+
+        // On-chain channel must still be PendingToClose — nothing mutated it.
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+        let alice_ch = channels
+            .iter()
+            .find(|c| c.destination == *ALICE)
+            .expect("BOB→ALICE channel must still exist on-chain");
+        assert!(
+            matches!(alice_ch.status, ChannelStatus::PendingToClose(_)),
+            "channel status must remain PendingToClose, got {:?}",
+            alice_ch.status
+        );
+
+        Ok(())
+    }
+
     /// try_open_channel: channel is already Open but stake < lower_balance_threshold.
     /// Expected: one FundChannel tx submitted immediately (no waiting for next tick);
     /// open_in_flight empty; on-chain balance increases by topup_balance.
