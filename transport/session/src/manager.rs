@@ -1162,11 +1162,11 @@ where
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
 
             // Validate that PIX toolbox is available before advertising UsePIX
-            if self.pix_toolbox.get().is_none() {
-                return Err(
-                    SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")).into(),
-                );
-            }
+            let pix_toolbox = self
+                .pix_toolbox
+                .get()
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
+
             // Validate dimensions are within protocol limits
             if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
             {
@@ -1177,6 +1177,27 @@ where
                 ))
                 .into());
             }
+
+            // Validate that the requested dimensions match the installed generator's
+            // configuration. The generator was initialized with fixed dimensions at startup;
+            // advertising mismatched values would let the session proceed but produce
+            // incompatible PIX shares on the wire.
+            let gen_cfg = pix_toolbox.share_generator.config();
+            if polys_per_ssa != gen_cfg.polynomials_per_ssa {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested polys_per_ssa {} does not match installed generator ({})",
+                    polys_per_ssa, gen_cfg.polynomials_per_ssa,
+                ))
+                .into());
+            }
+            if shares_per_ssa != gen_cfg.threshold {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested shares_per_ssa {} does not match installed generator ({})",
+                    shares_per_ssa, gen_cfg.threshold,
+                ))
+                .into());
+            }
+
             let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
             additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }
@@ -4572,6 +4593,79 @@ mod tests {
             mgr.session_initiations.entry_count(),
             0,
             "session_initiations must remain empty when UsePIX is rejected"
+        );
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that `new_session` rejects UsePIX when the requested
+    /// `polys_per_ssa`/`shares_per_ssa` don't match the installed
+    /// `SsaShareGenerator`'s configured dimensions.
+    ///
+    /// ## Steps
+    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
+    /// 2. Start the manager with that toolbox installed.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some((10, 10))` — both values are within protocol bounds but
+    ///    mismatch the generator.
+    /// 4. Assert the error identifies which dimension doesn't match.
+    /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 5,
+            threshold: 3,
+            surplus_shares: 5,
+        };
+        let (pix_toolbox, _) = PixToolbox::new(
+            Arc::new(SsaShareGenerator::new(ssa_gen_config)),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect NO sends.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    // Both values pass protocol bounds but polys=10 != generator's 5
+                    pix_ssa_quota: Some((10, 10)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(2.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("does not match installed generator"),
+            "expected generator mismatch error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when generator mismatch is rejected"
         );
 
         sender.close_channel();
