@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt, pin_mut};
+use tracing::Instrument;
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
@@ -71,10 +72,8 @@ pub(super) async fn process_chain_events<C, G>(
                         peer = %peer_id,
                         multiaddresses = ?multiaddrs,
                     );
-                    // Drop the span guard before .await — EnteredSpan is not Send.
-                    drop(span.enter());
-                    if let Err(e) = tx.send((peer_id, multiaddrs.to_vec())).await {
-                        tracing::error!(%e, "peer-discovery channel closed; announcement dropped");
+                    if let Err(e) = tx.send((peer_id, multiaddrs.to_vec())).instrument(span.clone()).await {
+                        tracing::error!(parent: &span, %e, "peer-discovery channel closed; announcement dropped");
                     }
                 }
             }
