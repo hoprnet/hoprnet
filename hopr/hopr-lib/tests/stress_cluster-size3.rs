@@ -101,10 +101,13 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
     let timeout = chain_propagation_delay(&chain_info) * 12;
     cluster.wait_for_channel_graph(src, channels.len(), timeout).await?;
 
-    // Create two sessions from src through relay to dst_a (different sessions, same path)
+    // Create two sessions from src through relay to dst_a (different sessions, same path).
+    // Disable the SURB balancer (None) so its background replenishment traffic does not
+    // exhaust the 100 wxHOPR channel funding before session_b can establish.  The intent
+    // of this test is deadlock / cross-contamination detection, not SURB replenishment.
     let path = [src, relay, dst_a];
-    let mut session_a = cluster.create_session(&path).await?;
-    let mut session_b = cluster.create_session(&path).await?;
+    let mut session_a = cluster.create_session_with(&path, Default::default(), None).await?;
+    let mut session_b = cluster.create_session_with(&path, Default::default(), None).await?;
 
     let payload_a: Vec<u8> = vec![0xAA; DATA_SIZE];
     let payload_b: Vec<u8> = vec![0xBB; DATA_SIZE];
