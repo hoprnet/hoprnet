@@ -164,38 +164,6 @@ The test asserts delivery ≥ target bytes and at least one non-zero throughput
 window. No hard MB/s floor is set — throughput varies with instrumentation
 overhead and machine load.
 
-## Interpreting the flame graph
-
-Wide frames near the top of the flame graph are the hot paths. Key frames to
-look for:
-
-| Frame | What it covers |
-|-------|----------------|
-| `hopr_crypto_packet::por` | Proof-of-Relay signing and verification |
-| `hopr_crypto_packet::packet` | SPHINX packet encode/decode (Chacha20, poly1305) |
-| `hopr_protocol_session` | Session framing, segmentation, ACK state machine |
-| `hopr_transport_mixer` | Mixer delay scheduling and packet reordering |
-| `tokio::runtime::task` | Async task dispatch overhead |
-
-An unusually wide `tokio::sync::*` frame (mutex, channel, semaphore) suggests
-contention. A wide `alloc` frame suggests excessive allocation in a hot path.
-
-## How it works
-
-1. `cluster_fixture(N nodes)` — spawns N per-node tokio runtimes in dedicated
-   threads; blocks until full-mesh connectivity and probe warmup are complete
-   (can take ~100 s for 3 nodes).
-2. Full channel mesh — opens `N*(N-1)` directed channels concurrently via
-   `try_join_all`; waits for graph convergence with `wait_for_channel_graph`.
-3. Route selection — picks `--routes` distinct `[src, relay, dst]` triples
-   using a seeded RNG; same seed = reproducible traffic across profiling runs.
-4. Session establishment — opens one long-lived `HoprSession` per triple
-   sequentially (each call can take up to ~60 s with retries).
-5. Workers — one tokio task per session: `write_all → flush → read_exact`
-   in a tight loop. The built-in `EchoServer` on each node echoes bytes back,
-   so `read_exact` confirms end-to-end delivery.
-6. Sampler — a background task records per-window bytes and MB/s every 500 ms,
-   producing the time-series output.
 
 ## Tools available in the dev shell
 
