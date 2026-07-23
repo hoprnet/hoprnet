@@ -1277,7 +1277,10 @@ mod tests {
             .fold(0u64, |acc, _| async move { acc + 1 })
             .await;
 
-        assert_eq!(unrelated_count, 0, "all Processed items should be filtered out by filter_map");
+        assert_eq!(
+            unrelated_count, 0,
+            "all Processed items should be filtered out by filter_map"
+        );
 
         // The canary must have been scheduled at least once while the dispatch loop ran.
         // If consume_budget() is removed and future::ready() is used instead, the loop
@@ -1285,10 +1288,9 @@ mod tests {
         let progress = counter.load(Ordering::Relaxed);
         assert!(
             progress > 0,
-            "canary task made no forward progress during the {N}-item dispatch run \
-             (counter = {progress}); the dispatch loop is monopolizing the executor thread — \
-             ensure filter_map returns `async move {{ consume_budget().await; result }}` \
-             rather than `future::ready(result)`"
+            "canary task made no forward progress during the {N}-item dispatch run (counter = {progress}); the \
+             dispatch loop is monopolizing the executor thread — ensure filter_map returns `async move {{ \
+             consume_budget().await; result }}` rather than `future::ready(result)`"
         );
 
         canary.abort();

@@ -1,10 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
 use bytes::Bytes;
-use hopr_transport::testing::{
-    harness::{PEERS, PEERS_CHAIN, random_packets_of_count},
-    stubs::{StubChainApi, StubPathResolver},
-};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{
     SinkExt, StreamExt,
@@ -26,6 +22,10 @@ use hopr_protocol_hopr::{
     SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
+use hopr_transport::testing::{
+    harness::{PEERS, PEERS_CHAIN, random_packets_of_count},
+    stubs::{StubChainApi, StubPathResolver},
+};
 use hopr_transport_mixer::config::MixerConfig;
 use libp2p::PeerId;
 
