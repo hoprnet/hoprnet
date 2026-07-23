@@ -1,10 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
 use bytes::Bytes;
-use hopr_transport::testing::{
-    harness::{PEERS, PEERS_CHAIN, random_packets_of_count},
-    stubs::{StubChainApi, StubPathResolver},
-};
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{
     SinkExt, StreamExt,
