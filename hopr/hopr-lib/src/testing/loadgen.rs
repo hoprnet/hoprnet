@@ -520,23 +520,16 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         SessionCapability::NoRateControl.into()
     };
 
-    // Open all sessions concurrently: sequential opening leaves earlier slots idle while
-    // later sessions are being set up, which can exceed idle_timeout and evict them.
-    //
-    // `create_session_with` uses only path[0] (source), path[last] (destination), and
-    // `path.len()-2` (hop count) — intermediate nodes are ignored, routing is random.
-    // Materialise paths before the async fan-out so borrows don't escape the closure.
-    let paths: Vec<Vec<_>> = routes
-        .iter()
-        .map(|idxs| idxs.iter().map(|&i| &cluster[i]).collect())
-        .collect();
-
-    let sessions = try_join_all(paths.iter().map(|path| {
-        tracing::info!(src = ?path[0].peer_id(), dst = ?path[path.len()-1].peer_id(), "opening session");
-        cluster.create_session_with(path, capabilities, cfg.surb_config.clone())
-    }))
-    .await
-    .context("opening sessions")?;
+    let mut sessions = Vec::with_capacity(routes.len());
+    for path_indices in routes {
+        tracing::info!(?path_indices, "opening session");
+        let path: Vec<&_> = path_indices.iter().map(|&i| &cluster[i]).collect();
+        let session = cluster
+            .create_session_with(&path, capabilities, cfg.surb_config.clone())
+            .await
+            .context("opening session")?;
+        sessions.push(session);
+    }
 
     // ── 4. Workload ───────────────────────────────────────────────────────────
 
