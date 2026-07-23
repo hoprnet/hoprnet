@@ -42,7 +42,7 @@ impl<T: 'static> Unpin for CrossfireSink<T> {}
 // SAFETY: All &self methods (try_send, clone) only access `tx: MAsyncTx<Array<T>>` which
 // is Sync. The `pending` and `buffered` fields are accessed exclusively via &mut self
 // (Sink trait methods), making concurrent &self access free of data races.
-unsafe impl<T: Send + 'static> Sync for CrossfireSink<T> {}
+unsafe impl<T: Send + 'static> Sync for CrossfireSink<T> where crossfire::MAsyncTx<crossfire::mpsc::Array<T>>: Sync {}
 
 impl<T: 'static> std::fmt::Debug for CrossfireSink<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
