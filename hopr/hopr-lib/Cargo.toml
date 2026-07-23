@@ -209,5 +209,3 @@ hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 # pprof: used only behind #[cfg(feature = "profiling")], which machete may not scan.
 ignored = ["humantime-serde", "pprof"]
 
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde", "pprof"]

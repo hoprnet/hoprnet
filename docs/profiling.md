@@ -56,7 +56,7 @@ cargo run --features testing \
 
 Example output:
 
-```
+```text
      time(s)   window MB/s     cumulative
   ──────────────────────────────────────
         0.50         8.412        4.21 MB
