@@ -434,7 +434,12 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .try_into()
         .map_err(|_| anyhow::anyhow!("expected 3 channel guards"))?;
 
-    let mut session = cluster_fixture.create_session(&[src, mid, dst]).await?;
+    // Disable the SURB balancer so its background replenishment traffic does not
+    // exhaust the channel balance before all test messages are delivered.
+    // This test is about win-probability ticket accounting, not SURB replenishment.
+    let mut session = cluster_fixture
+        .create_session_with(&[src, mid, dst], Default::default(), None)
+        .await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_api::types::crypto_random::random_bytes::<BUF_LEN>();
