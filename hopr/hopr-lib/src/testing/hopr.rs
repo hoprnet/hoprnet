@@ -44,7 +44,7 @@ pub fn create_hopr_instance_config(
                 announce_local_addresses: true,
             },
             session: SessionGlobalConfig {
-                idle_timeout: Duration::from_millis(2500),
+                idle_timeout: Duration::from_secs(60),
                 ..Default::default()
             },
             probe: crate::config::ProbeConfig {
