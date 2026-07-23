@@ -188,7 +188,7 @@ impl StressReport {
             peak_recv,
         );
         println!(
-            "  Loss:  {} ({:.2}%)  [packets dropped or still in pipeline at drain timeout]",
+            "  Loss:  {} ({:.2}%)  [bytes in-flight or dropped at drain timeout]",
             bytesize::ByteSize(in_flight),
             loss_pct,
         );
@@ -422,6 +422,8 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     // P(n, path_len) = n × (n-1) × … × (n - path_len + 1)
     let max_paths = (0..path_len).fold(1usize, |acc, k| acc.saturating_mul(n.saturating_sub(k)));
 
+    anyhow::ensure!(cfg.total_bytes > 0, "total_bytes must be greater than 0");
+    anyhow::ensure!(!cfg.sample_interval.is_zero(), "sample_interval must be non-zero");
     anyhow::ensure!(cfg.hops >= 1, "hops must be at least 1");
     anyhow::ensure!(
         n >= path_len,
@@ -627,6 +629,10 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
                     WriteStrategy::Continuous => usize::MAX,
                 };
 
+                // Pre-allocate a max-size payload buffer once; content is irrelevant (HOPR encrypts it).
+                let max_msg = *msg_size_range.end();
+                let payload_buf: Vec<u8> = (0..max_msg).map(|i| (i % 256) as u8).collect();
+
                 loop {
                     let msg_size = rng.random_range(msg_size_range.clone());
 
@@ -640,10 +646,7 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
                         batch_remaining = batch_remaining.saturating_sub(msg_size);
                     }
 
-                    // Payload: sequential bytes — content is irrelevant; HOPR encrypts it.
-                    let payload: Vec<u8> = (0..msg_size).map(|i| (i % 256) as u8).collect();
-
-                    session.write_all(&payload).await.context("write_all")?;
+                    session.write_all(&payload_buf[..msg_size]).await.context("write_all")?;
                     session.flush().await.context("flush")?;
 
                     // Count bytes written into the pipeline (forward path only).
@@ -680,13 +683,25 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     );
 
     // Collect finished sessions back so they stay open during the drain phase.
+    // On error, abort the sampler before returning so its infinite loop doesn't outlive this call.
     let mut live_sessions = Vec::with_capacity(worker_handles.len());
+    let mut worker_err: Option<anyhow::Error> = None;
     for handle in worker_handles {
-        let session = handle
-            .await
-            .context("worker task panicked")?
-            .context("worker task error")?;
-        live_sessions.push(session);
+        match handle.await {
+            Err(e) => {
+                worker_err = Some(anyhow::anyhow!("worker task panicked: {e}"));
+                break;
+            }
+            Ok(Err(e)) => {
+                worker_err = Some(e.context("worker task error"));
+                break;
+            }
+            Ok(Ok(session)) => live_sessions.push(session),
+        }
+    }
+    if let Some(e) = worker_err {
+        sampler.abort();
+        return Err(e);
     }
 
     let workload_duration = workload_start.elapsed();
@@ -760,15 +775,18 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
 
     let total_bytes_delivered = delivered.load(Ordering::Relaxed);
     let total_bytes_received = cluster.echo_received.load(Ordering::Relaxed) - recv_baseline;
-    let mean_mbps = if samples.is_empty() {
+    // Exclude drain-phase samples (window_bytes ≈ 0 because no sends occur after workload_duration)
+    // so the reported means reflect sustained throughput during the active send window only.
+    let active: Vec<_> = samples.iter().filter(|s| s.elapsed <= workload_duration).collect();
+    let mean_mbps = if active.is_empty() {
         (total_bytes_delivered as f64 / (1024.0 * 1024.0)) / workload_duration.as_secs_f64()
     } else {
-        samples.iter().map(|s| s.mbps).sum::<f64>() / samples.len() as f64
+        active.iter().map(|s| s.mbps).sum::<f64>() / active.len() as f64
     };
-    let mean_recv_mbps = if samples.is_empty() {
+    let mean_recv_mbps = if active.is_empty() {
         (total_bytes_received as f64 / (1024.0 * 1024.0)) / workload_duration.as_secs_f64()
     } else {
-        samples.iter().map(|s| s.recv_mbps).sum::<f64>() / samples.len() as f64
+        active.iter().map(|s| s.recv_mbps).sum::<f64>() / active.len() as f64
     };
 
     // Theoretical SURB keep-alive overhead (infrastructure, not counted in throughput).

@@ -172,10 +172,14 @@ fn main() -> anyhow::Result<()> {
         .enable_all()
         .build()?;
 
-    // Start the profiler *after* cluster/channel setup so the flame graph
-    // captures only the sustained workload, not startup overhead.
-    // When `profiling` feature is absent this is a zero-cost no-op.
-    let profiler = ProfilerGuard::start(1000)?;
+    // Start the profiler only when --out is given; starting without a destination wastes
+    // sampling overhead on runs that don't need a flame graph.
+    // When `profiling` feature is absent every call is a zero-cost no-op.
+    let profiler = if args.flamegraph_out.is_some() {
+        Some(ProfilerGuard::start(1000)?)
+    } else {
+        None
+    };
 
     eprintln!(
         "→ Sending {} MB across {} {}-hop session(s) (seed={})…",
@@ -189,14 +193,16 @@ fn main() -> anyhow::Result<()> {
 
     // Write the flame graph while the profiler guard is still alive.
     if let Some(ref path) = args.flamegraph_out {
-        profiler.write_flamegraph(path)?;
+        if let Some(ref p) = profiler {
+            p.write_flamegraph(path)?;
+        }
         if cfg!(feature = "profiling") {
             eprintln!("→ Flame graph written to {}", path.display());
         } else {
             eprintln!("→ --out set but `profiling` feature is disabled; no flame graph written.");
         }
     }
-    drop(profiler); // stop sampling
+    drop(profiler); // stop sampling if active
 
     report.print_series();
 
