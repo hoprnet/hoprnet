@@ -4007,7 +4007,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4086,10 +4086,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.19.2"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytesize",
  "chrono",
  "dashmap",
  "futures",
@@ -4098,6 +4099,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-chain-connector",
+ "hopr-crypto-packet",
  "hopr-utils",
  "humantime-serde",
  "insta",
@@ -4107,6 +4109,7 @@ dependencies = [
  "multiaddr",
  "parking_lot",
  "serde",
+ "serde_json",
  "serde_with",
  "smart-default",
  "test-log",

@@ -84,6 +84,7 @@ impl ChannelLifecycleStrategy {
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
             peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+            last_resolved_funding: Arc::new(parking_lot::Mutex::new(None)),
         })
     }
 }
@@ -119,7 +120,7 @@ where
             target = self.cfg.population.target_open_channels,
             min = self.cfg.population.min_open_channels,
             tick_interval_secs = self.cfg.tick_interval.as_secs(),
-            initial_balance = %self.cfg.funding.initial_balance,
+            initial_capacity = %self.cfg.funding.initial_capacity,
             "channel-lifecycle: strategy started"
         );
         self.run_pipeline().await;

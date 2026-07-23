@@ -31,6 +31,7 @@ use tracing::{debug, warn};
 
 use super::{
     ChannelLifecycleStrategyInner, ChannelObservation, PeerAddrCache,
+    config::ResolvedFunding,
     selector::{
         BucketCell, BucketView, CloseCandidate, LatencyBucket, OpenCandidate, PeerEdgeInfo, SelectorContext, SignalSet,
         StakeView, SubnetBucket,
@@ -136,12 +137,17 @@ where
     /// current tick**, before the snapshot pass refreshed `last_observed` —
     /// otherwise `prev_obs.balance` and `channel.balance` are equal and the
     /// drain estimate collapses to zero.
+    ///
+    /// `lower_threshold` is the resolved wxHOPR lower-balance threshold,
+    /// supplied by the caller so that the computation uses pre-resolved
+    /// economics from the current tick.
     fn proactive_fund_needed(
         &self,
         channel: &ChannelEntry,
         prev_obs: &HashMap<ChannelId, ChannelObservation>,
         est_tx_secs: f64,
         min_ticket_price_wei: f64,
+        lower_threshold: HoprBalance,
     ) -> bool {
         if !self.cfg.proactive_funding.enabled {
             return false;
@@ -172,7 +178,7 @@ where
         let projected_drain = drain_rate * est_tx_secs * self.cfg.proactive_funding.safety_margin;
 
         let balance_after = balance_current - projected_drain;
-        let threshold = self.cfg.funding.lower_balance_threshold.amount().low_u128() as f64;
+        let threshold = lower_threshold.amount().low_u128() as f64;
 
         balance_after < threshold
     }
@@ -302,12 +308,16 @@ where
     /// committed amount if a chain action was submitted (either a fresh open or
     /// an immediate top-up), or `None` if no action was taken.
     ///
+    /// `funding` carries the wxHOPR amounts already resolved from the capacity
+    /// config for this tick.  `amount` is `funding.initial_balance` (passed by
+    /// the caller so this helper stays generic).
+    ///
     /// Before submitting, queries the current on-chain channel state from the
     /// pipeline task so the strategy converges to the desired state in this
     /// tick rather than deferring to the next one.  The `channel_by_parties`
     /// call is serviced by the in-process cache (moka + RocksDB), so the
     /// overhead is a fast in-memory lookup in the common case.
-    fn try_open_channel(&self, dest: Address, amount: HoprBalance) -> Option<HoprBalance> {
+    fn try_open_channel(&self, dest: Address, amount: HoprBalance, funding: &ResolvedFunding) -> Option<HoprBalance> {
         if !self.open_in_flight.insert(dest) {
             return None;
         }
@@ -326,12 +336,12 @@ where
                 Ok(Some(existing)) => match existing.status {
                     ChannelStatus::Open => {
                         self.open_in_flight.remove(&dest);
-                        if existing.balance >= self.cfg.funding.lower_balance_threshold {
+                        if existing.balance >= funding.lower_balance_threshold {
                             debug!(%dest, balance = %existing.balance, "channel-lifecycle: already open at desired stake, skipping");
                             return None;
                         }
                         debug!(%dest, balance = %existing.balance, "channel-lifecycle: already open below threshold, funding immediately");
-                        let topup = self.cfg.funding.topup_balance;
+                        let topup = funding.topup_balance;
                         return self.try_fund_channel(&existing, topup).then_some(topup);
                     }
                     ChannelStatus::PendingToClose(_) => {
@@ -433,11 +443,31 @@ where
                 });
         }
 
-        let min_ticket_price_wei = chain
-            .minimum_ticket_price()
-            .await
-            .map(|p| p.amount().low_u128() as f64)
-            .unwrap_or(0.0);
+        // Fetch ticket economics once per tick.  Both values are needed for
+        // the capacity-to-wxHOPR conversion and for the proactive-funding drain
+        // estimate.  When either value is unavailable the fund and open passes
+        // are skipped; close and finalize still run.
+        let ticket_price = chain.minimum_ticket_price().await.unwrap_or_else(|e| {
+            warn!(%e, "channel-lifecycle: minimum_ticket_price unavailable, using zero");
+            HoprBalance::zero()
+        });
+        let min_ticket_price_wei = ticket_price.amount().low_u128() as f64;
+
+        let win_prob = match chain.minimum_incoming_ticket_win_prob().await {
+            Ok(wp) => Some(wp),
+            Err(e) => {
+                warn!(%e, "channel-lifecycle: minimum_incoming_ticket_win_prob unavailable, skipping fund/open passes");
+                None
+            }
+        };
+
+        // Resolve data-capacity config fields to wxHOPR amounts for this tick.
+        // `None` when win_prob is unavailable; fund/open passes are skipped.
+        let funding = win_prob.map(|wp| self.cfg.funding.resolve(ticket_price, wp));
+
+        // Share resolved economics with the event-driven funding handler so it
+        // can reuse per-tick values rather than issuing fresh chain RPC calls.
+        *self.last_resolved_funding.lock() = funding;
 
         let peer_addr_map = self.peer_addr_map(chain).await?;
 
@@ -472,37 +502,48 @@ where
         let mut safe_remaining = safe_balance;
 
         // ── 2. Fund pass ─────────────────────────────────────────────────────
-        if safe_balance >= self.cfg.funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
-            for ch in &open_channels {
-                if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
-                    continue;
-                }
-                let needs_topup = ch.balance <= self.cfg.funding.lower_balance_threshold;
-                let needs_proactive =
-                    self.proactive_fund_needed(ch, &prev_observations, est_tx_secs, min_ticket_price_wei);
+        if let Some(funding) = funding {
+            if funding.topup_balance.is_zero() {
+                debug!("channel-lifecycle: fund pass skipped: resolved topup is zero");
+            } else if safe_balance >= funding.min_safe_balance_required || !self.cfg.funding.stop_when_unfunded {
+                for ch in &open_channels {
+                    if self.fund_in_flight.contains(ch.get_id()) || self.close_in_flight.contains(ch.get_id()) {
+                        continue;
+                    }
+                    let needs_topup = ch.balance <= funding.lower_balance_threshold;
+                    let needs_proactive = self.proactive_fund_needed(
+                        ch,
+                        &prev_observations,
+                        est_tx_secs,
+                        min_ticket_price_wei,
+                        funding.lower_balance_threshold,
+                    );
 
-                if needs_topup || needs_proactive {
-                    let reason = if needs_topup {
-                        "below_lower_threshold"
-                    } else {
-                        "proactive_drain"
-                    };
-                    debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
-                    if safe_remaining < self.cfg.funding.topup_balance {
-                        debug!("channel-lifecycle: safe balance exhausted in fund pass");
-                        break;
-                    }
-                    if self.try_fund_channel(ch, self.cfg.funding.topup_balance) {
-                        safe_remaining -= self.cfg.funding.topup_balance;
+                    if needs_topup || needs_proactive {
+                        let reason = if needs_topup {
+                            "below_lower_threshold"
+                        } else {
+                            "proactive_drain"
+                        };
+                        debug!(%ch, reason, safe_remaining = %safe_remaining, "channel-lifecycle: fund candidate");
+                        if safe_remaining < funding.topup_balance {
+                            debug!("channel-lifecycle: safe balance exhausted in fund pass");
+                            break;
+                        }
+                        if self.try_fund_channel(ch, funding.topup_balance) {
+                            safe_remaining -= funding.topup_balance;
+                        }
                     }
                 }
+            } else {
+                debug!(
+                    safe = %safe_balance,
+                    min_required = %funding.min_safe_balance_required,
+                    "channel-lifecycle: fund pass skipped: safe below minimum"
+                );
             }
         } else {
-            debug!(
-                safe = %safe_balance,
-                min_required = %self.cfg.funding.min_safe_balance_required,
-                "channel-lifecycle: fund pass skipped: safe below minimum"
-            );
+            debug!("channel-lifecycle: fund pass skipped: ticket economics unavailable");
         }
 
         // ── Selector context ─────────────────────────────────────────────────
@@ -718,7 +759,17 @@ where
             return Ok(());
         }
 
-        if self.cfg.funding.stop_when_unfunded && safe_remaining < self.cfg.funding.initial_balance {
+        let Some(funding) = funding else {
+            debug!("channel-lifecycle: open pass skipped: ticket economics unavailable");
+            return Ok(());
+        };
+
+        if funding.initial_balance.is_zero() {
+            debug!("channel-lifecycle: open pass skipped: resolved initial balance is zero");
+            return Ok(());
+        }
+
+        if self.cfg.funding.stop_when_unfunded && safe_remaining < funding.initial_balance {
             debug!(%safe_remaining, "channel-lifecycle: safe balance too low to open new channels");
             return Ok(());
         }
@@ -729,10 +780,10 @@ where
         );
 
         for (addr, _) in opens_ranked.iter().take(deficit) {
-            if safe_remaining < self.cfg.funding.initial_balance {
+            if safe_remaining < funding.initial_balance {
                 break;
             }
-            if let Some(committed) = self.try_open_channel(*addr, self.cfg.funding.initial_balance) {
+            if let Some(committed) = self.try_open_channel(*addr, funding.initial_balance, &funding) {
                 safe_remaining -= committed;
             }
         }
@@ -987,6 +1038,7 @@ mod tests {
     };
 
     use anyhow::Context as _;
+    use bytesize::ByteSize;
     use dashmap::DashMap;
     use futures::StreamExt as _;
     use hex_literal::hex;
@@ -994,7 +1046,7 @@ mod tests {
         PeerId,
         chain::{
             AccountSelector, ChainEvent, ChainEvents, ChainReadAccountOperations, ChainReadChannelOperations,
-            ChainWriteAccountOperations, ChannelSelector, HoprChainApi,
+            ChainWriteAccountOperations, ChannelSelector, HoprChainApi, WinningProbability,
         },
         node::{
             ActionableEvent, ActionableEventDiscriminant, ActionableEventSource, ComponentStatus,
@@ -1014,7 +1066,23 @@ mod tests {
     // `super` here is `pipeline`; `super::super` is `channel_lifecycle`.
     // Private items (ChannelLifecycleStrategyInner) are accessible from descendant modules.
     use super::super::ChannelLifecycleStrategyInner;
-    use super::super::*;
+    use super::super::{config::ResolvedFunding, *};
+
+    /// Build a [`ResolvedFunding`] directly from wxHOPR amounts for use in
+    /// `try_open_channel` unit tests that bypass the pipeline.
+    fn make_resolved(
+        lower: HoprBalance,
+        topup: HoprBalance,
+        initial: HoprBalance,
+        min_safe: HoprBalance,
+    ) -> ResolvedFunding {
+        ResolvedFunding {
+            lower_balance_threshold: lower,
+            topup_balance: topup,
+            initial_balance: initial,
+            min_safe_balance_required: min_safe,
+        }
+    }
 
     lazy_static::lazy_static! {
         static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -1386,13 +1454,17 @@ mod tests {
 
         let node = Arc::new(ChainNode::new(Arc::clone(&connector)));
 
+        // With the Blokli sim's default ticket price of "1 wxHOPR" and win_prob = 1.0,
+        // ByteSize::b(1) resolves to 1 packet × 1 wxHOPR × 3 hops = 3 wxHOPR.
+        // The channel has balance 2 wei ≪ 3 wxHOPR → triggers funding.
+        // The safe has 1000 wxHOPR ≫ 3 wxHOPR topup → topup is affordable.
         let cfg = ChannelLifecycleConfig {
             tick_interval: Duration::from_millis(100),
             jitter: Duration::ZERO,
             funding: FundingConfig {
-                lower_balance_threshold: stake_limit,
-                topup_balance: fund_amount,
-                min_safe_balance_required: HoprBalance::from(1_u32),
+                lower_capacity_threshold: ByteSize::b(1),
+                topup_capacity: ByteSize::b(1),
+                min_safe_capacity_required: ByteSize::b(0),
                 stop_when_unfunded: true,
                 ..Default::default()
             },
@@ -1545,6 +1617,7 @@ mod tests {
                 last_observed: Arc::new(DashMap::new()),
                 peer_ticket_activity: Arc::new(DashMap::new()),
                 peer_addr_cache: Arc::new(Mutex::new(None)),
+                last_resolved_funding: Arc::new(Mutex::new(None)),
             }
         }
 
@@ -1670,6 +1743,7 @@ mod tests {
                 last_observed: Arc::new(DashMap::new()),
                 peer_ticket_activity: Arc::new(DashMap::new()),
                 peer_addr_cache: Arc::new(Mutex::new(None)),
+                last_resolved_funding: Arc::new(Mutex::new(None)),
             };
             old.close_in_flight.insert(*ch_close.get_id());
             old.finalize_in_flight.insert(*ch_close.get_id());
@@ -1692,6 +1766,7 @@ mod tests {
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
             peer_addr_cache: Arc::new(Mutex::new(None)),
+            last_resolved_funding: Arc::new(Mutex::new(None)),
         };
 
         assert!(fresh.close_in_flight.is_empty());
@@ -1763,6 +1838,7 @@ mod tests {
             last_observed: Arc::new(DashMap::new()),
             peer_ticket_activity: Arc::new(DashMap::new()),
             peer_addr_cache: Arc::new(parking_lot::Mutex::new(None)),
+            last_resolved_funding: Arc::new(parking_lot::Mutex::new(None)),
         }
     }
 
@@ -1798,20 +1874,18 @@ mod tests {
         let connector = Arc::new(connector);
         register_test_safe(&*connector, *BOB).await?;
 
-        let cfg = ChannelLifecycleConfig {
-            funding: FundingConfig {
-                lower_balance_threshold: lower_threshold,
-                initial_balance,
-                min_safe_balance_required: HoprBalance::from(1_u32),
-                stop_when_unfunded: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let cfg = ChannelLifecycleConfig::default();
 
         let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
-        let result = inner.try_open_channel(*ALICE, initial_balance);
+        // Build the resolved funding with the specific thresholds for this test.
+        let resolved = make_resolved(
+            lower_threshold,
+            HoprBalance::from(8_u32), // topup (arbitrary, not used in this path)
+            initial_balance,
+            HoprBalance::from(1_u32), // min_safe (arbitrary, not used in try_open_channel)
+        );
+        let result = inner.try_open_channel(*ALICE, initial_balance, &resolved);
 
         // No open tx should have been submitted; no fund tx either.
         assert!(
@@ -1830,6 +1904,80 @@ mod tests {
             channels.iter().find(|c| c.destination == *ALICE).map(|c| c.balance),
             Some(HoprBalance::from(5_u32)),
             "on-chain balance must be unchanged"
+        );
+
+        Ok(())
+    }
+
+    /// try_open_channel: channel is PendingToClose (deadline in the future).
+    /// Expected: no open tx submitted; open_in_flight cleared; on-chain channel unchanged.
+    #[tokio::test]
+    async fn open_pass_defers_open_when_pending_to_close() -> anyhow::Result<()> {
+        let initial_balance = HoprBalance::from(10_u32);
+        // Closure deadline is 10 minutes in the future — genuinely pending-close, not overdue.
+        let closure_deadline = std::time::SystemTime::now() + Duration::from_secs(600);
+
+        let existing_channel = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(5_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::PendingToClose(closure_deadline))
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([existing_channel])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            funding: FundingConfig {
+                initial_balance,
+                min_safe_balance_required: HoprBalance::from(1_u32),
+                stop_when_unfunded: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
+
+        let result = inner.try_open_channel(*ALICE, initial_balance);
+
+        // The PendingToClose guard must fire: no tx, in-flight marker cleared.
+        assert!(
+            result.is_none(),
+            "try_open_channel must return None when channel is PendingToClose"
+        );
+        assert!(inner.open_in_flight.is_empty(), "open_in_flight must be cleared");
+        assert!(inner.fund_in_flight.is_empty(), "fund_in_flight must be empty");
+
+        // On-chain channel must still be PendingToClose — nothing mutated it.
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+        let alice_ch = channels
+            .iter()
+            .find(|c| c.destination == *ALICE)
+            .expect("BOB→ALICE channel must still exist on-chain");
+        assert!(
+            matches!(alice_ch.status, ChannelStatus::PendingToClose(_)),
+            "channel status must remain PendingToClose, got {:?}",
+            alice_ch.status
         );
 
         Ok(())
@@ -1868,20 +2016,18 @@ mod tests {
         let connector = Arc::new(connector);
         register_test_safe(&*connector, *BOB).await?;
 
-        let cfg = ChannelLifecycleConfig {
-            funding: FundingConfig {
-                lower_balance_threshold: lower_threshold,
-                topup_balance,
-                min_safe_balance_required: HoprBalance::from(1_u32),
-                stop_when_unfunded: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let cfg = ChannelLifecycleConfig::default();
 
         let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
-        let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32));
+        // Build the resolved funding with the specific thresholds for this test.
+        let resolved = make_resolved(
+            lower_threshold,
+            topup_balance,
+            HoprBalance::from(10_u32), // initial (arbitrary)
+            HoprBalance::from(1_u32),  // min_safe (arbitrary)
+        );
+        let result = inner.try_open_channel(*ALICE, HoprBalance::from(10_u32), &resolved);
 
         // Should return Some(topup_balance) (fund tx submitted) and clear open_in_flight.
         assert_eq!(
@@ -1932,19 +2078,18 @@ mod tests {
         let connector = Arc::new(connector);
         register_test_safe(&*connector, *BOB).await?;
 
-        let cfg = ChannelLifecycleConfig {
-            funding: FundingConfig {
-                initial_balance,
-                min_safe_balance_required: HoprBalance::from(1_u32),
-                stop_when_unfunded: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
+        let cfg = ChannelLifecycleConfig::default();
 
         let inner = fresh_inner_with_chain(cfg, Arc::clone(&connector));
 
-        let result = inner.try_open_channel(*ALICE, initial_balance);
+        // Build resolved funding — for the "no prior channel" path only amount matters.
+        let resolved = make_resolved(
+            HoprBalance::from(3_u32), // lower (arbitrary, no channel to check)
+            HoprBalance::from(8_u32), // topup (arbitrary)
+            initial_balance,
+            HoprBalance::from(1_u32), // min_safe (arbitrary)
+        );
+        let result = inner.try_open_channel(*ALICE, initial_balance, &resolved);
         assert_eq!(
             result,
             Some(initial_balance),
@@ -1964,6 +2109,116 @@ mod tests {
                 .iter()
                 .any(|c| c.destination == *ALICE && c.status == ChannelStatus::Open),
             "BOB→ALICE channel must be Open after open tx; got {channels:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Pipeline integration: a `ByteSize` capacity config is resolved to the
+    /// correct wxHOPR **topup** amount via the live ticket economics fetched from
+    /// the Blokli simulator, and the fund pass applies it to an underfunded channel.
+    ///
+    /// The Blokli test sim defaults to `ticket_price = "1 wxHOPR"` and
+    /// `min_ticket_winning_probability = 1.0`.  With `assumed_hops = 3` and
+    /// `topup_capacity = 1 byte` (= 1 packet):
+    ///
+    /// ```text
+    /// topup_balance = 1 packet × 1 wxHOPR × 3 hops / 1.0 = 3 wxHOPR
+    /// ```
+    ///
+    /// The channel starts with 0 balance (< resolved threshold), triggering a
+    /// fund tx.  After confirmation the on-chain balance must equal exactly
+    /// 3 wxHOPR.
+    #[tokio::test]
+    async fn pipeline_funds_underfunded_channel_with_capacity_derived_wxhopr_amount() -> anyhow::Result<()> {
+        use super::super::config::capacity_to_balance;
+
+        // Blokli defaults: ticket_price = "1 wxHOPR", win_prob = 1.0, assumed_hops = 3.
+        // capacity_to_balance(ByteSize::b(1), 1 wxHOPR, 1.0, 3) = 3 wxHOPR.
+        // capacity_to_balance(1 byte, 1 wxHOPR, 1.0, 3 hops) = 3 wxHOPR.
+        let expected_topup = {
+            let price = HoprBalance::new_base(1); // 1 wxHOPR (Blokli default)
+            let wp = WinningProbability::try_from(1.0f64).expect("valid win_prob");
+            capacity_to_balance(ByteSize::b(1), price, wp, 3) // topup_capacity = ByteSize::b(1)
+        };
+
+        // Channel starts at 0 balance — below any non-zero threshold.
+        let ch = ChannelEntry::builder()
+            .between(*BOB, *ALICE)
+            .amount(0_u32)
+            .ticket_index(0)
+            .status(ChannelStatus::Open)
+            .epoch(0)
+            .build()?;
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([ch])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        connector.connect().await?;
+        let connector = Arc::new(connector);
+        register_test_safe(&*connector, *BOB).await?;
+
+        let cfg = ChannelLifecycleConfig {
+            tick_interval: Duration::from_millis(100),
+            jitter: Duration::ZERO,
+            restart: RestartGuardConfig {
+                startup_close_grace_period: Duration::ZERO,
+            },
+            funding: FundingConfig {
+                // threshold = 0 → only the initial 0-balance channel triggers funding.
+                // After the topup (3 wxHOPR), balance > 0 → no further funding on next tick.
+                lower_capacity_threshold: ByteSize::b(0),
+                // 1 byte = 1 packet → 3 wxHOPR topup at default sim economics.
+                topup_capacity: ByteSize::b(1),
+                min_safe_capacity_required: ByteSize::b(0),
+                stop_when_unfunded: true,
+                assumed_hops: 3,
+                ..Default::default()
+            },
+            // Disable proactive funding so only the reactive threshold path fires.
+            proactive_funding: ProactiveFundingConfig {
+                enabled: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let node = Arc::new(ChainNode::new(Arc::clone(&connector)));
+        let mut strategy: Box<dyn crate::strategy::Strategy + Send> = ChannelLifecycleStrategy::new(cfg).build(node);
+        let handle = tokio::spawn(async move {
+            let _ = strategy.run().await;
+        });
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        handle.abort();
+        let _ = handle.await;
+
+        let channels: Vec<ChannelEntry> = connector
+            .stream_channels(ChannelSelector::default().with_source(*BOB))
+            .context("failed to stream channels")?
+            .collect()
+            .await;
+
+        let funded = channels
+            .iter()
+            .find(|c| c.destination == *ALICE && c.status == ChannelStatus::Open)
+            .unwrap_or_else(|| panic!("BOB→ALICE open channel not found; got {channels:?}"));
+
+        assert_eq!(
+            funded.balance, expected_topup,
+            "after fund pass the channel balance must equal capacity_to_balance(1 byte, 1 wxHOPR, 1.0, 3 hops) = \
+             {expected_topup}; got {}; channels: {channels:?}",
+            funded.balance
         );
 
         Ok(())
@@ -2141,8 +2396,10 @@ mod tests {
             },
             // Require an unfeasibly high safe balance so the fund/open passes
             // are skipped, isolating the close pass.
+            // ByteSize::MAX resolves to a wxHOPR amount >> safe balance, so the
+            // fund/open passes are skipped — isolating the close/finalize pass.
             funding: FundingConfig {
-                min_safe_balance_required: HoprBalance::new_base(10_000),
+                min_safe_capacity_required: ByteSize::b(u64::MAX),
                 stop_when_unfunded: true,
                 ..Default::default()
             },
@@ -2222,8 +2479,10 @@ mod tests {
                 close_below_quality_score: 0.3,
                 ..Default::default()
             },
+            // ByteSize::MAX resolves to a wxHOPR amount >> safe balance, so the
+            // fund/open passes are skipped — isolating the close/finalize pass.
             funding: FundingConfig {
-                min_safe_balance_required: HoprBalance::new_base(10_000),
+                min_safe_capacity_required: ByteSize::b(u64::MAX),
                 stop_when_unfunded: true,
                 ..Default::default()
             },
@@ -2337,8 +2596,10 @@ mod tests {
                 ..Default::default()
             },
             // Disable fund/open passes to isolate the finalizer.
+            // ByteSize::MAX resolves to a wxHOPR amount >> safe balance, so the
+            // fund/open passes are skipped — isolating the close/finalize pass.
             funding: FundingConfig {
-                min_safe_balance_required: HoprBalance::new_base(10_000),
+                min_safe_capacity_required: ByteSize::b(u64::MAX),
                 stop_when_unfunded: true,
                 ..Default::default()
             },
@@ -2426,8 +2687,10 @@ mod tests {
                 max_closure_overdue: Duration::ZERO,
                 ..Default::default()
             },
+            // ByteSize::MAX resolves to a wxHOPR amount >> safe balance, so the
+            // fund/open passes are skipped — isolating the close/finalize pass.
             funding: FundingConfig {
-                min_safe_balance_required: HoprBalance::new_base(10_000),
+                min_safe_capacity_required: ByteSize::b(u64::MAX),
                 stop_when_unfunded: true,
                 ..Default::default()
             },
