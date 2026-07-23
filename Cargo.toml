@@ -258,6 +258,7 @@ strip = false
 inherits = "release"
 debug = 2
 strip = false
+split-debuginfo = "packed"
 
 # make insta snapshots faster
 [profile.dev.package]
