@@ -190,7 +190,11 @@ fn main() -> anyhow::Result<()> {
     // Write the flame graph while the profiler guard is still alive.
     if let Some(ref path) = args.flamegraph_out {
         profiler.write_flamegraph(path)?;
-        eprintln!("→ Flame graph written to {}", path.display());
+        if cfg!(feature = "profiling") {
+            eprintln!("→ Flame graph written to {}", path.display());
+        } else {
+            eprintln!("→ --out set but `profiling` feature is disabled; no flame graph written.");
+        }
     }
     drop(profiler); // stop sampling
 
