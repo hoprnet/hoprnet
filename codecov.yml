@@ -35,7 +35,7 @@ ignore:
   - "**/examples/**"
   - "**/build.rs"
   - "**/codegen/**"
-  - "hopr/hopr-lib/src/testing/loadgen.rs"
+  - "hopr/hopr-lib/src/testing/**"
   - "hopr/reference/src/testing/**"
   # Non-Rust directories (Python SDK, shell scripts, tools, deployment manifests, docs)
   - "sdk/**"
