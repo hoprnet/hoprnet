@@ -27,8 +27,8 @@ use hopr_protocol_pix::{
     SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
-    StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+    ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::{network_types::crossfire_sink::CrossfireSinkError, runtime::AbortableList};
 use tracing::{debug, error, info, trace, warn};
@@ -170,6 +170,7 @@ const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 ///
 /// The supervisor creates the action synchronously in the worker's first
 /// tick, so this is purely a safety guard in case of an internal stall.
+#[expect(dead_code)]
 const INITIAL_SSA_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 // Needs to use an UnboundedSender instead of oneshot
@@ -178,7 +179,7 @@ const INITIAL_SSA_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 // The Session initiation cache is only present on the Entry (client) side.
 type SessionInitiationCache = moka::sync::Cache<
     StartChallenge,
-    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType>>>,
+    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType<SessionId>>>>,
 >;
 
 /// Handles to streams and tasks spawned by the Session.
@@ -698,6 +699,14 @@ impl PixToolbox {
 /// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
 /// many polynomials and shares each SSA will use, which together define the data quota per SSA.
 ///
+/// Before encoding, the Entry validates that the requested dimensions match the installed
+/// [`SsaShareGenerator`]'s configured [`SsaGeneratorConfig::polynomials_per_ssa`] and
+/// [`SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
+/// for return-path SURBs operates at the same dimensions advertised to the Exit — a
+/// mismatch would let the session proceed with incompatible share parameters. The
+/// validation runs before the initiation challenge slot is reserved, so repeated
+/// misconfigurations cannot exhaust challenge slots.
+///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
@@ -905,16 +914,13 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
+        let initiation_timeout =
+            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
-                .time_to_live(
-                    2 * initiation_timeout_max_one_way(
-                        cfg.initiation_timeout_base,
-                        RoutingOptions::MAX_INTERMEDIATE_HOPS,
-                    ),
-                )
+                .time_to_live(initiation_timeout)
                 .build(),
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
@@ -1266,11 +1272,51 @@ where
                 .min(u32::MAX as u64);
         }
 
-        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data
-        if let Some(ref params) = ssa_params
-            && cfg.capabilities.contains(Capability::UsePIX)
-        {
-            additional_data |= (params.polys_per_ssa as u64) << 48 | (params.shares_per_poly as u64) << 32;
+        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // Run these validations BEFORE reserving the initiation challenge slot so that a
+        // repeated invalid request cannot exhaust all challenge slots.
+        if cfg.capabilities.contains(Capability::UsePIX) {
+            let (polys_per_ssa, shares_per_ssa) = cfg
+                .pix_ssa_quota
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
+
+            // Validate that PIX toolbox is available before advertising UsePIX
+            let pix_toolbox = self
+                .pix_toolbox
+                .get()
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
+
+            // Validate dimensions are within protocol limits
+            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+            {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "invalid PIX dimensions: polys={}, shares={}",
+                    polys_per_ssa,
+                    shares_per_ssa,
+                ))
+                .into());
+            }
+
+            // Validate that the requested dimensions match the installed generator's
+            // configuration.
+            let gen_cfg = pix_toolbox.share_generator.config();
+            if polys_per_ssa != gen_cfg.polynomials_per_ssa {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested polys_per_ssa {} does not match installed generator ({})",
+                    polys_per_ssa, gen_cfg.polynomials_per_ssa,
+                ))
+                .into());
+            }
+            if shares_per_ssa != gen_cfg.threshold {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested shares_per_ssa {} does not match installed generator ({})",
+                    shares_per_ssa, gen_cfg.threshold,
+                ))
+                .into());
+            }
+
+            let _ = ssa_state_lock.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
+            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
         }
 
         // Prepare the session initiation message in the Start protocol
@@ -1568,9 +1614,16 @@ where
             }
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
+                let challenge = match error.identifier {
+                    ErrorIdentifier::Challenge(c) => c,
+                    ErrorIdentifier::SessionId(_) => {
+                        // This arm should only ever receive pre-establishment errors.
+                        // Log the id if it matters for debugging.
+                        0
+                    }
+                };
                 error!(
-                    challenge = error.challenge,
-                    ?error,
+                    %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
                 Err(TransportSessionError::Rejected(error.reason))
@@ -1978,7 +2031,7 @@ where
                 "client offered PIX but this node has no PIX support installed"
             );
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason: StartErrorReason::UnacceptablePixParams,
             });
             send_via_msg_sender(
@@ -2001,7 +2054,7 @@ where
             // Notify the sender that the session could not be established
             let reason = StartErrorReason::UnacceptablePixParams;
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
             send_via_msg_sender(
@@ -2079,7 +2132,7 @@ where
             error!("no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
 
@@ -2392,7 +2445,9 @@ where
                             };
                             // Look up the session slot and send the request.
                             if let Some(s) = myself.sessions.get(&session_id) {
-                                let result = myself.send_ssa_request(session_id, &s, ssa_id.ssa_index()).await;
+                                let result = myself
+                                    .send_ssa_request(session_id, &s, ssa_id.ssa_index())
+                                    .await;
                                 let send_ok = result.is_ok();
                                 // Only register the SSA as sent if the wire write succeeded.
                                 if send_ok
@@ -2513,7 +2568,8 @@ where
         );
         let challenge = est.orig_challenge;
         let session_id = est.session_id;
-        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge) {
+
+        if let Some(tx_est) = self.session_initiations.remove(&challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
                 error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
@@ -2526,29 +2582,36 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(&self, error_type: StartErrorType) -> errors::Result<()> {
-        trace!(
-            challenge = error_type.challenge,
-            error = ?error_type.reason,
-            "failed to initialize a session",
-        );
-        // Currently, we do not distinguish between individual error types
-        // and just discard the initiation attempt and pass on the error.
-        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge) {
-            if let Err(error) = tx_est.try_send(Err(error_type)) {
-                error!(%error, "could not send session error message");
-                return Err(SessionManagerError::other(error).into());
+    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+        let reason = error_type.reason;
+        match error_type.identifier {
+            ErrorIdentifier::Challenge(challenge) => {
+                trace!(%challenge, error = ?error_type.reason, "session initiation error received");
+                if let Some(tx_est) = self.session_initiations.remove(&challenge) {
+                    if let Err(error) = tx_est.try_send(Err(error_type)) {
+                        error!(%error, "could not send session error message");
+                        return Err(SessionManagerError::other(error).into());
+                    }
+                    error!(%challenge, "session establishment error received");
+                } else {
+                    error!(
+                        %challenge,
+                        "session establishment attempt expired before error could be delivered"
+                    );
+                }
             }
-            error!(challenge = error_type.challenge, "session establishment error received");
-        } else {
-            error!(
-                challenge = error_type.challenge,
-                "session establishment attempt expired before error could be delivered"
-            );
+            ErrorIdentifier::SessionId(session_id) => {
+                error!(
+                    %session_id, %reason,
+                    "received post-establishment session error — closing session"
+                );
+                // Best-effort close; the session may have already been removed.
+                self.close_session(&session_id);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()]);
+        METRIC_RECEIVED_SESSION_ERRS.increment(&[&reason.to_string()]);
 
         Ok(())
     }
@@ -4148,7 +4211,7 @@ mod tests {
 
         // Inject the SessionError with the matching challenge before SessionEstablished arrives.
         let error_type = StartErrorType {
-            challenge,
+            identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
         mgr.handle_session_error(error_type).await?;
@@ -4954,6 +5017,79 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that `new_session` rejects UsePIX when the requested
+    /// `polys_per_ssa`/`shares_per_ssa` don't match the installed
+    /// `SsaShareGenerator`'s configured dimensions.
+    ///
+    /// ## Steps
+    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
+    /// 2. Start the manager with that toolbox installed.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some((10, 10))` — both values are within protocol bounds but
+    ///    mismatch the generator.
+    /// 4. Assert the error identifies which dimension doesn't match.
+    /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 5,
+            threshold: 3,
+            surplus_shares: 5,
+        };
+        let (pix_toolbox, _) = PixToolbox::new(
+            Arc::new(SsaShareGenerator::new(ssa_gen_config)),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect NO sends.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    // Both values pass protocol bounds but polys=10 != generator's 5
+                    pix_ssa_quota: Some((10, 10)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(2.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("does not match installed generator"),
+            "expected generator mismatch error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when generator mismatch is rejected"
+        );
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
     // ---------------------------------------------------------------------------
     // PIX protocol tests
     // ---------------------------------------------------------------------------
@@ -5025,7 +5161,7 @@ mod tests {
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
-        assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
@@ -5095,7 +5231,7 @@ mod tests {
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
-        assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
