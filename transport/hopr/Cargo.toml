@@ -124,7 +124,10 @@ hopr-transport-tag-allocator = { workspace = true }
 bimap = { workspace = true, optional = true }
 futures-concurrency = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
-hopr-chain-connector = { workspace = true, features = ["testing", "runtime-tokio"], optional = true }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+], optional = true }
 hopr-ticket-manager = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 

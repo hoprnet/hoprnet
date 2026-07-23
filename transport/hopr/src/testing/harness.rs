@@ -5,10 +5,9 @@
 //  - `CHAIN_DATA` — pre-seeded Blokli emulator state (channels, balances, ticket price).
 //  - Payload generators: `random_packets_of_count`, `random_packet_of_size`.
 //  - Routing helpers: `resolve_mock_path`, `make_routing`, `make_outgoing_packets`.
-//  - Per-peer pipeline wiring: `peer_setup_for`, `peer_setup_for_with_cfg`,
-//    `peer_setup_for_with_counters`.
-//  - In-process software transport: `emulate_channel_communication` — routes `(PeerId, Bytes)`
-//    between peers without any real network sockets.
+//  - Per-peer pipeline wiring: `peer_setup_for`, `peer_setup_for_with_cfg`, `peer_setup_for_with_counters`.
+//  - In-process software transport: `emulate_channel_communication` — routes `(PeerId, Bytes)` between peers without
+//    any real network sockets.
 //  - Convenience combined harness: `send_and_receive_packets`, `send_relay_receive_channel_of_n_peers`.
 //
 // Originally hosted in `tests/protocol/common/mod.rs`; moved here so both benches and
