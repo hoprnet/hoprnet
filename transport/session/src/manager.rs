@@ -222,7 +222,6 @@ struct SessionSsaState {
 }
 
 impl SessionSsaState {
-    #[expect(dead_code)]
     pub fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
         Self {
             current_index: std::sync::atomic::AtomicU32::new(1).into(),
@@ -1238,6 +1237,17 @@ where
             lock
         };
 
+        // Pre-populate the SSA state for outgoing sessions so that
+        // handle_ssa_request can read the quota to verify against the Exit's
+        // response. Shared across both SessionSlot construction sites below.
+        let ssa_state_lock: Arc<OnceLock<SessionSsaState>> = {
+            let lock = Arc::new(OnceLock::new());
+            if let Some(ref params) = ssa_params {
+                let _ = lock.set(SessionSsaState::new(params.polys_per_ssa, params.shares_per_poly));
+            }
+            lock
+        };
+
         let mut additional_data = 0_u64;
 
         // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
@@ -1423,7 +1433,7 @@ where
                                 ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
-                                current_ssa_state: Default::default(),
+                                current_ssa_state: ssa_state_lock.clone(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1506,7 +1516,7 @@ where
                                 ssa_params: ssa_params_lock.clone(),
                                 pix_supervisor: Arc::new(OnceLock::new()),
                                 pix_egress_gate: Default::default(),
-                                current_ssa_state: Default::default(),
+                                current_ssa_state: ssa_state_lock.clone(),
                             },
                         )
                         .ok_or_else(|| {
@@ -2030,6 +2040,19 @@ where
             crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
         let (session_rx, session_rx_ah) = hopr_utils::runtime::DropAbortable::new(session_rx.into_stream());
 
+        // If PIX is active, pre-fill the slot's SSA params before the slot is
+        // cloned into the sessions cache, so the action driver can read them.
+        let pix_params = if self.pix_toolbox.get().is_some()
+            && session_req.capabilities.0.contains(Capability::UsePIX)
+        {
+            Some(SessionSsaParameters {
+                polys_per_ssa: client_polys_per_ssa,
+                shares_per_poly: client_shares_per_ssa,
+            })
+        } else {
+            None
+        };
+
         let slot = SessionSlot {
             session_tx,
             routing_opts: reply_routing.clone(),
@@ -2042,6 +2065,10 @@ where
             current_ssa_state: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
+
+        if let Some(params) = &pix_params {
+            let _ = slot.ssa_params.set(params.clone());
+        }
 
         // Insert the slot and get a guard. Any failure from here on rolls the slot
         // back, otherwise it would block this pseudonym until idle eviction. The atomic
@@ -2081,13 +2108,8 @@ where
         // If PIX is active, set up the supervisor and install the egress gate
         // BEFORE constructing the session, so the gate is populated before any
         // write reaches the egress adapter.
-        let pix: Option<(SessionPixSupervisorHandle, SsaCommitmentGuard<HoprPixSpec>, ActionRx)> =
-            if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
-                let params = SessionSsaParameters {
-                    polys_per_ssa: client_polys_per_ssa,
-                    shares_per_poly: client_shares_per_ssa,
-                };
-
+        let pix: Option<(SessionPixSupervisorHandle, ActionRx)> =
+            if let Some(params) = &pix_params {
                 let dims = SsaDimensions {
                     polys: params.polys_per_ssa,
                     threshold: params.shares_per_poly,
@@ -2097,51 +2119,15 @@ where
 
                 let (handle, action_rx) = spawn_supervisor_worker(pix_cfg, dims, session_id, std::time::Instant::now());
 
-                // Receive the initial RequestSsa action and send it synchronously.
-                let initial_action = action_rx
-                    .recv()
-                    .timeout(futures_time::time::Duration::from(INITIAL_SSA_REQUEST_TIMEOUT))
-                    .await
-                    .map_err(|_| {
-                        SessionManagerError::Other(anyhow::anyhow!("timeout waiting for initial SSA request"))
-                    })?
-                    .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("action driver closed prematurely")))?;
-
-                let ssa_id = match &initial_action {
-                    SessionPixAction::RequestSsa { ssa_id, .. } => *ssa_id,
-                    other => {
-                        error!(?other, "unexpected initial action from supervisor");
-                        return Err(SessionManagerError::Other(anyhow::anyhow!("unexpected initial action")).into());
-                    }
-                };
-
-                // Store params in slot first — send_ssa_request reads them.
-                let _ = slot.ssa_params.set(params);
-
-                // Send the SSA request message on the wire and capture the RAII guard.
-                let guard = self
-                    .send_ssa_request(session_id, &slot, ssa_id.ssa_index())
-                    .await
-                    .map_err(|e| {
-                        error!(%session_id, %e, "failed to send initial SSA request, slot will be rolled back");
-                        e
-                    })?;
-
-                // Notify supervisor that the request was sent.
-                handle
-                    .send_event(SessionPixEvent::SsaRequestSent(ssa_id))
-                    .await
-                    .map_err(|_| SessionManagerError::Other(anyhow::anyhow!("supervisor channel closed")))?;
-
-                #[cfg(all(feature = "telemetry", not(test)))]
-                set_pix_current_ssa_phase(&session_id, ssa_id.ssa_index(), PixSsaPhase::AwaitingCommitment);
-
                 // Install the gate in the slot BEFORE session construction so the
                 // egress adapters inside HoprSession see a populated gate.
+                // The action driver handles the first RequestSsa after the
+                // SessionEstablished message is sent, preserving the correct
+                // wire ordering (SessionEstablished before SsaRequest).
                 let _ = slot.pix_supervisor.set(handle.clone());
                 let _ = slot.pix_egress_gate.set(handle.gate.clone());
 
-                Some((handle, guard, action_rx))
+                Some((handle, action_rx))
             } else {
                 None
             };
@@ -2375,7 +2361,7 @@ where
 
         // If PIX was set up before session construction, spawn the action
         // driver task now (after the session is published).
-        if let Some((handle, initial_guard, action_rx)) = pix {
+        if let Some((handle, action_rx)) = pix {
             let myself = self.clone();
             let gate = slot.pix_egress_gate.get().cloned().expect("gate just set");
             let slot_for_driver = slot.clone();
@@ -2385,7 +2371,7 @@ where
                 // retire_ssa on drop, so clearing the vec or dropping it
                 // handles cleanup automatically.
                 let mut retirement = SsaRetirementGuard {
-                    guards: vec![initial_guard],
+                    guards: Vec::new(),
                 };
 
                 loop {
@@ -5282,6 +5268,9 @@ mod tests {
         )
         .await?;
 
+        // Yield so the async action driver can send the initial SsaRequest.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
         for i in 1..=4 {
             mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
@@ -5386,6 +5375,9 @@ mod tests {
             },
         )
         .await?;
+
+        // Yield so the async action driver can send the initial SsaRequest.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
         mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
@@ -5566,6 +5558,9 @@ mod tests {
             },
         )
         .await?;
+
+        // Yield so the async action driver can send the initial SsaRequest.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         // The exit commitment is already set up by handle_incoming_session_initiation.
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
@@ -5836,6 +5831,9 @@ mod tests {
         )
         .await?;
 
+        // Yield so the async action driver can send the initial SsaRequest.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
         // Session is active
         assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
 
@@ -5932,6 +5930,9 @@ mod tests {
             },
         )
         .await?;
+
+        // Yield so the async action driver can send the initial SsaRequest.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         // Grab the egress gate reference while the session is live.
         let slot = mgr.sessions.get(&alice_pseudonym).expect("session must exist");
@@ -6166,6 +6167,11 @@ mod tests {
         bob_transport
             .expect_send_message()
             .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest
+        // (SsaRequest is sent by the async action driver task).
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
 
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx, mut new_session_rx) = futures::channel::mpsc::channel(1);
@@ -6182,6 +6188,10 @@ mod tests {
             },
         )
         .await?;
+
+        // Yield so the async action driver can send the initial SsaRequest
+        // and the supervisor registers the SSA before we dispatch events.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         // This is the session object the target/user task owns and writes into.
         let mut session = new_session_rx.next().await.expect("incoming session").session;

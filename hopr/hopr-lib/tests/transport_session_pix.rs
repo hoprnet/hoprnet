@@ -197,7 +197,9 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
         // instead of hanging until the rstest timeout.
         if session_died.load(Ordering::SeqCst) {
             anyhow::bail!(
-                "session died after {pk_recovered_count}/{target_cycles} PIX cycles; bg task detected closure"
+                "session died after {}/{} PIX cycles; bg task detected closure",
+                pk_recovered_ids.len(),
+                target_cycles,
             );
         }
         tokio::select! {
