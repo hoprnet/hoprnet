@@ -1258,8 +1258,8 @@ mod tests {
         let counter_clone = counter.clone();
         let canary = spawn(async move {
             loop {
-                yield_now().await;
                 counter_clone.fetch_add(1, Ordering::Relaxed);
+                yield_now().await;
             }
         });
 
@@ -1294,5 +1294,6 @@ mod tests {
         );
 
         canary.abort();
+        canary.await.ok();
     }
 }
