@@ -579,7 +579,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // Since segments are re-sent via Control stream, they are not later fed again
         // into the ring buffer.
         if !ctx.rb_tx.push(segment.clone()) {
-            tracing::warn!(
+            tracing::trace!(
                 frame_id = segment.frame_id,
                 seq_idx = segment.seq_idx,
                 "segment dropped: ring buffer full"
