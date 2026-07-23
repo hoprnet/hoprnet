@@ -1,19 +1,21 @@
-// OFAT (one-factor-at-a-time) stress matrices.
+// OFAT (one-factor-at-a-time) cluster throughput matrices.
 //
-// Each matrix varies one dimension (latency, write strategy, SURB buffer size, rate control)
-// across 1/2/3 hops at a fixed 20 MB baseline.  The *signal* is the printed throughput
-// series: a variant that stalls, shows a cliff, or produces higher loss is the finding.
+// Runs a real-QUIC multi-node cluster (mock Blokli chain) and varies one
+// dimension (latency shim, write strategy, SURB buffer size, rate control)
+// across 1/2/3 hops at a fixed 20 MB baseline.  The *signal* is the printed
+// throughput series: a variant that stalls, shows a cliff, or produces higher
+// loss is the finding.
 //
 // All tests are `#[ignore]`d by default — cluster bootstrap takes 60–120 s.
 // Run the full suite:
 //
 //   cargo nextest run -p hopr-lib --features session-client \
-//       --test 'stress_cluster-matrix' -j 1 --run-ignored all -- --no-capture
+//       --test 'cluster_throughput-matrix' -j 1 --run-ignored all -- --no-capture
 //
 // Run a single variant (e.g. latency 1-hop with 50ms, case index 1):
 //
 //   cargo nextest run -p hopr-lib --features session-client \
-//       --test 'stress_cluster-matrix' -j 1 --run-ignored all \
+//       --test 'cluster_throughput-matrix' -j 1 --run-ignored all \
 //       -- 'latency_matrix::case_1' --no-capture
 
 #![cfg(feature = "session-client")]

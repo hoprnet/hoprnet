@@ -1,6 +1,12 @@
-// Chain-API test stubs for benchmarks.
-// Moved here from hopr-utils/src/testing/mod.rs to avoid a publish-time
-// circular dep: hopr-utils (testing) → hopr-api → hopr-utils.
+// In-memory stub implementations of chain API traits.
+//
+// These stubs satisfy `ChainKeyOperations`, `ChainReadChannelOperations`,
+// `ChainReadTicketOperations`, and `ChainValues` without any network or database
+// I/O, making them suitable for benchmarks and unit tests that exercise the
+// packet pipeline in isolation.
+//
+// Originally hosted in `benches/bench_stubs.rs`; moved here so both benches and
+// integration tests can share it without the `#[path=...]` hack.
 use std::sync::Arc;
 
 use bimap::BiMap;
