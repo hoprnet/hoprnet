@@ -6,7 +6,10 @@ use std::{
 
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
-    primitive::{prelude::*, typenum::Unsigned},
+    primitive::{
+        hybrid_array::{Array, typenum::Unsigned},
+        prelude::*,
+    },
 };
 
 use super::{
@@ -258,8 +261,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
             // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
             // However, it would be nicer to make PaddedPayload take P as a typenum parameter
             // and enforce this invariant at compile time.
-            let block = <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(payload.as_mut())
-                .expect("block size mismatch");
+            let block = <&mut crypto_traits::Block<S::PRP>>::try_from(payload.as_mut()).expect("block size mismatch");
             prp.forward(block);
         }
 
@@ -433,8 +435,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
+        let alpha_arr = Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(self.alpha())
+            .map_err(|_| SphinxError::PacketDecodingError("invalid alpha".into()))?;
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
-            <&Alpha<<S::G as GroupElement<S::E>>::AlphaLen>>::try_from(self.alpha()).expect("alpha length mismatch"),
+            &alpha_arr,
             &(node_keypair.into()),
             node_keypair.public().into(),
         )?;
@@ -445,10 +449,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.inverse(
-            <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
-                .expect("block size mismatch"),
-        );
+        prp.inverse(<&mut crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted).expect("block size mismatch"));
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -486,7 +487,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     for secret in local_surb.shared_secrets.into_iter().rev() {
                         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
                         prp.forward(
-                            <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
+                            <&mut crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
                                 .expect("block size mismatch"),
                         );
                     }
@@ -495,8 +496,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
                     prp.inverse(
-                        <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
-                            .expect("block size mismatch"),
+                        <&mut crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted).expect("block size mismatch"),
                     );
                 }
 

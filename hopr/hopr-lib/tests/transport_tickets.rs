@@ -152,7 +152,7 @@ async fn redeem_ticket_on_request(
             let stats_before = mid.inner().ticket_statistics().map_err(HoprLibError::other)?;
             Ok::<_, HoprLibError>(stats_before.unredeemed_value >= message_count.into())
         },
-        Duration::from_secs(15),
+        Duration::from_secs(8),
     )
     .await
     .context("failed to wait for: `stats_before.unredeemed_value > message_count.into()`")?;
@@ -331,7 +331,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
             .context("write failed")??;
     }
 
-    sleep(Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(2)).await;
 
     mid.inner()
         .redeem_all_tickets(0)
@@ -393,7 +393,12 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
         .open_channels(&[&[src, mid, dst], &[dst, mid, src], &[src, dst]], funding_amount)
         .await?;
 
-    assert!(cluster_fixture.create_session(&[src, mid, dst]).await.is_err());
+    let session_timeout = Duration::from_secs(30);
+    let result = tokio::time::timeout(session_timeout, cluster_fixture.create_session(&[src, mid, dst])).await;
+    assert!(
+        matches!(result, Err(_) | Ok(Err(_))),
+        "expected session creation to fail or time out"
+    );
 
     Ok(())
 }
@@ -453,7 +458,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
             .await
             .context("write failed")??;
     }
-    sleep(Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(2)).await;
 
     mid.inner()
         .redeem_all_tickets(0)

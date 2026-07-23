@@ -21,16 +21,24 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
-default = ["rayon", "ed25519"]
+default = ["rayon", "ed25519", "bjj"]
 all-benchmarks = []
 
 rayon = ["hopr-utils/parallelize-rayon"]
 ed25519 = []
 x25519 = []
 secp256k1 = []
-serde = ["dep:serde", "dep:serde_bytes", "flagset/serde", "hopr-types/serde"]
+bjj = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "flagset/serde",
+  "hopr-protocol-pix/serde",
+  "hopr-types/serde",
+]
 allocator-mimalloc = [
   "dep:mimalloc",
 ] # Use mimalloc as the global allocator on Linux
@@ -50,6 +58,7 @@ tracing = { workspace = true }
 bimap = { workspace = true }
 subtle = { workspace = true }
 
+hopr-protocol-pix = { workspace = true }
 hopr-utils = { workspace = true, features = ["parallelize"] }
 hopr-types = { workspace = true, features = [
   "crypto",
@@ -67,12 +76,6 @@ parameterized = { workspace = true }
 postcard = { workspace = true }
 tokio = { workspace = true }
 
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
-
-[package.metadata.cargo-shear]
-ignored = ["serde_bytes"]
-
 [[bench]]
 name = "packet_bench"
 harness = false
@@ -84,6 +87,9 @@ harness = false
 [[bench]]
 name = "validation_bench"
 harness = false
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]

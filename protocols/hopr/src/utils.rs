@@ -6,6 +6,10 @@ use hopr_chain_connector::{
     HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, StaticState},
 };
+use hopr_crypto_packet::HoprPixSpec;
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator};
+
+use crate::MemorySurbStore;
 
 lazy_static::lazy_static! {
     pub static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -22,6 +26,9 @@ pub struct Node {
     pub chain_key: ChainKeypair,
     pub offchain_key: OffchainKeypair,
     pub chain_api: Arc<HoprBlockchainSafeConnector<BlokliTestClient<StaticState>>>,
+    pub surb_store: Arc<MemorySurbStore>,
+    pub ssa_gen: Arc<SsaShareGenerator<HoprPixSpec>>,
+    pub ssa_rcn: Arc<SsaReconstructor<HoprPixSpec>>,
 }
 
 pub fn create_blokli_client() -> anyhow::Result<BlokliTestClient<StaticState>> {
@@ -87,5 +94,16 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
         chain_key: PEERS[index].0.clone(),
         offchain_key: PEERS[index].1.clone(),
         chain_api: Arc::new(chain_api),
+        surb_store: Arc::new(Default::default()),
+        ssa_gen: Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 10,
+            threshold: 10,
+            surplus_shares: 3,
+            ..Default::default()
+        })),
+        ssa_rcn: Arc::new(SsaReconstructor::new(SsaReconstructorConfig {
+            early_recovery_threshold: 1.0,
+            ..Default::default()
+        })),
     })
 }

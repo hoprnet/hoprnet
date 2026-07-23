@@ -1,0 +1,60 @@
+[package]
+name = "hopr-protocol-pix"
+version = "0.1.0"
+description = "Protocol for Incentivizing eXit nodes (PIX) as specified in HOPR RFC-0012"
+license = "GPL-3.0-only"
+homepage.workspace = true
+repository.workspace = true
+documentation = "https://docs.rs/hopr-protocol-pix"
+rust-version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[features]
+default = ["rayon"]
+rayon = ["hopr-utils/parallelize-rayon"]
+serde = [
+  "dep:elliptic-curve-tools",
+  "dep:serde",
+  "dep:serde_bytes",
+  "vsss-rs/serde",
+  "hopr-types/serde",
+]
+
+[dependencies]
+ahash = { workspace = true }
+auto_impl = { workspace = true }
+elliptic-curve-tools = { workspace = true, optional = true }
+const-hex = { workspace = true }
+moka = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+validator = { workspace = true }
+vsss-rs = { workspace = true, features = [
+  "alloc",
+  "std",
+], default-features = false }
+
+hopr-utils = { workspace = true }
+hopr-types = { workspace = true, features = ["random", "primitive", "crypto"] }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+criterion = { workspace = true }
+rand = { workspace = true }
+
+[[bench]]
+name = "ssa_generator_bench"
+harness = false
+
+[[bench]]
+name = "ssa_reconstructor_bench"
+harness = false
+
+[lib]
+doctest = false

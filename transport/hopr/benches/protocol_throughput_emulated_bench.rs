@@ -24,6 +24,7 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use libp2p::PeerId;
 
@@ -111,12 +112,15 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             HoprUnacknowledgedTicketProcessorConfig::default(),
                         );
 
+                        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+
                         let encoder = HoprEncoder::new(
                             PEERS_CHAIN[TESTED_PEER_ID].clone(),
                             connectors[TESTED_PEER_ID].clone(),
                             surb_store.clone(),
                             node_dbs[TESTED_PEER_ID].clone(),
                             channels_dst,
+                            ssa_gen,
                             codec_config,
                         );
 

@@ -56,6 +56,7 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true, features = ["chain", "types-random", "tickets"] }
 hopr-crypto-packet = { workspace = true }
+hopr-protocol-pix = { workspace = true }
 hopr-utils = { workspace = true, features = ["parallelize", "platform"] }
 hopr-ticket-manager = { workspace = true }
 
@@ -65,6 +66,7 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
 tokio = { workspace = true }
+test-log = { workspace = true }
 
 hopr-chain-connector = { workspace = true, features = [
   "testing",
@@ -81,7 +83,4 @@ name = "codec_bench"
 harness = false
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde"]
-
-[package.metadata.cargo-shear]
 ignored = ["humantime-serde"]

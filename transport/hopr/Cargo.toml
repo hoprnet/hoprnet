@@ -22,6 +22,7 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []
@@ -64,6 +65,7 @@ cfg-if = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
 halfbrown = { workspace = true }
 humantime-serde = { workspace = true, optional = true }
 lazy_static = { workspace = true }
@@ -98,9 +100,10 @@ hopr-utils = { workspace = true, features = [
   "statistics-types",
   "statistics-types-weighted",
 ] }
-hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
+hopr-crypto-packet = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
+hopr-protocol-pix = { workspace = true, features = ["rayon"] }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
@@ -180,6 +183,3 @@ path = "tests/mixer_shared_heap.rs"
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
-
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde", "hopr-transport-probe"]

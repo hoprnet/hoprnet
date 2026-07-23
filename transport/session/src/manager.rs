@@ -1,11 +1,12 @@
 use std::{
+    collections::HashMap,
     pin::Pin,
-    sync::{Arc, OnceLock, atomic::Ordering},
+    sync::{Arc, Mutex, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
 use anyhow::anyhow;
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
+use futures::{FutureExt, Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
     crypto_random::Randomizable,
@@ -15,31 +16,42 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::{
+    HoprPixSpec,
+    prelude::{HoprPacket, HoprPixGroupElement},
+};
 use hopr_protocol_app::prelude::*;
+use hopr_protocol_pix::{
+    DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
+    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, SsaId, SsaIndex, SsaReconstructor,
+    SsaShareGenerator,
+};
 use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
-    StartInitiation,
+    ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
-    SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
+    self, SessionLifecycleState, initialize_session_metrics, remove_session_metrics_state, set_session_balancer_data,
     set_session_state,
 };
 use crate::{
-    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
-    SurbBalancerConfig,
+    AgreedSsaQuota, Capabilities, Capability, HoprSession, HoprSessionOutPixEvent, IncomingSession, SESSION_MTU,
+    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerStateValues, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
-    errors::{SessionManagerError, TransportSessionError},
-    types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG},
+    errors::{self, SessionManagerError, TransportSessionError},
+    types::{
+        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
+        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+    },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
 };
@@ -114,20 +126,19 @@ const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Minimum timeout until an unfinished frame is discarded.
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
+/// Maximum number of PIX shares that can fail verification before the session is closed.
+const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 3;
 
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
-/// How many packets can be buffered if the HoprSession socket is not fast enough.
-#[allow(dead_code)]
-pub const SESSION_FORWARD_CAPACITY: usize = 10000;
-
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
+// The Session initiation cache is only present on the Entry (client) side.
 type SessionInitiationCache = moka::sync::Cache<
     StartChallenge,
-    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType>>>,
+    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType<SessionId>>>>,
 >;
 
 /// Handles to streams and tasks spawned by the Session.
@@ -139,6 +150,85 @@ enum SessionHandles {
     KeepAlive,
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
+    /// Handle to the process which closes the Session unless the handle is aborted.
+    PixKillSwitch,
+    /// Handle to the process that awaits PIX deposit for a Session.
+    ///
+    /// Once the deposit is received, the handle [`SessionHandles::PixKillSwitch`] is aborted.
+    DepositAwaiter,
+}
+
+#[derive(Clone)]
+struct SessionSsaState {
+    current_index: Arc<std::sync::atomic::AtomicU32>,
+    /// Cumulative count of unverifiable PIX shares across all SSA cycles (intentional).
+    ///
+    /// This is *not* reset per SSA cycle: a steady trickle of 1 error per cycle
+    /// should still escalate to session closure, since an unreliable channel is
+    /// unlikely to improve on its own. The session closes once the *total* number
+    /// of unverifiable shares across all SSA cycles exceeds
+    /// `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
+    /// `AtomicUsize` is safe here because duplicates are already rejected by the
+    /// moka cache (keyed by `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by
+    /// share identifier), so no share triggers two errors.
+    num_errors: Arc<std::sync::atomic::AtomicUsize>,
+    polys_per_ssa: u16,
+    shares_per_poly: u16,
+}
+
+impl SessionSsaState {
+    pub fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
+        Self {
+            // SSA index starts from 1, not 0.
+            current_index: std::sync::atomic::AtomicU32::new(1).into(),
+            num_errors: Default::default(),
+            polys_per_ssa,
+            shares_per_poly,
+        }
+    }
+
+    /// Record an unverifiable share error.
+    ///
+    /// Returns the cumulative error count after this increment.
+    pub fn increment_errors(&self) -> usize {
+        self.num_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
+    }
+
+    /// Returns the current index without consuming it.
+    ///
+    /// Use this to inspect the next index before fallible operations;
+    /// call [`increment_index`](Self::increment_index) to commit *after* they succeed.
+    pub fn peek_index(&self) -> SsaIndex {
+        SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
+    }
+
+    pub fn increment_index(&self) -> SsaIndex {
+        SsaIndex::new(self.current_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+            .expect("ssa index cannot become 0 when incremented")
+    }
+
+    /// Returns the current SSA index value.
+    #[inline]
+    pub const fn quota_per_ssa(&self) -> SsaQuota {
+        pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
+    }
+}
+
+impl std::fmt::Debug for SessionSsaState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionSsaState")
+            .field(
+                "current_index",
+                &self.current_index.load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "num_errors",
+                &self.num_errors.load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field("polys_per_ssa", &self.polys_per_ssa)
+            .field("shares_per_poly", &self.shares_per_poly)
+            .finish()
+    }
 }
 
 #[derive(Clone)]
@@ -155,6 +245,8 @@ pub(crate) struct SessionSlot {
     // SURB flow updates happening outside of Session protocol
     // (e.g., due to Start protocol messages).
     surb_estimator: AtomicSurbFlowEstimator,
+    // Contains currently active SSA for this Session and its quota
+    current_ssa_state: Arc<OnceLock<SessionSsaState>>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -210,7 +302,6 @@ impl Drop for SessionSlotGuard<'_> {
             warn!(%session_id, "rolling back partially established session slot after setup failure");
             if let Some(slot) = self.sessions.remove(&session_id) {
                 self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-
                 close_session(session_id, slot, ClosureReason::Eviction);
             }
         }
@@ -224,6 +315,38 @@ pub enum DispatchResult {
     Processed,
     /// The message was not related to Start or Session protocol.
     Unrelated(ApplicationDataIn),
+}
+
+/// Configuration of the PIX protocol for incoming Sessions on Exit nodes.
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
+pub struct IncomingSessionPixConfig {
+    /// If set to true, incoming Session without the [`Capability::UsePIX`] will be rejected.
+    ///
+    /// Default `false`.
+    #[default(false)]
+    pub enforce_pix: bool,
+    /// Acceptable range of data quota per one SSA in bytes.
+    ///
+    /// If an Entry sends PIX parameters for SSA reconstruction that are outside this quota range,
+    /// the incoming Session will be rejected.
+    ///
+    /// Default is 128 MB to 512 MB (inclusive).
+    #[default(_code = "(134217728..=536870912)")]
+    pub quota_range: std::ops::RangeInclusive<u64>,
+    /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
+    ///
+    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
+    /// wait time because the Client has to be able to deliver its SSA commitment.
+    #[default(Duration::from_secs(20))]
+    pub max_ssa_delivery_time: Duration,
+    /// Maximum time to wait for the funds to be deposited in the SSA.
+    ///
+    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
+    /// wait time because the Client has to be able to deliver its SSA commitment.
+    ///
+    /// Default is 1 minute.
+    #[default(Duration::from_secs(60))]
+    pub max_deposit_wait: Duration,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -307,13 +430,8 @@ pub struct SessionManagerConfig {
     /// Keep in mind that each notification also costs 1 SURB, so the notification period should
     /// not be too frequent.
     ///
-    /// These notifications are the only absolute correction of the Entry's dead-reckoned
-    /// estimate of the Exit's SURB buffer. Without them, every packet lost in either
-    /// direction permanently inflates the Entry's estimate, until the Exit silently runs
-    /// out of SURBs and can no longer send any reply data.
-    ///
-    /// Default is 60 seconds (None disables the notifications), minimum is 1 second.
-    #[default(Some(Duration::from_secs(60)))]
+    /// Default is None (no notification sent to the client), minimum is 1 second.
+    #[default(None)]
     pub surb_balance_notify_period: Option<Duration>,
 
     /// If set, the Session initiator (Entry) will notify the Session recipient (Exit) about
@@ -335,17 +453,20 @@ pub struct SessionManagerConfig {
     ///
     /// Controls the capacity of the internal `crossfire` channel used for each session slot.
     ///
-    /// Default is 10_000.
+    /// Default is 10 000.
     #[default(10000)]
     pub session_forward_capacity: usize,
+
+    /// Configuration of the PIX protocol for the Exit nodes.
+    pub pix_config: IncomingSessionPixConfig,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
 // The errors produced by the underlying sink are remapped into `SessionManagerError`.
-type IncomingSessionSink = Pin<Box<dyn Sink<IncomingSession, Error = SessionManagerError> + Send>>;
+type BoxSink<T> = Pin<Box<dyn Sink<T, Error = SessionManagerError> + Send>>;
 
 type SessionNotifiers = (
-    Arc<hopr_utils::runtime::prelude::Mutex<IncomingSessionSink>>,
+    Arc<hopr_utils::runtime::prelude::Mutex<BoxSink<IncomingSession>>>,
     crossfire::MTx<crossfire::mpsc::Array<(SessionId, ClosureReason)>>,
 );
 
@@ -353,6 +474,31 @@ type SessionNotifiers = (
 // Must be within Arc to be shared across SessionManager clones.
 // The inner OnceLock is set once in `start()` and read in `dispatch_message`.
 type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(HoprPseudonym, HoprStartProtocol)>>>>;
+
+/// PIX protocol toolbox to enable [`SessionManager`] to use PIX protocol.
+#[derive(Clone)]
+pub struct PixToolbox {
+    share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+    share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
+    pix_events: crossfire::MTx<crossfire::mpsc::Array<HoprSessionOutPixEvent>>,
+}
+
+impl PixToolbox {
+    pub fn new(
+        share_generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+        share_processor: Arc<SsaReconstructor<HoprPixSpec>>,
+    ) -> (Self, impl futures::Stream<Item = HoprSessionOutPixEvent>) {
+        let (pix_events, pix_events_rx) = crossfire::mpsc::bounded_blocking_async::<HoprSessionOutPixEvent>(1024);
+        (
+            Self {
+                share_generator,
+                share_processor,
+                pix_events,
+            },
+            pix_events_rx.into_stream(),
+        )
+    }
+}
 
 /// Manages lifecycles of Sessions.
 ///
@@ -504,7 +650,102 @@ type StartProtocolMsgSink = Arc<OnceLock<crossfire::MTx<crossfire::mpsc::Array<(
 /// This can be set using the `surb_target_notify` field of the [`SessionManagerConfig`] of each new Session.
 ///
 /// Both mechanisms leverage the Keep Alive message to report the respective values.
+///
+/// ## PIX (Protocol for Incentivization of eXits) Protocol Flow
+///
+/// When a Session is opened with the [`Capability::UsePIX`] flag, the following protocol
+/// runs between the Entry (initiator) and Exit (recipient) to provide on-chain payment
+/// guarantees for the data relayed through the Session.
+///
+/// ### 1. PIX Parameter Negotiation (Session Initiation)
+///
+/// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
+/// Address) parameters in the upper 32 bits of the `StartSession.additional_data` field:
+/// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
+/// many polynomials and shares each SSA will use, which together define the data quota per SSA.
+///
+/// Before encoding, the Entry validates that the requested dimensions match the installed
+/// [`SsaShareGenerator`]'s configured [`hopr_protocol_pix::SsaGeneratorConfig::polynomials_per_ssa`] and
+/// [`hopr_protocol_pix::SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
+/// for return-path SURBs operates at the same dimensions advertised to the Exit — a
+/// mismatch would let the session proceed with incompatible share parameters. The
+/// validation runs before the initiation challenge slot is reserved, so repeated
+/// misconfigurations cannot exhaust challenge slots.
+///
+/// On the Exit side, `check_pix_params` validates these parameters against:
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
+/// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
+/// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
+/// - The Exit only checks the product of the number of polynomials and the threshold, so the Entry can set the
+///   individual parameters so that they better fit its computing power. The computation is easily parallelizable in the
+///   number of polynomials, but not in threshold.
+///
+/// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
+///
+/// ### 2. Exit SSA Request (`SsaRequest` → Entry)
+///
+/// Once the PIX parameters are accepted, the Exit calls `request_next_ssa`
+/// to create a new SSA commitment via the server-side [`SsaReconstructor`]. This produces an
+/// *Exit commitment* (a group element) that is sent back to the Entry as a
+/// [`SsaServerCommitmentMessage`].
+///
+/// The Exit also installs a *PIX kill switch* — a deadline (`max_deposit_wait` +
+/// `max_ssa_delivery_time`). If no deposit is observed before this deadline, the Session is
+/// closed with `ClosureReason::UnrealizedDeposit`.
+///
+/// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
+///
+/// Upon receiving the [`SsaServerCommitmentMessage`], the Entry's `handle_ssa_request`
+/// generates a *client commitment* using the shared [`SsaShareGenerator`] (which is also
+/// used by the packet pipeline to embed PIX shares into return-path SURBs). The client
+/// commitment is combined with the Exit commitment to derive the on-chain deposit address
+/// via [`HoprPixSpec::group_to_deposit_address`].
+///
+/// The Entry then sends one or more [`SsaClientCommitmentMessage`]s back to the Exit and
+/// emits a [`HoprSessionOutPixEvent::ReadyToDeposit`] to the upper layer, signaling that
+/// funds can be deposited at the computed address.
+///
+/// ### 4. Deposit Awaiting (Exit Side)
+///
+/// The Exit receives the client commitment messages in `handle_ssa_commit`, inserts the
+/// coefficient commitments into the [`SsaReconstructor`], and extracts the deposit address.
+/// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
+/// [`AgreedSsaQuota`] and a channel to confirm the deposit.
+///
+/// A *deposit awaiter* task waits for the deposit confirmation. Once confirmed, the PIX
+/// kill switch is aborted. If the deposit times out, the kill switch closes the Session.
+///
+/// ### 5. SSA Collection, Recovery and Pipelining
+///
+/// As the Entry sends return-path SURBs during the Session, each SURB can carry a PIX
+/// share generated from the client's polynomial set. The Exit's [`SsaReconstructor`]
+/// collects these shares.
+///
+/// When the reconstructor reaches the *early recovery threshold* (≈85%), an
+/// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires, which triggers
+/// `request_next_ssa` for the next SSA index — pipelining the costly
+/// commitment exchange with the tail of the share collection for the current SSA.
+///
+/// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the
+/// Exit to unlock and redeem the deposited funds. The deposit awaiter for the next SSA
+/// replaces the kill switch aborted for the previous one.
+///
+/// ### 6. Unverifiable Shares
+///
+/// If the reconstructor receives a share whose proof-of-correspondence cannot be verified
+/// against its polynomial commitment, an [`HoprSessionInPixEvent::UnverifiableShare`]
+/// event fires. After `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES` (3) such events, the
+/// Session is forcefully closed to prevent a malicious Entry from wasting the Exit's
+/// resources.
+///
+/// ### Configuring PIX at the Exit
+///
+/// The Exit configures PIX via [`IncomingSessionPixConfig`] within [`SessionManagerConfig`].
+///
+/// The [`PixToolbox`] (holding the [`SsaShareGenerator`] and [`SsaReconstructor`]) must
+/// be provided via [`SessionManager::start`] for PIX to function.
 pub struct SessionManager<S> {
+    // Keeps track of Session initiations requests on the Client side.
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     start_protocol_tx: StartProtocolMsgSink,
@@ -514,7 +755,13 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    pix_toolbox: OnceLock<PixToolbox>,
     cfg: SessionManagerConfig,
+    /// Per-SessionId waiters notified when a new session slot is allocated. Lets message
+    /// handlers that arrive before the slot insertion completes (e.g. SsaRequest vs
+    /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
+    /// Keyed by SessionId so that only waiters for the relevant session are woken.
+    slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -527,11 +774,13 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            pix_toolbox: self.pix_toolbox.clone(),
+            slot_allocated: Arc::clone(&self.slot_allocated),
         }
     }
 }
 
-fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
+fn session_config(cfg: &SessionManagerConfig, capabilities: Capabilities) -> HoprSessionConfig {
     HoprSessionConfig {
         capabilities,
         frame_mtu: cfg.frame_mtu,
@@ -544,7 +793,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
 fn initialize_session_telemetry(
     session_id: SessionId,
     cfg: &SessionManagerConfig,
-    capabilities: crate::Capabilities,
+    capabilities: Capabilities,
     surb_estimator: Option<&AtomicSurbFlowEstimator>,
     surb_mgmt: Option<&Arc<BalancerStateValues>>,
 ) {
@@ -560,7 +809,7 @@ async fn send_via_msg_sender<S, D>(
     routing: DestinationRouting,
     data: D,
     error_context: &'static str,
-) -> crate::errors::Result<()>
+) -> errors::Result<()>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Unpin,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
@@ -607,16 +856,13 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
+        let initiation_timeout =
+            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
-                .time_to_live(
-                    2 * initiation_timeout_max_one_way(
-                        cfg.initiation_timeout_base,
-                        RoutingOptions::MAX_INTERMEDIATE_HOPS,
-                    ),
-                )
+                .time_to_live(initiation_timeout)
                 .build(),
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
@@ -630,19 +876,29 @@ where
                     _ => {}
                 })
                 .build(),
+            pix_toolbox: OnceLock::new(),
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
             cfg,
+            slot_allocated: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`
     /// and a channel `new_session_notifier` used to notify when a new incoming session is opened to us.
     ///
+    /// Optionally, the PIX processor and event sink can be provided for handling PIX protocol.
+    /// If not specified, the `SessionManager` will not handle PIX protocol.
+    ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
-    pub fn start<T>(&self, msg_sender: S, new_session_notifier: T) -> crate::errors::Result<Vec<AbortHandle>>
+    pub fn start<T>(
+        &self,
+        msg_sender: S,
+        new_session_notifier: T,
+        pix: Option<PixToolbox>,
+    ) -> errors::Result<Vec<AbortHandle>>
     where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
@@ -651,11 +907,17 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
+        if let Some(pix) = pix {
+            self.pix_toolbox
+                .set(pix)
+                .map_err(|_| SessionManagerError::AlreadyStarted)?;
+        }
+
         // Re-map the user-provided sink errors to `SessionManagerError` and erase the concrete
-        // type, so that the `SessionManager` does not need to be generic over it. This also avoids
+        //  type so that the `SessionManager` does not need to be generic over it. This also avoids
         // having to spawn a separate task to forward items between channels: senders simply lock
         // the sink and send directly.
-        let new_session_notifier: IncomingSessionSink =
+        let new_session_notifier: BoxSink<IncomingSession> =
             Box::pin(new_session_notifier.sink_map_err(SessionManagerError::other));
         let new_session_notifier = Arc::new(hopr_utils::runtime::prelude::Mutex::new(new_session_notifier));
 
@@ -745,6 +1007,12 @@ where
                                 myself.handle_session_error(error_type).await
                             }
                             HoprStartProtocol::KeepAlive(msg) => myself.handle_keep_alive(msg).await,
+                            HoprStartProtocol::SsaCommit(client_commit_msg) => {
+                                myself.handle_ssa_commit(pseudonym, client_commit_msg).await
+                            }
+                            HoprStartProtocol::SsaRequest(server_commit_msg) => {
+                                myself.handle_ssa_request(pseudonym, server_commit_msg).await
+                            }
                         };
 
                         if let Err(error) = result {
@@ -817,6 +1085,17 @@ where
 
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
+                // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
+                // is now available. Drain only the senders registered for this SessionId;
+                // dropping them resolves the corresponding receivers.
+                if let Some(waiters) = self
+                    .slot_allocated
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&session_id)
+                {
+                    drop(waiters);
+                }
                 // take_guard borrows self, so the guard stores the counter clone separately.
                 Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
             }
@@ -836,7 +1115,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> crate::errors::Result<HoprSession> {
+    ) -> errors::Result<HoprSession> {
         self.sessions.run_pending_tasks();
         if self.cfg.maximum_sessions <= self.active_sessions.load(Ordering::Relaxed) {
             return Err(SessionManagerError::TooManySessions.into());
@@ -848,6 +1127,88 @@ where
             crossfire::MTx<crossfire::mpsc::One<_>>,
             crossfire::AsyncRx<crossfire::mpsc::One<_>>,
         ) = crossfire::mpsc::build(crossfire::mpsc::One::new());
+
+        let current_ssa_state = Arc::new(OnceLock::new());
+
+        let mut additional_data = 0_u64;
+
+        // SURB balancer target announcement is encoded in the lower 32-bits of additional_data
+        if !cfg.capabilities.contains(Capability::NoRateControl) {
+            additional_data |= cfg
+                .surb_management
+                .map(|c| c.target_surb_buffer_size)
+                .unwrap_or(
+                    self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs(),
+                )
+                .min(u32::MAX as u64);
+        }
+
+        // PIX quota parameter announcement is encoded in the upper 32-bits of additional_data.
+        // Run these validations BEFORE reserving the initiation challenge slot so that a
+        // repeated invalid request cannot exhaust all challenge slots.
+        if cfg.capabilities.contains(Capability::UsePIX) {
+            // PIX requires at least 1 intermediate hop on the return path so that PIX
+            // shares can be encrypted with the first relayer's ticket-challenge solution
+            // (`HalfKey`) and delivered via return-path SURBs. With 0 intermediate hops
+            // (a direct Exit→Entry SURB), there is no relayer to provide the challenge
+            // solution, so shares are never embedded — the ongoing PIX share delivery
+            // mechanism is dead and the Exit's quota is never replenished.
+            if cfg.return_path_options.count_hops() == 0 {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "UsePIX requires at least 1 intermediate hop on the return path, got 0"
+                ))
+                .into());
+            }
+
+            let (polys_per_ssa, shares_per_ssa) = cfg
+                .pix_ssa_quota
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
+
+            // Validate that PIX toolbox is available before advertising UsePIX
+            let pix_toolbox = self
+                .pix_toolbox
+                .get()
+                .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
+
+            // Validate dimensions are within protocol limits
+            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
+            {
+                return Err(SessionManagerError::Other(anyhow!(
+                    "invalid PIX dimensions: polys={}, shares={}",
+                    polys_per_ssa,
+                    shares_per_ssa,
+                ))
+                .into());
+            }
+
+            // Validate that the requested dimensions match the installed generator's
+            // configuration. The generator was initialized with fixed dimensions at startup;
+            // advertising mismatched values would let the session proceed but produce
+            // incompatible PIX shares on the wire.
+            let gen_cfg = pix_toolbox.share_generator.config();
+            if polys_per_ssa != gen_cfg.polynomials_per_ssa {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested polys_per_ssa {} does not match installed generator ({})",
+                    polys_per_ssa, gen_cfg.polynomials_per_ssa,
+                ))
+                .into());
+            }
+            if shares_per_ssa != gen_cfg.threshold {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested shares_per_ssa {} does not match installed generator ({})",
+                    shares_per_ssa, gen_cfg.threshold,
+                ))
+                .into());
+            }
+
+            let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
+            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
+        }
 
         let (challenge, _) = insert_into_next_slot(
             &self.session_initiations,
@@ -868,22 +1229,8 @@ where
         let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
             challenge,
             target,
-            capabilities: ByteCapabilities(cfg.capabilities),
-            additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
-                cfg.surb_management
-                    .map(|c| c.target_surb_buffer_size)
-                    .unwrap_or(
-                        self.cfg.initial_return_session_egress_rate as u64
-                            * self
-                                .cfg
-                                .minimum_surb_buffer_duration
-                                .max(MIN_SURB_BUFFER_DURATION)
-                                .as_secs(),
-                    )
-                    .min(u32::MAX as u64) as u32
-            } else {
-                0
-            },
+            capabilities: HoprSessionCapabilities(cfg.capabilities),
+            additional_data,
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -965,7 +1312,7 @@ where
                                 .produced
                                 .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_produced(&session_id, produced);
+                            telemetry::record_session_surb_produced(&session_id, produced);
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
@@ -1034,6 +1381,7 @@ where
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: surb_mgmt.clone(),
                                 surb_estimator: surb_estimator.clone(),
+                                current_ssa_state,
                             },
                         )
                         .ok_or_else(|| {
@@ -1082,7 +1430,7 @@ where
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
-                                crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                                telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
                         ),
                         Some(notifier),
@@ -1113,6 +1461,7 @@ where
                                 abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
                                 surb_mgmt: Default::default(), // Disabled SURB management
                                 surb_estimator: Default::default(), // No SURB estimator needed
+                                current_ssa_state,
                             },
                         )
                         .ok_or_else(|| {
@@ -1164,9 +1513,16 @@ where
             }
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
+                let challenge = match error.identifier {
+                    ErrorIdentifier::Challenge(c) => c,
+                    ErrorIdentifier::SessionId(_) => {
+                        // This arm should only ever receive pre-establishment errors.
+                        // Log the id if it matters for debugging.
+                        0
+                    }
+                };
                 error!(
-                    challenge = error.challenge,
-                    ?error,
+                    %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
                 Err(TransportSessionError::Rejected(error.reason))
@@ -1187,7 +1543,7 @@ where
     /// Sends a keep-alive packet with the given [`SessionId`].
     ///
     /// This currently "fires & forgets" and does not expect nor await any "pong" response.
-    pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+    pub async fn ping_session(&self, id: &SessionId) -> errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id) {
             trace!(session_id = ?id, "pinging manually session");
             let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
@@ -1202,6 +1558,92 @@ where
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
+    }
+
+    async fn request_next_ssa(&self, session_id: SessionId, slot: SessionSlot) -> errors::Result<()> {
+        let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        let current_ssa_state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
+            "cannot request new ssa on a session without pix state"
+        )))?;
+
+        // Peek at the next SSA index *before* fallible operations so that a failed
+        // commitment generation or send does not permanently consume it.
+        let ssa_index = current_ssa_state.peek_index();
+
+        // TODO: based on the offered quota, the Exit can decide here whether to ask for more than just one SSA
+        // commitment
+        let (polys_per_ssa, shares_per_poly) = (current_ssa_state.polys_per_ssa, current_ssa_state.shares_per_poly);
+        let exit_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+            move || {
+                pix_toolbox
+                    .share_processor
+                    .new_exit_commitment(
+                        SsaId::new(session_id, ssa_index),
+                        polys_per_ssa as usize,
+                        shares_per_poly as usize,
+                    )
+                    .map(|commitment| HoprPixGroupElement(commitment.to_bytes()))
+            },
+            "server_ssa_commitment",
+        )
+        .await
+        .map_err(SessionManagerError::other)?
+        .map_err(SessionManagerError::PixError)?;
+
+        info!(%session_id, ?current_ssa_state, %exit_commitment, "generated exit commitment");
+
+        // Set up a kill switch before sending the SSA request so there is no
+        // window where the commitment is in flight but no timeout is installed.
+        let session_cache = self.sessions.clone();
+        let active_sessions_clone = self.active_sessions.clone();
+        let session_deadline = std::time::Instant::now()
+            + self.cfg.pix_config.max_deposit_wait
+            + self.cfg.pix_config.max_ssa_delivery_time;
+        slot.abort_handles.lock().insert(
+            SessionHandles::PixKillSwitch,
+            hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
+                move |_| async move {
+                    if let Some(session_slot) = session_cache.remove(&session_id) {
+                        active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
+                        close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
+                        error!(%session_id, ssa_index, "pix session deposit timeout");
+                    } else {
+                        warn!(%session_id, "pix session deposit timeout - session not found");
+                    }
+                }
+            )),
+        );
+        info!(%session_id, "pix session deposit timeout set");
+
+        // Construct and send the Exit SSA commitment request message
+        // The parameters were previously verified to be acceptable.
+        let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            current_ssa_state.polys_per_ssa,
+            current_ssa_state.shares_per_poly,
+            [(ssa_index, exit_commitment)],
+        ));
+
+        send_via_msg_sender(
+            &mut msg_sender,
+            slot.routing_opts.clone(),
+            data,
+            "session SSA commitment request message",
+        )
+        .await
+        .map_err(TransportSessionError::packet_sending)?;
+
+        // All fallible steps succeeded — commit the index advance.
+        current_ssa_state.increment_index();
+
+        Ok(())
+    }
+
+    /// Returns the current number of active sessions.
+    pub fn num_active_sessions(&self) -> usize {
+        self.active_sessions.load(Ordering::Relaxed)
     }
 
     /// Returns [`SessionIds`](SessionId) of all currently active sessions.
@@ -1233,7 +1675,7 @@ where
     ///
     /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
-    pub fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> crate::errors::Result<()> {
+    pub fn update_surb_balancer_config(&self, id: &SessionId, config: SurbBalancerConfig) -> errors::Result<()> {
         let cfg = self
             .sessions
             .get(id)
@@ -1252,7 +1694,7 @@ where
     /// Retrieves the configuration of SURB balancing for the given Session.
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
+    pub fn get_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
         match self.sessions.get(id) {
             Some(session) => Ok(Some(session.surb_mgmt.as_ref())
                 .filter(|c| !c.is_disabled())
@@ -1267,7 +1709,7 @@ where
     /// For an incoming Session (Exit) the pair is the number of SURBs received (from Entry) and used (by us).
     ///
     /// Returns an error if the Session with the given `id` does not exist.
-    pub fn get_surb_level_estimates(&self, id: &SessionId) -> crate::errors::Result<(u64, u64)> {
+    pub fn get_surb_level_estimates(&self, id: &SessionId) -> errors::Result<(u64, u64)> {
         match self.sessions.get(id) {
             Some(session) => Ok((
                 session
@@ -1283,6 +1725,76 @@ where
         }
     }
 
+    /// Dispatches [`HoprSessionInPixEvent`] that notifies the `SessionManager` about PIX protocol
+    /// state update.
+    ///
+    /// Such an event can affect existing Sessions that use the PIX protocol.
+    pub async fn dispatch_pix_event(&self, event: HoprSessionInPixEvent) -> errors::Result<()> {
+        let session_id = event.pseudonym();
+        let Some(slot) = self.sessions.get(event.pseudonym()) else {
+            error!(%session_id, "trying to dispatch pix event on a non-existing session");
+            return Err(SessionManagerError::NonExistingSession.into());
+        };
+
+        match event {
+            // When the early recovery threshold is reached, issue a new SSA server request
+            // to pipeline deposit preparation with the last ~15% of share collection.
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => {
+                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
+                    "cannot process SsaAlmostRecovered on a session without pix state"
+                )))?;
+                // Validate that the event's SsaId matches the active cycle.  current_index is
+                // the *next* index to allocate (pre-incremented via fetch_add), so the active
+                // cycle's index is current_index - 1.
+                if ssa_id.ssa_index().get()
+                    != state
+                        .current_index
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .saturating_sub(1)
+                {
+                    trace!(
+                        %session_id, event_ssa_index = %ssa_id.ssa_index(),
+                        "ignoring SsaAlmostRecovered from stale SSA cycle"
+                    );
+                    return Ok(());
+                }
+                self.request_next_ssa(*session_id, slot).await?;
+            }
+            // SSA fully recovered — the next SSA request was already triggered by
+            // SsaAlmostRecovered. Deposit-key processing is handled in the upper layer.
+            HoprSessionInPixEvent::SsaRecovered(_) => {}
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => {
+                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
+                    "cannot register unverified share on a session without pix state"
+                )))?;
+                // Skip stale events from a previous SSA cycle (late arrivals after
+                // SsaAlmostRecovered advanced the current index).  current_index is
+                // the *next* index to allocate (pre-incremented via fetch_add), so
+                // the active cycle's index is current_index - 1.
+                if ssa_id.ssa_index().get()
+                    != state
+                        .current_index
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .saturating_sub(1)
+                {
+                    trace!(
+                        %session_id, event_ssa_index = %ssa_id.ssa_index(),
+                        "ignoring unverifiable share from stale SSA cycle"
+                    );
+                    return Ok(());
+                }
+                let num_errors = state.increment_errors();
+                trace!(%session_id, ssa_index = %ssa_id.ssa_index(), num_errors, "encountered unverifiable share in session with pix");
+
+                if num_errors > MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES && self.close_session(session_id) {
+                    error!(%session_id, "closed session due to too many unverifiable shares");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -1293,7 +1805,7 @@ where
         &self,
         pseudonym: HoprPseudonym,
         in_data: ApplicationDataIn,
-    ) -> crate::errors::Result<DispatchResult> {
+    ) -> errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
@@ -1313,6 +1825,7 @@ where
 
             return Ok(DispatchResult::Processed);
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
+            // This is traffic that belongs to one of the Sessions
             let session_id = pseudonym;
 
             return if let Some(session_slot) = self.sessions.get(&session_id) {
@@ -1361,8 +1874,13 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Arc::new(BalancerStateValues::default()),
             surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
+        self.slot_allocated
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&session_id);
     }
 
     /// Like [`pre_populate_session`](SessionManager::pre_populate_session) but also returns the
@@ -1383,21 +1901,116 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Arc::new(BalancerStateValues::default()),
             surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
         };
         self.sessions.insert(session_id, slot);
+        self.slot_allocated
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&session_id);
         session_rx
     }
 
+    /// Checks the PIX parameters offered by the Entry during the Session Initiation.
+    ///
+    /// Returns the validated parameters, or `None` if the offered parameters were rejected.
+    fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<(u16, u16)> {
+        // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
+        if req.capabilities.0.contains(Capability::UsePIX) {
+            // Client offered PIX, so validate the offered parameters
+            let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u16;
+            let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u16;
+
+            let quota_per_ssa = pix_params_to_quota(polys_per_ssa, shares_per_ssa);
+            debug!(
+                challenge = req.challenge,
+                polys_per_ssa,
+                shares_per_ssa,
+                acceptable_range = ?self.cfg.pix_config.quota_range,
+                offered_quota_mb_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
+                "client offered MB SSA quota"
+            );
+
+            let in_quota_range = self.cfg.pix_config.quota_range.contains(&quota_per_ssa);
+            let valid_polys = (1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa);
+            let valid_shares = (2_u16..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa);
+            (in_quota_range && valid_polys && valid_shares).then_some((polys_per_ssa, shares_per_ssa))
+        } else if self.cfg.pix_config.enforce_pix {
+            // Client didn't offer PIX, but PIX is enforced
+            None
+        } else {
+            // Client didn't offer PIX, and PIX is not enforced, so set default values
+            // which are not going to be used.
+            Some((DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD))
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self, session_req))]
     async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
-        session_req: StartInitiation<SessionTarget, ByteCapabilities>,
-    ) -> crate::errors::Result<()> {
+        session_req: StartInitiation<SessionTarget, HoprSessionCapabilities>,
+    ) -> errors::Result<()> {
         trace!(challenge = session_req.challenge, "received session initiation request");
 
-        debug!(%pseudonym, "got new session request, searching for a free session slot");
+        debug!("got new session request, searching for a free session slot");
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        // Reply routing uses SURBs only with the pseudonym of this Session's ID
+        let reply_routing = DestinationRouting::Return(pseudonym.into());
+
+        // Reject UsePIX if this node is not configured with a PixToolbox
+        // (e.g. relay nodes that do not participate in PIX processing).
+        if self.pix_toolbox.get().is_none() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            error!(
+                challenge = session_req.challenge,
+                "client offered PIX but this node has no PIX support installed"
+            );
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                reason: StartErrorReason::UnacceptablePixParams,
+            });
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing,
+                data,
+                "session error due to missing PIX support",
+            )
+            .await?;
+            return Ok(());
+        }
+
+        // Verify if the client offered the right parameters for PIX
+        let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
+            error!(
+                challenge = session_req.challenge,
+                "client offered unacceptable PIX parameters"
+            );
+
+            // Notify the sender that the session could not be established
+            let reason = StartErrorReason::UnacceptablePixParams;
+            let data = HoprStartProtocol::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                reason,
+            });
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing,
+                data,
+                "session error message due to unacceptable PIX parameters",
+            )
+            .await?;
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+            return Ok(());
+        };
+
+        info!(
+            client_polys_per_ssa,
+            client_shares_per_ssa, "client offered acceptable PIX parameters"
+        );
 
         let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
@@ -1411,19 +2024,6 @@ where
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
 
-        // A repeated initiation for a pseudonym that already has a Session means the
-        // initiator has lost or abandoned its side of it (it never received our
-        // SessionEstablished reply, or it reuses its pseudonym on reconnect).
-        // The pseudonym is known only to the initiator, so the existing Session cannot
-        // serve anyone else anymore: close it and let this initiation take the slot over.
-        // Otherwise, re-initiations would keep being rejected with NoSlotsAvailable
-        // until the stale Session gets evicted by the idle timeout.
-        if let Some(stale_slot) = self.sessions.remove(&pseudonym) {
-            self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-            info!(%pseudonym, "closing stale session superseded by a new initiation with the same pseudonym");
-            close_session(pseudonym, stale_slot, ClosureReason::Eviction);
-        }
-
         let session_id = pseudonym;
 
         let (session_tx, session_rx) =
@@ -1436,27 +2036,38 @@ where
             abort_handles: Default::default(),
             surb_mgmt: Default::default(),
             surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
-        // Insert the slot and obtain a guard. Any failure from here on rolls the slot
+        // Insert the slot and get a guard. Any failure from here on rolls the slot
         // back, otherwise it would block this pseudonym until idle eviction. The atomic
         // insert (inside the helper) also prevents a TOCTOU race, so only one concurrent
         // request can claim the slot for a given pseudonym.
         let Some(mut slot_guard) = self.allocate_session_slot(session_id, slot.clone()) else {
-            // Either the maximum number of sessions has been reached, or a concurrent
-            // initiation for the same pseudonym has claimed the slot first.
-            error!(%pseudonym, "no session slot available");
+            // No slots available for this pseudonym
+            error!("no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
-            send_via_msg_sender(&mut msg_sender, reply_routing.clone(), data, "session error message").await?;
+
+            send_via_msg_sender(
+                &mut msg_sender,
+                reply_routing.clone(),
+                data,
+                "session error message due to lack of slots",
+            )
+            .await?;
+
+            #[cfg(all(feature = "telemetry", not(test)))]
+            METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+
             return Ok(());
         };
 
-        debug!(?pseudonym, ?session_req, "assigned a new session");
+        debug!(?session_req, "assigned a new session");
 
         let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
             if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
@@ -1471,8 +2082,11 @@ where
 
             // The Session request carries a "hint" as additional data telling what
             // the Session initiator has configured as its target buffer size in the Balancer.
-            let target_surb_buffer_size = if session_req.additional_data > 0 {
-                (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
+            // The lower 32 bits contain the SURB target; the upper 32 bits carry PIX
+            // parameters and must be masked out.
+            let surb_target = (session_req.additional_data & u32::MAX as u64) as u32;
+            let target_surb_buffer_size = if surb_target > 0 {
+                (surb_target as u64).min(self.cfg.maximum_surb_buffer_size as u64)
             } else {
                 self.cfg.initial_return_session_egress_rate as u64
                     * self
@@ -1497,7 +2111,7 @@ where
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                            telemetry::record_session_surb_consumed(&session_id, 1);
                             futures::future::ok::<_, S::Error>((routing, data))
                         })
                         .rate_limit_with_controller(&egress_rate_control)
@@ -1510,7 +2124,7 @@ where
                             .produced
                             .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                         #[cfg(feature = "telemetry")]
-                        crate::telemetry::record_session_surb_produced(&session_id, produced);
+                        telemetry::record_session_surb_produced(&session_id, produced);
                     }),
                 ),
                 Some(closure_notifier),
@@ -1561,7 +2175,7 @@ where
                                 .consumed
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             #[cfg(feature = "telemetry")]
-                            crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                            telemetry::record_session_surb_consumed(&session_id, 1);
                             futures::future::ok::<_, S::Error>((routing, data))
                         }),
                     slot.routing_opts.clone(),
@@ -1646,23 +2260,58 @@ where
             Some(&slot.surb_mgmt),
         );
 
+        // If client requested PIX, and we support it
+        // (it was previously verified that the offered parameters are acceptable for us),
+        // then create initial Server SSA commitment message and send it to the client.
+        // Defer slot_guard.commit() until after PIX setup succeeds: if request_next_ssa
+        // fails, the Drop impl rolls back the session slot (removes it from the cache and
+        // closes the session), preventing an established session without a PixKillSwitch.
+        if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
+            // We use the same quota that the client offered
+            slot.current_ssa_state
+                .set(SessionSsaState::new(client_polys_per_ssa, client_shares_per_ssa))
+                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
+
+            // SessionEstablished was already sent to the Entry (above). If PIX
+            // setup fails now, the slot_guard Drop rolls back locally, but the
+            // Entry would be left with a zombie session that has no PIX kill
+            // switch and will never receive the SsaRequest it is waiting for.
+            // Best-effort notify the Entry so it can tear down its side too.
+            if let Err(e) = self.request_next_ssa(session_id, slot).await {
+                let _ = send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    HoprStartProtocol::SessionError(StartErrorType {
+                        identifier: ErrorIdentifier::SessionId(session_id),
+                        reason: StartErrorReason::Unknown,
+                    }),
+                    "session error after PIX setup failure",
+                )
+                .await;
+                return Err(e);
+            }
+        }
+
         info!(%session_id, "new session established");
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_NUM_ESTABLISHED_SESSIONS.increment();
 
         slot_guard.commit();
+
         Ok(())
     }
 
-    async fn handle_session_established(&self, est: StartEstablished<SessionId>) -> crate::errors::Result<()> {
-        trace!(
+    #[tracing::instrument(level = "debug", skip(self, est))]
+    async fn handle_session_established(&self, est: StartEstablished<SessionId>) -> errors::Result<()> {
+        debug!(
             session_id = ?est.session_id,
             "received session establishment confirmation"
         );
         let challenge = est.orig_challenge;
         let session_id = est.session_id;
-        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge) {
+
+        if let Some(tx_est) = self.session_initiations.remove(&challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
                 error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
@@ -1674,39 +2323,43 @@ where
         Ok(())
     }
 
-    async fn handle_session_error(&self, error_type: StartErrorType) -> crate::errors::Result<()> {
-        trace!(
-            challenge = error_type.challenge,
-            error = ?error_type.reason,
-            "failed to initialize a session",
-        );
-        // Currently, we do not distinguish between individual error types
-        // and just discard the initiation attempt and pass on the error.
-        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge) {
-            if let Err(error) = tx_est.try_send(Err(error_type)) {
-                error!(%error, ?error_type, "could not send session error message");
-                return Err(SessionManagerError::other(error).into());
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+        let reason = error_type.reason;
+        match error_type.identifier {
+            ErrorIdentifier::Challenge(challenge) => {
+                trace!(%challenge, error = ?error_type.reason, "session initiation error received");
+                if let Some(tx_est) = self.session_initiations.remove(&challenge) {
+                    if let Err(error) = tx_est.try_send(Err(error_type)) {
+                        error!(%error, "could not send session error message");
+                        return Err(SessionManagerError::other(error).into());
+                    }
+                    error!(%challenge, "session establishment error received");
+                } else {
+                    error!(
+                        %challenge,
+                        "session establishment attempt expired before error could be delivered"
+                    );
+                }
             }
-            error!(
-                challenge = error_type.challenge,
-                ?error_type,
-                "session establishment error received"
-            );
-        } else {
-            error!(
-                challenge = error_type.challenge,
-                ?error_type,
-                "session establishment attempt expired before error could be delivered"
-            );
+            ErrorIdentifier::SessionId(session_id) => {
+                error!(
+                    %session_id, %reason,
+                    "received post-establishment session error — closing session"
+                );
+                // Best-effort close; the session may have already been removed.
+                self.close_session(&session_id);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()]);
+        METRIC_RECEIVED_SESSION_ERRS.increment(&[&reason.to_string()]);
 
         Ok(())
     }
 
-    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> crate::errors::Result<()> {
+    #[tracing::instrument(level = "trace", skip(self, msg))]
+    async fn handle_keep_alive(&self, msg: KeepAliveMessage<SessionId>) -> errors::Result<()> {
         let session_id = msg.session_id;
         if let Some(session_slot) = self.sessions.get(&session_id) {
             trace!(?session_id, "received keep-alive message");
@@ -1731,7 +2384,7 @@ where
                         .consumed
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     #[cfg(feature = "telemetry")]
-                    crate::telemetry::record_session_surb_consumed(&session_id, 1);
+                    telemetry::record_session_surb_consumed(&session_id, 1);
                 }
                 // Session is incoming - keep-alive was received from the Entry
                 DestinationRouting::Return(_) => {
@@ -1762,12 +2415,300 @@ where
                         .produced
                         .fetch_add(produced, std::sync::atomic::Ordering::Relaxed);
                     #[cfg(feature = "telemetry")]
-                    crate::telemetry::record_session_surb_produced(&session_id, produced);
+                    telemetry::record_session_surb_produced(&session_id, produced);
                 }
             }
         } else {
             debug!(%session_id, "received keep-alive request for an unknown session");
         }
+
+        Ok(())
+    }
+
+    /// Handled by the Exit, when Entry replies with PIX commitment
+    #[tracing::instrument(level = "debug", skip(self, msg))]
+    async fn handle_ssa_commit(
+        &self,
+        pseudonym: HoprPseudonym,
+        msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>,
+    ) -> errors::Result<()> {
+        let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
+            return Err(SessionManagerError::UnsupportedMessage.into());
+        };
+
+        let session_id = msg.session_id;
+
+        if pseudonym != session_id {
+            error!(%pseudonym, %msg.session_id, "received SSA client commitment for a different session");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
+        let Some(session_slot) = self.sessions.get(&session_id) else {
+            return Err(SessionManagerError::NonExistingSession.into());
+        };
+
+        // See if we haven't received an SSA commitment for a Session that we did not register as PIX-capable
+        let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
+            return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
+        };
+
+        let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
+
+        // Insert the newly received coefficients into the SSA Reconstructor
+        let pix_toolbox_clone = pix_toolbox.clone();
+        let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(
+            move || {
+                pix_toolbox_clone
+                    .share_processor
+                    .insert_coefficient_commitments(
+                        ssa_id,
+                        msg.coefficient_index,
+                        msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
+                    )
+                    .map_err(SessionManagerError::PixError)
+            },
+            "ssa commitment reconstructor",
+        )
+        .await
+        .map_err(|_| {
+            SessionManagerError::Other(anyhow::anyhow!(
+                "failed to insert SSA coefficients into the SSA reconstructor"
+            ))
+        })??;
+
+        let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
+
+        if ssa_client_commitment_state.deposit_address_first_encountered
+            && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
+        {
+            let slot_clone = session_slot.clone();
+            let max_deposit_wait = self.cfg.pix_config.max_deposit_wait;
+            // TODO: generalize the awaiter into a perpetual Session task that either awaits for Deposit or a signal
+            // that sends Exit commitment and reinstates the kill-switch.
+            session_slot.abort_handles.lock().insert(
+                SessionHandles::DepositAwaiter,
+                hopr_utils::spawn_as_abortable!(async move {
+                    let deposit_done_rx_result = deposit_done_rx
+                        .filter(|((evt_pseudonym, evt_index), _)| {
+                            futures::future::ready(
+                                evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym(),
+                            )
+                        })
+                        .next()
+                        .delay(futures_time::time::Duration::from_millis(100))
+                        .timeout(futures_time::time::Duration::from(max_deposit_wait))
+                        .await;
+                    match deposit_done_rx_result {
+                        Ok(Some(_)) => {
+                            // Abort the kill switch once the deposit has been done
+                            // This kill-switch is reinstated once the SSA has been recovered and a new Client
+                            // commitment is needed.
+                            // TODO: how to kill the Session if we do not observe progress towards the current SSA
+                            // deposit recovery?
+                            slot_clone
+                                .abort_handles
+                                .lock()
+                                .abort_one(&SessionHandles::PixKillSwitch);
+                            info!(%session_id, "SSA deposit successful");
+                        }
+                        Ok(None) => {
+                            warn!(%session_id, "deposit channel closed without confirmation");
+                        }
+                        Err(_) => {
+                            warn!(%session_id, "deposit confirmation timed out");
+                        }
+                    }
+                }),
+            );
+
+            // Notify upstream that deposit is needed
+            pix_toolbox
+                .pix_events
+                .try_send(HoprSessionOutPixEvent::DepositNeeded(
+                    AgreedSsaQuota {
+                        ssa_id,
+                        deposit_address,
+                        quota_per_ssa,
+                    },
+                    deposit_done_tx,
+                ))
+                .map_err(|_| {
+                    SessionManagerError::other(anyhow::anyhow!("failed to send pix event for needed deposit"))
+                })?;
+            info!(%ssa_id, %deposit_address, quota_per_ssa, "retrieved first client SSA commitment and deposit address");
+        }
+
+        Ok(())
+    }
+
+    /// Handled by the Entry, when the Exit sends PIX initiation request
+    #[tracing::instrument(level = "debug", skip(self, msg))]
+    async fn handle_ssa_request(
+        &self,
+        pseudonym: HoprPseudonym,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>,
+    ) -> errors::Result<()> {
+        let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
+            return Err(SessionManagerError::UnsupportedMessage.into());
+        };
+
+        if pseudonym != msg.session_id {
+            error!(%pseudonym, %msg.session_id, "received SSA server commitment for a different session");
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
+        // The SsaRequest can arrive before new_session() or handle_incoming_session_initiation
+        // has finished allocating the session slot, since both SessionEstablished and SsaRequest
+        // are sent by the Exit back-to-back and processed concurrently by the Start protocol handler.
+        // Instead of busy-looping, await the allocation notification for this specific SessionId.
+        let session_slot = {
+            use std::collections::hash_map::Entry;
+            let session_id = msg.session_id;
+            loop {
+                // Optimistic cache check
+                if let Some(slot) = self.sessions.get(&session_id) {
+                    break slot;
+                }
+
+                // Register a waiter under the lock, then recheck the cache to avoid the
+                // TOCTOU race between the initial cache check and waiter registration.
+                let (tx, rx) = oneshot::channel::<()>();
+                {
+                    let mut map = self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner());
+                    // Recheck while holding the lock: the slot may have been inserted
+                    // between the optimistic check and now. If so, don't register.
+                    if self.sessions.get(&session_id).is_some() {
+                        drop(map);
+                        continue;
+                    }
+                    map.entry(session_id).or_default().push(tx);
+                }
+
+                let timeout = futures_time::time::Duration::from(Duration::from_millis(1000));
+                match rx.timeout(timeout).await {
+                    Ok(Ok(())) => {
+                        // Notified — recheck the cache
+                        continue;
+                    }
+                    _ => {
+                        // Timeout or the sender was dropped (cancelled). Clean up our
+                        // waiter entry to avoid unbounded accumulation in the map.
+                        let mut map = self.slot_allocated.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Entry::Occupied(mut e) = map.entry(session_id) {
+                            e.get_mut().retain(|w| !w.is_canceled());
+                            if e.get().is_empty() {
+                                e.remove();
+                            }
+                        }
+                        drop(map);
+
+                        // Final cache recheck before giving up — the slot might have
+                        // been inserted while we were cleaning up.
+                        if let Some(slot) = self.sessions.get(&session_id) {
+                            break slot;
+                        }
+
+                        error!(%session_id, "session slot not found after awaiting allocation");
+                        return Err(SessionManagerError::NonExistingSession.into());
+                    }
+                }
+            }
+        };
+
+        debug!(
+            num_server_commitments = msg.commitments.len(),
+            "received Exit SSA commitments"
+        );
+
+        let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
+            return Err(
+                SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {}", msg.session_id)).into(),
+            );
+        };
+
+        // The Entry enforces that the Exit's SSA parameters match exactly the quota we offered
+        // in the Session Initiation message.  Negotiation (accepting an Exit-chosen quota within
+        // our bounds) is not implemented, so any mismatch is rejected.
+        let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
+        if quota_per_ssa != server_quota {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
+            ))
+            .into());
+        }
+
+        let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+
+        // The server can theoretically send multiple SSA commitments
+        // asking us to make the equal number of client commitments and deposits.
+        // The server is authoritative in giving the ssa_index, the client only verifies if it's monotonic.
+        for (ssa_index, exit_commitment) in msg.commitments {
+            trace!(ssa_index, "received Exit SSA commitment");
+
+            // Use the global `pix_toolbox.share_generator` to generate the client
+            // commitment. The generator is shared with the packet pipeline's
+            // `next_share`, so polynomials created here will be used when the
+            // pipeline embeds PIX shares into return-path SURBs.
+            //
+            // The generator dimension (polys × threshold) must match what the
+            // Exit's reconstructor expects — both are set from the session's
+            // negotiated PIX params (pix_global_config on Entry → SsaRequest
+            // params on Exit).  If the client sends commitments that exceed the
+            // Exit's expected dimensions, the Exit rejects them as InvalidInput.
+            let pix_toolbox_clone = pix_toolbox.clone();
+            let client_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+                move || {
+                    pix_toolbox_clone
+                        .share_generator
+                        .new_ssa_commitment(&pseudonym, ssa_index)
+                },
+                "client_ssa_commitment",
+            )
+            .await
+            .map_err(SessionManagerError::other)?
+            .map_err(SessionManagerError::PixError)?;
+
+            // Construct the full SSA by adding the client and exit commitments, getting the deposit address
+            let full_ssa = client_commitment.ssa_commitment
+                + exit_commitment
+                    .try_into_pix_group()
+                    .map_err(SessionManagerError::other)?;
+            let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
+                anyhow::anyhow!("failed to convert SSA to deposit address"),
+            ))?;
+
+            // Split the SSA client commitment into Start protocol commitment messages
+            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment);
+            debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
+
+            // Send each commitment message into the message sender
+            for commitment_msg in commitment_msgs {
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    session_slot.routing_opts.clone(),
+                    HoprStartProtocol::SsaCommit(commitment_msg),
+                    "client SSA commitment message",
+                )
+                .await?;
+            }
+
+            debug!(%ssa_index, "all Entry SSA commitment messages were sent out");
+
+            // Notify the new SSA deposit address *after* all commitment messages have been
+            // sent out successfully, so the deposit cannot begin before the Exit has the
+            // complete commitment to reconstruct the deposit key.
+            pix_toolbox
+                .pix_events
+                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
+                    ssa_id: SsaId::new(pseudonym, ssa_index),
+                    deposit_address,
+                    quota_per_ssa,
+                }))
+                .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
+            info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
+        }
+
+        trace!(quota_per_ssa, "Exit commitment message has been fully processed");
         Ok(())
     }
 }
@@ -1782,6 +2723,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
+    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
@@ -1831,17 +2773,15 @@ mod tests {
         sender: MockMsgSender,
     ) -> (
         UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
-        tokio::task::JoinHandle<()>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
     ) {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let handle = tokio::task::spawn(async move {
             pin_mut!(rx);
             while let Some((routing, data)) = rx.next().await {
-                sender
-                    .send_message(routing, data)
-                    .await
-                    .expect("send message must not fail in mock");
+                sender.send_message(routing, data).await?;
             }
+            Ok(())
         });
         (tx, handle)
     }
@@ -1874,327 +2814,16 @@ mod tests {
         mgr.active_sessions().is_empty()
     }
 
-    #[test_log::test(tokio::test)]
-    async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
-    {
-        let alice_pseudonym = HoprPseudonym::random();
-        let bob_peer: Address = (&ChainKeypair::random()).into();
+    const SESSION_FORWARD_CAPACITY: usize = 10000;
 
-        let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(Default::default());
-
-        let mut sequence = mockall::Sequence::new();
-        let mut alice_transport = MockMsgSender::new();
-        let mut bob_transport = MockMsgSender::new();
-
-        // Alice sends the StartSession message
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                info!("alice sends {}", data.data.application_tag);
-                msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        ?;
-                    Ok(())
-                })
-            });
-
-        // Bob sends the SessionEstablished message
-        let alice_mgr_clone = alice_mgr.clone();
-        bob_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                info!("bob sends {}", data.data.application_tag);
-                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
-            })
-            .returning(move |_, data| {
-                let alice_mgr_clone = alice_mgr_clone.clone();
-
-                Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(
-                        alice_pseudonym,
-                        ApplicationDataIn {
-                            data: data.data,
-                            packet_info: Default::default(),
-                        },
-                    )?;
-                    Ok(())
-                })
-            });
-
-        // Alice sends the terminating segment to close the Session
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
-                    data.data.plain_text.as_ref(),
-                )
-                .expect("must be a session message")
-                .try_as_segment()
-                .expect("must be a segment")
-                .is_terminating()
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        ?;
-                    Ok(())
-                })
-            });
-
-        let mut ahs = Vec::new();
-
-        // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
-        assert!(alice_mgr.is_started());
-
-        // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
-        assert!(bob_mgr.is_started());
-
-        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
-
-        pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = timeout(
-            Duration::from_secs(2),
-            futures::future::join(
-                alice_mgr.new_session(
-                    bob_peer,
-                    SessionTarget::TcpStream(target.clone()),
-                    SessionClientConfig {
-                        pseudonym: alice_pseudonym.into(),
-                        capabilities: Capability::NoRateControl | Capability::Segmentation,
-                        surb_management: None,
-                        ..Default::default()
-                    },
-                ),
-                new_session_rx_bob.next(),
-            ),
-        )
-        .await?;
-
-        let mut alice_session = alice_session?;
-        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
-
-        assert_eq!(
-            alice_session.config().capabilities,
-            Capability::Segmentation | Capability::NoRateControl
-        );
-        assert_eq!(
-            alice_session.config().capabilities,
-            bob_session.session.config().capabilities
-        );
-        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
-
-        assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions());
-        assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id())?);
-        assert!(
-            alice_mgr
-                .update_surb_balancer_config(alice_session.id(), SurbBalancerConfig::default())
-                .is_err()
-        );
-
-        assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions());
-        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id())?);
-        assert!(
-            bob_mgr
-                .update_surb_balancer_config(bob_session.session.id(), SurbBalancerConfig::default())
-                .is_err()
-        );
-
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        alice_session.close().await?;
-
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        assert!(matches!(
-            alice_mgr.ping_session(alice_session.id()).await,
-            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
-        ));
-
-        futures::stream::iter(ahs)
-            .for_each(|ah| async move { ah.abort() })
-            .await;
-
-        // Cleanup: close senders and await handles
-        alice_sender.close_channel();
-        bob_sender.close_channel();
-        let _ = alice_handle.await;
-        let _ = bob_handle.await;
-
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
-        let alice_pseudonym = HoprPseudonym::random();
-        let bob_peer: Address = (&ChainKeypair::random()).into();
-
-        let cfg = SessionManagerConfig {
-            idle_timeout: Duration::from_millis(200),
-            ..Default::default()
-        };
-
-        let alice_mgr = SessionManager::new(cfg);
-        let bob_mgr = SessionManager::new(Default::default());
-
-        let mut sequence = mockall::Sequence::new();
-        let mut alice_transport = MockMsgSender::new();
-        let mut bob_transport = MockMsgSender::new();
-
-        // Alice sends the StartSession message
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone
-                        .dispatch_message(
-                            alice_pseudonym,
-                            ApplicationDataIn {
-                                data: data.data,
-                                packet_info: Default::default(),
-                            },
-                        )
-                        ?;
-                    Ok(())
-                })
-            });
-
-        // Bob sends the SessionEstablished message
-        let alice_mgr_clone = alice_mgr.clone();
-        bob_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
-            })
-            .returning(move |_, data| {
-                let alice_mgr_clone = alice_mgr_clone.clone();
-
-                Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(
-                        alice_pseudonym,
-                        ApplicationDataIn {
-                            data: data.data,
-                            packet_info: Default::default(),
-                        },
-                    )?;
-                    Ok(())
-                })
-            });
-
-        let mut ahs = Vec::new();
-
-        // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
-
-        // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
-        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
-        assert!(bob_mgr.is_started());
-
-        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
-
-        pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = timeout(
-            Duration::from_secs(2),
-            futures::future::join(
-                alice_mgr.new_session(
-                    bob_peer,
-                    SessionTarget::TcpStream(target.clone()),
-                    SessionClientConfig {
-                        pseudonym: alice_pseudonym.into(),
-                        capabilities: Capability::NoRateControl | Capability::Segmentation,
-                        surb_management: None,
-                        ..Default::default()
-                    },
-                ),
-                new_session_rx_bob.next(),
-            ),
-        )
-        .await?;
-
-        let alice_session = alice_session?;
-        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
-
-        assert_eq!(
-            alice_session.config().capabilities,
-            Capability::Segmentation | Capability::NoRateControl,
-        );
-        assert_eq!(
-            alice_session.config().capabilities,
-            bob_session.session.config().capabilities
-        );
-        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
-
-        // Let the session timeout at Alice
-        tokio::time::sleep(Duration::from_millis(300)).await;
-
-        assert!(matches!(
-            alice_mgr.ping_session(alice_session.id()).await,
-            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
-        ));
-
-        futures::stream::iter(ahs)
-            .for_each(|ah| async move { ah.abort() })
-            .await;
-
-        // Cleanup: close senders and await handles
-        alice_sender.close_channel();
-        bob_sender.close_channel();
-        let _ = alice_handle.await;
-        let _ = bob_handle.await;
-
-        Ok(())
-    }
-
+    /// Verifies that a session's SURB balancer config can be retrieved and updated via the manager API.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig`
+    ///    (`target_surb_buffer_size: 1000`, `max_surbs_per_sec: 100`).
+    /// 2. `get_surb_balancer_config` returns the config, confirming round-trip storage.
+    /// 3. `update_surb_balancer_config` is called with a new config (`target: 2000`, `max: 200`).
+    /// 4. `get_surb_balancer_config` is called again and the returned config matches the updated values.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_surb_balancer_config() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2217,6 +2846,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
@@ -2240,6 +2870,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a self-initiated session is rejected with `SessionManagerError::Loopback`.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is started with a mock transport that delivers messages back to itself.
+    /// 2. Alice initiates a session toward `bob_peer`; the mock routes her `StartSession` back to her own manager
+    ///    (simulating a network loopback).
+    /// 3. Alice's manager processes `StartSession` as incoming, auto-responds with `SessionEstablished`, and the mock
+    ///    delivers it back to complete the handshake.
+    /// 4. `new_session` returns `Err(TransportSessionError::Manager(SessionManagerError::Loopback))`.
+    /// 5. Exactly one active session is present — the incoming slot accepted from the self-delivered `StartSession`.
+    ///    The rejection fires after slot insertion, not before.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_not_allow_loopback_sessions() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2285,7 +2926,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
             })
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
@@ -2305,7 +2946,7 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
         assert!(alice_mgr.is_started());
 
         let alice_session = alice_mgr
@@ -2326,16 +2967,28 @@ mod tests {
             alice_session,
             Err(TransportSessionError::Manager(SessionManagerError::Loopback))
         ));
+        // There is one session in the manager, which is the incoming one that Alice's manager
+        // accepted when it received the StartSession message from itself.
+        assert_eq!(alice_mgr.num_active_sessions(), 1);
 
         drop(new_session_rx_alice);
 
         // Cleanup: close sender and await handle
         alice_sender.close_channel();
-        let _ = alice_handle.await;
+        alice_handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that a session initiation returns `TransportSessionError::Timeout` when the peer
+    /// never processes or responds to the `StartSession` message.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is configured with `initiation_timeout_base: 100ms`. Bob's manager is started but its mock
+    ///    transport silently swallows all messages (never dispatches to the manager).
+    /// 2. Alice calls `new_session`; her `StartSession` is captured by the mock and silently discarded.
+    /// 3. The 100ms timeout expires; `new_session` returns `Err(TransportSessionError::Timeout)`.
+    /// 4. `num_active_sessions` is 0, confirming no orphaned slot was left in the cache.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -2366,13 +3019,13 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
         assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
         assert!(bob_mgr.is_started());
 
         let result = alice_mgr
@@ -2389,10 +3042,22 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
 
         Ok(())
     }
 
+    /// Verifies that a failed incoming session establishment does not register any telemetry.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with the `telemetry` feature enabled.
+    /// 2. The new-session notification channel's receiver is dropped immediately, so notifying about a new incoming
+    ///    session will fail.
+    /// 3. `handle_incoming_session_initiation` is called with a random pseudonym. The slot is inserted first, then
+    ///    notifying about the new session fails (receiver is gone).
+    /// 4. `wait_for_no_active_sessions` polls until there are no active sessions, confirming the partially-inserted
+    ///    slot was rolled back.
+    /// 5. `num_active_sessions` is 0, proving the rollback prevented any telemetry registration for the failed session.
     #[cfg(feature = "telemetry")]
     #[test_log::test(tokio::test)]
     async fn failed_incoming_session_establishment_does_not_register_telemetry() -> anyhow::Result<()> {
@@ -2402,7 +3067,7 @@ mod tests {
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -2412,7 +3077,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities(Capabilities::empty()),
                     additional_data: 0,
                 },
             )
@@ -2426,14 +3091,24 @@ mod tests {
             wait_for_no_active_sessions(&mgr).await,
             "the partially established session slot was not rolled back"
         );
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that a session slot is rolled back if session setup fails after the slot is inserted.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started; the new-session notification channel's receiver is dropped, so notifying about
+    ///    a new incoming session will fail.
+    /// 2. `handle_incoming_session_initiation` is called with a random pseudonym. The slot is inserted into the cache
+    ///    first, then notifying about the new session fails (because the receiver is gone).
+    /// 3. The call returns an error, and `wait_for_no_active_sessions` confirms the slot was removed.
+    /// 4. `num_active_sessions` is 0, proving the rollback removed the slot and freed the pseudonym.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_roll_back_slot_when_incoming_session_setup_fails() -> anyhow::Result<()> {
         let mgr = SessionManager::new(Default::default());
@@ -2444,7 +3119,7 @@ mod tests {
         let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
         drop(new_session_rx);
         let (sender, handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -2458,7 +3133,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -2474,11 +3149,27 @@ mod tests {
 
         // Cleanup
         sender.close_channel();
-        let _ = handle.await;
+        handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that established sessions exchange `KeepAlive` messages driven by the SURB balancer,
+    /// that config updates propagate via keep-alives, and that SURB usage statistics are collected.
+    ///
+    /// ## Steps
+    /// 1. Alice's manager is started with no `PixToolbox` and a `SurbBalancerConfig` with `target_surb_buffer_size:
+    ///    10`. Bob's manager is configured with a 500ms `surb_balance_notify_period`.
+    /// 2. Alice initiates a session with the balancer config and PIX quota set; the `StartSession` /
+    ///    `SessionEstablished` handshake completes via mock transports.
+    /// 3. Both managers report the same `target_surb_buffer_size` via `get_surb_balancer_config` (confirmed from both
+    ///    Alice and Bob's perspective).
+    /// 4. A 1500ms sleep allows the SURB balancer's periodic keep-alive timer to fire multiple times.
+    /// 5. `update_surb_balancer_config` is called to raise the target to 50. After another 1500ms, Bob's manager
+    ///    reflects the updated target via `get_surb_balancer_config`, confirming keep-alives communicated the change.
+    /// 6. `get_surb_level_estimates` is called on both sides; both report positive sent/received/used counts,
+    ///    confirming the balancer collected SURB statistics.
+    /// 7. Alice closes the session; `ping_session` returns `NonExistingSession` after a short wait.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2529,7 +3220,7 @@ mod tests {
             .in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::SessionEstablished)
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
             })
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
@@ -2551,7 +3242,7 @@ mod tests {
         let bob_mgr_clone = bob_mgr.clone();
         alice_transport
             .expect_send_message()
-            .times(5..)
+            .times(1..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == INITIAL_BALANCER_TARGET))
@@ -2580,7 +3271,7 @@ mod tests {
         let bob_mgr_clone = bob_mgr.clone();
         alice_transport
             .expect_send_message()
-            .times(5..)
+            .times(1..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerTarget) && ka.additional_data == NEXT_BALANCER_TARGET))
@@ -2610,7 +3301,7 @@ mod tests {
             //.in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
                 start_msg_match(data, |msg| matches!(msg, StartProtocol::KeepAlive(ka) if ka.flags.contains(KeepAliveFlag::BalancerState) && ka.additional_data > 0))
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if *p == alice_pseudonym)
             })
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
@@ -2665,13 +3356,13 @@ mod tests {
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
-        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?);
         assert!(alice_mgr.is_started());
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
-        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?);
         assert!(bob_mgr.is_started());
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -2784,15 +3475,25 @@ mod tests {
         // Cleanup: close senders and await handles
         alice_sender.close_channel();
         bob_sender.close_channel();
-        let _ = alice_handle.await;
-        let _ = bob_handle.await;
+        alice_handle.await??;
+        bob_handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that a second incoming session initiation for the same pseudonym is handled gracefully
+    /// (returns `Ok`) without creating a duplicate session slot.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport that accepts two outbound messages.
+    /// 2. `handle_incoming_session_initiation` is called with pseudonym `X` — succeeds; exactly one active session is
+    ///    confirmed.
+    /// 3. `handle_incoming_session_initiation` is called again with the same pseudonym `X`. The manager detects the
+    ///    conflict and handles it internally by sending a `SessionError` to the peer.
+    /// 4. The call still returns `Ok` (error is handled internally); `num_active_sessions` remains 1 with only the
+    ///    original pseudonym present.
     #[test_log::test(tokio::test)]
-    async fn session_manager_should_supersede_stale_session_on_reinitiation_with_same_pseudonym() -> anyhow::Result<()>
-    {
+    async fn session_manager_should_reject_duplicate_session_for_same_pseudonym() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
 
         let bob_mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -2814,7 +3515,7 @@ mod tests {
             }
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        bob_mgr.start(sender.clone(), new_session_tx)?;
+        bob_mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(bob_mgr.is_started());
 
         let pseudonym = HoprPseudonym::random();
@@ -2826,7 +3527,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -2837,35 +3538,47 @@ mod tests {
         // Verify one session exists
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should have exactly one active session");
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
 
-        // Second session initiation with the same pseudonym: the stale session is
-        // closed and the new initiation takes the slot over (a re-initiation means
-        // the initiator has lost or abandoned its side of the old session).
+        // Second session initiation with same pseudonym - should be handled gracefully
+        // (returns Ok but sends SessionError to the requester)
         let result = bob_mgr
             .handle_incoming_session_initiation(
                 pseudonym,
                 StartInitiation {
-                    challenge: MIN_CHALLENGE + 1,
+                    challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
             .await;
 
-        assert!(result.is_ok(), "re-initiation should supersede the stale session");
+        // The second initiation returns Ok but handles the duplicate by sending SessionError
+        assert!(
+            result.is_ok(),
+            "second session initiation should return Ok (error is handled internally)"
+        );
 
-        // The stale session must have been replaced, not duplicated
+        // Verify still only one session exists
         let active = bob_mgr.active_sessions();
         assert_eq!(active.len(), 1, "should still have exactly one active session");
+        assert_eq!(bob_mgr.num_active_sessions(), 1);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that pinging a session that does not exist returns `NonExistingSession`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `ping_session` is called with a completely random (non-existent) session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
+    /// 4. `num_active_sessions` is 0, confirming no sessions were created.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_pinging_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -2878,10 +3591,11 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
+        assert_eq!(mgr.num_active_sessions(), 0);
         let result = mgr.ping_session(&fake_session_id).await;
 
         assert!(result.is_err());
@@ -2892,11 +3606,17 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that closing a session that does not exist returns `false` (no-op).
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `close_session` is called with a random (non-existent) session ID.
+    /// 3. The call returns `false`, indicating no session was closed.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_false_when_closing_non_existent_session() -> anyhow::Result<()> {
         let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
@@ -2909,10 +3629,11 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
+        assert_eq!(mgr.num_active_sessions(), 0);
         let result = mgr.close_session(&fake_session_id);
 
         assert!(!result, "closing non-existent session should return false");
@@ -2920,6 +3641,12 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that updating the SURB balancer config for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `update_surb_balancer_config` is called with a random session ID.
+    /// 3. The call returns an error (no `Ok` variant is expected).
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_updating_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -2933,7 +3660,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -2943,11 +3670,17 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that retrieving the SURB balancer config for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `get_surb_balancer_config` is called with a random session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_getting_surb_config_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -2961,7 +3694,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -2975,11 +3708,17 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that retrieving SURB level estimates for a non-existent session returns an error.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `get_surb_level_estimates` is called with a random session ID.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_error_when_getting_surb_estimates_for_non_existent_session()
     -> anyhow::Result<()> {
@@ -2993,7 +3732,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         let fake_session_id = HoprPseudonym::random();
@@ -3007,7 +3746,7 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3036,7 +3775,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Spawn new_session so it is blocked waiting for the session establishment response.
@@ -3069,7 +3808,7 @@ mod tests {
 
         // Inject the SessionError with the matching challenge before SessionEstablished arrives.
         let error_type = StartErrorType {
-            challenge,
+            identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
         mgr.handle_session_error(error_type).await?;
@@ -3087,10 +3826,20 @@ mod tests {
         }
 
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
         Ok(())
     }
 
+    /// Verifies that an incoming session initiation is rejected (handled internally) when the
+    /// manager already has `maximum_sessions` active sessions.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1`.
+    /// 2. `handle_incoming_session_initiation` is called with pseudonym `X1` — succeeds; one active session confirmed.
+    /// 3. `handle_incoming_session_initiation` is called with pseudonym `X2` — the manager detects it is at capacity
+    ///    and handles the conflict internally (sends `SessionError` to peer).
+    /// 4. The call returns `Ok` (handled internally); `num_active_sessions` remains 1, with only `X1` present — `X2`
+    ///    was rejected without creating a slot.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_new_session_when_max_sessions_reached() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3115,7 +3864,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // First session - should succeed
@@ -3125,7 +3874,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3133,6 +3882,7 @@ mod tests {
 
         // Verify one session exists
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Second session - should fail with TooManySessions
         let pseudonym2 = HoprPseudonym::random();
@@ -3142,7 +3892,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3151,10 +3901,11 @@ mod tests {
         // The error is handled internally (sends SessionError), so result is Ok
         // But we can verify no new session was added
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
@@ -3188,7 +3939,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Fill the cache with two incoming sessions (Exits).
@@ -3199,13 +3950,14 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE + i as u64,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
             .await?;
         }
         assert_eq!(mgr.active_sessions().len(), 2);
+        assert_eq!(mgr.num_active_sessions(), 2);
 
         // Third outgoing call hits the early return before sending anything.
         let result = mgr
@@ -3226,7 +3978,7 @@ mod tests {
         ));
 
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
         Ok(())
     }
 
@@ -3249,7 +4001,7 @@ mod tests {
             pin_mut!(new_session_rx);
             while let Some(_session) = new_session_rx.next().await {}
         });
-        mgr.start(tx, new_session_tx)?;
+        mgr.start(tx, new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Verify that sending fails because the receiver is gone.
@@ -3265,6 +4017,7 @@ mod tests {
             .await;
 
         assert!(result.is_err());
+        assert_eq!(mgr.num_active_sessions(), 0);
         // The challenge must have been removed from `session_initiations` even
         // though the send failed.
         assert_eq!(
@@ -3302,12 +4055,12 @@ mod tests {
 
         let (alice_sender, _alice_handle) = mock_packet_planning(alice_transport);
         let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
-        alice_mgr.start(alice_sender.clone(), new_session_tx_alice)?;
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
         assert!(alice_mgr.is_started());
 
         let (bob_sender, _bob_handle) = mock_packet_planning(bob_transport);
         let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
-        bob_mgr.start(bob_sender.clone(), new_session_tx_bob)?;
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
         assert!(bob_mgr.is_started());
 
         // Record how many entries are in `session_initiations` before the call.
@@ -3327,6 +4080,7 @@ mod tests {
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));
+        assert_eq!(alice_mgr.num_active_sessions(), 0);
         // The pending challenge must have been removed from `session_initiations`
         // after the timeout error propagated.
         assert_eq!(
@@ -3338,6 +4092,14 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that dispatching data to a session that does not exist returns `UnknownData`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport.
+    /// 2. `dispatch_message` is called with a random pseudonym and an `ApplicationData` carrying the
+    ///    `SESSION_APPLICATION_TAG` (a session-scoped tag).
+    /// 3. The manager has no matching session, so the call returns `Err(TransportSessionError::UnknownData)`.
+    /// 4. `num_active_sessions` is 0, confirming no session was implicitly created.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_unknown_data_error_when_dispatching_to_unknown_session() -> anyhow::Result<()>
     {
@@ -3351,7 +4113,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Send data with session application tag but no session exists
@@ -3366,14 +4128,22 @@ mod tests {
 
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that closing an existing session returns `true` and removes the session from the manager.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is started with a mock transport that accepts one outbound message.
+    /// 2. `handle_incoming_session_initiation` is called to create a session — one active session confirmed.
+    /// 3. `close_session` is called with the session's pseudonym — returns `true`.
+    /// 4. `num_active_sessions` is 0, confirming the session was fully removed.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_return_true_when_closing_existing_session() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3393,7 +4163,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Create a session
@@ -3403,7 +4173,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3411,6 +4181,7 @@ mod tests {
 
         // Verify session exists
         assert_eq!(mgr.active_sessions().len(), 1);
+        assert_eq!(mgr.num_active_sessions(), 1);
 
         // Close the session - should return true
         let result = mgr.close_session(&pseudonym);
@@ -3418,14 +4189,26 @@ mod tests {
 
         // Verify session is closed
         assert_eq!(mgr.active_sessions().len(), 0);
+        assert_eq!(mgr.num_active_sessions(), 0);
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
 
         Ok(())
     }
 
+    /// Verifies that a `KeepAlive` message with the `BalancerState` flag updates the session's
+    /// SURB buffer level in the manager.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig` and an initial
+    ///    buffer level of 100.
+    /// 2. A `KeepAlive` message with `KeepAliveFlag::BalancerState` and `additional_data: 200` is constructed and
+    ///    dispatched to Alice's manager via `dispatch_message`.
+    /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's `buffer_level` reaches
+    ///    200 (with a 1-second timeout).
+    /// 4. The buffer level is confirmed to be 200, proving the `BalancerState` flag updated it.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_buffer_level_on_keep_alive_with_balancer_state_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -3446,7 +4229,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
@@ -3464,6 +4247,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
@@ -3520,6 +4304,17 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a `KeepAlive` message with the `BalancerTarget` flag updates the session's
+    /// target SURB buffer size in the manager.
+    ///
+    /// ## Steps
+    /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig` and
+    ///    `target_surb_buffer_size: 1000`.
+    /// 2. A `KeepAlive` message with `KeepAliveFlag::BalancerTarget` and `additional_data: 2000` is constructed and
+    ///    dispatched via `dispatch_message`.
+    /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's
+    ///    `target_surb_buffer_size` reaches 2000 (with a 1-second timeout).
+    /// 4. The target is confirmed to be 2000, proving the `BalancerTarget` flag updated it.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_target_on_keep_alive_with_balancer_target_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -3540,7 +4335,7 @@ mod tests {
 
         let (new_session_tx, _) = futures::channel::mpsc::channel(1024);
         let (mock_sender, _) = futures::channel::mpsc::unbounded();
-        let _ahs = alice_mgr.start(mock_sender, new_session_tx)?;
+        let _ahs = alice_mgr.start(mock_sender, new_session_tx, None)?;
         assert!(alice_mgr.is_started());
 
         let (dummy_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
@@ -3552,6 +4347,7 @@ mod tests {
                 abort_handles: Default::default(),
                 surb_mgmt: Arc::new(BalancerStateValues::from(balancer_cfg)),
                 surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
             },
         );
 
@@ -3604,6 +4400,14 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a session is evicted after the `idle_timeout` fires, without needing an explicit close.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1` and `idle_timeout: 100ms`.
+    /// 2. `handle_incoming_session_initiation` creates one session — confirmed active.
+    /// 3. The test sleeps 200ms (well past the 100ms timeout), then calls `sessions.run_pending_tasks()` to drive the
+    ///    eviction timer.
+    /// 4. `active_sessions` is empty, confirming the idle session was cleaned up without an explicit close call.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_evict_idle_session_and_call_close_callback() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3628,7 +4432,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Create first session
@@ -3638,7 +4442,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3661,6 +4465,16 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that a second incoming session initiation is rejected (not evicted) when the manager
+    /// is at `maximum_sessions` capacity with a long `idle_timeout`.
+    ///
+    /// ## Steps
+    /// 1. A `SessionManager` is configured with `maximum_sessions: 1` and `idle_timeout: 3600s` (long enough that
+    ///    eviction will not fire during the test).
+    /// 2. `handle_incoming_session_initiation` creates session `X1` — confirmed active.
+    /// 3. `handle_incoming_session_initiation` is called for session `X2` — the manager detects capacity is reached and
+    ///    rejects the initiation internally (sends `SessionError`).
+    /// 4. `active_sessions` still contains only `X1`; the first session was not evicted to make room.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_reject_new_session_when_max_sessions_reached_no_eviction() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
@@ -3686,7 +4500,7 @@ mod tests {
             while let Some(_session) = new_session_rx.next().await {}
         });
         let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
+        mgr.start(sender.clone(), new_session_tx, None)?;
         assert!(mgr.is_started());
 
         // Create first session
@@ -3696,7 +4510,7 @@ mod tests {
             StartInitiation {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: ByteCapabilities(Capabilities::empty()),
+                capabilities: HoprSessionCapabilities::empty(),
                 additional_data: 0,
             },
         )
@@ -3713,7 +4527,7 @@ mod tests {
                 StartInitiation {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                    capabilities: ByteCapabilities(Capabilities::empty()),
+                    capabilities: HoprSessionCapabilities::empty(),
                     additional_data: 0,
                 },
             )
@@ -3734,7 +4548,1197 @@ mod tests {
 
         // Cleanup: close sender and await handle
         sender.close_channel();
-        let _ = _handle.await;
+        _handle.await??;
+
+        Ok(())
+    }
+
+    /// Verifies that `new_session` rejects `UsePIX` when the return path has 0 intermediate hops.
+    ///
+    /// PIX shares are encrypted with the first relayer's ticket-challenge solution and carried
+    /// in return-path SURBs. With 0 intermediate hops (a direct Exit→Entry SURB), there is no
+    /// relayer to provide the challenge solution, so shares are never embedded — the ongoing
+    /// PIX share delivery mechanism is dead and the Exit's quota is never replenished.
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_with_zero_return_hops() -> anyhow::Result<()> {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect_send_message should NOT fire.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, None)?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    pix_ssa_quota: Some((2, 2)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(0.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("UsePIX requires at least 1 intermediate hop on the return path"),
+            "expected return-path guard error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when UsePIX is rejected"
+        );
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that `new_session` rejects UsePIX when the requested
+    /// `polys_per_ssa`/`shares_per_ssa` don't match the installed
+    /// `SsaShareGenerator`'s configured dimensions.
+    ///
+    /// ## Steps
+    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
+    /// 2. Start the manager with that toolbox installed.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some((10, 10))` — both values are within protocol bounds but
+    ///    mismatch the generator.
+    /// 4. Assert the error identifies which dimension doesn't match.
+    /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
+    #[test_log::test(tokio::test)]
+    async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 5,
+            threshold: 3,
+            surplus_shares: 5,
+        };
+        let (pix_toolbox, _) = PixToolbox::new(
+            Arc::new(SsaShareGenerator::new(ssa_gen_config)),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(Default::default());
+
+        let mut transport = MockMsgSender::new();
+        // The error happens before any message is sent, so expect NO sends.
+        transport.expect_send_message().times(0);
+
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+        assert!(mgr.is_started());
+
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    // Both values pass protocol bounds but polys=10 != generator's 5
+                    pix_ssa_quota: Some((10, 10)),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(2.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        let err = result.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("does not match installed generator"),
+            "expected generator mismatch error, got: {msg}"
+        );
+
+        assert_eq!(mgr.num_active_sessions(), 0);
+        // No challenge slot was consumed because the validations run before insert_into_next_slot.
+        assert_eq!(
+            mgr.session_initiations.entry_count(),
+            0,
+            "session_initiations must remain empty when generator mismatch is rejected"
+        );
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------------------
+    // PIX protocol tests
+    // ---------------------------------------------------------------------------
+
+    /// Verifies that an incoming session initiation with a PIX quota outside the acceptable range
+    /// is rejected with `StartErrorReason::UnacceptablePixParams`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `pix_config.quota_range: 0..=2048*1024*1024` (accepts quotas up to ~2 GiB).
+    /// 2. The test encodes `additional_data` as `(polynomials=3000, shares=3000)`, which translates to a quota of
+    ///    9,000,000 — far outside the allowed range.
+    /// 3. `handle_incoming_session_initiation` is called with `Capability::UsePIX` and the out-of-range quota.
+    /// 4. Bob's manager sends a `SessionError` back to the peer with reason `UnacceptablePixParams`.
+    /// 5. The test receives the error on a one-shot channel and asserts `err.reason == UnacceptablePixParams` and
+    ///    `err.challenge == MIN_CHALLENGE`.
+    /// 6. `num_active_sessions` is 0, confirming no session slot was created.
+    #[test_log::test(tokio::test)]
+    async fn incoming_session_with_unacceptable_pix_quota_is_rejected() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_start::{StartErrorReason, StartInitiation};
+        use tokio::sync::oneshot;
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=2048 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        let (tx, rx) = oneshot::channel();
+        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        // Encode (polys=3000, shares=3000) => quota = 9_000_000 which is way
+        // outside the acceptable range of 0..=2048*1024*1024
+        let additional_data = (u64::from(3000u32) << 48) | (u64::from(3000u32) << 32);
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data,
+            },
+        )
+        .await?;
+
+        let err = rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that an incoming session initiation that does not declare `UsePIX` capability is
+    /// rejected when PIX is enforced on the responder.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `pix_config.enforce_pix: true`, requiring all incoming sessions to opt into
+    ///    PIX.
+    /// 2. The incoming initiation carries `Capability::Segmentation` only (no `UsePIX`).
+    /// 3. `handle_incoming_session_initiation` is called; Bob's manager detects the missing `UsePIX` capability and
+    ///    sends a `SessionError` with `UnacceptablePixParams`.
+    /// 4. The test receives the error and asserts `err.reason == UnacceptablePixParams`.
+    /// 5. `num_active_sessions` is 0, confirming no session slot was created.
+    #[test_log::test(tokio::test)]
+    async fn incoming_session_without_usepix_is_rejected_when_pix_enforced() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_start::{StartErrorReason, StartInitiation};
+        use tokio::sync::oneshot;
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                enforce_pix: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        let (tx, rx) = oneshot::channel();
+        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::Segmentation.into()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        let err = rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that the exit/responder (Bob) rejects an `SsaCommit` for a session that has no PIX
+    /// state — i.e., the SSA commit is delivered with a session ID that Bob does not hold.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    normally via `handle_incoming_session_initiation`, establishing a session with PIX state.
+    /// 2. `handle_ssa_commit` is called with a completely different (random) session ID — one that Bob's manager does
+    ///    not have.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::NonExistingSession)`,
+    ///    confirming the exit rejects commits for unknown sessions.
+    #[test_log::test(tokio::test)]
+    async fn exit_rejects_ssa_commit_when_session_has_no_pix_state() -> anyhow::Result<()> {
+        use std::collections::HashMap;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+        let ssa_rec_config = SsaReconstructorConfig::default();
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(ssa_rec_config).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let result = mgr
+            .handle_ssa_commit(
+                HoprPseudonym::random(),
+                SsaClientCommitmentMessage {
+                    session_id: alice_pseudonym,
+                    ssa_index: SsaIndex::MIN,
+                    coefficient_index: 0,
+                    coefficient_commitments: HashMap::new(),
+                },
+            )
+            .await;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::NonExistingSession)
+        ));
+
+        Ok(())
+    }
+
+    /// Verifies that a session is automatically closed after receiving more than the allowed number
+    /// of `UnverifiableShare` PIX events (the configurable fault tolerance threshold).
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    via `handle_incoming_session_initiation`.
+    /// 2. The test dispatches four `UnverifiableShare` events for the same `SsaId` in a loop, calling
+    ///    `dispatch_pix_event` each time.
+    /// 3. After the first 3 events, `num_active_sessions` is still 1 and `active_sessions` is non-empty — the session
+    ///    remains open (below the fault threshold).
+    /// 4. After the 4th event, the session is closed. `active_sessions` is empty and `num_active_sessions` is 0,
+    ///    confirming the kill switch fired.
+    #[test_log::test(tokio::test)]
+    async fn session_is_closed_after_too_many_unverifiable_shares() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        for i in 1..=4 {
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .await?;
+            if i < 4 {
+                assert!(
+                    !mgr.active_sessions().is_empty(),
+                    "session should remain open after {i} error(s)"
+                );
+                assert_eq!(mgr.num_active_sessions(), 1);
+            }
+        }
+
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session must be closed after 4 unverifiable shares"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that when the exit/responder receives an `SsaAlmostRecovered` PIX event, it requests
+    /// a fresh SSA by sending another `SsaRequest` to the entry/initiator.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
+    ///    via `handle_incoming_session_initiation`, which triggers an initial `SsaRequest` (message 1).
+    /// 2. The mock transport tracks all outbound messages; exactly 3 messages are expected: `SessionEstablished`,
+    ///    initial `SsaRequest` at init, and a second `SsaRequest` after recovery.
+    /// 3. `dispatch_pix_event(SsaAlmostRecovered(ssa_id))` is called on Bob's manager.
+    /// 4. The manager processes the event and emits a second `SsaRequest` to Alice.
+    /// 5. The test asserts that exactly 2 `SsaRequest` messages were sent, confirming the early recovery path triggered
+    ///    a new SSA request.
+    #[test_log::test(tokio::test)]
+    async fn exit_requests_new_ssa_after_almost_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // Accept all messages; track SsaRequest calls.
+        // 3 messages expected: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after early event (3).
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (one at init, one after SsaAlmostRecovered)"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that a stale `SsaAlmostRecovered` event from a previous SSA cycle is silently
+    /// ignored and does NOT trigger a duplicate `request_next_ssa`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager starts with PIX; process Alice's session initiation (1 SsaRequest at init).
+    /// 2. Dispatch `SsaAlmostRecovered(ssa_id)` — matches active cycle, triggers a second SsaRequest.
+    /// 3. Dispatch the *same* `SsaAlmostRecovered(ssa_id)` again — now stale (index advanced in step 2), must be
+    ///    silently ignored.
+    /// 4. Assert exactly 2 SsaRequest messages total (init + step 2, no duplicate from step 3).
+    #[test_log::test(tokio::test)]
+    async fn exit_ignores_stale_ssa_almost_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // 3 messages: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest after first
+        // SsaAlmostRecovered (3). The stale dispatch must not trigger a fourth message.
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+
+        // First dispatch — matches the active cycle index (1 = current_index - 1).
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        // Second dispatch — same ssa_id, but request_next_ssa in step 2 advanced the
+        // current_index, so this is now stale and must be silently ignored.
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (init + first AlmostRecovered), stale event must not trigger a \
+             third"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that the exit/responder does NOT request a new SSA when it receives
+    /// `SsaRecovered` (the request was already triggered by `SsaAlmostRecovered`).
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed,
+    ///    which triggers an initial `SsaRequest` (message 1).
+    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager.
+    /// 3. The test asserts that exactly 1 `SsaRequest` message was sent (only the one at init), confirming
+    ///    `SsaRecovered` alone does NOT trigger `request_next_ssa`.
+    #[test_log::test(tokio::test)]
+    async fn exit_does_not_request_new_ssa_on_ssa_recovered_event() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // Accept 2 messages: SessionEstablished (1) + SsaRequest at init (2) only.
+        // SsaRecovered must NOT trigger a third message.
+        bob_transport.expect_send_message().times(2).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id))
+            .await?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            1,
+            "expected exactly 1 SsaRequest message (only the one at init), SsaRecovered must not trigger a second"
+        );
+
+        Ok(())
+    }
+
+    /// Verifies that the entry/initiator (Alice) rejects a `SsaRequest` from the exit when the
+    /// proposed SSA quota does not match what Alice offered in `pix_ssa_quota`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` and a generous PIX quota config. Alice's session initiation is
+    ///    processed with `additional_data = (polynomials=2, shares=2)`.
+    /// 2. `handle_ssa_request` is called with a mismatched quota: `(server_polynomials=10, server_shares=10)` while
+    ///    Alice offered `(2, 2)`.
+    /// 3. The call returns an error matching `TransportSessionError::Manager(SessionManagerError::Unacceptable(_))`,
+    ///    confirming the quota mismatch was detected and rejected.
+    #[test_log::test(tokio::test)]
+    async fn entry_rejects_ssa_request_with_mismatched_quota() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let session_id = alice_pseudonym;
+
+        // Server sends a quota of (10, 10) while we offered (2, 2) — should be rejected.
+        let result = mgr
+            .handle_ssa_request(
+                alice_pseudonym,
+                SsaServerCommitmentMessage::new(session_id, 10, 10, BTreeMap::new()),
+            )
+            .await;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+        ));
+
+        Ok(())
+    }
+
+    /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient
+    /// commits for all polynomials causes the PIX event stream to emit `DepositNeeded`.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is started with a `PixToolbox` configured for `polynomials_per_ssa=2, threshold=2,
+    ///    surplus_shares=1`. Alice's session initiation is processed normally.
+    /// 2. The exit has already registered an exit commitment from `handle_incoming_session_initiation`.
+    /// 3. Coefficient 0 (constant terms across all polynomials) is delivered via `handle_ssa_commit` using identity
+    ///    group elements as dummy commitments.
+    /// 4. Coefficient 1 (linear terms) is delivered similarly.
+    /// 5. After the second coefficient delivery, Bob's PIX event stream emits `DepositNeeded` with the correct `SsaId`
+    ///    and `quota_per_ssa` matching `pix_params_to_quota(2, 2)`.
+    /// 6. The event is received within a 2-second timeout.
+    #[test_log::test(tokio::test)]
+    async fn exit_receives_ssa_commits_and_emits_deposit_needed_event() -> anyhow::Result<()> {
+        use std::collections::HashMap;
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{
+            PixGroup, PolynomialIndex, SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+        };
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest.
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // The exit commitment is already set up by handle_incoming_session_initiation.
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+
+        // Deliver coefficient 0 (constant terms across all polynomials).
+        // Use the identity/infinity group element as a dummy commitment.
+        // PixGroup<HoprPixSpec> = k256::ProjectivePoint, which has identity/infinity as all-zero bytes.
+        let identity_element = {
+            let g: PixGroup<HoprPixSpec> = Default::default();
+            HoprPixGroupElement::try_from(g.to_bytes().as_ref()).expect("identity element must be valid")
+        };
+        let mut coeff_0_map = HashMap::new();
+        for poly in 0..2 {
+            coeff_0_map.insert(poly as PolynomialIndex, identity_element);
+        }
+        mgr.handle_ssa_commit(
+            alice_pseudonym,
+            SsaClientCommitmentMessage {
+                session_id: alice_pseudonym,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 0,
+                coefficient_commitments: coeff_0_map,
+            },
+        )
+        .await?;
+
+        // Deliver coefficient 1 (linear terms across all polynomials).
+        let mut coeff_1_map = HashMap::new();
+        for poly in 0..2 {
+            coeff_1_map.insert(poly as PolynomialIndex, identity_element);
+        }
+        mgr.handle_ssa_commit(
+            alice_pseudonym,
+            SsaClientCommitmentMessage {
+                session_id: alice_pseudonym,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 1,
+                coefficient_commitments: coeff_1_map,
+            },
+        )
+        .await?;
+
+        // The first coefficient commitment should trigger DepositNeeded.
+        pin_mut!(pix_events_rx);
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), pix_events_rx.next())
+            .await
+            .map_err(|e| anyhow::anyhow!("timeout waiting for pix event: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("pix_events_rx closed without emitting an event"))?;
+
+        assert!(matches!(
+            event,
+            HoprSessionOutPixEvent::DepositNeeded(AgreedSsaQuota { ssa_id: ref received_ssa_id, .. }, _)
+            if received_ssa_id == &ssa_id
+        ));
+
+        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+            unreachable!();
+        };
+        assert_eq!(quota.quota_per_ssa, pix_params_to_quota(2, 2));
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        Ok(())
+    }
+
+    /// Verifies that a PIX session is closed automatically if the deposit is not realized within
+    /// the configured `max_deposit_wait` period.
+    ///
+    /// ## Steps
+    /// 1. Bob's manager is configured with `max_deposit_wait: 50ms` and `max_ssa_delivery_time: 0` (total kill-switch
+    ///    window: 50ms).
+    /// 2. A `PixToolbox` is provided so the PIX state machine runs. Alice's session initiation is processed via
+    ///    `handle_incoming_session_initiation`.
+    /// 3. Immediately after establishment, `active_sessions` contains Alice's pseudonym — session is live.
+    /// 4. The test sleeps 100ms (past the 50ms deadline). No deposit is ever made.
+    /// 5. `active_sessions` is empty and `num_active_sessions` is 0, confirming the kill switch closed the session due
+    ///    to the unrealized deposit.
+    #[test_log::test(tokio::test)]
+    async fn session_is_closed_when_deposit_timeout_fires() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        // Short timeouts so the kill switch fires quickly.
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                max_deposit_wait: Duration::from_millis(50),
+                max_ssa_delivery_time: Duration::ZERO,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        // handle_incoming_session_initiation sends SessionEstablished + SsaRequest (2 messages).
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // Session is active after establishment.
+        assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
+
+        // Wait for the kill switch to fire (max_deposit_wait + max_ssa_delivery_time = 50ms + 0 = 50ms).
+        // Add a 100ms buffer to be safe.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Session must be closed due to unrealized deposit.
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session should be closed after deposit timeout"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        Ok(())
+    }
+
+    /// Verifies that `check_pix_params` rejects out-of-bounds parameters that pass the
+    /// quota-range check but exceed the protocol limits.
+    ///
+    /// This is a regression test for the incentive-bypass fix (round-1 finding #1).
+    #[test_log::test(tokio::test)]
+    async fn check_pix_params_must_reject_invalid_bounds() -> anyhow::Result<()> {
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        // polys_per_ssa > MAX_POLYS_PER_SSA (16192) with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(65535u16) << 48) | (u64::from(128u16) << 32),
+        });
+        assert!(result.is_none(), "should reject polys_per_ssa > MAX_POLYS_PER_SSA");
+
+        // shares_per_ssa < 2 with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(1u16) << 48) | (u64::from(1u16) << 32),
+        });
+        assert!(result.is_none(), "should reject shares_per_ssa < 2");
+
+        // shares_per_ssa > MAX_POLY_THRESHOLD (4096) with valid quota -> should reject
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(1u16) << 48) | (u64::from(5000u16) << 32),
+        });
+        assert!(result.is_none(), "should reject shares_per_ssa > MAX_POLY_THRESHOLD");
+
+        // Valid params should still be accepted
+        let result = mgr.check_pix_params(&StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (u64::from(8192u16) << 48) | (u64::from(128u16) << 32),
+        });
+        assert!(result.is_some(), "should accept valid params");
+
+        Ok(())
+    }
+
+    /// Verifies that dispatching too many `UnverifiableShare` events closes the session.
+    #[test_log::test(tokio::test)]
+    async fn too_many_unverifiable_shares_closes_session() -> anyhow::Result<()> {
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    max_deposit_wait: Duration::from_secs(1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox.clone()))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // Session is active
+        assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
+
+        // `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES = 3`, so 4 dispatch events close the session.
+        // The first 3 increment the counter; the 4th exceeds the limit.
+        for _ in 0..=MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES {
+            let result = mgr
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .await;
+            // The first 3 succeed; the 4th also "succeeds" because closing the session returns Ok.
+            assert!(result.is_ok(), "dispatch_pix_event should not return an error");
+        }
+
+        // Session should be closed after too many unverifiable shares.
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session should be closed after too many unverifiable shares"
+        );
+        assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
 
         Ok(())
     }

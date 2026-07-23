@@ -10,7 +10,6 @@ use std::{
     time::Duration,
 };
 
-use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use hopr_api::{
     chain::{ChainEvent, ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
@@ -316,7 +315,7 @@ impl<N: HasChainApi + HasTicketManagement> Display for AutoRedeemingStrategyInne
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<N> StrategyTrait for AutoRedeemingStrategyInner<N>
 where
     N: HasChainApi + HasTicketManagement + ActionableEventSource + Send + Sync + 'static,

@@ -10,7 +10,6 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use tracing::warn;
 
 use crate::errors::Result;
 
@@ -68,9 +67,6 @@ impl Display for MultiStrategy {
 #[async_trait]
 impl Strategy for MultiStrategy {
     async fn run(&mut self) -> Result<()> {
-        use futures::StreamExt as _;
-        use hopr_utils::runtime::prelude::{AbortHandle, abortable, spawn};
-
         let strategies = std::mem::take(&mut self.strategies);
 
         if strategies.is_empty() {
@@ -79,51 +75,65 @@ impl Strategy for MultiStrategy {
             return Ok(());
         }
 
-        // Spawn each sub-strategy as an abortable task.
-        // Keeping all AbortHandles in a RAII guard ensures every sub-task is cancelled
-        // when MultiStrategy is dropped (graceful shutdown).
-        let mut join_handles = Vec::new();
-        let mut abort_handles: Vec<AbortHandle> = Vec::new();
-        for mut s in strategies {
-            let proc = hopr_utils::runtime::diagnostics::instrument(
-                async move { s.run().await },
-                "multi_strategy_sub_task",
-                module_path!(),
-                file!(),
-                line!(),
-            );
-            let (proc, abort_handle) = abortable(proc);
-            join_handles.push(spawn(proc));
-            abort_handles.push(abort_handle);
+        #[cfg(not(feature = "runtime-tokio"))]
+        {
+            let _ = strategies;
+            return Err(crate::errors::StrategyError::Other(anyhow::anyhow!(
+                "MultiStrategy with sub-strategies requires the `runtime-tokio` feature"
+            )));
         }
 
-        struct AbortGuard(Vec<AbortHandle>);
-        impl Drop for AbortGuard {
-            fn drop(&mut self) {
-                for h in &self.0 {
-                    h.abort();
+        #[cfg(feature = "runtime-tokio")]
+        {
+            use futures::StreamExt as _;
+            use hopr_utils::runtime::prelude::{AbortHandle, abortable, spawn};
+
+            // Spawn each sub-strategy as an abortable task.
+            // Keeping all AbortHandles in a RAII guard ensures every sub-task is cancelled
+            // when MultiStrategy is dropped (graceful shutdown).
+            let mut join_handles = Vec::new();
+            let mut abort_handles: Vec<AbortHandle> = Vec::new();
+            for mut s in strategies {
+                let proc = hopr_utils::runtime::diagnostics::instrument(
+                    async move { s.run().await },
+                    "multi_strategy_sub_task",
+                    module_path!(),
+                    file!(),
+                    line!(),
+                );
+                let (proc, abort_handle) = abortable(proc);
+                join_handles.push(spawn(proc));
+                abort_handles.push(abort_handle);
+            }
+
+            struct AbortGuard(Vec<AbortHandle>);
+            impl Drop for AbortGuard {
+                fn drop(&mut self) {
+                    for h in &self.0 {
+                        h.abort();
+                    }
                 }
             }
-        }
-        let _guard = AbortGuard(abort_handles);
+            let _guard = AbortGuard(abort_handles);
 
-        // Process completions as they arrive. Sub-strategies are fully isolated:
-        // a failure in one is logged but does not affect the others.
-        let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
+            // Process completions as they arrive. Sub-strategies are fully isolated:
+            // a failure in one is logged but does not affect the others.
+            let mut pending: futures::stream::FuturesUnordered<_> = join_handles.into_iter().collect();
 
-        while let Some(join_result) = pending.next().await {
-            let strategy_result = match join_result {
-                Err(e) => Err(crate::errors::StrategyError::Other(e.into())),
-                Ok(Ok(result)) => result,
-                Ok(Err(_aborted)) => continue, // aborted by the guard — expected during shutdown
-            };
+            while let Some(join_result) = pending.next().await {
+                let strategy_result = match join_result {
+                    Err(e) => Err(crate::errors::StrategyError::Other(e.into())),
+                    Ok(Ok(result)) => result,
+                    Ok(Err(_aborted)) => continue, // aborted by the guard — expected during shutdown
+                };
 
-            if let Err(e) = strategy_result {
-                warn!(%e, "sub-strategy failed");
+                if let Err(e) = strategy_result {
+                    tracing::warn!(%e, "sub-strategy failed");
+                }
             }
-        }
 
-        Ok(())
+            Ok(())
+        }
     }
 }
 
@@ -177,6 +187,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_multi_strategy_sub_failure_does_not_propagate() -> anyhow::Result<()> {
         // A failing sub-strategy is isolated: the MultiStrategy still returns Ok.
@@ -185,6 +196,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_multi_strategy_accepts_external_strategy() -> anyhow::Result<()> {
         // Demonstrates that any impl Strategy can be composed without modifying hopr-strategy.

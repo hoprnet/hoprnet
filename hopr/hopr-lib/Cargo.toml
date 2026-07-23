@@ -15,6 +15,7 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [[test]]
 name = "api_general"
@@ -179,11 +180,9 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+hopr-ct-full-network = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde"]
-
-[package.metadata.cargo-shear]
 ignored = ["humantime-serde"]

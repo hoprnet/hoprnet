@@ -484,8 +484,12 @@ impl<T: std::fmt::Debug> std::fmt::Debug for AbortableList<T> {
 
 impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
+    ///
+    /// If a task with the same key was previously present on the list, it will be aborted.
     pub fn insert<A: Abortable + Send + Sync + 'static>(&mut self, process: T, task: A) {
-        self.0.insert(process, Box::new(task));
+        if let Some(old_task) = self.0.insert(process, Box::new(task)) {
+            old_task.abort_task();
+        }
     }
 
     /// Checks if the list contains a task with the given key.
@@ -510,16 +514,28 @@ impl<T: Hash + Eq> AbortableList<T> {
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
+    ///
+    /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn extend_from(&mut self, mut other: AbortableList<T>) {
-        self.0.extend(other.0.drain(..));
+        for (k, v) in other.0.drain(..) {
+            if let Some(old_task) = self.0.insert(k, v) {
+                old_task.abort_task();
+            }
+        }
     }
 
     /// Extends this list by appending `other` while mapping its keys to the ones in this list.
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
+    ///
+    /// If tasks with the same key were previously present on this list, they will be aborted.
     pub fn flat_map_extend_from<U>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
-        self.0.extend(other.0.drain(..).map(|(k, v)| (key_map(k), v)));
+        for (k, v) in other.0.drain(..).map(|(k, v)| (key_map(k), v)) {
+            if let Some(old_task) = self.0.insert(k, v) {
+                old_task.abort_task();
+            }
+        }
     }
 }
 impl<T> AbortableList<T> {
@@ -603,6 +619,20 @@ mod tests {
         assert!(!list.contains(&"task3"));
         assert_eq!(list.size(), 2);
         assert!(!list.is_empty());
+    }
+
+    #[test]
+    fn test_insert_should_abort_previous() {
+        let mut list = AbortableList::default();
+
+        let task1 = Arc::new(MockTask::default());
+        list.insert("task1", task1.clone());
+
+        let task2 = Arc::new(MockTask::default());
+        list.insert("task1", task2.clone());
+
+        assert!(task1.was_aborted());
+        assert!(!task2.was_aborted());
     }
 
     #[test]

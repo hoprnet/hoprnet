@@ -13,9 +13,13 @@ use hopr_api::{
     node::TicketEvent,
     types::{crypto::prelude::*, internal::prelude::*},
 };
-use hopr_crypto_packet::HoprSurb;
+use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSsaCommitmentState, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_protocol_pix::{
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
+    ShareResolution, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
+};
 use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
@@ -91,14 +95,16 @@ pub enum PacketPipelineProcesses {
 }
 
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
-async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
+async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
+    exit_ack_proc: Option<A>,
     wire_outgoing: WOut,
-    counters: super::counters::PeerProtocolCounterRegistry,
+    counters: PeerProtocolCounterRegistry,
     concurrency: usize,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Clone + Send + Sync + 'static,
     E: PacketEncoder + Send + Sync + 'static,
     WOut: futures::Sink<(PeerId, Bytes), Error = SinkTimeoutError<WOutErr>> + Clone + Unpin + Send + 'static,
     WOutErr: std::error::Error,
@@ -107,6 +113,7 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
         .then_concurrent(
             |(routing, data)| {
                 let encoder = encoder.clone();
+                let exit_ack_proc = exit_ack_proc.clone();
                 let counters = counters.clone();
                 async move {
                     match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
@@ -127,8 +134,34 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                         Ok(Ok(Ok(packet))) => {
                             #[cfg(all(feature = "telemetry", not(test)))]
                             METRIC_PACKET_COUNT.increment(&["sent"]);
-
                             counters.get_or_create(&packet.next_hop).record_message_sent();
+
+                            // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
+                            // and the packet contains a non-empty encrypted partial SSA share (it is therefore an RP
+                            // packet), add it to the exit acknowledgement processor.
+                            if let Some(exit_ack_proc) = exit_ack_proc.as_ref()
+                                && let Some(encrypted_pix_share) =
+                                    packet.encrypted_pix_share.filter(|s| !s.partial_share.is_empty())
+                            // Fail-safe to skip empty shares
+                            {
+                                if let Err(error) = exit_ack_proc.insert_encrypted_share(
+                                    &packet.next_hop,
+                                    packet.ack_challenge,
+                                    encrypted_pix_share,
+                                ) {
+                                    tracing::error!(
+                                        next_hop = packet.next_hop.to_peerid_str(),
+                                        %error,
+                                        "failed to insert encrypted share into the exit acknowledgement processor"
+                                    );
+                                } else {
+                                    tracing::trace!(
+                                        next_hop = packet.next_hop.to_peerid_str(),
+                                        "inserted new encrypted share into the exit acknowledgement processor"
+                                    );
+                                }
+                            }
+
                             tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                             Some((packet.next_hop.into(), packet.data))
                         }
@@ -538,6 +571,57 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     );
 }
 
+/// Processes incoming acknowledgements using the [`ExitAcknowledgementShareProcessor`], sending
+/// all recovered SSAs to the given `recovered_ssa` sink.
+///
+/// Used by Exit nodes: they do not receive any incoming tickets but still use the incoming acknowledgements
+/// to recover SSAs and forward them to the `recovered_ssa` sink.
+async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, recovered_ssa: SEvt)
+where
+    S: PixSpec,
+    AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
+    A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
+    SEvt: futures::Sink<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
+{
+    ack_incoming
+        .for_each(move |(peer, acks)| {
+            let exit_proc = exit_proc.clone();
+            let mut recovered_ssa = recovered_ssa.clone();
+            async move {
+                tracing::trace!(%peer, num = acks.len(), "received acknowledgements");
+                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    move || exit_proc.acknowledge_shares(peer, acks),
+                    "exit_ack_decode",
+                )
+                .await
+                {
+                    Ok(Ok(ssa_priv_keys)) => {
+                        if let Err(error) = recovered_ssa
+                            .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "failed to send pix resolution");
+                        }
+                    }
+                    Ok(Err(error)) => {
+                        tracing::error!(%peer, %error, "failed to acknowledge pix share")
+                    }
+                    Err(error) => {
+                        tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                    }
+                }
+            }
+        })
+        .in_current_span()
+        .await;
+
+    tracing::warn!(
+        task = "transport (protocol - pix share acknowledgement)",
+        "long-running background task finished"
+    );
+}
+
 /// Drains incoming acknowledgements without forwarding them to an [`UnacknowledgedTicketProcessor`].
 ///
 /// Used by Entry and Exit nodes — neither processes incoming ticket acknowledgements.
@@ -563,29 +647,69 @@ where
     );
 }
 
-async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
+async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt, A, SEvt>(
     ack_incoming: AckIn,
     ticket_events: TEvt,
     ticket_proc: std::sync::Arc<T>,
+    exit_ack_proc: std::sync::Arc<A>,
+    recovered_ssa: SEvt,
     concurrency: usize,
 ) where
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
 {
     ack_incoming
         .for_each_concurrent(concurrency, move |(peer, acks)| {
             let ticket_proc = ticket_proc.clone();
             let mut ticket_evt = ticket_events.clone();
+            let exit_proc = exit_ack_proc.clone();
+            let mut ssa_evt = recovered_ssa.clone();
             async move {
                 tracing::trace!(num = acks.len(), "received acknowledgements");
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
-                    move || ticket_proc.acknowledge_tickets(peer, acks),
-                    "ack_decode",
-                )
-                .await
-                {
+                if acks.is_empty() {
+                    return;
+                }
+
+                // Ticket processing always runs — every ack batch on a relay is checked
+                // against pending tickets even when none are expected.
+                // Unlike exit shares below, there is no has_pending_tickets shortcut:
+                // the acknowledge_tickets call itself does the lookup internally, so a
+                // separate check would just duplicate the work.
+
+                // When the peer has pending PIX shares (relay is also an Exit for this peer):
+                // clone acks for the ticket future and move the original into the exit future,
+                // then run both concurrently on the thread pool via join.
+                // When there are no pending shares, avoid the clone and move acks directly into
+                // the ticket future — a single blocking spawn, no concurrent join needed.
+                // Clone before the `if` so it stays alive for `is_expected_error` after the join.
+                let exit_proc_for_spawn = exit_proc.clone();
+                let (ticket_result, exit_result) = if exit_proc.has_pending_shares(&peer) {
+                    let ack_clone = acks.clone();
+                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, ack_clone),
+                        "ack_decode",
+                    );
+                    let exit_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || exit_proc_for_spawn.acknowledge_shares(peer, acks),
+                        "exit_ack_decode",
+                    );
+                    let (t_r, e_r) = futures::future::join(ticket_fut, exit_fut).await;
+                    (t_r, Some(e_r))
+                } else {
+                    let ticket_fut = hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                        move || ticket_proc.acknowledge_tickets(peer, acks),
+                        "ack_decode",
+                    );
+                    let t_r = ticket_fut.await;
+                    (t_r, None)
+                };
+
+                match ticket_result {
                     Ok(Ok(resolutions)) if !resolutions.is_empty() => {
                         let resolutions_iter = resolutions.into_iter().filter_map(|resolution| match resolution {
                             ResolvedAcknowledgement::RelayingWin(redeemable_ticket) => {
@@ -627,6 +751,32 @@ async fn start_relay_incoming_ack_pipeline<AckIn, T, TEvt>(
                     }
                     Err(error) => {
                         tracing::error!(%error, "parallel processing of the incoming acknowledgements failed")
+                    }
+                }
+
+                // Process PIX share acknowledgements (skipped when no pending shares).
+                if let Some(result) = exit_result {
+                    match result {
+                        Ok(Ok(ssa_priv_keys)) if !ssa_priv_keys.is_empty() => {
+                            if let Err(error) = ssa_evt
+                                .send_all(&mut futures::stream::iter(ssa_priv_keys.into_iter().map(Ok)))
+                                .await
+                            {
+                                tracing::error!(%peer, %error, "failed to send pix resolution");
+                            }
+                        }
+                        Ok(Ok(_)) => {
+                            tracing::trace!(%peer, "empty pix share resolution batch");
+                        }
+                        Ok(Err(ref error)) if exit_proc.is_expected_error(error) => {
+                            tracing::trace!(%peer, %error, "pix share acknowledgement skipped");
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(%peer, %error, "pix share acknowledgement failed");
+                        }
+                        Err(error) => {
+                            tracing::error!(%peer, %error, "failed to spawn pix share acknowledgement")
+                        }
                     }
                 }
             }
@@ -685,17 +835,76 @@ impl UnacknowledgedTicketProcessor for NoopTicketProcessor {
         Ok(Vec::with_capacity(0))
     }
 }
+
+#[derive(Debug, Default, Copy, Clone)]
+#[doc(hidden)]
+pub struct NopExitAcknowledgementShareProcessor;
+
+impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementShareProcessor {
+    type Error = std::convert::Infallible;
+
+    fn has_pending_shares(&self, _: &OffchainPublicKey) -> bool {
+        false
+    }
+
+    fn new_exit_commitment(
+        &self,
+        _: SsaId<HoprPseudonym>,
+        _: usize,
+        _: usize,
+    ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+        Ok(PixGroup::<HoprPixSpec>::default())
+    }
+
+    #[inline]
+    fn insert_coefficient_commitments(
+        &self,
+        ssa_id: SsaId<SimplePseudonym>,
+        _: CoefficientIndex,
+        _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
+    ) -> Result<HoprSsaCommitmentState, Self::Error> {
+        Ok(SsaCommitmentState::new(ssa_id))
+    }
+
+    #[inline]
+    fn insert_encrypted_share(
+        &self,
+        _: &OffchainPublicKey,
+        _: HalfKeyChallenge,
+        _: TaggedEncryptedPartialSsaShare<HoprPixSpec>,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn acknowledge_shares(
+        &self,
+        _: OffchainPublicKey,
+        _: Vec<Acknowledgement>,
+    ) -> Result<Vec<HoprShareResolution>, Self::Error> {
+        Ok(Vec::with_capacity(0))
+    }
+}
+
+// NOTE: `PixScalar<HoprPixSpec>` normalizes to `HoprPixScalar` (i.e.
+// `<Secp256k1 as CurveArithmetic>::Scalar`). The bound is spelled in its
+// normalized form because rustc fails to equate the deeply nested
+// associated-type projection with `HoprPixScalar` during trait selection
+// when the bound is written as `Sink<PixScalar<HoprPixSpec>>` here.
+
 /// Shared implementation of the packet pipeline used by [`PacketPipelineBuilder`]'s
 /// terminal `build_for_*` methods.
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip_all, level = "trace", fields(me = packet_key.public().to_peerid_str()))]
-pub(super) fn run_packet_pipeline_inner<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+pub(super) fn run_packet_pipeline_inner<WIn, WOut, A, C, D, T, TEvt, SEvt, AppOut, AppIn>(
     node_type: NodeType,
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
     codec: (C, D),
     ticket_proc: T,
+    exit_ack_proc: A,
     ticket_events: TEvt,
+    ssa_events: SEvt,
     cfg: PacketPipelineConfig,
     api: (AppOut, AppIn),
     counters: PeerProtocolCounterRegistry,
@@ -706,7 +915,10 @@ where
     WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
     C: PacketEncoder + Sync + Send + 'static,
     D: PacketDecoder + Sync + Send + 'static,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
     T: UnacknowledgedTicketProcessor + Sync + Send + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
@@ -741,10 +953,12 @@ where
     let incoming_ack_tx = incoming_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
     let outgoing_ack_tx = outgoing_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
     let ticket_events = ticket_events.with_timeout(QUEUE_SEND_TIMEOUT);
+    let ssa_events = ssa_events.with_timeout(QUEUE_SEND_TIMEOUT);
 
     let encoder = std::sync::Arc::new(codec.0);
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
+    let exit_ack_proc = std::sync::Arc::new(exit_ack_proc);
 
     // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
     // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
@@ -764,6 +978,11 @@ where
             start_outgoing_packet_pipeline(
                 app_in,
                 encoder.clone(),
+                // Pass exit_ack_proc to any node that has an outgoing packet pipeline
+                // (Relay, Exit, or Relay+Exit). Entry nodes never have a processor.
+                // The Option inside already guards absent processors (e.g. pure Relay
+                // without PIX uses a no-op), so this is safe to pass unconditionally.
+                (node_type != NodeType::Entry).then(|| exit_ack_proc.clone()),
                 wire_out.clone(),
                 counters.clone(),
                 output_concurrency
@@ -812,7 +1031,9 @@ where
                         incoming_ack_rx,
                         ticket_events,
                         ticket_proc,
-                        ack_input_concurrency
+                        exit_ack_proc.clone(),
+                        ssa_events.clone(),
+                        ack_input_concurrency,
                     )
                     .in_current_span()
                 ),
@@ -825,7 +1046,9 @@ where
             let _ = (ticket_events, ticket_proc, ack_input_concurrency);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
-                hopr_utils::spawn_as_abortable!(start_drain_incoming_ack_pipeline(incoming_ack_rx).in_current_span()),
+                hopr_utils::spawn_as_abortable!(
+                    start_exit_incoming_ack_pipeline(incoming_ack_rx, exit_ack_proc, ssa_events,).in_current_span()
+                ),
             );
         }
         NodeType::Entry => {
@@ -848,6 +1071,16 @@ mod tests {
     use futures::channel::mpsc;
 
     use super::*;
+
+    #[test]
+    fn noop_exit_proc_has_no_pending_shares() {
+        let noop = NopExitAcknowledgementShareProcessor;
+        let dummy = *OffchainKeypair::random().public();
+        assert!(
+            !noop.has_pending_shares(&dummy),
+            "NopExitAcknowledgementShareProcessor must always report no pending shares"
+        );
+    }
 
     /// Regression test for the Entry-node ack-sink bug.
     ///

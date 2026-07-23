@@ -1,9 +1,12 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_types::primitive::prelude::GeneralError;
+use hopr_protocol_pix::{CofactorGroup, GroupEncoding, PixGroup};
+use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{
-    HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT,
+    HoprEncryptedPartialSsaShare, HoprPixGroupRepr, HoprPixSpec, HoprSphinxHeaderSpec, HoprSphinxSuite,
+    PAYLOAD_SIZE_INT,
+    por::ProofOfRelayValues,
     sphinx::{
         errors::SphinxError,
         prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
@@ -203,6 +206,109 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PacketMessage<S, 
     }
 }
 
+/// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
+/// that is supposed to be passed along with the SURB.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+
+impl SurbReceiverInfo {
+    pub fn new(pov: ProofOfRelayValues, encrypted_partial_ssa_share: HoprEncryptedPartialSsaShare) -> Self {
+        let mut ret = [0u8; Self::SIZE];
+        ret[0..ProofOfRelayValues::SIZE].copy_from_slice(pov.as_ref());
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE]
+            .copy_from_slice(encrypted_partial_ssa_share.as_ref());
+        Self(ret)
+    }
+
+    pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
+        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
+            .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")
+    }
+
+    pub fn encrypted_partial_ssa_share(&self) -> HoprEncryptedPartialSsaShare {
+        HoprEncryptedPartialSsaShare::try_from(
+            &self.0[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE],
+        )
+        .expect("SurbReceiverInfo always contains valid HoprEncryptedPartialSsaShare")
+    }
+}
+
+impl AsRef<[u8]> for SurbReceiverInfo {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> std::result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("SurbReceiverInfo".into()))
+    }
+}
+
+impl BytesRepresentable for SurbReceiverInfo {
+    const SIZE: usize = ProofOfRelayValues::SIZE + HoprEncryptedPartialSsaShare::SIZE;
+}
+
+/// New-type wrapper for the PIX group element representation to provide additional functionality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HoprPixGroupElement(pub HoprPixGroupRepr);
+
+impl std::hash::Hash for HoprPixGroupElement {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_ref().hash(state);
+    }
+}
+
+impl HoprPixGroupElement {
+    /// Tries to convert the instance into a `PixGroup<HoprPixSpec>`.
+    pub fn try_into_pix_group(self) -> Result<PixGroup<HoprPixSpec>, GeneralError> {
+        Option::<PixGroup<HoprPixSpec>>::from(PixGroup::<HoprPixSpec>::from_bytes(&self.0))
+            .filter(|pt| {
+                // Reject points outside the prime-order subgroup. Baby JubJub has
+                // cofactor 8, so small-order points can pass the on-curve check.
+                bool::from(pt.is_torsion_free())
+            })
+            .ok_or(GeneralError::ParseError("pix group from bytes failed".into()))
+    }
+}
+
+impl From<HoprPixGroupRepr> for HoprPixGroupElement {
+    fn from(value: HoprPixGroupRepr) -> Self {
+        Self(value)
+    }
+}
+
+impl AsRef<[u8]> for HoprPixGroupElement {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() != size_of::<HoprPixGroupRepr>() {
+            return Err(GeneralError::ParseError("pix repr length".into()));
+        }
+        let mut arr = HoprPixGroupRepr::default();
+        arr.as_mut().copy_from_slice(value);
+        Ok(Self(arr))
+    }
+}
+
+impl std::fmt::Display for HoprPixGroupElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", const_hex::encode(self.0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
@@ -214,10 +320,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
-        packet::HoprPacket,
-        por::{SurbReceiverInfo, generate_proof_of_relay},
-        sphinx::prelude::*,
+        HoprEncryptedPartialSsaShare, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, packet::HoprPacket,
+        por::generate_proof_of_relay, sphinx::prelude::*, types::SurbReceiverInfo,
     };
 
     lazy_static::lazy_static! {
@@ -249,7 +353,7 @@ mod tests {
         Ok((0..count)
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
-                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)
+                let (por_strings, (por_values, _)) = generate_proof_of_relay(&shared_keys.secrets)
                     .map_err(|e| CryptoError::Other(GeneralError::NonSpecificError(e.to_string())))?;
 
                 create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
@@ -257,7 +361,7 @@ mod tests {
                     &path_ids,
                     &por_strings,
                     recv_data,
-                    SurbReceiverInfo::new(por_values, [0u8; 32]),
+                    SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default()),
                 )
                 .map(|(s, _)| s)
             })

@@ -6,6 +6,10 @@ When working on Rust files, also read `.claude/rust.md` for language-specific ru
 
 Claude configuration and instructions live under `.claude/`.
 
+## Skills
+
+- **CODE-COVERAGE-SKILL.md**: Documentation for running `cargo llvm-cov` for code coverage analysis.
+
 ## Workflow
 
 1. Before modifying code, understand the surrounding context and existing patterns.

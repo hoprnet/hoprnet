@@ -15,7 +15,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d122413f284cf2d62fb1b7db97e02edb8cda96d769b16e443a4f6195e35662b0"
 dependencies = [
  "crypto-common 0.1.7",
- "generic-array",
+ "generic-array 0.14.7",
 ]
 
 [[package]]
@@ -1587,7 +1587,7 @@ version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
- "generic-array",
+ "generic-array 0.14.7",
 ]
 
 [[package]]
@@ -1745,9 +1745,9 @@ dependencies = [
 
 [[package]]
 name = "bytesize"
-version = "2.4.0"
+version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49e78e506b9d7633710dab98996f22f95f3d0f488e8f1aa162830556ed9fc14d"
+checksum = "3d7c8918969267b2932ffd5655509bbbea0833823058c378876953217f5fc50e"
 dependencies = [
  "serde_core",
 ]
@@ -2244,14 +2244,14 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crossfire"
-version = "3.1.18"
+version = "3.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df981decccf9b846c396ae513b3d2c6a1770d9593c8e47853d8fdb336c7bcb46"
+checksum = "111ce8f7abfbac38b4bc4f32a3a2dda1a8034b873c90c7899f302cc9dbbc05ec"
 dependencies = [
  "crossbeam-utils",
- "embed-collections",
  "futures-core",
  "parking_lot",
+ "pointers",
  "smallvec",
  "tokio",
 ]
@@ -2268,7 +2268,7 @@ version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
 dependencies = [
- "generic-array",
+ "generic-array 0.14.7",
  "rand_core 0.6.4",
  "subtle",
  "zeroize",
@@ -2286,6 +2286,7 @@ dependencies = [
  "hybrid-array",
  "num-traits",
  "rand_core 0.10.1",
+ "serdect 0.4.3",
  "subtle",
  "zeroize",
 ]
@@ -2296,7 +2297,7 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
- "generic-array",
+ "generic-array 0.14.7",
  "rand_core 0.6.4",
  "typenum",
 ]
@@ -2645,7 +2646,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
- "generic-array",
+ "generic-array 0.14.7",
 ]
 
 [[package]]
@@ -2822,7 +2823,7 @@ dependencies = [
  "crypto-bigint 0.5.5",
  "digest 0.10.7",
  "ff 0.13.1",
- "generic-array",
+ "generic-array 0.14.7",
  "group 0.13.0",
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
@@ -2855,10 +2856,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "embed-collections"
-version = "0.12.4"
+name = "elliptic-curve-tools"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f49c327886cdc0e7eda24cd0827f195db19a5f941425914bc6db76c79c64bc21"
+checksum = "7a0d5e534f103b079a71ef1d66c6e62c89413f1b62709ca11f744429b4afe5b4"
+dependencies = [
+ "elliptic-curve 0.14.1",
+ "heapless",
+ "serde",
+ "serdect 0.4.3",
+]
 
 [[package]]
 name = "embedded-io"
@@ -3354,6 +3361,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic-array"
+version = "1.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab4e5aa225bc56696909483320f0ff9b600f1a971b52e07a17d70f3d9b43254b"
+dependencies = [
+ "rustversion",
+ "serde_core",
+ "typenum",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3424,9 +3442,9 @@ dependencies = [
 
 [[package]]
 name = "granit-parser"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14668345710c92cb04181d9268407067689327d4b055273e3c4179a0777ee6a1"
+checksum = "d03f81ad4732830d85cfd417a9f62cde6dadda4354d37d078a6084a19560aa2d"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -3505,6 +3523,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606"
+dependencies = [
+ "byteorder",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3558,6 +3585,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
+]
+
+[[package]]
+name = "heapless"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25ba4bd83f9415b58b4ed8dc5714c76e626a105be4646c02630ad730ad3b5aa4"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -3836,6 +3873,7 @@ dependencies = [
  "criterion",
  "flagset",
  "hex-literal",
+ "hopr-protocol-pix",
  "hopr-types",
  "hopr-utils",
  "lazy_static",
@@ -3987,6 +4025,7 @@ dependencies = [
  "hopr-api",
  "hopr-chain-connector",
  "hopr-crypto-packet",
+ "hopr-protocol-pix",
  "hopr-ticket-manager",
  "hopr-utils",
  "humantime-serde",
@@ -3999,10 +4038,36 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.28.0",
+ "test-log",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "validator",
+]
+
+[[package]]
+name = "hopr-protocol-pix"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "auto_impl",
+ "const-hex",
+ "criterion",
+ "elliptic-curve-tools",
+ "hopr-types",
+ "hopr-utils",
+ "moka",
+ "parking_lot",
+ "rand 0.10.2",
+ "serde",
+ "serde_bytes",
+ "smart-default",
+ "strum 0.28.0",
+ "thiserror 2.0.18",
+ "tracing",
+ "validator",
+ "vsss-rs",
 ]
 
 [[package]]
@@ -4052,13 +4117,15 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-start"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "aquamarine",
  "flagset",
  "hopr-crypto-packet",
  "hopr-protocol-app",
+ "hopr-protocol-pix",
+ "hopr-types",
  "serde",
  "serde_cbor_2",
  "strum 0.28.0",
@@ -4091,6 +4158,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytesize",
+ "chacha20poly1305",
  "chrono",
  "dashmap",
  "futures",
@@ -4108,10 +4176,13 @@ dependencies = [
  "moka",
  "multiaddr",
  "parking_lot",
+ "redb",
+ "scrypt",
  "serde",
  "serde_json",
  "serde_with",
  "smart-default",
+ "tempfile",
  "test-log",
  "thiserror 2.0.18",
  "tokio",
@@ -4173,6 +4244,7 @@ dependencies = [
  "hopr-network-graph",
  "hopr-protocol-app",
  "hopr-protocol-hopr",
+ "hopr-protocol-pix",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-ticket-manager",
@@ -4303,6 +4375,7 @@ dependencies = [
  "hopr-api",
  "hopr-crypto-packet",
  "hopr-protocol-app",
+ "hopr-protocol-pix",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-utils",
@@ -4883,7 +4956,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
- "generic-array",
+ "generic-array 0.14.7",
 ]
 
 [[package]]
@@ -5894,6 +5967,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "num"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5901,6 +5988,17 @@ checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
+dependencies = [
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -5916,6 +6014,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "num-iter"
+version = "0.1.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -6356,6 +6476,12 @@ name = "pkg-config"
 version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
+
+[[package]]
+name = "pointers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dcdc93847ad24990939cce6e1804361e903efcb5f99daa5abd87943a9d6d7ba"
 
 [[package]]
 name = "polling"
@@ -7453,7 +7579,7 @@ checksum = "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
 dependencies = [
  "base16ct 0.2.0",
  "der 0.7.10",
- "generic-array",
+ "generic-array 0.14.7",
  "pkcs8 0.10.2",
  "serdect 0.2.0",
  "subtle",
@@ -7575,9 +7701,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.28"
+version = "0.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a15e3bc297370dc9c526bcf0986f29167a9286cfaad404f2f572b3074dabe5ec"
+checksum = "7bd22781911de0ca6debda95f073c8f18bec65d1a94f1fa9573f3102e514cea4"
 dependencies = [
  "ahash",
  "annotate-snippets",
@@ -7784,6 +7910,17 @@ checksum = "59cbb88c189d6352cc8ae96a39d19c7ecad8f7330b29461187f2587fdc2988d5"
 dependencies = [
  "cc",
  "cfg-if",
+]
+
+[[package]]
+name = "shake"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09057cb2149ad4cbd2da1e26b351f9a4c354219421229c69c3063e6f61947c4a"
+dependencies = [
+ "digest 0.11.3",
+ "keccak",
+ "sponge-cursor",
 ]
 
 [[package]]
@@ -8765,6 +8902,26 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vsss-rs"
+version = "6.0.0-rc2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d498ad24479a74788accee28b19911ffd0028701654740c17b01c54c1f4e1c24"
+dependencies = [
+ "crypto-bigint 0.7.5",
+ "elliptic-curve 0.14.1",
+ "elliptic-curve-tools",
+ "generic-array 1.4.4",
+ "hex",
+ "hybrid-array",
+ "num",
+ "rand_core 0.10.1",
+ "serde",
+ "sha3 0.12.0",
+ "shake",
+ "subtle",
+]
 
 [[package]]
 name = "wait-timeout"

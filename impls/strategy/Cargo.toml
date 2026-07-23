@@ -15,6 +15,7 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [features]
 default = []
@@ -25,6 +26,7 @@ strategy-auto-funding = []
 strategy-auto-redeeming = []
 strategy-closure-finalizer = []
 strategy-channel-lifecycle = []
+strategy-pix = ["dep:redb", "dep:scrypt", "dep:chacha20poly1305"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -43,11 +45,14 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 bytesize = { workspace = true }
-hopr-api = { workspace = true, features = ["node", "serde"] }
+hopr-api = { workspace = true, features = ["node", "serde", "types-random"] }
 hopr-crypto-packet = { workspace = true }
 hopr-utils = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
+redb = { workspace = true, optional = true }
+scrypt = { workspace = true, optional = true }
+chacha20poly1305 = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
@@ -62,6 +67,7 @@ hopr-api = { workspace = true, features = ["types-random"] }
 insta = { workspace = true }
 mockall = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 
@@ -69,4 +75,4 @@ tokio = { workspace = true }
 ignored = ["humantime-serde"]
 
 [package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+ignored = []

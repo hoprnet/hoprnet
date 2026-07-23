@@ -1,17 +1,25 @@
 use std::{
     convert::Into,
-    fmt::{Debug, Formatter},
+    fmt::Debug,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_api::types::{
-    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
-    primitive::errors::GeneralError,
+use hopr_api::{
+    HoprBalance,
+    types::{
+        internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+        primitive::errors::GeneralError,
+    },
+};
+use hopr_crypto_packet::{
+    HoprPixSpec,
+    prelude::{HoprPacket, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
+use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -29,9 +37,15 @@ use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ByteCapabilities(pub Capabilities);
+pub struct HoprSessionCapabilities(pub Capabilities);
 
-impl TryFrom<u8> for ByteCapabilities {
+impl HoprSessionCapabilities {
+    pub fn empty() -> Self {
+        Self(Capabilities::empty())
+    }
+}
+
+impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -41,32 +55,95 @@ impl TryFrom<u8> for ByteCapabilities {
     }
 }
 
-impl From<ByteCapabilities> for u8 {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for u8 {
+    fn from(value: HoprSessionCapabilities) -> Self {
         *value.0.as_ref()
     }
 }
 
-impl From<ByteCapabilities> for Capabilities {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for Capabilities {
+    fn from(value: HoprSessionCapabilities) -> Self {
         value.0
     }
 }
 
-impl From<Capabilities> for ByteCapabilities {
+impl From<Capabilities> for HoprSessionCapabilities {
     fn from(value: Capabilities) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<Capabilities> for ByteCapabilities {
+impl AsRef<Capabilities> for HoprSessionCapabilities {
     fn as_ref(&self) -> &Capabilities {
         &self.0
     }
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
+
+/// Quota per single SSA in bytes.
+///
+/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent from
+/// Exit -> Entry before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred
+/// before SSA private key recovery at the Exit.
+///
+/// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
+pub type SsaQuota = u64;
+
+pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16) -> SsaQuota {
+    polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
+}
+
+/// Representation of a data quota per SSA agreed upon during the Session establishment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgreedSsaQuota {
+    /// ID of the SSA.
+    pub ssa_id: SsaId<HoprPseudonym>,
+    /// Deposit address of the SSA.
+    pub deposit_address: <HoprPixSpec as PixSpec>::DepositAddress,
+    /// Quota of the SSA in bytes.
+    pub quota_per_ssa: SsaQuota,
+}
+
+/// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
+#[derive(Debug)]
+pub enum HoprSessionOutPixEvent {
+    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
+    /// agreed data quota.
+    ReadyToDeposit(AgreedSsaQuota),
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
+    /// funds to be deposited.
+    ///
+    /// The attached sender is used to deliver updates once the deposit is completed.
+    DepositNeeded(
+        AgreedSsaQuota,
+        futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
+    ),
+}
+
+/// Events received by the [`crate::manager::SessionManager`] in reaction to received shares from the packet pipeline.
+#[derive(Debug, Clone)]
+pub enum HoprSessionInPixEvent {
+    /// Informs the [`crate::manager::SessionManager`] that an SSA was fully recovered.
+    SsaRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
+    /// for an SSA — the next SSA request can be made.
+    SsaAlmostRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
+    UnverifiableShare(SsaId<HoprPseudonym>),
+}
+
+impl HoprSessionInPixEvent {
+    /// Extracts the pseudonym of the SSA that might map to an existing Session.
+    pub fn pseudonym(&self) -> &HoprPseudonym {
+        match self {
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+        }
+    }
+}
 
 /// Constant application tag used for all sessions.
 /// Previously tags were dynamically allocated per session.
@@ -97,6 +174,8 @@ pub enum ClosureReason {
     EmptyRead,
     /// Session has been evicted from the cache due to inactivity or capacity reasons.
     Eviction,
+    /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
+    UnrealizedDeposit,
 }
 
 /// Helper trait to allow Box aliasing
@@ -308,7 +387,7 @@ impl HoprSession {
 }
 
 impl std::fmt::Debug for HoprSession {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
             .field("routing", &self.routing)
@@ -395,8 +474,9 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_api::types::{
-        crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions, primitive::prelude::*,
+    use hopr_api::{
+        Address,
+        types::{crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions},
     };
 
     use super::*;
@@ -406,9 +486,9 @@ mod tests {
     #[test]
     fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
         let flags: Capabilities = Capability::Segmentation.into();
-        let caps = ByteCapabilities::from(flags);
+        let caps = HoprSessionCapabilities::from(flags);
         let byte_val: u8 = caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(caps, restored);
         Ok(())
     }
@@ -416,12 +496,12 @@ mod tests {
     #[test]
     fn byte_capabilities_invalid_bits_are_rejected() {
         // 0xFF has bits set that don't correspond to any Capability
-        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+        assert!(HoprSessionCapabilities::try_from(0xFF_u8).is_err());
     }
 
     #[test]
     fn byte_capabilities_empty_is_zero() {
-        let caps = ByteCapabilities::from(Capabilities::empty());
+        let caps = HoprSessionCapabilities::from(Capabilities::empty());
         let byte_val: u8 = caps.into();
         assert_eq!(byte_val, 0);
     }
@@ -429,9 +509,9 @@ mod tests {
     #[test]
     fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
         let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
-        let byte_caps = ByteCapabilities::from(caps);
+        let byte_caps = HoprSessionCapabilities::from(caps);
         let byte_val: u8 = byte_caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
         Ok(())
     }

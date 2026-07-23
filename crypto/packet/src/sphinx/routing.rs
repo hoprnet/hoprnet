@@ -11,7 +11,7 @@ use hopr_types::{
         types::Pseudonym,
     },
     crypto_random::random_fill,
-    primitive::{prelude::*, typenum::Unsigned},
+    primitive::{hybrid_array::typenum::Unsigned, prelude::*},
 };
 
 use super::{
@@ -427,10 +427,10 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(&header[0..H::HEADER_LEN]);
     #[allow(deprecated)]
-    uh.verify(hopr_types::crypto::crypto_traits::Block::<H::UH>::from_slice(
+    let tag = hopr_types::primitive::hybrid_array::Array::<u8, <H::UH as crypto_traits::BlockSizeUser>::BlockSize>::from_slice(
         &header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE],
-    ))
-    .map_err(|_| CryptoError::TagMismatch)?;
+    );
+    uh.verify(tag).map_err(|_| CryptoError::TagMismatch)?;
 
     // Decrypt the header using the key=stream
     let mut prg = H::new_prg(secret)?;

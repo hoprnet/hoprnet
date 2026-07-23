@@ -91,49 +91,6 @@ impl BytesRepresentable for ProofOfRelayValues {
     const SIZE: usize = 1 + HalfKeyChallenge::SIZE + EthereumChallenge::SIZE;
 }
 
-/// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
-/// that is supposed to be passed along with the SURB.
-// TODO: currently 32 bytes are reserved for future use by Shamir's secret sharing scheme.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
-
-impl SurbReceiverInfo {
-    pub fn new(pov: ProofOfRelayValues, share: [u8; 32]) -> Self {
-        let mut ret = [0u8; Self::SIZE];
-        ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
-        // Share is currently not used but will be used in the future
-        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
-        Self(ret)
-    }
-
-    pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
-        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
-            .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")
-    }
-}
-
-impl AsRef<[u8]> for SurbReceiverInfo {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> std::result::Result<Self, Self::Error> {
-        value
-            .try_into()
-            .map(Self)
-            .map_err(|_| GeneralError::ParseError("SurbReceiverInfo".into()))
-    }
-}
-
-impl BytesRepresentable for SurbReceiverInfo {
-    const SIZE: usize = ProofOfRelayValues::SIZE + 32;
-}
-
 /// Contains the Proof of Relay challenge for the next downstream node as well as the hint that is used to
 /// verify the challenge that is given to the relayer.
 #[derive(Clone, PartialEq, Eq)]
@@ -227,18 +184,28 @@ pub fn pre_verify(
     }
 }
 
-/// Helper function which generates proof of relay for the given path.
-pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayValues)> {
+/// Contains Proof of Relay values and a solution to the first acknowledgement challenge.
+///
+/// This is useful when additional pre-conditioning is needed on the acknowledgement
+/// sent by the first relayer, such as in PIX.
+pub type ProofOfRelayValuesWithSolution = (ProofOfRelayValues, HalfKey);
+
+/// Helper function that generates proof of relay for the given path.
+pub fn generate_proof_of_relay(
+    secrets: &[SharedSecret],
+) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayValuesWithSolution)> {
+    if secrets.is_empty() {
+        return Err(PacketError::LogicError("no shared secrets".into()));
+    }
+
     let mut last_ack_key_share = None;
     let mut por_strings = Vec::with_capacity(secrets.len());
     let mut por_values = None;
 
+    let first_ack_key_share = derive_ack_key_share(&secrets[0]); // s0_ack
+
     for i in 0..secrets.len() {
-        let hint = last_ack_key_share
-            .unwrap_or_else(|| {
-                derive_ack_key_share(&secrets[i]) // s0_ack
-            })
-            .to_challenge()?;
+        let hint = last_ack_key_share.unwrap_or(first_ack_key_share).to_challenge()?;
 
         let next_ticket_challenge = if let Some(next_secret) = secrets.get(i + 1) {
             let s1 = derive_own_key_share(&secrets[i]); // s1_own
@@ -250,6 +217,9 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
                 .to_challenge()?
                 .to_ethereum_challenge()
         } else {
+            // NOTE: we do not generate a random ack_key_share to create the challenge for performance reasons
+            // This means for 0-hop packets, the solution to the Proof of Relay is unknown, because
+            // we do not even try to solve it in such case.
             EthereumChallenge(hopr_types::crypto_random::random_bytes::<{ Address::SIZE }>().into())
         };
 
@@ -266,7 +236,11 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
     Ok((
         por_strings,
-        por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?,
+        (
+            // Cannot panic due to the first check
+            por_values.expect("there must be shared secrets at this point"),
+            first_ack_key_share,
+        ),
     ))
 }
 
@@ -351,27 +325,97 @@ mod tests {
             let por_strings = ProofOfRelayString::from_shared_secrets(&secrets)?;
             let por_values = ProofOfRelayValues::create(&secrets[0], secrets.get(1), secrets.len() as u8)?.0;
 
-            let (gen_por_strings, gen_por_values) = generate_proof_of_relay(&secrets)?;
+            let (gen_por_strings, (gen_por_values, gen_por_sol)) = generate_proof_of_relay(&secrets)?;
+
+            // The solution to the first Proof of Relay must be the acknowledgement key share derived from the first
+            // shared secret.
+            assert_eq!(gen_por_sol, derive_ack_key_share(&secrets[0]));
+
+            // The chain length should be the number of nodes in the path (hops + 1).
+
+            assert_eq!(gen_por_values.chain_length(), (hops + 1) as u8);
+
+            // The acknowledgement challenge in the PoR values must be solved by the generated solution.
+            assert_eq!(gen_por_values.acknowledgement_challenge(), gen_por_sol.to_challenge()?);
 
             // The ticket challenge is randomly generated for 0-hop, so cannot compare them
             if hops > 0 {
+                // For paths with at least one hop, the generated PoR values should match the expected values.
                 assert_eq!(por_values, gen_por_values);
+
+                // The ticket challenge of the first node must be solved by its own key share and the next node's
+                // acknowledgement key share.
+                assert!(validate_por_half_keys(
+                    &gen_por_values.ticket_challenge(),
+                    &derive_own_key_share(&secrets[0]),
+                    &derive_ack_key_share(&secrets[1])
+                ));
+
+                // pre_verify should correctly transition from the current node's challenge to the next node's PoR data.
+                let res = pre_verify(&secrets[0], &gen_por_strings[0], &gen_por_values.ticket_challenge())?;
+                // The extracted next ticket challenge must match the one in the PoR string.
+                assert_eq!(res.next_ticket_challenge, gen_por_strings[0].next_ticket_challenge());
+
+                // The extracted acknowledgement challenge must match the hint/challenge in the PoR string.
+                assert_eq!(
+                    res.ack_challenge,
+                    gen_por_strings[0].acknowledgement_challenge_or_hint()
+                );
+
+                // The derived own key must match the expected one for the first hop.
+                assert_eq!(res.own_key, derive_own_key_share(&secrets[0]));
             }
 
+            // The number of Proof of Relay strings should match the number of hops.
             assert_eq!(por_strings.len(), gen_por_strings.len());
 
             for i in 0..por_strings.len() {
+                // Each PoR string's hint should match the expected one.
                 assert_eq!(
                     por_strings[i].acknowledgement_challenge_or_hint(),
                     gen_por_strings[i].acknowledgement_challenge_or_hint()
                 );
+                // Each hint must be the challenge form of the corresponding node's acknowledgement key share.
+                assert_eq!(
+                    gen_por_strings[i].acknowledgement_challenge_or_hint(),
+                    derive_ack_key_share(&secrets[i + 1]).to_challenge()?
+                );
 
                 // The ticket challenge is randomly generated, so cannot compare them
                 if i != por_strings.len() - 1 {
+                    // The generated next ticket challenge should match the expected one.
                     assert_eq!(
                         por_strings[i].next_ticket_challenge(),
                         gen_por_strings[i].next_ticket_challenge()
                     );
+
+                    // Each hop's ticket challenge must be solved by its own key share and the next hop's
+                    // acknowledgement key share.
+                    assert!(validate_por_half_keys(
+                        &gen_por_strings[i].next_ticket_challenge(),
+                        &derive_own_key_share(&secrets[i + 1]),
+                        &derive_ack_key_share(&secrets[i + 2])
+                    ));
+
+                    // pre_verify should work for all hops, correctly extracting the next challenge and verifying the
+                    // current one.
+                    let res = pre_verify(
+                        &secrets[i + 1],
+                        &gen_por_strings[i + 1],
+                        &gen_por_strings[i].next_ticket_challenge(),
+                    )?;
+                    // Verifies that the forwarded challenge matches the next one in the chain.
+                    assert_eq!(
+                        res.next_ticket_challenge,
+                        gen_por_strings[i + 1].next_ticket_challenge()
+                    );
+                    // Verifies that the extracted acknowledgement challenge matches the next hint.
+                    assert_eq!(
+                        res.ack_challenge,
+                        gen_por_strings[i + 1].acknowledgement_challenge_or_hint()
+                    );
+                    // Verifies that the correct own key is derived for each intermediate hop.
+                    assert_eq!(res.own_key, derive_own_key_share(&secrets[i + 1]));
                 }
             }
         }

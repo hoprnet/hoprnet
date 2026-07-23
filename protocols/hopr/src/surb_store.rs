@@ -201,7 +201,6 @@ impl Default for MemorySurbStore {
     }
 }
 
-#[async_trait::async_trait]
 impl SurbStore for MemorySurbStore {
     #[tracing::instrument(skip_all, level = "trace", fields(?matcher), ret)]
     fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {

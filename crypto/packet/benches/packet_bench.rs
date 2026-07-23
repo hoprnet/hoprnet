@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::{prelude::*, sphinx::prelude::SimpleBiMapper};
+use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_types::{
     crypto::prelude::*,
     crypto_random::Randomizable,
@@ -86,9 +87,10 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                         );
                         let mut payload = vec![0; HoprPacket::max_message_with_surbs(surb_count)];
                         hopr_types::crypto_random::random_fill(&mut payload);
-                        (addrs, forward_path, return_paths, payload)
+                        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+                        (addrs, forward_path, return_paths, ssa_gen, payload)
                     },
-                    |((_sender_addr, destination_addr), forward_path, return_paths, payload)| {
+                    |((_sender_addr, destination_addr), forward_path, return_paths, ssa_gen, payload)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
                         let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         HoprPacket::into_outgoing(
@@ -102,6 +104,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                             tb,
                             MAPPER.deref(),
                             &DST,
+                            &ssa_gen,
                             None,
                         )
                         .unwrap();
@@ -131,6 +134,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
             // The number of hops for ticket creation does not matter for benchmark purposes
             let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
             let forward_path = TransportPath::new(path.iter().take(hops + 1).copied()).unwrap();
+            let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
             let precomputed = PartialHoprPacket::new(
                 &PSEUDONYM,
                 PacketRouting::ForwardPath {
@@ -140,6 +144,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                 sender_chain,
                 tb,
                 MAPPER.deref(),
+                &ssa_gen,
                 &DST,
             )
             .unwrap();
@@ -184,9 +189,10 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                             sender_chain.public().to_address(),
                             destination_chain.public().to_address(),
                         );
-                        (addrs, forward_path, return_paths)
+                        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+                        (addrs, forward_path, return_paths, ssa_gen)
                     },
-                    |((_sender_addr, destination_addr), forward_path, return_paths)| {
+                    |((_sender_addr, destination_addr), forward_path, return_paths, ssa_gen)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
                         let tb = TicketBuilder::zero_hop().counterparty(destination_addr);
                         PartialHoprPacket::new(
@@ -198,6 +204,7 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                             sender_chain,
                             tb,
                             MAPPER.deref(),
+                            &ssa_gen,
                             &DST,
                         )
                         .unwrap();
@@ -225,6 +232,8 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
+    let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+
     // Sender
     let packet = HoprPacket::into_outgoing(
         &msg,
@@ -237,6 +246,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         tb,
         MAPPER.deref(),
         &DST,
+        &ssa_gen,
         None,
     )
     .map_err(anyhow::Error::new)
@@ -284,6 +294,8 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().counterparty(destination_chain.public().to_address());
 
+    let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
+
     // Sender
     let forward_path = TransportPath::new(path).unwrap();
     let packet = HoprPacket::into_outgoing(
@@ -297,6 +309,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         tb,
         MAPPER.deref(),
         &DST,
+        &ssa_gen,
         None,
     )
     .map_err(anyhow::Error::new)
