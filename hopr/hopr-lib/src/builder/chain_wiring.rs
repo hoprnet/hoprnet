@@ -701,4 +701,24 @@ mod tests {
         assert_eq!(edges[0].src, *own_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
     }
+
+    #[tokio::test]
+    async fn announcement_should_handle_disconnected_peer_discovery_tx_gracefully() {
+        let (offchain, chain) = make_keypairs();
+        let addr = chain.public().to_address();
+        let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(1);
+        drop(rx); // receiver dropped — send will return Err(Disconnected)
+
+        process_chain_events(
+            StubChainKeys::new([]),
+            RecordingGraph::default(),
+            futures::stream::iter(vec![ChainEvent::Announcement(account(*offchain.public(), addr))]),
+            addr,
+            *offchain.public(),
+            Arc::new(RwLock::new(HoprBalance::from(10u64))),
+            Arc::new(RwLock::new(WinningProbability::ALWAYS)),
+            Some(tx),
+        )
+        .await;
+    }
 }
