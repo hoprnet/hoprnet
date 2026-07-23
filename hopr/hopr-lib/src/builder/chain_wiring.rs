@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt, pin_mut};
-use tracing::Instrument;
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
@@ -14,6 +13,7 @@ use hopr_api::{
 };
 use hopr_transport::{NeighborTelemetry, PathTelemetry};
 use parking_lot::RwLock;
+use tracing::Instrument;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
