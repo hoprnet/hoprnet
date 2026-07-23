@@ -27,8 +27,8 @@ use hopr_protocol_pix::{
     SsaShareGenerator,
 };
 use hopr_protocol_start::{
-    KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage, StartChallenge,
-    StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+    ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
@@ -138,7 +138,7 @@ const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 // The Session initiation cache is only present on the Entry (client) side.
 type SessionInitiationCache = moka::sync::Cache<
     StartChallenge,
-    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType>>>,
+    crossfire::MTx<crossfire::mpsc::One<Result<StartEstablished<SessionId>, StartErrorType<SessionId>>>>,
 >;
 
 /// Handles to streams and tasks spawned by the Session.
@@ -848,16 +848,13 @@ where
         let active_sessions_for_listener = active_sessions.clone();
 
         let msg_sender = Arc::new(OnceLock::new());
+        let initiation_timeout =
+            2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
-                .time_to_live(
-                    2 * initiation_timeout_max_one_way(
-                        cfg.initiation_timeout_base,
-                        RoutingOptions::MAX_INTERMEDIATE_HOPS,
-                    ),
-                )
+                .time_to_live(initiation_timeout)
                 .build(),
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
@@ -1487,9 +1484,16 @@ where
             }
             Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
+                let challenge = match error.identifier {
+                    ErrorIdentifier::Challenge(c) => c,
+                    ErrorIdentifier::SessionId(_) => {
+                        // This arm should only ever receive pre-establishment errors.
+                        // Log the id if it matters for debugging.
+                        0
+                    }
+                };
                 error!(
-                    challenge = error.challenge,
-                    ?error,
+                    %challenge, ?error,
                     "the other party rejected the session initiation with error"
                 );
                 Err(TransportSessionError::Rejected(error.reason))
@@ -1935,7 +1939,7 @@ where
                 "client offered PIX but this node has no PIX support installed"
             );
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason: StartErrorReason::UnacceptablePixParams,
             });
             send_via_msg_sender(
@@ -1958,7 +1962,7 @@ where
             // Notify the sender that the session could not be established
             let reason = StartErrorReason::UnacceptablePixParams;
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
             send_via_msg_sender(
@@ -2016,7 +2020,7 @@ where
             error!("no slots available for this pseudonym");
             let reason = StartErrorReason::NoSlotsAvailable;
             let data = HoprStartProtocol::SessionError(StartErrorType {
-                challenge: session_req.challenge,
+                identifier: ErrorIdentifier::Challenge(session_req.challenge),
                 reason,
             });
 
@@ -2239,7 +2243,24 @@ where
                 .set(SessionSsaState::new(client_polys_per_ssa, client_shares_per_ssa))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
-            self.request_next_ssa(session_id, slot).await?;
+            // SessionEstablished was already sent to the Entry (above). If PIX
+            // setup fails now, the slot_guard Drop rolls back locally, but the
+            // Entry would be left with a zombie session that has no PIX kill
+            // switch and will never receive the SsaRequest it is waiting for.
+            // Best-effort notify the Entry so it can tear down its side too.
+            if let Err(e) = self.request_next_ssa(session_id, slot).await {
+                let _ = send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    HoprStartProtocol::SessionError(StartErrorType {
+                        identifier: ErrorIdentifier::SessionId(session_id),
+                        reason: StartErrorReason::Unknown,
+                    }),
+                    "session error after PIX setup failure",
+                )
+                .await;
+                return Err(e);
+            }
         }
 
         info!(%session_id, "new session established");
@@ -2260,7 +2281,8 @@ where
         );
         let challenge = est.orig_challenge;
         let session_id = est.session_id;
-        if let Some(tx_est) = self.session_initiations.remove(&est.orig_challenge) {
+
+        if let Some(tx_est) = self.session_initiations.remove(&challenge) {
             if let Err(error) = tx_est.try_send(Ok(est)) {
                 error!(%challenge, %session_id, %error, "failed to send session establishment confirmation");
                 return Err(SessionManagerError::other(error).into());
@@ -2273,29 +2295,36 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn handle_session_error(&self, error_type: StartErrorType) -> errors::Result<()> {
-        trace!(
-            challenge = error_type.challenge,
-            error = ?error_type.reason,
-            "failed to initialize a session",
-        );
-        // Currently, we do not distinguish between individual error types
-        // and just discard the initiation attempt and pass on the error.
-        if let Some(tx_est) = self.session_initiations.remove(&error_type.challenge) {
-            if let Err(error) = tx_est.try_send(Err(error_type)) {
-                error!(%error, "could not send session error message");
-                return Err(SessionManagerError::other(error).into());
+    async fn handle_session_error(&self, error_type: StartErrorType<SessionId>) -> errors::Result<()> {
+        let reason = error_type.reason;
+        match error_type.identifier {
+            ErrorIdentifier::Challenge(challenge) => {
+                trace!(%challenge, error = ?error_type.reason, "session initiation error received");
+                if let Some(tx_est) = self.session_initiations.remove(&challenge) {
+                    if let Err(error) = tx_est.try_send(Err(error_type)) {
+                        error!(%error, "could not send session error message");
+                        return Err(SessionManagerError::other(error).into());
+                    }
+                    error!(%challenge, "session establishment error received");
+                } else {
+                    error!(
+                        %challenge,
+                        "session establishment attempt expired before error could be delivered"
+                    );
+                }
             }
-            error!(challenge = error_type.challenge, "session establishment error received");
-        } else {
-            error!(
-                challenge = error_type.challenge,
-                "session establishment attempt expired before error could be delivered"
-            );
+            ErrorIdentifier::SessionId(session_id) => {
+                error!(
+                    %session_id, %reason,
+                    "received post-establishment session error — closing session"
+                );
+                // Best-effort close; the session may have already been removed.
+                self.close_session(&session_id);
+            }
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
-        METRIC_RECEIVED_SESSION_ERRS.increment(&[&error_type.reason.to_string()]);
+        METRIC_RECEIVED_SESSION_ERRS.increment(&[&reason.to_string()]);
 
         Ok(())
     }
@@ -3750,7 +3779,7 @@ mod tests {
 
         // Inject the SessionError with the matching challenge before SessionEstablished arrives.
         let error_type = StartErrorType {
-            challenge,
+            identifier: ErrorIdentifier::Challenge(challenge),
             reason: StartErrorReason::NoSlotsAvailable,
         };
         mgr.handle_session_error(error_type).await?;
@@ -4621,7 +4650,7 @@ mod tests {
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
-        assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();
@@ -4691,7 +4720,7 @@ mod tests {
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
-        assert_eq!(err.challenge, MIN_CHALLENGE);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
         assert_eq!(mgr.num_active_sessions(), 0);
 
         bob_sender.close_channel();

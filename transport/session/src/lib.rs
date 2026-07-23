@@ -134,7 +134,8 @@ mod tests {
     use hopr_protocol_app::v1::ApplicationData;
     use hopr_protocol_session::session_socket_mtu;
     use hopr_protocol_start::{
-        KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+        ErrorIdentifier, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+        StartInitiation,
     };
 
     use super::*;
@@ -175,7 +176,7 @@ mod tests {
         );
 
         let msg = HoprStartProtocol::SessionError(StartErrorType {
-            challenge: StartChallenge::MAX,
+            identifier: ErrorIdentifier::Challenge(StartChallenge::MAX),
             reason: StartErrorReason::NoSlotsAvailable,
         });
 

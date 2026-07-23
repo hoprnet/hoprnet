@@ -43,11 +43,26 @@ pub enum StartErrorReason {
     UnacceptablePixParams = 3,
 }
 
+/// Identifies which entity a [`StartErrorType`] refers to.
+///
+/// During session establishment (before `SessionEstablished` is sent), errors
+/// refer back to the initiation [`StartChallenge`]. After the session is
+/// established, errors refer to the established session by its [`SessionId`](I).
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
+pub enum ErrorIdentifier<I> {
+    /// The error relates to a pending session initiation identified by this challenge.
+    Challenge(StartChallenge),
+    /// The error relates to an established session identified by this session ID.
+    SessionId(I),
+}
+
 /// Error message in the Start protocol.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct StartErrorType {
-    /// Challenge that relates to this error.
-    pub challenge: StartChallenge,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartErrorType<I> {
+    /// Identifies the session initiation or established session this error refers to.
+    pub identifier: ErrorIdentifier<I>,
     /// The [reason](StartErrorReason) of this error.
     pub reason: StartErrorReason,
 }
@@ -128,7 +143,7 @@ pub enum StartProtocol<I, T, C, G> {
     /// Server-side commitment to Session Stealth Address (SSA).
     SsaRequest(SsaServerCommitmentMessage<I, G>),
     /// Counterparty could not establish a new session due to an error.
-    SessionError(StartErrorType),
+    SessionError(StartErrorType<I>),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<I>),
 }
@@ -357,7 +372,17 @@ where
                 data.extend(session_id);
             }
             StartProtocol::SessionError(err) => {
-                data.extend_from_slice(&err.challenge.to_be_bytes());
+                match err.identifier {
+                    ErrorIdentifier::Challenge(challenge) => {
+                        data.push(ErrorIdentifierDiscriminants::Challenge as u8);
+                        data.extend_from_slice(&challenge.to_be_bytes());
+                    }
+                    ErrorIdentifier::SessionId(id) => {
+                        data.push(ErrorIdentifierDiscriminants::SessionId as u8);
+                        let id_bytes = serde_cbor_2::to_vec(&id)?;
+                        data.extend(id_bytes);
+                    }
+                }
                 data.push(err.reason as u8);
             }
             StartProtocol::KeepAlive(ping) => {
@@ -512,16 +537,37 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
-                    if body.len() < size_of::<StartChallenge>() + 1 {
+                    if body.is_empty() {
                         return Err(StartProtocolError::InvalidLength);
                     }
+                    let (identifier, reason_start) = match ErrorIdentifierDiscriminants::from_repr(body[0])
+                        .ok_or(StartProtocolError::ParseError("err.identifier_tag".into()))?
+                    {
+                        ErrorIdentifierDiscriminants::Challenge => {
+                            if body.len() < 1 + size_of::<StartChallenge>() + 1 {
+                                return Err(StartProtocolError::InvalidLength);
+                            }
+                            let challenge = StartChallenge::from_be_bytes(
+                                body[1..1 + size_of::<StartChallenge>()]
+                                    .try_into()
+                                    .map_err(|_| StartProtocolError::ParseError("err.challenge".into()))?,
+                            );
+                            (ErrorIdentifier::Challenge(challenge), 1 + size_of::<StartChallenge>())
+                        }
+                        ErrorIdentifierDiscriminants::SessionId => {
+                            if body.len() < 2 {
+                                return Err(StartProtocolError::InvalidLength);
+                            }
+                            // Reason byte is the last byte; CBOR session_id is everything
+                            // between the tag byte and the reason.
+                            let reason_start = body.len().saturating_sub(1);
+                            let session_id: I = serde_cbor_2::from_slice(&body[1..reason_start])?;
+                            (ErrorIdentifier::SessionId(session_id), reason_start)
+                        }
+                    };
                     StartProtocol::SessionError(StartErrorType {
-                        challenge: StartChallenge::from_be_bytes(
-                            body[..size_of::<StartChallenge>()]
-                                .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("err.challenge".into()))?,
-                        ),
-                        reason: StartErrorReason::from_repr(body[size_of::<StartChallenge>()])
+                        identifier,
+                        reason: StartErrorReason::from_repr(body[reason_start])
                             .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
                     })
                 }
@@ -779,7 +825,7 @@ mod tests {
     #[test]
     fn start_protocol_session_error_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::SessionError(StartErrorType {
-            challenge: 10,
+            identifier: ErrorIdentifier::Challenge(10),
             reason: StartErrorReason::NoSlotsAvailable,
         });
 
@@ -790,6 +836,17 @@ mod tests {
         let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+
+        // Also test SessionId variant
+        let msg_3 = StartProtocol::SessionError(StartErrorType {
+            identifier: ErrorIdentifier::SessionId(42_i32),
+            reason: StartErrorReason::UnacceptablePixParams,
+        });
+
+        let (tag, msg) = msg_3.clone().encode()?;
+        let msg_4 = StartProtocol::<i32, String, u8, Box<[u8]>>::decode(tag, &msg)?;
+        assert_eq!(msg_3, msg_4);
+
         Ok(())
     }
 
@@ -924,13 +981,26 @@ mod tests {
         );
 
         let msg = StartProtocol::<String, String, u8, Box<[u8]>>::SessionError(StartErrorType {
-            challenge: StartChallenge::MAX,
+            identifier: ErrorIdentifier::Challenge(StartChallenge::MAX),
             reason: StartErrorReason::NoSlotsAvailable,
         });
 
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
-            "SessionError must fit within {}",
+            "SessionError(Challenge) must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
+        );
+
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>>::SessionError(StartErrorType {
+            identifier: ErrorIdentifier::SessionId(
+                "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+            ),
+            reason: StartErrorReason::UnacceptablePixParams,
+        });
+
+        assert!(
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "SessionError(SessionId) must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
