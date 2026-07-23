@@ -106,8 +106,12 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
     // No SURB balancer: this test verifies concurrency/deadlock, not return-path management.
     // The test only writes (never reads), so no SURBs are needed.
     let path = [src, relay, dst_a];
-    let mut session_a = cluster.create_session_with(&path, SessionCapabilities::default(), None).await?;
-    let mut session_b = cluster.create_session_with(&path, SessionCapabilities::default(), None).await?;
+    let mut session_a = cluster
+        .create_session_with(&path, SessionCapabilities::default(), None)
+        .await?;
+    let mut session_b = cluster
+        .create_session_with(&path, SessionCapabilities::default(), None)
+        .await?;
 
     let payload_a: Vec<u8> = vec![0xAA; DATA_SIZE];
     let payload_b: Vec<u8> = vec![0xBB; DATA_SIZE];

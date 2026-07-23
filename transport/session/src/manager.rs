@@ -1025,8 +1025,6 @@ where
 
                     // Insert the slot before the SURB readiness wait so any echo packets that
                     // arrive during pre-loading are accepted rather than dropped as unknown.
-                    // The session configuration must ensure idle_timeout ≥ SESSION_READINESS_TIMEOUT
-                    // so the slot is not evicted while SURBs are still being pre-loaded.
                     // Early return from the wait below drops slot_guard uncommitted, which removes
                     // the slot and calls close_session → abort_all() on the spawned tasks.
                     let mut slot_guard = self
@@ -1046,15 +1044,28 @@ where
                             SessionManagerError::Loopback
                         })?;
 
+                    // Prevent the slot from being evicted by time_to_idle while SURBs are
+                    // pre-loading. Each `get()` call resets the idle timer; the task is
+                    // aborted as soon as the readiness wait resolves.
+                    let sessions_keepalive = self.sessions.clone();
+                    let touch_period = (self.cfg.idle_timeout / 2).max(std::time::Duration::from_millis(100));
+                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                        loop {
+                            hopr_utils::runtime::prelude::sleep(touch_period).await;
+                            let _ = sessions_keepalive.get(&session_id);
+                        }
+                    });
+
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    match level_stream
+                    let wait_result = level_stream
                         .skip_while(|current_level| {
                             futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
                         })
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
-                        .await
-                    {
+                        .await;
+                    slot_keepalive.abort();
+                    match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
