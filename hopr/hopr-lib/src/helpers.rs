@@ -2,91 +2,42 @@ use std::time::Duration;
 
 use hopr_api::{
     chain::ChainValues,
-    types::primitive::prelude::{Address, HoprBalance, WxHOPR, XDai, XDaiBalance},
+    types::primitive::{
+        balance::{Balance, Currency},
+        prelude::Address,
+    },
 };
 
-use crate::errors::HoprLibError;
-
-/// Waits until the given address is funded.
-///
-/// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
-pub(crate) async fn wait_for_funds<R: ChainValues>(
-    min_balance: XDaiBalance,
-    suggested_balance: XDaiBalance,
+/// Polls the on-chain balance of `address` for currency `C` with exponential backoff,
+/// returning `Ok` as soon as it reaches `min_balance`, or `Err` once the per-iteration
+/// backoff grows past `max_delay`.
+pub(crate) async fn wait_for_balance<C: Currency, R: ChainValues>(
+    min_balance: Balance<C>,
     max_delay: Duration,
-    account: Address,
+    address: Address,
     resolver: &R,
-) -> Result<(), HoprLibError> {
-    tracing::info!(
-        suggested_minimum_balance = %suggested_balance,
-        "node about to start, checking for funds",
-    );
-
+) -> Result<(), ()> {
     let multiplier = 1.05;
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match resolver.balance::<XDai, _>(account).await {
+        match resolver.balance::<C, _>(address).await {
             Ok(current_balance) => {
-                tracing::info!(balance = %current_balance, "balance status");
+                tracing::info!(%address, balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
-                    tracing::info!("node is funded");
                     return Ok(());
                 } else {
-                    tracing::warn!("still unfunded, trying again soon");
+                    tracing::warn!(%address, "still underfunded, trying again soon");
                 }
             }
-            Err(error) => tracing::error!(%error, "failed to fetch balance from the chain"),
+            Err(error) => tracing::error!(%address, %error, "failed to fetch balance from the chain"),
         }
 
         hopr_utils::runtime::prelude::sleep(current_delay).await;
         current_delay = current_delay.mul_f64(multiplier);
     }
 
-    Err(HoprLibError::InsufficientFunds(format!(
-        "failed to fund the node within {} seconds",
-        max_delay.as_secs()
-    )))
-}
-
-/// Waits until the given safe holds at least `min_balance` of wxHOPR.
-pub(crate) async fn wait_for_safe_hopr_balance<R: ChainValues>(
-    min_balance: HoprBalance,
-    max_delay: Duration,
-    safe: Address,
-    resolver: &R,
-) -> Result<(), HoprLibError> {
-    tracing::info!(
-        %safe,
-        required_wxhopr = %min_balance,
-        "safe is underfunded with wxHOPR, waiting for it to be funded before announcing the node",
-    );
-
-    let multiplier = 1.05;
-    let mut current_delay = Duration::from_secs(2).min(max_delay);
-
-    while current_delay <= max_delay {
-        match resolver.balance::<WxHOPR, _>(safe).await {
-            Ok(current_balance) => {
-                tracing::info!(%safe, balance = %current_balance, "safe wxHOPR balance status");
-                if current_balance.ge(&min_balance) {
-                    tracing::info!(%safe, "safe is funded with enough wxHOPR to announce the node");
-                    return Ok(());
-                } else {
-                    tracing::warn!(%safe, "safe still underfunded with wxHOPR, trying again soon");
-                }
-            }
-            Err(error) => tracing::error!(%safe, %error, "failed to fetch the safe wxHOPR balance from the chain"),
-        }
-
-        hopr_utils::runtime::prelude::sleep(current_delay).await;
-        current_delay = current_delay.mul_f64(multiplier);
-    }
-
-    Err(HoprLibError::InsufficientFunds(format!(
-        "the safe {safe} does not hold enough wxHOPR (needs at least {min_balance}) to announce the node on chain; \
-         fund the safe with wxHOPR and restart the node"
-    )))
+    Err(())
 }
 
 #[cfg(test)]
@@ -100,12 +51,11 @@ mod tests {
         chain::{ChainInfo, ChainValues, DomainSeparators, RedemptionStats, WinningProbability},
         types::primitive::{
             balance::{Balance, Currency},
-            prelude::Address,
+            prelude::{Address, HoprBalance},
         },
     };
 
-    use super::{HoprBalance, wait_for_safe_hopr_balance};
-    use crate::errors::HoprLibError;
+    use super::wait_for_balance;
 
     #[derive(Debug, thiserror::Error)]
     #[error("mock chain error")]
@@ -150,38 +100,38 @@ mod tests {
         }
 
         async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn key_binding_fee(&self) -> Result<HoprBalance, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn redemption_stats<A: Into<Address> + Send>(
             &self,
             _safe_addr: A,
         ) -> Result<RedemptionStats, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
 
         async fn typical_resolution_time(&self) -> Result<Duration, Self::Error> {
-            unimplemented!("not used by wait_for_safe_hopr_balance")
+            unimplemented!("not used by wait_for_balance")
         }
     }
 
@@ -193,7 +143,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = wait_for_safe_hopr_balance(
+        let result = wait_for_balance(
             HoprBalance::new_base(50),
             Duration::from_secs(200),
             Address::default(),
@@ -214,7 +164,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = wait_for_safe_hopr_balance(
+        let result = wait_for_balance(
             HoprBalance::new_base(50),
             Duration::from_secs(200),
             Address::default(),
@@ -222,10 +172,7 @@ mod tests {
         )
         .await;
 
-        assert!(
-            matches!(result, Err(HoprLibError::InsufficientFunds(_))),
-            "expected InsufficientFunds, got {result:?}"
-        );
+        assert_eq!(result, Err(()), "expected the wait to time out, got {result:?}");
     }
 
     #[tokio::test(start_paused = true)]
@@ -238,7 +185,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = wait_for_safe_hopr_balance(
+        let result = wait_for_balance(
             HoprBalance::new_base(50),
             Duration::from_secs(200),
             Address::default(),
@@ -261,7 +208,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = wait_for_safe_hopr_balance(
+        let result = wait_for_balance(
             HoprBalance::new_base(50),
             Duration::from_secs(200),
             Address::default(),
