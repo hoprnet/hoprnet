@@ -1023,29 +1023,13 @@ where
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionHandles::Balancer, balancer_abort_handle);
 
-                    // Insert the slot and obtain a guard that rolls it back (also tearing
-                    // down the abort handles) if any subsequent setup step fails.
-                    let mut slot_guard = self
-                        .allocate_session_slot(
-                            session_id,
-                            SessionSlot {
-                                session_tx,
-                                routing_opts: forward_routing.clone(),
-                                abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
-                                surb_mgmt: surb_mgmt.clone(),
-                                surb_estimator: surb_estimator.clone(),
-                            },
-                        )
-                        .ok_or_else(|| {
-                            // Session already exists; it means it is most likely a loopback attempt
-                            error!(%session_id, "session already exists - loopback attempt");
-                            SessionManagerError::Loopback
-                        })?;
-
-                    #[cfg(all(feature = "telemetry", not(test)))]
-                    METRIC_NUM_INITIATED_SESSIONS.increment();
-
-                    // Wait for enough SURBs to be sent to the counterparty
+                    // Wait for enough SURBs to be sent to the counterparty before registering
+                    // the session slot. Registering earlier would start the moka idle timer, but
+                    // no echo data can arrive at the Entry during SURB pre-loading (the caller
+                    // sends data only after new_session returns), so an idle_timeout shorter than
+                    // SESSION_READINESS_TIMEOUT would evict the slot before it is ever used.
+                    // Dropping abort_handles on an early return here correctly aborts all spawned
+                    // tasks via AbortableList::drop → abort_all().
                     // TODO: consider making this interactive = other party reports the exact level periodically
                     match level_stream
                         .skip_while(|current_level| {
@@ -1067,6 +1051,28 @@ where
                             warn!(%session_id, "session didn't reach target SURB buffer size in time");
                         }
                     }
+
+                    // Insert the slot and obtain a guard that rolls it back (also tearing
+                    // down the abort handles) if any subsequent setup step fails.
+                    let mut slot_guard = self
+                        .allocate_session_slot(
+                            session_id,
+                            SessionSlot {
+                                session_tx,
+                                routing_opts: forward_routing.clone(),
+                                abort_handles: Arc::new(parking_lot::Mutex::new(abort_handles)),
+                                surb_mgmt: surb_mgmt.clone(),
+                                surb_estimator: surb_estimator.clone(),
+                            },
+                        )
+                        .ok_or_else(|| {
+                            // Session already exists; it means it is most likely a loopback attempt
+                            error!(%session_id, "session already exists - loopback attempt");
+                            SessionManagerError::Loopback
+                        })?;
+
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
