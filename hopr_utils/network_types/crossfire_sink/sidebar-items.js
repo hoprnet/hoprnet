@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CrossfireSinkError"],"fn":["bounded_sink_channel"],"struct":["CrossfireSink"],"type":["PendingFut"]};

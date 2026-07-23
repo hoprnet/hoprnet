@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["QUEUE_DISPATCH_THRESHOLD"],"enum":["ForeignDataMode","State","UdpStreamParallelism"],"struct":["ConnectedUdpStream","UdpStreamBuilder"],"type":["BoxIoSink"]};

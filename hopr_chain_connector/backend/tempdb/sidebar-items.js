@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ACCOUNTS_TABLE_DEF","ADDRESS_TO_ID","CHANNELS_TABLE_DEF","KEY_TO_ID"],"enum":["TempDbError"],"struct":["TempDbBackend"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SOCKET_ADDRESS_MAX_LEN"],"fn":["copy_duplex","copy_duplex_abortable"],"mod":["tokio_utils"],"struct":["AsyncReadStreamer","AsyncWriteSink","DuplexIO","SocketAddrStr"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["PAYLOAD_SIZE_INT"],"mod":["errors","packet","por","sphinx","types","validation"],"struct":["HoprSphinxHeaderSpec"],"type":["HoprKeyIdent","HoprReplyOpener","HoprSphinxSuite","HoprSurb"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["OUT_IDX_TABLE","TABLE_QUEUE_NAME_PREFIX"],"enum":["RedbStoreError"],"fn":["make_index"],"struct":["RedbStore","RedbTicketQueue"],"type":["TicketTableDef"]};

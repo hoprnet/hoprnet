@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CHAIN_INFO_CACHE_KEY"]};

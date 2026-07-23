@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["MultiStrategy"],"trait":["Strategy"]};

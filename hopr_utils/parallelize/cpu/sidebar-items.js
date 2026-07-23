@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SpawnError"],"fn":["cancellable_task","init_thread_pool","outstanding_tasks","queue_limit","spawn_blocking","spawn_fifo_blocking"],"mod":["metrics"],"static":["OUTSTANDING"],"struct":["QUEUE_LIMIT","SlotGuard"]};

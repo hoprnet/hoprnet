@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CommandResult","Commands","OutputFormat"],"fn":["main","run_command"],"struct":["ChannelList","Cli","DeleteQueueResult","DeleteTicketResult","TicketList","TotalValueResult"]};
