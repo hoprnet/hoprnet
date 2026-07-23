@@ -664,6 +664,14 @@ impl PixToolbox {
 /// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
 /// many polynomials and shares each SSA will use, which together define the data quota per SSA.
 ///
+/// Before encoding, the Entry validates that the requested dimensions match the installed
+/// [`SsaShareGenerator`]'s configured [`SsaGeneratorConfig::polynomials_per_ssa`] and
+/// [`SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
+/// for return-path SURBs operates at the same dimensions advertised to the Exit — a
+/// mismatch would let the session proceed with incompatible share parameters. The
+/// validation runs before the initiation challenge slot is reserved, so repeated
+/// misconfigurations cannot exhaust challenge slots.
+///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
