@@ -1777,9 +1777,26 @@ where
                 }
                 self.request_next_ssa(*session_id, slot).await?;
             }
-            // SSA fully recovered — the next SSA request was already triggered by
-            // SsaAlmostRecovered. Deposit-key processing is handled in the upper layer.
-            HoprSessionInPixEvent::SsaRecovered(_) => {}
+            // SSA fully recovered. Deposit-key processing is handled in the upper layer.
+            // If early-recovery pipelining already advanced the cycle (via SsaAlmostRecovered),
+            // the guard below is false and this is a no-op. Otherwise — e.g. when
+            // early_recovery_threshold == 1.0, or ceil(threshold * num_polys) == num_polys for
+            // small num_polys, where the early signal never fires before full recovery — this is
+            // the only remaining trigger, so request the next SSA here. Same stale-cycle guard as
+            // SsaAlmostRecovered ⇒ fires at most once per cycle and never double-requests.
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
+                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
+                    "cannot process SsaRecovered on a session without pix state"
+                )))?;
+                if ssa_id.ssa_index().get()
+                    == state
+                        .current_index
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .saturating_sub(1)
+                {
+                    self.request_next_ssa(*session_id, slot).await?;
+                }
+            }
             HoprSessionInPixEvent::UnverifiableShare(ssa_id) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
                     "cannot register unverified share on a session without pix state"
@@ -5240,17 +5257,22 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that the exit/responder does NOT request a new SSA when it receives
-    /// `SsaRecovered` (the request was already triggered by `SsaAlmostRecovered`).
+    /// Verifies that the exit/responder requests the next SSA on `SsaRecovered` when
+    /// early-recovery pipelining did NOT already do so for this cycle.
+    ///
+    /// With `polynomials_per_ssa == 2` and the default `0.85` threshold,
+    /// `ceil(0.85 * 2) == 2 == num_polys`, so `SsaAlmostRecovered` never fires before full
+    /// recovery — `SsaRecovered` is the only remaining trigger for the next SSA. (The same holds
+    /// for `early_recovery_threshold == 1.0` at any `num_polys`.) This is the M1 regression guard.
     ///
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed,
     ///    which triggers an initial `SsaRequest` (message 1).
-    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager.
-    /// 3. The test asserts that exactly 1 `SsaRequest` message was sent (only the one at init), confirming
-    ///    `SsaRecovered` alone does NOT trigger `request_next_ssa`.
+    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager, with no preceding `SsaAlmostRecovered`.
+    /// 3. The test asserts that 2 `SsaRequest` messages were sent (init + the one triggered by `SsaRecovered`),
+    ///    confirming full recovery advances the cycle when no early-recovery event pipelined it.
     #[test_log::test(tokio::test)]
-    async fn exit_does_not_request_new_ssa_on_ssa_recovered_event() -> anyhow::Result<()> {
+    async fn exit_requests_new_ssa_on_recovery_when_not_already_pipelined() -> anyhow::Result<()> {
         use std::sync::Arc;
 
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
@@ -5279,9 +5301,9 @@ mod tests {
         let mut bob_transport = MockMsgSender::new();
         let sent_ssa_requests_clone = sent_ssa_requests.clone();
 
-        // Accept 2 messages: SessionEstablished (1) + SsaRequest at init (2) only.
-        // SsaRecovered must NOT trigger a third message.
-        bob_transport.expect_send_message().times(2).returning(move |_, data| {
+        // Accept 3 messages: SessionEstablished (1) + SsaRequest at init (2) +
+        // SsaRequest triggered by SsaRecovered (3).
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
             let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
             Box::pin(async move {
                 if let Ok(HoprStartProtocol::SsaRequest(_)) =
@@ -5323,8 +5345,8 @@ mod tests {
 
         assert_eq!(
             sent_ssa_requests.lock().unwrap().len(),
-            1,
-            "expected exactly 1 SsaRequest message (only the one at init), SsaRecovered must not trigger a second"
+            2,
+            "expected 2 SsaRequest messages (init + one triggered by SsaRecovered, since no SsaAlmostRecovered pipelined it)"
         );
 
         Ok(())
