@@ -84,7 +84,7 @@ impl<Q: TicketQueue> TicketQueue for ValueCachedQueue<Q> {
 
     fn push(&mut self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
         let epoch = ticket.verified_ticket().channel_epoch;
-        self.current_epoch = Some(epoch);
+        self.current_epoch = Some(epoch.max(self.current_epoch.unwrap_or(0)));
         self.value_cache
             .entry(epoch)
             .or_default()
