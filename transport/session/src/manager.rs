@@ -1023,8 +1023,10 @@ where
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionHandles::Balancer, balancer_abort_handle);
 
-                    // Insert the slot and obtain a guard that rolls it back (also tearing
-                    // down the abort handles) if any subsequent setup step fails.
+                    // Insert the slot before the SURB readiness wait so any echo packets that
+                    // arrive during pre-loading are accepted rather than dropped as unknown.
+                    // Early return from the wait below drops slot_guard uncommitted, which removes
+                    // the slot and calls close_session → abort_all() on the spawned tasks.
                     let mut slot_guard = self
                         .allocate_session_slot(
                             session_id,
@@ -1042,19 +1044,28 @@ where
                             SessionManagerError::Loopback
                         })?;
 
-                    #[cfg(all(feature = "telemetry", not(test)))]
-                    METRIC_NUM_INITIATED_SESSIONS.increment();
+                    // Prevent the slot from being evicted by time_to_idle while SURBs are
+                    // pre-loading. Each `get()` call resets the idle timer; the task is
+                    // aborted as soon as the readiness wait resolves.
+                    let sessions_keepalive = self.sessions.clone();
+                    let touch_period = (self.cfg.idle_timeout / 2).max(std::time::Duration::from_millis(100));
+                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                        loop {
+                            hopr_utils::runtime::prelude::sleep(touch_period).await;
+                            let _ = sessions_keepalive.get(&session_id);
+                        }
+                    });
 
-                    // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    match level_stream
+                    let wait_result = level_stream
                         .skip_while(|current_level| {
                             futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
                         })
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
-                        .await
-                    {
+                        .await;
+                    slot_keepalive.abort();
+                    match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
@@ -1067,6 +1078,9 @@ where
                             warn!(%session_id, "session didn't reach target SURB buffer size in time");
                         }
                     }
+
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
