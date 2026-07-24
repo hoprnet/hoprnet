@@ -44,6 +44,22 @@ cargo nextest run -p hopr-lib --test chain_operations-size2 -j 1
 cargo nextest run -p hopr-lib --test chain_operations-size3 -j 1
 ```
 
+For `hopr-lib` multi-node throughput cluster tests:
+
+```bash
+cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size3' -j 1
+cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size5' -j 1 --run-ignored all
+# OFAT matrices (all variants, ~60–120 s bootstrap):
+cargo nextest run -p hopr-lib --features session-client --test 'cluster_throughput-matrix' -j 1 --run-ignored all
+```
+
+For profiling the packet pipeline against a real-QUIC cluster (mock chain):
+
+```bash
+cargo run --profile profiling --features testing,profiling \
+  --example cluster_throughput -- --hops 1 --mb 20 --out /tmp/flame.svg
+```
+
 For `hopr-lib` non-cluster integration tests:
 
 ```bash

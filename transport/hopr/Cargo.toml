@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.33.0"
+version = "0.33.2"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -27,6 +27,17 @@ crate-type = ["rlib"]
 default = []
 all-benchmarks = []
 capture = ["dep:pcap-file"]
+# Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
+# Exposes `hopr_transport::testing::{stubs, harness}` for use by benches and integration tests.
+testing = [
+  "dep:bimap",
+  "dep:futures-concurrency",
+  "dep:hex-literal",
+  "dep:hopr-chain-connector",
+  "dep:hopr-ticket-manager",
+  "dep:tokio",
+  "hopr-utils/runtime-tokio",
+]
 telemetry = [
   "serde",
   "hopr-api/types-telemetry",
@@ -109,6 +120,17 @@ hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }
 
+# Optional deps enabled by the `testing` feature.
+bimap = { workspace = true, optional = true }
+futures-concurrency = { workspace = true, optional = true }
+hex-literal = { workspace = true, optional = true }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+], optional = true }
+hopr-ticket-manager = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
 [dev-dependencies]
 anyhow = { workspace = true }
 parking_lot = { workspace = true }
@@ -144,38 +166,47 @@ tokio = { workspace = true }
 [[bench]]
 name = "pipeline_e2e_bench"
 harness = false
+required-features = ["testing"]
 
 [[bench]]
 name = "protocol_throughput_emulated_bench"
 harness = false
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_backpressure_flow_control"
 path = "tests/protocol/backpressure_flow_control.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_configuration_tunability"
 path = "tests/protocol/configuration_tunability.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_counters_graph_integration"
 path = "tests/protocol/counters_graph_integration.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_error_handling_adversarial"
 path = "tests/protocol/error_handling_adversarial.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_msg_ack_workflows"
 path = "tests/protocol/msg_ack_workflows.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_pipeline_stage_isolation"
 path = "tests/protocol/pipeline_stage_isolation.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "protocol_stress_throughput"
 path = "tests/protocol/stress_throughput.rs"
+required-features = ["testing"]
 
 [[test]]
 name = "mixer_shared_heap"

@@ -1,10 +1,6 @@
-#[path = "../tests/protocol/common/mod.rs"]
-mod common;
-
 use std::{str::FromStr, sync::Arc};
 
 use bytes::Bytes;
-use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
 use hopr_api::{
@@ -25,6 +21,7 @@ use hopr_protocol_hopr::{
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
+use hopr_transport::testing::harness::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
