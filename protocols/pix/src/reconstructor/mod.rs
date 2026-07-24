@@ -128,8 +128,14 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             commitment_builder: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
+            // The builder must not be reclaimed before its verifiers (I1): a live verifier
+            // paired with an expired builder makes an incoming share's recovered part
+            // permanently unrecoverable (the guard returns `MissingSsaCommitment` and the
+            // ack is dropped). The builder and its verifiers are inserted together at
+            // commitment completion, so clamping the builder's idle TTL to at least the
+            // verifier's guarantees the builder always outlives them.
             ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
-                .time_to_idle(cfg.incomplete_ssa_lifetime)
+                .time_to_idle(cfg.incomplete_ssa_lifetime.max(cfg.unused_verifier_lifetime))
                 .build(),
             // Indispensable per-cycle state: never size-evicted. Built without a
             // `max_capacity`, so only `time_to_idle` reclaims it (see H1). Explicit
