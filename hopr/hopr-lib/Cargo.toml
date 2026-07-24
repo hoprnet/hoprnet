@@ -166,7 +166,7 @@ rstest = { workspace = true }
 serial_test = { workspace = true }
 serde-saphyr = { workspace = true }
 test-log = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 opentelemetry-prometheus-text-exporter = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = [
   "metrics",
