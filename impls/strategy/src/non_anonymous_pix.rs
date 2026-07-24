@@ -12,14 +12,13 @@
 //! **DO NOT USE THIS STRATEGY IN PRODUCTION**
 
 use std::{
-    collections::HashSet,
     convert::identity,
     fmt::{Debug, Display, Formatter},
     sync::Arc,
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
     ChainKeypair,
@@ -27,6 +26,7 @@ use hopr_api::{
     node::{ActionableEventDiscriminant, ActionableEventSource, HasChainApi, PixEvent},
     types::{crypto::prelude::Keypair, primitive::prelude::*},
 };
+use moka::sync::Cache;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -92,11 +92,11 @@ impl NonAnonymousPixStrategy {
             .transpose()?;
 
         Ok(Box::new(NonAnonymousPixStrategyInner {
-            cfg: self.cfg,
+            cfg: self.cfg.clone(),
             interval: self.interval,
             node,
             recovery_store,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         }))
     }
 }
@@ -110,7 +110,10 @@ struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     /// Entry role leaves this as `None`.
     recovery_store: Option<crate::pix_recovery_store::PixRecoveryStore>,
     /// Entry role only: IDs of deposit addresses already funded.
-    processed_deposits: HashSet<hopr_api::node::PixAddressId>,
+    /// Bounded at 1024 entries (capacity-only, no TTL) to prevent unbounded
+    /// growth on long-lived Entry nodes without introducing an expiration
+    /// window that could allow duplicate withdrawals.
+    processed_deposits: Cache<hopr_api::node::PixAddressId, ()>,
 }
 
 impl<N> NonAnonymousPixStrategyInner<N>
@@ -131,7 +134,7 @@ where
                 tracing::info!(?new_deposit_address, "new deposit address");
 
                 // Entry-side dedup: skip duplicates within the same strategy lifetime.
-                if self.processed_deposits.contains(&new_deposit_address.id) {
+                if self.processed_deposits.contains_key(&new_deposit_address.id) {
                     tracing::warn!(id = ?new_deposit_address.id, "duplicate NewDepositAddress event, skipping");
                     return Ok(());
                 }
@@ -156,7 +159,7 @@ where
 
                 // Mark completed only after the withdrawal succeeds so a transient
                 // failure doesn't permanently poison this ID.
-                self.processed_deposits.insert(new_deposit_address.id);
+                self.processed_deposits.insert(new_deposit_address.id, ());
                 tracing::info!(%target_deposit, ?new_deposit_address, "deposit successful");
             }
             PixEvent::DepositAddressReceived(deposit_address_recv) => {
@@ -608,7 +611,7 @@ mod tests {
             interval: StdDuration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let event = PixEvent::DepositAddressReceived(PixDepositAddressReceived {
@@ -685,7 +688,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let bob_balance_before = strategy
@@ -769,7 +772,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::new(chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
@@ -840,7 +843,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let safe_address = strategy.node.identity().safe_address;
@@ -969,7 +972,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let bob_before = strategy.get_balance(*BOB).await?;
@@ -1100,7 +1103,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         let event_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
@@ -1187,7 +1190,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None, // not needed for the test — we pass store directly
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         // No need to call on_tick or register a safe — balance is zero so replay
@@ -1258,7 +1261,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         strategy.replay_pending_recoveries(&store).await;
@@ -1333,7 +1336,7 @@ mod tests {
             interval: Duration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
-            processed_deposits: HashSet::new(),
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
         strategy.replay_pending_recoveries(&store).await;

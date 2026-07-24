@@ -202,9 +202,14 @@ impl SessionSsaState {
         SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
     }
 
-    pub fn increment_index(&self) -> SsaIndex {
-        SsaIndex::new(self.current_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
-            .expect("ssa index cannot become 0 when incremented")
+    pub fn increment_index(&self) -> Result<SsaIndex, SessionManagerError> {
+        let old = self
+            .current_index
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .map_err(|_| SessionManagerError::Other(anyhow!("SSA index overflow after u32::MAX cycles")))?;
+        SsaIndex::new(old).ok_or_else(|| {
+            SessionManagerError::Other(anyhow!("SSA index cannot be 0 after increment (pre-increment was 0)"))
+        })
     }
 
     /// Returns the current SSA index value.
@@ -1643,7 +1648,7 @@ where
         .map_err(TransportSessionError::packet_sending)?;
 
         // All fallible steps succeeded — commit the index advance.
-        current_ssa_state.increment_index();
+        current_ssa_state.increment_index()?;
 
         Ok(())
     }
@@ -5268,7 +5273,8 @@ mod tests {
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed,
     ///    which triggers an initial `SsaRequest` (message 1).
-    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager, with no preceding `SsaAlmostRecovered`.
+    /// 2. `dispatch_pix_event(SsaRecovered(ssa_id))` is called on Bob's manager, with no preceding
+    ///    `SsaAlmostRecovered`.
     /// 3. The test asserts that 2 `SsaRequest` messages were sent (init + the one triggered by `SsaRecovered`),
     ///    confirming full recovery advances the cycle when no early-recovery event pipelined it.
     #[test_log::test(tokio::test)]
@@ -5346,7 +5352,8 @@ mod tests {
         assert_eq!(
             sent_ssa_requests.lock().unwrap().len(),
             2,
-            "expected 2 SsaRequest messages (init + one triggered by SsaRecovered, since no SsaAlmostRecovered pipelined it)"
+            "expected 2 SsaRequest messages (init + one triggered by SsaRecovered, since no SsaAlmostRecovered \
+             pipelined it)"
         );
 
         Ok(())
