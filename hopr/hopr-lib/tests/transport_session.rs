@@ -90,7 +90,10 @@ async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
         .chain(std::iter::once(dst))
         .collect();
 
-    let _session = cluster.create_session(&path).await?;
+    // Disable the SURB balancer so its background replenishment traffic does not
+    // exhaust the 100 wxHOPR channels (10 tickets at win_prob=0.2) before the
+    // handshake completes. This test verifies session establishment, not SURB management.
+    let _session = cluster.create_session_with(&path, Default::default(), None).await?;
 
     // TODO: check here that the destination sees the new session created
 

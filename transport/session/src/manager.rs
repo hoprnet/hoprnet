@@ -1329,15 +1329,19 @@ where
                     })
                     .map_err(|error| {
                         error!(%session_id, %error, "failed to dispatch session data");
+                        hopr_utils::parallelize::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         SessionManagerError::other(error)
                     })?)
             } else {
                 error!(%session_id, "received data from an unestablished session");
+                hopr_utils::parallelize::SESSION_UNKNOWN_DATA_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 Err(TransportSessionError::UnknownData)
             };
         }
 
         trace!(tag = %in_data.data.application_tag, "received data not associated with session protocol or any existing session");
+
+        hopr_utils::parallelize::SESSION_UNRELATED_DATA_DISPATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_DISPATCHED_MSGS.increment_by(&["unrelated"], 1);

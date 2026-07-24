@@ -124,7 +124,8 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                 let encoder = encoder.clone();
                 let counters = counters.clone();
                 async move {
-                    match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
+                    hopr_utils::parallelize::ENCODE_STAGE_ENTRIES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    match hopr_utils::parallelize::cpu::spawn_encode_blocking(
                         move || {
                             encoder.encode_packet(
                                 data.data.to_bytes(),
@@ -157,6 +158,8 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
                         }
                         Err(error) => {
                             tracing::error!(%error, "timeout while processing the outgoing packet");
+                            hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             None
                         }
                     }
@@ -228,7 +231,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
             tracing::trace!(%peer, "protocol message in");
 
             async move {
-                match hopr_utils::parallelize::cpu::spawn_fifo_blocking(move || decoder.decode(peer, data), "packet_decode")
+                match hopr_utils::parallelize::cpu::spawn_decode_blocking(move || decoder.decode(peer, data), "packet_decode")
                     .timeout(futures_time::time::Duration::from(PACKET_DECODING_TIMEOUT))
                     .await {
                     Ok(Ok(Ok(packet))) => {
@@ -296,6 +299,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                             timeout_ms = PACKET_DECODING_TIMEOUT.as_millis() as u64,
                             "dropped incoming packet: decode timeout - check the 'hopr_rayon_queue_wait_seconds' metric for pool saturation"
                         );
+                        hopr_utils::parallelize::cpu::DECODE_TIMEOUT_DROPS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         #[cfg(all(feature = "telemetry", not(test)))]
                         {
                             METRIC_PACKET_DECODE_TIMEOUTS.increment();
@@ -761,8 +766,7 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // `avail_concurrency` is used as a deep ready-queue for the encode (egress) path where deep
-    // queuing is harmless, and as a fallback when the Rayon pool has not been initialised yet.
+    // Fallback concurrency when the Rayon pool has not been initialised yet.
     // Zero is normalised to 1 to prevent deadlock (0 concurrent tasks = no work done ever).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
@@ -771,13 +775,30 @@ where
         .max(1)
         * 8;
 
-    let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+    // Cap `output_concurrency` so the egress encode pipeline does not submit more tasks to Rayon
+    // than it can drain within `PACKET_ENCODING_TIMEOUT`.  A deep queue (output_concurrency >> pool)
+    // lets SURB keep-alive bursts queue hundreds of encode tasks, starving data packets that
+    // arrive later and triggering the 150 ms timeout.
+    //
+    // The default cap mirrors the ingress watermark: `pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
+    // At encode time ≤ 5 ms and 14 threads: max queue wait ≈ (3×14 − 14)/14 × 5 ms = 10 ms, well
+    // within the 150 ms budget.  Falls back to avail_concurrency when the pool is uninitialised.
+    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
+    let default_output_concurrency = if pool_threads > 0 {
+        pool_threads * INGRESS_POOL_HIGH_WATERMARK_FACTOR
+    } else {
+        avail_concurrency
+    };
+    let output_concurrency = cfg
+        .output_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(default_output_concurrency);
 
     // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
     // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
     // Without this cap the FIFO pool fills up with decode work under heavy download traffic and
     // SURB replenishment starves, slowly collapsing the session's download throughput.
-    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
+    // Note: pool_threads is already computed above for output_concurrency.
     let default_input_concurrency = if pool_threads > ENCODE_RESERVED_THREADS {
         pool_threads - ENCODE_RESERVED_THREADS
     } else if pool_threads > 0 {
@@ -791,17 +812,15 @@ where
         .unwrap_or(default_input_concurrency);
 
     // --- Ingress gate (safety-net backpressure) ---
-    // outstanding_tasks() is a single atomic load, so checking it per-packet is cheaper than
-    // maintaining a sampler task + shared AtomicBool. The delay is only incurred when the pool is
-    // actually congested, which is also when packets arrive fastest.
-    let effective_pool = if pool_threads > 0 {
-        pool_threads
-    } else {
-        avail_concurrency.max(1)
-    };
-    let high_watermark = effective_pool * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
+    // Gate on DECODE_OUTSTANDING rather than the global outstanding_tasks() so that
+    // encode work from the outgoing SURB/keep-alive pipeline (which runs concurrently
+    // in the same process in cluster tests — and in production on the same node) does
+    // not interfere with the relay's decision to throttle incoming packet decoding.
+    // Using the decode-specific counter means only sustained decode congestion triggers
+    // the delay; encode saturation alone does not.
+    let high_watermark = input_concurrency * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
     let wire_in = wire_in.then(move |(peer, data)| async move {
-        if hopr_utils::parallelize::cpu::outstanding_tasks() > high_watermark {
+        if hopr_utils::parallelize::cpu::decode_outstanding_tasks() > high_watermark {
             hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
         }
         (peer, data)

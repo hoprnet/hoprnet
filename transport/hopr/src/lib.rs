@@ -522,20 +522,83 @@ where
             .unwrap_or(u64::MAX)
             .max(1);
         let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
+        let transit_latency_cfg = self.cfg.transit_latency;
         processes.insert(
             HoprTransportProcess::MixerForwarder,
             hopr_utils::spawn_as_abortable!(async move {
-                mix_rx
-                    .fold(wire_msg_tx, |mut sink, item| async move {
-                        if sink.send(item).await.is_err() {
+                let mut mix_rx = mix_rx;
+                let mut wire_sink = wire_msg_tx;
+
+                if let Some(lat) = transit_latency_cfg {
+                    // Concurrent transit-latency fan-out: spawn one short-lived task per
+                    // packet so each packet ages through its own ~mean delay independently.
+                    // A burst of N packets at mean=50 ms takes ~50 ms total, not N×50 ms.
+                    //
+                    // Without a tokio runtime the latency is silently skipped (pass-through).
+                    #[cfg(feature = "runtime-tokio")]
+                    {
+                        let (tx, rx) = futures::channel::mpsc::unbounded();
+                        let fan_out = async move {
+                            while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                                let mean_us = lat.mean.as_micros() as f64;
+                                let std_us = lat.std_dev.as_micros() as f64;
+                                let delay_us = if std_us > 0.0 {
+                                    use rand_distr::{Distribution, Normal};
+                                    Normal::new(mean_us, std_us)
+                                        .expect("transit latency Normal params are valid")
+                                        .sample(&mut rand::rng())
+                                        .max(0.0_f64)
+                                } else {
+                                    mean_us.max(0.0)
+                                };
+                                let delay = Duration::from_micros(delay_us as u64);
+                                let item_tx = tx.clone();
+                                hopr_utils::runtime::prelude::spawn(async move {
+                                    if !delay.is_zero() {
+                                        futures_timer::Delay::new(delay).await;
+                                    }
+                                    let _ = item_tx.unbounded_send(item);
+                                });
+                            }
+                            // `tx` drops here; the channel closes once all per-packet tasks send
+                        };
+                        let fan_in = async move {
+                            let mut rx = rx;
+                            while let Some(item) = futures::StreamExt::next(&mut rx).await {
+                                if wire_sink.send(item).await.is_err() {
+                                    tracing::error!(
+                                        task = %HoprTransportProcess::MixerForwarder,
+                                        "wire sink dropped — discarding transit-delayed packet"
+                                    );
+                                    break;
+                                }
+                            }
+                        };
+                        futures::join!(fan_out, fan_in);
+                    }
+                    #[cfg(not(feature = "runtime-tokio"))]
+                    {
+                        let _ = lat;
+                        while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                            if wire_sink.send(item).await.is_err() {
+                                tracing::error!(
+                                    task = %HoprTransportProcess::MixerForwarder,
+                                    "wire sink dropped — discarding mixed packet"
+                                );
+                            }
+                        }
+                    }
+                } else {
+                    while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                        if wire_sink.send(item).await.is_err() {
                             tracing::error!(
                                 task = %HoprTransportProcess::MixerForwarder,
                                 "wire sink dropped — discarding mixed packet"
                             );
                         }
-                        sink
-                    })
-                    .await;
+                    }
+                }
+
                 tracing::warn!(
                     task = %HoprTransportProcess::MixerForwarder,
                     "long-running background task finished"
@@ -635,6 +698,8 @@ where
                 move |(unresolved, mut data)| {
                     let path_planner = path_planner.clone();
                     async move {
+                        hopr_utils::parallelize::ROUTING_RESOLUTION_ATTEMPTS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         trace!(?unresolved, "resolving routing for packet");
                         match path_planner
                             .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
@@ -668,6 +733,8 @@ where
                                 Some((resolved, data))
                             }
                             Err(error) => {
+                                hopr_utils::parallelize::ROUTING_RESOLUTION_FAILURES
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 error!(%error, "failed to resolve routing");
                                 None
                             }
@@ -810,6 +877,8 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
+                        hopr_utils::parallelize::DISPATCH_MESSAGE_CALLS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
                             Ok(DispatchResult::Processed) => {
                                 tracing::trace!("message dispatch completed");

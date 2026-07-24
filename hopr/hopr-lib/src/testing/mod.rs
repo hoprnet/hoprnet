@@ -12,6 +12,7 @@ use hopr_transport_p2p::HoprNetwork;
 pub mod dummies;
 pub mod fixtures;
 pub mod hopr;
+pub mod loadgen;
 pub mod wiring;
 
 pub(crate) type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;

@@ -9,6 +9,114 @@
 //!
 //! See the [`cpu`] module for the primary API.
 
+/// Cumulative count of application data packets dropped because the session inbox
+/// channel was full (`try_send` returned `TrySendError::Full`).
+///
+/// This counter is not gated on any feature so it is available wherever `hopr-utils`
+/// is linked (including crates that do not use the Rayon `parallelize-rayon` feature).
+pub static SESSION_INBOX_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative session inbox drop count.
+#[inline]
+pub fn session_inbox_drop_count() -> usize {
+    SESSION_INBOX_DROPS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of data packets dropped because no matching session slot was
+/// found in the session manager (`UnknownData` / unestablished-session path).
+pub static SESSION_UNKNOWN_DATA_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative UnknownData drop count.
+#[inline]
+pub fn session_unknown_data_drop_count() -> usize {
+    SESSION_UNKNOWN_DATA_DROPS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of data packets dispatched as "unrelated" — reached dispatch_message
+/// but matched neither the session protocol tag nor any session application tag.
+pub static SESSION_UNRELATED_DATA_DISPATCHES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative unrelated dispatch count.
+#[inline]
+pub fn session_unrelated_dispatch_count() -> usize {
+    SESSION_UNRELATED_DATA_DISPATCHES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of packets that failed path/routing resolution before encoding.
+pub static ROUTING_RESOLUTION_FAILURES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative routing resolution failure count.
+#[inline]
+pub fn routing_resolution_failure_count() -> usize {
+    ROUTING_RESOLUTION_FAILURES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of packets that successfully entered the routing resolution stage.
+pub static ROUTING_RESOLUTION_ATTEMPTS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative routing resolution attempt count.
+#[inline]
+pub fn routing_resolution_attempt_count() -> usize {
+    ROUTING_RESOLUTION_ATTEMPTS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of packets that entered the SPHINX encode stage (spawn_encode_blocking called).
+pub static ENCODE_STAGE_ENTRIES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative encode stage entry count.
+#[inline]
+pub fn encode_stage_entry_count() -> usize {
+    ENCODE_STAGE_ENTRIES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of calls to `smgr.dispatch_message` in SessionsManagement(0).
+/// Non-zero means packets are reaching the session manager dispatcher.
+pub static DISPATCH_MESSAGE_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative dispatch_message call count.
+#[inline]
+pub fn dispatch_message_call_count() -> usize {
+    DISPATCH_MESSAGE_CALLS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Cumulative count of packets dropped by `forward_to_timeout(app_incoming)` at the ingress
+/// pipeline because `tx_from_protocol` was full for longer than `QUEUE_SEND_TIMEOUT` (50 ms).
+pub static APP_INCOMING_TIMEOUT_DROPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Returns the cumulative app-incoming timeout drop count.
+#[inline]
+pub fn app_incoming_timeout_drop_count() -> usize {
+    APP_INCOMING_TIMEOUT_DROPS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Factor of `pool_thread_count` above which the encode pool is considered to be
+/// under high pressure.
+///
+/// With 0.5: pressure is considered high once encode tasks occupy more than half
+/// the pool's thread count (as outstanding = queued + running).
+const ENCODE_PRESSURE_HIGH_FACTOR: f64 = 0.5;
+
+/// Returns `true` when the encode pool has headroom for another SURB keep-alive task.
+///
+/// Reads the current [`cpu::ENCODE_OUTSTANDING`] and [`cpu::pool_thread_count`]
+/// at call time, avoiding the stale-flag problem that a cached `AtomicBool`
+/// introduces.  When the `parallelize-rayon` feature is not enabled (e.g. in
+/// unit tests) this always returns `true`.
+#[inline]
+pub fn encode_pool_has_headroom() -> bool {
+    #[cfg(feature = "parallelize-rayon")]
+    {
+        let threads = cpu::pool_thread_count();
+        if threads == 0 {
+            return true; // pool not initialised yet — don't block
+        }
+        let outstanding = cpu::ENCODE_OUTSTANDING.load(std::sync::atomic::Ordering::Relaxed);
+        (outstanding as f64) < threads as f64 * ENCODE_PRESSURE_HIGH_FACTOR
+    }
+    #[cfg(not(feature = "parallelize-rayon"))]
+    true
+}
+
 /// Module for thread pool-based parallelization of CPU-heavy blocking workloads.
 ///
 /// ## Zombie Task Prevention
@@ -319,6 +427,80 @@ pub mod cpu {
         POOL_THREAD_COUNT.load(Ordering::Relaxed)
     }
 
+    /// Outstanding tasks currently attributed to the **encode** path (packet_encode + SURB generation).
+    pub static ENCODE_OUTSTANDING: AtomicUsize = AtomicUsize::new(0);
+
+    /// Outstanding tasks currently attributed to the **decode** path (packet_decode).
+    pub static DECODE_OUTSTANDING: AtomicUsize = AtomicUsize::new(0);
+
+    /// Cumulative count of packets dropped because the Rayon decode future timed out.
+    ///
+    /// Incremented unconditionally (not gated on the `telemetry` feature) so the
+    /// stress harness can read it in test builds.
+    pub static DECODE_TIMEOUT_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Cumulative count of outgoing packets (data or SURB) dropped because the
+    /// Rayon encode future timed out (150 ms budget exceeded).
+    ///
+    /// A non-zero and rising count indicates the encode path is saturating the pool.
+    pub static ENCODE_TIMEOUT_DROPS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Returns the current encode-path outstanding task count.
+    #[inline]
+    pub fn encode_outstanding_tasks() -> usize {
+        ENCODE_OUTSTANDING.load(Ordering::Relaxed)
+    }
+
+    /// Returns the current decode-path outstanding task count.
+    #[inline]
+    pub fn decode_outstanding_tasks() -> usize {
+        DECODE_OUTSTANDING.load(Ordering::Relaxed)
+    }
+
+    /// Returns the cumulative decode timeout drop count.
+    #[inline]
+    pub fn decode_timeout_drop_count() -> usize {
+        DECODE_TIMEOUT_DROPS.load(Ordering::Relaxed)
+    }
+
+    /// Returns the cumulative encode timeout drop count.
+    #[inline]
+    pub fn encode_timeout_drop_count() -> usize {
+        ENCODE_TIMEOUT_DROPS.load(Ordering::Relaxed)
+    }
+
+    /// RAII guard that decrements a tagged outstanding counter when dropped.
+    ///
+    /// Caller must increment the counter before constructing this guard.
+    struct TaggedGuard(&'static AtomicUsize);
+
+    impl Drop for TaggedGuard {
+        #[inline]
+        fn drop(&mut self) {
+            self.0.fetch_sub(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Like [`spawn_fifo_blocking`] but also tracks the task in [`ENCODE_OUTSTANDING`].
+    pub async fn spawn_encode_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
+    ) -> Result<R, SpawnError> {
+        ENCODE_OUTSTANDING.fetch_add(1, Ordering::Relaxed);
+        let _guard = TaggedGuard(&ENCODE_OUTSTANDING);
+        spawn_fifo_blocking(f, operation).await
+    }
+
+    /// Like [`spawn_fifo_blocking`] but also tracks the task in [`DECODE_OUTSTANDING`].
+    pub async fn spawn_decode_blocking<R: Send + 'static>(
+        f: impl FnOnce() -> R + Send + 'static,
+        operation: &'static str,
+    ) -> Result<R, SpawnError> {
+        DECODE_OUTSTANDING.fetch_add(1, Ordering::Relaxed);
+        let _guard = TaggedGuard(&DECODE_OUTSTANDING);
+        spawn_fifo_blocking(f, operation).await
+    }
+
     /// Builds a cancellable task closure and its receiver.
     ///
     /// The closure wraps `f` with cooperative cancellation, panic catching,
@@ -589,6 +771,21 @@ mod tests {
 
         let after = cpu::outstanding_tasks();
         assert_eq!(after, initial, "Outstanding should return to initial after completion");
+    }
+
+    #[test]
+    fn telemetry_counters_are_accessible() {
+        // All counters start at zero in a fresh process; verify the accessor path works.
+        // In production these are only incremented by live packet-processing code.
+        let _ = super::session_inbox_drop_count();
+        let _ = super::session_unknown_data_drop_count();
+        let _ = super::session_unrelated_dispatch_count();
+        let _ = super::routing_resolution_failure_count();
+        let _ = super::routing_resolution_attempt_count();
+        let _ = super::encode_stage_entry_count();
+        let _ = super::dispatch_message_call_count();
+        let _ = super::app_incoming_timeout_drop_count();
+        let _ = super::encode_pool_has_headroom();
     }
 
     #[tokio::test]

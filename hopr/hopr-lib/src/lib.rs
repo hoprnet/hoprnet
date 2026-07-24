@@ -73,7 +73,7 @@ use hopr_api::{
 pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
-use hopr_transport::{
+pub use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
