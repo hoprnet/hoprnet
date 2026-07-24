@@ -202,6 +202,9 @@ pub mod cpu {
     /// Current number of outstanding tasks (queued + running).
     static OUTSTANDING: AtomicUsize = AtomicUsize::new(0);
 
+    /// Thread count set by [`init_thread_pool`]; `0` means the pool has not been initialised yet.
+    static POOL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(0);
+
     lazy_static::lazy_static! {
         /// Queue limit from environment. `None` means no limit.
         static ref QUEUE_LIMIT: Option<usize> = {
@@ -301,9 +304,19 @@ pub mod cpu {
             Ok(())
         });
 
+        // Store the requested thread count before build_global() so that pipeline code that
+        // calls pool_thread_count() after init can read a non-zero value immediately.
+        POOL_THREAD_COUNT.store(num_threads, Ordering::Relaxed);
         let result = builder.build_global();
         let _ = *QUEUE_LIMIT; // Initialize limit metric
         result
+    }
+
+    /// Returns the thread count the pool was initialised with, or `0` if [`init_thread_pool`]
+    /// has not been called yet.
+    #[inline]
+    pub fn pool_thread_count() -> usize {
+        POOL_THREAD_COUNT.load(Ordering::Relaxed)
     }
 
     /// Builds a cancellable task closure and its receiver.
