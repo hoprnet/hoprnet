@@ -211,7 +211,11 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
         for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
-            polynomial.entry(coeff_index).or_insert(polynomial_coeff_commitment);
+            // Allow overwrite: if a previous coefficient was inserted but the resulting
+            // decode+subgroup-check failed (self.complete is still false), the caller
+            // needs to retransmit corrected bytes. `insert` replaces stale malformed
+            // data; for first-time insertion it behaves identically to `or_insert`.
+            polynomial.insert(coeff_index, polynomial_coeff_commitment);
         }
 
         tracing::trace!(
@@ -221,7 +225,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         );
 
         // Check if we already have all the committed polynomials and all coefficient commitments in them
-        self.complete = self.committed_polynomials.len() == self.num_polys
+        let all_entries_present = self.committed_polynomials.len() == self.num_polys
             && self
                 .committed_polynomials
                 .values()
@@ -233,19 +237,25 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .values()
                 .all(|committed_poly| committed_poly.get(&0).is_some());
 
-        if self.complete {
+        if all_entries_present {
             tracing::debug!("SSA is fully committed for verification");
 
-            let complete_ssa_verifier = self
-                .committed_polynomials
-                .drain()
-                .map(|(polynomial_index, mut polynomial)| {
+            // Phase 1: decode and subgroup-check ALL commitments into temporary verifier
+            // state BEFORE mutating self. Malformed bytes or non-torsion-free points
+            // produce Err here, which short-circuits without poisoning the builder.
+            // The caller can retransmit the corrected coefficient (fix for M2).
+            let complete_ssa_verifier = (0..self.num_polys as PolynomialIndex)
+                .map(|poly_index| {
+                    let polynomial = self
+                        .committed_polynomials
+                        .get(&poly_index)
+                        .expect("polynomial must be present");
                     PartialSsaShareVerifier::from_serializable_commitments(
-                        SsaPolynomialId::new(self.id, polynomial_index),
+                        SsaPolynomialId::new(self.id, poly_index),
                         (0..self.poly_threshold as CoefficientIndex)
                             .map(|coeff_idx| {
-                                polynomial
-                                    .remove(&coeff_idx)
+                                *polynomial
+                                    .get(&coeff_idx)
                                     .expect("polynomial coeffs must be already present")
                             })
                             .collect(),
@@ -253,6 +263,10 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 })
                 .map(|v| v.map(SsaPartBuilder::new))
                 .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
+
+            // Phase 2: all fallible operations succeeded — commit state change.
+            self.complete = true;
+            self.committed_polynomials.clear();
 
             let full_commitment = match self.full_ssa_commitment.as_ref().map(|(c, _)| *c) {
                 None => {

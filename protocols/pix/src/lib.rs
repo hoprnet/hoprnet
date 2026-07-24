@@ -441,8 +441,7 @@ pub(crate) mod tests {
         // these must round-trip correctly since generator-valued coefficients are
         // legitimate (they represent scalar coefficient 1).
         let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
-        let verifier =
-            PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator.clone())?;
+        let verifier = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator.clone())?;
         let (_, serialized) = verifier.into_serializable_commitments();
         assert_eq!(
             serialized, all_generator,

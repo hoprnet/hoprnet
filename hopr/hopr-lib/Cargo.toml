@@ -50,6 +50,10 @@ name = "transport_session-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_session_pix"
+required-features = ["testing"]
+
+[[test]]
 name = "transport_tickets"
 required-features = ["testing"]
 

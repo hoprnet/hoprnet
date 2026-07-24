@@ -998,6 +998,71 @@ mod tests {
     }
 
     #[test]
+    fn malformed_commitment_does_not_poison_corrected_retransmission() -> anyhow::Result<()> {
+        // Regression test for M2: a malformed coefficient that fails EC point
+        // decoding must NOT leave the commitment builder permanently poisoned.
+        // After submitting malformed bytes, a retry with correct bytes must
+        // succeed and complete the SSA.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let mut commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        // Extract the constant term (coeff 0) and the final coefficient (coeff 1).
+        let constant_term = commitment
+            .verifiers
+            .remove(&0)
+            .ok_or_else(|| anyhow::anyhow!("missing constant-term commitment"))?
+            .into_iter()
+            .collect::<Vec<_>>();
+        assert_eq!(constant_term.len(), 1);
+
+        let final_coefficient = commitment
+            .verifiers
+            .remove(&1)
+            .ok_or_else(|| anyhow::anyhow!("missing final coefficient commitment"))?
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+
+        // Step 1: Submit constant term — must succeed, produce a deposit address,
+        // but NOT be verifiable (coefficient 1 is still missing).
+        let partial = reconstructor.insert_coefficient_commitments(ssa_id, 0, constant_term.into_iter())?;
+        assert!(
+            partial.ssa_deposit_address.is_some(),
+            "constant term alone should yield a deposit address"
+        );
+        assert!(!partial.is_verifiable, "not yet complete");
+
+        // Step 2: Submit a malformed coefficient (bytes with an invalid EC
+        // compressed-point prefix of 0xff) — must return InvalidInput.
+        let mut malformed = PixGroupRepr::<TestSpec>::default(); // zero-filled
+        AsMut::<[u8]>::as_mut(&mut malformed).fill(0xff);
+        let malformed_result = reconstructor.insert_coefficient_commitments(ssa_id, 1, [(0, malformed)].into_iter());
+        assert!(
+            matches!(&malformed_result, Err(crate::errors::PixError::InvalidInput)),
+            "malformed commitment must be rejected, got {malformed_result:?}"
+        );
+
+        // Step 3: Retry with the correct bytes — must succeed and produce a
+        // verifiable SSA commitment.
+        let retry = reconstructor.insert_coefficient_commitments(ssa_id, 1, final_coefficient.into_iter());
+        assert!(
+            matches!(&retry, Ok(state) if state.is_verifiable),
+            "corrected retransmission must complete the SSA, got {retry:?}"
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn full_recovery_retires_all_reconstructor_state() -> anyhow::Result<()> {
         // 4 polynomials, threshold 4, no surplus → 16 shares, fully recoverable.
         // Multiple polynomials on purpose: this exercises the whole `0..num_polys`

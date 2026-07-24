@@ -723,7 +723,9 @@ mod tests {
             "deposit address should have received the withdrawal"
         );
 
-        insta::assert_yaml_snapshot!(*snapshot.refresh());
+        insta::assert_yaml_snapshot!(*snapshot.refresh(), {
+            ".chain_info.contract_addresses" => "[contract_addresses]",
+        });
 
         Ok(())
     }
@@ -871,7 +873,9 @@ mod tests {
             "safe should have received the full recovered balance"
         );
 
-        insta::assert_yaml_snapshot!(*snapshot.refresh());
+        insta::assert_yaml_snapshot!(*snapshot.refresh(), {
+            ".chain_info.contract_addresses" => "[contract_addresses]",
+        });
 
         Ok(())
     }
