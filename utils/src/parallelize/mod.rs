@@ -773,6 +773,21 @@ mod tests {
         assert_eq!(after, initial, "Outstanding should return to initial after completion");
     }
 
+    #[test]
+    fn telemetry_counters_are_accessible() {
+        // All counters start at zero in a fresh process; verify the accessor path works.
+        // In production these are only incremented by live packet-processing code.
+        let _ = super::session_inbox_drop_count();
+        let _ = super::session_unknown_data_drop_count();
+        let _ = super::session_unrelated_dispatch_count();
+        let _ = super::routing_resolution_failure_count();
+        let _ = super::routing_resolution_attempt_count();
+        let _ = super::encode_stage_entry_count();
+        let _ = super::dispatch_message_call_count();
+        let _ = super::app_incoming_timeout_drop_count();
+        let _ = super::encode_pool_has_headroom();
+    }
+
     #[tokio::test]
     #[serial]
     async fn outstanding_decrements_on_cancellation() {
