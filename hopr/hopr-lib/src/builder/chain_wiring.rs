@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{StreamExt, pin_mut};
+use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
@@ -13,6 +13,7 @@ use hopr_api::{
 };
 use hopr_transport::{NeighborTelemetry, PathTelemetry};
 use parking_lot::RwLock;
+use tracing::Instrument;
 
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
@@ -39,7 +40,7 @@ pub(super) async fn process_chain_events<C, G>(
     own_packet_key: OffchainPublicKey,
     ticket_price: Arc<RwLock<HoprBalance>>,
     win_probability: Arc<RwLock<WinningProbability>>,
-    mut peer_discovery_tx: Option<futures::channel::mpsc::Sender<(PeerId, Vec<Multiaddr>)>>,
+    mut peer_discovery_tx: Option<hopr_utils::network_types::crossfire_sink::CrossfireSink<(PeerId, Vec<Multiaddr>)>>,
 ) where
     C: ChainKeyOperations + Clone + Send + Sync + 'static,
     G: NetworkGraphUpdate + Send + Sync + 'static,
@@ -66,14 +67,13 @@ pub(super) async fn process_chain_events<C, G>(
                 if let Some(ref mut tx) = peer_discovery_tx {
                     let peer_id: PeerId = account.public_key.into();
                     let multiaddrs = account.get_multiaddrs();
-                    let _span = tracing::info_span!(
+                    let span = tracing::info_span!(
                         "peer_announcement",
                         peer = %peer_id,
                         multiaddresses = ?multiaddrs,
-                    )
-                    .entered();
-                    if let Err(e) = tx.try_send((peer_id, multiaddrs.to_vec())) {
-                        tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
+                    );
+                    if let Err(e) = tx.send((peer_id, multiaddrs.to_vec())).instrument(span.clone()).await {
+                        tracing::error!(parent: &span, %e, "peer-discovery channel closed; announcement dropped");
                     }
                 }
             }
@@ -363,7 +363,7 @@ mod tests {
         win_probability: WinningProbability,
     ) -> Vec<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)> {
         use futures::StreamExt;
-        let (tx, rx) = futures::channel::mpsc::channel(64);
+        let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(64);
         process_chain_events(
             chain,
             graph,
@@ -700,5 +700,25 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].src, *own_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
+    }
+
+    #[tokio::test]
+    async fn announcement_should_handle_disconnected_peer_discovery_tx_gracefully() {
+        let (offchain, chain) = make_keypairs();
+        let addr = chain.public().to_address();
+        let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(1);
+        drop(rx); // receiver dropped — send will return Err(Disconnected)
+
+        process_chain_events(
+            StubChainKeys::new([]),
+            RecordingGraph::default(),
+            futures::stream::iter(vec![ChainEvent::Announcement(account(*offchain.public(), addr))]),
+            addr,
+            *offchain.public(),
+            Arc::new(RwLock::new(HoprBalance::from(10u64))),
+            Arc::new(RwLock::new(WinningProbability::ALWAYS)),
+            Some(tx),
+        )
+        .await;
     }
 }
