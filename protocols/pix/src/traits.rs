@@ -98,6 +98,12 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
         false
     }
 
+    /// Releases all reconstructor state for a finished or torn-down SSA cycle.
+    ///
+    /// Called on full recovery and on session closure. Implementations must be
+    /// idempotent — retiring an unknown or already-retired cycle is a no-op.
+    fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>);
+
     /// Generates a new random Exit SSA commitment and registers it internally under the given `id`.
     fn new_exit_commitment(
         &self,

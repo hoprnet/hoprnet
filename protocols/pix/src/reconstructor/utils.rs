@@ -30,6 +30,11 @@ impl<S: PixSpec> SsaBuilder<S> {
         }
     }
 
+    /// Number of polynomials this SSA is composed of.
+    pub fn num_polys(&self) -> usize {
+        self.num_polys
+    }
+
     /// Returns `true` once, when the number of received polynomial parts reaches
     /// `ceil(threshold * num_polys)` for the first time. Subsequent calls return
     /// `false` (idempotent guard — fires at most once per SSA lifecycle).
@@ -174,6 +179,11 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
     pub fn get_deposit_address(&self) -> Option<&S::DepositAddress> {
         self.full_ssa_commitment.as_ref().map(|(_, a)| a)
+    }
+
+    /// Number of polynomials this SSA commitment is composed of.
+    pub fn num_polys(&self) -> usize {
+        self.num_polys
     }
 
     pub fn add_transposed(

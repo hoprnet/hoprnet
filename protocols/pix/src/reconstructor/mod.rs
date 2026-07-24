@@ -11,11 +11,6 @@ use hopr_types::{
 use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use validator::Validate;
 
-/// Maximum number of concurrent SSA cycles (current + pipelined + sessions) that
-/// can have verifiers in flight before eviction. Past this, late shares from slower
-/// cycles get `MissingVerifier` and are silently lost.
-const MAX_CONCURRENT_SSA_CYCLES: u64 = 8;
-
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
     PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState,
@@ -136,7 +131,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
                 .time_to_idle(cfg.incomplete_ssa_lifetime)
                 .build(),
-            ssa_verifiers: moka::sync::CacheBuilder::new(MAX_CONCURRENT_SSA_CYCLES * (MAX_POLYS_PER_SSA as u64))
+            // Indispensable per-cycle state: never size-evicted. Built without a
+            // `max_capacity`, so only `time_to_idle` reclaims it (see H1). Explicit
+            // `retire_ssa` removes verifiers on full recovery and session teardown.
+            ssa_verifiers: moka::sync::Cache::builder()
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
@@ -153,6 +151,18 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     #[inline]
     pub fn config(&self) -> &SsaReconstructorConfig {
         &self.cfg
+    }
+
+    /// Removes all reconstructor state for a single SSA cycle whose polynomial
+    /// count is already known. At commitment completion the polynomial indices are
+    /// contiguous `0..num_polys`, so those are exactly the verifier keys to drop.
+    /// Idempotent: invalidating an absent key is a no-op.
+    fn remove_cycle(&self, ssa_id: SsaId<S::Pseudonym>, num_polys: usize) {
+        for poly_index in 0..num_polys as PolynomialIndex {
+            self.ssa_verifiers.invalidate(&SsaPolynomialId::new(ssa_id, poly_index));
+        }
+        self.ssa_builders.invalidate(&ssa_id);
+        self.commitment_builder.invalidate(&ssa_id);
     }
 
     fn process_verified_ack(
@@ -208,11 +218,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
         match ssa {
             Some(scalar) => {
+                let ssa_id = *spi.as_ref();
+                // Capture what we need and release the builder lock before retiring,
+                // so `remove_cycle` does not re-enter this same mutex.
+                let num_polys = builder_guard.num_polys();
+                drop(builder_guard);
                 let Some(ssa) = S::scalar_to_private_key(scalar) else {
                     tracing::error!(%spi, "ssa reconstruction failed");
                     return Err(PixError::InvalidSsa);
                 };
-                let ssa_id = *spi.as_ref();
+                // Full recovery: this cycle's verifier state is no longer needed.
+                self.remove_cycle(ssa_id, num_polys);
                 tracing::info!(%ssa_id, "ssa recovered");
                 Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }))
             }
@@ -240,6 +256,24 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
     fn is_expected_error(&self, error: &Self::Error) -> bool {
         matches!(error, PixError::UnexpectedShare)
+    }
+
+    fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
+        // `num_polys` is available while either builder still exists; one always
+        // does while verifiers exist (both are created at commitment completion).
+        let num_polys = self
+            .ssa_builders
+            .get(&ssa_id)
+            .map(|b| b.lock().num_polys())
+            .or_else(|| self.commitment_builder.get(&ssa_id).map(|b| b.lock().num_polys()));
+        match num_polys {
+            Some(num_polys) => self.remove_cycle(ssa_id, num_polys),
+            None => {
+                // No builder left: any lingering verifiers fall to the idle-TTL backstop.
+                self.ssa_builders.invalidate(&ssa_id);
+                self.commitment_builder.invalidate(&ssa_id);
+            }
+        }
     }
 
     fn new_exit_commitment(
@@ -959,6 +993,133 @@ mod tests {
 
         assert!(has_early, "expected AlmostRecoveredSsa event");
         assert!(has_full, "expected RecoveredSsa event");
+
+        Ok(())
+    }
+
+    #[test]
+    fn full_recovery_retires_all_reconstructor_state() -> anyhow::Result<()> {
+        // 4 polynomials, threshold 4, no surplus → 16 shares, fully recoverable.
+        // Multiple polynomials on purpose: this exercises the whole `0..num_polys`
+        // cleanup loop, so a wrong-key or off-by-one in `remove_cycle` would surface.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 4,
+            threshold: 4,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+        reconstructor.new_exit_commitment(ssa_id, 4, 4)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        // Precondition: the completed cycle holds its verifier + builder state.
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            4,
+            "4 verifiers present after completion"
+        );
+        assert!(
+            reconstructor.ssa_builders.contains_key(&ssa_id),
+            "ssa builder present after completion"
+        );
+
+        // Drive full recovery: generate every share, insert it encrypted, acknowledge.
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc_share = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        assert!(
+            resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
+            "cycle must fully recover"
+        );
+
+        // Behaviour under test: full recovery must retire ALL of the cycle's
+        // reconstructor state, rather than leave it to linger until the idle TTL.
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        reconstructor.ssa_builders.run_pending_tasks();
+        reconstructor.commitment_builder.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            0,
+            "verifiers must be retired on full recovery"
+        );
+        assert!(
+            !reconstructor.ssa_builders.contains_key(&ssa_id),
+            "ssa builder must be retired on full recovery"
+        );
+        assert!(
+            !reconstructor.commitment_builder.contains_key(&ssa_id),
+            "commitment builder must be retired on full recovery"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn retire_ssa_removes_cycle_state_and_is_idempotent() -> anyhow::Result<()> {
+        // 3 polynomials so the cleanup loop is again exercised over several keys.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 3,
+            threshold: 4,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+        reconstructor.new_exit_commitment(ssa_id, 3, 4)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            3,
+            "3 verifiers present after completion"
+        );
+        assert!(reconstructor.ssa_builders.contains_key(&ssa_id));
+
+        // Explicit retirement (as invoked on session teardown) drops everything.
+        reconstructor.retire_ssa(ssa_id);
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        reconstructor.ssa_builders.run_pending_tasks();
+        reconstructor.commitment_builder.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            0,
+            "verifiers must be removed by retire_ssa"
+        );
+        assert!(!reconstructor.ssa_builders.contains_key(&ssa_id));
+        assert!(!reconstructor.commitment_builder.contains_key(&ssa_id));
+
+        // Idempotent: retiring the same (now-empty) cycle again is a harmless no-op.
+        reconstructor.retire_ssa(ssa_id);
+
+        // `None` fallback: retiring a cycle that was never created must not panic and
+        // must leave the caches untouched.
+        let never_seen = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+        reconstructor.retire_ssa(never_seen);
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(reconstructor.ssa_verifiers.entry_count(), 0);
 
         Ok(())
     }

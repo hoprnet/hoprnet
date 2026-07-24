@@ -1562,6 +1562,9 @@ where
 
     async fn request_next_ssa(&self, session_id: SessionId, slot: SessionSlot) -> errors::Result<()> {
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        // Clone for the deposit-timeout kill switch below; `pix_toolbox` itself is
+        // moved into the blocking commitment task.
+        let pix_toolbox_killswitch = pix_toolbox.clone();
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
         let current_ssa_state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
@@ -1608,6 +1611,10 @@ where
                     if let Some(session_slot) = session_cache.remove(&session_id) {
                         active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
                         close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
+                        // Release this cycle's reconstructor state on an abandoned deposit.
+                        pix_toolbox_killswitch
+                            .share_processor
+                            .retire_ssa(SsaId::new(session_id, ssa_index));
                         error!(%session_id, ssa_index, "pix session deposit timeout");
                     } else {
                         warn!(%session_id, "pix session deposit timeout - session not found");
@@ -1664,6 +1671,15 @@ where
     pub fn close_session(&self, id: &SessionId) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
+            // Release reconstructor state for this session's live SSA cycle(s):
+            // the current index and its pipelined predecessor.
+            if let (Some(ssa_state), Some(pix_toolbox)) = (slot.current_ssa_state.get(), self.pix_toolbox.get()) {
+                let current = ssa_state.peek_index();
+                pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, current));
+                if let Some(previous) = SsaIndex::new(current.get().saturating_sub(1)) {
+                    pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, previous));
+                }
+            }
             close_session(*id, slot, ClosureReason::Eviction);
             true
         } else {

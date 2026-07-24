@@ -442,7 +442,7 @@ pub(crate) mod tests {
         // legitimate (they represent scalar coefficient 1).
         let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
         let verifier =
-            PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi.clone(), all_generator.clone())?;
+            PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator.clone())?;
         let (_, serialized) = verifier.into_serializable_commitments();
         assert_eq!(
             serialized, all_generator,
