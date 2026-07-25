@@ -194,17 +194,24 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
     {
         let ssa_index = commitment.ssa_id.ssa_index();
 
-        // A single message can only carry a limited number of coefficient commitments so that the
-        // resulting encoded message still fits within a HOPR packet payload. The commitments of a
-        // single coefficient (across all polynomials) might therefore need to be split across
-        // multiple messages. The bound below mirrors the conservative estimate used by the encoder
-        // (it intentionally over-reserves space for the per-commitment polynomial index and the
-        // message header), guaranteeing that every produced message encodes successfully.
-        let max_commitments_per_message = ((ApplicationData::PAYLOAD_SIZE
-            - StartProtocol::<I, (), (), G>::START_HEADER_SIZE)
-            / (size_of::<hopr_protocol_pix::SsaIndex>()
-                + StartProtocol::<I, (), (), G>::PIX_COEFF_COMMITMENT_REPR_SIZE))
-            .max(1);
+        // A single message can only carry a limited number of coefficient commitments
+        // so that the resulting encoded message still fits within a HOPR packet payload.
+        // The commitments of a single coefficient (across all polynomials) might therefore
+        // need to be split across multiple messages.
+        //
+        // The bound is derived from the actual SsaCommit encode layout:
+        //   header:     version(1) + disc(1) + data_len(2) = 4
+        //   fixed:      ssa_index(4) + coefficient_index(2) + poly_count(2) = 8
+        //   per-entry:  PolynomialIndex(2) + commitment_repr(PIX_COEFF_COMMITMENT_REPR_SIZE)
+        //   trailer:    CBOR session_id (~size_of::<I>() + 2 framing overhead)
+        let header_and_fixed: usize = 4 + 4 + 2 + 2; // header + ssa_index + coeff_index + num_polys
+        let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
+            + StartProtocol::<I, (), (), G>::PIX_COEFF_COMMITMENT_REPR_SIZE;
+        // CBOR session_id estimate: size_of::<I>() data + 2 bytes CBOR framing overhead.
+        // Conservative for the fixed-size byte-string session IDs used in production.
+        let cbor_session_id_size = size_of::<I>() + 2;
+        let max_commitments_per_message =
+            (ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size) / per_entry).max(1);
 
         // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
         // guarantee that the resulting messages are ordered by coefficient index, making sure the

@@ -867,6 +867,9 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     }
 
     #[inline]
+    fn retire_ssa(&self, _: SsaId<HoprPseudonym>) {}
+
+    #[inline]
     fn insert_encrypted_share(
         &self,
         _: &OffchainPublicKey,

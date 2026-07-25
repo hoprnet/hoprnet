@@ -174,6 +174,9 @@ struct SessionSsaState {
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
+    /// Serializes the three call sites of [`request_next_ssa`] so that
+    /// `peek_index` / fallible work / `increment_index` is never interleaved.
+    request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
 }
 
 impl SessionSsaState {
@@ -184,6 +187,7 @@ impl SessionSsaState {
             num_errors: Default::default(),
             polys_per_ssa,
             shares_per_poly,
+            request_lock: Arc::new(hopr_utils::runtime::prelude::Mutex::new(())),
         }
     }
 
@@ -1091,15 +1095,16 @@ where
         match result {
             moka::ops::compute::CompResult::Inserted(_) => {
                 // Notify any waiting message handler (e.g. handle_ssa_request) that the slot
-                // is now available. Drain only the senders registered for this SessionId;
-                // dropping them resolves the corresponding receivers.
+                // is now available. Drain and signal the senders registered for this SessionId.
                 if let Some(waiters) = self
                     .slot_allocated
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .remove(&session_id)
                 {
-                    drop(waiters);
+                    for w in waiters {
+                        let _ = w.send(());
+                    }
                 }
                 // take_guard borrows self, so the guard stores the counter clone separately.
                 Some(SessionSlotGuard::new(&self.sessions, session_id, counter.clone()))
@@ -1575,6 +1580,17 @@ where
         let current_ssa_state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
             "cannot request new ssa on a session without pix state"
         )))?;
+
+        // Serialize the three call sites (establishment, SsaAlmostRecovered, SsaRecovered)
+        // so that peek_index → fallible work → increment_index is never interleaved.
+        // The timeout is a safety net: if a prior call crashed without releasing the lock,
+        // we surface the error rather than blocking the session forever.
+        let _guard = current_ssa_state
+            .request_lock
+            .lock()
+            .timeout(futures_time::time::Duration::from(Duration::from_secs(30)))
+            .await
+            .map_err(|_| SessionManagerError::Other(anyhow!("request_next_ssa lock timed out")))?;
 
         // Peek at the next SSA index *before* fallible operations so that a failed
         // commitment generation or send does not permanently consume it.
@@ -5806,6 +5822,49 @@ mod tests {
 
         bob_sender.close_channel();
         bob_handle.await??;
+
+        Ok(())
+    }
+
+    /// Verifies that `allocate_session_slot` signals waiters via `.send(())` rather than
+    /// dropping the senders. The `Ok(Ok(()))` path in `handle_ssa_request` must be live.
+    #[test_log::test(tokio::test)]
+    async fn allocate_session_slot_must_signal_waiters_not_cancel_them() -> anyhow::Result<()> {
+        let session_id = HoprPseudonym::random();
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        // Register a waiter before the slot is allocated
+        let (tx, mut rx) = oneshot::channel::<()>();
+        mgr.slot_allocated
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(session_id)
+            .or_default()
+            .push(tx);
+
+        let (session_tx, _) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(SESSION_FORWARD_CAPACITY);
+
+        // Allocate the slot — this should signal the waiter
+        let guard = mgr.allocate_session_slot(
+            session_id,
+            SessionSlot {
+                session_tx,
+                routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(session_id)),
+                abort_handles: Default::default(),
+                surb_mgmt: Arc::new(BalancerStateValues::from(SurbBalancerConfig::default())),
+                surb_estimator: Default::default(),
+                current_ssa_state: Default::default(),
+            },
+        );
+        assert!(guard.is_some(), "slot allocation must succeed");
+
+        // The waiter should receive Some(()) — the direct signal, not Canceled
+        assert!(
+            matches!(rx.try_recv(), Ok(Some(()))),
+            "waiter must be signaled with Ok(()), not canceled"
+        );
+
+        guard.unwrap().commit();
 
         Ok(())
     }
