@@ -125,7 +125,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new(cfg: SsaReconstructorConfig) -> Self {
         cfg.validate().expect("invalid SsaReconstructorConfig");
         Self {
-            commitment_builder: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+            commitment_builder: moka::sync::Cache::builder()
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
             // The builder must not be reclaimed before its verifiers (I1): a live verifier
@@ -134,7 +134,13 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // ack is dropped). The builder and its verifiers are inserted together at
             // commitment completion, so clamping the builder's idle TTL to at least the
             // verifier's guarantees the builder always outlives them.
-            ssa_builders: moka::sync::CacheBuilder::new((MAX_POLYS_PER_SSA + 1) as u64)
+            //
+            // Both builder caches intentionally have NO max_capacity (same as
+            // `ssa_verifiers`): active removal happens via `remove_cycle` on full
+            // recovery and `retire_ssa` on session teardown, and TTL is the backstop.
+            // A hard capacity would silently evict a builder while its verifiers remain
+            // live, permanently stranding the SSA cycle.
+            ssa_builders: moka::sync::Cache::builder()
                 .time_to_idle(cfg.incomplete_ssa_lifetime.max(cfg.unused_verifier_lifetime))
                 .build(),
             // Indispensable per-cycle state: never size-evicted. Built without a
@@ -157,6 +163,14 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     #[inline]
     pub fn config(&self) -> &SsaReconstructorConfig {
         &self.cfg
+    }
+
+    /// Returns `true` if the reconstructor still holds a builder (SSA-part
+    /// builder or commitment builder) for the given cycle.  Used by tests to
+    /// verify that [`retire_ssa`](ExitAcknowledgementShareProcessor::retire_ssa)
+    /// cleaned up the expected state.
+    pub fn contains_builder(&self, ssa_id: &SsaId<S::Pseudonym>) -> bool {
+        self.ssa_builders.contains_key(ssa_id) || self.commitment_builder.contains_key(ssa_id)
     }
 
     /// Removes all reconstructor state for a single SSA cycle whose polynomial
@@ -1257,6 +1271,21 @@ mod tests {
             "peer_b's stash must survive peer_a's invalidation"
         );
 
+        Ok(())
+    }
+
+    /// Verifies that the builder caches accept more entries than the old
+    /// `MAX_POLYS_PER_SSA` size bound. After removing the hard capacity, only
+    /// TTL governs eviction.
+    #[test]
+    fn builder_caches_accept_more_entries_than_max_polys_per_ssa() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let exceed = MAX_POLYS_PER_SSA as usize + 5;
+        for i in 0..exceed {
+            let ssa_id = SsaId::new(SimplePseudonym::random(), (1u32 + i as u32).try_into()?);
+            reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        }
+        // No error and no crash means no hard-cap eviction of active entries.
         Ok(())
     }
 }

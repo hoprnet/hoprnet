@@ -142,7 +142,7 @@ type SessionInitiationCache = moka::sync::Cache<
 >;
 
 /// Handles to streams and tasks spawned by the Session.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum SessionHandles {
     /// Handle to the stream that facilitates ingress of data from the HOPR network into the Session.
     Ingress,
@@ -151,11 +151,29 @@ enum SessionHandles {
     /// Handle to the process that monitors and balances SURBs.
     Balancer,
     /// Handle to the process which closes the Session unless the handle is aborted.
-    PixKillSwitch,
+    ///
+    /// Carries the inner `SsaIndex` value so that each cycle gets its own
+    /// independent entry in `AbortableList` — pipelining does not cancel an
+    /// earlier cycle's deadline.
+    PixKillSwitch(u32),
     /// Handle to the process that awaits PIX deposit for a Session.
     ///
     /// Once the deposit is received, the handle [`SessionHandles::PixKillSwitch`] is aborted.
-    DepositAwaiter,
+    /// Carries the inner `SsaIndex` value so that each cycle's awaiter is
+    /// independent.
+    DepositAwaiter(u32),
+}
+
+impl std::fmt::Display for SessionHandles {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ingress => write!(f, "Ingress"),
+            Self::KeepAlive => write!(f, "KeepAlive"),
+            Self::Balancer => write!(f, "Balancer"),
+            Self::PixKillSwitch(idx) => write!(f, "PixKillSwitch({idx})"),
+            Self::DepositAwaiter(idx) => write!(f, "DepositAwaiter({idx})"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -764,7 +782,7 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
-    pix_toolbox: OnceLock<PixToolbox>,
+    pix_toolbox: Arc<OnceLock<PixToolbox>>,
     cfg: SessionManagerConfig,
     /// Per-SessionId waiters notified when a new session slot is allocated. Lets message
     /// handlers that arrive before the slot insertion completes (e.g. SsaRequest vs
@@ -867,6 +885,8 @@ where
         let msg_sender = Arc::new(OnceLock::new());
         let initiation_timeout =
             2 * initiation_timeout_max_one_way(cfg.initiation_timeout_base, RoutingOptions::MAX_INTERMEDIATE_HOPS);
+        let pix_toolbox: Arc<OnceLock<PixToolbox>> = Arc::new(OnceLock::new());
+        let pix_toolbox_eviction = pix_toolbox.clone();
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::sync::Cache::builder()
@@ -876,16 +896,30 @@ where
             sessions: moka::sync::Cache::builder()
                 .max_capacity(maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
-                .eviction_listener(move |session_id: Arc<SessionId>, entry, reason| match &reason {
-                    moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
-                        trace!(?session_id, ?reason, "session evicted from the cache");
-                        active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
-                        close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
-                    }
-                    _ => {}
-                })
+                .eviction_listener(
+                    move |session_id: Arc<SessionId>, entry: SessionSlot, reason| match &reason {
+                        moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
+                            trace!(?session_id, ?reason, "session evicted from the cache");
+                            if let (Some(ssa_state), Some(pix_toolbox)) =
+                                (entry.current_ssa_state.get(), pix_toolbox_eviction.get())
+                            {
+                                let current = ssa_state.peek_index();
+                                for i in 1..=current.get() {
+                                    if let Some(idx) = SsaIndex::new(i) {
+                                        pix_toolbox
+                                            .share_processor
+                                            .retire_ssa(SsaId::new(*session_id.as_ref(), idx));
+                                    }
+                                }
+                            }
+                            active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
+                            close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
+                        }
+                        _ => {}
+                    },
+                )
                 .build(),
-            pix_toolbox: OnceLock::new(),
+            pix_toolbox,
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
@@ -959,6 +993,18 @@ where
                         // an empty read is encountered, which means the closure was done by the
                         // other party.
                         if let Some(session_data) = myself.sessions.remove(&session_id) {
+                            // Release reconstructor state for all live SSA cycles
+                            // before closing.
+                            if let (Some(ssa_state), Some(pix_toolbox)) =
+                                (session_data.current_ssa_state.get(), myself.pix_toolbox.get())
+                            {
+                                let current = ssa_state.peek_index();
+                                for i in 1..=current.get() {
+                                    if let Some(idx) = SsaIndex::new(i) {
+                                        pix_toolbox.share_processor.retire_ssa(SsaId::new(session_id, idx));
+                                    }
+                                }
+                            }
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                             close_session(session_id, session_data, closure_reason);
                         } else {
@@ -1626,7 +1672,7 @@ where
             + self.cfg.pix_config.max_deposit_wait
             + self.cfg.pix_config.max_ssa_delivery_time;
         slot.abort_handles.lock().insert(
-            SessionHandles::PixKillSwitch,
+            SessionHandles::PixKillSwitch(ssa_index.get()),
             hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
                 move |_| async move {
                     if let Some(session_slot) = session_cache.remove(&session_id) {
@@ -1692,13 +1738,14 @@ where
     pub fn close_session(&self, id: &SessionId) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
-            // Release reconstructor state for this session's live SSA cycle(s):
-            // the current index and its pipelined predecessor.
+            // Release reconstructor state for all live SSA cycles:
+            // every index from 1 through the current peek index.
             if let (Some(ssa_state), Some(pix_toolbox)) = (slot.current_ssa_state.get(), self.pix_toolbox.get()) {
                 let current = ssa_state.peek_index();
-                pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, current));
-                if let Some(previous) = SsaIndex::new(current.get().saturating_sub(1)) {
-                    pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, previous));
+                for i in 1..=current.get() {
+                    if let Some(idx) = SsaIndex::new(i) {
+                        pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, idx));
+                    }
                 }
             }
             close_session(*id, slot, ClosureReason::Eviction);
@@ -2542,7 +2589,7 @@ where
             // TODO: generalize the awaiter into a perpetual Session task that either awaits for Deposit or a signal
             // that sends Exit commitment and reinstates the kill-switch.
             session_slot.abort_handles.lock().insert(
-                SessionHandles::DepositAwaiter,
+                SessionHandles::DepositAwaiter(ssa_id.ssa_index().get()),
                 hopr_utils::spawn_as_abortable!(async move {
                     let deposit_done_rx_result = deposit_done_rx
                         .filter(|((evt_pseudonym, evt_index), _)| {
@@ -2564,7 +2611,7 @@ where
                             slot_clone
                                 .abort_handles
                                 .lock()
-                                .abort_one(&SessionHandles::PixKillSwitch);
+                                .abort_one(&SessionHandles::PixKillSwitch(ssa_id.ssa_index().get()));
                             info!(%session_id, "SSA deposit successful");
                         }
                         Ok(None) => {
@@ -5372,6 +5419,153 @@ mod tests {
              pipelined it)"
         );
 
+        Ok(())
+    }
+
+    /// Verifies that pipelining a second SSA does NOT abort the first cycle's
+    /// deposit kill-switch.  With per-index keys, `PixKillSwitch(1)` and
+    /// `PixKillSwitch(2)` are independent entries in the `AbortableList`.
+    #[test_log::test(tokio::test)]
+    async fn pipelined_ssa_preserves_earlier_deposit_deadline() -> anyhow::Result<()> {
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let slot = mgr.sessions.get(&alice_pseudonym).unwrap();
+        assert!(
+            slot.abort_handles.lock().contains(&SessionHandles::PixKillSwitch(1)),
+            "first cycle's PixKillSwitch must be present after init"
+        );
+
+        // Pipeline the second SSA via early recovery.
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+
+        // After pipelining both must coexist.
+        let handles = slot.abort_handles.lock();
+        assert!(
+            handles.contains(&SessionHandles::PixKillSwitch(1)),
+            "first cycle's deposit deadline was removed by pipelining"
+        );
+        assert!(
+            handles.contains(&SessionHandles::PixKillSwitch(2)),
+            "second cycle's deposit deadline was not installed"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Verifies that explicit close_session retires all SSA cycles, not just
+    /// the last two.  After several pipelined cycles, every index from 1
+    /// through current must be retired.
+    #[test_log::test(tokio::test)]
+    async fn close_session_retires_all_ssa_cycles() -> anyhow::Result<()> {
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        // Pipeline two more SSAs via SsaAlmostRecovered so that current_index
+        // advances past index 1, 2, 3.
+        let ssa1 = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa1))
+            .await?;
+        let ssa2 = SsaId::new(alice_pseudonym, 2.try_into()?);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa2))
+            .await?;
+
+        // Grab a reference to the reconstructor before close_session consumes
+        // the slot.
+        let pix_toolbox_ref = mgr.pix_toolbox.get().unwrap().clone();
+        let share_processor = pix_toolbox_ref.share_processor;
+
+        mgr.close_session(&alice_pseudonym);
+
+        // After close_session, every builder for indices 1,2,3 must be gone.
+        for i in 1..=3_u32 {
+            let sid = SsaId::new(alice_pseudonym, i.try_into()?);
+            assert!(
+                !share_processor.contains_builder(&sid),
+                "builder for SsaId index {i} should have been retired"
+            );
+        }
+
+        bob_sender.close_channel();
+        bob_handle.await??;
         Ok(())
     }
 
