@@ -32,11 +32,23 @@ use validator::Validate;
 
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
+/// Default amount of xDai to send to a recovered stealth address for gas
+/// (0.01 xDai, i.e. 10^16 base units).
+fn default_gas_xdai() -> XDaiBalance {
+    XDaiBalance::new_base(1)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct NonAnonymousPixStrategyConfig {
     pub price_per_byte: HoprBalance,
     pub max_ssa_allocation: HoprBalance,
     pub max_deposit_tracking_time: Duration,
+    /// Amount of xDai to send from the Safe to a recovered stealth address to
+    /// cover gas for the `withdraw_from_signer` sweep.  Must be non-zero to
+    /// enable the sweep; the Safe's xDai balance is checked before sending.
+    /// Default: 0.01 xDai.
+    #[serde(default = "default_gas_xdai")]
+    pub gas_xdai_per_sweep: XDaiBalance,
     /// If set, the strategy persists recovered private keys to `redb` at this
     /// path before withdrawing (Exit role).  `None` means in-memory only (Entry role).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,6 +135,48 @@ where
     /// Periodic task logic.
     async fn on_tick(&self) -> crate::errors::Result<()> {
         tracing::debug!("PixStrategy tick");
+        Ok(())
+    }
+
+    /// Send the configured gas xDai from the node operator to the recovered
+    /// stealth address, so that [`withdraw_from_signer`] can pay for gas.
+    /// Checks the Safe's xDai balance and returns
+    /// [`StrategyError::CriteriaNotSatisfied`] when insufficient.
+    async fn fund_sweep_gas(&self, recovered_address: Address) -> crate::errors::Result<()> {
+        if self.cfg.gas_xdai_per_sweep.is_zero() {
+            return Ok(());
+        }
+
+        let safe_xdai: XDaiBalance = self
+            .node
+            .chain_api()
+            .balance(self.node.identity().safe_address)
+            .await
+            .map_err(StrategyError::other)?;
+
+        if safe_xdai < self.cfg.gas_xdai_per_sweep {
+            tracing::warn!(
+                safe = %self.node.identity().safe_address,
+                required = %self.cfg.gas_xdai_per_sweep,
+                available = %safe_xdai,
+                "insufficient xDai in safe to fund sweep gas"
+            );
+            return Err(StrategyError::CriteriaNotSatisfied);
+        }
+
+        self.node
+            .chain_api()
+            .withdraw(self.cfg.gas_xdai_per_sweep, &recovered_address)
+            .and_then(identity)
+            .await
+            .map_err(StrategyError::other)?;
+
+        tracing::info!(
+            amount = %self.cfg.gas_xdai_per_sweep,
+            %recovered_address,
+            "funded sweep gas from safe"
+        );
+
         Ok(())
     }
 
@@ -256,16 +310,16 @@ where
 
                 let chain_key =
                     ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
-
+                let recovered_address = chain_key.public().to_address();
                 let safe_address = self.node.identity().safe_address;
 
                 let recovered_balance: HoprBalance = self
                     .node
                     .chain_api()
-                    .balance(chain_key.public().to_address())
+                    .balance(recovered_address)
                     .await
                     .map_err(StrategyError::other)?;
-                tracing::info!(%recovered_balance, address = %chain_key.public().to_address(), "recovered deposit balance");
+                tracing::info!(%recovered_balance, %recovered_address, "recovered deposit balance");
 
                 if recovered_balance.is_zero() {
                     // Already swept; just clean up the store entry.
@@ -275,6 +329,9 @@ where
                         tracing::warn!(%error, ?private_key_recovered.id, "failed to remove zero-balance entry from store");
                     }
                 } else {
+                    // Fund the recovered address with xDai for sweep gas, then sweep.
+                    self.fund_sweep_gas(recovered_address).await?;
+
                     self.node
                         .chain_api()
                         .withdraw_from_signer(&chain_key, recovered_balance, &safe_address)
@@ -291,7 +348,7 @@ where
                         tracing::warn!(%error, ?private_key_recovered.id, "failed to remove recovered key from store");
                     }
 
-                    tracing::info!(%recovered_balance, address = %chain_key.public().to_address(),  "deposit withdrawn");
+                    tracing::info!(%recovered_balance, %recovered_address, "deposit withdrawn");
                 }
             }
         }
@@ -336,6 +393,16 @@ where
                     }
 
                     tracing::info!(%balance, ?id, "replaying withdrawal for pending recovery");
+
+                    let recovered_address = chain_key.public().to_address();
+
+                    // Fund gas before replaying the sweep.  Errors are logged (not
+                    // propagated) so a transient gas failure does not stall the entire
+                    // recovery iteration.
+                    if let Err(error) = self.fund_sweep_gas(recovered_address).await {
+                        tracing::error!(%error, ?id, "recovery replay: fund_sweep_gas failed");
+                        continue;
+                    }
 
                     let withdraw_fut = match self
                         .node
@@ -602,6 +669,7 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: StdDuration::from_secs(5),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -679,6 +747,7 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -763,6 +832,7 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -791,11 +861,12 @@ mod tests {
     }
 
     /// PixEvent::PrivateKeyRecovered reads the balance of the recovered keypair's
-    /// raw chain address, then calls `withdraw_from_signer` to sweep the full balance
-    /// to the node's own safe address.
+    /// raw chain address, then funds gas from the safe and calls
+    /// `withdraw_from_signer` to sweep the full balance to the node's own safe.
     ///
     /// Verifies the recovered address ends at 0 wxHOPR and the safe receives the
-    /// full recovered balance (50 wxHOPR). The blokli snapshot records the final state.
+    /// full recovered balance (50 wxHOPR). The recovered address is NOT pre-funded
+    /// with xDai; the gas is sent by the strategy via `fund_sweep_gas`.
     #[test_log::test(tokio::test)]
     async fn test_private_key_recovered_withdraws_to_safe() -> anyhow::Result<()> {
         // Construct a deterministic keypair to simulate a recovered private key.
@@ -811,13 +882,13 @@ mod tests {
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
-                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                &[&*ALICE, &*BOB, &*CHRIS],
                 false,
-                XDaiBalance::new_base(1),
-                recovered_initial_balance,
+                XDaiBalance::new_base(2), // 2 xDai — 1 for sweep gas + buffer for registration fees
+                HoprBalance::new_base(1000),
             )
-            // with_generated_accounts sets balances for each account's derived safe address,
-            // but the test queries balance of the recovered address directly.
+            // Give the recovered address wxHOPR but NOT xDai — the strategy must
+            // fund its own sweep gas from the safe.
             .with_balances([(recovered_address, recovered_initial_balance)])
             .build_dynamic_client([1; Address::SIZE].into());
 
@@ -834,6 +905,8 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
+            // Use the default 0.01 xDai — BOB has 1 xDai from with_generated_accounts.
+            gas_xdai_per_sweep: default_gas_xdai(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -889,6 +962,7 @@ mod tests {
             price_per_byte: HoprBalance::new_base(1),
             max_ssa_allocation: HoprBalance::new_base(100),
             max_deposit_tracking_time: std::time::Duration::from_secs(60),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -919,6 +993,7 @@ mod tests {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
+                gas_xdai_per_sweep: XDaiBalance::zero(),
                 pix_recovery_db_path: None,
                 pix_recovery_password_env: None,
             },
@@ -963,6 +1038,7 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: Duration::from_secs(5),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
             pix_recovery_db_path: None,
             pix_recovery_password_env: None,
         };
@@ -1040,6 +1116,7 @@ mod tests {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
+                gas_xdai_per_sweep: XDaiBalance::zero(),
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
@@ -1070,10 +1147,10 @@ mod tests {
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
-                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                &[&*ALICE, &*BOB, &*CHRIS],
                 false,
-                XDaiBalance::new_base(1),
-                recovered_initial_balance,
+                XDaiBalance::new_base(2),
+                HoprBalance::new_base(1000),
             )
             .with_balances([(recovered_address, recovered_initial_balance)])
             .build_dynamic_client([1; Address::SIZE].into());
@@ -1089,6 +1166,7 @@ mod tests {
             price_per_byte,
             max_ssa_allocation,
             max_deposit_tracking_time: std::time::Duration::from_secs(5),
+            gas_xdai_per_sweep: default_gas_xdai(),
             pix_recovery_db_path: Some(db_path.clone()),
             pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
         };
@@ -1106,6 +1184,7 @@ mod tests {
             processed_deposits: Cache::builder().max_capacity(1024).build(),
         };
 
+        #[allow(clippy::disallowed_names)]
         let event_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
 
         let event = PixEvent::PrivateKeyRecovered(hopr_api::node::PixPrivateKeyRecovered {
@@ -1184,6 +1263,7 @@ mod tests {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                gas_xdai_per_sweep: XDaiBalance::zero(), // balance is zero — no gas needed
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
@@ -1225,10 +1305,10 @@ mod tests {
 
         let blokli_sim = BlokliTestStateBuilder::default()
             .with_generated_accounts(
-                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                &[&*ALICE, &*BOB, &*CHRIS],
                 false,
-                XDaiBalance::new_base(1),
-                recovered_balance,
+                XDaiBalance::new_base(2),
+                HoprBalance::new_base(1000),
             )
             .with_balances([(recovered_address, recovered_balance)])
             .build_dynamic_client([1; Address::SIZE].into());
@@ -1255,6 +1335,7 @@ mod tests {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                gas_xdai_per_sweep: default_gas_xdai(),
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
@@ -1330,6 +1411,7 @@ mod tests {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                gas_xdai_per_sweep: XDaiBalance::zero(),
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },

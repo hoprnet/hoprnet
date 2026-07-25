@@ -21,62 +21,50 @@ accounts:
     multi_addresses: []
     packet_key: 8994396d4907dc5e18e209cf958f001afe8f04d7dc1b3a4fd0f9086ee8c610b7
     safe_address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
-  3:
-    chain_key: a42259c04b40d58459de59f6067a1b376403c2a5
-    keyid: 3
-    multi_addresses: []
-    packet_key: 23d9733052875d7b1824d44c4269eee180cceaaee990b2068f975ac8385b2f7b
-    safe_address: 99575ba0e3a9a2c83fdc0971217a4c2f351cef75
 native_balances:
   18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
     __typename: NativeBalance
-    balance: 1 xDai
+    balance: 2 xDai
   93534e8ca82510a346dd329115ce7aefd4d35583:
     __typename: NativeBalance
     balance: 0 xDai
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
     __typename: NativeBalance
-    balance: 0.999999999999999999 xDai
+    balance: 0.999999999999999998 xDai
   259bed99d230648d7c8a116af59abdd15c9f4f1e:
     __typename: NativeBalance
     balance: 0 xDai
   b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
     __typename: NativeBalance
-    balance: 1 xDai
+    balance: 2 xDai
   0f944bc36fdcf97fff6807174eeb839ecd6035bd:
     __typename: NativeBalance
     balance: 0 xDai
   a42259c04b40d58459de59f6067a1b376403c2a5:
     __typename: NativeBalance
     balance: 0.999999999999999999 xDai
-  99575ba0e3a9a2c83fdc0971217a4c2f351cef75:
-    __typename: NativeBalance
-    balance: 0 xDai
 token_balances:
   18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
     __typename: HoprBalance
     balance: 0 wxHOPR
   93534e8ca82510a346dd329115ce7aefd4d35583:
     __typename: HoprBalance
-    balance: 50 wxHOPR
+    balance: 1000 wxHOPR
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
     __typename: HoprBalance
     balance: 50 wxHOPR
   259bed99d230648d7c8a116af59abdd15c9f4f1e:
     __typename: HoprBalance
-    balance: 50 wxHOPR
+    balance: 1000 wxHOPR
   b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
     __typename: HoprBalance
     balance: 0 wxHOPR
   0f944bc36fdcf97fff6807174eeb839ecd6035bd:
     __typename: HoprBalance
-    balance: 50 wxHOPR
+    balance: 1000 wxHOPR
   a42259c04b40d58459de59f6067a1b376403c2a5:
     __typename: HoprBalance
     balance: 0 wxHOPR
-  99575ba0e3a9a2c83fdc0971217a4c2f351cef75:
-    __typename: HoprBalance
-    balance: 50 wxHOPR
 safe_allowances:
   93534e8ca82510a346dd329115ce7aefd4d35583:
     __typename: SafeHoprAllowance
@@ -85,9 +73,6 @@ safe_allowances:
     __typename: SafeHoprAllowance
     allowance: 10000000000000 wxHOPR
   0f944bc36fdcf97fff6807174eeb839ecd6035bd:
-    __typename: SafeHoprAllowance
-    allowance: 10000000000000 wxHOPR
-  99575ba0e3a9a2c83fdc0971217a4c2f351cef75:
     __typename: SafeHoprAllowance
     allowance: 10000000000000 wxHOPR
 deployed_safes:
@@ -116,17 +101,9 @@ deployed_safes:
     module_address: 1613d5898cae268775bb85aa0b7e6e7fbc9dcd47
     registered_nodes: []
     threshold: "1"
-  99575ba0e3a9a2c83fdc0971217a4c2f351cef75:
-    address: 99575ba0e3a9a2c83fdc0971217a4c2f351cef75
-    chain_key: a42259c04b40d58459de59f6067a1b376403c2a5
-    owners:
-      - a42259c04b40d58459de59f6067a1b376403c2a5
-    module_address: f416f2e435179f109e356ec813ad246b074f5a08
-    registered_nodes: []
-    threshold: "1"
 safe_redeem_stats: {}
 tx_counts:
-  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 2
   a42259c04b40d58459de59f6067a1b376403c2a5: 1
 channels: {}
 chain_info:
