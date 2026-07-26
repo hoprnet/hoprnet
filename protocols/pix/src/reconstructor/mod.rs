@@ -686,6 +686,40 @@ mod tests {
     }
 
     #[test]
+    fn reconstructor_duplicate_per_cell_commitment() -> anyhow::Result<()> {
+        // Regression test for the per-cell duplicate check inside add_transposed.
+        // Previously the same (poly_index, coeff_index) slot silently overwrote;
+        // now it returns DuplicateCommitment.
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+
+        // Insert coeff_index=0 for poly 0
+        let mut poly_map_1 = HashMap::new();
+        poly_map_1.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map_1.into_iter())?;
+
+        // Insert coeff_index=0 for the same poly 0 again — should now fail
+        let mut poly_map_2 = HashMap::new();
+        poly_map_2.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map_2.into_iter());
+        assert!(matches!(result, Err(PixError::DuplicateCommitment)));
+
+        // But coeff_index=1 for the same poly should still succeed
+        let mut poly_map_3 = HashMap::new();
+        poly_map_3.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        assert!(
+            reconstructor
+                .insert_coefficient_commitments(ssa_id, 1, poly_map_3.into_iter())
+                .is_ok()
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn reconstructor_missing_verifier_retains_share() -> anyhow::Result<()> {
         // Regression test for the share-loss race:
         // When `process_verified_ack` encounters MissingVerifier, the share must

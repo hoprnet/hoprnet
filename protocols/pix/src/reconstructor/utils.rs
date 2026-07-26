@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use vsss_rs::{
     ReadableShareSet,
     elliptic_curve::group::{Group, GroupEncoding},
@@ -206,17 +208,27 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             if polynomial_index >= self.num_polys as PolynomialIndex {
                 return Err(errors::PixError::InvalidInput);
             }
+            // Validate that bytes decode to a valid group element before insertion.
+            // Without this check, a malformed (undecodable) commitment would occupy
+            // the cell permanently since re-insertion is now rejected.
+            if Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&polynomial_coeff_commitment)).is_none() {
+                return Err(errors::PixError::InvalidInput);
+            }
             validated.push((polynomial_index, polynomial_coeff_commitment));
         }
 
         for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
 
-            // Overwrite is safe here: the `complete` flag at line 195 prevents any
-            // insertion after Phase 2, so a late duplicate for an already-committed
-            // slot cannot corrupt the commitment.
-
-            polynomial.insert(coeff_index, polynomial_coeff_commitment);
+            // Do not allow any re-insertion
+            match polynomial.entry(coeff_index) {
+                Entry::Vacant(v) => {
+                    v.insert(polynomial_coeff_commitment);
+                }
+                Entry::Occupied(_) => {
+                    return Err(errors::PixError::DuplicateCommitment);
+                }
+            }
         }
 
         tracing::trace!(
