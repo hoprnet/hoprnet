@@ -172,13 +172,13 @@ pub struct InactiveConfiguredNetwork {
 /// process function. The network supports event subscription via
 /// [`NetworkView::subscribe_network_events`](hopr_api::network::NetworkView::subscribe_network_events).
 pub struct HoprLibp2pNetworkBuilder {
-    bootstrap: std::pin::Pin<Box<dyn Stream<Item = PeerDiscovery> + Send + Sync>>,
+    bootstrap: std::pin::Pin<Box<dyn Stream<Item = PeerDiscovery> + Send>>,
 }
 
 impl HoprLibp2pNetworkBuilder {
     pub fn new<T>(bootstrap: T) -> Self
     where
-        T: Stream<Item = PeerDiscovery> + Send + Sync + 'static,
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             bootstrap: Box::pin(bootstrap),
