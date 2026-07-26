@@ -34,9 +34,9 @@ use validator::Validate;
 use crate::{errors::StrategyError, strategy::Strategy as StrategyTrait};
 
 /// Default amount of xDai to send to a recovered stealth address for gas
-/// (0.01 xDai, i.e. 10^16 base units).
+/// (0.01 xDai, i.e. 10^16 wei).
 fn default_gas_xdai() -> XDaiBalance {
-    XDaiBalance::new_base(1)
+    "0.01 xdai".parse().expect("valid static xDai amount")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
@@ -132,14 +132,6 @@ impl<N> NonAnonymousPixStrategyInner<N>
 where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
-    /// Send the configured gas xDai from the node operator to the recovered
-    /// stealth address, so that [`withdraw_from_signer`] can pay for gas.
-    /// Checks the Safe's xDai balance and returns
-    /// [`StrategyError::CriteriaNotSatisfied`] when insufficient.
-    async fn fund_sweep_gas(&self, recovered_address: Address) -> crate::errors::Result<()> {
-        fund_sweep_gas_impl(&*self.node, &self.cfg, recovered_address).await
-    }
-
     /// Handle PIX event.
     async fn on_pix_event(&mut self, event: PixEvent) -> crate::errors::Result<()> {
         tracing::debug!(?event, "PixStrategy event");
