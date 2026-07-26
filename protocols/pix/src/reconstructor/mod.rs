@@ -1437,4 +1437,101 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn retire_ssa_tombstone_prevents_resurrection_in_insert_coefficient_commitments() -> anyhow::Result<()> {
+        // Regression test for the M9 tombstone fix: when a concurrent `retire_ssa`
+        // runs between verifier insertion and builder/liveness publication inside
+        // `insert_coefficient_commitments`'s `CommitmentResult::Completed` arm, the
+        // tombstone must prevent resurrection.
+        //
+        // The race window is:
+        //  1. commitment_builder entry is completed
+        //  2. verifiers are inserted (line 443-447)
+        //  3. retire_ssa runs concurrently (sets tombstone + removes builder/verifier)
+        //  4. tombstone check (line 451) intercepts and skips publication
+        //
+        // We simulate step 3 by setting the tombstone directly (the `retired_ssas`
+        // cache) between the two coefficient insertions.  The first insertion makes
+        // the commitment almost-complete; the second triggers Completed.
+        //
+        // The test uses a 2-coefficient generator so that two separate
+        // insert_coefficient_commitments calls are needed to complete the SSA.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+
+        // Insert first coefficient — makes the builder almost-complete.
+        // Builders may be lazily evaluated; run pending tasks to flush.
+        {
+            let coeff_0: Vec<_> = commitment
+                .verifiers
+                .get(&0)
+                .ok_or_else(|| anyhow::anyhow!("missing coeff 0"))?
+                .iter()
+                .map(|(pi, repr)| (*pi, *repr))
+                .collect();
+            let partial = reconstructor.insert_coefficient_commitments(ssa_id, 0, coeff_0.into_iter())?;
+            assert!(!partial.is_verifiable, "not yet complete after coeff 0");
+        }
+        reconstructor.commitment_builder.run_pending_tasks();
+
+        // Simulate concurrent retire_ssa by setting only the tombstone.
+        // In the real race, retire_ssa would also remove builders/verifiers,
+        // but setting the tombstone is sufficient to test the critical check.
+        reconstructor.retired_ssas.insert(ssa_id, ());
+
+        // Insert final coefficient — triggers Completed; tombstone must intercept.
+        reconstructor.commitment_builder.run_pending_tasks();
+        {
+            let coeff_1: Vec<_> = commitment
+                .verifiers
+                .get(&1)
+                .ok_or_else(|| anyhow::anyhow!("missing coeff 1"))?
+                .iter()
+                .map(|(pi, repr)| (*pi, *repr))
+                .collect();
+            let result = reconstructor.insert_coefficient_commitments(ssa_id, 1, coeff_1.into_iter())?;
+
+            // The tombstone path drops verifiers and skips builder/liveness
+            // publication even though the builder completed.
+            // Note: ssa_deposit_address is populated at line 409 from the
+            // commitment_builder's internal state (set before the tombstone
+            // check), so it may still be Some.  The key invariant is
+            // is_verifiable=false — the builder was NOT published.
+            assert!(!result.is_verifiable, "tombstone prevented verifiable=true");
+        }
+
+        // Flush lazy caches.
+        reconstructor.ssa_builders.run_pending_tasks();
+
+        // Builder and liveness caches must be empty.
+        assert!(
+            !reconstructor.ssa_builders.contains_key(&ssa_id),
+            "tombstone prevented builder publication"
+        );
+        assert!(
+            !reconstructor.ssa_num_polys.contains_key(&ssa_id),
+            "tombstone prevented liveness publication"
+        );
+
+        // The verifiers should also have been invalidated by the tombstone path.
+        for poly_idx in 0..1 {
+            let spi = SsaPolynomialId::new(ssa_id, poly_idx);
+            assert!(
+                !reconstructor.ssa_verifiers.contains_key(&spi),
+                "tombstone must also remove verifier for spi {spi:?}"
+            );
+        }
+
+        Ok(())
+    }
 }

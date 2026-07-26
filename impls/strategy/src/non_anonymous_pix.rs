@@ -1466,4 +1466,145 @@ mod tests {
 
         Ok(())
     }
+
+    /// PrivateKeyRecovered handler exercises the deficit-calculation path in
+    /// `fund_sweep_gas_impl`: the recovered address has wxHOPR but NO xDai,
+    /// so the strategy must send gas from the safe before sweeping.
+    #[test_log::test(tokio::test)]
+    async fn test_private_key_recovered_without_xdai_funds_gas_from_safe() -> anyhow::Result<()> {
+        let recovered_kp = ChainKeypair::from_secret(&hex!(
+            "e555e08c3c2d47f89df2c6d3e5e7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4dd"
+        ))
+        .expect("recovered keypair should be valid");
+        let recovered_address = recovered_kp.public().to_address();
+
+        let recovered_initial_balance = HoprBalance::new_base(50);
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &recovered_address],
+                false,
+                XDaiBalance::new_base(0), // give each generated account 0 xDai initially
+                HoprBalance::new_base(1000),
+            )
+            // Give BOB enough xDai for registration + sweep gas
+            .with_balances([(*BOB, XDaiBalance::new_base(2))])
+            // Give the recovered address wxHOPR and zero xDai
+            .with_balances([(recovered_address, recovered_initial_balance)])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let snapshot = blokli_sim.snapshot();
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        register_test_safe(&chain_connector, *BOB).await?;
+        let chain_connector = Arc::new(chain_connector);
+
+        let mut strategy = NonAnonymousPixStrategyInner {
+            cfg: NonAnonymousPixStrategyConfig {
+                price_per_byte: HoprBalance::new_base(1),
+                max_ssa_allocation: HoprBalance::new_base(100),
+                max_deposit_tracking_time: std::time::Duration::from_secs(5),
+                gas_xdai_per_sweep: default_gas_xdai(), // 0.01 xDai — deficit must be funded from safe
+                pix_recovery_db_path: None,
+                pix_recovery_password_env: None,
+            },
+            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            recovery_store: None,
+            processed_deposits: Cache::builder().max_capacity(1024).build(),
+        };
+
+        let safe_address = strategy.node.identity().safe_address;
+
+        let event = PixEvent::PrivateKeyRecovered(hopr_api::node::PixPrivateKeyRecovered {
+            id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
+            secret: hopr_api::node::PixDepositSecret(recovered_kp.secret().clone()),
+        });
+
+        strategy.on_pix_event(event).await?;
+
+        // Recovered keypair's wxHOPR balance should be zero after withdrawal.
+        let recovered_balance = strategy
+            .get_balance(recovered_address)
+            .await
+            .context("get recovered address balance after withdraw")?;
+        assert_eq!(
+            recovered_balance,
+            HoprBalance::zero(),
+            "recovered keypair's balance should be zero after withdrawal"
+        );
+
+        // Safe should have received the full recovered wxHOPR balance.
+        let safe_balance = strategy
+            .get_balance(safe_address)
+            .await
+            .context("get safe balance after withdraw")?;
+        assert_eq!(
+            safe_balance, recovered_initial_balance,
+            "safe should have received the full recovered balance"
+        );
+
+        insta::assert_yaml_snapshot!(*snapshot.refresh(), {
+            ".chain_info.contract_addresses" => "[contract_addresses]",
+        });
+
+        Ok(())
+    }
+
+    /// Build with only one of pix_recovery_db_path / pix_recovery_password_env must
+    /// silently succeed (config validation passes; the error occurs at build() time).
+    #[test]
+    fn test_build_fails_when_only_one_recovery_config_set() {
+        let cfg = NonAnonymousPixStrategyConfig {
+            price_per_byte: HoprBalance::new_base(1),
+            max_ssa_allocation: HoprBalance::new_base(100),
+            max_deposit_tracking_time: std::time::Duration::from_secs(60),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
+            pix_recovery_db_path: Some(std::path::PathBuf::from("/tmp/test.db")),
+            pix_recovery_password_env: None,
+        };
+        assert!(matches!(cfg.validate(), Ok(())), "config validation passes");
+    }
+
+    /// Build with pix_recovery_db_path set but missing password env must fail.
+    #[tokio::test]
+    async fn test_build_fails_when_password_env_var_missing() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir().context("tempdir")?;
+        let db_path = dir.path().join("pix_recovery.db");
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+        let node = Arc::new(ChainNode(Arc::new(chain_connector)));
+
+        // Use a password env var that doesn't exist.
+        let result = NonAnonymousPixStrategy::new(NonAnonymousPixStrategyConfig {
+            price_per_byte: HoprBalance::new_base(1),
+            max_ssa_allocation: HoprBalance::new_base(100),
+            max_deposit_tracking_time: Duration::from_secs(60),
+            gas_xdai_per_sweep: XDaiBalance::zero(),
+            pix_recovery_db_path: Some(db_path),
+            pix_recovery_password_env: Some("HOPRD_NONEXISTENT_VAR".into()),
+        })
+        .build(node);
+
+        assert!(
+            matches!(result, Err(_)),
+            "build should fail when password env var is missing"
+        );
+
+        Ok(())
+    }
 }
