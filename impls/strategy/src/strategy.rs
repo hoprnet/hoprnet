@@ -171,6 +171,7 @@ mod tests {
     }
 
     /// An externally-defined strategy — simulates a plugin or application-defined strategy.
+    #[allow(dead_code)]
     struct ExternalStrategy {
         ran: bool,
     }

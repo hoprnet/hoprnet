@@ -18,6 +18,7 @@ use std::{
     time::Duration,
 };
 
+use backon::Retryable;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::{
@@ -68,13 +69,12 @@ pub struct NonAnonymousPixStrategyConfig {
 /// runnable `Box<dyn StrategyTrait + Send>`.
 pub struct NonAnonymousPixStrategy {
     cfg: NonAnonymousPixStrategyConfig,
-    interval: Duration,
 }
 
 impl NonAnonymousPixStrategy {
     /// Create a new builder with the given configuration.
-    pub fn new(cfg: NonAnonymousPixStrategyConfig, interval: Duration) -> Self {
-        Self { cfg, interval }
+    pub fn new(cfg: NonAnonymousPixStrategyConfig) -> Self {
+        Self { cfg }
     }
 
     /// Wire in a node and return a running-ready strategy.
@@ -105,7 +105,6 @@ impl NonAnonymousPixStrategy {
 
         Ok(Box::new(NonAnonymousPixStrategyInner {
             cfg: self.cfg.clone(),
-            interval: self.interval,
             node,
             recovery_store,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -117,7 +116,6 @@ impl NonAnonymousPixStrategy {
 struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     node: Arc<N>,
     cfg: NonAnonymousPixStrategyConfig,
-    interval: Duration,
     /// Exit role only: persisted recovery store for [`PixEvent::PrivateKeyRecovered`].
     /// Entry role leaves this as `None`.
     recovery_store: Option<crate::pix_recovery_store::PixRecoveryStore>,
@@ -128,56 +126,18 @@ struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     processed_deposits: Cache<hopr_api::node::PixAddressId, ()>,
 }
 
+const MAX_SWEEP_RETRIES: usize = 5;
+
 impl<N> NonAnonymousPixStrategyInner<N>
 where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
-    /// Periodic task logic.
-    async fn on_tick(&self) -> crate::errors::Result<()> {
-        tracing::debug!("PixStrategy tick");
-        Ok(())
-    }
-
     /// Send the configured gas xDai from the node operator to the recovered
     /// stealth address, so that [`withdraw_from_signer`] can pay for gas.
     /// Checks the Safe's xDai balance and returns
     /// [`StrategyError::CriteriaNotSatisfied`] when insufficient.
     async fn fund_sweep_gas(&self, recovered_address: Address) -> crate::errors::Result<()> {
-        if self.cfg.gas_xdai_per_sweep.is_zero() {
-            return Ok(());
-        }
-
-        let safe_xdai: XDaiBalance = self
-            .node
-            .chain_api()
-            .balance(self.node.identity().safe_address)
-            .await
-            .map_err(StrategyError::other)?;
-
-        if safe_xdai < self.cfg.gas_xdai_per_sweep {
-            tracing::warn!(
-                safe = %self.node.identity().safe_address,
-                required = %self.cfg.gas_xdai_per_sweep,
-                available = %safe_xdai,
-                "insufficient xDai in safe to fund sweep gas"
-            );
-            return Err(StrategyError::CriteriaNotSatisfied);
-        }
-
-        self.node
-            .chain_api()
-            .withdraw(self.cfg.gas_xdai_per_sweep, &recovered_address)
-            .and_then(identity)
-            .await
-            .map_err(StrategyError::other)?;
-
-        tracing::info!(
-            amount = %self.cfg.gas_xdai_per_sweep,
-            %recovered_address,
-            "funded sweep gas from safe"
-        );
-
-        Ok(())
+        fund_sweep_gas_impl(&*self.node, &self.cfg, recovered_address).await
     }
 
     /// Handle PIX event.
@@ -357,6 +317,7 @@ where
     }
 
     /// Replay recovery entries whose on-chain balance is still non-zero (crash recovery).
+    /// Entries whose sweep fails are retried in a background task with exponential backoff.
     async fn replay_pending_recoveries(&self, store: &crate::pix_recovery_store::PixRecoveryStore) {
         let entries = match store.iter() {
             Ok(entries) => entries,
@@ -372,62 +333,164 @@ where
 
         tracing::info!(count = entries.len(), "replaying pending private key recoveries");
 
+        let node = Arc::clone(&self.node);
+        let cfg = self.cfg.clone();
+        let store = store.clone();
+
         for (id, secret) in entries {
-            match ChainKeypair::from_secret(secret.0.as_ref()) {
-                Ok(chain_key) => {
-                    let balance: HoprBalance =
-                        match self.node.chain_api().balance(chain_key.public().to_address()).await {
-                            Ok(b) => b,
-                            Err(e) => {
-                                tracing::error!(%e, ?id, "failed to query balance during recovery replay");
-                                continue;
-                            }
-                        };
+            let node = Arc::clone(&node);
+            let cfg = cfg.clone();
+            let store = store.clone();
 
-                    if balance.is_zero() {
-                        // Already swept in a prior run; drop the stale secret.
-                        if let Err(error) = store.remove(&id) {
-                            tracing::warn!(%error, ?id, "failed to remove zero-balance entry from store");
-                        }
-                        continue;
-                    }
-
-                    tracing::info!(%balance, ?id, "replaying withdrawal for pending recovery");
-
-                    let recovered_address = chain_key.public().to_address();
-
-                    // Fund gas before replaying the sweep.  Errors are logged (not
-                    // propagated) so a transient gas failure does not stall the entire
-                    // recovery iteration.
-                    if let Err(error) = self.fund_sweep_gas(recovered_address).await {
-                        tracing::error!(%error, ?id, "recovery replay: fund_sweep_gas failed");
-                        continue;
-                    }
-
-                    let withdraw_fut = match self
-                        .node
-                        .chain_api()
-                        .withdraw_from_signer(&chain_key, balance, &self.node.identity().safe_address)
-                        .await
-                    {
-                        Ok(fut) => fut,
-                        Err(error) => {
-                            tracing::error!(%error, ?id, "recovery replay: withdraw_from_signer call failed");
-                            continue;
-                        }
-                    };
-                    if let Err(error) = withdraw_fut.await {
-                        tracing::error!(%error, ?id, "recovery replay withdrawal failed");
-                    } else if let Err(error) = store.remove(&id) {
-                        tracing::warn!(%error, ?id, "failed to remove replayed key from store");
-                    }
-                }
+            let chain_key = match ChainKeypair::from_secret(secret.0.as_ref()) {
+                Ok(k) => k,
                 Err(error) => {
                     tracing::error!(%error, ?id, "failed to reconstruct chain key during recovery replay");
+                    continue;
+                }
+            };
+
+            let balance: HoprBalance = match node.chain_api().balance(chain_key.public().to_address()).await {
+                Ok(b) => b,
+                Err(e) => {
+                    tracing::error!(%e, ?id, "failed to query balance during recovery replay");
+                    spawn_sweep_retry(id, chain_key, HoprBalance::zero(), node, cfg, store);
+                    continue;
+                }
+            };
+
+            if balance.is_zero() {
+                // Already swept in a prior run; drop the stale secret.
+                if let Err(error) = store.remove(&id) {
+                    tracing::warn!(%error, ?id, "failed to remove zero-balance entry from store");
+                }
+                continue;
+            }
+
+            // Try the sweep inline.  On failure, spawn a background retry task.
+            // Clone chain_key beforehand so it's available for the spawn on error.
+            let ck_for_spawn = chain_key.clone();
+            match sweep_recovered(node.clone(), cfg.clone(), store.clone(), id, &chain_key, balance).await {
+                Ok(()) => {}
+                Err(error) => {
+                    tracing::error!(%error, ?id, "recovery replay failed — spawning background retry");
+                    spawn_sweep_retry(id, ck_for_spawn, balance, node, cfg, store);
                 }
             }
         }
     }
+}
+
+/// Sweep a single recovery: fund gas, withdraw from signer, remove from store.
+async fn sweep_recovered<N: HasChainApi + ?Sized>(
+    node: Arc<N>,
+    cfg: NonAnonymousPixStrategyConfig,
+    store: crate::pix_recovery_store::PixRecoveryStore,
+    id: hopr_api::node::PixAddressId,
+    chain_key: &ChainKeypair,
+    balance: HoprBalance,
+) -> Result<(), StrategyError> {
+    let recovered_address = chain_key.public().to_address();
+
+    fund_sweep_gas_impl(&*node, &cfg, recovered_address).await?;
+
+    let safe_address = node.identity().safe_address;
+    node.chain_api()
+        .withdraw_from_signer(chain_key, balance, &safe_address)
+        .await
+        .map_err(StrategyError::other)?
+        .await
+        .map_err(StrategyError::other)?;
+
+    if let Err(error) = store.remove(&id) {
+        tracing::warn!(%error, ?id, "sweep succeeded but failed to remove from store");
+    }
+
+    tracing::info!(%balance, %recovered_address, "deposit withdrawn");
+    Ok(())
+}
+
+/// Spawn a background task that retries [`sweep_recovered`] with exponential backoff.
+/// Silently ignores zero-balance entries (already swept).
+fn spawn_sweep_retry(
+    id: hopr_api::node::PixAddressId,
+    chain_key: ChainKeypair,
+    balance: HoprBalance,
+    node: Arc<impl HasChainApi + ActionableEventSource + Send + Sync + 'static>,
+    cfg: NonAnonymousPixStrategyConfig,
+    store: crate::pix_recovery_store::PixRecoveryStore,
+) {
+    hopr_utils::runtime::prelude::spawn(async move {
+        if balance.is_zero() {
+            // Query the current balance; the old value may be stale from a failed
+            // startup query.  If still zero, the entry is already swept.
+            let current = node.chain_api().balance(chain_key.public().to_address()).await;
+            let balance = current.unwrap_or(balance);
+            if balance.is_zero() {
+                let _ = store.remove(&id);
+                return;
+            }
+        }
+
+        let recovered_address = chain_key.public().to_address();
+
+        (|| sweep_recovered(Arc::clone(&node), cfg.clone(), store.clone(), id, &chain_key, balance))
+            .retry(backon::ExponentialBuilder::default().with_max_times(MAX_SWEEP_RETRIES))
+            .sleep(backon::FuturesTimerSleeper)
+            .when(|e| {
+                // Only retry on transient errors; permanent ones skip retry immediately.
+                !matches!(e, StrategyError::CriteriaNotSatisfied)
+            })
+            .notify(|e, dur| {
+                tracing::warn!(%e, ?dur, ?id, "sweep retry in");
+            })
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!(%e, ?id, %recovered_address, "sweep failed after max retries, giving up");
+                // Leave the entry in the store for manual recovery.
+            });
+    });
+}
+
+/// Shared implementation of `fund_sweep_gas` usable from spawned tasks.
+async fn fund_sweep_gas_impl<N: HasChainApi + ?Sized>(
+    node: &N,
+    cfg: &NonAnonymousPixStrategyConfig,
+    recovered_address: Address,
+) -> crate::errors::Result<()> {
+    if cfg.gas_xdai_per_sweep.is_zero() {
+        return Ok(());
+    }
+
+    let safe_xdai: XDaiBalance = node
+        .chain_api()
+        .balance(node.identity().safe_address)
+        .await
+        .map_err(StrategyError::other)?;
+
+    if safe_xdai < cfg.gas_xdai_per_sweep {
+        tracing::warn!(
+            safe = %node.identity().safe_address,
+            required = %cfg.gas_xdai_per_sweep,
+            available = %safe_xdai,
+            "insufficient xDai in safe to fund sweep gas"
+        );
+        return Err(StrategyError::CriteriaNotSatisfied);
+    }
+
+    node.chain_api()
+        .withdraw(cfg.gas_xdai_per_sweep, &recovered_address)
+        .and_then(identity)
+        .await
+        .map_err(StrategyError::other)?;
+
+    tracing::info!(
+        amount = %cfg.gas_xdai_per_sweep,
+        %recovered_address,
+        "funded sweep gas from safe"
+    );
+
+    Ok(())
 }
 
 impl<N: HasChainApi> Debug for NonAnonymousPixStrategyInner<N> {
@@ -448,46 +511,21 @@ where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
-        enum Event {
-            Tick,
-            Pix(PixEvent),
-        }
-
-        // Run the first scan immediately at startup without waiting for the initial interval.
-        if let Err(error) = self.on_tick().await
-            && !matches!(error, StrategyError::CriteriaNotSatisfied)
-        {
-            tracing::error!(%error, "pix tick failed");
-        }
-
         // Startup recovery: replay persisted keys whose on-chain balance is still non-zero.
+        // Failed entries are retried in the background with exponential backoff.
         if let Some(ref store) = self.recovery_store {
             self.replay_pending_recoveries(store).await;
         }
 
-        let tick_stream = futures_time::stream::interval(self.interval.into()).map(|_| Event::Tick);
-        let event_stream = self
+        let mut event_stream = self
             .node
             .subscribe_to_actionable_events(Some(&[ActionableEventDiscriminant::Pix]))
             .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
-            .filter_map(|event| futures::future::ready(event.try_as_pix().map(Event::Pix)));
+            .filter_map(|event| futures::future::ready(event.try_as_pix()));
 
-        let mut combined = futures_concurrency::stream::Merge::merge((tick_stream, event_stream));
-
-        while let Some(event) = combined.next().await {
-            match event {
-                Event::Tick => {
-                    if let Err(error) = self.on_tick().await
-                        && !matches!(error, StrategyError::CriteriaNotSatisfied)
-                    {
-                        tracing::error!(%error, "pix tick failed");
-                    }
-                }
-                Event::Pix(event) => {
-                    if let Err(error) = self.on_pix_event(event).await {
-                        tracing::error!(%error, "pix event failed");
-                    }
-                }
+        while let Some(event) = event_stream.next().await {
+            if let Err(error) = self.on_pix_event(event).await {
+                tracing::error!(%error, "pix event failed");
             }
         }
 
@@ -676,7 +714,6 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: StdDuration::from_secs(60),
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -754,7 +791,7 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -839,7 +876,7 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::new(chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -913,7 +950,7 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -988,18 +1025,16 @@ mod tests {
         chain_connector.connect().await?;
         let node = Arc::new(ChainNode(Arc::new(chain_connector)));
 
-        let strategy: Box<dyn crate::strategy::Strategy + Send> = NonAnonymousPixStrategy::new(
-            NonAnonymousPixStrategyConfig {
+        let strategy: Box<dyn crate::strategy::Strategy + Send> =
+            NonAnonymousPixStrategy::new(NonAnonymousPixStrategyConfig {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 gas_xdai_per_sweep: XDaiBalance::zero(),
                 pix_recovery_db_path: None,
                 pix_recovery_password_env: None,
-            },
-            Duration::from_secs(60),
-        )
-        .build(node)?;
+            })
+            .build(node)?;
 
         assert_eq!(strategy.to_string(), "non_anonymous_pix");
         fn assert_send<T: Send>(_: T) {}
@@ -1045,7 +1080,7 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg,
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -1111,18 +1146,16 @@ mod tests {
         chain_connector.connect().await?;
         let node = Arc::new(ChainNode(Arc::new(chain_connector)));
 
-        let strategy: Box<dyn crate::strategy::Strategy + Send> = NonAnonymousPixStrategy::new(
-            NonAnonymousPixStrategyConfig {
+        let strategy: Box<dyn crate::strategy::Strategy + Send> =
+            NonAnonymousPixStrategy::new(NonAnonymousPixStrategyConfig {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: Duration::from_secs(60),
                 gas_xdai_per_sweep: XDaiBalance::zero(),
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
-            },
-            Duration::from_secs(60),
-        )
-        .build(node)?;
+            })
+            .build(node)?;
 
         assert!(db_path.exists(), "recovery db should be created on build");
         assert_eq!(strategy.to_string(), "non_anonymous_pix");
@@ -1178,7 +1211,7 @@ mod tests {
 
         let mut strategy = NonAnonymousPixStrategyInner {
             cfg: cfg.clone(),
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -1267,7 +1300,7 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None, // not needed for the test — we pass store directly
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -1339,7 +1372,7 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
@@ -1415,7 +1448,7 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-            interval: Duration::from_secs(60),
+
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),

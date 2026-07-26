@@ -211,10 +211,11 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
         for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
-            // Allow overwrite: if a previous coefficient was inserted but the resulting
-            // decode+subgroup-check failed (self.complete is still false), the caller
-            // needs to retransmit corrected bytes. `insert` replaces stale malformed
-            // data; for first-time insertion it behaves identically to `or_insert`.
+
+            // Overwrite is safe here: the `complete` flag at line 195 prevents any
+            // insertion after Phase 2, so a late duplicate for an already-committed
+            // slot cannot corrupt the commitment.
+
             polynomial.insert(coeff_index, polynomial_coeff_commitment);
         }
 
@@ -264,7 +265,9 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .map(|v| v.map(SsaPartBuilder::new))
                 .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
-            // Phase 2: all fallible operations succeeded — commit state change.
+            // Phase 2: all fallible decode+subgroup checks passed.
+            // The conditional overwrite in Phase 1 means any prior undecodable or
+            // small-order entries were replaced by this point.
             self.complete = true;
             self.committed_polynomials.clear();
 

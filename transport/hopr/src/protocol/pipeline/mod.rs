@@ -78,6 +78,11 @@ lazy_static::lazy_static! {
         "Number of tickets by type (winning, losing, rejected)",
         &["type"]
     ).unwrap();
+    static ref METRIC_SHARE_INSERT_FAILURES: hopr_api::types::telemetry::SimpleCounter =
+        hopr_api::types::telemetry::SimpleCounter::new(
+            "hopr_pix_share_insert_failures",
+            "Number of failed encrypted share insertions into the exit acknowledgement processor"
+        ).unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -144,13 +149,18 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                                     packet.encrypted_pix_share.filter(|s| !s.partial_share.is_empty())
                             // Fail-safe to skip empty shares
                             {
+                                let spi = encrypted_pix_share.ssa_polynomial_id();
                                 if let Err(error) = exit_ack_proc.insert_encrypted_share(
                                     &packet.next_hop,
                                     packet.ack_challenge,
                                     encrypted_pix_share,
                                 ) {
+                                    #[cfg(all(feature = "telemetry", not(test)))]
+                                    METRIC_SHARE_INSERT_FAILURES.increment();
                                     tracing::error!(
                                         next_hop = packet.next_hop.to_peerid_str(),
+                                        ack_challenge = %packet.ack_challenge,
+                                        ssa_poly_id = ?spi,
                                         %error,
                                         "failed to insert encrypted share into the exit acknowledgement processor"
                                     );
@@ -587,9 +597,16 @@ where
     ack_incoming
         .for_each(move |(peer, acks)| {
             let exit_proc = exit_proc.clone();
+            let exit_proc_check = exit_proc.clone();
             let mut recovered_ssa = recovered_ssa.clone();
             async move {
                 tracing::trace!(%peer, num = acks.len(), "received acknowledgements");
+
+                if !exit_proc_check.has_pending_shares(&peer) {
+                    tracing::trace!(%peer, "no pending pix shares, skipping acknowledgement");
+                    return;
+                }
+
                 match hopr_utils::parallelize::cpu::spawn_fifo_blocking(
                     move || exit_proc.acknowledge_shares(peer, acks),
                     "exit_ack_decode",
@@ -603,6 +620,9 @@ where
                         {
                             tracing::error!(%peer, %error, "failed to send pix resolution");
                         }
+                    }
+                    Ok(Err(ref error)) if exit_proc_check.is_expected_error(error) => {
+                        tracing::debug!(%peer, %error, "expected error while acknowledging pix share")
                     }
                     Ok(Err(error)) => {
                         tracing::error!(%peer, %error, "failed to acknowledge pix share")

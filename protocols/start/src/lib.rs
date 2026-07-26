@@ -180,7 +180,7 @@ pub struct SsaClientCommitmentMessage<I, G> {
     pub coefficient_commitments: std::collections::HashMap<hopr_protocol_pix::PolynomialIndex, G>,
 }
 
-impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
+impl<I: serde::Serialize + Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
     /// Uses given the `session_id` and an [`SsaCommitment`] that will be split across multiple messages.
     ///
     /// The returned messages are ordered by coefficient index, making sure the constant terms
@@ -188,7 +188,7 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
     pub fn new_multiple<S: hopr_protocol_pix::PixSpec>(
         session_id: I,
         commitment: SsaCommitment<S, S::Pseudonym>,
-    ) -> Vec<Self>
+    ) -> Result<Vec<Self>, StartProtocolError>
     where
         G: From<hopr_protocol_pix::PixGroupRepr<S>>,
     {
@@ -203,13 +203,12 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
         //   header:     version(1) + disc(1) + data_len(2) = 4
         //   fixed:      ssa_index(4) + coefficient_index(2) + poly_count(2) = 8
         //   per-entry:  PolynomialIndex(2) + commitment_repr(PIX_COEFF_COMMITMENT_REPR_SIZE)
-        //   trailer:    CBOR session_id (~size_of::<I>() + 2 framing overhead)
+        //   trailer:    CBOR-encoded session_id
         let header_and_fixed: usize = 4 + 4 + 2 + 2; // header + ssa_index + coeff_index + num_polys
         let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
             + StartProtocol::<I, (), (), G>::PIX_COEFF_COMMITMENT_REPR_SIZE;
-        // CBOR session_id estimate: size_of::<I>() data + 2 bytes CBOR framing overhead.
-        // Conservative for the fixed-size byte-string session IDs used in production.
-        let cbor_session_id_size = size_of::<I>() + 2;
+        // Compute the exact CBOR size of the session_id for this instantiation.
+        let cbor_session_id_size = serde_cbor_2::to_vec(&session_id)?.len();
         let max_commitments_per_message =
             (ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size) / per_entry).max(1);
 
@@ -239,7 +238,7 @@ impl<I: Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
             }
         }
 
-        messages
+        Ok(messages)
     }
 }
 
@@ -340,6 +339,16 @@ impl<I> From<I> for KeepAliveMessage<I> {
 }
 
 impl<I, T, C, G> StartProtocol<I, T, C, G> {
+    /// Maximum number of SSAs that can be requested in a single SsaRequest message.
+    ///
+    /// Derived from the SsaRequest encode layout with a zero-length CBOR session_id:
+    /// header(4) + params(4) + num_commitments(2) = 10 overhead;
+    /// (PAYLOAD_SIZE - 10) / (SsaIndex + commitment_repr) = (1030 - 10) / (4 + 33) = 27.
+    /// Since a zero-length session_id is the smallest possible, any non-empty session_id
+    /// only makes this bound tighter, making it a safe decode limit.
+    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 10)
+        / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
+        as u16;
     /// Size of the PIX coefficient commitment representation in bytes.
     pub const PIX_COEFF_COMMITMENT_REPR_SIZE: usize = size_of::<G>();
     /// Size of the Start protocol message header in bytes.
@@ -693,7 +702,7 @@ where
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("num_commitments".into()))?,
                     );
-                    if num_commitments == 0 || num_commitments > MAX_POLYS_PER_SSA {
+                    if num_commitments == 0 || num_commitments > Self::MAX_SSAS_PER_REQUEST {
                         return Err(StartProtocolError::NumberOfCommitments);
                     }
                     next_offset += size_of::<u16>();
@@ -912,6 +921,14 @@ mod tests {
             33,
             StartProtocol::<i32, String, u8, [u8; 33]>::PIX_COEFF_COMMITMENT_REPR_SIZE
         );
+        // MAX_SSAS_PER_REQUEST must never drop below 25, which is the number of SSA
+        // commitments the existing test at `start_protocol_new_multiple_messages_should_encode_and_decode`
+        // encodes without a session_id trailer.
+        let ssas_per_request = StartProtocol::<i32, String, u8, [u8; 33]>::MAX_SSAS_PER_REQUEST;
+        assert!(
+            ssas_per_request >= 25,
+            "MAX_SSAS_PER_REQUEST={ssas_per_request} is too small to encode 25 SSA commitments",
+        );
 
         let max_coeffs = (ApplicationData::PAYLOAD_SIZE
             - StartProtocol::<i32, String, u8, [u8; 33]>::START_HEADER_SIZE)
@@ -1098,7 +1115,7 @@ mod tests {
 
         let session_id: DummySessionId = Default::default();
         let messages: Vec<SsaClientCommitmentMessage<DummySessionId, HoprPixGroupElement>> =
-            SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment);
+            SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment)?;
 
         // Since 2048 polynomials per coefficient cannot fit into a single packet, the commitments
         // of each coefficient are split across multiple messages, so there are far more messages
@@ -1120,6 +1137,8 @@ mod tests {
         );
         assert!(commitments_per_coefficient.values().all(|&count| count == 2048));
 
+        let mut max_encoded_size = 0;
+
         for message in messages {
             let msg_1 = StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement>::SsaCommit(message);
 
@@ -1127,9 +1146,27 @@ mod tests {
             let expected: Tag = StartProtocol::<(), (), (), HoprPixGroupElement>::START_PROTOCOL_MESSAGE_TAG;
             assert_eq!(tag, expected);
 
+            assert!(
+                encoded.len() <= ApplicationData::PAYLOAD_SIZE,
+                "encoded SsaCommit message ({} bytes) exceeds PAYLOAD_SIZE ({})",
+                encoded.len(),
+                ApplicationData::PAYLOAD_SIZE
+            );
+            max_encoded_size = max_encoded_size.max(encoded.len());
+
             let msg_2 = StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement>::decode(tag, &encoded)?;
             assert_eq!(msg_1, msg_2);
         }
+
+        // Verify that the largest encoded message leaves ≤10 bytes of headroom,
+        // ensuring the PAYLOAD_SIZE is tight against the real encoding.
+        let headroom = ApplicationData::PAYLOAD_SIZE - max_encoded_size;
+        assert!(
+            headroom <= 12,
+            "largest encoded SsaCommit ({} bytes) leaves {} bytes of headroom, expected ≤12",
+            max_encoded_size,
+            headroom
+        );
 
         Ok(())
     }

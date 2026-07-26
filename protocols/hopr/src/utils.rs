@@ -99,7 +99,6 @@ pub async fn create_node(index: usize, blokli_client: &BlokliTestClient<StaticSt
             polynomials_per_ssa: 10,
             threshold: 10,
             surplus_shares: 3,
-            ..Default::default()
         })),
         ssa_rcn: Arc::new(SsaReconstructor::new(SsaReconstructorConfig {
             early_recovery_threshold: 1.0,

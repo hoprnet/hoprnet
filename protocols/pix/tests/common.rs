@@ -11,10 +11,10 @@ impl PixSpec for TestSpecK256 {
     type Cipher = ChaCha20;
     type Curve = Secp256k1;
     type DepositAddress = Address;
-    type Digest = Sha3_256;
+    type Digest = Blake3;
     type Pseudonym = SimplePseudonym;
 
-    const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:SHA3-256_SSWU_RO_";
+    const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:BLAKE3_SSWU_RO_";
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
         PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())

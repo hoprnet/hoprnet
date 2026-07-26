@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     pin::Pin,
     sync::{Arc, Mutex, OnceLock, atomic::Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::anyhow;
@@ -192,7 +192,7 @@ struct SessionSsaState {
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
-    /// Serializes the three call sites of [`request_next_ssa`] so that
+    /// Serializes the three call sites of [`SessionManager::request_next_ssa`] so that
     /// `peek_index` / fallible work / `increment_index` is never interleaved.
     request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
 }
@@ -224,14 +224,12 @@ impl SessionSsaState {
         SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
     }
 
-    pub fn increment_index(&self) -> Result<SsaIndex, SessionManagerError> {
+    pub fn increment_index(&self) -> SsaIndex {
         let old = self
             .current_index
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-            .map_err(|_| SessionManagerError::Other(anyhow!("SSA index overflow after u32::MAX cycles")))?;
-        SsaIndex::new(old).ok_or_else(|| {
-            SessionManagerError::Other(anyhow!("SSA index cannot be 0 after increment (pre-increment was 0)"))
-        })
+            .expect("SSA index overflow after u32::MAX cycles");
+        SsaIndex::new(old.checked_add(1).expect("just incremented")).expect("non-zero just incremented")
     }
 
     /// Returns the current SSA index value.
@@ -1616,7 +1614,12 @@ where
         }
     }
 
-    async fn request_next_ssa(&self, session_id: SessionId, slot: SessionSlot) -> errors::Result<()> {
+    async fn request_next_ssa(
+        &self,
+        session_id: SessionId,
+        slot: SessionSlot,
+        expected_ssa_index: Option<SsaIndex>,
+    ) -> errors::Result<()> {
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         // Clone for the deposit-timeout kill switch below; `pix_toolbox` itself is
         // moved into the blocking commitment task.
@@ -1629,14 +1632,26 @@ where
 
         // Serialize the three call sites (establishment, SsaAlmostRecovered, SsaRecovered)
         // so that peek_index → fallible work → increment_index is never interleaved.
-        // The timeout is a safety net: if a prior call crashed without releasing the lock,
-        // we surface the error rather than blocking the session forever.
+        // The 30-second timeout bounds waiting behind a genuinely slow in-flight request
+        // (blocked commitment work or stalled send_via_msg_sender), returning an error
+        // instead of waiting indefinitely.
         let _guard = current_ssa_state
             .request_lock
             .lock()
             .timeout(futures_time::time::Duration::from(Duration::from_secs(30)))
             .await
             .map_err(|_| SessionManagerError::Other(anyhow!("request_next_ssa lock timed out")))?;
+
+        // Stale-cycle guard: if this request was triggered by a PIX event (e.g.
+        // SsaAlmostRecovered), verify the index hasn't already been advanced by a
+        // concurrent handler. Under the lock this is race-free.
+        if let Some(expected) = expected_ssa_index {
+            let current = current_ssa_state.current_index.load(Ordering::Relaxed);
+            if expected.get() != current.saturating_sub(1) {
+                trace!(%session_id, %expected, "stale SSA event — index already advanced");
+                return Ok(());
+            }
+        }
 
         // Peek at the next SSA index *before* fallible operations so that a failed
         // commitment generation or send does not permanently consume it.
@@ -1710,7 +1725,7 @@ where
         .map_err(TransportSessionError::packet_sending)?;
 
         // All fallible steps succeeded — commit the index advance.
-        current_ssa_state.increment_index()?;
+        current_ssa_state.increment_index();
 
         Ok(())
     }
@@ -1824,26 +1839,8 @@ where
             // When the early recovery threshold is reached, issue a new SSA server request
             // to pipeline deposit preparation with the last ~15% of share collection.
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => {
-                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
-                    "cannot process SsaAlmostRecovered on a session without pix state"
-                )))?;
-                // Validate that the event's SsaId matches the active cycle.  current_index is
-                // the *next* index to allocate; `request_next_ssa` peeks it and only increments
-                // (via `increment_index`) after the SsaRequest send succeeds, so once a cycle is
-                // in flight the active cycle's index is current_index - 1.
-                if ssa_id.ssa_index().get()
-                    != state
-                        .current_index
-                        .load(std::sync::atomic::Ordering::Relaxed)
-                        .saturating_sub(1)
-                {
-                    trace!(
-                        %session_id, event_ssa_index = %ssa_id.ssa_index(),
-                        "ignoring SsaAlmostRecovered from stale SSA cycle"
-                    );
-                    return Ok(());
-                }
-                self.request_next_ssa(*session_id, slot).await?;
+                self.request_next_ssa(*session_id, slot, Some(ssa_id.ssa_index()))
+                    .await?;
             }
             // SSA fully recovered. Deposit-key processing is handled in the upper layer.
             // If early-recovery pipelining already advanced the cycle (via SsaAlmostRecovered),
@@ -1853,17 +1850,8 @@ where
             // the only remaining trigger, so request the next SSA here. Same stale-cycle guard as
             // SsaAlmostRecovered ⇒ fires at most once per cycle and never double-requests.
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => {
-                let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
-                    "cannot process SsaRecovered on a session without pix state"
-                )))?;
-                if ssa_id.ssa_index().get()
-                    == state
-                        .current_index
-                        .load(std::sync::atomic::Ordering::Relaxed)
-                        .saturating_sub(1)
-                {
-                    self.request_next_ssa(*session_id, slot).await?;
-                }
+                self.request_next_ssa(*session_id, slot, Some(ssa_id.ssa_index()))
+                    .await?;
             }
             HoprSessionInPixEvent::UnverifiableShare(ssa_id) => {
                 let state = slot.current_ssa_state.get().ok_or(SessionManagerError::Other(anyhow!(
@@ -2380,8 +2368,15 @@ where
             // Entry would be left with a zombie session that has no PIX kill
             // switch and will never receive the SsaRequest it is waiting for.
             // Best-effort notify the Entry so it can tear down its side too.
-            if let Err(e) = self.request_next_ssa(session_id, slot).await {
-                let _ = send_via_msg_sender(
+            // Known asymmetry: SessionEstablished is sent to the Entry *before* PIX setup
+            // below. If request_next_ssa fails here, the Entry sees an established session
+            // with no PIX kill switch and will never receive the SsaRequest it is waiting
+            // for. The SessionError below notifies the Entry to tear down via
+            // handle_session_error(ErrorIdentifier::SessionId(..)), which calls
+            // close_session. This is best-effort: network loss or concurrent processing
+            // may leave the Entry's session alive (it will time out on its own).
+            if let Err(e) = self.request_next_ssa(session_id, slot, None).await {
+                if let Err(send_err) = send_via_msg_sender(
                     &mut msg_sender,
                     reply_routing,
                     HoprStartProtocol::SessionError(StartErrorType {
@@ -2390,7 +2385,10 @@ where
                     }),
                     "session error after PIX setup failure",
                 )
-                .await;
+                .await
+                {
+                    tracing::warn!(%session_id, %send_err, "failed to send SessionError after PIX setup failure");
+                }
                 return Err(e);
             }
         }
@@ -2667,7 +2665,12 @@ where
         let session_slot = {
             use std::collections::hash_map::Entry;
             let session_id = msg.session_id;
+            let waiter_deadline = Instant::now() + Duration::from_secs(30);
             loop {
+                if Instant::now() >= waiter_deadline {
+                    error!(%session_id, "session slot waiter deadline exceeded");
+                    return Err(SessionManagerError::NonExistingSession.into());
+                }
                 // Optimistic cache check
                 if let Some(slot) = self.sessions.get(&session_id) {
                     break slot;
@@ -2801,7 +2804,8 @@ where
             ))?;
 
             // Split the SSA client commitment into Start protocol commitment messages
-            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment);
+            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment)
+                .map_err(SessionManagerError::other)?;
             debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
 
             // Send each commitment message into the message sender
@@ -5325,6 +5329,117 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies that concurrent [`SsaAlmostRecovered`] and [`SsaRecovered`] for the same SSA cycle
+    /// are serialized by the `request_lock` and produce exactly one extra SSA request.
+    ///
+    /// ## Rationale
+    ///
+    /// Both events are dispatched by the PIX reconstructor upon reaching the early-recovery
+    /// threshold and full recovery, respectively. In non-deterministic environments (Tokio task
+    /// scheduling, shared thread pools), both can arrive in quick succession — sometimes racing
+    /// inside [`SessionManager::dispatch_pix_event`]. The `request_lock` ensures that only one
+    /// thread passes through `peek_index → fallible work → increment_index`; the other sees a stale
+    /// index (the cycle advanced before it acquired the lock) and becomes a no-op via the
+    /// [stale-cycle guard](SessionManager::request_next_ssa).
+    ///
+    /// ## Steps
+    ///
+    /// 1. Bob's manager is started with a `PixToolbox` and PIX quota config.
+    /// 2. Alice's session initiation is processed (triggers 1st `SsaRequest` via internal `request_next_ssa` from
+    ///    `handle_incoming_session_initiation`).
+    /// 3. `SsaAlmostRecovered(ssa_id)` and `SsaRecovered(ssa_id)` are dispatched concurrently with `tokio::join!`.
+    /// 4. Exactly 2 `SsaRequest` messages total — the PIX event that acquires `request_lock` first advances the index;
+    ///    the second finds it stale and returns without sending.
+    #[test_log::test(tokio::test)]
+    async fn exit_handles_concurrent_almost_and_full_recovery_for_same_ssa() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let sent_ssa_requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut bob_transport = MockMsgSender::new();
+        let sent_ssa_requests_clone = sent_ssa_requests.clone();
+
+        // 3 messages: SessionEstablished (1) + SsaRequest at init (2) + SsaRequest from
+        // whichever PIX event wins the lock (3). The other event is a no-op.
+        bob_transport.expect_send_message().times(3).returning(move |_, data| {
+            let sent_ssa_requests_clone = sent_ssa_requests_clone.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SsaRequest(_)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                {
+                    sent_ssa_requests_clone.lock().unwrap().push(());
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+
+        // Dispatch both events concurrently. The request_lock serializes them:
+        // whichever acquires the lock first advances the index; the other returns
+        // early via the stale-cycle guard.
+        let (almost_result, recovered_result) = tokio::join!(
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id)),
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaRecovered(ssa_id)),
+        );
+        almost_result?;
+        recovered_result?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert_eq!(
+            sent_ssa_requests.lock().unwrap().len(),
+            2,
+            "expected exactly 2 SsaRequest messages (init + one from the concurrent dispatch), the second event must \
+             be a no-op due to the stale-cycle guard"
+        );
+
+        Ok(())
+    }
+
     /// Verifies that the exit/responder requests the next SSA on `SsaRecovered` when
     /// early-recovery pipelining did NOT already do so for this cycle.
     ///
@@ -5478,16 +5593,18 @@ mod tests {
         mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
             .await?;
 
-        // After pipelining both must coexist.
-        let handles = slot.abort_handles.lock();
-        assert!(
-            handles.contains(&SessionHandles::PixKillSwitch(1)),
-            "first cycle's deposit deadline was removed by pipelining"
-        );
-        assert!(
-            handles.contains(&SessionHandles::PixKillSwitch(2)),
-            "second cycle's deposit deadline was not installed"
-        );
+        // After pipelining both must coexist (scoped to drop MutexGuard before .await).
+        {
+            let handles = slot.abort_handles.lock();
+            assert!(
+                handles.contains(&SessionHandles::PixKillSwitch(1)),
+                "first cycle's deposit deadline was removed by pipelining"
+            );
+            assert!(
+                handles.contains(&SessionHandles::PixKillSwitch(2)),
+                "second cycle's deposit deadline was not installed"
+            );
+        }
 
         bob_sender.close_channel();
         bob_handle.await??;

@@ -98,6 +98,33 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// retry in O(1) per-peer once the verifier arrives. Tied to `max_ack_await_time` in
     /// line with the awaiting_acks TTL.
     pending_ack_keys: moka::sync::Cache<OffchainPublicKey, PendingAckPerPeerCache>,
+    /// Liveness map: records `num_polys` for every completed SSA cycle so that
+    /// [`retire_ssa`] can remove all verifier/builder state even when both builders
+    /// have been TTL-evicted.
+    ///
+    /// ## Why a separate map? (builder TTL guard is insufficient for retirement)
+    ///
+    /// The builder TTL guard at construction (`max(builder_ttl, verifier_ttl)`) only
+    /// guarantees *starting* TTL parity. It cannot prevent the TTL window we call
+    /// the "verifier-widow":
+    ///
+    /// `process_verified_ack` (the ack processing hot path) accesses the verifier
+    /// [`self.ssa_verifiers.get()`] *before* the builder [`self.ssa_builders.get()`].
+    /// When an ack arrives just after the builder has expired:
+    ///  1. The verifier `.get()` at line 213 succeeds and **resets** the verifier's idle-timer to the full
+    ///     `unused_verifier_lifetime` (e.g. another 30 min).
+    ///  2. The builder `.get()` at line 221 fails → `MissingSsaCommitment`.
+    ///  3. The builder is now gone forever, but the verifier lives for another 30 minutes with no way to learn
+    ///     `num_polys`.
+    ///
+    /// `ssa_num_polys` bridges this widow. It is populated alongside the verifiers
+    /// at `CommitmentResult::Completed` time, shares their TTL (so it stays alive
+    /// as long as what it shadows), and is explicitly invalidated in [`remove_cycle`]
+    /// so it does not outlive the cleanup it enables.
+    ///
+    /// Populated at `CommitmentResult::Completed` time in
+    /// [`insert_coefficient_commitments`]; cleaned up by [`remove_cycle`].
+    ssa_num_polys: moka::sync::Cache<SsaId<S::Pseudonym>, usize>,
     cfg: SsaReconstructorConfig,
 }
 
@@ -128,12 +155,20 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             commitment_builder: moka::sync::Cache::builder()
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
-            // The builder must not be reclaimed before its verifiers (I1): a live verifier
-            // paired with an expired builder makes an incoming share's recovered part
-            // permanently unrecoverable (the guard returns `MissingSsaCommitment` and the
-            // ack is dropped). The builder and its verifiers are inserted together at
-            // commitment completion, so clamping the builder's idle TTL to at least the
-            // verifier's guarantees the builder always outlives them.
+            // The builder must not be reclaimed *before* its verifiers (I1): a live
+            // verifier paired with an expired builder makes a recovered share permanently
+            // unreachable (`process_verified_ack` returns `MissingSsaCommitment` and the
+            // ack is dropped). Clamping the builder TTL to at least the verifier TTL
+            // prevents this *during ack processing* — the two `.get()` calls in
+            // `process_verified_ack` are sequential (verifier first, builder second), so
+            // a builder that started with ≥ the verifier's TTL will never expire between
+            // them in a single invocation.
+            //
+            // NOTE: This TTL guard alone is *not* sufficient for `retire_ssa` cleanup
+            // (see `ssa_num_polys` docstring — the "verifier-widow"). The guard prevents
+            // mid-request expiration, but across requests the verifier's idle timestamp
+            // can be independently refreshed while the builder is not, creating an
+            // asymmetric window where the builder has expired but the verifier has not.
             //
             // Both builder caches intentionally have NO max_capacity (same as
             // `ssa_verifiers`): active removal happens via `remove_cycle` on full
@@ -154,6 +189,12 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .build(),
             pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
+                .build(),
+            // Liveness map for retirement: TTL must cover the verifier lifetime so the
+            // entry survives as long as the verifiers it shadows. No max_capacity because
+            // entries are explicitly invalidated in remove_cycle.
+            ssa_num_polys: moka::sync::Cache::builder()
+                .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             cfg,
         }
@@ -183,6 +224,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         }
         self.ssa_builders.invalidate(&ssa_id);
         self.commitment_builder.invalidate(&ssa_id);
+        self.ssa_num_polys.invalidate(&ssa_id);
     }
 
     fn process_verified_ack(
@@ -245,6 +287,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 drop(builder_guard);
                 let Some(ssa) = S::scalar_to_private_key(scalar) else {
                     tracing::error!(%spi, "ssa reconstruction failed");
+                    self.remove_cycle(ssa_id, num_polys);
                     return Err(PixError::InvalidSsa);
                 };
                 // Full recovery: this cycle's verifier state is no longer needed.
@@ -279,17 +322,20 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     }
 
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
-        // `num_polys` is available while either builder still exists; one always
-        // does while verifiers exist (both are created at commitment completion).
-        let num_polys = self
-            .ssa_builders
-            .get(&ssa_id)
-            .map(|b| b.lock().num_polys())
-            .or_else(|| self.commitment_builder.get(&ssa_id).map(|b| b.lock().num_polys()));
+        // Prefer the liveness map: it retains num_polys even after both builders
+        // have been TTL-evicted, enabling full verifier cleanup.
+        let num_polys = self.ssa_num_polys.get(&ssa_id).or_else(|| {
+            // Fallback: num_polys is also available from either builder while it exists.
+            self.ssa_builders
+                .get(&ssa_id)
+                .map(|b| b.lock().num_polys())
+                .or_else(|| self.commitment_builder.get(&ssa_id).map(|b| b.lock().num_polys()))
+        });
         match num_polys {
             Some(num_polys) => self.remove_cycle(ssa_id, num_polys),
             None => {
-                // No builder left: any lingering verifiers fall to the idle-TTL backstop.
+                // No builder and no liveness entry: any lingering verifiers fall to
+                // the idle-TTL backstop.
                 self.ssa_builders.invalidate(&ssa_id);
                 self.commitment_builder.invalidate(&ssa_id);
             }
@@ -369,9 +415,13 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 tracing::trace!(%ssa_id, "ssa commitment still incomplete");
             }
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
+                let num_polys = ssa_builder.num_polys();
                 let full_ssa_commitment = ssa_builder.full_commitment;
                 self.ssa_builders
                     .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
+                // Record the polynomial count in the liveness map so retire_ssa can
+                // clean up even after both builders have been TTL-evicted.
+                self.ssa_num_polys.insert(ssa_id, num_polys);
 
                 for ssa_reconstructor in ssa_reconstructors {
                     self.ssa_verifiers.insert(
