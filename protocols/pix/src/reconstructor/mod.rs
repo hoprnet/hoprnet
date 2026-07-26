@@ -99,7 +99,7 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// line with the awaiting_acks TTL.
     pending_ack_keys: moka::sync::Cache<OffchainPublicKey, PendingAckPerPeerCache>,
     /// Liveness map: records `num_polys` for every completed SSA cycle so that
-    /// [`retire_ssa`] can remove all verifier/builder state even when both builders
+    /// `retire_ssa` can remove all verifier/builder state even when both builders
     /// have been TTL-evicted.
     ///
     /// ## Why a separate map? (builder TTL guard is insufficient for retirement)
@@ -109,7 +109,7 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// the "verifier-widow":
     ///
     /// `process_verified_ack` (the ack processing hot path) accesses the verifier
-    /// [`self.ssa_verifiers.get()`] *before* the builder [`self.ssa_builders.get()`].
+    /// `self.ssa_verifiers.get()` *before* the builder `self.ssa_builders.get()`.
     /// When an ack arrives just after the builder has expired:
     ///  1. The verifier `.get()` at line 213 succeeds and **resets** the verifier's idle-timer to the full
     ///     `unused_verifier_lifetime` (e.g. another 30 min).
@@ -119,11 +119,11 @@ pub struct SsaReconstructor<S: PixSpec> {
     ///
     /// `ssa_num_polys` bridges this widow. It is populated alongside the verifiers
     /// at `CommitmentResult::Completed` time, shares their TTL (so it stays alive
-    /// as long as what it shadows), and is explicitly invalidated in [`remove_cycle`]
+    /// as long as what it shadows), and is explicitly invalidated in `remove_cycle`
     /// so it does not outlive the cleanup it enables.
     ///
     /// Populated at `CommitmentResult::Completed` time in
-    /// [`insert_coefficient_commitments`]; cleaned up by [`remove_cycle`].
+    /// `insert_coefficient_commitments`; cleaned up by `remove_cycle`.
     ssa_num_polys: moka::sync::Cache<SsaId<S::Pseudonym>, usize>,
     cfg: SsaReconstructorConfig,
 }
