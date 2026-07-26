@@ -87,6 +87,18 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Release reconstructor state for every live SSA cycle of a session (indices
+/// 1 through `peek_index()`).  Called from session teardown paths to ensure no
+/// builder, verifier, or liveness entry is stranded.
+fn retire_all_live_ssa_cycles(session_id: SessionId, ssa_state: &SessionSsaState, pix_toolbox: &PixToolbox) {
+    let current = ssa_state.peek_index();
+    for i in 1..=current.get() {
+        if let Some(idx) = SsaIndex::new(i) {
+            pix_toolbox.share_processor.retire_ssa(SsaId::new(session_id, idx));
+        }
+    }
+}
+
 #[tracing::instrument(level = "debug", skip(session_data))]
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!("closing session");
@@ -901,14 +913,7 @@ where
                             if let (Some(ssa_state), Some(pix_toolbox)) =
                                 (entry.current_ssa_state.get(), pix_toolbox_eviction.get())
                             {
-                                let current = ssa_state.peek_index();
-                                for i in 1..=current.get() {
-                                    if let Some(idx) = SsaIndex::new(i) {
-                                        pix_toolbox
-                                            .share_processor
-                                            .retire_ssa(SsaId::new(*session_id.as_ref(), idx));
-                                    }
-                                }
+                                retire_all_live_ssa_cycles(*session_id.as_ref(), &ssa_state, pix_toolbox);
                             }
                             active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
                             close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
@@ -996,12 +1001,7 @@ where
                             if let (Some(ssa_state), Some(pix_toolbox)) =
                                 (session_data.current_ssa_state.get(), myself.pix_toolbox.get())
                             {
-                                let current = ssa_state.peek_index();
-                                for i in 1..=current.get() {
-                                    if let Some(idx) = SsaIndex::new(i) {
-                                        pix_toolbox.share_processor.retire_ssa(SsaId::new(session_id, idx));
-                                    }
-                                }
+                                retire_all_live_ssa_cycles(session_id, &ssa_state, pix_toolbox);
                             }
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                             close_session(session_id, session_data, closure_reason);
@@ -1700,14 +1700,7 @@ where
                         // session, not just the timed-out index.  Pipelining may have
                         // created earlier unpaid cycles whose builders/verifiers must
                         // also be cleaned up.
-                        let current = ssa_state_snapshot.peek_index();
-                        for i in 1..=current.get() {
-                            if let Some(idx) = SsaIndex::new(i) {
-                                pix_toolbox_killswitch
-                                    .share_processor
-                                    .retire_ssa(SsaId::new(session_id, idx));
-                            }
-                        }
+                        retire_all_live_ssa_cycles(session_id, &ssa_state_snapshot, &pix_toolbox_killswitch);
                         error!(%session_id, ssa_index, "pix session deposit timeout");
                     } else {
                         warn!(%session_id, "pix session deposit timeout - session not found");
@@ -1767,12 +1760,7 @@ where
             // Release reconstructor state for all live SSA cycles:
             // every index from 1 through the current peek index.
             if let (Some(ssa_state), Some(pix_toolbox)) = (slot.current_ssa_state.get(), self.pix_toolbox.get()) {
-                let current = ssa_state.peek_index();
-                for i in 1..=current.get() {
-                    if let Some(idx) = SsaIndex::new(i) {
-                        pix_toolbox.share_processor.retire_ssa(SsaId::new(*id, idx));
-                    }
-                }
+                retire_all_live_ssa_cycles(*id, &ssa_state, pix_toolbox);
             }
             close_session(*id, slot, ClosureReason::Eviction);
             true

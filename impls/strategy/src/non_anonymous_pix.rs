@@ -270,45 +270,31 @@ where
 
                 let chain_key =
                     ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
-                let recovered_address = chain_key.public().to_address();
-                let safe_address = self.node.identity().safe_address;
 
-                let recovered_balance: HoprBalance = self
-                    .node
-                    .chain_api()
-                    .balance(recovered_address)
-                    .await
-                    .map_err(StrategyError::other)?;
-                tracing::info!(%recovered_balance, %recovered_address, "recovered deposit balance");
-
-                if recovered_balance.is_zero() {
-                    // Already swept; just clean up the store entry.
-                    if let Some(ref store) = self.recovery_store
-                        && let Err(error) = store.remove(&private_key_recovered.id)
-                    {
-                        tracing::warn!(%error, ?private_key_recovered.id, "failed to remove zero-balance entry from store");
+                let store = self.recovery_store.clone();
+                let ck_for_spawn = chain_key.clone();
+                match sweep_recovered(
+                    Arc::clone(&self.node),
+                    self.cfg.clone(),
+                    store.clone(),
+                    private_key_recovered.id,
+                    &chain_key,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        tracing::info!(?private_key_recovered.id, "deposit withdrawn");
                     }
-                } else {
-                    // Fund the recovered address with xDai for sweep gas, then sweep.
-                    self.fund_sweep_gas(recovered_address).await?;
-
-                    self.node
-                        .chain_api()
-                        .withdraw_from_signer(&chain_key, recovered_balance, &safe_address)
-                        .await
-                        .map_err(StrategyError::other)?
-                        .await
-                        .map_err(StrategyError::other)?;
-
-                    // Delete the entry now that the deposit has been withdrawn, so the
-                    // recovery store doesn't accumulate entries unboundedly over time.
-                    if let Some(ref store) = self.recovery_store
-                        && let Err(error) = store.remove(&private_key_recovered.id)
-                    {
-                        tracing::warn!(%error, ?private_key_recovered.id, "failed to remove recovered key from store");
+                    Err(error) => {
+                        tracing::error!(%error, ?private_key_recovered.id, "live sweep failed — spawning background retry");
+                        spawn_sweep_retry(
+                            private_key_recovered.id,
+                            ck_for_spawn,
+                            Arc::clone(&self.node),
+                            self.cfg.clone(),
+                            store,
+                        );
                     }
-
-                    tracing::info!(%recovered_balance, %recovered_address, "deposit withdrawn");
                 }
             }
         }
@@ -354,7 +340,7 @@ where
                 Ok(b) => b,
                 Err(e) => {
                     tracing::error!(%e, ?id, "failed to query balance during recovery replay");
-                    spawn_sweep_retry(id, chain_key, node, cfg, store);
+                    spawn_sweep_retry(id, chain_key, node, cfg, Some(store));
                     continue;
                 }
             };
@@ -370,11 +356,11 @@ where
             // Try the sweep inline.  On failure, spawn a background retry task.
             // Clone chain_key beforehand so it's available for the spawn on error.
             let ck_for_spawn = chain_key.clone();
-            match sweep_recovered(node.clone(), cfg.clone(), store.clone(), id, &chain_key).await {
+            match sweep_recovered(node.clone(), cfg.clone(), Some(store.clone()), id, &chain_key).await {
                 Ok(()) => {}
                 Err(error) => {
                     tracing::error!(%error, ?id, "recovery replay failed — spawning background retry");
-                    spawn_sweep_retry(id, ck_for_spawn, node, cfg, store);
+                    spawn_sweep_retry(id, ck_for_spawn, node, cfg, Some(store));
                 }
             }
         }
@@ -382,12 +368,12 @@ where
 }
 
 /// Sweep a single recovery: query the live on-chain balance, fund gas, withdraw
-/// from signer, remove from store.  Uses the current balance rather than a
-/// caller-supplied snapshot to avoid racing with out-of-band sweeps.
+/// from signer, optionally remove from store.  Uses the current balance rather
+/// than a caller-supplied snapshot to avoid racing with out-of-band sweeps.
 async fn sweep_recovered<N: HasChainApi + ?Sized>(
     node: Arc<N>,
     cfg: NonAnonymousPixStrategyConfig,
-    store: crate::pix_recovery_store::PixRecoveryStore,
+    store: Option<crate::pix_recovery_store::PixRecoveryStore>,
     id: hopr_api::node::PixAddressId,
     chain_key: &ChainKeypair,
 ) -> Result<(), StrategyError> {
@@ -401,8 +387,8 @@ async fn sweep_recovered<N: HasChainApi + ?Sized>(
 
     if balance.is_zero() {
         tracing::trace!(?id, %recovered_address, "recovered address has zero balance: already swept");
-        if let Err(error) = store.remove(&id) {
-            tracing::warn!(%error, ?id, "sweep succeeded but failed to remove from store");
+        if let Some(ref store) = store {
+            let _ = store.remove(&id);
         }
         return Ok(());
     }
@@ -417,8 +403,8 @@ async fn sweep_recovered<N: HasChainApi + ?Sized>(
         .await
         .map_err(StrategyError::other)?;
 
-    if let Err(error) = store.remove(&id) {
-        tracing::warn!(%error, ?id, "sweep succeeded but failed to remove from store");
+    if let Some(ref store) = store {
+        let _ = store.remove(&id);
     }
 
     tracing::info!(%balance, %recovered_address, "deposit withdrawn");
@@ -431,7 +417,7 @@ fn spawn_sweep_retry(
     chain_key: ChainKeypair,
     node: Arc<impl HasChainApi + ActionableEventSource + Send + Sync + 'static>,
     cfg: NonAnonymousPixStrategyConfig,
-    store: crate::pix_recovery_store::PixRecoveryStore,
+    store: Option<crate::pix_recovery_store::PixRecoveryStore>,
 ) {
     hopr_utils::runtime::prelude::spawn(async move {
         let recovered_address = chain_key.public().to_address();
@@ -479,16 +465,18 @@ async fn fund_sweep_gas_impl<N: HasChainApi + ?Sized>(
         return Ok(());
     }
 
+    let deficit = cfg.gas_xdai_per_sweep - recovered_xdai;
+
     let safe_xdai: XDaiBalance = node
         .chain_api()
         .balance(node.identity().safe_address)
         .await
         .map_err(StrategyError::other)?;
 
-    if safe_xdai < cfg.gas_xdai_per_sweep {
+    if safe_xdai < deficit {
         tracing::warn!(
             safe = %node.identity().safe_address,
-            required = %cfg.gas_xdai_per_sweep,
+            deficit = %deficit,
             available = %safe_xdai,
             "insufficient xDai in safe to fund sweep gas"
         );
@@ -496,13 +484,13 @@ async fn fund_sweep_gas_impl<N: HasChainApi + ?Sized>(
     }
 
     node.chain_api()
-        .withdraw(cfg.gas_xdai_per_sweep, &recovered_address)
+        .withdraw(deficit, &recovered_address)
         .and_then(identity)
         .await
         .map_err(StrategyError::other)?;
 
     tracing::info!(
-        amount = %cfg.gas_xdai_per_sweep,
+        amount = %deficit,
         %recovered_address,
         "funded sweep gas from safe"
     );

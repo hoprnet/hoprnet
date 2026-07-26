@@ -125,6 +125,11 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// Populated at `CommitmentResult::Completed` time in
     /// `insert_coefficient_commitments`; cleaned up by `remove_cycle`.
     ssa_num_polys: moka::sync::Cache<SsaId<S::Pseudonym>, usize>,
+    /// Tombstone set: SsaIds that have been retired.  The commitment completion
+    /// path checks this after inserting verifiers but before publishing the
+    /// builder/liveness entry, preventing resurrection when `retire_ssa` runs
+    /// between verifier installation and publication.
+    retired_ssas: moka::sync::Cache<SsaId<S::Pseudonym>, ()>,
     cfg: SsaReconstructorConfig,
 }
 
@@ -194,6 +199,12 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // entry survives as long as the verifiers it shadows. No max_capacity because
             // entries are explicitly invalidated in remove_cycle.
             ssa_num_polys: moka::sync::Cache::builder()
+                .time_to_idle(cfg.unused_verifier_lifetime)
+                .build(),
+            // Tombstone set: short TTL since it only needs to cover the window between
+            // verifier insertion and builder/liveness publication.  Once the builder
+            // is published, retire_ssa can find the cycle via the liveness map.
+            retired_ssas: moka::sync::Cache::builder()
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             cfg,
@@ -322,6 +333,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     }
 
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
+        // Mark tombstone BEFORE removing state so the commitment completion path
+        // can detect retirement and skip builder/liveness publication.
+        self.retired_ssas.insert(ssa_id, ());
+
         // Prefer the liveness map: it retains num_polys even after both builders
         // have been TTL-evicted, enabling full verifier cleanup.
         let num_polys = self.ssa_num_polys.get(&ssa_id).or_else(|| {
@@ -417,28 +432,35 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
                 let num_polys = ssa_builder.num_polys();
                 let full_ssa_commitment = ssa_builder.full_commitment;
-                // Insert verifiers BEFORE publishing the builder + liveness entry,
-                // so that a concurrent retire_ssa never sees a bare liveness entry
-                // without corresponding verifiers (which would let the cycle
-                // resurrect when the verifier loop runs after retire_ssa completes).
+                // Insert verifiers BEFORE checking the tombstone, so that
+                // a concurrent retire_ssa can find and remove them via the
+                // liveness map once we publish below.  If we checked the
+                // tombstone first, retire_ssa might run between the check
+                // and the insert, leaving verifiers that were never published
+                // to any cache and are thus invisible to cleanup.
+                let spis: Vec<SsaPolynomialId<S::Pseudonym>> =
+                    ssa_reconstructors.iter().map(|r| r.verifier.spi).collect();
                 for ssa_reconstructor in ssa_reconstructors {
                     self.ssa_verifiers.insert(
                         ssa_reconstructor.verifier.spi,
                         std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
                     );
                 }
-                // Publish the builder and liveness entry after all verifiers are
-                // installed.  At this point retire_ssa can find the full cycle via
-                // the liveness map and clean it up completely.
-                self.ssa_builders
-                    .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
-                // Record the polynomial count so retire_ssa can clean up verifiers
-                // even after both builders have been TTL-evicted.
-                self.ssa_num_polys.insert(ssa_id, num_polys);
-
-                res.ssa_deposit_address =
-                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
-                res.is_verifiable = true;
+                // Check the tombstone: if retire_ssa ran during verifier
+                // insertion, clean up the verifiers and skip publication.
+                if self.retired_ssas.contains_key(&ssa_id) {
+                    for spi in &spis {
+                        self.ssa_verifiers.invalidate(spi);
+                    }
+                    tracing::trace!(%ssa_id, "ssa commitment completed but cycle was retired — dropped verifiers");
+                } else {
+                    self.ssa_builders
+                        .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
+                    self.ssa_num_polys.insert(ssa_id, num_polys);
+                    res.ssa_deposit_address =
+                        Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+                    res.is_verifiable = true;
+                }
 
                 tracing::trace!(%ssa_id, "ssa commitment completed");
             }

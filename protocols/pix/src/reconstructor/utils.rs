@@ -1,5 +1,3 @@
-use std::collections::hash_map::Entry;
-
 use vsss_rs::{
     ReadableShareSet,
     elliptic_curve::group::{Group, GroupEncoding},
@@ -217,18 +215,18 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             validated.push((polynomial_index, polynomial_coeff_commitment));
         }
 
+        // Check for duplicate occupancy before any insertion (transactional).
+        for (polynomial_index, _) in &validated {
+            let polynomial = self.committed_polynomials.entry(*polynomial_index).or_default();
+            if polynomial.contains_key(&coeff_index) {
+                return Err(errors::PixError::DuplicateCommitment);
+            }
+        }
+
+        // Second phase: insert into confirmed-vacant slots.
         for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
-
-            // Do not allow any re-insertion
-            match polynomial.entry(coeff_index) {
-                Entry::Vacant(v) => {
-                    v.insert(polynomial_coeff_commitment);
-                }
-                Entry::Occupied(_) => {
-                    return Err(errors::PixError::DuplicateCommitment);
-                }
-            }
+            polynomial.insert(coeff_index, polynomial_coeff_commitment);
         }
 
         tracing::trace!(
