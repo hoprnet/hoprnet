@@ -1683,6 +1683,9 @@ where
         // window where the commitment is in flight but no timeout is installed.
         let session_cache = self.sessions.clone();
         let active_sessions_clone = self.active_sessions.clone();
+        // Snapshot the SSA state before the closure so peek_index remains
+        // available after close_session consumes the slot.
+        let ssa_state_snapshot = current_ssa_state.clone();
         let session_deadline = std::time::Instant::now()
             + self.cfg.pix_config.max_deposit_wait
             + self.cfg.pix_config.max_ssa_delivery_time;
@@ -1693,10 +1696,18 @@ where
                     if let Some(session_slot) = session_cache.remove(&session_id) {
                         active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
                         close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
-                        // Release this cycle's reconstructor state on an abandoned deposit.
-                        pix_toolbox_killswitch
-                            .share_processor
-                            .retire_ssa(SsaId::new(session_id, ssa_index));
+                        // Release reconstructor state for all live cycles for this
+                        // session, not just the timed-out index.  Pipelining may have
+                        // created earlier unpaid cycles whose builders/verifiers must
+                        // also be cleaned up.
+                        let current = ssa_state_snapshot.peek_index();
+                        for i in 1..=current.get() {
+                            if let Some(idx) = SsaIndex::new(i) {
+                                pix_toolbox_killswitch
+                                    .share_processor
+                                    .retire_ssa(SsaId::new(session_id, idx));
+                            }
+                        }
                         error!(%session_id, ssa_index, "pix session deposit timeout");
                     } else {
                         warn!(%session_id, "pix session deposit timeout - session not found");
@@ -5669,6 +5680,17 @@ mod tests {
         // the slot.
         let pix_toolbox_ref = mgr.pix_toolbox.get().unwrap().clone();
         let share_processor = pix_toolbox_ref.share_processor;
+
+        // Precondition: builders exist for indices 1 through 3 before teardown,
+        // so that the post-close assertions below prove actual retirement rather
+        // than absence of never-created builders.
+        for i in 1..=3_u32 {
+            let sid = SsaId::new(alice_pseudonym, i.try_into()?);
+            assert!(
+                share_processor.contains_builder(&sid),
+                "precondition: builder for SsaId index {i} must exist before close_session"
+            );
+        }
 
         mgr.close_session(&alice_pseudonym);
 

@@ -354,7 +354,7 @@ where
                 Ok(b) => b,
                 Err(e) => {
                     tracing::error!(%e, ?id, "failed to query balance during recovery replay");
-                    spawn_sweep_retry(id, chain_key, HoprBalance::zero(), node, cfg, store);
+                    spawn_sweep_retry(id, chain_key, node, cfg, store);
                     continue;
                 }
             };
@@ -370,27 +370,42 @@ where
             // Try the sweep inline.  On failure, spawn a background retry task.
             // Clone chain_key beforehand so it's available for the spawn on error.
             let ck_for_spawn = chain_key.clone();
-            match sweep_recovered(node.clone(), cfg.clone(), store.clone(), id, &chain_key, balance).await {
+            match sweep_recovered(node.clone(), cfg.clone(), store.clone(), id, &chain_key).await {
                 Ok(()) => {}
                 Err(error) => {
                     tracing::error!(%error, ?id, "recovery replay failed — spawning background retry");
-                    spawn_sweep_retry(id, ck_for_spawn, balance, node, cfg, store);
+                    spawn_sweep_retry(id, ck_for_spawn, node, cfg, store);
                 }
             }
         }
     }
 }
 
-/// Sweep a single recovery: fund gas, withdraw from signer, remove from store.
+/// Sweep a single recovery: query the live on-chain balance, fund gas, withdraw
+/// from signer, remove from store.  Uses the current balance rather than a
+/// caller-supplied snapshot to avoid racing with out-of-band sweeps.
 async fn sweep_recovered<N: HasChainApi + ?Sized>(
     node: Arc<N>,
     cfg: NonAnonymousPixStrategyConfig,
     store: crate::pix_recovery_store::PixRecoveryStore,
     id: hopr_api::node::PixAddressId,
     chain_key: &ChainKeypair,
-    balance: HoprBalance,
 ) -> Result<(), StrategyError> {
     let recovered_address = chain_key.public().to_address();
+
+    let balance: HoprBalance = node
+        .chain_api()
+        .balance(recovered_address)
+        .await
+        .map_err(StrategyError::other)?;
+
+    if balance.is_zero() {
+        tracing::trace!(?id, %recovered_address, "recovered address has zero balance: already swept");
+        if let Err(error) = store.remove(&id) {
+            tracing::warn!(%error, ?id, "sweep succeeded but failed to remove from store");
+        }
+        return Ok(());
+    }
 
     fund_sweep_gas_impl(&*node, &cfg, recovered_address).await?;
 
@@ -411,35 +426,24 @@ async fn sweep_recovered<N: HasChainApi + ?Sized>(
 }
 
 /// Spawn a background task that retries [`sweep_recovered`] with exponential backoff.
-/// Silently ignores zero-balance entries (already swept).
 fn spawn_sweep_retry(
     id: hopr_api::node::PixAddressId,
     chain_key: ChainKeypair,
-    balance: HoprBalance,
     node: Arc<impl HasChainApi + ActionableEventSource + Send + Sync + 'static>,
     cfg: NonAnonymousPixStrategyConfig,
     store: crate::pix_recovery_store::PixRecoveryStore,
 ) {
     hopr_utils::runtime::prelude::spawn(async move {
-        if balance.is_zero() {
-            // Query the current balance; the old value may be stale from a failed
-            // startup query.  If still zero, the entry is already swept.
-            let current = node.chain_api().balance(chain_key.public().to_address()).await;
-            let balance = current.unwrap_or(balance);
-            if balance.is_zero() {
-                let _ = store.remove(&id);
-                return;
-            }
-        }
-
         let recovered_address = chain_key.public().to_address();
 
-        (|| sweep_recovered(Arc::clone(&node), cfg.clone(), store.clone(), id, &chain_key, balance))
+        (|| sweep_recovered(Arc::clone(&node), cfg.clone(), store.clone(), id, &chain_key))
             .retry(backon::ExponentialBuilder::default().with_max_times(MAX_SWEEP_RETRIES))
             .sleep(backon::FuturesTimerSleeper)
-            .when(|e| {
-                // Only retry on transient errors; permanent ones skip retry immediately.
-                !matches!(e, StrategyError::CriteriaNotSatisfied)
+            .when(|_| {
+                // Retry all errors up to MAX_SWEEP_RETRIES; CriteriaNotSatisfied
+                // (insufficient xDai) may resolve on retry when another sweep
+                // completes and returns gas to the Safe.
+                true
             })
             .notify(|e, dur| {
                 tracing::warn!(%e, ?dur, ?id, "sweep retry in");
@@ -459,6 +463,19 @@ async fn fund_sweep_gas_impl<N: HasChainApi + ?Sized>(
     recovered_address: Address,
 ) -> crate::errors::Result<()> {
     if cfg.gas_xdai_per_sweep.is_zero() {
+        return Ok(());
+    }
+
+    // Query the recovered address's current native balance.  If it already has
+    // enough xDai for gas, don't send any more.
+    let recovered_xdai: XDaiBalance = node
+        .chain_api()
+        .balance(recovered_address)
+        .await
+        .map_err(StrategyError::other)?;
+
+    if recovered_xdai >= cfg.gas_xdai_per_sweep {
+        tracing::trace!(%recovered_address, balance = %recovered_xdai, "recovered address already has enough xDai for sweep gas");
         return Ok(());
     }
 
@@ -511,17 +528,20 @@ where
     N: HasChainApi + ActionableEventSource + Send + Sync + 'static,
 {
     async fn run(&mut self) -> crate::errors::Result<()> {
-        // Startup recovery: replay persisted keys whose on-chain balance is still non-zero.
-        // Failed entries are retried in the background with exponential backoff.
-        if let Some(ref store) = self.recovery_store {
-            self.replay_pending_recoveries(store).await;
-        }
-
+        // Subscribe to the event stream before replaying pending recoveries so
+        // that any PIX events emitted during startup recovery are captured by
+        // the stream rather than missed.
         let mut event_stream = self
             .node
             .subscribe_to_actionable_events(Some(&[ActionableEventDiscriminant::Pix]))
             .map_err(|e| StrategyError::Other(anyhow::anyhow!(e)))?
             .filter_map(|event| futures::future::ready(event.try_as_pix()));
+
+        // Startup recovery: replay persisted keys whose on-chain balance is still non-zero.
+        // Failed entries are retried in the background with exponential backoff.
+        if let Some(ref store) = self.recovery_store {
+            self.replay_pending_recoveries(store).await;
+        }
 
         while let Some(event) = event_stream.next().await {
             if let Err(error) = self.on_pix_event(event).await {
@@ -924,9 +944,9 @@ mod tests {
                 XDaiBalance::new_base(2), // 2 xDai — 1 for sweep gas + buffer for registration fees
                 HoprBalance::new_base(1000),
             )
-            // Give the recovered address wxHOPR but NOT xDai — the strategy must
-            // fund its own sweep gas from the safe.
+            // Give the recovered address wxHOPR and enough xDai to cover sweep gas.
             .with_balances([(recovered_address, recovered_initial_balance)])
+            .with_balances([(recovered_address, XDaiBalance::new_base(1))])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
@@ -1186,6 +1206,7 @@ mod tests {
                 HoprBalance::new_base(1000),
             )
             .with_balances([(recovered_address, recovered_initial_balance)])
+            .with_balances([(recovered_address, XDaiBalance::new_base(1))])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let mut chain_connector =
@@ -1344,6 +1365,7 @@ mod tests {
                 HoprBalance::new_base(1000),
             )
             .with_balances([(recovered_address, recovered_balance)])
+            .with_balances([(recovered_address, XDaiBalance::new_base(1))])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let mut chain_connector =

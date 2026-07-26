@@ -417,18 +417,24 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
                 let num_polys = ssa_builder.num_polys();
                 let full_ssa_commitment = ssa_builder.full_commitment;
-                self.ssa_builders
-                    .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
-                // Record the polynomial count in the liveness map so retire_ssa can
-                // clean up even after both builders have been TTL-evicted.
-                self.ssa_num_polys.insert(ssa_id, num_polys);
-
+                // Insert verifiers BEFORE publishing the builder + liveness entry,
+                // so that a concurrent retire_ssa never sees a bare liveness entry
+                // without corresponding verifiers (which would let the cycle
+                // resurrect when the verifier loop runs after retire_ssa completes).
                 for ssa_reconstructor in ssa_reconstructors {
                     self.ssa_verifiers.insert(
                         ssa_reconstructor.verifier.spi,
                         std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
                     );
                 }
+                // Publish the builder and liveness entry after all verifiers are
+                // installed.  At this point retire_ssa can find the full cycle via
+                // the liveness map and clean it up completely.
+                self.ssa_builders
+                    .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
+                // Record the polynomial count so retire_ssa can clean up verifiers
+                // even after both builders have been TTL-evicted.
+                self.ssa_num_polys.insert(ssa_id, num_polys);
 
                 res.ssa_deposit_address =
                     Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
@@ -1360,16 +1366,53 @@ mod tests {
 
     /// Verifies that the builder caches accept more entries than the old
     /// `MAX_POLYS_PER_SSA` size bound. After removing the hard capacity, only
-    /// TTL governs eviction.
+    /// TTL governs eviction.  Also verifies that fully-committed IDs populate
+    /// `ssa_builders` and remain cached.
     #[test]
     fn builder_caches_accept_more_entries_than_max_polys_per_ssa() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let pseudonym = SimplePseudonym::random();
         let exceed = MAX_POLYS_PER_SSA as usize + 5;
+        let mut ids = Vec::with_capacity(exceed);
         for i in 0..exceed {
-            let ssa_id = SsaId::new(SimplePseudonym::random(), (1u32 + i as u32).try_into()?);
+            let ssa_id = SsaId::new(pseudonym, (1u32 + i as u32).try_into()?);
             reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+            ids.push(ssa_id);
         }
-        // No error and no crash means no hard-cap eviction of active entries.
+        reconstructor.commitment_builder.run_pending_tasks();
+        for ssa_id in &ids {
+            assert!(
+                reconstructor.contains_builder(ssa_id),
+                "commitment builder must retain every accepted SsaId ({ssa_id:?})"
+            );
+        }
+
+        // Complete the first few IDs through the full commitment path to populate
+        // ssa_builders.  Use a 2-poly 2-threshold generator so that
+        // insert_coefficient_commitments eventually hits CommitmentResult::Completed
+        // and pushes into ssa_builders.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        });
+        for ssa_id in ids.iter().take(3) {
+            let commit = generator.new_ssa_commitment(&pseudonym, ssa_id.ssa_index())?;
+            commit.process_into_reconstructor(&reconstructor)?;
+            reconstructor.commitment_builder.run_pending_tasks();
+            reconstructor.ssa_builders.run_pending_tasks();
+
+            assert!(
+                reconstructor.ssa_builders.contains_key(ssa_id),
+                "ssa_builders must contain completed SsaId index {} ({ssa_id:?})",
+                ssa_id.ssa_index().get(),
+            );
+            assert!(
+                reconstructor.ssa_num_polys.contains_key(ssa_id),
+                "ssa_num_polys must retain the completed SsaId ({ssa_id:?})",
+            );
+        }
+
         Ok(())
     }
 }

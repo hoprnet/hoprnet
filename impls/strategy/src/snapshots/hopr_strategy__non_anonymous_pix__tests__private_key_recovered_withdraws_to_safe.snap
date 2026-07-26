@@ -30,7 +30,7 @@ native_balances:
     balance: 0 xDai
   bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
     __typename: NativeBalance
-    balance: 0.999999999999999998 xDai
+    balance: 1.999999999999999999 xDai
   259bed99d230648d7c8a116af59abdd15c9f4f1e:
     __typename: NativeBalance
     balance: 0 xDai
@@ -103,7 +103,7 @@ deployed_safes:
     threshold: "1"
 safe_redeem_stats: {}
 tx_counts:
-  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 2
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
   a42259c04b40d58459de59f6067a1b376403c2a5: 1
 channels: {}
 chain_info:

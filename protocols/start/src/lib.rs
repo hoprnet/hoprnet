@@ -47,7 +47,7 @@ pub enum StartErrorReason {
 ///
 /// During session establishment (before `SessionEstablished` is sent), errors
 /// refer back to the initiation [`StartChallenge`]. After the session is
-/// established, errors refer to the established session by its [`SessionId`](I).
+/// established, errors refer to the established session by its `SessionId`.
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
@@ -647,10 +647,28 @@ where
                         return Err(StartProtocolError::NumberOfCommitments);
                     }
 
-                    let mut coefficient_commitments = std::collections::HashMap::with_capacity(num_polys as usize);
-                    let mut next_offset = size_of::<hopr_protocol_pix::SsaIndex>()
+                    let fixed_prefix_size = size_of::<hopr_protocol_pix::SsaIndex>()
                         + size_of::<hopr_protocol_pix::CoefficientIndex>()
                         + size_of::<hopr_protocol_pix::PolynomialIndex>();
+                    let mut coefficient_commitments = {
+                        // Derive the maximum number of polynomial entries this packet
+                        // can carry from the same per-entry constraints as the encoder
+                        // (see `new_multiple`).  Enforce it before allocating, so
+                        // unreasonably large `num_polys` values that pass the
+                        // `MAX_POLYS_PER_SSA` guard are still caught by the wire limit.
+                        let per_entry =
+                            size_of::<hopr_protocol_pix::PolynomialIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
+                        // Availability: remaining body after the fixed prefix fields
+                        // (ssa_index + coefficient_index + num_polys), reserving at
+                        // least one byte for the trailing CBOR session_id.
+                        let avail = body.len().saturating_sub(fixed_prefix_size);
+                        let max_by_payload = avail.saturating_sub(1) / per_entry;
+                        if num_polys as usize > max_by_payload {
+                            return Err(StartProtocolError::NumberOfCommitments);
+                        }
+                        std::collections::HashMap::with_capacity(num_polys as usize)
+                    };
+                    let mut next_offset = fixed_prefix_size;
                     for _ in 0..num_polys {
                         // Still needs to be space left for Session ID at the end of commitments
                         if body.len()
