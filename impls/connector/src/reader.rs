@@ -51,7 +51,13 @@ where
     async fn balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
         let address = address.into();
         if Cy::is::<WxHOPR>() {
-            Ok(self.0.query_token_balance(&address.into()).await?.balance.0.parse()?)
+            Ok(self
+                .0
+                .query_token_balance(&address.into(), blokli_client::types::Token::WxHOPR)
+                .await?
+                .balance
+                .0
+                .parse()?)
         } else if Cy::is::<XDai>() {
             Ok(self.0.query_native_balance(&address.into()).await?.balance.0.parse()?)
         } else {
