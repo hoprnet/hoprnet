@@ -276,8 +276,9 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
             // Phase 2: all fallible decode+subgroup checks passed.
-            // The conditional overwrite in Phase 1 means any prior undecodable or
-            // small-order entries were replaced by this point.
+            // Phase 1 already rejected any undecodable or duplicate entries
+            // with InvalidInput / DuplicateCommitment, so no entries were
+            // overwritten — the builder is now atomically complete.
             self.complete = true;
             self.committed_polynomials.clear();
 

@@ -108,6 +108,8 @@ impl NonAnonymousPixStrategy {
             node,
             recovery_store,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         }))
     }
 }
@@ -124,6 +126,15 @@ struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     /// growth on long-lived Entry nodes without introducing an expiration
     /// window that could allow duplicate withdrawals.
     processed_deposits: Cache<hopr_api::node::PixAddressId, ()>,
+    /// In-flight sweep guard (both roles): prevents duplicate concurrent sweeps of
+    /// the same PixAddressId.  A key is inserted before each sweep attempt (inline,
+    /// retry, or replay) and removed when the sweep succeeds, fails, or gives up.
+    /// `moka::sync::Cache` is internally `Arc`-based, so cloning is cheap.
+    in_flight_sweeps: Cache<hopr_api::node::PixAddressId, ()>,
+    /// In-flight withdrawal guard (Entry role): prevents parallel withdrawals to the
+    /// same destination address.  Inserted before the `withdraw` `.await` and removed
+    /// on success or failure.  Bounded at 1024 to protect against unbounded growth.
+    in_flight_destinations: Cache<Address, ()>,
 }
 
 const MAX_SWEEP_RETRIES: usize = 5;
@@ -151,14 +162,25 @@ where
                     return Err(StrategyError::CriteriaNotSatisfied);
                 }
 
-                // TODO: do not allow parallel withdrawals to any address
+                // Prevent parallel withdrawals to the same destination address.
+                // The `processed_deposits` dedup above guards the PixAddressId, not the
+                // destination address — two events for different IDs on the same address
+                // could race when event processing becomes parallelized.
+                let dest_addr: Address = new_deposit_address.address.try_into()?;
+                if self.in_flight_destinations.contains_key(&dest_addr) {
+                    tracing::warn!(?dest_addr, "withdrawal already in flight to this destination, skipping");
+                    return Ok(());
+                }
+                self.in_flight_destinations.insert(dest_addr, ());
+
                 if let Err(error) = self
                     .node
                     .chain_api()
-                    .withdraw(target_deposit, &new_deposit_address.address.try_into()?)
+                    .withdraw(target_deposit, &dest_addr)
                     .and_then(identity)
                     .await
                 {
+                    self.in_flight_destinations.invalidate(&dest_addr);
                     tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed");
                     return Err(StrategyError::other(error));
                 }
@@ -166,6 +188,7 @@ where
                 // Mark completed only after the withdrawal succeeds so a transient
                 // failure doesn't permanently poison this ID.
                 self.processed_deposits.insert(new_deposit_address.id, ());
+                self.in_flight_destinations.invalidate(&dest_addr);
                 tracing::info!(%target_deposit, ?new_deposit_address, "deposit successful");
             }
             PixEvent::DepositAddressReceived(deposit_address_recv) => {
@@ -260,11 +283,19 @@ where
                     return Err(StrategyError::other(error));
                 }
 
+                // Prevent duplicate concurrent sweeps for the same PixAddressId.
+                if self.in_flight_sweeps.contains_key(&private_key_recovered.id) {
+                    tracing::warn!(?private_key_recovered.id, "sweep already in flight, skipping");
+                    return Ok(());
+                }
+                self.in_flight_sweeps.insert(private_key_recovered.id, ());
+
                 let chain_key =
                     ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
 
                 let store = self.recovery_store.clone();
                 let ck_for_spawn = chain_key.clone();
+                let in_flight = self.in_flight_sweeps.clone();
                 match sweep_recovered(
                     Arc::clone(&self.node),
                     self.cfg.clone(),
@@ -275,6 +306,7 @@ where
                 .await
                 {
                     Ok(()) => {
+                        in_flight.invalidate(&private_key_recovered.id);
                         tracing::info!(?private_key_recovered.id, "deposit withdrawn");
                     }
                     Err(error) => {
@@ -285,6 +317,7 @@ where
                             Arc::clone(&self.node),
                             self.cfg.clone(),
                             store,
+                            in_flight,
                         );
                     }
                 }
@@ -316,14 +349,25 @@ where
         let store = store.clone();
 
         for (id, secret) in entries {
+            // Replay is sequential (spawns detached on error), so a duplicate
+            // entry in the store cannot race itself.  The guard catches races with
+            // the live PrivateKeyRecovered handler.
+            if self.in_flight_sweeps.contains_key(&id) {
+                tracing::warn!(?id, "sweep already in flight for recovery replay entry, skipping");
+                continue;
+            }
+            self.in_flight_sweeps.insert(id, ());
+
             let node = Arc::clone(&node);
             let cfg = cfg.clone();
             let store = store.clone();
+            let in_flight = self.in_flight_sweeps.clone();
 
             let chain_key = match ChainKeypair::from_secret(secret.0.as_ref()) {
                 Ok(k) => k,
                 Err(error) => {
                     tracing::error!(%error, ?id, "failed to reconstruct chain key during recovery replay");
+                    in_flight.invalidate(&id);
                     continue;
                 }
             };
@@ -332,13 +376,14 @@ where
                 Ok(b) => b,
                 Err(e) => {
                     tracing::error!(%e, ?id, "failed to query balance during recovery replay");
-                    spawn_sweep_retry(id, chain_key, node, cfg, Some(store));
+                    spawn_sweep_retry(id, chain_key, node, cfg, Some(store), in_flight);
                     continue;
                 }
             };
 
             if balance.is_zero() {
                 // Already swept in a prior run; drop the stale secret.
+                in_flight.invalidate(&id);
                 if let Err(error) = store.remove(&id) {
                     tracing::warn!(%error, ?id, "failed to remove zero-balance entry from store");
                 }
@@ -349,10 +394,12 @@ where
             // Clone chain_key beforehand so it's available for the spawn on error.
             let ck_for_spawn = chain_key.clone();
             match sweep_recovered(node.clone(), cfg.clone(), Some(store.clone()), id, &chain_key).await {
-                Ok(()) => {}
+                Ok(()) => {
+                    in_flight.invalidate(&id);
+                }
                 Err(error) => {
                     tracing::error!(%error, ?id, "recovery replay failed — spawning background retry");
-                    spawn_sweep_retry(id, ck_for_spawn, node, cfg, Some(store));
+                    spawn_sweep_retry(id, ck_for_spawn, node, cfg, Some(store), in_flight);
                 }
             }
         }
@@ -410,6 +457,7 @@ fn spawn_sweep_retry(
     node: Arc<impl HasChainApi + ActionableEventSource + Send + Sync + 'static>,
     cfg: NonAnonymousPixStrategyConfig,
     store: Option<crate::pix_recovery_store::PixRecoveryStore>,
+    in_flight_sweeps: Cache<hopr_api::node::PixAddressId, ()>,
 ) {
     hopr_utils::runtime::prelude::spawn(async move {
         let recovered_address = chain_key.public().to_address();
@@ -431,6 +479,9 @@ fn spawn_sweep_retry(
                 tracing::error!(%e, ?id, %recovered_address, "sweep failed after max retries, giving up");
                 // Leave the entry in the store for manual recovery.
             });
+
+        // Release the in-flight guard on completion (success or final failure).
+        in_flight_sweeps.invalidate(&id);
     });
 }
 
@@ -717,6 +768,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let event = PixEvent::DepositAddressReceived(PixDepositAddressReceived {
@@ -795,6 +848,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let bob_balance_before = strategy
@@ -880,6 +935,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::new(chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
@@ -954,6 +1011,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let safe_address = strategy.node.identity().safe_address;
@@ -1084,6 +1143,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let bob_before = strategy.get_balance(*BOB).await?;
@@ -1216,6 +1277,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         #[allow(clippy::disallowed_names)]
@@ -1305,6 +1368,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None, // not needed for the test — we pass store directly
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         // No need to call on_tick or register a safe — balance is zero so replay
@@ -1378,6 +1443,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         strategy.replay_pending_recoveries(&store).await;
@@ -1454,6 +1521,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         strategy.replay_pending_recoveries(&store).await;
@@ -1514,6 +1583,8 @@ mod tests {
             node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store: None,
             processed_deposits: Cache::builder().max_capacity(1024).build(),
+            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
+            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
         };
 
         let safe_address = strategy.node.identity().safe_address;
