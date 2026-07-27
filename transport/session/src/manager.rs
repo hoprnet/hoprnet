@@ -49,8 +49,8 @@ use crate::{
     },
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
-        ClosureReason, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
-        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+        ClosureReason, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprSessionCapabilities, HoprSessionConfig,
+        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -355,7 +355,8 @@ pub enum DispatchResult {
 }
 
 /// Configuration of the PIX protocol for incoming Sessions on Exit nodes.
-#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct IncomingSessionPixConfig {
     /// If set to true, incoming Session without the [`Capability::UsePIX`] will be rejected.
     ///
@@ -367,14 +368,24 @@ pub struct IncomingSessionPixConfig {
     /// If an Entry sends PIX parameters for SSA reconstruction that are outside this quota range,
     /// the incoming Session will be rejected.
     ///
-    /// Default is 128 MB to 512 MB (inclusive).
-    #[default(_code = "(134217728..=536870912)")]
+    /// The default is derived from the default PIX dimensions
+    /// ([`DEFAULT_PIX_POLYS_PER_SSA`] × [`DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
+    /// so that an Entry running the default configuration is always accepted. The upper bound is
+    /// exactly [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing
+    /// to serve unincentivized per SSA cycle, and accepting more than our own nominal dimensions
+    /// would raise both that exposure and the reconstructor memory held per Session. An Exit that
+    /// wants to serve Entries configured with larger dimensions must widen this range explicitly.
+    ///
+    /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
+    /// (≈ 130 MiB to ≈ 519 MiB, inclusive).
+    #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
     ///
     /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
     /// wait time because the Client has to be able to deliver its SSA commitment.
     #[default(Duration::from_secs(20))]
+    #[serde(with = "humantime_serde")]
     pub max_ssa_delivery_time: Duration,
     /// Maximum time to wait for the funds to be deposited in the SSA.
     ///
@@ -383,6 +394,7 @@ pub struct IncomingSessionPixConfig {
     ///
     /// Default is 1 minute.
     #[default(Duration::from_secs(60))]
+    #[serde(with = "humantime_serde")]
     pub max_deposit_wait: Duration,
 }
 
@@ -710,7 +722,8 @@ impl PixToolbox {
 /// misconfigurations cannot exhaust challenge slots.
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (default 128 MB–512 MB per SSA).
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈130
+///   MiB–519 MiB per SSA).
 /// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
 /// - The Exit only checks the product of the number of polynomials and the threshold, so the Entry can set the

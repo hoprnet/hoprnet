@@ -95,6 +95,34 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16
     polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
 }
 
+/// Default number of polynomials ("SSA parts") a single SSA is split into.
+///
+/// This is the single source of truth for the Entry-side generator dimension
+/// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
+/// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
+/// Both must be derived from it so the two cannot drift apart: the Exit computes the
+/// offered quota as `polys × shares × PAYLOAD_SIZE` and rejects the Session if it falls
+/// outside its configured range, so a hard-coded range that no longer matches the
+/// dimension defaults makes every PIX Session fail to establish.
+pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = 4096;
+
+/// Default number of shares required to reconstruct a single SSA part.
+///
+/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides.
+pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = 128;
+
+/// Nominal per-SSA data quota implied by the default PIX dimensions.
+///
+/// This is the amount of Exit → Entry data covered by a single SSA deposit when both
+/// nodes run the default PIX configuration.
+pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
+
+/// Divisor applied to [`DEFAULT_PIX_SSA_QUOTA`] to obtain the lower bound of the default
+/// [`quota_range`](crate::IncomingSessionPixConfig::quota_range).
+///
+/// Preserves the 4× span the range had when its bounds were hard-coded.
+pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
+
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgreedSsaQuota {

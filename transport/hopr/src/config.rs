@@ -10,7 +10,10 @@ use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_session::{IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
+use hopr_transport_session::{
+    DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL,
+    MIN_SURB_BUFFER_DURATION,
+};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
@@ -135,10 +138,11 @@ pub struct HoprProtocolConfig {
     pub session: SessionGlobalConfig,
     /// Global configuration for the PIX.
     #[validate(nested)]
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub pix: PixGlobalConfig,
     /// Per-node PIX session configuration for incoming sessions.
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[validate(custom(function = "validate_incoming_session_pix_config"))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub incoming_session_pix_config: IncomingSessionPixConfig,
     /// Mixer configuration.
     #[cfg_attr(feature = "serde", serde(default))]
@@ -163,30 +167,47 @@ pub struct HoprProtocolConfig {
     pub counter_flush_interval: Duration,
 }
 
+/// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything.
+///
+/// `quota_range` is operator-settable, and an empty (inverted) range silently makes
+/// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
+/// `UnacceptablePixParams` errors at Session establishment time.
+fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
+    if cfg.quota_range.is_empty() {
+        return Err(ValidationError::new(
+            "pix quota_range must be non-empty (start must not exceed end)",
+        ));
+    }
+    Ok(())
+}
+
 /// Global configuration for the Protocol for Incentivization of eXits (PIX).
 #[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
-    serde(deny_unknown_fields)
+    serde(default, deny_unknown_fields)
 )]
 pub struct PixGlobalConfig {
     /// Number of parts an SSA is split into.
     ///
     /// This scales will with the CPU parallelism.
     ///
-    /// Default is 4096.
+    /// Defaults to [`DEFAULT_PIX_POLYS_PER_SSA`], which is also what
+    /// [`IncomingSessionPixConfig::quota_range`] is derived from — changing this without
+    /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
     #[validate(range(min = 8, max = 16192))]
-    #[default(4096)]
+    #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
     pub num_ssa_parts: usize,
 
     /// Number of shares required to reconstruct an SSA part.
     ///
     /// This does not scale well with CPU parallelism.
     ///
-    /// Default is 128.
+    /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
+    /// for the interaction with the Exit's accepted quota range.
     #[validate(range(min = 2, max = 4096))]
-    #[default(128)]
+    #[default(DEFAULT_PIX_SHARES_PER_POLY as usize)]
     pub ssa_part_size: usize,
 
     /// Number of shares sent in addition to `ssa_part_size` to reconstruct an SSA part.
@@ -587,6 +608,101 @@ pub struct SessionGlobalConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Exit computes the offered quota as `polys × shares × HoprPacket::PAYLOAD_SIZE` and
+    /// rejects the Session when it falls outside `quota_range`. An Entry running the default
+    /// `PixGlobalConfig` must therefore always be acceptable to an Exit running the default
+    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and
+    /// before both structs became `serde(default)` there was no way for an operator to fix it.
+    #[test]
+    fn default_pix_dimensions_must_be_inside_default_incoming_quota_range() {
+        let pix = PixGlobalConfig::default();
+        let incoming = IncomingSessionPixConfig::default();
+
+        let quota = pix.num_ssa_parts as u64
+            * pix.ssa_part_size as u64
+            * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+
+        assert!(
+            incoming.quota_range.contains(&quota),
+            "default PIX quota {quota} is outside the default accepted range {:?} — every PIX session would be \
+             rejected with UnacceptablePixParams",
+            incoming.quota_range
+        );
+
+        // Both sides are derived from the same constants, so the range must be anchored exactly
+        // at the nominal quota. Asserting the relationship rather than a literal keeps this test
+        // correct if `HoprPacket::PAYLOAD_SIZE` ever changes, while still failing loudly if the
+        // range or the dimensions stop being derived from a shared source.
+        assert_eq!(
+            quota,
+            *incoming.quota_range.end(),
+            "the accepted range must be anchored at the nominal default quota"
+        );
+    }
+
+    #[test]
+    fn default_pix_configs_must_validate() {
+        PixGlobalConfig::default()
+            .validate()
+            .expect("default PixGlobalConfig must be valid");
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default())
+            .expect("default IncomingSessionPixConfig must be valid");
+        HoprProtocolConfig::default()
+            .validate()
+            .expect("default HoprProtocolConfig must be valid");
+    }
+
+    // The reversed range is the point of the test: `quota_range` is operator-settable, so an
+    // inverted range is reachable from a config file and must be rejected by validation rather
+    // than silently matching nothing.
+    #[allow(clippy::reversed_empty_ranges)]
+    #[test]
+    fn empty_pix_quota_range_is_rejected() {
+        let cfg = IncomingSessionPixConfig {
+            quota_range: 100..=10,
+            ..Default::default()
+        };
+        assert!(validate_incoming_session_pix_config(&cfg).is_err());
+
+        let cfg = HoprProtocolConfig {
+            incoming_session_pix_config: IncomingSessionPixConfig {
+                quota_range: 100..=10,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn pix_configs_are_reachable_from_serialized_config() {
+        // Regression guard: these two fields used to be `serde(skip)`, which pinned them to
+        // their defaults and made PIX unconfigurable.
+        let json = r#"{
+            "pix": { "num_ssa_parts": 2048 },
+            "incoming_session_pix_config": { "enforce_pix": true, "max_deposit_wait": "90s" }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
+
+        assert_eq!(2048, cfg.pix.num_ssa_parts);
+        // Container-level `serde(default)` keeps unspecified fields at their defaults.
+        assert_eq!(
+            PixGlobalConfig::default().ssa_part_size,
+            cfg.pix.ssa_part_size,
+            "unspecified PIX fields must fall back to their defaults"
+        );
+        assert!(cfg.incoming_session_pix_config.enforce_pix);
+        assert_eq!(
+            Duration::from_secs(90),
+            cfg.incoming_session_pix_config.max_deposit_wait
+        );
+        assert_eq!(
+            IncomingSessionPixConfig::default().quota_range,
+            cfg.incoming_session_pix_config.quota_range
+        );
+    }
 
     #[test]
     fn test_valid_domains_for_looks_like_a_domain() {

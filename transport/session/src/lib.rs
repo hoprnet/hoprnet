@@ -30,8 +30,9 @@ pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use test_helpers::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
-    AgreedSsaQuota, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
-    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, ServiceId, SessionId, SessionTarget,
+    AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA, HoprSession,
+    HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprSessionOutPixEvent, HoprStartProtocol,
+    IncomingSession, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

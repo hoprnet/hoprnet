@@ -121,6 +121,7 @@ hex-literal = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 rstest = { workspace = true }
+serde_json = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 
