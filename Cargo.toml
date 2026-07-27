@@ -76,7 +76,7 @@ backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bitvec = "1.1.1"
-blokli-client = "0.30.0"
+blokli-client = "0.30.2"
 bloomfilter = { version = "3.0.1" }
 bytesize = { version = "2.4.0", features = ["serde"] }
 bytes = "1.12.0"
@@ -186,7 +186,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
 hopr-api = "1.15.0"
-hopr-types = { version = "2.0.0", features = ["use-bindings"] }
+hopr-types = { version = "2.0.2", features = ["use-bindings"] }
 hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
