@@ -125,6 +125,52 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
 }
 
+/// Conservative lower bound on how many coefficient commitments fit into one `SsaCommit` message.
+///
+/// Mirrors the sizing in `SsaClientCommitmentMessage::new_multiple`: payload minus the fixed
+/// prefix (`ssa_index` + `coefficient_index` + `num_polys` + the Start header) and minus a generous
+/// allowance for the CBOR-encoded session id, divided by the per-entry cost
+/// (`PolynomialIndex` + one serialized group element). Using a *lower* bound here means the derived
+/// message count is an over-estimate, which is the safe direction for sizing a queue.
+const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
+    const FIXED_PREFIX: usize = 12;
+    // A `SessionId` is a 10-byte pseudonym; 64 bytes is a large allowance for its CBOR framing.
+    const CBOR_SESSION_ID_ALLOWANCE: usize = 64;
+    const PER_ENTRY: usize = size_of::<hopr_protocol_pix::PolynomialIndex>() + size_of::<HoprPixGroupElement>();
+
+    let usable = ApplicationData::PAYLOAD_SIZE.saturating_sub(FIXED_PREFIX + CBOR_SESSION_ID_ALLOWANCE);
+    let per_msg = usable / PER_ENTRY;
+    if per_msg == 0 { 1 } else { per_msg }
+};
+
+/// Slack added on top of the PIX commitment burst to cover non-PIX Start protocol traffic
+/// (session initiations, establishments, errors, keep-alives).
+const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
+
+/// Capacity of the Start protocol ingress channel.
+///
+/// This channel is fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow
+/// **drops** the message. For most Start messages that is recoverable, but a dropped `SsaCommit`
+/// is not: there is no NACK or retransmission, so the corresponding coefficient cell stays empty
+/// forever, the commitment never completes, every subsequent share fails to verify, and the cycle
+/// dies on the deposit kill switch.
+///
+/// PIX changed this channel's load from roughly one message per session to the *entire* commitment
+/// set of an SSA cycle — `polys × threshold` commitments, chunked into packet-sized messages. The
+/// capacity is therefore derived from the largest quota this node will accept
+/// ([`IncomingSessionPixConfig::quota_range`]), since `quota / PAYLOAD_SIZE` is exactly the number
+/// of commitments that quota implies, plus a reserve for ordinary Start traffic.
+fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
+    let max_commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+    let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
+
+    // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
+    usize::try_from(max_commit_msgs)
+        .unwrap_or(usize::MAX)
+        .saturating_add(cfg.maximum_sessions)
+        .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
+}
+
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
 pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
@@ -140,6 +186,15 @@ const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// Maximum number of PIX shares that can fail verification before the session is closed.
 const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 3;
+
+/// Maximum number of SSA commitments an Entry will accept in a single [`SsaServerCommitmentMessage`].
+///
+/// [`request_next_ssa`](SessionManager::request_next_ssa) always requests exactly one SSA, and
+/// pipelining needs at most one cycle in flight ahead of the active one, so 2 leaves room for a
+/// batching Exit without turning one inbound packet into an unbounded amount of Entry work and
+/// on-chain deposits. This is deliberately far below the wire limit
+/// (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only bounds what can be *decoded*.
+const MAX_SSAS_PER_SSA_REQUEST: usize = 2;
 
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
@@ -987,7 +1042,7 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let (start_protocol_tx, start_protocol_rx) =
-            crossfire::mpsc::bounded_blocking_async(self.cfg.maximum_sessions + 10);
+            crossfire::mpsc::bounded_blocking_async(start_protocol_channel_capacity(&self.cfg));
         let _ = self.start_protocol_tx.set(start_protocol_tx);
 
         let myself = self.clone();
@@ -2737,6 +2792,22 @@ where
             num_server_commitments = msg.commitments.len(),
             "received Exit SSA commitments"
         );
+
+        // Cap how many SSAs a single request may ask us to commit to.
+        //
+        // The wire format alone permits `MAX_SSAS_PER_REQUEST` (27) commitments per message, and
+        // every accepted entry costs a full `new_ssa_commitment` (hundreds of thousands of EC
+        // commitments) plus thousands of outbound `SsaCommit` packets, and emits its own
+        // `ReadyToDeposit` — i.e. its own on-chain deposit. Without a cap, a single packet from a
+        // misbehaving Exit amplifies into minutes of Entry CPU, a large packet burst, and up to 27
+        // simultaneous deposits bounded only by the per-deposit allocation limit.
+        if msg.commitments.len() > MAX_SSAS_PER_SSA_REQUEST {
+            return Err(SessionManagerError::Unacceptable(format!(
+                "Exit requested {} SSA commitments in a single request, at most {MAX_SSAS_PER_SSA_REQUEST} allowed",
+                msg.commitments.len()
+            ))
+            .into());
+        }
 
         let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
             return Err(
@@ -5795,6 +5866,132 @@ mod tests {
         ));
 
         Ok(())
+    }
+
+    /// An `SsaRequest` asking for more than [`MAX_SSAS_PER_SSA_REQUEST`] SSA commitments must be
+    /// rejected outright, before any commitment is generated or any `ReadyToDeposit` is emitted.
+    ///
+    /// Each accepted entry costs a full client commitment plus its own on-chain deposit, so without
+    /// this cap one inbound packet could amplify into up to `MAX_SSAS_PER_REQUEST` (27) deposits.
+    #[test_log::test(tokio::test)]
+    async fn entry_rejects_ssa_request_exceeding_ssa_cap() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let session_id = alice_pseudonym;
+        let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+            .expect("identity element must be valid");
+
+        // One more than the cap, with an otherwise perfectly valid quota.
+        let commitments: BTreeMap<_, _> = (1..=MAX_SSAS_PER_SSA_REQUEST as u32 + 1)
+            .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+            .collect();
+
+        let result = mgr
+            .handle_ssa_request(
+                alice_pseudonym,
+                SsaServerCommitmentMessage::new(session_id, 2, 2, commitments),
+            )
+            .await;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "an over-cap SsaRequest must be rejected, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// The Start protocol ingress channel must be sized for the worst-case commitment burst of a
+    /// single SSA cycle, not for the number of sessions.
+    ///
+    /// A dropped `SsaCommit` is unrecoverable — there is no retransmission — so the queue has to
+    /// absorb the whole `polys × threshold` commitment set implied by the largest accepted quota.
+    #[test]
+    fn start_protocol_channel_is_sized_for_the_worst_case_commitment_burst() {
+        let cfg = SessionManagerConfig::default();
+        let capacity = start_protocol_channel_capacity(&cfg);
+
+        // Number of commitments implied by the largest quota this node accepts.
+        let commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+        let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
+
+        assert!(
+            capacity >= min_expected + cfg.maximum_sessions,
+            "capacity {capacity} must cover the {min_expected}-message commitment burst plus room for {} concurrent \
+             session setups",
+            cfg.maximum_sessions
+        );
+
+        // The commitment burst must be the term that was added, not incidental slack: the old
+        // sizing was `maximum_sessions + 10` and carried no PIX component at all.
+        assert_eq!(
+            min_expected,
+            capacity - cfg.maximum_sessions - START_PROTOCOL_CHANNEL_RESERVE,
+            "the PIX commitment burst must be an explicit component of the capacity"
+        );
+        assert!(
+            min_expected > 0,
+            "a non-zero accepted quota must imply commitment messages"
+        );
+
+        // Guards against a units mistake (e.g. counting bytes rather than messages) turning this
+        // into a multi-gigabyte ring allocation.
+        assert!(capacity < 1_000_000, "capacity {capacity} is implausibly large");
     }
 
     /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient

@@ -1194,6 +1194,103 @@ mod tests {
         Ok(())
     }
 
+    /// Regression test for M13: the validation applied when a commitment *arrives* must be exactly
+    /// the validation the verifiers apply, i.e. [`PartialSsaShareVerifier::decode_commitment`].
+    ///
+    /// A commitment that passes the arrival check occupies its `(poly, coeff)` cell permanently —
+    /// re-insertion is rejected as a duplicate. So if the arrival check were weaker than the
+    /// verifier check (e.g. decode-only, without the prime-order-subgroup test), a decodable
+    /// small-order point would take a cell and then make the completion step fail unconditionally,
+    /// with no way to retransmit a correction. This matters in practice: the default build uses
+    /// BabyJubJub, whose cofactor is 8, so small-order points do exist and do pass a plain
+    /// on-curve check.
+    ///
+    /// The two paths cannot be compared by construction in a test, so this pins the contract of the
+    /// shared decode helper that both of them call.
+    #[test]
+    fn decode_commitment_is_the_single_validation_point() {
+        use vsss_rs::elliptic_curve::group::GroupEncoding;
+
+        use crate::PartialSsaShareVerifier;
+
+        // A well-formed commitment (the generator) decodes.
+        let generator_repr = PixGroup::<TestSpec>::generator().to_bytes();
+        assert!(
+            PartialSsaShareVerifier::<TestSpec>::decode_commitment(&generator_repr).is_ok(),
+            "the generator is a valid coefficient commitment (scalar coefficient 1)"
+        );
+
+        // Undecodable bytes are rejected.
+        let mut malformed = PixGroupRepr::<TestSpec>::default();
+        AsMut::<[u8]>::as_mut(&mut malformed).fill(0xff);
+        assert!(
+            matches!(
+                PartialSsaShareVerifier::<TestSpec>::decode_commitment(&malformed),
+                Err(PixError::InvalidInput)
+            ),
+            "undecodable bytes must be rejected"
+        );
+
+        // Whatever `decode_commitment` accepts, building a verifier from the same bytes must also
+        // accept — and vice versa. This is the invariant `add_transposed` relies on.
+        for repr in [generator_repr, malformed] {
+            let decoded_ok = PartialSsaShareVerifier::<TestSpec>::decode_commitment(&repr).is_ok();
+            let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), SsaIndex::MIN), 0);
+            let verifier_ok =
+                PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, vec![repr, repr]).is_ok();
+            assert_eq!(
+                decoded_ok, verifier_ok,
+                "arrival-time validation and verifier-build validation must agree"
+            );
+        }
+    }
+
+    /// `from_decoded_commitments` must produce exactly the same verifier as
+    /// `from_serializable_commitments` fed the serialized form of the same points.
+    ///
+    /// The reconstructor now decodes each commitment once, on arrival, and builds verifiers from
+    /// the stored group elements; that shortcut is only sound if it is observably identical to
+    /// decoding at build time.
+    #[test]
+    fn from_decoded_commitments_matches_from_serializable_commitments() -> anyhow::Result<()> {
+        use crate::PartialSsaShareVerifier;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 4,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let spi = SsaPolynomialId::new(SsaId::new(pseudonym, SsaIndex::MIN), 0);
+
+        // Collect the single polynomial's coefficients in coefficient order.
+        let mut reprs = Vec::new();
+        for coeff_idx in 0..4u16 {
+            let (_, repr) = commitment
+                .verifiers
+                .get(&coeff_idx)
+                .and_then(|v| v.first().copied())
+                .ok_or_else(|| anyhow::anyhow!("missing coefficient {coeff_idx}"))?;
+            reprs.push(repr);
+        }
+
+        let from_bytes = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, reprs.clone())?;
+        let decoded = reprs
+            .iter()
+            .map(PartialSsaShareVerifier::<TestSpec>::decode_commitment)
+            .collect::<crate::errors::Result<Vec<_>, _>>()?;
+        let from_points = PartialSsaShareVerifier::<TestSpec>::from_decoded_commitments(spi, decoded)?;
+
+        assert_eq!(from_bytes, from_points);
+        assert_eq!(from_bytes.min_shares(), from_points.min_shares());
+
+        // Too few commitments must still be rejected on the decoded path.
+        assert!(PartialSsaShareVerifier::<TestSpec>::from_decoded_commitments(spi, []).is_err());
+
+        Ok(())
+    }
+
     #[test]
     fn full_recovery_retires_all_reconstructor_state() -> anyhow::Result<()> {
         // 4 polynomials, threshold 4, no surplus → 16 shares, fully recoverable.

@@ -208,30 +208,63 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
         )
     }
 
+    /// Decodes a single serialized coefficient commitment into a group element.
+    ///
+    /// Rejects bytes that do not decode, and points outside the prime-order subgroup: Baby JubJub
+    /// has cofactor 8, so small-order points can pass the plain on-curve check.
+    ///
+    /// No value-based filtering is applied — a coefficient commitment equal to the generator
+    /// validly represents scalar coefficient 1 and must be preserved.
+    pub fn decode_commitment(commitment: &PixGroupRepr<S>) -> errors::Result<PixGroup<S>, S::Pseudonym> {
+        Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(commitment))
+            .filter(|pt| bool::from(pt.is_torsion_free()))
+            .ok_or(errors::PixError::InvalidInput)
+    }
+
     /// Tries to create a new verifier from [`SsaPolynomialId`] and serialized polynomial coefficient commitments.
     ///
     /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
-    /// All received commitments are deserialized without value-based filtering — a coefficient commitment
-    /// equal to the generator validly represents scalar coefficient 1 and must be preserved.
+    /// Each entry is validated with [`decode_commitment`](Self::decode_commitment).
     pub fn from_serializable_commitments(
         spi: SsaPolynomialId<S::Pseudonym>,
         poly_commitments: Vec<PixGroupRepr<S>>,
     ) -> errors::Result<Self, S::Pseudonym> {
-        let recv_commitments = poly_commitments.into_iter().map(|c| {
-            Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&c))
-                .filter(|pt| {
-                    // Reject points outside the prime-order subgroup. Baby JubJub has
-                    // cofactor 8, so small-order points can pass the on-curve check.
-                    bool::from(pt.is_torsion_free())
-                })
-                .map(ShareVerifierGroup::<PixGroup<S>>::from)
-                .ok_or(errors::PixError::InvalidInput)
-        });
+        let recv_commitments = poly_commitments
+            .into_iter()
+            .map(|c| Self::decode_commitment(&c).map(ShareVerifierGroup::<PixGroup<S>>::from));
 
         // Re-add the generator as the first entry
         let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
             .chain(recv_commitments)
             .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
+        if poly_commitment.len() < 2 {
+            return Err(errors::PixError::InvalidInput);
+        }
+        Ok(Self { spi, poly_commitment })
+    }
+
+    /// Creates a new verifier from [`SsaPolynomialId`] and coefficient commitments that were
+    /// **already decoded and subgroup-checked** by [`decode_commitment`](Self::decode_commitment).
+    ///
+    /// This is the counterpart of
+    /// [`from_serializable_commitments`](Self::from_serializable_commitments) for callers that
+    /// decode incrementally as commitments arrive on the wire, so that every commitment is
+    /// decompressed exactly once. Decompression requires a modular square root, and there are
+    /// `polys × threshold` commitments per SSA (over half a million at default dimensions), which
+    /// makes a second decode a dominant and entirely avoidable cost.
+    ///
+    /// The generator is prepended automatically, so `poly_commitments` must not contain it.
+    pub fn from_decoded_commitments(
+        spi: SsaPolynomialId<S::Pseudonym>,
+        poly_commitments: impl IntoIterator<Item = PixGroup<S>>,
+    ) -> errors::Result<Self, S::Pseudonym> {
+        let poly_commitment: Vec<_> = std::iter::once(ShareVerifierGroup::<PixGroup<S>>::generator())
+            .chain(
+                poly_commitments
+                    .into_iter()
+                    .map(ShareVerifierGroup::<PixGroup<S>>::from),
+            )
+            .collect();
         if poly_commitment.len() < 2 {
             return Err(errors::PixError::InvalidInput);
         }

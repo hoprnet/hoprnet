@@ -126,7 +126,14 @@ impl<S: PixSpec> SsaPartBuilder<S> {
     }
 }
 
-type CommittedPolynomial<S> = std::collections::HashMap<CoefficientIndex, PixGroupRepr<S>>;
+/// Coefficient commitments of a single polynomial, keyed by coefficient index.
+///
+/// Commitments are stored **decoded**: each one is decompressed and subgroup-checked exactly once,
+/// when it arrives in [`SsaCommitmentBuilder::add_transposed`]. Keeping the compressed
+/// representation instead would force a second decompression when the verifiers are built, and at
+/// production dimensions (`polys × threshold` commitments per SSA) that doubles the dominant cost
+/// of the commitment phase.
+type CommittedPolynomial<S> = std::collections::HashMap<CoefficientIndex, PixGroup<S>>;
 
 /// Result of building an SSA commitment.
 pub enum CommitmentResult<S: PixSpec> {
@@ -201,18 +208,24 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         }
 
         // Collect and validate all items before mutating state (transactional).
-        let mut validated: Vec<(PolynomialIndex, PixGroupRepr<S>)> = Vec::new();
+        //
+        // Decoding here is the *only* decode of each commitment: the resulting group element is
+        // what gets stored, so the verifier-building phase below never decompresses again.
+        //
+        // The check is `decode_commitment`, i.e. the exact same validation the verifiers apply
+        // (decodable *and* inside the prime-order subgroup). It must not be weaker: a commitment
+        // that passes here occupies its cell permanently, because re-insertion is rejected as a
+        // duplicate. A weaker check would let a decodable-but-small-order point take a cell and
+        // then fail unconditionally at completion, with no way to retransmit a correction.
+        let mut validated: Vec<(PolynomialIndex, PixGroup<S>)> = Vec::new();
         for (polynomial_index, polynomial_coeff_commitment) in polynomial_coeff_commitments {
             if polynomial_index >= self.num_polys as PolynomialIndex {
                 return Err(errors::PixError::InvalidInput);
             }
-            // Validate that bytes decode to a valid group element before insertion.
-            // Without this check, a malformed (undecodable) commitment would occupy
-            // the cell permanently since re-insertion is now rejected.
-            if Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&polynomial_coeff_commitment)).is_none() {
-                return Err(errors::PixError::InvalidInput);
-            }
-            validated.push((polynomial_index, polynomial_coeff_commitment));
+            validated.push((
+                polynomial_index,
+                PartialSsaShareVerifier::<S>::decode_commitment(&polynomial_coeff_commitment)?,
+            ));
         }
 
         // Check for duplicate occupancy before any insertion (transactional).
@@ -251,36 +264,49 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         if all_entries_present {
             tracing::debug!("SSA is fully committed for verification");
 
-            // Phase 1: decode and subgroup-check ALL commitments into temporary verifier
-            // state BEFORE mutating self. Malformed bytes or non-torsion-free points
-            // produce Err here, which short-circuits without poisoning the builder.
-            // The caller can retransmit the corrected coefficient (fix for M2).
+            // Every commitment was decoded and subgroup-checked on arrival in `add_transposed`
+            // and stored as a group element, so assembling the verifiers involves no elliptic
+            // curve decompression at all — the previous implementation decoded the entire
+            // `polys × threshold` set a second time here, single-threaded, while holding this
+            // builder's lock.
+            //
+            // Each polynomial is *removed* from `committed_polynomials` as its verifier is built,
+            // so the peak footprint stays near the size of one representation rather than holding
+            // the full commitment set and the full verifier set simultaneously.
+            //
+            // Because that moves state out of the builder, the one way verifier construction can
+            // fail — being handed fewer than one coefficient — is checked *first*, while the
+            // builder is still intact. `new_exit_commitment` enforces `shares_per_poly >= 2`, so
+            // this is a defensive guard rather than a reachable path, but it keeps the drain below
+            // infallible instead of merely unlikely to fail.
+            if self.poly_threshold == 0 {
+                return Err(errors::PixError::InvalidInput);
+            }
+
+            let mut committed = std::mem::take(&mut self.committed_polynomials);
             let complete_ssa_verifier = (0..self.num_polys as PolynomialIndex)
                 .map(|poly_index| {
-                    let polynomial = self
-                        .committed_polynomials
-                        .get(&poly_index)
-                        .expect("polynomial must be present");
-                    PartialSsaShareVerifier::from_serializable_commitments(
+                    let polynomial = committed
+                        .remove(&poly_index)
+                        .expect("polynomial must be present when all entries are present");
+                    PartialSsaShareVerifier::from_decoded_commitments(
                         SsaPolynomialId::new(self.id, poly_index),
-                        (0..self.poly_threshold as CoefficientIndex)
-                            .map(|coeff_idx| {
-                                *polynomial
-                                    .get(&coeff_idx)
-                                    .expect("polynomial coeffs must be already present")
-                            })
-                            .collect(),
+                        (0..self.poly_threshold as CoefficientIndex).map(|coeff_idx| {
+                            *polynomial
+                                .get(&coeff_idx)
+                                .expect("polynomial coeffs must be already present")
+                        }),
                     )
                 })
                 .map(|v| v.map(SsaPartBuilder::new))
                 .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
-            // Phase 2: all fallible decode+subgroup checks passed.
-            // Phase 1 already rejected any undecodable or duplicate entries
-            // with InvalidInput / DuplicateCommitment, so no entries were
-            // overwritten — the builder is now atomically complete.
+            // All entries were validated on arrival and none could be overwritten (re-insertion
+            // is rejected as a duplicate), so the builder is now atomically complete. The only
+            // remaining fallible step is the deposit-address conversion below, which does not
+            // depend on `committed_polynomials`.
             self.complete = true;
-            self.committed_polynomials.clear();
+            drop(committed);
 
             let full_commitment = match self.full_ssa_commitment.as_ref().map(|(c, _)| *c) {
                 None => {
@@ -309,15 +335,12 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             // Check if we already have at least all the constant term commitments on all polynomials.
             tracing::debug!("SSA commitment is complete");
 
+            // Constant terms are already decoded; summing them needs no decompression.
             let client_ssa_commitment = self
                 .committed_polynomials
                 .values()
-                .map(|p| p.get(&0).expect("constant term must be present"))
-                .map(|const_term: &PixGroupRepr<S>| {
-                    Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(const_term))
-                        .ok_or(errors::PixError::InvalidInput)
-                })
-                .sum::<errors::Result<PixGroup<S>, S::Pseudonym>>()?;
+                .map(|p| *p.get(&0).expect("constant term must be present"))
+                .sum::<PixGroup<S>>();
             tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
 
             let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;

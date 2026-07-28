@@ -586,16 +586,23 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
 ///
 /// Used by Exit nodes: they do not receive any incoming tickets but still use the incoming acknowledgements
 /// to recover SSAs and forward them to the `recovered_ssa` sink.
-async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(ack_incoming: AckIn, exit_proc: A, recovered_ssa: SEvt)
-where
+async fn start_exit_incoming_ack_pipeline<S, AckIn, A, SEvt>(
+    ack_incoming: AckIn,
+    exit_proc: A,
+    recovered_ssa: SEvt,
+    concurrency: usize,
+) where
     S: PixSpec,
     AckIn: futures::Stream<Item = (OffchainPublicKey, Vec<Acknowledgement>)> + Send + 'static,
     A: ExitAcknowledgementShareProcessor<S> + Clone + Send + Sync + 'static,
     SEvt: futures::Sink<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> + Clone + Unpin + Send + 'static,
     SEvt::Error: std::error::Error,
 {
+    // Matches the concurrency of `start_relay_incoming_ack_pipeline`: each batch triggers up to
+    // `threshold` share verifications (an EC multi-scalar multiplication each), so processing
+    // batches one at a time would serialize all PIX recovery on a dedicated Exit node.
     ack_incoming
-        .for_each(move |(peer, acks)| {
+        .for_each_concurrent(concurrency, move |(peer, acks)| {
             let exit_proc = exit_proc.clone();
             let exit_proc_check = exit_proc.clone();
             let mut recovered_ssa = recovered_ssa.clone();
@@ -1066,11 +1073,17 @@ where
             // Exit nodes still run the incoming acknowledgement pipeline (for future PIX use),
             // but only drain the stream — incoming acknowledgements are NOT forwarded to the
             // UnacknowledgedTicketProcessor because Exit nodes do not process tickets.
-            let _ = (ticket_events, ticket_proc, ack_input_concurrency);
+            let _ = (ticket_events, ticket_proc);
             processes.insert(
                 PacketPipelineProcesses::AckIn,
                 hopr_utils::spawn_as_abortable!(
-                    start_exit_incoming_ack_pipeline(incoming_ack_rx, exit_ack_proc, ssa_events,).in_current_span()
+                    start_exit_incoming_ack_pipeline(
+                        incoming_ack_rx,
+                        exit_ack_proc,
+                        ssa_events,
+                        ack_input_concurrency,
+                    )
+                    .in_current_span()
                 ),
             );
         }
