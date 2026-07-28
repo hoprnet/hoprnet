@@ -12,6 +12,9 @@ edition.workspace = true
 
 [features]
 default = ["rayon"]
+# Enables the full parameter sweeps in the benchmarks. Without it, only the
+# production-dimension points are measured, which keeps CI runs bounded.
+all-benchmarks = []
 rayon = ["hopr-utils/parallelize-rayon"]
 serde = [
   "dep:elliptic-curve-tools",
