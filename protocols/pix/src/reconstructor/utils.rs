@@ -85,7 +85,7 @@ pub struct SsaPartBuilder<S: PixSpec> {
     /// [`add_share`](Self::add_share)), so after that point only `spi` remains meaningful.
     /// The field is private for exactly that reason: nothing outside this module may reach
     /// through it to `min_shares()`, `constant_term()` or `verify*()`, since those read the
-    /// released vector. Use [`spi`](Self::spi) and [`constant_term`](Self::constant_term).
+    /// released vector. Use [`spi`](Self::spi).
     verifier: PartialSsaShareVerifier<S>,
     /// Cached `verifier.min_shares()`.
     ///
@@ -112,14 +112,6 @@ impl<S: PixSpec> SsaPartBuilder<S> {
     /// Remains valid after the verification state has been released.
     pub(crate) fn spi(&self) -> SsaPolynomialId<S::Pseudonym> {
         self.verifier.spi
-    }
-
-    /// Commitment to this polynomial's constant term.
-    ///
-    /// Only meaningful before the part is reconstructed. The reconstructor reads this while
-    /// installing verifiers, i.e. before any share can arrive.
-    pub(crate) fn constant_term(&self) -> &PixGroup<S> {
-        self.verifier.constant_term()
     }
 
     /// Frees everything that was only needed to verify and combine shares.
@@ -192,25 +184,69 @@ impl<S: PixSpec> SsaPartBuilder<S> {
 /// of the commitment phase.
 type CommittedPolynomial<S> = std::collections::HashMap<CoefficientIndex, PixGroup<S>>;
 
-/// Result of building an SSA commitment.
-pub enum CommitmentResult<S: PixSpec> {
-    /// Not enough commitments have been received yet.
-    NotEnoughCommitments,
-    /// There are enough commitments to build at least the SSA commitment.
-    SsaCommitmentDone(PixGroup<S>),
-    /// There are enough commitments to build at least the SSA commitment, but not all coefficients are committed yet.
-    StillIncomplete(PixGroup<S>),
-    /// All coefficients have been committed.
-    Completed(SsaBuilder<S>, Vec<SsaPartBuilder<S>>),
+/// Incremental outcome of feeding coefficient commitments into an [`SsaCommitmentBuilder`].
+///
+/// Unlike an all-or-nothing result, this reports the two milestones independently, because they
+/// are reached at different times and each unblocks something different:
+///
+/// * the **SSA commitment** becoming known (all constant terms in) yields the deposit address and the [`SsaBuilder`] —
+///   from that point recovered polynomial parts have somewhere to go;
+/// * an **individual polynomial's row** completing yields that polynomial's verifier — from that point its shares can
+///   be verified, long before the rest of the cycle has arrived.
+pub struct CommitmentProgress<S: PixSpec> {
+    /// Full SSA commitment (Client + Exit), once every constant term has arrived.
+    pub full_commitment: Option<PixGroup<S>>,
+    /// The SSA part accumulator, yielded exactly once — on the call that first completes the
+    /// constant-term set. The caller must publish it before any share can be reconstructed.
+    pub ssa_builder: Option<SsaBuilder<S>>,
+    /// Verifiers for polynomials whose rows completed on this call (or earlier, if they had to wait
+    /// for the SSA commitment). Each is yielded exactly once.
+    pub new_verifiers: Vec<SsaPartBuilder<S>>,
+    /// `true` on the call that hands out the last polynomial's verifier.
+    pub fully_committed: bool,
+}
+
+impl<S: PixSpec> CommitmentProgress<S> {
+    fn empty() -> Self {
+        Self {
+            full_commitment: None,
+            ssa_builder: None,
+            new_verifiers: Vec::new(),
+            fully_committed: false,
+        }
+    }
 }
 
 /// Builds a complete SSA from the incoming client polynomial coefficient commitments of
 /// SSA-part polynomials for a specific Session Stealth Address (SSA).
+///
+/// ## Progress tracking is O(1) per commitment
+///
+/// Completion used to be detected by scanning every polynomial's map on every inserted batch,
+/// which is `O(polys)` per message — at production dimensions ~8192 iterations across ~18 700
+/// messages per cycle. The counters below make each of the three questions ("how far along?",
+/// "are all constant terms in?", "is this polynomial's row full?") a single comparison.
 pub struct SsaCommitmentBuilder<S: PixSpec> {
     id: SsaId<S::Pseudonym>,
     poly_threshold: usize,
     num_polys: usize,
     committed_polynomials: std::collections::HashMap<PolynomialIndex, CommittedPolynomial<S>>,
+    /// Cells filled so far, counted across polynomials that have since been handed out as
+    /// verifiers. Used for the progress trace and for `is_empty`, both of which would otherwise
+    /// have to walk `committed_polynomials`.
+    total_committed: usize,
+    /// Polynomials whose constant term (coefficient 0) has arrived. The SSA commitment is
+    /// computable once this reaches `num_polys`.
+    constant_terms_committed: usize,
+    /// Polynomials whose row is complete but whose verifier has not been handed out yet.
+    ///
+    /// Only ever non-empty while the SSA commitment is still unknown: a verifier is useless
+    /// until there is an [`SsaBuilder`] to receive the part it reconstructs, and the constant
+    /// terms are what produce that. A conforming Entry sends the constant-term pass first, so
+    /// this stays empty in practice — but correctness must not depend on the peer's send order.
+    ready_polynomials: Vec<PolynomialIndex>,
+    /// Verifiers handed out so far. The commitment is fully verifiable at `num_polys`.
+    installed_polynomials: usize,
     complete: bool,
     exit_commitment_secret: PixScalar<S>,
     exit_commitment_public: PixGroup<S>,
@@ -232,13 +268,21 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             exit_commitment_secret,
             exit_commitment_public,
             committed_polynomials: std::collections::HashMap::new(),
+            total_committed: 0,
+            constant_terms_committed: 0,
+            ready_polynomials: Vec::new(),
+            installed_polynomials: 0,
             complete: false,
             full_ssa_commitment: None,
         }
     }
 
+    /// `true` if not a single coefficient commitment has been received yet.
+    ///
+    /// Counts rather than inspecting `committed_polynomials`, which is drained as verifiers are
+    /// handed out and would therefore report empty again mid-cycle.
     pub fn is_empty(&self) -> bool {
-        self.committed_polynomials.is_empty()
+        self.total_committed == 0
     }
 
     pub fn get_deposit_address(&self) -> Option<&S::DepositAddress> {
@@ -254,7 +298,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         &mut self,
         coeff_index: CoefficientIndex,
         polynomial_coeff_commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
-    ) -> errors::Result<CommitmentResult<S>, S::Pseudonym> {
+    ) -> errors::Result<CommitmentProgress<S>, S::Pseudonym> {
         // Cannot add more commitments if we already have all
         if self.complete {
             return Err(errors::PixError::DuplicateCommitment);
@@ -293,105 +337,35 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             }
         }
 
-        // Second phase: insert into confirmed-vacant slots.
+        // Second phase: insert into confirmed-vacant slots, maintaining the progress counters.
         for (polynomial_index, polynomial_coeff_commitment) in validated {
             let polynomial = self.committed_polynomials.entry(polynomial_index).or_default();
             polynomial.insert(coeff_index, polynomial_coeff_commitment);
+
+            self.total_committed += 1;
+            if coeff_index == 0 {
+                self.constant_terms_committed += 1;
+            }
+            // A row is complete the moment it holds one commitment per coefficient. Cells can
+            // never be overwritten (re-insertion is rejected as a duplicate above), so `len`
+            // reaching the threshold happens exactly once per polynomial.
+            if polynomial.len() == self.poly_threshold {
+                self.ready_polynomials.push(polynomial_index);
+            }
         }
 
         tracing::trace!(
             id = %self.id,
             "SSA commitment is {:.2}% complete",
-            self.committed_polynomials.values().map(|p| p.len()).sum::<usize>() as f64 * 100.0 / (self.num_polys * self.poly_threshold) as f64
+            self.total_committed as f64 * 100.0 / (self.num_polys * self.poly_threshold) as f64
         );
 
-        // Check if we already have all the committed polynomials and all coefficient commitments in them
-        let all_entries_present = self.committed_polynomials.len() == self.num_polys
-            && self
-                .committed_polynomials
-                .values()
-                .all(|committed_poly| committed_poly.len() == self.poly_threshold);
+        let mut progress = CommitmentProgress::empty();
 
-        let all_constant_terms_committed = self.committed_polynomials.len() == self.num_polys
-            && self
-                .committed_polynomials
-                .values()
-                .all(|committed_poly| committed_poly.get(&0).is_some());
-
-        if all_entries_present {
-            tracing::debug!("SSA is fully committed for verification");
-
-            // Every commitment was decoded and subgroup-checked on arrival in `add_transposed`
-            // and stored as a group element, so assembling the verifiers involves no elliptic
-            // curve decompression at all — the previous implementation decoded the entire
-            // `polys × threshold` set a second time here, single-threaded, while holding this
-            // builder's lock.
-            //
-            // Each polynomial is *removed* from `committed_polynomials` as its verifier is built,
-            // so the peak footprint stays near the size of one representation rather than holding
-            // the full commitment set and the full verifier set simultaneously.
-            //
-            // Because that moves state out of the builder, the one way verifier construction can
-            // fail — being handed fewer than one coefficient — is checked *first*, while the
-            // builder is still intact. `new_exit_commitment` enforces `shares_per_poly >= 2`, so
-            // this is a defensive guard rather than a reachable path, but it keeps the drain below
-            // infallible instead of merely unlikely to fail.
-            if self.poly_threshold == 0 {
-                return Err(errors::PixError::InvalidInput);
-            }
-
-            let mut committed = std::mem::take(&mut self.committed_polynomials);
-            let complete_ssa_verifier = (0..self.num_polys as PolynomialIndex)
-                .map(|poly_index| {
-                    let polynomial = committed
-                        .remove(&poly_index)
-                        .expect("polynomial must be present when all entries are present");
-                    PartialSsaShareVerifier::from_decoded_commitments(
-                        SsaPolynomialId::new(self.id, poly_index),
-                        (0..self.poly_threshold as CoefficientIndex).map(|coeff_idx| {
-                            *polynomial
-                                .get(&coeff_idx)
-                                .expect("polynomial coeffs must be already present")
-                        }),
-                    )
-                })
-                .map(|v| v.map(SsaPartBuilder::new))
-                .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
-
-            // All entries were validated on arrival and none could be overwritten (re-insertion
-            // is rejected as a duplicate), so the builder is now atomically complete. The only
-            // remaining fallible step is the deposit-address conversion below, which does not
-            // depend on `committed_polynomials`.
-            self.complete = true;
-            drop(committed);
-
-            let full_commitment = match self.full_ssa_commitment.as_ref().map(|(c, _)| *c) {
-                None => {
-                    // Full client SSA commitment is the sum of all constant term commitments on all polynomials
-                    let client_ssa_commitment: PixGroup<S> =
-                        complete_ssa_verifier.iter().map(|v| v.constant_term()).sum();
-                    tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
-
-                    let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
-
-                    // Treat the failed conversion to deposit address as error
-                    let deposit_addr =
-                        S::group_to_deposit_address(full_ssa_commitment).ok_or(errors::PixError::InvalidInput)?;
-
-                    self.full_ssa_commitment = Some((full_ssa_commitment, deposit_addr));
-                    full_ssa_commitment
-                }
-                Some(commitment) => commitment,
-            };
-
-            Ok(CommitmentResult::Completed(
-                SsaBuilder::new(full_commitment, self.exit_commitment_secret, self.num_polys),
-                complete_ssa_verifier,
-            ))
-        } else if self.full_ssa_commitment.is_none() && all_constant_terms_committed {
-            // Check if we already have at least all the constant term commitments on all polynomials.
-            tracing::debug!("SSA commitment is complete");
-
+        // Milestone 1: every constant term is in, so the SSA commitment — and with it the deposit
+        // address and the part accumulator — becomes known. Must run before any polynomial is
+        // handed out below, because handing one out removes its constant term from the map.
+        if self.full_ssa_commitment.is_none() && self.constant_terms_committed == self.num_polys {
             // Constant terms are already decoded; summing them needs no decompression.
             let client_ssa_commitment = self
                 .committed_polynomials
@@ -407,12 +381,60 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 S::group_to_deposit_address(full_ssa_commitment).ok_or(errors::PixError::InvalidInput)?;
 
             self.full_ssa_commitment = Some((full_ssa_commitment, deposit_addr));
-
-            Ok(CommitmentResult::SsaCommitmentDone(full_ssa_commitment))
-        } else if let Some(ssa_committed) = self.full_ssa_commitment.as_ref().map(|(c, _)| c) {
-            Ok(CommitmentResult::StillIncomplete(*ssa_committed))
-        } else {
-            Ok(CommitmentResult::NotEnoughCommitments)
+            progress.ssa_builder = Some(SsaBuilder::new(
+                full_ssa_commitment,
+                self.exit_commitment_secret,
+                self.num_polys,
+            ));
         }
+
+        progress.full_commitment = self.full_ssa_commitment.as_ref().map(|(c, _)| *c);
+
+        // Milestone 2: hand out verifiers for every row that is complete, but only once there is
+        // an `SsaBuilder` to receive what they reconstruct. Rows that completed earlier are still
+        // queued in `ready_polynomials` and are released here in the same batch.
+        // `from_decoded_commitments` rejects a commitment vector shorter than two entries, i.e. a
+        // zero threshold. Checked here, before any state is moved out below, so that the release
+        // loop cannot fail part-way through and strand the rows it has already taken.
+        // `new_exit_commitment` enforces `shares_per_poly >= 2`, so this is defensive.
+        if self.poly_threshold == 0 {
+            return Err(errors::PixError::InvalidInput);
+        }
+
+        if self.full_ssa_commitment.is_some() && !self.ready_polynomials.is_empty() {
+            // Every commitment was decoded and subgroup-checked on arrival above and stored as a
+            // group element, so assembling a verifier involves no elliptic curve decompression.
+            //
+            // Each polynomial is *removed* from `committed_polynomials` as its verifier is built,
+            // so the builder never holds a row and its verifier simultaneously. With rows released
+            // as they complete, the live commitment set is a sliding window over the polynomials
+            // still in flight rather than the whole `polys × threshold` matrix.
+            let ready = std::mem::take(&mut self.ready_polynomials);
+            progress.new_verifiers.reserve(ready.len());
+            for poly_index in ready {
+                let polynomial = self
+                    .committed_polynomials
+                    .remove(&poly_index)
+                    .expect("a ready polynomial must still be present");
+                let verifier = PartialSsaShareVerifier::from_decoded_commitments(
+                    SsaPolynomialId::new(self.id, poly_index),
+                    (0..self.poly_threshold as CoefficientIndex).map(|coeff_idx| {
+                        *polynomial
+                            .get(&coeff_idx)
+                            .expect("polynomial coeffs must be already present")
+                    }),
+                )?;
+                progress.new_verifiers.push(SsaPartBuilder::new(verifier));
+            }
+
+            self.installed_polynomials += progress.new_verifiers.len();
+            if self.installed_polynomials == self.num_polys {
+                tracing::debug!(id = %self.id, "SSA is fully committed for verification");
+                self.complete = true;
+                progress.fully_committed = true;
+            }
+        }
+
+        Ok(progress)
     }
 }

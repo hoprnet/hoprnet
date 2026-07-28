@@ -981,7 +981,7 @@ where
                             if let (Some(ssa_state), Some(pix_toolbox)) =
                                 (entry.current_ssa_state.get(), pix_toolbox_eviction.get())
                             {
-                                retire_all_live_ssa_cycles(*session_id.as_ref(), &ssa_state, pix_toolbox);
+                                retire_all_live_ssa_cycles(*session_id.as_ref(), ssa_state, pix_toolbox);
                             }
                             active_sessions_for_listener.fetch_sub(1, Ordering::Relaxed);
                             close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
@@ -1069,7 +1069,7 @@ where
                             if let (Some(ssa_state), Some(pix_toolbox)) =
                                 (session_data.current_ssa_state.get(), myself.pix_toolbox.get())
                             {
-                                retire_all_live_ssa_cycles(session_id, &ssa_state, pix_toolbox);
+                                retire_all_live_ssa_cycles(session_id, ssa_state, pix_toolbox);
                             }
                             myself.active_sessions.fetch_sub(1, Ordering::Relaxed);
                             close_session(session_id, session_data, closure_reason);
@@ -1828,7 +1828,7 @@ where
             // Release reconstructor state for all live SSA cycles:
             // every index from 1 through the current peek index.
             if let (Some(ssa_state), Some(pix_toolbox)) = (slot.current_ssa_state.get(), self.pix_toolbox.get()) {
-                retire_all_live_ssa_cycles(*id, &ssa_state, pix_toolbox);
+                retire_all_live_ssa_cycles(*id, ssa_state, pix_toolbox);
             }
             close_session(*id, slot, ClosureReason::Eviction);
             true

@@ -17,8 +17,6 @@ pub enum PixError<P: std::fmt::Display> {
     DuplicateCommitment,
     #[error("missing commitment for building ssa")]
     MissingSsaCommitment,
-    #[error("missing verifier for partial ssa reconstruction")]
-    MissingVerifier,
     #[error("ssa index will overflow")]
     SsaIndexOverflow,
     #[error("crypto error: {0}")]

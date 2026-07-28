@@ -8,7 +8,7 @@ use hopr_types::{
     },
     internal::prelude::Acknowledgement,
 };
-use utils::{CommitmentResult, SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
+use utils::{SsaBuilder, SsaCommitmentBuilder, SsaPartBuilder};
 use validator::Validate;
 
 use crate::{
@@ -72,7 +72,25 @@ pub struct SsaReconstructorConfig {
 
 type EncryptedShareCache<S> =
     moka::sync::Cache<HalfKeyChallenge, TaggedEncryptedPartialSsaShare<S, <S as PixSpec>::Pseudonym, PixScalar<S>>>;
-type PendingAckPerPeerCache = moka::sync::Cache<HalfKeyChallenge, HalfKey>;
+
+/// An acknowledgement that arrived before its polynomial's verifier was installed.
+///
+/// The peer is carried per entry because a polynomial's shares are spread across return paths, and
+/// therefore across first-relayers: one bucket can hold deferred acks from several peers.
+type DeferredAck = (OffchainPublicKey, HalfKeyChallenge, HalfKey);
+
+/// Deferred acknowledgements for one polynomial, drained in one shot when its verifier installs.
+///
+/// A plain `Vec` rather than a nested cache: the bucket is only ever appended to and then drained
+/// whole, so per-entry cache bookkeeping (and its ~200 B overhead per entry) buys nothing.
+type DeferredAckBucket = std::sync::Arc<parking_lot::Mutex<Vec<DeferredAck>>>;
+
+/// Cap on deferred acknowledgements held for a single polynomial.
+///
+/// A conforming Entry emits `threshold + surplus` shares per polynomial — 96 at the default
+/// dimensions — across all return paths combined, so this cannot be reached without the peer
+/// exceeding its own share budget. Anything above the cap is dropped rather than buffered.
+const MAX_DEFERRED_ACKS_PER_POLYNOMIAL: usize = 128;
 
 /// Allows server-side reconstruction of SSAs.
 ///
@@ -92,12 +110,39 @@ pub struct SsaReconstructor<S: PixSpec> {
     ssa_verifiers:
         moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaPartBuilder<S>>>>,
     awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
-    /// Cache of ack keys whose verifier was not yet available.
-    /// `OffchainPublicKey → { HalfKeyChallenge → HalfKey }`. When a verified ack hits
-    /// `MissingVerifier`, it is stored here so subsequent `acknowledge_shares` calls can
-    /// retry in O(1) per-peer once the verifier arrives. Tied to `max_ack_await_time` in
-    /// line with the awaiting_acks TTL.
-    pending_ack_keys: moka::sync::Cache<OffchainPublicKey, PendingAckPerPeerCache>,
+    /// Acknowledgements that arrived before their polynomial's verifier was installed, bucketed by
+    /// polynomial.
+    ///
+    /// ## Why bucketed by polynomial
+    ///
+    /// The bucket key is exactly the thing whose arrival unblocks the entries inside it, so a
+    /// bucket is drained once, by the installation of its own verifier, and never scanned
+    /// speculatively. That is what keeps [`acknowledge_shares`] free of retry work: it only ever
+    /// *appends* to a bucket.
+    ///
+    /// The previous per-peer stash had to be re-scanned in full on every `acknowledge_shares` call,
+    /// because a per-peer key says nothing about which entries have become viable. That is
+    /// quadratic in the number of acks received while a cycle's commitments are in flight, and the
+    /// per-peer key aggregates across every Session sharing a first-relayer.
+    ///
+    /// `max_capacity` allows two full cycles' worth of polynomials — the pipelining factor — so a
+    /// polynomial can never be denied a bucket by another polynomial's traffic. That headroom is
+    /// deliberate: a size eviction here silently drops real shares, and only the surplus absorbs
+    /// that. In practice the `max_ack_await_time` TTL is the operative bound, since a bucket only
+    /// exists at all when shares outrun the commitment row they belong to.
+    pending_acks: moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, DeferredAckBucket>,
+    /// Resolutions produced by draining deferred-ack buckets at verifier-installation time, waiting
+    /// to be picked up by the next [`acknowledge_shares`] call.
+    ///
+    /// Draining happens on the commitment path (`insert_coefficient_commitments`), which is where
+    /// the verifier that unblocks the acks is installed. That deliberately keeps the share
+    /// verification off the acknowledgement hot path, but it also means the resolutions surface
+    /// somewhere that has no route to the upper layer — hence this hand-off. Acks flow continuously
+    /// while a Session is live, so pickup latency is one ack batch.
+    ready_resolutions: parking_lot::Mutex<Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>>>,
+    /// Length of [`ready_resolutions`](Self::ready_resolutions), so the common case (nothing to pick
+    /// up) costs one relaxed load instead of a mutex acquisition on every ack batch.
+    ready_resolutions_len: std::sync::atomic::AtomicUsize,
     /// Liveness map: records `num_polys` for every completed SSA cycle so that
     /// `retire_ssa` can remove all verifier/builder state even when both builders
     /// have been TTL-evicted.
@@ -137,6 +182,10 @@ pub struct SsaReconstructor<S: PixSpec> {
 enum ProcessedAckResult<S: PixSpec> {
     /// No SSA recovery progress — still waiting for more polynomial parts.
     NoProgress,
+    /// The share is valid but its polynomial's verifier is not installed yet, so it cannot be
+    /// checked. Deferral, not failure: the ack is bucketed under this
+    /// [`SsaPolynomialId`] and retried once the verifier arrives.
+    VerifierNotReady(SsaPolynomialId<<S as PixSpec>::Pseudonym>),
     /// The early recovery threshold was crossed (identified by SsaId).
     EarlyRecovery(SsaId<<S as PixSpec>::Pseudonym>),
     /// Full SSA was recovered.
@@ -192,9 +241,15 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
                 .build(),
-            pending_ack_keys: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
-                .time_to_idle(cfg.max_ack_await_time)
+            // One bucket per polynomial of a cycle, expiring on the same clock as the shares they
+            // belong to: an ack whose share has left `awaiting_acks` can never be used again, so
+            // there is nothing to keep. `time_to_live`, not idle — appending to a bucket must not
+            // extend the life of entries already in it.
+            pending_acks: moka::sync::CacheBuilder::new(2 * MAX_POLYS_PER_SSA as u64)
+                .time_to_live(cfg.max_ack_await_time)
                 .build(),
+            ready_resolutions: parking_lot::Mutex::new(Vec::new()),
+            ready_resolutions_len: std::sync::atomic::AtomicUsize::new(0),
             // Liveness map for retirement: TTL must cover the verifier lifetime so the
             // entry survives as long as the verifiers it shadows. No max_capacity because
             // entries are explicitly invalidated in remove_cycle.
@@ -231,7 +286,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Idempotent: invalidating an absent key is a no-op.
     fn remove_cycle(&self, ssa_id: SsaId<S::Pseudonym>, num_polys: usize) {
         for poly_index in 0..num_polys as PolynomialIndex {
-            self.ssa_verifiers.invalidate(&SsaPolynomialId::new(ssa_id, poly_index));
+            let spi = SsaPolynomialId::new(ssa_id, poly_index);
+            self.ssa_verifiers.invalidate(&spi);
+            // Deferred acks for a retired cycle can never be redeemed — their verifier will not
+            // come back and their shares are about to expire.
+            self.pending_acks.invalidate(&spi);
         }
         self.ssa_builders.invalidate(&ssa_id);
         self.commitment_builder.invalidate(&ssa_id);
@@ -251,7 +310,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
         let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
 
-        let reconstructor = self.ssa_verifiers.get(&spi).ok_or(PixError::MissingVerifier)?;
+        let Some(reconstructor) = self.ssa_verifiers.get(&spi) else {
+            // Not an error: this polynomial's commitment row has not arrived yet. Leave the share
+            // in `awaiting_acks` and hand the caller the key it needs to bucket the ack.
+            return Ok(ProcessedAckResult::VerifierNotReady(spi));
+        };
 
         // Guard: confirm the builder exists (and refresh its idle TTL) before consuming
         // the share. The builder has a shorter TTL (10 min) than the verifier (30 min),
@@ -318,6 +381,106 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 }
             }
         }
+    }
+
+    /// Buckets an acknowledgement whose polynomial verifier has not been installed yet.
+    ///
+    /// O(1) — this is the entire cost the acknowledgement path pays for a deferral.
+    fn defer_ack(&self, spi: SsaPolynomialId<S::Pseudonym>, deferred: DeferredAck) {
+        let bucket = self
+            .pending_acks
+            .get_with(spi, || std::sync::Arc::new(parking_lot::Mutex::new(Vec::new())));
+        {
+            let mut bucket = bucket.lock();
+            if bucket.len() >= MAX_DEFERRED_ACKS_PER_POLYNOMIAL {
+                // Only reachable if the peer emits more shares for one polynomial than its own
+                // `threshold + surplus` budget allows, so the excess is almost certainly duplicate.
+                tracing::warn!(
+                    %spi,
+                    cap = MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+                    "dropping deferred acknowledgement: polynomial bucket is full"
+                );
+                return;
+            }
+            bucket.push(deferred);
+        }
+
+        // Close the race against a concurrent installation. The decision to defer was made on a
+        // verifier lookup that missed; if the verifier has appeared since, the drain that would have
+        // redeemed this ack has already run and nothing else will come for it. Probing with
+        // `contains_key` rather than `get` keeps this from refreshing the verifier's idle timer.
+        if self.ssa_verifiers.contains_key(&spi) {
+            self.drain_deferred_acks(&spi);
+        }
+    }
+
+    /// Redeems the acknowledgements that were waiting for this polynomial's verifier.
+    ///
+    /// Called from the commitment path immediately after the verifier is installed, so each bucket
+    /// is processed exactly once and never speculatively re-scanned. Resolutions are parked in
+    /// [`ready_resolutions`](Self::ready_resolutions) for the next `acknowledge_shares` call, since
+    /// the commitment path has no route to the upper layer.
+    fn drain_deferred_acks(&self, spi: &SsaPolynomialId<S::Pseudonym>) {
+        let Some(bucket) = self.pending_acks.get(spi) else {
+            return;
+        };
+        self.pending_acks.invalidate(spi);
+
+        let deferred = std::mem::take(&mut *bucket.lock());
+        if deferred.is_empty() {
+            return;
+        }
+
+        let mut resolved = Vec::new();
+        for (peer, challenge, ack) in deferred {
+            // The share lives in the peer's own awaiting-acks cache; if the peer entry is gone the
+            // share has expired with it and the ack is dead.
+            let Some(awaiting) = self.awaiting_acks.get(&peer) else {
+                continue;
+            };
+            match self.process_verified_ack(ack, challenge, &awaiting) {
+                Ok(ProcessedAckResult::FullRecovery(ssa)) => resolved.push(ShareResolution::RecoveredSsa(ssa)),
+                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
+                    resolved.push(ShareResolution::AlmostRecoveredSsa(ssa_id))
+                }
+                Ok(ProcessedAckResult::NoProgress) => {}
+                Ok(ProcessedAckResult::VerifierNotReady(_)) => {
+                    // The verifier was installed and then immediately withdrawn, which only the
+                    // retirement path does. Re-bucketing would leak, so drop.
+                    tracing::trace!(%spi, "verifier withdrawn while draining deferred acknowledgements");
+                }
+                Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
+                    tracing::error!(%pseudonym, ssa_index, "deferred share could not be verified");
+                    resolved.push(ShareResolution::InvalidShare(
+                        peer.into(),
+                        SsaId::new(pseudonym, ssa_index),
+                    ));
+                }
+                Err(error) => tracing::debug!(%spi, %error, "failed to process deferred acknowledgement"),
+            }
+        }
+
+        if !resolved.is_empty() {
+            tracing::debug!(%spi, num = resolved.len(), "redeemed deferred acknowledgements");
+            let mut ready = self.ready_resolutions.lock();
+            ready.extend(resolved);
+            self.ready_resolutions_len
+                .store(ready.len(), std::sync::atomic::Ordering::Release);
+        }
+    }
+
+    /// Takes any resolutions parked by [`drain_deferred_acks`](Self::drain_deferred_acks).
+    ///
+    /// One relaxed load in the common case — the buckets are empty whenever the Entry delivers a
+    /// polynomial's commitment row before the shares that reference it.
+    fn take_ready_resolutions(&self) -> Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> {
+        if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) == 0 {
+            return Vec::new();
+        }
+        let mut ready = self.ready_resolutions.lock();
+        self.ready_resolutions_len
+            .store(0, std::sync::atomic::Ordering::Release);
+        std::mem::take(&mut *ready)
     }
 }
 
@@ -403,66 +566,73 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::MissingSsaCommitment);
         };
 
-        let maybe_complete_ssa_commitment = {
+        let progress = {
             let mut builder = builder.lock();
             res.is_first_encountered = builder.is_empty();
             res.ssa_deposit_address = builder.get_deposit_address().copied();
             builder.add_transposed(index, commitments)?
         };
 
+        // `ssa_deposit_address` was read *before* the insertion, so it being absent here means the
+        // address (if any) was discovered by this very call.
         res.deposit_address_first_encountered = res.ssa_deposit_address.is_none();
 
-        match maybe_complete_ssa_commitment {
-            CommitmentResult::NotEnoughCommitments => {
-                res.deposit_address_first_encountered = false; // Not yet encountered
-                tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more data");
-            }
-            CommitmentResult::SsaCommitmentDone(full_ssa_commitment) => {
-                res.ssa_deposit_address =
-                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+        let Some(full_ssa_commitment) = progress.full_commitment else {
+            res.deposit_address_first_encountered = false; // Not yet encountered
+            tracing::trace!(%ssa_id, "ssa commitment not yet complete, waiting for more constant terms");
+            return Ok(res);
+        };
+        res.ssa_deposit_address = Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
 
-                tracing::trace!(%ssa_id, "ssa commitment done");
-            }
-            CommitmentResult::StillIncomplete(full_ssa_commitment) => {
-                res.ssa_deposit_address =
-                    Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
+        // Publish the part accumulator BEFORE installing any verifier, and never the other way
+        // round. `process_verified_ack` reads the verifier first and the builder second, so a share
+        // that finds a verifier but no builder fails with `MissingSsaCommitment` — which is a
+        // permanent drop, with no deferral path to recover it. Reversed, a share that finds no
+        // verifier yet is simply deferred and redeemed by the drain below. Only one of the two
+        // orderings has a recovery path.
+        //
+        // Both publications are also what makes a concurrent `retire_ssa` able to see this cycle:
+        // the liveness map now exists before the verifiers it accounts for, so retirement can
+        // always enumerate them.
+        if let Some(ssa_builder) = progress.ssa_builder {
+            let num_polys = ssa_builder.num_polys();
+            self.ssa_builders
+                .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
+            self.ssa_num_polys.insert(ssa_id, num_polys);
+            tracing::debug!(%ssa_id, num_polys, "ssa commitment known — cycle is live");
+        }
 
-                tracing::trace!(%ssa_id, "ssa commitment still incomplete");
-            }
-            CommitmentResult::Completed(ssa_builder, ssa_reconstructors) => {
-                let num_polys = ssa_builder.num_polys();
-                let full_ssa_commitment = ssa_builder.full_commitment;
-                // Insert verifiers BEFORE checking the tombstone, so that
-                // a concurrent retire_ssa can find and remove them via the
-                // liveness map once we publish below.  If we checked the
-                // tombstone first, retire_ssa might run between the check
-                // and the insert, leaving verifiers that were never published
-                // to any cache and are thus invisible to cleanup.
-                let spis: Vec<SsaPolynomialId<S::Pseudonym>> = ssa_reconstructors.iter().map(|r| r.spi()).collect();
-                for ssa_reconstructor in ssa_reconstructors {
-                    self.ssa_verifiers.insert(
-                        ssa_reconstructor.spi(),
-                        std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
-                    );
-                }
-                // Check the tombstone: if retire_ssa ran during verifier
-                // insertion, clean up the verifiers and skip publication.
-                if self.retired_ssas.contains_key(&ssa_id) {
-                    for spi in &spis {
-                        self.ssa_verifiers.invalidate(spi);
-                    }
-                    tracing::trace!(%ssa_id, "ssa commitment completed but cycle was retired — dropped verifiers");
-                } else {
-                    self.ssa_builders
-                        .insert(ssa_id, std::sync::Arc::new(parking_lot::Mutex::new(ssa_builder)));
-                    self.ssa_num_polys.insert(ssa_id, num_polys);
-                    res.ssa_deposit_address =
-                        Some(S::group_to_deposit_address(full_ssa_commitment).ok_or(PixError::InvalidSsa)?);
-                    res.is_verifiable = true;
-                }
+        let installed: Vec<SsaPolynomialId<S::Pseudonym>> = progress.new_verifiers.iter().map(|v| v.spi()).collect();
+        for verifier in progress.new_verifiers {
+            self.ssa_verifiers
+                .insert(verifier.spi(), std::sync::Arc::new(parking_lot::Mutex::new(verifier)));
+        }
 
-                tracing::trace!(%ssa_id, "ssa commitment completed");
+        // Tombstone checked *after* publishing, so that retirement racing this call cannot slip
+        // between a check and a write. If it did run, undo everything this call published — the
+        // cycle's state was already torn down and republishing it would resurrect it.
+        if self.retired_ssas.contains_key(&ssa_id) {
+            for spi in &installed {
+                self.ssa_verifiers.invalidate(spi);
+                self.pending_acks.invalidate(spi);
             }
+            self.ssa_builders.invalidate(&ssa_id);
+            self.ssa_num_polys.invalidate(&ssa_id);
+            tracing::trace!(%ssa_id, "ssa commitment progressed but cycle was retired — dropped published state");
+            res.deposit_address_first_encountered = false;
+            return Ok(res);
+        }
+
+        // Each freshly installed verifier unblocks exactly the acknowledgements bucketed under its
+        // own polynomial. Doing this here rather than on the acknowledgement path is what keeps
+        // `acknowledge_shares` free of retry scanning.
+        for spi in &installed {
+            self.drain_deferred_acks(spi);
+        }
+
+        res.is_verifiable = progress.fully_committed;
+        if progress.fully_committed {
+            tracing::trace!(%ssa_id, "ssa commitment completed");
         }
 
         Ok(res)
@@ -508,44 +678,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         // Feed output into HashSet, that deduplicates
         let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
 
-        // Drain pending retries from previous calls — the verifier may have
-        // been inserted since the last acknowledge_shares invocation.
-        if let Some(per_peer) = self.pending_ack_keys.get(&peer) {
-            let stashed: Vec<(HalfKeyChallenge, HalfKey)> = per_peer.iter().map(|entry| (*entry.0, entry.1)).collect();
-            for (challenge, ack) in &stashed {
-                if !awaiting_ack_from_peer.contains_key(challenge) {
-                    // Share was already consumed (e.g. by the main loop in a prior call).
-                    per_peer.invalidate(challenge);
-                    continue;
-                }
-                match self.process_verified_ack(*ack, *challenge, &awaiting_ack_from_peer) {
-                    Ok(ProcessedAckResult::FullRecovery(ssa)) => {
-                        per_peer.invalidate(challenge);
-                        res.insert(ShareResolution::RecoveredSsa(ssa));
-                    }
-                    Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
-                        per_peer.invalidate(challenge);
-                        res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
-                    }
-                    Ok(ProcessedAckResult::NoProgress) => {
-                        per_peer.invalidate(challenge);
-                    }
-                    Err(PixError::MissingVerifier) => {
-                        // Verifier still not available — leave in pending_ack_keys for the next call.
-                        tracing::trace!(%peer, "verifier not yet available, share retained in pending cache");
-                    }
-                    Err(_) => {
-                        // Permanent failure — don't retry.
-                        per_peer.invalidate(challenge);
-                    }
-                }
-            }
-
-            // Clean up empty per-peer entries so the outer index does not leak.
-            if per_peer.weighted_size() == 0 {
-                self.pending_ack_keys.invalidate(&peer);
-            }
-        }
+        // Collect anything redeemed while verifiers were being installed. No retry scanning happens
+        // here: a deferred ack is retried exactly once, by the installation of the verifier it was
+        // waiting for (see `drain_deferred_acks`).
+        res.extend(self.take_ready_resolutions());
 
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
@@ -556,6 +692,12 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
                 }
                 Ok(ProcessedAckResult::NoProgress) => {}
+                Ok(ProcessedAckResult::VerifierNotReady(spi)) => {
+                    // The share stays in `awaiting_acks`; bucket the ack under the polynomial whose
+                    // verifier it needs, so installing that verifier redeems it.
+                    tracing::trace!(%peer, %spi, "verifier not yet installed, deferring acknowledgement");
+                    self.defer_ack(spi, (peer, ack_challenge, ack));
+                }
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
                 Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
                     tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
@@ -563,16 +705,6 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                         peer.into(),
                         SsaId::new(pseudonym, ssa_index),
                     ));
-                }
-                Err(PixError::MissingVerifier) => {
-                    // Share retained in awaiting_acks (process_verified_ack now uses .get()).
-                    // Stash the ack so a subsequent call can retry once the verifier arrives.
-                    tracing::trace!(%peer, "verifier not yet available, stashing ack for retry");
-                    self.pending_ack_keys
-                        .get_with(peer, || {
-                            moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64).build()
-                        })
-                        .insert(ack_challenge, ack);
                 }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
@@ -749,14 +881,13 @@ mod tests {
     #[test]
     fn reconstructor_missing_verifier_retains_share() -> anyhow::Result<()> {
         // Regression test for the share-loss race:
-        // When `process_verified_ack` encounters MissingVerifier, the share must
-        // NOT be removed from the awaiting_acks cache — it should remain available
-        // for a later retry when the verifier arrives.
+        // When the polynomial's verifier is not installed yet, the share must NOT be removed
+        // from the awaiting_acks cache — it must remain available for the retry that happens
+        // when the verifier arrives.
         //
-        // The implementation guarantees this: `process_verified_ack` looks the share
-        // up with `.get()` and only `.remove()`s it after the verifier lookup
-        // succeeds, so a MissingVerifier error leaves the share in place. This test
-        // asserts that retention.
+        // The implementation guarantees this: `process_verified_ack` looks the share up with
+        // `.get()` and only `.remove()`s it after the verifier lookup succeeds, so the
+        // `VerifierNotReady` deferral leaves the share in place. This test asserts that retention.
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
         let ack_key = HalfKey::random();
@@ -789,29 +920,29 @@ mod tests {
             "share must be present in the peer cache before processing"
         );
 
-        // Process the ack — this should return MissingVerifier
+        // Process the ack — the verifier is not installed, so this defers rather than failing,
+        // and reports the polynomial the ack must be bucketed under.
         let peer_cache_ref = reconstructor.awaiting_acks.get(peer.public()).unwrap();
         let result = reconstructor.process_verified_ack(ack_key, challenge, &peer_cache_ref);
-        assert!(matches!(result, Err(PixError::MissingVerifier)));
-
-        // The share MUST NOT be destroyed by the MissingVerifier error: the
-        // implementation only removes it after the verifier lookup succeeds, so it
-        // stays available for a later retry.
-        let peer_cache_after = reconstructor.awaiting_acks.get(peer.public());
         assert!(
-            peer_cache_after.is_some(),
-            "share must be retained after MissingVerifier"
+            matches!(result, Ok(ProcessedAckResult::VerifierNotReady(reported)) if reported == spi),
+            "expected deferral naming polynomial {spi:?}"
         );
+
+        // The share MUST NOT be destroyed by the deferral: the implementation only removes it
+        // after the verifier lookup succeeds, so it stays available for the retry.
+        let peer_cache_after = reconstructor.awaiting_acks.get(peer.public());
+        assert!(peer_cache_after.is_some(), "share must be retained when deferred");
         assert!(
             peer_cache_after.as_ref().unwrap().contains_key(&challenge),
-            "share must be retained after MissingVerifier"
+            "share must be retained when deferred"
         );
 
         Ok(())
     }
 
     #[test]
-    fn reconstructor_missing_verifier() -> anyhow::Result<()> {
+    fn reconstructor_defers_ack_when_verifier_is_not_installed() -> anyhow::Result<()> {
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
 
         let ack_key = HalfKey::random();
@@ -849,7 +980,10 @@ mod tests {
                 .as_ref()
                 .ok_or(anyhow::anyhow!("missing peer"))?,
         );
-        assert!(matches!(result, Err(PixError::MissingVerifier)));
+        assert!(
+            matches!(result, Ok(ProcessedAckResult::VerifierNotReady(reported)) if reported == spi),
+            "an ack with no installed verifier must be deferred, not failed"
+        );
 
         Ok(())
     }
@@ -1297,10 +1431,10 @@ mod tests {
     /// plus `threshold` shares, held for every one of `polys` polynomials — and neither can be
     /// read again once the part is reconstructed.
     ///
-    /// Retaining the (now-stripped) cache entry is equally deliberate: evicting it would make
-    /// every late or surplus share for that polynomial return `MissingVerifier`, which stashes
-    /// the ack in `pending_ack_keys` for retry. The stripped builder keeps the cheap
-    /// already-reconstructed path instead.
+    /// Retaining the (now-stripped) cache entry is equally deliberate: evicting it would make every
+    /// late or surplus share for that polynomial look like a not-yet-installed verifier, so the ack
+    /// would be deferred into a bucket that nothing will ever drain. The stripped builder keeps the
+    /// cheap already-reconstructed path instead.
     #[test]
     fn reconstructed_polynomial_releases_verification_state_but_keeps_its_entry() -> anyhow::Result<()> {
         // 2 polynomials, threshold 2, no surplus: finishing polynomial 0 does *not* complete the
@@ -1509,66 +1643,353 @@ mod tests {
         Ok(())
     }
 
+    /// Deferred acknowledgements are bucketed by the polynomial they are waiting for, *not* by peer.
+    ///
+    /// Both halves matter. Isolation by polynomial is what lets a bucket be drained by exactly one
+    /// event (its own verifier installing) instead of being rescanned speculatively. And a single
+    /// bucket deliberately holding several peers' acks is not an accident: one polynomial's shares
+    /// are spread across return paths, hence across first-relayers, so the peer has to be carried
+    /// per entry rather than being the key.
     #[test]
-    fn pending_ack_cache_isolates_stashed_acks_by_peer() -> anyhow::Result<()> {
-        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig { ..Default::default() });
+    fn deferred_acks_are_bucketed_by_polynomial_across_peers() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
-        let ack_a = HalfKey::random();
-        let challenge_a = ack_a.to_challenge()?;
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+        let spi_0 = SsaPolynomialId::new(ssa_id, 0);
+        let spi_1 = SsaPolynomialId::new(ssa_id, 1);
+
         let peer_a = OffchainKeypair::random();
-
-        let ack_b = HalfKey::random();
-        let challenge_b = ack_b.to_challenge()?;
         let peer_b = OffchainKeypair::random();
+        let ack_a = HalfKey::random();
+        let ack_b = HalfKey::random();
+        let ack_other = HalfKey::random();
 
-        // Stash acks for two different peers — the nested cache must keep them isolated.
-        reconstructor
-            .pending_ack_keys
-            .get_with(*peer_a.public(), || moka::sync::CacheBuilder::new(8).build())
-            .insert(challenge_a, ack_a);
-        reconstructor
-            .pending_ack_keys
-            .get_with(*peer_b.public(), || moka::sync::CacheBuilder::new(8).build())
-            .insert(challenge_b, ack_b);
+        // Two peers defer for the same polynomial; a third ack belongs to another polynomial.
+        reconstructor.defer_ack(spi_0, (*peer_a.public(), ack_a.to_challenge()?, ack_a));
+        reconstructor.defer_ack(spi_0, (*peer_b.public(), ack_b.to_challenge()?, ack_b));
+        reconstructor.defer_ack(spi_1, (*peer_a.public(), ack_other.to_challenge()?, ack_other));
 
-        // peer_a's per-peer cache contains only challenge_a
-        let cache_a = reconstructor.pending_ack_keys.get(peer_a.public()).unwrap();
-        assert!(cache_a.contains_key(&challenge_a), "peer_a should have its stash");
-        assert!(
-            !cache_a.contains_key(&challenge_b),
-            "peer_a must not see peer_b's stash"
-        );
-
-        // peer_b's per-peer cache contains only challenge_b
-        let cache_b = reconstructor.pending_ack_keys.get(peer_b.public()).unwrap();
-        assert!(cache_b.contains_key(&challenge_b), "peer_b should have its stash");
-        assert!(
-            !cache_b.contains_key(&challenge_a),
-            "peer_b must not see peer_a's stash"
-        );
-
-        // Invalidating by challenge from peer_a's cache does not affect peer_b
-        reconstructor
-            .pending_ack_keys
-            .get(peer_a.public())
-            .unwrap()
-            .invalidate(&challenge_a);
-        assert!(
+        let bucket_0 = reconstructor
+            .pending_acks
+            .get(&spi_0)
+            .ok_or_else(|| anyhow::anyhow!("missing bucket for polynomial 0"))?;
+        assert_eq!(bucket_0.lock().len(), 2, "one bucket holds both peers' acks");
+        assert_eq!(
             reconstructor
-                .pending_ack_keys
-                .get(peer_a.public())
-                .unwrap()
-                .weighted_size()
-                == 0,
-            "peer_a cache should be empty after invalidate"
+                .pending_acks
+                .get(&spi_1)
+                .ok_or_else(|| anyhow::anyhow!("missing bucket for polynomial 1"))?
+                .lock()
+                .len(),
+            1,
+            "a different polynomial keeps its own bucket"
+        );
+
+        // Draining one polynomial's bucket must not touch the other's. Neither share exists in
+        // `awaiting_acks`, so nothing is redeemed — the point is the bucket bookkeeping.
+        reconstructor.drain_deferred_acks(&spi_0);
+        assert!(
+            !reconstructor.pending_acks.contains_key(&spi_0),
+            "a drained bucket is removed"
         );
         assert!(
+            reconstructor.pending_acks.contains_key(&spi_1),
+            "draining one polynomial must not disturb another"
+        );
+
+        Ok(())
+    }
+
+    /// Verifiers must become available polynomial by polynomial as rows complete, not all at once
+    /// at the end of the cycle. This is the property the whole sliding-window behaviour rests on:
+    /// the live commitment set stays proportional to the polynomials still in flight.
+    #[test]
+    fn verifiers_are_installed_as_individual_polynomial_rows_complete() -> anyhow::Result<()> {
+        const POLYS: u16 = 6;
+        const THRESHOLD: u16 = 4;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+
+        // Constant-term pass across every polynomial: the deposit address becomes known, but no row
+        // is complete, so nothing is verifiable yet.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        )?;
+        assert!(state.ssa_deposit_address.is_some());
+        assert!(!state.is_verifiable);
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(reconstructor.ssa_verifiers.entry_count(), 0);
+
+        // Now complete one polynomial at a time by sending its remaining coefficients, and watch
+        // exactly one verifier appear per completed row.
+        for poly in 0..POLYS as PolynomialIndex {
+            for coeff in 1..THRESHOLD as CoefficientIndex {
+                let state = reconstructor.insert_coefficient_commitments(
+                    ssa_id,
+                    coeff,
+                    coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
+                )?;
+
+                let row_complete = coeff == THRESHOLD as CoefficientIndex - 1;
+                let all_rows_complete = row_complete && poly == POLYS as PolynomialIndex - 1;
+                assert_eq!(
+                    state.is_verifiable, all_rows_complete,
+                    "is_verifiable must flip only when the last row completes (poly {poly}, coeff {coeff})"
+                );
+
+                reconstructor.ssa_verifiers.run_pending_tasks();
+                let expected = poly as u64 + u64::from(row_complete);
+                assert_eq!(
+                    reconstructor.ssa_verifiers.entry_count(),
+                    expected,
+                    "after poly {poly} coeff {coeff} there must be {expected} verifiers installed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// The Exit must not depend on the Entry's send order for correctness.
+    ///
+    /// A polynomial's verifier is withheld until the SSA commitment is known, because a
+    /// reconstructed part has nowhere to go before that. So an Entry that sends complete rows
+    /// *before* finishing the constant-term pass must still end up with every verifier installed —
+    /// released in one batch the moment the last constant term lands.
+    #[test]
+    fn rows_completed_before_the_constant_term_pass_are_released_together() -> anyhow::Result<()> {
+        const POLYS: u16 = 3;
+        const THRESHOLD: u16 = 3;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+
+        // Fully commit polynomials 0 and 1 (all their coefficients, constant term included), while
+        // polynomial 2 gets nothing. Two rows are now complete but the SSA commitment is not known.
+        for poly in 0..2 as PolynomialIndex {
+            for coeff in 0..THRESHOLD as CoefficientIndex {
+                let state = reconstructor.insert_coefficient_commitments(
+                    ssa_id,
+                    coeff,
+                    coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
+                )?;
+                assert!(
+                    state.ssa_deposit_address.is_none(),
+                    "the deposit address needs every constant term"
+                );
+                assert!(!state.is_verifiable);
+            }
+        }
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            0,
+            "verifiers must be withheld while the SSA commitment is unknown, however complete the rows are"
+        );
+
+        // Polynomial 2's constant term completes the SSA commitment and releases the two rows that
+        // were already waiting.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            coefficient_of(&commitment, 0, Some(2))?.into_iter(),
+        )?;
+        assert!(state.ssa_deposit_address.is_some());
+        assert!(!state.is_verifiable, "polynomial 2's row is still incomplete");
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            2,
+            "both waiting rows must be released as soon as the SSA commitment is known"
+        );
+
+        // Finish polynomial 2.
+        for coeff in 1..THRESHOLD as CoefficientIndex {
+            let state = reconstructor.insert_coefficient_commitments(
+                ssa_id,
+                coeff,
+                coefficient_of(&commitment, coeff, Some(2))?.into_iter(),
+            )?;
+            assert_eq!(state.is_verifiable, coeff == THRESHOLD as CoefficientIndex - 1);
+        }
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(reconstructor.ssa_verifiers.entry_count(), POLYS as u64);
+
+        Ok(())
+    }
+
+    /// End-to-end deferral: shares that arrive before their polynomial's row is committed must be
+    /// redeemed when the verifier installs, and the resulting resolutions must reach the caller.
+    ///
+    /// This is the path that used to be a full stash re-scan on every acknowledgement batch.
+    #[test]
+    fn shares_arriving_before_their_verifier_are_redeemed_on_installation() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+
+        // Only the constant-term pass so far: the cycle is live, but no row is committed, so no
+        // share can be verified yet.
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, coefficient_of(&commitment, 0, None)?.into_iter())?;
+
+        // All shares for the whole cycle arrive now — every one of them ahead of its verifier.
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc_share = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        // Nothing can resolve yet, and every ack must have been bucketed rather than dropped.
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        assert!(
+            resolutions.is_empty(),
+            "no share can resolve before its polynomial is committed"
+        );
+        let deferred: usize = (0..POLYS as PolynomialIndex)
+            .filter_map(|poly| reconstructor.pending_acks.get(&SsaPolynomialId::new(ssa_id, poly)))
+            .map(|bucket| bucket.lock().len())
+            .sum();
+        assert_eq!(
+            deferred,
+            (POLYS * THRESHOLD) as usize,
+            "every early ack must be bucketed under its own polynomial"
+        );
+
+        // Committing the rows installs the verifiers, which redeems the deferred acknowledgements.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            1,
+            coefficient_of(&commitment, 1, None)?.into_iter(),
+        )?;
+        assert!(state.is_verifiable);
+
+        // Buckets are consumed by the drain, not left to be re-scanned.
+        for poly in 0..POLYS as PolynomialIndex {
+            assert!(
+                !reconstructor
+                    .pending_acks
+                    .contains_key(&SsaPolynomialId::new(ssa_id, poly)),
+                "bucket for polynomial {poly} must be consumed by the drain"
+            );
+        }
+
+        // The redeemed resolutions surface on the next acknowledgement batch. An empty ack batch is
+        // enough — the work is already done, only the hand-off remains.
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), Vec::new())?;
+        assert!(
+            resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
+            "deferred shares must recover the SSA once their verifiers install, got {resolutions:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Deferring is decided on a verifier lookup that missed, so a verifier installing concurrently
+    /// would leave the ack in a bucket whose one and only drain has already run — a share silently
+    /// lost to a microsecond-wide window. `defer_ack` re-probes and drains itself in that case.
+    #[test]
+    fn deferring_against_an_installed_verifier_drains_immediately() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        generator
+            .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+            .process_into_reconstructor(&reconstructor)?;
+
+        // Every verifier is installed and every bucket already drained.
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+        assert!(reconstructor.ssa_verifiers.contains_key(&spi));
+
+        // Simulate the racing path: an ack deferred *after* its verifier appeared.
+        let ack = HalfKey::random();
+        reconstructor.defer_ack(spi, (*peer.public(), ack.to_challenge()?, ack));
+
+        assert!(
+            !reconstructor.pending_acks.contains_key(&spi),
+            "a bucket created after its verifier installed must drain itself, not linger unclaimed"
+        );
+
+        Ok(())
+    }
+
+    /// The per-polynomial bucket cap must hold, so a peer cannot make the Exit buffer without
+    /// bound by emitting more shares for one polynomial than its own share budget permits.
+    #[test]
+    fn deferred_ack_buckets_are_capped() -> anyhow::Result<()> {
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), SsaIndex::MIN), 0);
+        let peer = OffchainKeypair::random();
+
+        for _ in 0..MAX_DEFERRED_ACKS_PER_POLYNOMIAL + 32 {
+            let ack = HalfKey::random();
+            reconstructor.defer_ack(spi, (*peer.public(), ack.to_challenge()?, ack));
+        }
+
+        assert_eq!(
             reconstructor
-                .pending_ack_keys
-                .get(peer_b.public())
-                .unwrap()
-                .contains_key(&challenge_b),
-            "peer_b's stash must survive peer_a's invalidation"
+                .pending_acks
+                .get(&spi)
+                .ok_or_else(|| anyhow::anyhow!("missing bucket"))?
+                .lock()
+                .len(),
+            MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+            "bucket must not grow past the cap"
         );
 
         Ok(())
@@ -1626,27 +2047,32 @@ mod tests {
         Ok(())
     }
 
+    /// Extracts one coefficient's commitments from a generated SSA commitment, optionally narrowed
+    /// to a single polynomial, in the shape `insert_coefficient_commitments` expects.
+    fn coefficient_of(
+        commitment: &crate::SsaCommitment<TestSpec>,
+        coeff_index: CoefficientIndex,
+        only_poly: Option<PolynomialIndex>,
+    ) -> anyhow::Result<Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>> {
+        Ok(commitment
+            .verifiers
+            .get(&coeff_index)
+            .ok_or_else(|| anyhow::anyhow!("missing coefficient {coeff_index}"))?
+            .iter()
+            .filter(|(poly_index, _)| only_poly.is_none_or(|wanted| *poly_index == wanted))
+            .map(|(poly_index, repr)| (*poly_index, *repr))
+            .collect())
+    }
+
+    /// Tombstone guard on the *first* publication point: the SSA becoming live.
+    ///
+    /// Since verifiers are now installed as individual polynomials complete, the part accumulator
+    /// has to be published earlier — the moment the constant terms yield the SSA commitment. A
+    /// `retire_ssa` racing that publication must still leave nothing behind.
     #[test]
-    fn retire_ssa_tombstone_prevents_resurrection_in_insert_coefficient_commitments() -> anyhow::Result<()> {
-        // Regression test for the M9 tombstone fix: when a concurrent `retire_ssa`
-        // runs between verifier insertion and builder/liveness publication inside
-        // `insert_coefficient_commitments`'s `CommitmentResult::Completed` arm, the
-        // tombstone must prevent resurrection.
-        //
-        // The race window is:
-        //  1. commitment_builder entry is completed
-        //  2. verifiers are inserted (line 443-447)
-        //  3. retire_ssa runs concurrently (sets tombstone + removes builder/verifier)
-        //  4. tombstone check (line 451) intercepts and skips publication
-        //
-        // We simulate step 3 by setting the tombstone directly (the `retired_ssas`
-        // cache) between the two coefficient insertions.  The first insertion makes
-        // the commitment almost-complete; the second triggers Completed.
-        //
-        // The test uses a 2-coefficient generator so that two separate
-        // insert_coefficient_commitments calls are needed to complete the SSA.
+    fn retire_ssa_tombstone_prevents_builder_publication() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
-            polynomials_per_ssa: 1,
+            polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
         });
@@ -1655,70 +2081,102 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // Insert first coefficient — makes the builder almost-complete.
-        // Builders may be lazily evaluated; run pending tasks to flush.
-        {
-            let coeff_0: Vec<_> = commitment
-                .verifiers
-                .get(&0)
-                .ok_or_else(|| anyhow::anyhow!("missing coeff 0"))?
-                .iter()
-                .map(|(pi, repr)| (*pi, *repr))
-                .collect();
-            let partial = reconstructor.insert_coefficient_commitments(ssa_id, 0, coeff_0.into_iter())?;
-            assert!(!partial.is_verifiable, "not yet complete after coeff 0");
-        }
-        reconstructor.commitment_builder.run_pending_tasks();
+        // Constant term of polynomial 0 only — the SSA commitment is still unknown.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            coefficient_of(&commitment, 0, Some(0))?.into_iter(),
+        )?;
+        assert!(
+            state.ssa_deposit_address.is_none(),
+            "deposit address must not be derivable from a partial constant-term set"
+        );
 
-        // Simulate concurrent retire_ssa by setting only the tombstone.
-        // In the real race, retire_ssa would also remove builders/verifiers,
-        // but setting the tombstone is sufficient to test the critical check.
+        // Simulate `retire_ssa` racing the completion by setting only the tombstone.
         reconstructor.retired_ssas.insert(ssa_id, ());
 
-        // Insert final coefficient — triggers Completed; tombstone must intercept.
-        reconstructor.commitment_builder.run_pending_tasks();
-        {
-            let coeff_1: Vec<_> = commitment
-                .verifiers
-                .get(&1)
-                .ok_or_else(|| anyhow::anyhow!("missing coeff 1"))?
-                .iter()
-                .map(|(pi, repr)| (*pi, *repr))
-                .collect();
-            let result = reconstructor.insert_coefficient_commitments(ssa_id, 1, coeff_1.into_iter())?;
+        // Constant term of polynomial 1 completes the set, so this call would publish the builder.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
+        )?;
+        assert!(!state.is_verifiable, "a retired cycle is never verifiable");
 
-            // The tombstone path drops verifiers and skips builder/liveness
-            // publication even though the builder completed.
-            // Note: ssa_deposit_address is populated at line 409 from the
-            // commitment_builder's internal state (set before the tombstone
-            // check), so it may still be Some.  The key invariant is
-            // is_verifiable=false — the builder was NOT published.
-            assert!(!result.is_verifiable, "tombstone prevented verifiable=true");
-        }
-
-        // Flush lazy caches.
         reconstructor.ssa_builders.run_pending_tasks();
-
-        // Builder and liveness caches must be empty.
         assert!(
             !reconstructor.ssa_builders.contains_key(&ssa_id),
-            "tombstone prevented builder publication"
+            "tombstone must prevent builder publication"
         );
         assert!(
             !reconstructor.ssa_num_polys.contains_key(&ssa_id),
-            "tombstone prevented liveness publication"
+            "tombstone must prevent liveness publication"
         );
 
-        // The verifiers should also have been invalidated by the tombstone path.
-        for poly_idx in 0..1 {
-            let spi = SsaPolynomialId::new(ssa_id, poly_idx);
-            assert!(
-                !reconstructor.ssa_verifiers.contains_key(&spi),
-                "tombstone must also remove verifier for spi {spi:?}"
-            );
-        }
+        Ok(())
+    }
+
+    /// Tombstone guard on the *second* publication point: per-polynomial verifier installation.
+    ///
+    /// Retirement can land after the cycle has legitimately gone live but before its rows complete.
+    /// Every later row must then install nothing, on every subsequent call — the guard has to hold
+    /// per call now that installation is spread across many of them.
+    #[test]
+    fn retire_ssa_tombstone_prevents_verifier_installation() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+
+        // Full constant-term pass: the cycle goes live, but no row is complete yet.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        )?;
+        assert!(
+            state.ssa_deposit_address.is_some(),
+            "the full constant-term set must yield the deposit address"
+        );
+        assert!(!state.is_verifiable, "no polynomial is complete after coefficient 0");
+        reconstructor.ssa_builders.run_pending_tasks();
+        assert!(
+            reconstructor.ssa_builders.contains_key(&ssa_id),
+            "the cycle must go live as soon as the SSA commitment is known"
+        );
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            0,
+            "no verifier may be installed before a row is complete"
+        );
+
+        // Retirement lands here.
+        reconstructor.retired_ssas.insert(ssa_id, ());
+
+        // Coefficient 1 completes both rows, so this call would install both verifiers.
+        let state = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            1,
+            coefficient_of(&commitment, 1, None)?.into_iter(),
+        )?;
+        assert!(!state.is_verifiable, "a retired cycle is never verifiable");
+
+        reconstructor.ssa_verifiers.run_pending_tasks();
+        assert_eq!(
+            reconstructor.ssa_verifiers.entry_count(),
+            0,
+            "tombstone must withdraw every verifier installed after retirement"
+        );
 
         Ok(())
     }

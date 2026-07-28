@@ -160,6 +160,12 @@ pub enum StartProtocol<I, T, C, G> {
 ///
 /// The client always begins sending a message with `coefficient_index` equal to 0 to
 /// deliver the commitment to the SSA first.
+///
+/// After that pass, [`new_multiple`](Self::new_multiple) emits the remaining coefficients a *block
+/// of polynomials* at a time rather than a coefficient at a time, so that individual polynomials
+/// become completely committed — and therefore verifiable — early and progressively instead of all
+/// at the very end. The receiving side does not depend on this order for correctness: it installs a
+/// polynomial's verifier whenever that polynomial's row happens to complete.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaClientCommitmentMessage<I, G> {
     /// Session ID.
@@ -212,9 +218,9 @@ impl<I: serde::Serialize + Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
         let max_commitments_per_message =
             (ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size) / per_entry).max(1);
 
-        // Group the transposed verifiers by their coefficient index. A `BTreeMap` is used to
-        // guarantee that the resulting messages are ordered by coefficient index, making sure the
-        // constant terms (coefficient index 0) of the polynomials are delivered first.
+        // Group the transposed verifiers by coefficient index, each group sorted by polynomial
+        // index. A `BTreeMap` keeps the coefficient order deterministic; the inner sort is what
+        // lets a block of polynomials be addressed as the same slice range in every coefficient.
         let mut by_coefficient: std::collections::BTreeMap<u16, Vec<(hopr_protocol_pix::PolynomialIndex, G)>> =
             std::collections::BTreeMap::new();
 
@@ -224,17 +230,55 @@ impl<I: serde::Serialize + Clone, G: Clone> SsaClientCommitmentMessage<I, G> {
                 entry.push((poly_index, G::from(coefficient_commitment)));
             }
         }
+        for coefficients in by_coefficient.values_mut() {
+            coefficients.sort_unstable_by_key(|(poly_index, _)| *poly_index);
+        }
 
         let mut messages = Vec::new();
-        for (coefficient_index, coefficients) in by_coefficient {
-            // Split the commitments of this coefficient into chunks that each fit within a packet.
-            for chunk in coefficients.chunks(max_commitments_per_message) {
-                messages.push(Self {
-                    session_id: session_id.clone(),
-                    ssa_index,
-                    coefficient_index,
-                    coefficient_commitments: chunk.iter().cloned().collect(),
-                });
+        let mut push_chunk = |coefficient_index: u16, chunk: &[(hopr_protocol_pix::PolynomialIndex, G)]| {
+            messages.push(Self {
+                session_id: session_id.clone(),
+                ssa_index,
+                coefficient_index,
+                coefficient_commitments: chunk.iter().cloned().collect(),
+            });
+        };
+
+        // Phase 1 — every polynomial's constant term, so the Exit can derive the SSA deposit
+        // address as early as possible. This is the one coefficient that must be delivered across
+        // *all* polynomials before anything else, because the address is their sum.
+        let constant_terms = by_coefficient.remove(&0).unwrap_or_default();
+        for chunk in constant_terms.chunks(max_commitments_per_message) {
+            push_chunk(0, chunk);
+        }
+
+        // Phase 2 — the remaining coefficients, a block of polynomials at a time.
+        //
+        // The Exit installs a polynomial's share verifier as soon as that polynomial's own row of
+        // coefficients is complete, so the order in which rows are completed decides how early
+        // shares can start being verified. Walking coefficient-major (the natural layout of
+        // `TransposedVerifiers`) completes *no* row until the very last message — ~18 700 of them at
+        // production dimensions — which is what forces every share arriving in the meantime to be
+        // deferred, and what makes the Exit hold the entire `polys × threshold` commitment matrix
+        // at once.
+        //
+        // Emitting one polynomial's row at a time would instead waste most of each packet, since a
+        // row is only `threshold` commitments long. Blocking by exactly the number of commitments
+        // that fit in one message gives both: every message stays full, and a whole block of
+        // polynomials becomes verifiable every `threshold - 1` messages.
+        //
+        // The block size is shared with phase 1's chunking, so block boundaries line up and no
+        // block straddles a partially filled constant-term message.
+        let num_polys = constant_terms
+            .len()
+            .max(by_coefficient.values().map(|c| c.len()).max().unwrap_or(0));
+        for block_start in (0..num_polys).step_by(max_commitments_per_message) {
+            for (&coefficient_index, coefficients) in &by_coefficient {
+                if block_start >= coefficients.len() {
+                    continue;
+                }
+                let block_end = (block_start + max_commitments_per_message).min(coefficients.len());
+                push_chunk(coefficient_index, &coefficients[block_start..block_end]);
             }
         }
 
@@ -1184,6 +1228,91 @@ mod tests {
             "largest encoded SsaCommit ({} bytes) leaves {} bytes of headroom, expected ≤12",
             max_encoded_size,
             headroom
+        );
+
+        Ok(())
+    }
+
+    /// The emission order is what lets the Exit install a share verifier per polynomial instead of
+    /// waiting for the whole cycle, so it is a protocol property worth pinning rather than an
+    /// implementation detail of `new_multiple`.
+    ///
+    /// Two things must hold: the constant-term pass comes first (the deposit address is the sum of
+    /// every polynomial's constant term, so it needs all of them), and afterwards each polynomial's
+    /// remaining coefficients arrive close together, so that rows complete progressively.
+    #[test]
+    fn start_protocol_ssa_commit_messages_should_complete_polynomial_rows_progressively() -> anyhow::Result<()> {
+        const POLYS: u16 = 2048;
+        const THRESHOLD: u16 = 64;
+
+        let generator = SsaShareGenerator::<HoprPixSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        type DummySessionId = [u8; 20];
+        let session_id: DummySessionId = Default::default();
+        let messages: Vec<SsaClientCommitmentMessage<DummySessionId, HoprPixGroupElement>> =
+            SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment)?;
+
+        // Walk the messages in order, tracking how many coefficients each polynomial has received,
+        // and record after how many messages each polynomial's row became complete.
+        let mut received = std::collections::BTreeMap::<hopr_protocol_pix::PolynomialIndex, u16>::new();
+        let mut completed_at = Vec::new();
+        let mut constant_terms_done_at = None;
+        let mut constant_terms_seen = 0u16;
+
+        for (position, message) in messages.iter().enumerate() {
+            if message.coefficient_index == 0 {
+                constant_terms_seen += message.coefficient_commitments.len() as u16;
+                if constant_terms_seen == POLYS && constant_terms_done_at.is_none() {
+                    constant_terms_done_at = Some(position + 1);
+                }
+            }
+            for poly_index in message.coefficient_commitments.keys() {
+                let count = received.entry(*poly_index).or_default();
+                *count += 1;
+                if *count == THRESHOLD {
+                    completed_at.push(position + 1);
+                }
+            }
+        }
+
+        assert_eq!(
+            completed_at.len(),
+            POLYS as usize,
+            "every polynomial's row must eventually complete"
+        );
+
+        // The constant-term pass must finish before any row does — a verifier is useless to the
+        // Exit until the SSA commitment (and hence the deposit address) is known.
+        let constant_terms_done_at =
+            constant_terms_done_at.ok_or_else(|| anyhow::anyhow!("constant-term pass never completed"))?;
+        assert!(
+            constant_terms_done_at <= completed_at[0],
+            "constant terms must be delivered before the first row completes ({constant_terms_done_at} vs {})",
+            completed_at[0]
+        );
+
+        // The essential property: rows complete progressively. Under the old coefficient-major
+        // emission every row completed only on the very last message, so the first completion sat at
+        // `messages.len()`. Require the first row to be done within the first quarter of the stream.
+        assert!(
+            completed_at[0] <= messages.len() / 4,
+            "the first polynomial row should complete early, but did so only at message {}/{}",
+            completed_at[0],
+            messages.len()
+        );
+
+        // ...and spread out, rather than all landing at the end.
+        let midpoint_completions = completed_at.iter().filter(|&&at| at <= messages.len() / 2).count();
+        assert!(
+            midpoint_completions >= POLYS as usize / 4,
+            "at least a quarter of the rows should be complete by the halfway point, got \
+             {midpoint_completions}/{POLYS}"
         );
 
         Ok(())
