@@ -140,7 +140,7 @@
           ticketInspectorBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hopr-ticket-manager --bin ticket-inspector -F redb,serde,cli";
-            cargoToml = ./logic/ticket-manager/Cargo.toml;
+            cargoToml = ./impls/ticket-manager/Cargo.toml;
           };
 
           # Shared preBuild hook to fix stale sandbox paths in cached utoipa-swagger-ui build script outputs
