@@ -104,12 +104,25 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16
 /// offered quota as `polys × shares × PAYLOAD_SIZE` and rejects the Session if it falls
 /// outside its configured range, so a hard-coded range that no longer matches the
 /// dimension defaults makes every PIX Session fail to establish.
-pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = 4096;
+///
+/// ## Choosing the split
+///
+/// For a fixed quota `Q = polys × threshold` the *product* is pinned, so the split between
+/// the two is free — but the two costs scale differently:
+///
+/// * Reconstructor memory is `Q × size_of::<PixGroup>()`, i.e. **invariant** in the split.
+/// * Share verification is `O(threshold)` elliptic curve multiplications per share, and there are `Q` shares, so total
+///   verification work is `Q × threshold` — **linear in `threshold`**.
+///
+/// The split is therefore chosen to keep `threshold` as small as the loss-tolerance design
+/// allows and put the remaining factor into the polynomial count.
+pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = 8192;
 
 /// Default number of shares required to reconstruct a single SSA part.
 ///
-/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides.
-pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = 128;
+/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, and why it is
+/// kept small relative to the polynomial count.
+pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = 64;
 
 /// Nominal per-SSA data quota implied by the default PIX dimensions.
 ///

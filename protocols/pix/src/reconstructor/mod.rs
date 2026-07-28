@@ -438,11 +438,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 // tombstone first, retire_ssa might run between the check
                 // and the insert, leaving verifiers that were never published
                 // to any cache and are thus invisible to cleanup.
-                let spis: Vec<SsaPolynomialId<S::Pseudonym>> =
-                    ssa_reconstructors.iter().map(|r| r.verifier.spi).collect();
+                let spis: Vec<SsaPolynomialId<S::Pseudonym>> = ssa_reconstructors.iter().map(|r| r.spi()).collect();
                 for ssa_reconstructor in ssa_reconstructors {
                     self.ssa_verifiers.insert(
-                        ssa_reconstructor.verifier.spi,
+                        ssa_reconstructor.spi(),
                         std::sync::Arc::new(parking_lot::Mutex::new(ssa_reconstructor)),
                     );
                 }
@@ -1287,6 +1286,98 @@ mod tests {
 
         // Too few commitments must still be rejected on the decoded path.
         assert!(PartialSsaShareVerifier::<TestSpec>::from_decoded_commitments(spi, []).is_err());
+
+        Ok(())
+    }
+
+    /// A reconstructed polynomial part must release its commitment vector and its collected
+    /// shares, while **keeping its cache entry**.
+    ///
+    /// Those two allocations dominate reconstructor memory — `(threshold + 1)` group elements
+    /// plus `threshold` shares, held for every one of `polys` polynomials — and neither can be
+    /// read again once the part is reconstructed.
+    ///
+    /// Retaining the (now-stripped) cache entry is equally deliberate: evicting it would make
+    /// every late or surplus share for that polynomial return `MissingVerifier`, which stashes
+    /// the ack in `pending_ack_keys` for retry. The stripped builder keeps the cheap
+    /// already-reconstructed path instead.
+    #[test]
+    fn reconstructed_polynomial_releases_verification_state_but_keeps_its_entry() -> anyhow::Result<()> {
+        // 2 polynomials, threshold 2, no surplus: finishing polynomial 0 does *not* complete the
+        // SSA, so the cycle is still live and its per-polynomial state is observable.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let poly_0 = SsaPolynomialId::new(ssa_id, 0);
+
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        commitment.process_into_reconstructor(&reconstructor)?;
+
+        // Freshly installed: the verifier holds threshold + 1 commitments and no shares.
+        let builder = reconstructor
+            .ssa_verifiers
+            .get(&poly_0)
+            .ok_or_else(|| anyhow::anyhow!("verifier for polynomial 0 must be installed"))?;
+        assert_eq!(
+            (3, 0),
+            builder.lock().verification_state_len(),
+            "a fresh verifier holds threshold + 1 commitments (incl. the generator) and no shares"
+        );
+        drop(builder);
+
+        // Feed exactly enough shares to reconstruct polynomial 0. The generator drains the front
+        // polynomial first, so the first `threshold` shares all belong to polynomial 0.
+        for _ in 0..2 {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let share = generator
+                .next_share(&pseudonym, &msg)?
+                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+            assert_eq!(0, share.id.poly_index(), "shares must arrive polynomial-major");
+
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let enc = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            reconstructor.acknowledge_shares(*peer.public(), vec![VerifiedAcknowledgement::new(ack, &peer).leak()])?;
+        }
+
+        // The SSA as a whole is not recovered (polynomial 1 is untouched), so the cycle — and
+        // polynomial 0's cache entry — must still be there.
+        assert!(
+            reconstructor.contains_builder(&ssa_id),
+            "the cycle must still be live while polynomial 1 is outstanding"
+        );
+        let builder = reconstructor
+            .ssa_verifiers
+            .get(&poly_0)
+            .ok_or_else(|| anyhow::anyhow!("a reconstructed polynomial must keep its cache entry"))?;
+        assert_eq!(
+            (0, 0),
+            builder.lock().verification_state_len(),
+            "a reconstructed polynomial must hold neither commitments nor shares"
+        );
+
+        // Polynomial 1 is untouched and must still hold its full verification state.
+        let other = reconstructor
+            .ssa_verifiers
+            .get(&SsaPolynomialId::new(ssa_id, 1))
+            .ok_or_else(|| anyhow::anyhow!("verifier for polynomial 1 must be installed"))?;
+        assert_eq!(
+            (3, 0),
+            other.lock().verification_state_len(),
+            "an unreconstructed polynomial must keep its commitments"
+        );
 
         Ok(())
     }

@@ -79,7 +79,20 @@ impl<S: PixSpec> SsaBuilder<S> {
 
 /// Verifies shares and reconstructs a single SSA part from them.
 pub struct SsaPartBuilder<S: PixSpec> {
-    pub(crate) verifier: PartialSsaShareVerifier<S>,
+    /// Verifier for this polynomial's shares.
+    ///
+    /// Its commitment vector is **released** the moment the part is reconstructed (see
+    /// [`add_share`](Self::add_share)), so after that point only `spi` remains meaningful.
+    /// The field is private for exactly that reason: nothing outside this module may reach
+    /// through it to `min_shares()`, `constant_term()` or `verify*()`, since those read the
+    /// released vector. Use [`spi`](Self::spi) and [`constant_term`](Self::constant_term).
+    verifier: PartialSsaShareVerifier<S>,
+    /// Cached `verifier.min_shares()`.
+    ///
+    /// Must be cached rather than derived on demand: `min_shares()` is
+    /// `poly_commitment.len() - 1`, which stops being meaningful once the commitment vector
+    /// is released.
+    min_shares: usize,
     shares: Vec<CompletedShare<S>>,
     reconstructed: Option<PixScalar<S>>,
 }
@@ -87,10 +100,53 @@ pub struct SsaPartBuilder<S: PixSpec> {
 impl<S: PixSpec> SsaPartBuilder<S> {
     pub fn new(verifier: PartialSsaShareVerifier<S>) -> Self {
         Self {
+            min_shares: verifier.min_shares(),
             verifier,
             shares: Vec::new(),
             reconstructed: None,
         }
+    }
+
+    /// [`SsaPolynomialId`] of the polynomial this builder reconstructs.
+    ///
+    /// Remains valid after the verification state has been released.
+    pub(crate) fn spi(&self) -> SsaPolynomialId<S::Pseudonym> {
+        self.verifier.spi
+    }
+
+    /// Commitment to this polynomial's constant term.
+    ///
+    /// Only meaningful before the part is reconstructed. The reconstructor reads this while
+    /// installing verifiers, i.e. before any share can arrive.
+    pub(crate) fn constant_term(&self) -> &PixGroup<S> {
+        self.verifier.constant_term()
+    }
+
+    /// Frees everything that was only needed to verify and combine shares.
+    ///
+    /// Called once the part is reconstructed, at which point neither the commitment vector nor
+    /// the collected shares can be read again — the early return in
+    /// [`add_share`](Self::add_share) short-circuits every later call before it touches them.
+    ///
+    /// This is the dominant term in reconstructor memory: at production dimensions the
+    /// commitment vector is `(threshold + 1) × size_of::<PixGroup>()` and the share buffer is
+    /// `threshold × size_of::<CompletedShare>()`, held for *every* one of the `polys`
+    /// polynomials until the whole cycle is retired. Since the Entry emits shares
+    /// polynomial-major, releasing here means only the polynomials still in flight hold any.
+    ///
+    /// Assigns fresh empty `Vec`s rather than `clear()`, so the backing allocations are
+    /// actually returned instead of being retained at capacity.
+    fn release_verification_state(&mut self) {
+        self.verifier.poly_commitment = Vec::new();
+        self.shares = Vec::new();
+    }
+
+    /// Number of commitments and collected shares still held for verification.
+    ///
+    /// Both drop to zero once the part is reconstructed.
+    #[cfg(test)]
+    pub(crate) fn verification_state_len(&self) -> (usize, usize) {
+        (self.verifier.poly_commitment.len(), self.shares.len())
     }
 
     pub fn add_share(
@@ -116,9 +172,10 @@ impl<S: PixSpec> SsaPartBuilder<S> {
 
         self.shares.push(share);
 
-        if self.shares.len() >= self.verifier.min_shares() {
+        if self.shares.len() >= self.min_shares {
             let reconstructed = self.shares.combine()?.0;
             self.reconstructed = Some(reconstructed);
+            self.release_verification_state();
             Ok(Some(reconstructed))
         } else {
             Ok(None)
@@ -312,7 +369,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 None => {
                     // Full client SSA commitment is the sum of all constant term commitments on all polynomials
                     let client_ssa_commitment: PixGroup<S> =
-                        complete_ssa_verifier.iter().map(|v| v.verifier.constant_term()).sum();
+                        complete_ssa_verifier.iter().map(|v| v.constant_term()).sum();
                     tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
 
                     let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
