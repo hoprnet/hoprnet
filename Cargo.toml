@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "utils",
   "crypto/packet",
   "hopr/hopr-lib",
   "impls/ticket-manager",
@@ -37,7 +36,6 @@ repository = "https://github.com/hoprnet/hoprnet"
 
 [workspace.metadata.publish]
 order = [
-  "hopr-utils",
   "hopr-crypto-packet",
   "hopr-protocol-app",
   "hopr-protocol-start",
@@ -187,7 +185,7 @@ validator = { version = "0.20.0", features = ["derive"] }
 
 hopr-api = "1.15.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
+hopr-utils = { package = "hopr-utilities", git = "https://github.com/hoprnet/hopr-utilities", branch = "main", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
