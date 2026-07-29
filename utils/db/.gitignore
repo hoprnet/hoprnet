@@ -1,2 +1,0 @@
-*.db
-entity/src/codegen/**/*.rs

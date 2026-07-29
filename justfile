@@ -78,10 +78,19 @@ test:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
     echo "==> Running clippy..."
-    cargo clippy --workspace --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets --features testing -- -D warnings
     echo ""
     echo "==> Checking metrics documentation..."
     ./.github/scripts/generate-metrics-docs.sh
     echo ""
-    echo "==> Running unit & integration tests..."
-    cargo test --test '*' -- --test-threads=1
+    echo "==> Running unit tests with default features..."
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --lib
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --lib --features testing
+    echo ""
+    echo "==> Running doc tests with default features..."
+    cargo test --doc --workspace
+    cargo test --doc --workspace --features testing
+    echo ""
+    echo "==> Running integration tests with default features..."
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --tests -E 'kind(test)' -j 1
+    NEXTEST_SHOW_PROGRESS=none cargo nextest run --test '*' -j 1 --features testing

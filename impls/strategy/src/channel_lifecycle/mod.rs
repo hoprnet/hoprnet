@@ -190,4 +190,8 @@ struct ChannelLifecycleStrategyInner<N> {
     /// TTL-cached peer-id → (offchain key, chain address) map.  Avoids
     /// streaming the full on-chain account list on every tick.
     peer_addr_cache: Arc<Mutex<Option<PeerAddrCache>>>,
+    /// Economics resolved by the most-recent pipeline tick, shared with the
+    /// event-driven funding handler so it reuses per-tick values instead of
+    /// issuing fresh chain RPC calls on every balance-decrease event.
+    last_resolved_funding: Arc<Mutex<Option<ResolvedFunding>>>,
 }

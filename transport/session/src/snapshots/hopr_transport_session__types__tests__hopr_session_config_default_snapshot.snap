@@ -1,7 +1,9 @@
 ---
 source: transport/session/src/types.rs
+assertion_line: 487
 expression: cfg
 ---
 capabilities: 0
 frame_mtu: 1500
 frame_timeout: 800ms
+max_buffered_segments: 0

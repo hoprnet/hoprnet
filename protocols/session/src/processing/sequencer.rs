@@ -169,7 +169,11 @@ where
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Instant::now();
+                            // `last_emitted` is intentionally NOT reset here: it is only reset
+                            // when an actual frame is emitted. Resetting it per discarded id would
+                            // drain a contiguous gap of K missing frames at 1 frame per `max_wait`
+                            // (a K x max_wait delivery stall of frames already sitting in the
+                            // buffer), instead of flushing the whole gap once `max_wait` elapses.
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!(discarded, "discard frame");
@@ -409,6 +413,44 @@ mod tests {
         assert!(matches!(rx.next().await, Some(Ok(6))));
         assert!(matches!(rx.next().await, Some(Ok(7))));
         assert!(matches!(rx.next().await, Some(Ok(8))));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_drain_contiguous_gap_within_single_timeout_window() -> anyhow::Result<()> {
+        let timeout = Duration::from_millis(50);
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        pin_mut!(tx);
+        tx.send_all(&mut futures::stream::iter([1u32, 2, 10, 11, 12]).map(Ok))
+            .await?;
+
+        let rx = rx.sequencer(timeout, 4096);
+        pin_mut!(rx);
+
+        assert_eq!(Some(1), rx.try_next().await?);
+        assert_eq!(Some(2), rx.try_next().await?);
+
+        let now = Instant::now();
+        for expected in 3u32..=9 {
+            assert!(matches!(
+                rx.next().await,
+                Some(Err(SessionError::FrameDiscarded(id))) if id == expected
+            ));
+        }
+        assert_eq!(Some(10), rx.try_next().await?);
+        assert_eq!(Some(11), rx.try_next().await?);
+        assert_eq!(Some(12), rx.try_next().await?);
+
+        // The 7-frame gap must be flushed after one timeout window,
+        // not at a rate of one frame per window.
+        assert!(
+            now.elapsed() < 3 * timeout,
+            "gap drain took {:?}, expected well under {:?}",
+            now.elapsed(),
+            7 * timeout
+        );
 
         Ok(())
     }

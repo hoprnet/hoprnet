@@ -1,8 +1,11 @@
 use std::fmt::Formatter;
 
-use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, primitive::prelude::*};
+use hopr_types::{
+    crypto::prelude::*,
+    crypto_random::Randomizable,
+    primitive::{prelude::*, typenum::Unsigned},
+};
 use subtle::ConstantTimeEq;
-use typenum::Unsigned;
 
 use super::{
     routing::{RoutingInfo, SphinxHeaderSpec},
@@ -147,10 +150,13 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
                 first_relayer: value[0..H::KEY_ID_SIZE.get()]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.first_relayer".into()))?,
-                alpha: Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
-                    &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
-                )
-                .clone(),
+                alpha: {
+                    #[allow(deprecated)]
+                    Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
+                        &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
+                    )
+                    .clone()
+                },
                 header: value[H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.header".into()))?,

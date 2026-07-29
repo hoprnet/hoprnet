@@ -44,6 +44,7 @@ pub(crate) type TestSwarm = HoprNetwork;
 
 async fn build_p2p_swarm(
     announcement: Announcement,
+    per_peer_channel_capacity: usize,
 ) -> anyhow::Result<(Interface, (TestSwarm, hopr_api::network::BoxedProcessFn))> {
     let random_port = random_free_local_ipv4_port().context("could not find a free port")?;
     let random_keypair = OffchainKeypair::random();
@@ -70,9 +71,12 @@ async fn build_p2p_swarm(
         .map_err(|e| anyhow::anyhow!("failed to build network: {e}"))?;
 
     let msg_codec = hopr_transport::protocol::HoprBinaryCodec {};
+    let stream_config = hopr_transport::config::StreamProtocolConfig {
+        per_peer_channel_capacity,
+        ..Default::default()
+    };
     let (wire_msg_tx, wire_msg_rx) =
-        hopr_transport::protocol::stream::process_stream_protocol(msg_codec, network.clone(), Default::default())
-            .await?;
+        hopr_transport::protocol::stream::process_stream_protocol(msg_codec, network.clone(), stream_config).await?;
 
     let api = Interface {
         me: peer_id,
@@ -132,8 +136,9 @@ use tokio::{
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
-    let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC).await?;
-    let (mut api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC).await?;
+    let packet_count: usize = 2 * 1024 * 10; // ~10 MB
+    let (mut api1, (_swarm1, process1)) = build_p2p_swarm(Announcement::QUIC, packet_count).await?;
+    let (mut api2, (_swarm2, process2)) = build_p2p_swarm(Announcement::QUIC, packet_count).await?;
 
     let _sjh1 = SelfClosingJoinHandle::new(process1());
     let _sjh2 = SelfClosingJoinHandle::new(process2());
@@ -165,7 +170,6 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     // Bulk send: blast all packets into the pre-primed stream. The egress drain
     // is fully non-blocking (drop-oldest ring), so drops are acceptable — we
     // assert on achieved goodput rather than exact delivery.
-    let packet_count: usize = 2 * 1024 * 10; // ~10 MB
     let target_bytes = RANDOM_GIBBERISH.len() * packet_count;
 
     let start = Instant::now();

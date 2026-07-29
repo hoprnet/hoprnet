@@ -341,13 +341,17 @@ where
                     .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
                     .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
                     .max(Duration::from_millis(100)),
+                max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                surb_balance_notify_period: None,
+                surb_balance_notify_period: cfg.session.surb_balance_notify_period,
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 ..Default::default()

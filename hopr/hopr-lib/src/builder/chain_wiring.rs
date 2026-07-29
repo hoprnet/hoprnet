@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{StreamExt, pin_mut};
+use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
@@ -13,6 +13,16 @@ use hopr_api::{
 };
 use hopr_transport::{NeighborTelemetry, PathTelemetry};
 use parking_lot::RwLock;
+use tracing::Instrument;
+
+#[cfg(all(feature = "telemetry", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_CHANNELS_COUNT: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_channels_count",
+        "Number of open channels of the node per direction",
+        &["direction"]
+    ).unwrap();
+}
 
 /// Processes chain events and records them as graph updates.
 ///
@@ -36,6 +46,15 @@ pub(super) async fn process_chain_events<C, G>(
     G: NetworkGraphUpdate + Send + Sync + 'static,
 {
     pin_mut!(events);
+
+    // Tracks the node's currently-open channel IDs per direction so `hopr_channels_count`
+    // can be maintained incrementally from channel events. The initial on-chain state is
+    // replayed as `ChannelOpened` events by the state-sync subscription at startup, so the
+    // sets are seeded correctly without an explicit query. Set operations are idempotent,
+    // making this robust to duplicated events.
+    #[cfg(all(feature = "telemetry", not(test)))]
+    let (mut incoming_open, mut outgoing_open) = (std::collections::HashSet::new(), std::collections::HashSet::new());
+
     while let Some(chain_event) = events.next().await {
         tracing::debug!(event = %chain_event, "processing chain event");
         match chain_event {
@@ -48,14 +67,13 @@ pub(super) async fn process_chain_events<C, G>(
                 if let Some(ref mut tx) = peer_discovery_tx {
                     let peer_id: PeerId = account.public_key.into();
                     let multiaddrs = account.get_multiaddrs();
-                    let _span = tracing::info_span!(
+                    let span = tracing::info_span!(
                         "peer_announcement",
                         peer = %peer_id,
                         multiaddresses = ?multiaddrs,
-                    )
-                    .entered();
-                    if let Err(e) = tx.try_send((peer_id, multiaddrs.to_vec())) {
-                        tracing::error!(%e, "peer-discovery channel full or closed; announcement dropped");
+                    );
+                    if let Err(e) = tx.send((peer_id, multiaddrs.to_vec())).instrument(span.clone()).await {
+                        tracing::error!(parent: &span, %e, "peer-discovery channel closed; announcement dropped");
                     }
                 }
             }
@@ -66,6 +84,28 @@ pub(super) async fn process_chain_events<C, G>(
             | ChainEvent::ChannelBalanceDecreased(channel, _) => {
                 let src_addr = channel.source;
                 let dst_addr = channel.destination;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                {
+                    let channel_id = *channel.get_id();
+                    let is_open = matches!(channel.status, ChannelStatus::Open);
+                    if src_addr == own_chain_addr {
+                        if is_open {
+                            outgoing_open.insert(channel_id);
+                        } else {
+                            outgoing_open.remove(&channel_id);
+                        }
+                        METRIC_CHANNELS_COUNT.set(&["outgoing"], outgoing_open.len() as f64);
+                    } else if dst_addr == own_chain_addr {
+                        if is_open {
+                            incoming_open.insert(channel_id);
+                        } else {
+                            incoming_open.remove(&channel_id);
+                        }
+                        METRIC_CHANNELS_COUNT.set(&["incoming"], incoming_open.len() as f64);
+                    }
+                }
+
                 let reader = chain_reader.clone();
                 let keys = hopr_utils::runtime::prelude::spawn_blocking(move || {
                     let resolve = |addr: Address| {
@@ -323,7 +363,7 @@ mod tests {
         win_probability: WinningProbability,
     ) -> Vec<(hopr_api::PeerId, Vec<hopr_api::Multiaddr>)> {
         use futures::StreamExt;
-        let (tx, rx) = futures::channel::mpsc::channel(64);
+        let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(64);
         process_chain_events(
             chain,
             graph,
@@ -660,5 +700,25 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].src, *own_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
+    }
+
+    #[tokio::test]
+    async fn announcement_should_handle_disconnected_peer_discovery_tx_gracefully() {
+        let (offchain, chain) = make_keypairs();
+        let addr = chain.public().to_address();
+        let (tx, rx) = hopr_utils::network_types::crossfire_sink::bounded_sink_channel(1);
+        drop(rx); // receiver dropped — send will return Err(Disconnected)
+
+        process_chain_events(
+            StubChainKeys::new([]),
+            RecordingGraph::default(),
+            futures::stream::iter(vec![ChainEvent::Announcement(account(*offchain.public(), addr))]),
+            addr,
+            *offchain.public(),
+            Arc::new(RwLock::new(HoprBalance::from(10u64))),
+            Arc::new(RwLock::new(WinningProbability::ALWAYS)),
+            Some(tx),
+        )
+        .await;
     }
 }

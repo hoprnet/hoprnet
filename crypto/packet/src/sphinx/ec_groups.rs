@@ -1,19 +1,76 @@
 use hopr_types::crypto::errors::Result;
+#[cfg(feature = "x25519")]
+use hopr_types::crypto::primitives::Curve25519MontgomeryPoint;
+#[cfg(any(feature = "x25519", feature = "ed25519"))]
+use hopr_types::crypto::primitives::{Curve25519CompressedPoint, Curve25519Point, Curve25519Scalar, IsIdentity};
 #[cfg(feature = "secp256k1")]
-use {
-    elliptic_curve::{
-        Group,
-        ops::MulByGenerator,
-        sec1::{FromEncodedPoint, ToEncodedPoint},
+use hopr_types::crypto::{
+    crypto_traits::elliptic_curve::{
+        self, Group,
+        field::FieldBytes,
+        sec1::{FromSec1Point, Sec1Point, ToSec1Point},
     },
-    hopr_types::crypto::prelude::CryptoError,
-    k256::{AffinePoint, EncodedPoint},
+    keypairs::ChainKeypair,
+    prelude::{CryptoError, Secp256k1},
+    types::PublicKey,
 };
 
 use super::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
+/// Newtype for secp256k1 scalars — avoids Rust 2024 coherence issues
+/// that arise when using transparent type aliases to `elliptic_curve::Scalar<Secp256k1>`.
+#[cfg(feature = "secp256k1")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Secp256k1Scalar(pub elliptic_curve::Scalar<Secp256k1>);
+
+/// Newtype for secp256k1 projective points — avoids Rust 2024 coherence issues
+/// that arise when using transparent type aliases to `elliptic_curve::ProjectivePoint<Secp256k1>`.
+#[cfg(feature = "secp256k1")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Secp256k1Point(pub elliptic_curve::ProjectivePoint<Secp256k1>);
+
+#[cfg(feature = "secp256k1")]
+impl Default for Secp256k1Point {
+    fn default() -> Self {
+        Self(elliptic_curve::ProjectivePoint::<Secp256k1>::IDENTITY)
+    }
+}
+
+// Forwarding impls needed by SphinxSuite trait bounds
+#[cfg(feature = "secp256k1")]
+impl std::ops::Mul for Secp256k1Scalar {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+#[cfg(feature = "secp256k1")]
+impl<'a> std::ops::Mul<&'a Secp256k1Scalar> for Secp256k1Point {
+    type Output = Self;
+
+    fn mul(self, rhs: &'a Secp256k1Scalar) -> Self::Output {
+        Self(self.0 * rhs.0)
+    }
+}
+
+#[cfg(feature = "secp256k1")]
+impl From<&ChainKeypair> for Secp256k1Scalar {
+    fn from(value: &ChainKeypair) -> Self {
+        Self(elliptic_curve::Scalar::<Secp256k1>::from(value))
+    }
+}
+
+#[cfg(feature = "secp256k1")]
+impl From<&PublicKey> for Secp256k1Point {
+    fn from(value: &PublicKey) -> Self {
+        Self(elliptic_curve::ProjectivePoint::<Secp256k1>::from(value))
+    }
+}
+
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
-impl Scalar for curve25519_dalek::scalar::Scalar {
+impl Scalar for Curve25519Scalar {
     fn random() -> Self {
         let bytes = hopr_types::crypto_random::random_bytes::<32>();
         Self::from_bytes(&bytes).unwrap()
@@ -25,115 +82,123 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
 }
 
 #[cfg(feature = "secp256k1")]
-impl Scalar for k256::Scalar {
+impl Scalar for Secp256k1Scalar {
     fn random() -> Self {
         // Beware, this is not constant-time
         let mut rng = hopr_types::crypto_random::rng();
-        let mut bytes = k256::FieldBytes::default();
+        let mut bytes = FieldBytes::<Secp256k1>::default();
         use elliptic_curve::PrimeField;
         use hopr_types::crypto_random::Rng;
         // Needs manual implementation due to incompatible rand crates
-        // k256::Scalar::generate_vartime(&mut hopr_types::crypto_random::rng())
+        // elliptic_curve::Scalar::<Secp256k1>::generate_vartime(&mut hopr_types::crypto_random::rng())
 
         loop {
             rng.fill_bytes(&mut bytes);
-            if let Some(scalar) = k256::Scalar::from_repr(bytes).into() {
-                return scalar;
+            if let Some(scalar) = elliptic_curve::Scalar::<Secp256k1>::from_repr(bytes).into() {
+                return Secp256k1Scalar(scalar);
             }
         }
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        hopr_types::crypto::utils::k256_scalar_from_bytes(bytes)
+        Ok(Secp256k1Scalar(hopr_types::crypto::utils::k256_scalar_from_bytes(
+            bytes,
+        )?))
     }
 }
 
 #[cfg(feature = "x25519")]
-impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::MontgomeryPoint {
-    type AlphaLen = typenum::U32;
+impl GroupElement<Curve25519Scalar> for Curve25519MontgomeryPoint {
+    type AlphaLen = hopr_types::primitive::typenum::U32;
 
-    fn to_alpha(&self) -> Alpha<typenum::U32> {
+    fn to_alpha(&self) -> Alpha<hopr_types::primitive::typenum::U32> {
         self.0.into()
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        Ok(curve25519_dalek::MontgomeryPoint(alpha.into()))
+    fn from_alpha(alpha: Alpha<hopr_types::primitive::typenum::U32>) -> Result<Self> {
+        Ok(Curve25519MontgomeryPoint(alpha.into()))
     }
 
-    fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        curve25519_dalek::EdwardsPoint::mul_base(scalar).to_montgomery()
+    fn generate(scalar: &Curve25519Scalar) -> Self {
+        Curve25519Point::mul_base(scalar).to_montgomery()
     }
 
     fn is_valid(&self) -> bool {
-        use curve25519_dalek::traits::IsIdentity;
+        use IsIdentity;
         !self.is_identity()
     }
 }
 
 #[cfg(feature = "ed25519")]
-impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::EdwardsPoint {
-    type AlphaLen = typenum::U32;
+impl GroupElement<Curve25519Scalar> for Curve25519Point {
+    type AlphaLen = hopr_types::primitive::typenum::U32;
 
-    fn to_alpha(&self) -> Alpha<typenum::U32> {
+    fn to_alpha(&self) -> Alpha<hopr_types::primitive::typenum::U32> {
         self.compress().0.into()
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
+    fn from_alpha(alpha: Alpha<hopr_types::primitive::typenum::U32>) -> Result<Self> {
+        Curve25519CompressedPoint(alpha.into())
             .decompress()
             .ok_or(hopr_types::crypto::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
-    fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        curve25519_dalek::EdwardsPoint::mul_base(scalar)
+    fn generate(scalar: &Curve25519Scalar) -> Self {
+        Curve25519Point::mul_base(scalar)
     }
 
     fn is_valid(&self) -> bool {
         // Ed25519 scalars always come clamped (pre-multiplied by the curve's co-factor)
         // and therefore cannot result into points of small order.
         // See `x25519_scalar_from_bytes` for more details.
-        use curve25519_dalek::traits::IsIdentity;
+        use IsIdentity;
         !self.is_identity()
     }
 }
 
 #[cfg(feature = "secp256k1")]
-impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
-    type AlphaLen = typenum::U33;
+impl GroupElement<Secp256k1Scalar> for Secp256k1Point {
+    type AlphaLen = hopr_types::primitive::typenum::U33;
 
-    fn to_alpha(&self) -> Alpha<typenum::U33> {
-        let mut ret = Alpha::<typenum::U33>::default();
-        ret.copy_from_slice(self.to_affine().to_encoded_point(true).as_ref());
+    fn to_alpha(&self) -> Alpha<hopr_types::primitive::typenum::U33> {
+        debug_assert!(self.is_valid(), "to_alpha called on identity point");
+        let mut ret = Alpha::<hopr_types::primitive::typenum::U33>::default();
+        // Copy only if the point is not the identity, we do not care here about constant-time here.
+        if !bool::from(self.0.is_identity()) {
+            ret.copy_from_slice(self.0.to_affine().to_sec1_point(true).as_ref());
+        }
         ret
     }
 
-    fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        EncodedPoint::from_bytes(alpha)
+    fn from_alpha(alpha: Alpha<hopr_types::primitive::typenum::U33>) -> Result<Self> {
+        Sec1Point::<Secp256k1>::from_bytes(alpha)
             .map_err(|_| CryptoError::InvalidInputValue("alpha"))
             .and_then(|ep| {
-                AffinePoint::from_encoded_point(&ep)
+                <Secp256k1 as elliptic_curve::CurveArithmetic>::AffinePoint::from_sec1_point(&ep)
                     .into_option()
                     .ok_or(CryptoError::InvalidInputValue("alpha"))
             })
-            .map(k256::ProjectivePoint::from)
+            .map(|ap| Secp256k1Point(elliptic_curve::ProjectivePoint::<Secp256k1>::from(ap)))
     }
 
-    fn generate(scalar: &k256::Scalar) -> Self {
-        k256::ProjectivePoint::mul_by_generator(scalar)
+    fn generate(scalar: &Secp256k1Scalar) -> Self {
+        Secp256k1Point(elliptic_curve::ProjectivePoint::<Secp256k1>::mul_by_generator(
+            &scalar.0,
+        ))
     }
 
     fn is_valid(&self) -> bool {
-        !bool::from(self.is_identity())
+        !bool::from(self.0.is_identity())
     }
 }
 
 // TODO: invert this, so that each SphinxSuite takes this as a type argument
 /// Default packet block size for the Sphinx protocol.
 ///
-/// Currently, 1038 bytes.
-pub type DefaultSphinxPacketSize = typenum::Sum<typenum::U1024, typenum::U14>;
+/// Currently, 1040 bytes.
+pub type DefaultSphinxPacketSize = hopr_types::primitive::hybrid_array::sizes::U1040;
 
-pub use typenum::Unsigned;
+pub use hopr_types::primitive::typenum::Unsigned;
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
 #[cfg(feature = "secp256k1")]
@@ -143,8 +208,8 @@ pub struct Secp256k1Suite;
 
 #[cfg(feature = "secp256k1")]
 impl SphinxSuite for Secp256k1Suite {
-    type E = k256::Scalar;
-    type G = k256::ProjectivePoint;
+    type E = Secp256k1Scalar;
+    type G = Secp256k1Point;
     type P = hopr_types::crypto::keypairs::ChainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
@@ -157,8 +222,8 @@ pub struct Ed25519Suite;
 
 #[cfg(feature = "ed25519")]
 impl SphinxSuite for Ed25519Suite {
-    type E = curve25519_dalek::scalar::Scalar;
-    type G = curve25519_dalek::edwards::EdwardsPoint;
+    type E = Curve25519Scalar;
+    type G = Curve25519Point;
     type P = hopr_types::crypto::keypairs::OffchainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
@@ -171,8 +236,8 @@ pub struct X25519Suite;
 
 #[cfg(feature = "x25519")]
 impl SphinxSuite for X25519Suite {
-    type E = curve25519_dalek::scalar::Scalar;
-    type G = curve25519_dalek::montgomery::MontgomeryPoint;
+    type E = Curve25519Scalar;
+    type G = Curve25519MontgomeryPoint;
     type P = hopr_types::crypto::keypairs::OffchainKeypair;
     type PRP = hopr_types::crypto::lioness::LionessBlake3ChaCha20<DefaultSphinxPacketSize>;
 }
@@ -186,10 +251,12 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[test]
     fn test_extract_key_from_group_element() {
-        use super::super::shared_keys::GroupElement;
+        use hopr_types::crypto::{crypto_traits::elliptic_curve, prelude::Secp256k1};
+
+        use super::{super::shared_keys::GroupElement, Secp256k1Point};
 
         let salt = [0xde, 0xad, 0xbe, 0xef];
-        let pt = k256::ProjectivePoint::GENERATOR;
+        let pt = Secp256k1Point(elliptic_curve::ProjectivePoint::<Secp256k1>::GENERATOR);
 
         let key = pt.extract_key("test", &salt);
         assert_eq!(
@@ -201,10 +268,12 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     #[test]
     fn test_expand_key_from_group_element() {
-        use super::super::shared_keys::GroupElement;
+        use hopr_types::crypto::{crypto_traits::elliptic_curve, prelude::Secp256k1};
+
+        use super::{super::shared_keys::GroupElement, Secp256k1Point};
 
         let salt = [0xde, 0xad, 0xbe, 0xef];
-        let pt = k256::ProjectivePoint::GENERATOR;
+        let pt = Secp256k1Point(elliptic_curve::ProjectivePoint::<Secp256k1>::GENERATOR);
 
         let key = pt.extract_key("test", &salt);
 

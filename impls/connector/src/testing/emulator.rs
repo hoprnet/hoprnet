@@ -466,6 +466,8 @@ impl BlokliTestStateMutator for FullStateEmulator {
                                 __typename: "RedeemedStats".to_string(),
                                 redeemed_amount: blokli_client::api::types::TokenValueString(ticket_amount.to_string()),
                                 redemption_count: blokli_client::api::types::Uint64("1".into()),
+                                rejected_amount: blokli_client::api::types::TokenValueString("0".into()),
+                                rejection_count: blokli_client::api::types::Uint64("0".into()),
                             });
                         }
                     }
