@@ -16,7 +16,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HoprPacket, HoprPixGroupElement},
+    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
 use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
@@ -80,7 +80,8 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement>;
+pub type HoprStartProtocol =
+    StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement, HoprPixCommitmentProof>;
 
 /// Quota per single SSA in bytes.
 ///

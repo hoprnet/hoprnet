@@ -17,6 +17,11 @@ pub enum PixError<P: std::fmt::Display> {
     DuplicateCommitment,
     #[error("missing commitment for building ssa")]
     MissingSsaCommitment,
+    #[error(
+        "client ssa commitment is not accompanied by a valid proof of knowledge of its discrete logarithm — the \
+         sender may be attempting to make the deposit key recoverable by itself alone"
+    )]
+    UnprovenSsaCommitment,
     #[error("ssa index will overflow")]
     SsaIndexOverflow,
     #[error("crypto error: {0}")]

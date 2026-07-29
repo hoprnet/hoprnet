@@ -38,7 +38,9 @@ pub mod prelude {
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{HoprPixGroupElement, PacketSignal, PacketSignals},
+        types::{
+            HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPixCommitmentProof, HoprPixGroupElement, PacketSignal, PacketSignals,
+        },
         validation::validate_unacknowledged_ticket,
     };
 }

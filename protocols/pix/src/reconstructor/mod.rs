@@ -13,8 +13,8 @@ use validator::Validate;
 
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
-    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentState,
-    SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof,
+    SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -557,6 +557,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         &self,
         ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
+        proof: Option<SsaCommitmentProof<S>>,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> Result<SsaCommitmentState<S::Pseudonym, S::DepositAddress>, Self::Error> {
         let mut res = SsaCommitmentState::new(ssa_id);
@@ -570,7 +571,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             let mut builder = builder.lock();
             res.is_first_encountered = builder.is_empty();
             res.ssa_deposit_address = builder.get_deposit_address().copied();
-            builder.add_transposed(index, commitments)?
+            builder.add_transposed(index, proof, commitments)?
         };
 
         // `ssa_deposit_address` was read *before* the insertion, so it being absent here means the
@@ -729,11 +730,28 @@ mod tests {
 
     use super::*;
     use crate::{
-        DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, PartialSsaShare, SsaGeneratorConfig, SsaIndex,
+        DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, GroupEncoding, PartialSsaShare, SsaGeneratorConfig, SsaIndex,
         SsaShareGenerator,
         tests::TestSpec,
         traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
     };
+
+    /// The proof a generated commitment carries, attached only to the constant-term batch — the
+    /// shape the wire uses, since that batch is what determines the commitment being opened.
+    fn proof_of(
+        commitment: &crate::SsaCommitment<TestSpec>,
+        coeff_index: CoefficientIndex,
+    ) -> Option<SsaCommitmentProof<TestSpec>> {
+        (coeff_index == 0).then_some(commitment.commitment_proof)
+    }
+
+    /// Proof matching the all-identity commitment sets some fixtures use as filler: their sum is the
+    /// identity, whose discrete logarithm is zero, so the proof is honest rather than a bypass.
+    fn identity_proof(ssa_id: &SsaId<SimplePseudonym>) -> SsaCommitmentProof<TestSpec> {
+        let zero = <PixScalar<TestSpec> as Field>::ZERO;
+        SsaCommitmentProof::prove(ssa_id, &zero, &PixGroup::<TestSpec>::mul_by_generator(&zero))
+            .expect("identity proof must be constructible")
+    }
 
     #[test]
     fn reconstructor_rejects_invalid_exit_commitment_inputs() -> anyhow::Result<()> {
@@ -789,6 +807,7 @@ mod tests {
         let result = reconstructor.insert_coefficient_commitments(
             ssa_id,
             2, // threshold is 2, so 2 is invalid
+            None,
             HashMap::new().into_iter(),
         );
         assert!(matches!(result, Err(PixError::InvalidInput)));
@@ -796,7 +815,7 @@ mod tests {
         // 2. Invalid polynomial index (>= polys_per_ssa)
         let mut invalid_poly_map = HashMap::new();
         invalid_poly_map.insert(2 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
-        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, invalid_poly_map.into_iter());
+        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, invalid_poly_map.into_iter());
         assert!(matches!(result, Err(PixError::InvalidInput)));
 
         Ok(())
@@ -813,7 +832,7 @@ mod tests {
             poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         }
 
-        let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map.into_iter());
+        let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map.into_iter());
 
         assert!(matches!(res, Err(PixError::MissingSsaCommitment)));
 
@@ -834,11 +853,16 @@ mod tests {
             for poly in 0..2 {
                 poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
             }
-            reconstructor.insert_coefficient_commitments(ssa_id, coeff as CoefficientIndex, poly_map.into_iter())?;
+            reconstructor.insert_coefficient_commitments(
+                ssa_id,
+                coeff as CoefficientIndex,
+                (coeff == 0).then(|| identity_proof(&ssa_id)),
+                poly_map.into_iter(),
+            )?;
         }
 
         // Now adding more should fail with DuplicateCommitment
-        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::new().into_iter());
+        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, HashMap::new().into_iter());
         assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
         Ok(())
@@ -858,12 +882,12 @@ mod tests {
         // Insert coeff_index=0 for poly 0
         let mut poly_map_1 = HashMap::new();
         poly_map_1.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
-        reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map_1.into_iter())?;
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_1.into_iter())?;
 
         // Insert coeff_index=0 for the same poly 0 again — should now fail
         let mut poly_map_2 = HashMap::new();
         poly_map_2.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
-        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, poly_map_2.into_iter());
+        let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_2.into_iter());
         assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
         // But coeff_index=1 for the same poly should still succeed
@@ -871,7 +895,7 @@ mod tests {
         poly_map_3.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         assert!(
             reconstructor
-                .insert_coefficient_commitments(ssa_id, 1, poly_map_3.into_iter())
+                .insert_coefficient_commitments(ssa_id, 1, None, poly_map_3.into_iter())
                 .is_ok()
         );
 
@@ -1299,7 +1323,12 @@ mod tests {
 
         // Step 1: Submit constant term — must succeed, produce a deposit address,
         // but NOT be verifiable (coefficient 1 is still missing).
-        let partial = reconstructor.insert_coefficient_commitments(ssa_id, 0, constant_term.into_iter())?;
+        let partial = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            Some(commitment.commitment_proof),
+            constant_term.into_iter(),
+        )?;
         assert!(
             partial.ssa_deposit_address.is_some(),
             "constant term alone should yield a deposit address"
@@ -1310,7 +1339,8 @@ mod tests {
         // compressed-point prefix of 0xff) — must return InvalidInput.
         let mut malformed = PixGroupRepr::<TestSpec>::default(); // zero-filled
         AsMut::<[u8]>::as_mut(&mut malformed).fill(0xff);
-        let malformed_result = reconstructor.insert_coefficient_commitments(ssa_id, 1, [(0, malformed)].into_iter());
+        let malformed_result =
+            reconstructor.insert_coefficient_commitments(ssa_id, 1, None, [(0, malformed)].into_iter());
         assert!(
             matches!(&malformed_result, Err(crate::errors::PixError::InvalidInput)),
             "malformed commitment must be rejected, got {malformed_result:?}"
@@ -1318,7 +1348,7 @@ mod tests {
 
         // Step 3: Retry with the correct bytes — must succeed and produce a
         // verifiable SSA commitment.
-        let retry = reconstructor.insert_coefficient_commitments(ssa_id, 1, final_coefficient.into_iter());
+        let retry = reconstructor.insert_coefficient_commitments(ssa_id, 1, None, final_coefficient.into_iter());
         assert!(
             matches!(&retry, Ok(state) if state.is_verifiable),
             "corrected retransmission must complete the SSA, got {retry:?}"
@@ -1725,6 +1755,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
+            proof_of(&commitment, 0),
             coefficient_of(&commitment, 0, None)?.into_iter(),
         )?;
         assert!(state.ssa_deposit_address.is_some());
@@ -1739,6 +1770,7 @@ mod tests {
                 let state = reconstructor.insert_coefficient_commitments(
                     ssa_id,
                     coeff,
+                    proof_of(&commitment, coeff),
                     coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
                 )?;
 
@@ -1792,6 +1824,7 @@ mod tests {
                 let state = reconstructor.insert_coefficient_commitments(
                     ssa_id,
                     coeff,
+                    proof_of(&commitment, coeff),
                     coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
                 )?;
                 assert!(
@@ -1813,6 +1846,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
+            proof_of(&commitment, 0),
             coefficient_of(&commitment, 0, Some(2))?.into_iter(),
         )?;
         assert!(state.ssa_deposit_address.is_some());
@@ -1829,6 +1863,7 @@ mod tests {
             let state = reconstructor.insert_coefficient_commitments(
                 ssa_id,
                 coeff,
+                proof_of(&commitment, coeff),
                 coefficient_of(&commitment, coeff, Some(2))?.into_iter(),
             )?;
             assert_eq!(state.is_verifiable, coeff == THRESHOLD as CoefficientIndex - 1);
@@ -1863,7 +1898,12 @@ mod tests {
 
         // Only the constant-term pass so far: the cycle is live, but no row is committed, so no
         // share can be verified yet.
-        reconstructor.insert_coefficient_commitments(ssa_id, 0, coefficient_of(&commitment, 0, None)?.into_iter())?;
+        reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        )?;
 
         // All shares for the whole cycle arrive now — every one of them ahead of its verifier.
         let mut acks = Vec::new();
@@ -1902,6 +1942,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             1,
+            proof_of(&commitment, 1),
             coefficient_of(&commitment, 1, None)?.into_iter(),
         )?;
         assert!(state.is_verifiable);
@@ -2087,6 +2128,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
+            proof_of(&commitment, 0),
             coefficient_of(&commitment, 0, Some(0))?.into_iter(),
         )?;
         assert!(
@@ -2101,6 +2143,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
+            proof_of(&commitment, 0),
             coefficient_of(&commitment, 0, Some(1))?.into_iter(),
         )?;
         assert!(!state.is_verifiable, "a retired cycle is never verifiable");
@@ -2141,6 +2184,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
+            proof_of(&commitment, 0),
             coefficient_of(&commitment, 0, None)?.into_iter(),
         )?;
         assert!(
@@ -2167,6 +2211,7 @@ mod tests {
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             1,
+            proof_of(&commitment, 1),
             coefficient_of(&commitment, 1, None)?.into_iter(),
         )?;
         assert!(!state.is_verifiable, "a retired cycle is never verifiable");
@@ -2176,6 +2221,182 @@ mod tests {
             reconstructor.ssa_verifiers.entry_count(),
             0,
             "tombstone must withdraw every verifier installed after retirement"
+        );
+
+        Ok(())
+    }
+
+    /// The commitment proof must bind everything it claims to: both of its own components, the SSA
+    /// index it was issued for, and the commitment it opens.
+    #[test]
+    fn commitment_proof_must_bind_its_components_the_ssa_index_and_the_commitment() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let proof = commitment.commitment_proof;
+
+        assert!(
+            proof.verify(&ssa_id, &commitment.ssa_commitment),
+            "the generator's own proof must verify"
+        );
+
+        // Flipping a bit anywhere breaks it, whether it lands in the nonce commitment or in the
+        // response. Some flips make the component unparseable, which is equally a rejection.
+        let bytes = proof.to_bytes();
+        assert_eq!(SsaCommitmentProof::<TestSpec>::SIZE, bytes.len());
+        for position in [0, bytes.len() / 2, bytes.len() - 1] {
+            let mut tampered = bytes.clone();
+            tampered[position] ^= 1;
+            if let Ok(tampered) = SsaCommitmentProof::<TestSpec>::try_from_bytes(&tampered) {
+                assert!(
+                    !tampered.verify(&ssa_id, &commitment.ssa_commitment),
+                    "a proof with byte {position} flipped must not verify"
+                );
+            }
+        }
+
+        // Bound to the SSA index, so it cannot be replayed onto another cycle even if the commitment
+        // were somehow reused.
+        let other_index = SsaId::new(pseudonym, SsaIndex::new(SsaIndex::MIN.get() + 1).expect("non-zero"));
+        assert!(
+            !proof.verify(&other_index, &commitment.ssa_commitment),
+            "a proof must not verify against a different SSA index"
+        );
+
+        // And bound to the commitment: this is the property the whole thing exists for.
+        let unrelated = PixGroup::<TestSpec>::mul_by_generator(&PixScalar::<TestSpec>::random(
+            &mut hopr_types::crypto_random::rng(),
+        ));
+        assert!(
+            !proof.verify(&ssa_id, &unrelated),
+            "a proof must not verify against a commitment it does not open"
+        );
+
+        // A truncated or over-long encoding is refused outright.
+        assert!(SsaCommitmentProof::<TestSpec>::try_from_bytes(&bytes[..bytes.len() - 1]).is_err());
+        assert!(SsaCommitmentProof::<TestSpec>::try_from_bytes(&[bytes.as_slice(), &[0u8]].concat()).is_err());
+
+        Ok(())
+    }
+
+    /// A constant-term set that carries no proof at all is refused, exactly as one carrying an
+    /// invalid proof is: the Exit cannot tell the difference, and both mean the cycle is unusable.
+    #[test]
+    fn constant_terms_arriving_without_a_proof_are_refused() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+
+        let refused = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            None,
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        );
+        assert!(
+            matches!(refused, Err(PixError::UnprovenSsaCommitment)),
+            "constant terms without a proof must be refused, got {refused:?}"
+        );
+        assert!(
+            !reconstructor.ssa_builders.contains_key(&ssa_id),
+            "no part accumulator may be published"
+        );
+
+        Ok(())
+    }
+
+    /// A client commitment crafted so the Entry alone knows the *combined* deposit key must be
+    /// refused, and must not produce a deposit address.
+    ///
+    /// The deposit key is `s + e`, where `s` is the sum of the Entry's polynomial constant terms and
+    /// `e` is the Exit's commitment secret. Neither party is supposed to know the sum. But
+    /// `SsaRequest` hands `e·G` to the Entry *before* it chooses its own constant terms
+    /// (`protocols/start/src/lib.rs:305`, consumed at `transport/session/src/manager.rs:2879-2883`),
+    /// so an Entry that is made to prove nothing can pick `w`, publish constant terms summing to
+    /// `w·G − e·G`, and end up with a combined commitment of `w·G` — a key it can sweep alone.
+    ///
+    /// It cannot then produce shares for the polynomial whose constant term it does not know, so the
+    /// Exit never recovers the SSA and is never paid. But the Entry controls emission order
+    /// (`generator.rs` builds `poly_queue`, `next_share` drains `front_mut()`) and puts that
+    /// polynomial last, so it is served nearly the whole cycle before the Exit notices — by which
+    /// time it has already swept the deposit. Note this is distinct from the by-design burn
+    /// semantics: there *neither* party can recover, whereas here the party that owes can.
+    ///
+    /// Before [`SsaCommitmentProof`] existed this construction was accepted, and the Exit published
+    /// `addr(w·G)` as the address to watch — verified by asserting exactly that. The proof cannot be
+    /// forged here because producing it would require `dlog(w·G − e·G)`, and knowing that together
+    /// with `w` yields `e`. So the assertion is now inverted.
+    #[test]
+    fn exit_refuses_a_client_commitment_whose_deposit_key_the_entry_knows() -> anyhow::Result<()> {
+        const POLYS: usize = 3;
+        const THRESHOLD: usize = 2;
+
+        let mut rng = hopr_types::crypto_random::rng();
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+
+        // The Exit reveals its half. This is exactly what `SsaRequest` carries to the Entry.
+        let exit_public = reconstructor.new_exit_commitment(ssa_id, POLYS, THRESHOLD)?;
+
+        // The attacker picks the deposit key it wants to end up holding.
+        let w = PixScalar::<TestSpec>::random(&mut rng);
+        let target = PixGroup::<TestSpec>::mul_by_generator(&w);
+
+        // Honest constant terms for every polynomial but the last.
+        let honest: Vec<PixGroup<TestSpec>> = (0..POLYS - 1)
+            .map(|_| PixGroup::<TestSpec>::mul_by_generator(&PixScalar::<TestSpec>::random(&mut rng)))
+            .collect();
+        let honest_sum: PixGroup<TestSpec> = honest.iter().copied().sum();
+
+        // The last one is obtained by group subtraction. The attacker never learns its discrete log
+        // — that would require the Exit's secret — and does not need to.
+        let rogue = target - exit_public - honest_sum;
+
+        let mut constant_terms: HashMap<PolynomialIndex, PixGroupRepr<TestSpec>> = honest
+            .iter()
+            .enumerate()
+            .map(|(poly_index, c0)| (poly_index as PolynomialIndex, c0.to_bytes()))
+            .collect();
+        constant_terms.insert((POLYS - 1) as PolynomialIndex, rogue.to_bytes());
+
+        // The best the attacker can offer is a proof over the client commitment it actually
+        // published, using the only scalar it knows — which is not that commitment's discrete log.
+        let bogus_proof = SsaCommitmentProof::prove(&ssa_id, &w, &(target - exit_public))?;
+
+        let rejected =
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(bogus_proof), constant_terms.into_iter());
+        assert!(
+            matches!(rejected, Err(PixError::UnprovenSsaCommitment)),
+            "a commitment whose discrete logarithm the sender does not know must be refused, got {rejected:?}"
+        );
+
+        // Nothing about the cycle may have been published: with no deposit address the strategy is
+        // never asked to fund an SSA the Entry could reclaim.
+        assert!(
+            reconstructor
+                .commitment_builder
+                .get(&ssa_id)
+                .is_some_and(|b| b.lock().get_deposit_address().is_none()),
+            "no deposit address may be derived from an unproven commitment"
+        );
+        // The part accumulator is what makes a cycle live and able to accept recovered shares.
+        // `commitment_builder` legitimately still exists — `new_exit_commitment` created it.
+        assert!(
+            !reconstructor.ssa_builders.contains_key(&ssa_id),
+            "the part accumulator must not be published for an unproven commitment"
         );
 
         Ok(())

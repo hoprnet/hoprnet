@@ -33,11 +33,11 @@ pub use reconstructor::{SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RawSsaIndex,
-    RecoveredSsa, SsaCommitment, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize, SsaPolynomialId,
-    TaggedEncryptedPartialSsaShare,
+    RecoveredSsa, SsaCommitment, SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, SsaPolyIndexPrefixSize,
+    SsaPolynomialId, TaggedEncryptedPartialSsaShare,
 };
 pub use vsss_rs::elliptic_curve::{
-    Group,
+    Field, Group,
     group::{GroupEncoding, cofactor::CofactorGroup},
 };
 
@@ -92,6 +92,8 @@ where
     const KEY_DERIVATION_CONTEXT: &'static str = "HASH_SSA_POLY_SHARE";
     /// Domain separator used to derive the X value of a share.
     const HASH_SCALAR_DERIVATION_CONTEXT: &'static str = "HASH_SSA_POLY_SHARE_SCALAR";
+    /// Domain separator used to derive the Fiat–Shamir challenge of an [`SsaCommitmentProof`].
+    const HASH_COMMITMENT_PROOF_CONTEXT: &'static str = "HASH_SSA_COMMITMENT_PROOF";
 
     /// Stable, protocol-versioned hash-to-scalar suite identifier used for
     /// domain separation. This must be a fixed string — deriving it dynamically
@@ -117,6 +119,46 @@ where
             &[
                 Self::HASH_TO_SCALAR_SUITE_ID,
                 Self::HASH_SCALAR_DERIVATION_CONTEXT.as_bytes(),
+            ],
+        )
+        .map_err(|_| errors::PixError::InvalidInput)
+    }
+
+    /// Derives the Fiat–Shamir challenge of an [`SsaCommitmentProof`] over the client's
+    /// `ssa_commitment` and the prover's `nonce_commitment`.
+    ///
+    /// `ssa_id` is bound in so that a proof cannot be replayed onto a different SSA index or a
+    /// different Session's pseudonym.
+    ///
+    /// The Exit's own commitment is deliberately **not** bound in. The statement being proven is
+    /// knowledge of `dlog(ssa_commitment)` alone, and the deposit is protected because the Exit's
+    /// secret is what separates that from `dlog(ssa_commitment + exit_commitment)` — which holds
+    /// regardless of what the challenge hashes. Binding it would only prevent reusing one proof for
+    /// the same `ssa_commitment` against two different Exits, and an Entry that reuses its
+    /// commitment does know its discrete log, so that case is honest (reuse is a linkability
+    /// concern, not an exploit).
+    fn commitment_proof_challenge(
+        ssa_id: &SsaId<Self::Pseudonym>,
+        ssa_commitment: &PixGroup<Self>,
+        nonce_commitment: &PixGroup<Self>,
+    ) -> errors::Result<PixScalar<Self>, Self::Pseudonym>
+    where
+        Self: Sized,
+    {
+        let ssa_index = ssa_id.ssa_index().get().to_be_bytes();
+        let ssa_commitment = ssa_commitment.to_bytes();
+        let nonce_commitment = nonce_commitment.to_bytes();
+
+        hash_to_scalar::<Self::Curve, ExpandMsgXmd<Self::Digest>, <Self::Curve as Curve>::FieldBytesSize>(
+            &[
+                ssa_id.pseudonym().as_ref(),
+                ssa_index.as_ref(),
+                ssa_commitment.as_ref(),
+                nonce_commitment.as_ref(),
+            ],
+            &[
+                Self::HASH_TO_SCALAR_SUITE_ID,
+                Self::HASH_COMMITMENT_PROOF_CONTEXT.as_bytes(),
             ],
         )
         .map_err(|_| errors::PixError::InvalidInput)

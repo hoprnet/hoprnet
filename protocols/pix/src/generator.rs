@@ -13,7 +13,10 @@ use crate::{
     PartialSsaShareVerifier, PixGroup, PixScalar, PixSpec, PolynomialIndex, errors,
     errors::PixError,
     traits::EntryShareGenerator,
-    types::{GeneratedShare, PartialSsaShare, SsaCommitment, SsaId, SsaIndex, SsaPolynomialId, TransposedVerifiers},
+    types::{
+        GeneratedShare, PartialSsaShare, SsaCommitment, SsaCommitmentProof, SsaId, SsaIndex, SsaPolynomialId,
+        TransposedVerifiers,
+    },
 };
 
 type RawPolynomial<S> = Vec<DefaultShare<IdentifierPrimeField<PixScalar<S>>, IdentifierPrimeField<PixScalar<S>>>>;
@@ -285,9 +288,14 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             })?;
 
         let ssa_id = *verifiers[0].spi.as_ref();
+        let ssa_commitment = PixGroup::<S>::generator() * our_commitment_secret;
         Ok(SsaCommitment {
             ssa_id,
-            ssa_commitment: PixGroup::<S>::generator() * our_commitment_secret,
+            ssa_commitment,
+            // Proves we know the sum of the sub-secrets. The recipient adds its own commitment to
+            // ours to get the deposit key, and this is what stops us from having chosen our half so
+            // that we — rather than nobody — know that sum. See `SsaCommitmentProof`.
+            commitment_proof: SsaCommitmentProof::prove(&ssa_id, &our_commitment_secret, &ssa_commitment)?,
             verifiers: transpose_commitments(verifiers),
         })
     }

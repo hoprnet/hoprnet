@@ -28,6 +28,7 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
 
     let SsaCommitment {
         ssa_commitment: client_commitment,
+        commitment_proof,
         verifiers,
         ..
     } = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
@@ -56,15 +57,22 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     // Remove the first polynomial completely
     let remainder = first_coeffs.remove(&0).unwrap();
 
-    // Insert all constant term commitments, except the constant term commitments of the first polynomial
-    let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, first_coeffs.into_iter())?;
+    // Insert all constant term commitments, except the constant term commitments of the first polynomial.
+    // Every constant-term message carries the proof of knowledge, as it does on the wire.
+    let res =
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), first_coeffs.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(res.is_first_encountered);
     assert!(res.ssa_deposit_address.is_none());
     assert!(!res.is_verifiable);
 
     // Now add the constant term commitments of the first polynomial
-    let res = reconstructor.insert_coefficient_commitments(ssa_id, 0, HashMap::from([(0, remainder)]).into_iter())?;
+    let res = reconstructor.insert_coefficient_commitments(
+        ssa_id,
+        0,
+        Some(commitment_proof),
+        HashMap::from([(0, remainder)]).into_iter(),
+    )?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
     assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
@@ -73,8 +81,12 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     // Add all the remaining coefficient commitments for all polynomials except one
     let remainder = transposed.remove(&5).unwrap();
     for (coeff_index, poly_coeff_commitments) in transposed {
-        let res =
-            reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, poly_coeff_commitments.into_iter())?;
+        let res = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            coeff_index,
+            None,
+            poly_coeff_commitments.into_iter(),
+        )?;
         assert_eq!(ssa_id, res.ssa_id);
         assert!(!res.is_first_encountered);
         assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
@@ -82,7 +94,7 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     }
 
     // Now the SSA should be fully committed
-    let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, remainder.into_iter())?;
+    let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, None, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
     assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);

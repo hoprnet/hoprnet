@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
-use hopr_protocol_pix::{CofactorGroup, GroupEncoding, PixGroup};
+use hopr_protocol_pix::{CofactorGroup, GroupEncoding, PixGroup, SsaCommitmentProof};
 use hopr_types::primitive::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{
@@ -304,6 +304,58 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
 }
 
 impl std::fmt::Display for HoprPixGroupElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", const_hex::encode(self.0))
+    }
+}
+
+/// Byte size of a serialized [`SsaCommitmentProof`] for [`HoprPixSpec`].
+pub const HOPR_PIX_COMMITMENT_PROOF_SIZE: usize = SsaCommitmentProof::<HoprPixSpec>::SIZE;
+
+/// Wire form of the PIX client SSA commitment proof of knowledge.
+///
+/// A fixed-size byte blob so that the Start protocol can carry it without knowing the curve, the
+/// same way [`HoprPixGroupElement`] wraps a coefficient commitment. The layout is
+/// [`SsaCommitmentProof::to_bytes`]'s, and neither component is secret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HoprPixCommitmentProof(pub [u8; HOPR_PIX_COMMITMENT_PROOF_SIZE]);
+
+impl HoprPixCommitmentProof {
+    /// Tries to convert the instance back into the typed proof.
+    ///
+    /// Only the length is checked here; whether the proof actually opens the commitment is decided
+    /// by `SsaCommitmentProof::verify` on the reconstructor side.
+    pub fn try_into_pix_proof(self) -> Result<SsaCommitmentProof<HoprPixSpec>, GeneralError> {
+        SsaCommitmentProof::<HoprPixSpec>::try_from_bytes(&self.0)
+            .map_err(|_| GeneralError::ParseError("pix commitment proof from bytes failed".into()))
+    }
+}
+
+impl From<SsaCommitmentProof<HoprPixSpec>> for HoprPixCommitmentProof {
+    fn from(value: SsaCommitmentProof<HoprPixSpec>) -> Self {
+        let mut out = [0u8; HOPR_PIX_COMMITMENT_PROOF_SIZE];
+        out.copy_from_slice(&value.to_bytes());
+        Self(out)
+    }
+}
+
+impl AsRef<[u8]> for HoprPixCommitmentProof {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for HoprPixCommitmentProof {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| {
+            GeneralError::ParseError("pix commitment proof length".into())
+        })?))
+    }
+}
+
+impl std::fmt::Display for HoprPixCommitmentProof {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", const_hex::encode(self.0))
     }

@@ -7,7 +7,7 @@ use hopr_types::{
 
 use crate::{
     CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
+    SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
 };
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
@@ -118,10 +118,17 @@ pub trait ExitAcknowledgementShareProcessor<S: PixSpec> {
     /// the polynomial coefficient index that is common to all the polynomial coefficient commitments included in
     /// `commitments`. In other words, the `commitments` argument contains commitments to
     /// the same polynomial coefficients across multiple polynomials (each one with its own polynomial index).
+    ///
+    /// `proof` carries the sender's [`SsaCommitmentProof`] and is expected on messages delivering
+    /// constant terms (`index == 0`), since those are what determine the commitment it opens. The
+    /// first one supplied for an SSA is kept and the rest ignored — any single valid proof suffices.
+    /// A cycle whose constant terms are all present but which never carried a valid proof is
+    /// rejected, and no deposit address is published for it.
     fn insert_coefficient_commitments(
         &self,
         ssa_id: SsaId<S::Pseudonym>,
         index: CoefficientIndex,
+        proof: Option<SsaCommitmentProof<S>>,
         commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> Result<SsaCommitmentState<S::Pseudonym, S::DepositAddress>, Self::Error>;
 

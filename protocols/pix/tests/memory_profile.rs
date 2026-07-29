@@ -142,7 +142,13 @@ fn install_remaining_coefficients(
             if block_start < coeff.len() {
                 let end = block_end.min(coeff.len());
                 reconstructor
-                    .insert_coefficient_commitments(ssa_id, coeff_index as u16, coeff[block_start..end].iter().copied())
+                    .insert_coefficient_commitments(
+                        ssa_id,
+                        coeff_index as u16,
+                        // Only constant-term messages carry the proof, and phase 1 already did.
+                        None,
+                        coeff[block_start..end].iter().copied(),
+                    )
                     .unwrap();
             }
         }
@@ -249,6 +255,7 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     let pseudonym = SimplePseudonym::random();
     let peer = OffchainKeypair::random();
     let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+    let commitment_proof = commitment.commitment_proof;
     let mut matrix = vec![Vec::new(); threshold];
     for (coeff_index, mut poly_commitments) in commitment.verifiers {
         poly_commitments.sort_unstable_by_key(|(poly_index, _)| *poly_index);
@@ -283,7 +290,7 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     // accumulator, installs no verifiers.
     for chunk in matrix[0].chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
         reconstructor
-            .insert_coefficient_commitments(ssa_id, 0, chunk.iter().copied())
+            .insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), chunk.iter().copied())
             .unwrap();
     }
     report("after constant-term pass", baseline);

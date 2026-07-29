@@ -18,7 +18,7 @@ use hopr_api::types::{
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
-    prelude::{HoprPacket, HoprPixGroupElement},
+    prelude::{HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
@@ -132,13 +132,18 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 /// allowance for the CBOR-encoded session id, divided by the per-entry cost
 /// (`PolynomialIndex` + one serialized group element). Using a *lower* bound here means the derived
 /// message count is an over-estimate, which is the safe direction for sizing a queue.
+///
+/// The commitment proof of knowledge is subtracted as well. It only rides on constant-term messages,
+/// so the true per-message figure is higher for the rest of the cycle — but a lower bound is exactly
+/// what makes the derived message count safe, so the smaller of the two is the right one to use.
 const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
     const FIXED_PREFIX: usize = 12;
     // A `SessionId` is a 10-byte pseudonym; 64 bytes is a large allowance for its CBOR framing.
     const CBOR_SESSION_ID_ALLOWANCE: usize = 64;
     const PER_ENTRY: usize = size_of::<hopr_protocol_pix::PolynomialIndex>() + size_of::<HoprPixGroupElement>();
 
-    let usable = ApplicationData::PAYLOAD_SIZE.saturating_sub(FIXED_PREFIX + CBOR_SESSION_ID_ALLOWANCE);
+    let usable = ApplicationData::PAYLOAD_SIZE
+        .saturating_sub(FIXED_PREFIX + CBOR_SESSION_ID_ALLOWANCE + HOPR_PIX_COMMITMENT_PROOF_SIZE);
     let per_msg = usable / PER_ENTRY;
     if per_msg == 0 { 1 } else { per_msg }
 };
@@ -2598,7 +2603,7 @@ where
     async fn handle_ssa_commit(
         &self,
         pseudonym: HoprPseudonym,
-        msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement>,
+        msg: SsaClientCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixCommitmentProof>,
     ) -> errors::Result<()> {
         let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
@@ -2622,6 +2627,15 @@ where
 
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
+        // Decode the accompanying proof of knowledge, if the message carries one. A malformed proof
+        // is rejected here rather than being passed on as absent, so that it cannot be mistaken for
+        // a peer that simply did not send one.
+        let commitment_proof = msg
+            .commitment_proof
+            .map(|proof| proof.try_into_pix_proof())
+            .transpose()
+            .map_err(SessionManagerError::other)?;
+
         // Insert the newly received coefficients into the SSA Reconstructor
         let pix_toolbox_clone = pix_toolbox.clone();
         let ssa_client_commitment_state = hopr_utils::parallelize::cpu::spawn_blocking(
@@ -2631,6 +2645,7 @@ where
                     .insert_coefficient_commitments(
                         ssa_id,
                         msg.coefficient_index,
+                        commitment_proof,
                         msg.coefficient_commitments.into_iter().map(|(k, v)| (k, v.0)),
                     )
                     .map_err(SessionManagerError::PixError)
@@ -5114,6 +5129,7 @@ mod tests {
                     session_id: alice_pseudonym,
                     ssa_index: SsaIndex::MIN,
                     coefficient_index: 0,
+                    commitment_proof: None,
                     coefficient_commitments: HashMap::new(),
                 },
             )
@@ -6011,9 +6027,10 @@ mod tests {
     async fn exit_receives_ssa_commits_and_emits_deposit_needed_event() -> anyhow::Result<()> {
         use std::collections::HashMap;
 
-        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_crypto_packet::prelude::{HoprPixCommitmentProof, HoprPixGroupElement};
         use hopr_protocol_pix::{
-            PixGroup, PolynomialIndex, SsaGeneratorConfig, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+            Field, PixGroup, PixScalar, PolynomialIndex, SsaCommitmentProof, SsaGeneratorConfig, SsaReconstructor,
+            SsaReconstructorConfig, SsaShareGenerator,
         };
         use hopr_protocol_start::StartInitiation;
 
@@ -6080,12 +6097,21 @@ mod tests {
         for poly in 0..2 {
             coeff_0_map.insert(poly as PolynomialIndex, identity_element);
         }
+        // The dummy constant terms sum to the identity, whose discrete logarithm is zero, so an
+        // honest proof of knowledge over it is constructible — the Exit refuses the cycle without
+        // one.
+        let zero = <PixScalar<HoprPixSpec> as Field>::ZERO;
+        let identity_proof = HoprPixCommitmentProof::from(
+            SsaCommitmentProof::<HoprPixSpec>::prove(&ssa_id, &zero, &PixGroup::<HoprPixSpec>::default())
+                .expect("identity proof must be constructible"),
+        );
         mgr.handle_ssa_commit(
             alice_pseudonym,
             SsaClientCommitmentMessage {
                 session_id: alice_pseudonym,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 0,
+                commitment_proof: Some(identity_proof),
                 coefficient_commitments: coeff_0_map,
             },
         )
@@ -6102,6 +6128,7 @@ mod tests {
                 session_id: alice_pseudonym,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 1,
+                commitment_proof: None,
                 coefficient_commitments: coeff_1_map,
             },
         )

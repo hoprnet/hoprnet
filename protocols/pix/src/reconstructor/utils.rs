@@ -5,7 +5,7 @@ use vsss_rs::{
 
 use crate::{
     CoefficientIndex, CompletedShare, PartialSsaShare, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar,
-    PixSpec, PolynomialIndex, SsaPolynomialId, errors, into_completed_share, types::SsaId,
+    PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPolynomialId, errors, into_completed_share, types::SsaId,
 };
 
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
@@ -250,6 +250,12 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     complete: bool,
     exit_commitment_secret: PixScalar<S>,
     exit_commitment_public: PixGroup<S>,
+    /// First [`SsaCommitmentProof`] the peer supplied, checked once the constant-term set is
+    /// complete — that is the point at which the commitment it opens becomes known.
+    ///
+    /// Only the first is kept: any single valid proof is sufficient, and Schnorr proofs are
+    /// randomised, so there is nothing to reconcile between several of them.
+    commitment_proof: Option<SsaCommitmentProof<S>>,
     full_ssa_commitment: Option<(PixGroup<S>, S::DepositAddress)>,
 }
 
@@ -273,6 +279,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             ready_polynomials: Vec::new(),
             installed_polynomials: 0,
             complete: false,
+            commitment_proof: None,
             full_ssa_commitment: None,
         }
     }
@@ -297,6 +304,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
     pub fn add_transposed(
         &mut self,
         coeff_index: CoefficientIndex,
+        proof: Option<SsaCommitmentProof<S>>,
         polynomial_coeff_commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<S>)>,
     ) -> errors::Result<CommitmentProgress<S>, S::Pseudonym> {
         // Cannot add more commitments if we already have all
@@ -306,6 +314,14 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
         if coeff_index >= self.poly_threshold as CoefficientIndex {
             return Err(errors::PixError::InvalidInput);
+        }
+
+        // Retain the first proof offered. It cannot be checked yet: the commitment it opens is the
+        // sum of *all* constant terms, so verification waits for the milestone below. Recorded
+        // before the transactional insert so that a batch which later bails on a duplicate still
+        // leaves the proof available — it is not part of the state the duplicate check protects.
+        if self.commitment_proof.is_none() {
+            self.commitment_proof = proof;
         }
 
         // Collect and validate all items before mutating state (transactional).
@@ -373,6 +389,23 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 .map(|p| *p.get(&0).expect("constant term must be present"))
                 .sum::<PixGroup<S>>();
             tracing::debug!(id = %self.id, commitment = const_hex::encode(client_ssa_commitment.to_bytes()), "SSA client commitment");
+
+            // The client commitment is now known, so its proof of knowledge can finally be checked.
+            //
+            // This gate must sit *before* `full_ssa_commitment` is recorded and before the
+            // `SsaBuilder` is handed out: those are what produce the deposit address and make the
+            // cycle live. Rejecting here means an unproven commitment never reaches the deposit
+            // path at all, which is the whole point — a peer that does not know the discrete
+            // logarithm of what it published may know the discrete logarithm of the *sum* with our
+            // own commitment, and could then sweep the deposit itself.
+            if !self
+                .commitment_proof
+                .as_ref()
+                .is_some_and(|proof| proof.verify(&self.id, &client_ssa_commitment))
+            {
+                tracing::error!(id = %self.id, "client ssa commitment has no valid proof of knowledge");
+                return Err(errors::PixError::UnprovenSsaCommitment);
+            }
 
             let full_ssa_commitment = client_ssa_commitment + self.exit_commitment_public;
 

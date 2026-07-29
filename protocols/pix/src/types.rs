@@ -23,8 +23,8 @@ use hopr_types::{
 };
 
 use crate::{
-    ExitAcknowledgementShareProcessor, PartialSsaShareVerifier, PixGroup, PixGroupRepr, PixScalar, PixSpec, errors,
-    errors::PixError,
+    ExitAcknowledgementShareProcessor, Group, GroupEncoding, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
+    PixScalar, PixSpec, errors, errors::PixError,
 };
 
 /// Raw zeroable SSA Index.
@@ -455,6 +455,154 @@ impl<S: PixSpec> GeneratedShare<S, S::Pseudonym> {
     }
 }
 
+/// Wire form of a [`PixScalar`].
+type ScalarRepr<S> = <PixScalar<S> as PrimeField>::Repr;
+
+/// Proof that whoever published an [`SsaCommitment`] knows its discrete logarithm.
+///
+/// ## Why this exists
+///
+/// The SSA deposit key is `s + e`, where `s` is the sum of the Entry's polynomial constant terms and
+/// `e` is the Exit's commitment secret. The deposit is safe precisely because neither party knows
+/// the sum. But the Exit publishes `e·G` *first* — the `SsaRequest` message carries it so the Entry
+/// can derive the address it has to fund — and without this proof nothing stops a malicious Entry
+/// from picking a `w` it knows, publishing constant terms that sum to `w·G − e·G`, and ending up
+/// with a deposit address whose key is `w`. It could then sweep its own deposit while the
+/// polynomial whose constant term it does *not* know never yields a valid share, so the Exit is
+/// never paid — and because the Entry chooses the order in which polynomials are drained, it can
+/// place that one last and be served nearly the whole cycle first.
+///
+/// Requiring proof of knowledge of `s` closes this, and the case analysis is exhaustive:
+///
+/// * if the Entry can produce the proof it knows `s`, and then `s + e` is out of reach because `e` is not;
+/// * if it cannot, the Exit rejects the SSA before it ever publishes a deposit address.
+///
+/// The proof is over the *sum* rather than per polynomial on purpose: an individual constant-term
+/// commitment whose discrete log the Entry does not know is harmless, as long as the sum's is known,
+/// because the deposit key is then still unreachable.
+///
+/// The Exit needs no matching proof as long as it keeps committing first — it cannot adapt `e·G` to
+/// the Entry's commitment, so the symmetric attack is unavailable to it. Reversing the message order
+/// would move the exploit to the Exit and oblige *it* to prove instead.
+///
+/// ## Construction
+///
+/// A standard non-interactive Schnorr proof of knowledge: `R = r·G`,
+/// `c = H(ssa_id ‖ commitment ‖ R)`, `z = r + c·s`, verified as `z·G == R + c·commitment`. Neither
+/// component is secret, so both travel and print in the clear.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "PixGroupRepr<S>: serde::Serialize, ScalarRepr<S>: serde::Serialize",
+        deserialize = "PixGroupRepr<S>: serde::Deserialize<'de>, ScalarRepr<S>: serde::Deserialize<'de>"
+    ))
+)]
+pub struct SsaCommitmentProof<S: PixSpec> {
+    /// Commitment to the proof nonce, `R = r·G`.
+    nonce_commitment: PixGroupRepr<S>,
+    /// Response, `z = r + c·s`.
+    response: ScalarRepr<S>,
+}
+
+// Both components are plain byte arrays, so these are unconditional in `S`. Deriving them instead
+// would demand `S: Clone + PartialEq + Eq`, which callers generic only over `PixSpec` cannot supply.
+impl<S: PixSpec> Clone for SsaCommitmentProof<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S: PixSpec> Copy for SsaCommitmentProof<S> {}
+
+impl<S: PixSpec> PartialEq for SsaCommitmentProof<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.nonce_commitment.as_ref() == other.nonce_commitment.as_ref()
+            && AsRef::<[u8]>::as_ref(&self.response) == AsRef::<[u8]>::as_ref(&other.response)
+    }
+}
+
+impl<S: PixSpec> Eq for SsaCommitmentProof<S> {}
+
+impl<S: PixSpec> SsaCommitmentProof<S> {
+    /// Byte size of the serialized proof: the nonce commitment followed by the response.
+    pub const SIZE: usize = size_of::<PixGroupRepr<S>>() + size_of::<ScalarRepr<S>>();
+
+    /// Proves knowledge of `secret`, the discrete logarithm of `ssa_commitment`.
+    pub fn prove(
+        ssa_id: &SsaId<S::Pseudonym>,
+        secret: &PixScalar<S>,
+        ssa_commitment: &PixGroup<S>,
+    ) -> errors::Result<Self, S::Pseudonym> {
+        // The nonce must be freshly random for every proof. Two proofs sharing an `r` but having
+        // different challenges expose `secret` as `(z₁ − z₂)/(c₁ − c₂)`, so this must never be
+        // derived from the SSA id, the commitment, or anything else that repeats.
+        let nonce =
+            <PixScalar<S> as crypto_traits::elliptic_curve::Field>::random(&mut hopr_types::crypto_random::rng());
+        let nonce_commitment = PixGroup::<S>::mul_by_generator(&nonce);
+        let challenge = S::commitment_proof_challenge(ssa_id, ssa_commitment, &nonce_commitment)?;
+
+        Ok(Self {
+            nonce_commitment: nonce_commitment.to_bytes(),
+            response: (nonce + challenge * *secret).to_repr(),
+        })
+    }
+
+    /// Checks the proof against the `ssa_commitment` it is supposed to open.
+    ///
+    /// Returns `false` for anything malformed as well as for a genuine verification failure — a
+    /// caller cannot act differently on the two, since both mean the commitment is unusable.
+    pub fn verify(&self, ssa_id: &SsaId<S::Pseudonym>, ssa_commitment: &PixGroup<S>) -> bool {
+        let Some(nonce_commitment) = Option::<PixGroup<S>>::from(PixGroup::<S>::from_bytes(&self.nonce_commitment))
+        else {
+            return false;
+        };
+        // Same subgroup check the coefficient commitments get: on a curve with a cofactor a
+        // small-order `R` would let the verification equation hold for a wrong response.
+        if !bool::from(crate::CofactorGroup::is_torsion_free(&nonce_commitment)) {
+            return false;
+        }
+        let Some(response) = Option::<PixScalar<S>>::from(PixScalar::<S>::from_repr(self.response)) else {
+            return false;
+        };
+        let Ok(challenge) = S::commitment_proof_challenge(ssa_id, ssa_commitment, &nonce_commitment) else {
+            return false;
+        };
+
+        PixGroup::<S>::mul_by_generator(&response) == nonce_commitment + *ssa_commitment * challenge
+    }
+
+    /// Serializes the proof as `nonce_commitment ‖ response`, exactly [`Self::SIZE`] bytes.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(Self::SIZE);
+        out.extend_from_slice(self.nonce_commitment.as_ref());
+        out.extend_from_slice(self.response.as_ref());
+        out
+    }
+
+    /// Parses a proof from the layout produced by [`Self::to_bytes`].
+    ///
+    /// Only the length is checked here; whether the components are meaningful is decided by
+    /// [`Self::verify`], so that a malformed proof and an invalid one take the same path.
+    pub fn try_from_bytes(bytes: &[u8]) -> errors::Result<Self, S::Pseudonym> {
+        if bytes.len() != Self::SIZE {
+            return Err(PixError::InvalidInput);
+        }
+
+        let (nonce_bytes, response_bytes) = bytes.split_at(size_of::<PixGroupRepr<S>>());
+        let mut nonce_commitment = PixGroupRepr::<S>::default();
+        AsMut::<[u8]>::as_mut(&mut nonce_commitment).copy_from_slice(nonce_bytes);
+        let mut response = ScalarRepr::<S>::default();
+        AsMut::<[u8]>::as_mut(&mut response).copy_from_slice(response_bytes);
+
+        Ok(Self {
+            nonce_commitment,
+            response,
+        })
+    }
+}
+
 /// Contains commitment to a specific SSA and corresponding verifier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -464,6 +612,11 @@ pub struct SsaCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     /// Commitment to the SSA.
     #[cfg_attr(feature = "serde", serde(with = "elliptic_curve_tools::group"))]
     pub ssa_commitment: PixGroup<S>,
+    /// Proof that the sender knows the discrete logarithm of [`Self::ssa_commitment`].
+    ///
+    /// Without it the recipient cannot tell a genuine commitment from one crafted so that the
+    /// *combined* deposit key is known to the sender alone — see [`SsaCommitmentProof`].
+    pub commitment_proof: SsaCommitmentProof<S>,
     /// Verifiers of the partial SSA shares.
     #[cfg_attr(
         feature = "serde",
@@ -505,12 +658,17 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
     }
 
     /// Shorthand to pass all the coefficient commitments into the [reconstructor](ExitAcknowledgementShareProcessor).
+    ///
+    /// The proof accompanies the constant-term batch, mirroring how the wire messages carry it.
     pub fn process_into_reconstructor<R: ExitAcknowledgementShareProcessor<S>>(
         self,
         reconstructor: &R,
     ) -> Result<(), R::Error> {
+        let ssa_id = self.ssa_id;
+        let proof = self.commitment_proof;
         for (coeff_idx, coeffs) in self.verifiers {
-            reconstructor.insert_coefficient_commitments(self.ssa_id, coeff_idx, coeffs.into_iter())?;
+            let batch_proof = (coeff_idx == 0).then_some(proof);
+            reconstructor.insert_coefficient_commitments(ssa_id, coeff_idx, batch_proof, coeffs.into_iter())?;
         }
         Ok(())
     }
