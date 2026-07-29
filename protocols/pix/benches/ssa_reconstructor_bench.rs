@@ -73,6 +73,21 @@ const QUOTA_BYTES_PER_SHARE: u64 = 1038;
 /// production call shape.
 const ACK_BATCH_SIZES: [usize; 2] = [1, 10];
 
+/// Concurrency levels for the concurrent sustained-rate group.
+///
+/// 1 is the control (identical shape to the sequential group); 10 mirrors
+/// `DEFAULT_ACK_INPUT_CONCURRENCY`, the width the Exit ack pipeline actually runs at. The third
+/// point is one caller per core, which bounds what raising that config value could buy —
+/// `verify_completed_share`'s internal rayon means the two do not simply multiply.
+fn ack_concurrency() -> Vec<usize> {
+    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(8);
+    let mut levels = vec![1usize, 10];
+    if cores > 10 {
+        levels.push(cores);
+    }
+    levels
+}
+
 /// Batch size for the sustained-rate group.
 ///
 /// Large enough that the per-call overhead of `acknowledge_shares` is amortised and the
@@ -595,6 +610,92 @@ fn bench_acknowledge_shares_sustained(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
+    // The sequential sustained-rate group above measures one `acknowledge_shares` at a time,
+    // but the Exit pipeline runs `for_each_concurrent(ack_input_concurrency)` around
+    // `spawn_fifo_blocking` (`transport/hopr/src/protocol/pipeline/mod.rs`). That distinction
+    // decides the per-Exit Session capacity: `verify_completed_share` parallelises *within* one
+    // share's MSM via rayon, so if a single call already saturates the machine, concurrency buys
+    // nothing and the sequential figure is the machine ceiling. If it does not, aggregate
+    // throughput scales and the ceiling is several times higher.
+    //
+    // Reported in aggregate bytes of Session quota, so the ids are directly comparable to the
+    // sequential group: flat throughput means saturated, rising throughput means it was not.
+    let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/concurrent_quota_rate");
+    group.measurement_time(Duration::from_secs(20));
+    group.sample_size(10);
+
+    let polys = ACK_BENCH_POLYS;
+    let shares_per_cycle = polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
+
+    for concurrency in ack_concurrency() {
+        group.throughput(Throughput::Bytes(
+            (concurrency * SUSTAINED_BATCH) as u64 * QUOTA_BYTES_PER_SHARE,
+        ));
+
+        let peer = OffchainKeypair::random();
+        let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
+        let new_cycle = || {
+            let (generator, pseudonym, matrix) = generate_commitment_matrix(polys, PROD_THRESHOLD);
+            let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+            reconstructor
+                .new_exit_commitment(ssa_id, polys as usize, PROD_THRESHOLD as usize)
+                .unwrap();
+            install_commitment(&reconstructor, ssa_id, &matrix, polys as usize);
+            (generator, pseudonym)
+        };
+
+        group.bench_function(BenchmarkId::from_parameter(format!("c{concurrency}")), |b| {
+            let (mut generator, mut pseudonym) = new_cycle();
+            let mut remaining = shares_per_cycle;
+            let mut counter: u64 = 0;
+            b.iter_custom(|iters| {
+                let mut total = Duration::ZERO;
+                for _ in 0..iters {
+                    let needed = concurrency * SUSTAINED_BATCH;
+                    if remaining < needed {
+                        let (g, p) = new_cycle();
+                        generator = g;
+                        pseudonym = p;
+                        remaining = shares_per_cycle;
+                        counter = 0;
+                    }
+
+                    // Stage every thread's batch untimed, so the timed region is exactly the
+                    // concurrent `acknowledge_shares` wave.
+                    let batches: Vec<_> = (0..concurrency)
+                        .map(|_| {
+                            stage_shares(
+                                &reconstructor,
+                                &generator,
+                                &peer,
+                                pseudonym,
+                                &mut counter,
+                                SUSTAINED_BATCH,
+                            )
+                        })
+                        .collect();
+                    remaining -= needed;
+
+                    let recon = &reconstructor;
+                    let peer_ref = &peer;
+                    let start = Instant::now();
+                    std::thread::scope(|scope| {
+                        for acks in batches {
+                            scope.spawn(move || {
+                                recon.acknowledge_shares(*peer_ref.public(), acks).unwrap();
+                            });
+                        }
+                    });
+                    total += start.elapsed();
+                }
+                total
+            });
+        });
+    }
+    group.finish();
+}
+
 fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
     // Acknowledgements that arrive before their polynomial's verifier is installed. Only
     // the constant terms are inserted, so the part accumulator exists but no verifier
@@ -809,6 +910,7 @@ criterion_group!(
     bench_insert_encrypted_share,
     bench_acknowledge_shares,
     bench_acknowledge_shares_sustained,
+    bench_acknowledge_shares_concurrent,
     bench_acknowledge_shares_deferred,
     bench_drain_deferred_acks,
     bench_acknowledge_shares_full_ssa
