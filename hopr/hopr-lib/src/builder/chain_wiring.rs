@@ -30,7 +30,7 @@ pub(super) async fn process_chain_events<C, G>(
     own_packet_key: OffchainPublicKey,
     ticket_price: Arc<RwLock<HoprBalance>>,
     win_probability: Arc<RwLock<WinningProbability>>,
-    mut peer_discovery_tx: Option<futures::channel::mpsc::Sender<(PeerId, Vec<Multiaddr>)>>,
+    mut peer_discovery_tx: Option<hopr_utils::network_types::crossfire_sink::CrossfireSink<(PeerId, Vec<Multiaddr>)>>,
 ) where
     C: ChainKeyOperations + Clone + Send + Sync + 'static,
     G: NetworkGraphUpdate + Send + Sync + 'static,

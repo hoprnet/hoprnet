@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-probe"
-version = "0.7.0"
+version = "0.8.0"
 description = "Probing mechanism of the discovered network topology"
 edition.workspace = true
 license.workspace = true
@@ -23,6 +23,7 @@ runtime-tokio = ["hopr-utils/runtime-tokio"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+crossfire = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 const-hex = { workspace = true }
