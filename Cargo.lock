@@ -4022,11 +4022,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-<<<<<<< HEAD
-version = "1.2.0"
-=======
 version = "1.2.3"
->>>>>>> origin/master
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4209,6 +4205,7 @@ dependencies = [
  "parking_lot",
  "pcap-file",
  "proc-macro-regex",
+ "rayon",
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",
@@ -4421,15 +4418,10 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
-name = "hopr-utils"
-version = "0.2.0"
-=======
 name = "hopr-utilities"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5f44193a6854b1c8dd5339e692eb1e3a7eb4992c534ea2c82b249a0d17211d"
->>>>>>> origin/master
 dependencies = [
  "arrayvec",
  "auto_impl",

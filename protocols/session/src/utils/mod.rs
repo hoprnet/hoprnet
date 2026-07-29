@@ -29,15 +29,10 @@ impl<T> RingBufferProducer<T> {
     /// Pushes `item` into the ring buffer, returning `true` if there was capacity and `false`
     /// if the buffer was already full and an existing entry was overwritten.
     pub fn push(&mut self, item: T) -> bool {
-<<<<<<< HEAD
-        self.0.lock().enqueue(item);
-        true
-=======
         let mut rb = self.0.lock();
         let had_capacity = !rb.is_full();
         rb.enqueue(item);
         had_capacity
->>>>>>> origin/master
     }
 }
 

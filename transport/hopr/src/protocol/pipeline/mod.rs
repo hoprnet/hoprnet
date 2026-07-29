@@ -36,7 +36,7 @@ const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_m
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
 /// Number of Rayon threads kept permanently free for outgoing packet encode (SURB generation).
-/// The ingress decode concurrency default is `pool_thread_count - ENCODE_RESERVED_THREADS` so
+/// The ingress decode concurrency default is `rayon::current_num_threads() - ENCODE_RESERVED_THREADS` so
 /// that heavy download traffic cannot starve the upload/SURB replenishment path.
 const ENCODE_RESERVED_THREADS: usize = 2;
 
@@ -49,7 +49,7 @@ const INGRESS_GATE_SAMPLE_INTERVAL: std::time::Duration = std::time::Duration::f
 const INGRESS_THROTTLE_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// Pool outstanding-task watermark factor: the gate trips when
-/// `outstanding_tasks > pool_thread_count * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
+/// `outstanding_tasks > rayon::current_num_threads() * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
 /// A factor of 3 gives one full pool worth of headroom above the cap.
 const INGRESS_POOL_HIGH_WATERMARK_FACTOR: usize = 3;
 
@@ -806,13 +806,11 @@ where
     // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
     // Without this cap the FIFO pool fills up with decode work under heavy download traffic and
     // SURB replenishment starves, slowly collapsing the session's download throughput.
-    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
+    let pool_threads = rayon::current_num_threads();
     let default_input_concurrency = if pool_threads > ENCODE_RESERVED_THREADS {
         pool_threads - ENCODE_RESERVED_THREADS
-    } else if pool_threads > 0 {
-        1 // pool is tiny but initialised — leave at least 1 decode slot
     } else {
-        avail_concurrency // pool not initialised yet; fall back to the old behaviour
+        1 // pool is tiny — leave at least 1 decode slot
     };
     let input_concurrency = cfg
         .input_concurrency

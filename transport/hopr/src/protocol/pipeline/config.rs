@@ -104,8 +104,7 @@ pub struct PacketPipelineConfig {
     /// Maximum concurrency when processing incoming packets (SPHINX decode).
     ///
     /// `None` or `Some(0)` fall back to the default, which is computed as
-    /// `max(1, pool_thread_count - ENCODE_RESERVED_THREADS)` when the shared Rayon pool has
-    /// been initialised, or `available_parallelism * 8` as a fallback when it has not.
+    /// `max(1, rayon::current_num_threads() - ENCODE_RESERVED_THREADS)`.
     ///
     /// The default is deliberately lower than `output_concurrency` to reserve Rayon threads
     /// for outgoing packet encode (SURB generation). Flooding the pool with decode work would
