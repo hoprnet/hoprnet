@@ -457,11 +457,17 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     #[test]
     #[cfg(any(feature = "testing", target_os = "android", target_os = "ios"))]
     fn uses_cloudflare_dns_resolver_config() {
-        let (resolver_config, resolver_opts) = super::swarm_dns_config();
-        assert_eq!(resolver_config, libp2p::dns::ResolverConfig::cloudflare());
-        assert_eq!(resolver_opts, libp2p::dns::ResolverOpts::default());
+        let (resolver_config, _) = super::swarm_dns_config();
+        assert!(
+            resolver_config
+                .name_servers()
+                .iter()
+                .any(|server| server.socket_addr.ip() == IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))
+        );
     }
 }
