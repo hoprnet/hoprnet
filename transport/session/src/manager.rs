@@ -263,6 +263,17 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
 
+    /// Minimum interval at which an establishing Session's cache slot is refreshed
+    /// ("touched") to keep [`idle_timeout`](Self::idle_timeout) from evicting it while
+    /// SURBs pre-load.
+    ///
+    /// The touch period is [`idle_timeout`](Self::idle_timeout)` / 2`, floored to this
+    /// value so it never drops below a sane minimum for very short idle timeouts.
+    ///
+    /// Default is 100 milliseconds.
+    #[default(Duration::from_millis(100))]
+    pub min_session_touch_period: Duration,
+
     /// The sampling interval for SURB balancer.
     /// It will make SURB control decisions regularly at this interval.
     ///
@@ -1048,7 +1059,7 @@ where
                     // pre-loading. Each `get()` call resets the idle timer; the task is
                     // aborted as soon as the readiness wait resolves.
                     let sessions_keepalive = self.sessions.clone();
-                    let touch_period = (self.cfg.idle_timeout / 2).max(std::time::Duration::from_millis(100));
+                    let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
                     let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
                         loop {
                             hopr_utils::runtime::prelude::sleep(touch_period).await;
