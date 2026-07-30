@@ -15,7 +15,7 @@ updates:
       time: "02:00"
       timezone: "UTC"
     cooldown:
-      default: 7
+      default-days: 7
     groups:
       nix-flake-inputs:
         patterns:
