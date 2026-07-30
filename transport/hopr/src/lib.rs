@@ -1208,6 +1208,22 @@ where
     }
 }
 
+// ---------------------------------------------------------------------------
+// PacketTransport impl
+// ---------------------------------------------------------------------------
+
+/// Zero-sized carrier for HOPR packet-transport protocol constants.
+///
+/// Provides access to fixed packet-layer parameters (e.g. maximum payload size)
+/// without requiring a live transport instance or generic type parameters.
+pub struct TransportCharacteristics;
+
+impl hopr_api::node::PacketTransport for TransportCharacteristics {
+    fn packet_payload_size() -> usize {
+        hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
