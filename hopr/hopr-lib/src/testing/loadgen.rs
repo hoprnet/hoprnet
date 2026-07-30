@@ -525,7 +525,7 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
         tracing::info!(?path_indices, "opening session");
         let path: Vec<&_> = path_indices.iter().map(|&i| &cluster[i]).collect();
         let session = cluster
-            .create_session_with(&path, capabilities, cfg.surb_config.clone())
+            .create_session_with(&path, capabilities, cfg.surb_config)
             .await
             .context("opening session")?;
         sessions.push(session);
@@ -798,10 +798,8 @@ pub async fn run_stress(cluster: &ClusterGuard, cfg: &StressConfig) -> anyhow::R
     let surb_overhead_mbps_per_session =
         (MAX_SURBS_PER_SEC / MAX_SURBS_IN_PACKET * SPHINX_PKT_BYTES) / (1024.0 * 1024.0);
 
-    let decode_timeout_drops =
-        hopr_utils::parallelize::cpu::decode_timeout_drop_count() as u64 - baseline_decode_drops;
-    let encode_timeout_drops =
-        hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64 - baseline_encode_drops;
+    let decode_timeout_drops = hopr_utils::parallelize::cpu::decode_timeout_drop_count() as u64 - baseline_decode_drops;
+    let encode_timeout_drops = hopr_utils::parallelize::cpu::encode_timeout_drop_count() as u64 - baseline_encode_drops;
     let session_inbox_drops =
         hopr_transport::session::counters::session_inbox_drop_count() as u64 - baseline_inbox_drops;
     let session_unknown_data_drops =
