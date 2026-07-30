@@ -213,6 +213,13 @@ opt-level = 2
 [profile.test]
 opt-level = 1
 
+# CI keeps useful line-level backtraces while avoiding large incremental and
+# full debug-info artifacts in the Nix binary cache.
+[profile.ci-test]
+debug = 1
+incremental = false
+inherits = "test"
+
 # this profile focuses on the best runtime performance and the smallest binary size
 [profile.release]
 codegen-units = 1
