@@ -1,12 +1,12 @@
-// 5-node cluster throughput smoke test.
+// 5-node cluster throughput smoke test (real QUIC transport, mock Blokli chain).
 //
 // This test is `#[ignore]`d by default — it takes several minutes due to
 // cluster bootstrap time (~100 s) plus the 5 MB transfer.  Run it explicitly:
 //
 //   cargo nextest run -p hopr-lib --features testing \
-//       --test 'stress_cluster-size5' -j 1 --run-ignored all -- --nocapture
+//       --test 'cluster_throughput-size5' -j 1 --run-ignored all -- --nocapture
 //
-// For a profiling run use the `stress_cluster` example binary instead, which
+// For a profiling run use the `cluster_throughput` example binary instead, which
 // gives a clean single entry point for `cargo flamegraph` / `perf`.
 
 #![cfg(feature = "session-client")]
