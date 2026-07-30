@@ -49,6 +49,10 @@
 //! It does **not** protect against:
 //! - An attacker who also has the config (the password comes from the same config file).
 //! - An attacker who can execute code as the node process (they can read the derived key from process memory).
+//! - An attacker who can read the node's process environment.  The password is passed via an environment variable,
+//!   which is readable through `/proc/<pid>/environ` by the same user and by root, is visible to anything that inspects
+//!   the process table, and is inherited by every child process the node spawns.  Keeping the password out of the
+//!   config file narrows the on-disk exposure; it does not eliminate exposure to a local attacker.
 //! - Side-channel or fault-analysis attacks.
 //!
 //! ## Recovery on restart
@@ -295,10 +299,8 @@ impl PixRecoveryStore {
                 Ok(id) => id,
                 Err(_) => continue,
             };
-            let stored: [u8; VALUE_SIZE] = match value_bytes.value().try_into() {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
+            // The table is typed `[u8; VALUE_SIZE]`, so the length is already guaranteed.
+            let stored: [u8; VALUE_SIZE] = value_bytes.value();
             let plaintext = match decrypt(&self.encryption_key, &stored) {
                 Ok(p) => p,
                 Err(_) => continue,

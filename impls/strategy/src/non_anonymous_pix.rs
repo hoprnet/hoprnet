@@ -14,7 +14,10 @@
 use std::{
     convert::identity,
     fmt::{Debug, Display, Formatter},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 
@@ -39,10 +42,26 @@ fn default_gas_xdai() -> XDaiBalance {
     "0.01 xdai".parse().expect("valid static xDai amount")
 }
 
+/// Default deadline for observing a deposit landing on a stealth address.
+///
+/// Matches the Exit's default `max_deposit_wait`, since tracking for longer than
+/// the Exit is prepared to wait cannot save the session.
+fn default_max_deposit_tracking_time() -> Duration {
+    Duration::from_secs(60)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Validate)]
 pub struct NonAnonymousPixStrategyConfig {
     pub price_per_byte: HoprBalance,
     pub max_ssa_allocation: HoprBalance,
+    /// How long to keep polling a stealth address for the expected deposit before
+    /// giving up.
+    ///
+    /// Should not exceed the Exit's `max_deposit_wait` (60 s by default): the Exit
+    /// kills the session once that elapses, so any tracking beyond it is wasted RPC
+    /// traffic. The two live in different crates and cannot be validated against each
+    /// other here.
+    #[serde(default = "default_max_deposit_tracking_time")]
     pub max_deposit_tracking_time: Duration,
     /// Amount of xDai to send from the Safe to a recovered stealth address to
     /// cover gas for the `withdraw_from_signer` sweep.  Must be non-zero to
@@ -103,14 +122,11 @@ impl NonAnonymousPixStrategy {
             })
             .transpose()?;
 
-        Ok(Box::new(NonAnonymousPixStrategyInner {
-            cfg: self.cfg.clone(),
+        Ok(Box::new(NonAnonymousPixStrategyInner::new(
+            self.cfg.clone(),
             node,
             recovery_store,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        }))
+        )))
     }
 }
 
@@ -122,22 +138,102 @@ struct NonAnonymousPixStrategyInner<N: HasChainApi> {
     /// Entry role leaves this as `None`.
     recovery_store: Option<crate::pix_recovery_store::PixRecoveryStore>,
     /// Entry role only: IDs of deposit addresses already funded.
-    /// Bounded at 1024 entries (capacity-only, no TTL) to prevent unbounded
-    /// growth on long-lived Entry nodes without introducing an expiration
-    /// window that could allow duplicate withdrawals.
+    ///
+    /// Bounded by both capacity and TTL.  A TTL looks like it opens a window in
+    /// which a redelivered `NewDepositAddress` could withdraw twice — but LRU
+    /// eviction at the capacity bound opens exactly the same window already, and
+    /// does so at an unpredictable moment.  Making the window explicit and
+    /// time-bounded is strictly better than pretending it does not exist.
     processed_deposits: Cache<hopr_api::node::PixAddressId, ()>,
     /// In-flight sweep guard (both roles): prevents duplicate concurrent sweeps of
     /// the same PixAddressId.  A key is inserted before each sweep attempt (inline,
     /// retry, or replay) and removed when the sweep succeeds, fails, or gives up.
     /// `moka::sync::Cache` is internally `Arc`-based, so cloning is cheap.
+    ///
+    /// The TTL is a safety net against a leaked guard permanently blocking an ID.
+    /// A duplicate sweep let through by expiry is harmless: `sweep_recovered`
+    /// re-reads the on-chain balance and no-ops when it is already zero.
     in_flight_sweeps: Cache<hopr_api::node::PixAddressId, ()>,
     /// In-flight withdrawal guard (Entry role): prevents parallel withdrawals to the
     /// same destination address.  Inserted before the `withdraw` `.await` and removed
-    /// on success or failure.  Bounded at 1024 to protect against unbounded growth.
+    /// on success or failure.
     in_flight_destinations: Cache<Address, ()>,
+    /// Number of live [`PixEvent::DepositAddressReceived`] polling tasks, capped at
+    /// [`MAX_CONCURRENT_DEPOSIT_TRACKERS`] so the strategy cannot spawn an unbounded
+    /// number of RPC pollers.
+    active_deposit_trackers: Arc<AtomicUsize>,
+}
+
+impl<N: HasChainApi> NonAnonymousPixStrategyInner<N> {
+    fn new(
+        cfg: NonAnonymousPixStrategyConfig,
+        node: Arc<N>,
+        recovery_store: Option<crate::pix_recovery_store::PixRecoveryStore>,
+    ) -> Self {
+        Self {
+            cfg,
+            node,
+            recovery_store,
+            processed_deposits: Cache::builder()
+                .max_capacity(PROCESSED_DEPOSITS_CAPACITY)
+                .time_to_live(PROCESSED_DEPOSITS_TTL)
+                .build(),
+            in_flight_sweeps: Cache::builder()
+                .max_capacity(IN_FLIGHT_GUARD_CAPACITY)
+                .time_to_live(IN_FLIGHT_GUARD_TTL)
+                .build(),
+            in_flight_destinations: Cache::builder()
+                .max_capacity(IN_FLIGHT_GUARD_CAPACITY)
+                .time_to_live(IN_FLIGHT_GUARD_TTL)
+                .build(),
+            active_deposit_trackers: Arc::new(AtomicUsize::new(0)),
+        }
+    }
 }
 
 const MAX_SWEEP_RETRIES: usize = 5;
+
+/// Retry budget for the Entry-side deposit withdrawal.  Deliberately small: the Exit
+/// gives up on the deposit after `max_deposit_wait` (60 s by default), so a long
+/// backoff would outlive the session it is trying to save.
+const MAX_DEPOSIT_WITHDRAW_RETRIES: usize = 3;
+
+/// ~4 TB of traffic at the default 519 MiB SSA quota.
+const PROCESSED_DEPOSITS_CAPACITY: u64 = 8192;
+
+/// Long enough that no realistic redelivery of a `NewDepositAddress` falls outside it.
+const PROCESSED_DEPOSITS_TTL: Duration = Duration::from_secs(24 * 3600);
+
+const IN_FLIGHT_GUARD_CAPACITY: u64 = 1024;
+
+/// Comfortably longer than the worst-case `spawn_sweep_retry` backoff chain.
+const IN_FLIGHT_GUARD_TTL: Duration = Duration::from_secs(600);
+
+/// Upper bound on concurrent deposit-tracking tasks, and hence on the RPC polling rate
+/// this strategy generates.  Well above the 100-concurrent-session target profile.
+const MAX_CONCURRENT_DEPOSIT_TRACKERS: usize = 256;
+
+/// Releases a [`MAX_CONCURRENT_DEPOSIT_TRACKERS`] slot when the tracking task ends —
+/// on success, on failure, or when the timeout drops the future.
+struct DepositTrackerSlot(Arc<AtomicUsize>);
+
+impl DepositTrackerSlot {
+    /// Returns `None` when all slots are taken.
+    fn try_acquire(counter: &Arc<AtomicUsize>) -> Option<Self> {
+        counter
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                (n < MAX_CONCURRENT_DEPOSIT_TRACKERS).then_some(n + 1)
+            })
+            .ok()
+            .map(|_| Self(Arc::clone(counter)))
+    }
+}
+
+impl Drop for DepositTrackerSlot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 
 impl<N> NonAnonymousPixStrategyInner<N>
 where
@@ -173,16 +269,31 @@ where
                 }
                 self.in_flight_destinations.insert(dest_addr, ());
 
-                if let Err(error) = self
-                    .node
-                    .chain_api()
-                    .withdraw(target_deposit, &dest_addr)
-                    .and_then(identity)
-                    .await
-                {
+                // Retry transient RPC failures: an unfunded SSA is a dead session, and the
+                // Exit's kill switch will fire regardless of whose fault the failure was.
+                // The guard above is held across the whole retry chain.
+                let node = Arc::clone(&self.node);
+                let withdrawn = (|| {
+                    let node = Arc::clone(&node);
+                    async move {
+                        node.chain_api()
+                            .withdraw(target_deposit, &dest_addr)
+                            .and_then(identity)
+                            .await
+                            .map_err(StrategyError::other)
+                    }
+                })
+                .retry(backon::ExponentialBuilder::default().with_max_times(MAX_DEPOSIT_WITHDRAW_RETRIES))
+                .sleep(backon::FuturesTimerSleeper)
+                .notify(|error, dur| {
+                    tracing::warn!(%error, ?dur, ?dest_addr, "deposit withdrawal failed, retrying in");
+                })
+                .await;
+
+                if let Err(error) = withdrawn {
                     self.in_flight_destinations.invalidate(&dest_addr);
-                    tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed");
-                    return Err(StrategyError::other(error));
+                    tracing::error!(%error, %target_deposit, ?new_deposit_address, "withdraw failed after max retries");
+                    return Err(error);
                 }
 
                 // Mark completed only after the withdrawal succeeds so a transient
@@ -204,34 +315,57 @@ where
                 let max_tracking_time = self.cfg.max_deposit_tracking_time;
                 let target_for_filter = target_deposit;
 
-                let mut stream = futures_time::stream::interval(
-                    futures_time::time::Duration::from(max_tracking_time / 10).max(Duration::from_secs(1).into()),
-                )
-                .then(move |_| {
-                    let node_clone = node_clone.clone();
-                    async move { node_clone.chain_api().balance(deposit_addr).await }
-                })
-                .filter_map(move |result| {
-                    let target = target_for_filter;
-                    async move {
-                        match result {
-                            Ok(balance) if balance >= target => Some(balance),
-                            Ok(_) => {
-                                // Still below target — keep polling.
-                                None
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, %target, "deposit balance poll failed");
-                                None
+                // Bound the number of live pollers, and hence the RPC rate: every tracker
+                // issues one `balance` call per `poll_interval` for up to `max_tracking_time`.
+                let Some(tracker_slot) = DepositTrackerSlot::try_acquire(&self.active_deposit_trackers) else {
+                    tracing::error!(
+                        ?pix_id,
+                        max = MAX_CONCURRENT_DEPOSIT_TRACKERS,
+                        "too many concurrent deposit trackers, not tracking this deposit"
+                    );
+                    return Err(StrategyError::CriteriaNotSatisfied);
+                };
+
+                let poll_interval = (max_tracking_time / 10).max(Duration::from_secs(1));
+
+                // Decorrelate the polling phase across trackers.  Without this, sessions
+                // established in the same instant align their polls into one burst every
+                // `poll_interval` for the whole tracking window.
+                let phase_jitter = Duration::from_millis(hopr_api::types::crypto_random::random_integer(
+                    0,
+                    Some(poll_interval.as_millis() as u64),
+                ));
+
+                let mut stream = futures_time::stream::interval(poll_interval.into())
+                    .then(move |_| {
+                        let node_clone = node_clone.clone();
+                        async move { node_clone.chain_api().balance(deposit_addr).await }
+                    })
+                    .filter_map(move |result| {
+                        let target = target_for_filter;
+                        async move {
+                            match result {
+                                Ok(balance) if balance >= target => Some(balance),
+                                Ok(_) => {
+                                    // Still below target — keep polling.
+                                    None
+                                }
+                                Err(error) => {
+                                    tracing::error!(%error, %target, "deposit balance poll failed");
+                                    None
+                                }
                             }
                         }
-                    }
-                })
-                .boxed();
+                    })
+                    .boxed();
 
-                tracing::info!(%target_deposit, ?max_tracking_time, "tracking until deposit");
+                tracing::info!(%target_deposit, ?max_tracking_time, ?poll_interval, "tracking until deposit");
                 hopr_utils::runtime::prelude::spawn(
                     async move {
+                        // Held for the lifetime of the task; dropped on completion, on
+                        // failure, and when the timeout below drops this future.
+                        let _tracker_slot = tracker_slot;
+
                         // Check balance immediately (first poll) to avoid the sub-second
                         // first-poll delay inherent to stream::interval. Both the immediate
                         // check and the interval polling are inside the timeout guard so a
@@ -246,6 +380,7 @@ where
                         let deposit = if let Some(balance) = immediate {
                             balance
                         } else {
+                            futures_time::task::sleep(phase_jitter.into()).await;
                             match stream.next().await {
                                 Some(balance) => balance,
                                 None => {
@@ -290,8 +425,17 @@ where
                 }
                 self.in_flight_sweeps.insert(private_key_recovered.id, ());
 
-                let chain_key =
-                    ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()).map_err(StrategyError::other)?;
+                let chain_key = match ChainKeypair::from_secret(private_key_recovered.secret.0.as_ref()) {
+                    Ok(chain_key) => chain_key,
+                    Err(error) => {
+                        // Release the guard before bailing out.  Leaving it set would block
+                        // this ID from ever being swept again in this process — including by
+                        // the startup replay path, which consults the same guard.
+                        self.in_flight_sweeps.invalidate(&private_key_recovered.id);
+                        tracing::error!(%error, ?private_key_recovered.id, "failed to reconstruct chain key");
+                        return Err(StrategyError::other(error));
+                    }
+                };
 
                 let store = self.recovery_store.clone();
                 let ck_for_spawn = chain_key.clone();
@@ -763,14 +907,8 @@ mod tests {
             pix_recovery_password_env: None,
         };
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg,
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        let mut strategy =
+            NonAnonymousPixStrategyInner::new(cfg, Arc::new(ChainNode(Arc::clone(&chain_connector))), None);
 
         let event = PixEvent::DepositAddressReceived(PixDepositAddressReceived {
             id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
@@ -842,15 +980,8 @@ mod tests {
             pix_recovery_password_env: None,
         };
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg,
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        let mut strategy =
+            NonAnonymousPixStrategyInner::new(cfg, Arc::new(ChainNode(Arc::clone(&chain_connector))), None);
 
         let bob_balance_before = strategy
             .get_balance(*BOB)
@@ -929,15 +1060,7 @@ mod tests {
             pix_recovery_password_env: None,
         };
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg,
-
-            node: Arc::new(ChainNode(Arc::new(chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        let mut strategy = NonAnonymousPixStrategyInner::new(cfg, Arc::new(ChainNode(Arc::new(chain_connector))), None);
 
         let event = PixEvent::NewDepositAddress(hopr_api::node::PixNewDepositAddress {
             id: (HoprPseudonym::random(), NonZeroU32::new(1).unwrap()),
@@ -949,6 +1072,59 @@ mod tests {
         assert!(
             matches!(result, Err(crate::errors::StrategyError::CriteriaNotSatisfied)),
             "withdrawal should be rejected when target deposit exceeds max_ssa_allocation"
+        );
+
+        Ok(())
+    }
+
+    /// A secret that cannot be turned into a keypair must release the in-flight sweep
+    /// guard on its way out.  Leaving the guard set would permanently block that
+    /// `PixAddressId` from being swept for the lifetime of the process, including by
+    /// the startup replay path, which consults the same guard.
+    #[test_log::test(tokio::test)]
+    async fn test_unusable_secret_releases_the_in_flight_sweep_guard() -> anyhow::Result<()> {
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS],
+                false,
+                XDaiBalance::new_base(2),
+                HoprBalance::new_base(1000),
+            )
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect().await?;
+
+        let mut strategy = NonAnonymousPixStrategyInner::new(
+            NonAnonymousPixStrategyConfig {
+                price_per_byte: HoprBalance::new_base(1),
+                max_ssa_allocation: HoprBalance::new_base(100),
+                max_deposit_tracking_time: default_max_deposit_tracking_time(),
+                gas_xdai_per_sweep: XDaiBalance::zero(),
+                pix_recovery_db_path: None,
+                pix_recovery_password_env: None,
+            },
+            Arc::new(ChainNode(Arc::new(chain_connector))),
+            None,
+        );
+
+        let id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
+
+        // All-ones is above the secp256k1 group order, so `from_secret` rejects it.
+        let event = PixEvent::PrivateKeyRecovered(hopr_api::node::PixPrivateKeyRecovered {
+            id,
+            secret: hopr_api::node::PixDepositSecret([0xffu8; 32].into()),
+        });
+
+        assert!(
+            strategy.on_pix_event(event).await.is_err(),
+            "an unusable secret should surface as an error"
+        );
+        assert!(
+            !strategy.in_flight_sweeps.contains_key(&id),
+            "the in-flight sweep guard must not survive a keypair-construction failure"
         );
 
         Ok(())
@@ -1005,15 +1181,8 @@ mod tests {
             pix_recovery_password_env: None,
         };
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg,
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        let mut strategy =
+            NonAnonymousPixStrategyInner::new(cfg, Arc::new(ChainNode(Arc::clone(&chain_connector))), None);
 
         let safe_address = strategy.node.identity().safe_address;
 
@@ -1137,15 +1306,8 @@ mod tests {
             pix_recovery_password_env: None,
         };
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg,
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        let mut strategy =
+            NonAnonymousPixStrategyInner::new(cfg, Arc::new(ChainNode(Arc::clone(&chain_connector))), None);
 
         let bob_before = strategy.get_balance(*BOB).await?;
 
@@ -1271,15 +1433,11 @@ mod tests {
             "test-password",
         )?);
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg: cfg.clone(),
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
+        let mut strategy = NonAnonymousPixStrategyInner::new(
+            cfg.clone(),
+            Arc::new(ChainNode(Arc::clone(&chain_connector))),
             recovery_store,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+        );
 
         #[allow(clippy::disallowed_names)]
         let event_id = (HoprPseudonym::random(), NonZeroU32::new(1).unwrap());
@@ -1355,8 +1513,8 @@ mod tests {
 
         assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
 
-        let strategy = NonAnonymousPixStrategyInner {
-            cfg: NonAnonymousPixStrategyConfig {
+        let strategy = NonAnonymousPixStrategyInner::new(
+            NonAnonymousPixStrategyConfig {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
@@ -1364,13 +1522,9 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None, // not needed for the test — we pass store directly
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+            Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            None, // not needed for the test — we pass the store directly
+        );
 
         // No need to call on_tick or register a safe — balance is zero so replay
         // won't attempt a withdrawal.
@@ -1430,8 +1584,8 @@ mod tests {
 
         assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
 
-        let strategy = NonAnonymousPixStrategyInner {
-            cfg: NonAnonymousPixStrategyConfig {
+        let strategy = NonAnonymousPixStrategyInner::new(
+            NonAnonymousPixStrategyConfig {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
@@ -1439,13 +1593,9 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+            Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            None,
+        );
 
         strategy.replay_pending_recoveries(&store).await;
 
@@ -1508,8 +1658,8 @@ mod tests {
 
         assert!(store.contains(&entry_id).unwrap(), "entry should exist before replay");
 
-        let strategy = NonAnonymousPixStrategyInner {
-            cfg: NonAnonymousPixStrategyConfig {
+        let strategy = NonAnonymousPixStrategyInner::new(
+            NonAnonymousPixStrategyConfig {
                 price_per_byte,
                 max_ssa_allocation,
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
@@ -1517,13 +1667,9 @@ mod tests {
                 pix_recovery_db_path: Some(db_path.clone()),
                 pix_recovery_password_env: Some(TEST_PASSWORD_ENV.into()),
             },
-
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+            Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            None,
+        );
 
         strategy.replay_pending_recoveries(&store).await;
 
@@ -1571,8 +1717,8 @@ mod tests {
         register_test_safe(&chain_connector, *BOB).await?;
         let chain_connector = Arc::new(chain_connector);
 
-        let mut strategy = NonAnonymousPixStrategyInner {
-            cfg: NonAnonymousPixStrategyConfig {
+        let mut strategy = NonAnonymousPixStrategyInner::new(
+            NonAnonymousPixStrategyConfig {
                 price_per_byte: HoprBalance::new_base(1),
                 max_ssa_allocation: HoprBalance::new_base(100),
                 max_deposit_tracking_time: std::time::Duration::from_secs(5),
@@ -1580,12 +1726,9 @@ mod tests {
                 pix_recovery_db_path: None,
                 pix_recovery_password_env: None,
             },
-            node: Arc::new(ChainNode(Arc::clone(&chain_connector))),
-            recovery_store: None,
-            processed_deposits: Cache::builder().max_capacity(1024).build(),
-            in_flight_sweeps: Cache::builder().max_capacity(1024).build(),
-            in_flight_destinations: Cache::builder().max_capacity(1024).build(),
-        };
+            Arc::new(ChainNode(Arc::clone(&chain_connector))),
+            None,
+        );
 
         let safe_address = strategy.node.identity().safe_address;
 
@@ -1671,10 +1814,7 @@ mod tests {
         })
         .build(node);
 
-        assert!(
-            matches!(result, Err(_)),
-            "build should fail when password env var is missing"
-        );
+        assert!(result.is_err(), "build should fail when password env var is missing");
 
         Ok(())
     }
