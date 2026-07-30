@@ -20,6 +20,7 @@ crate-type = ["rlib"]
 default = []
 telemetry = ["dep:lazy_static", "hopr-api/types-telemetry"]
 runtime-tokio = ["libp2p/tokio", "hopr-transport-probe/runtime-tokio"]
+testing = []
 transport-quic = ["libp2p/quic", "dep:quinn-udp"]
 
 [dependencies]

@@ -104,6 +104,7 @@ testing = [
   "hopr-chain-connector/testing",
   "hopr-chain-connector/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-p2p/testing",
   "hopr-transport-p2p/transport-quic",
   "hopr-network-graph/petgraph",
   "hopr-network-graph/graph-api",
