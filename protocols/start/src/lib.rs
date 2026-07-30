@@ -159,14 +159,14 @@ pub enum StartProtocol<I, T, C, G, K> {
 /// Each of these messages contains commitments to polynomial coefficients that all belong
 /// to the same coefficient in each polynomial.
 ///
-/// The client always begins sending a message with `coefficient_index` equal to 0 to
-/// deliver the commitment to the SSA first.
+/// In practice every message carries `coefficient_index == 0`: PIX commits to each polynomial's
+/// constant term and nothing else, so the constant-term pass *is* the whole commitment. The field
+/// (and phase 2 of [`new_multiple`](Self::new_multiple), which now has nothing to emit) is retained
+/// because the wire format still admits higher coefficient indices; a peer that sends them merely
+/// wastes bandwidth, since the receiver ignores them.
 ///
-/// After that pass, [`new_multiple`](Self::new_multiple) emits the remaining coefficients a *block
-/// of polynomials* at a time rather than a coefficient at a time, so that individual polynomials
-/// become completely committed — and therefore verifiable — early and progressively instead of all
-/// at the very end. The receiving side does not depend on this order for correctness: it installs a
-/// polynomial's verifier whenever that polynomial's row happens to complete.
+/// See [`hopr_protocol_pix::SsaPartCommitment`] for why the non-constant coefficient commitments
+/// were dropped and what that costs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SsaClientCommitmentMessage<I, G, K> {
     /// Session ID.
@@ -178,6 +178,8 @@ pub struct SsaClientCommitmentMessage<I, G, K> {
     /// Zero value indicates the polynomial constant term commitment, which when summed over
     /// all polynomials for a given [`SsaIndex`](hopr_protocol_pix::SsaIndex)
     /// results in the Client's SSA commitment.
+    ///
+    /// This is always zero in practice — see the type-level documentation.
     pub coefficient_index: u16,
     /// Proof that the Client knows the discrete logarithm of its SSA commitment.
     ///
@@ -275,23 +277,14 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
             push_chunk(0, chunk);
         }
 
-        // Phase 2 — the remaining coefficients, a block of polynomials at a time.
+        // Phase 2 — any remaining coefficients, a block of polynomials at a time.
         //
-        // The Exit installs a polynomial's share verifier as soon as that polynomial's own row of
-        // coefficients is complete, so the order in which rows are completed decides how early
-        // shares can start being verified. Walking coefficient-major (the natural layout of
-        // `TransposedVerifiers`) completes *no* row until the very last message — ~18 700 of them at
-        // production dimensions — which is what forces every share arriving in the meantime to be
-        // deferred, and what makes the Exit hold the entire `polys × threshold` commitment matrix
-        // at once.
-        //
-        // Emitting one polynomial's row at a time would instead waste most of each packet, since a
-        // row is only `threshold` commitments long. Blocking by exactly the number of commitments
-        // that fit in one message gives both: every message stays full, and a whole block of
-        // polynomials becomes verifiable every `threshold - 1` messages.
-        //
-        // The block size is shared with phase 1's chunking, so block boundaries line up and no
-        // block straddles a partially filled constant-term message.
+        // Dead in practice: PIX commits to constant terms only, so `by_coefficient` is empty after
+        // the `remove(&0)` above and this loop body never runs. It is kept because the wire format
+        // still admits higher coefficient indices, and because the block-major layout is the
+        // non-obvious part — emitting one polynomial's row at a time would waste most of each
+        // packet, while walking coefficient-major would complete no polynomial until the very last
+        // message.
         let num_polys = constant_terms
             .len()
             .max(by_coefficient.values().map(|c| c.len()).max().unwrap_or(0));
@@ -1268,37 +1261,29 @@ mod tests {
         let messages: Vec<SsaClientCommitmentMessage<DummySessionId, HoprPixGroupElement, HoprPixCommitmentProof>> =
             SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment)?;
 
-        // Since 2048 polynomials per coefficient cannot fit into a single packet, the commitments
-        // of each coefficient are split across multiple messages, so there are far more messages
-        // than the threshold (= number of coefficient indices). The constant terms (coefficient
-        // index 0) must still be delivered first.
-        assert!(messages.len() > 64);
-        assert_eq!(0, messages[0].coefficient_index);
-
-        // Each coefficient index in 0..threshold must carry exactly 2048 commitments in total.
-        let mut commitments_per_coefficient = std::collections::BTreeMap::<u16, usize>::new();
-        for message in &messages {
-            *commitments_per_coefficient
-                .entry(message.coefficient_index)
-                .or_default() += message.coefficient_commitments.len();
-        }
-        assert_eq!(
-            (0u16..64).collect::<Vec<_>>(),
-            commitments_per_coefficient.keys().copied().collect::<Vec<_>>()
-        );
-        assert!(commitments_per_coefficient.values().all(|&count| count == 2048));
-
-        // The proof of knowledge rides on every constant-term message and on no other: presence is
-        // implied by the coefficient index rather than a flag, so the two must never disagree.
+        // PIX commits to constant terms only, so every message carries coefficient index 0 — the
+        // wire format still admits others, nothing produces them. 2048 commitments do not fit in
+        // one packet, so the pass spans many messages.
+        assert!(messages.len() > 1);
         assert!(
-            messages
-                .iter()
-                .all(|m| m.commitment_proof.is_some() == (m.coefficient_index == 0)),
-            "the proof must accompany exactly the constant-term messages"
+            messages.iter().all(|m| m.coefficient_index == 0),
+            "only constant-term commitments are ever emitted"
         );
+
+        // Between them they must carry exactly one commitment per polynomial.
+        let total: usize = messages.iter().map(|m| m.coefficient_commitments.len()).sum();
+        assert_eq!(2048, total);
+        let distinct: std::collections::BTreeSet<_> = messages
+            .iter()
+            .flat_map(|m| m.coefficient_commitments.keys().copied())
+            .collect();
+        assert_eq!(2048, distinct.len(), "each polynomial must be committed exactly once");
+
+        // The proof of knowledge rides on every constant-term message: presence is implied by the
+        // coefficient index rather than a flag, so the two must never disagree.
         assert!(
-            messages.iter().filter(|m| m.coefficient_index == 0).count() > 1,
-            "the constant-term pass must span several messages for this to be a meaningful check"
+            messages.iter().all(|m| m.commitment_proof.is_some()),
+            "the proof must accompany every constant-term message"
         );
 
         let mut max_encoded_size = 0;
@@ -1329,28 +1314,28 @@ mod tests {
             assert_eq!(msg_1, msg_2);
         }
 
-        // Verify that the largest encoded message leaves ≤10 bytes of headroom,
-        // ensuring the PAYLOAD_SIZE is tight against the real encoding.
+        // The packing must be tight: the largest encoded message must leave less than one entry's
+        // worth of headroom, or `new_multiple` is under-filling packets and emitting more of them
+        // than the cycle needs.
+        let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
+            + StartProtocol::<DummySessionId, (), (), HoprPixGroupElement, HoprPixCommitmentProof>::PIX_COEFF_COMMITMENT_REPR_SIZE;
         let headroom = ApplicationData::PAYLOAD_SIZE - max_encoded_size;
         assert!(
-            headroom <= 12,
-            "largest encoded SsaCommit ({} bytes) leaves {} bytes of headroom, expected ≤12",
-            max_encoded_size,
-            headroom
+            headroom < per_entry,
+            "largest encoded SsaCommit ({max_encoded_size} bytes) leaves {headroom} bytes of headroom, enough for \
+             another {per_entry}-byte entry"
         );
 
         Ok(())
     }
 
-    /// The emission order is what lets the Exit install a share verifier per polynomial instead of
-    /// waiting for the whole cycle, so it is a protocol property worth pinning rather than an
-    /// implementation detail of `new_multiple`.
-    ///
-    /// Two things must hold: the constant-term pass comes first (the deposit address is the sum of
-    /// every polynomial's constant term, so it needs all of them), and afterwards each polynomial's
-    /// remaining coefficients arrive close together, so that rows complete progressively.
+    /// The whole commitment is `polys` constant terms, so the message count is decided purely by
+    /// how many fit in a packet alongside the proof of knowledge. That bound is what
+    /// `MIN_COMMITMENTS_PER_SSA_COMMIT_MSG` in `transport/session/src/manager.rs` mirrors to size
+    /// the Start ingress channel, where an overflow silently kills a cycle — so it is worth
+    /// pinning here rather than leaving it an implementation detail of `new_multiple`.
     #[test]
-    fn start_protocol_ssa_commit_messages_should_complete_polynomial_rows_progressively() -> anyhow::Result<()> {
+    fn start_protocol_ssa_commit_messages_should_cover_every_polynomial_exactly_once() -> anyhow::Result<()> {
         const POLYS: u16 = 2048;
         const THRESHOLD: u16 = 64;
 
@@ -1367,61 +1352,31 @@ mod tests {
         let messages: Vec<SsaClientCommitmentMessage<DummySessionId, HoprPixGroupElement, HoprPixCommitmentProof>> =
             SsaClientCommitmentMessage::new_multiple::<HoprPixSpec>(session_id, commitment)?;
 
-        // Walk the messages in order, tracking how many coefficients each polynomial has received,
-        // and record after how many messages each polynomial's row became complete.
-        let mut received = std::collections::BTreeMap::<hopr_protocol_pix::PolynomialIndex, u16>::new();
-        let mut completed_at = Vec::new();
-        let mut constant_terms_done_at = None;
-        let mut constant_terms_seen = 0u16;
-
-        for (position, message) in messages.iter().enumerate() {
-            if message.coefficient_index == 0 {
-                constant_terms_seen += message.coefficient_commitments.len() as u16;
-                if constant_terms_seen == POLYS && constant_terms_done_at.is_none() {
-                    constant_terms_done_at = Some(position + 1);
-                }
-            }
+        // Every polynomial committed exactly once, no duplicates and no omissions.
+        let mut seen = std::collections::BTreeMap::<hopr_protocol_pix::PolynomialIndex, usize>::new();
+        for message in &messages {
             for poly_index in message.coefficient_commitments.keys() {
-                let count = received.entry(*poly_index).or_default();
-                *count += 1;
-                if *count == THRESHOLD {
-                    completed_at.push(position + 1);
-                }
+                *seen.entry(*poly_index).or_default() += 1;
             }
         }
+        assert_eq!(POLYS as usize, seen.len(), "every polynomial must be committed");
+        assert!(
+            seen.values().all(|&count| count == 1),
+            "no polynomial may be committed twice — the Exit rejects the second as a duplicate"
+        );
 
+        // Every message but the last must be packed to the same width, and that width is the
+        // per-message figure the channel sizing is derived from.
+        let widths: Vec<usize> = messages.iter().map(|m| m.coefficient_commitments.len()).collect();
+        let full = widths[0];
+        assert!(
+            widths[..widths.len() - 1].iter().all(|&w| w == full),
+            "all but the trailing message must be full, got {widths:?}"
+        );
         assert_eq!(
-            completed_at.len(),
-            POLYS as usize,
-            "every polynomial's row must eventually complete"
-        );
-
-        // The constant-term pass must finish before any row does — a verifier is useless to the
-        // Exit until the SSA commitment (and hence the deposit address) is known.
-        let constant_terms_done_at =
-            constant_terms_done_at.ok_or_else(|| anyhow::anyhow!("constant-term pass never completed"))?;
-        assert!(
-            constant_terms_done_at <= completed_at[0],
-            "constant terms must be delivered before the first row completes ({constant_terms_done_at} vs {})",
-            completed_at[0]
-        );
-
-        // The essential property: rows complete progressively. Under the old coefficient-major
-        // emission every row completed only on the very last message, so the first completion sat at
-        // `messages.len()`. Require the first row to be done within the first quarter of the stream.
-        assert!(
-            completed_at[0] <= messages.len() / 4,
-            "the first polynomial row should complete early, but did so only at message {}/{}",
-            completed_at[0],
-            messages.len()
-        );
-
-        // ...and spread out, rather than all landing at the end.
-        let midpoint_completions = completed_at.iter().filter(|&&at| at <= messages.len() / 2).count();
-        assert!(
-            midpoint_completions >= POLYS as usize / 4,
-            "at least a quarter of the rows should be complete by the halfway point, got \
-             {midpoint_completions}/{POLYS}"
+            messages.len(),
+            (POLYS as usize).div_ceil(full),
+            "the message count must be exactly what the packing implies"
         );
 
         Ok(())

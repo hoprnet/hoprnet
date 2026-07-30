@@ -14,10 +14,8 @@ use hopr_types::{
         typenum::{IsGreaterOrEqual, IsLess, IsLessOrEqual, NonZero, Prod, True, U2},
     },
 };
-#[cfg(feature = "rayon")]
-use hopr_utils::parallelize::cpu::rayon::prelude::*;
 use vsss_rs::{
-    DefaultShare, IdentifierPrimeField, Share, ShareElement, ShareVerifierGroup, ValueGroup,
+    DefaultShare, IdentifierPrimeField,
     elliptic_curve::{Curve, CurveArithmetic, PrimeCurve, PrimeField, consts::U256},
 };
 
@@ -45,6 +43,13 @@ pub use vsss_rs::elliptic_curve::{
 pub mod prelude {
     pub use super::*;
 }
+
+/// Coefficient index of the polynomial constant term.
+///
+/// The only coefficient PIX commits to: see [`SsaPartCommitment`] for why the rest are not sent.
+/// The wire format still carries a `coefficient_index`, so a peer *may* send others — the Exit
+/// ignores them.
+pub const CONSTANT_TERM_COEFFICIENT: CoefficientIndex = 0;
 
 /// Number of polynomials per SSA.
 pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
@@ -199,18 +204,48 @@ pub(crate) fn into_completed_share<S: PixSpec>(
     })
 }
 
-/// Verifier for shares of a polynomial with the given [`SsaPolynomialId`].
+/// Commitment to the constant term of the polynomial with the given [`SsaPolynomialId`].
 ///
-/// This contains commitments to all coefficients of the polynomial with the given [`SsaPolynomialId`].
+/// ## Why only the constant term
+///
+/// This used to be a full Feldman verifier — a commitment to *every* coefficient — so that each
+/// individual share could be checked the moment it arrived. Classic VSS needs that, because its
+/// shares sit with mutually distrusting parties that reconstruct later. PIX has exactly **one**
+/// shareholder: the Exit holds every share, reconstructs locally, is the whole quorum, and
+/// consumes only the recovered constant term. Checking `a₀·G == C₀` once, on the reconstructed
+/// part, is therefore deterministic and exact for the property actually relied upon — and costs
+/// one scalar multiplication per polynomial instead of `threshold` per share.
+///
+/// What the per-coefficient commitments did buy was fault *isolation*: one bad share could be
+/// rejected on arrival and its slot refilled from the surplus. That is given up. A share that
+/// fails to reconstruct implies a dishonest or broken Entry — it travels inside a
+/// Sphinx-authenticated SURB, and its decryption key is fixed by the very acknowledgement
+/// challenge it is filed under, so there is no benign path to a corrupt one — and such an Entry
+/// has already funded the deposit it thereby forfeits. The price paid is detection latency:
+/// a dishonest Entry is caught on the `threshold`-th share of a polynomial rather than the first.
+///
+/// [`surplus_shares`](SsaGeneratorConfig::surplus_shares) still absorbs *lost* shares, since
+/// reconstruction starts at the first `threshold` distinct shares that arrive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PartialSsaShareVerifier<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
+pub struct SsaPartCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     pub(crate) spi: SsaPolynomialId<P>,
-    pub(crate) poly_commitment: Vec<ShareVerifierGroup<PixGroup<S>>>,
+    #[cfg_attr(feature = "serde", serde(with = "elliptic_curve_tools::group"))]
+    pub(crate) constant_term: PixGroup<S>,
 }
 
-impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
-    /// Returns the [`SsaPolynomialId`] of the polynomial corresponding to this verifier.
+impl<S: PixSpec> SsaPartCommitment<S, S::Pseudonym> {
+    /// Creates a commitment from an **already decoded and subgroup-checked** group element.
+    ///
+    /// The only decode is [`decode_commitment`](Self::decode_commitment), performed once when the
+    /// commitment arrives on the wire. Decompression requires a modular square root and is the
+    /// dominant per-commitment cost, so nothing here decodes a second time.
+    #[inline]
+    pub fn from_decoded_commitment(spi: SsaPolynomialId<S::Pseudonym>, constant_term: PixGroup<S>) -> Self {
+        Self { spi, constant_term }
+    }
+
+    /// Returns the [`SsaPolynomialId`] of the polynomial this commitment belongs to.
     #[inline]
     pub fn spi(&self) -> &SsaPolynomialId<S::Pseudonym> {
         &self.spi
@@ -219,35 +254,17 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
     /// Returns the commitment to the constant term of the polynomial.
     #[inline]
     pub fn constant_term(&self) -> &PixGroup<S> {
-        // Constant term is the second entry, first is always the generator.
-        &self.poly_commitment[1].0
+        &self.constant_term
     }
 
-    /// Minimum number of shares required to reconstruct the polynomial corresponding to this verifier.
-    #[inline]
-    pub fn min_shares(&self) -> usize {
-        // For a polynomial of degree t, there has to be t+1 shares to reconstruct it.
-        // However, there are t+2 commitments for a polynomial of degree t (t+1 coefficient commitments + 1 generator),
-        // so the minimum number of shares required to reconstruct the polynomial is equal
-        // to the number of commitments minus 1.
-        self.poly_commitment.len() - 1
-    }
-
-    /// Converts this verifier into a tuple containing the [`SsaPolynomialId`] and the serialized polynomial
-    /// coefficient commitments.
+    /// Checks a reconstructed constant term against this commitment.
     ///
-    /// The generator (first entry) is omitted by position. The remaining entries are all coefficient
-    /// commitments regardless of their value, because a coefficient commitment equal to the generator
-    /// validly represents scalar coefficient 1.
-    pub fn into_serializable_commitments(self) -> (SsaPolynomialId<S::Pseudonym>, Vec<PixGroupRepr<S>>) {
-        (
-            self.spi,
-            self.poly_commitment
-                .into_iter()
-                .skip(1) // Omit the structural generator at index 0 by position
-                .map(|c| c.to_bytes())
-                .collect(),
-        )
+    /// This is the *entire* verification the Exit performs on a polynomial, and it happens once,
+    /// after `threshold` shares have been interpolated. A mismatch means at least one of those
+    /// shares did not come from the committed polynomial; it does not say which.
+    #[inline]
+    pub fn verify_reconstructed(&self, secret: &PixScalar<S>) -> bool {
+        PixGroup::<S>::mul_by_generator(secret) == self.constant_term
     }
 
     /// Decodes a single serialized coefficient commitment into a group element.
@@ -262,113 +279,10 @@ impl<S: PixSpec> PartialSsaShareVerifier<S, S::Pseudonym> {
             .filter(|pt| bool::from(pt.is_torsion_free()))
             .ok_or(errors::PixError::InvalidInput)
     }
-
-    /// Tries to create a new verifier from [`SsaPolynomialId`] and serialized polynomial coefficient commitments.
-    ///
-    /// The `poly_commitments` do not need to contain the generator, because it is added automatically.
-    /// Each entry is validated with [`decode_commitment`](Self::decode_commitment).
-    pub fn from_serializable_commitments(
-        spi: SsaPolynomialId<S::Pseudonym>,
-        poly_commitments: Vec<PixGroupRepr<S>>,
-    ) -> errors::Result<Self, S::Pseudonym> {
-        let recv_commitments = poly_commitments
-            .into_iter()
-            .map(|c| Self::decode_commitment(&c).map(ShareVerifierGroup::<PixGroup<S>>::from));
-
-        // Re-add the generator as the first entry
-        let poly_commitment = std::iter::once(Ok(ShareVerifierGroup::<PixGroup<S>>::generator()))
-            .chain(recv_commitments)
-            .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
-        if poly_commitment.len() < 2 {
-            return Err(errors::PixError::InvalidInput);
-        }
-        Ok(Self { spi, poly_commitment })
-    }
-
-    /// Creates a new verifier from [`SsaPolynomialId`] and coefficient commitments that were
-    /// **already decoded and subgroup-checked** by [`decode_commitment`](Self::decode_commitment).
-    ///
-    /// This is the counterpart of
-    /// [`from_serializable_commitments`](Self::from_serializable_commitments) for callers that
-    /// decode incrementally as commitments arrive on the wire, so that every commitment is
-    /// decompressed exactly once. Decompression requires a modular square root, and there are
-    /// `polys × threshold` commitments per SSA (over half a million at default dimensions), which
-    /// makes a second decode a dominant and entirely avoidable cost.
-    ///
-    /// The generator is prepended automatically, so `poly_commitments` must not contain it.
-    pub fn from_decoded_commitments(
-        spi: SsaPolynomialId<S::Pseudonym>,
-        poly_commitments: impl IntoIterator<Item = PixGroup<S>>,
-    ) -> errors::Result<Self, S::Pseudonym> {
-        let poly_commitment: Vec<_> = std::iter::once(ShareVerifierGroup::<PixGroup<S>>::generator())
-            .chain(
-                poly_commitments
-                    .into_iter()
-                    .map(ShareVerifierGroup::<PixGroup<S>>::from),
-            )
-            .collect();
-        if poly_commitment.len() < 2 {
-            return Err(errors::PixError::InvalidInput);
-        }
-        Ok(Self { spi, poly_commitment })
-    }
-
-    pub(crate) fn verify_completed_share(&self, share: &CompletedShare<S>) -> errors::Result<(), S::Pseudonym> {
-        if (share.value().is_zero() | share.identifier().is_zero()).into() {
-            return Err(vsss_rs::Error::InvalidShare.into());
-        }
-        if self.poly_commitment[0].is_zero().into() {
-            return Err(vsss_rs::Error::InvalidGenerator("generator is identity").into());
-        }
-
-        let mut i = IdentifierPrimeField::<PixScalar<S>>::one();
-        let mut scalars = Vec::with_capacity(self.poly_commitment.len() - 2);
-
-        // The below multi-scalar multiplication method (MSM) is more efficient
-        // for large polynomial degrees than Horner's method because it can be parallelized.
-
-        // Computes x^1, x^2, x^3, ... x^t
-        for _ in 0..self.poly_commitment.len() - 2 {
-            *i.as_mut() *= share.identifier().as_ref();
-            scalars.push(i);
-        }
-
-        #[cfg(feature = "rayon")]
-        let scalars_iter = scalars.into_par_iter();
-
-        #[cfg(not(feature = "rayon"))]
-        let scalars_iter = scalars.into_iter();
-
-        // v[1] + v[2]*x + v[3]*x^2 + ... + v[t]*x^t
-        let rhs = self.poly_commitment[1].0
-            + scalars_iter
-                .enumerate()
-                .map(|(i, c)| (self.poly_commitment[i + 2] * c).0)
-                .sum::<PixGroup<S>>();
-
-        let rhs = ValueGroup::from(rhs);
-        let lhs = self.poly_commitment[0] * share.value();
-
-        let res = rhs - lhs;
-
-        if res.is_zero().into() {
-            Ok(())
-        } else {
-            Err(vsss_rs::Error::InvalidShare.into())
-        }
-    }
-
-    /// Verifies that the given `share` corresponding to `msg` belongs to the polynomial associated with this verifier.
-    #[inline]
-    pub fn verify(&self, share: &PartialSsaShare<S>, msg: impl AsRef<[u8]>) -> errors::Result<(), S::Pseudonym> {
-        let msg = S::msg_to_scalar(&self.spi, msg)?;
-        self.verify_completed_share(&into_completed_share(msg, share)?)
-    }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use anyhow::Context;
     use hopr_types::{
         crypto::{
             crypto_traits,
@@ -377,7 +291,7 @@ pub(crate) mod tests {
         primitive::prelude::Address,
     };
     use vsss_rs::{
-        ParticipantIdGeneratorType,
+        ParticipantIdGeneratorType, ReadableShareSet, ShareVerifierGroup,
         elliptic_curve::{Field, rand_core::CryptoRng},
         feldman,
     };
@@ -436,92 +350,87 @@ pub(crate) mod tests {
         Ok((shares, verifier_set))
     }
 
-    #[test]
-    fn ssa_share_verifier_must_correspond_to_standard() -> anyhow::Result<()> {
-        let mut rng = rand::rng();
-        let secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut rng);
-
-        let spi = SsaPolynomialId::new(
+    fn test_spi() -> anyhow::Result<SsaPolynomialId<SimplePseudonym>> {
+        Ok(SsaPolynomialId::new(
             SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
             1,
-        );
+        ))
+    }
+
+    /// The commitment PIX keeps must be exactly the constant-term entry of a standard Feldman
+    /// verifier set, and interpolating `threshold` of the standard shares must open it.
+    ///
+    /// This is the replacement for the old per-share verification test: the property the Exit now
+    /// relies on is not "every share lies on the committed polynomial" but "the reconstructed
+    /// constant term is the one that was committed to".
+    #[test]
+    fn ssa_part_commitment_must_correspond_to_standard() -> anyhow::Result<()> {
+        const THRESHOLD: usize = 10;
+
+        let mut rng = rand::rng();
+        let secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut rng);
+        let spi = test_spi()?;
+
         let x = (0..=20_u32)
             .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
 
-        let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
-
-        assert_eq!(verifier.len(), 11);
-
-        let verifier: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
-            spi,
-            poly_commitment: verifier,
-        };
-
+        let (shares, verifier) = standard_shamir_generate::<TestSpec>(secret, THRESHOLD, &x, &mut rng)?;
         assert_eq!(shares.len(), x.len());
-        assert_eq!(verifier.min_shares(), 10);
-        assert_eq!(verifier.poly_commitment.len() - 1, verifier.min_shares());
+        // [generator, C₀, C₁ … C_{t-1}] — PIX now keeps only the second entry.
+        assert_eq!(verifier.len(), THRESHOLD + 1);
 
-        for (i, s) in shares.into_iter().enumerate() {
-            let share: PartialSsaShare<TestSpec> = PartialSsaShare(s.value.0.to_repr());
-            verifier
-                .verify(&share, (i as u32).to_be_bytes())
-                .context(format!("Verification failed for share index {i}"))?;
-        }
+        let commitment = SsaPartCommitment::<TestSpec>::from_decoded_commitment(spi, verifier[1].0);
+        assert_eq!(&verifier[1].0, commitment.constant_term());
+        assert_eq!(&spi, commitment.spi());
+
+        // Exactly `threshold` shares suffice, and they open the commitment.
+        let reconstructed = shares[..THRESHOLD].to_vec().combine().map_err(anyhow::Error::msg)?.0;
+        assert_eq!(secret, reconstructed, "threshold shares must recover the secret");
+        assert!(commitment.verify_reconstructed(&reconstructed));
+
+        // Any other scalar must not.
+        assert!(!commitment.verify_reconstructed(&(reconstructed + PixScalar::<TestSpec>::ONE)));
 
         Ok(())
     }
 
+    /// A single corrupted share is not detected on arrival — that is the cost of dropping the
+    /// per-coefficient commitments — but it does surface at reconstruction.
     #[test]
-    fn ssa_share_verifier_must_be_convertible_to_and_from_serializable_commitments() -> anyhow::Result<()> {
+    fn ssa_part_commitment_must_reject_a_corrupted_share_set() -> anyhow::Result<()> {
+        const THRESHOLD: usize = 10;
+
         let mut rng = rand::rng();
         let secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut rng);
+        let spi = test_spi()?;
 
-        let spi = SsaPolynomialId::new(
-            SsaId::new(SimplePseudonym::try_from([0u8; 10].as_ref())?, 1.try_into()?),
-            1,
-        );
         let x = (0..=20_u32)
             .map(|i| TestSpec::msg_to_scalar(&spi, i.to_be_bytes()).unwrap())
             .collect::<Vec<_>>();
 
-        let (_, verifier) = standard_shamir_generate::<TestSpec>(secret, 10, &x, &mut rng)?;
+        let (mut shares, verifier) = standard_shamir_generate::<TestSpec>(secret, THRESHOLD, &x, &mut rng)?;
+        let commitment = SsaPartCommitment::<TestSpec>::from_decoded_commitment(spi, verifier[1].0);
 
-        let verifier_1: PartialSsaShareVerifier<TestSpec> = PartialSsaShareVerifier {
-            spi,
-            poly_commitment: verifier,
-        };
+        *shares[3].value.as_mut() += PixScalar::<TestSpec>::ONE;
 
-        assert!(PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, vec![]).is_err());
-
-        let (spi, poly_commitments) = verifier_1.clone().into_serializable_commitments();
-        let verifier_2: PartialSsaShareVerifier<TestSpec> =
-            PartialSsaShareVerifier::from_serializable_commitments(spi, poly_commitments)?;
-        assert_eq!(verifier_1, verifier_2);
+        let reconstructed = shares[..THRESHOLD].to_vec().combine().map_err(anyhow::Error::msg)?.0;
+        assert_ne!(secret, reconstructed);
+        assert!(
+            !commitment.verify_reconstructed(&reconstructed),
+            "a corrupted share must make the reconstructed part fail its commitment"
+        );
 
         Ok(())
     }
 
+    /// A commitment equal to the generator represents constant term 1 and must survive decoding —
+    /// no value-based filtering is applied.
     #[test]
-    fn from_serializable_commitments_roundtrip_generator_valued_coefficients()
-    -> errors::Result<(), <TestSpec as PixSpec>::Pseudonym> {
-        let spi = SsaPolynomialId::new(
-            SsaId::new(
-                SimplePseudonym::try_from([0u8; 10].as_ref()).unwrap(),
-                1.try_into().unwrap(),
-            ),
-            1,
-        );
-        // A polynomial whose coefficient commitments are all the generator point:
-        // these must round-trip correctly since generator-valued coefficients are
-        // legitimate (they represent scalar coefficient 1).
-        let all_generator = vec![PixGroup::<TestSpec>::generator().to_bytes(); 10];
-        let verifier = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, all_generator.clone())?;
-        let (_, serialized) = verifier.into_serializable_commitments();
-        assert_eq!(
-            serialized, all_generator,
-            "all generator-valued coefficients must round-trip exactly"
-        );
+    fn decode_commitment_accepts_a_generator_valued_commitment() -> errors::Result<(), SimplePseudonym> {
+        let generator = PixGroup::<TestSpec>::generator();
+        let decoded = SsaPartCommitment::<TestSpec>::decode_commitment(&generator.to_bytes())?;
+        assert_eq!(generator, decoded);
         Ok(())
     }
 }

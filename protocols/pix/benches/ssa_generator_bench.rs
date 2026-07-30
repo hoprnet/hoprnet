@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use common::TestSpec;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
-    DEFAULT_POLYS_PER_SSA, EntryShareGenerator, GeneratedShare, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
+    DEFAULT_POLYS_PER_SSA, EntryShareGenerator, PixScalar, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
 };
 use hopr_types::{crypto::prelude::SimplePseudonym, crypto_random::Randomizable};
 
@@ -97,20 +97,22 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_verify(c: &mut Criterion) {
-    let mut group = c.benchmark_group("SsaShareVerifier::verify");
+/// Cost of opening one polynomial's commitment: the single elliptic curve operation the Exit
+/// performs per polynomial, replacing the `threshold`-term MSM that used to run per *share*.
+///
+/// Parameterised by threshold only so the figures line up with the historical
+/// `SsaShareVerifier::verify` series it supersedes; the cost is in fact threshold-independent,
+/// which is the whole point.
+fn bench_verify_reconstructed(c: &mut Criterion) {
+    let mut group = c.benchmark_group("SsaPartCommitment::verify_reconstructed");
     group.throughput(Throughput::Elements(1));
     group.measurement_time(Duration::from_secs(10));
     group.sample_size(10);
 
     let pseudonym = SimplePseudonym::random();
-    let x = hopr_types::crypto_random::random_bytes::<10>();
 
     let mut index = SsaIndex::MIN;
     for &threshold in &THRESHOLDS {
-        // Verification touches exactly one polynomial's commitments, so a single polynomial
-        // is enough. Committing at production width here would spend seconds per threshold
-        // building 8191 verifiers that are never used.
         let cfg = SsaGeneratorConfig {
             threshold,
             polynomials_per_ssa: 1,
@@ -120,17 +122,16 @@ fn bench_verify(c: &mut Criterion) {
         let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
         index = index.checked_add(1).unwrap();
 
-        let GeneratedShare { share, .. } = generator.next_share(&pseudonym, &x).unwrap().unwrap();
-
-        let verifiers = c.reconstruct_verifiers().unwrap();
-        let verifier = &verifiers[0];
+        let commitments = c.reconstruct_part_commitments().unwrap();
+        let commitment = &commitments[0];
+        let secret = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("t{threshold}")),
             &threshold,
             |b, _| {
                 b.iter(|| {
-                    verifier.verify(&share, x).unwrap();
+                    std::hint::black_box(commitment.verify_reconstructed(&secret));
                 });
             },
         );
@@ -236,7 +237,7 @@ fn bench_next_share_no_ssa(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_new_ssa_commitment,
-    bench_verify,
+    bench_verify_reconstructed,
     bench_next_share,
     bench_next_share_no_ssa
 );

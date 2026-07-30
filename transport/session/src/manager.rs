@@ -133,9 +133,8 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 /// (`PolynomialIndex` + one serialized group element). Using a *lower* bound here means the derived
 /// message count is an over-estimate, which is the safe direction for sizing a queue.
 ///
-/// The commitment proof of knowledge is subtracted as well. It only rides on constant-term messages,
-/// so the true per-message figure is higher for the rest of the cycle — but a lower bound is exactly
-/// what makes the derived message count safe, so the smaller of the two is the right one to use.
+/// The commitment proof of knowledge is subtracted as well. Every message carries it, since every
+/// message is a constant-term message.
 const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
     const FIXED_PREFIX: usize = 12;
     // A `SessionId` is a 10-byte pseudonym; 64 bytes is a large allowance for its CBOR framing.
@@ -161,10 +160,14 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// dies on the deposit kill switch.
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
-/// set of an SSA cycle — `polys × threshold` commitments, chunked into packet-sized messages. The
-/// capacity is therefore derived from the largest quota this node will accept
-/// ([`IncomingSessionPixConfig::quota_range`]), since `quota / PAYLOAD_SIZE` is exactly the number
-/// of commitments that quota implies, plus a reserve for ordinary Start traffic.
+/// set of an SSA cycle, chunked into packet-sized messages. The capacity is derived from the
+/// largest quota this node will accept ([`IncomingSessionPixConfig::quota_range`]), since
+/// `quota / PAYLOAD_SIZE` is `polys × threshold`, plus a reserve for ordinary Start traffic.
+///
+/// That is now a `threshold`-fold over-estimate — a cycle only carries `polys` commitments, one
+/// constant term each — because the quota alone does not reveal how the product splits. Left as
+/// is: over-provisioning is the safe direction for a channel whose overflow silently kills a
+/// cycle, and the capacity only bounds the queue, it does not reserve it.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     let max_commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
@@ -189,8 +192,26 @@ const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Minimum timeout until an unfinished frame is discarded.
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
-/// Maximum number of PIX shares that can fail verification before the session is closed.
-const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 3;
+
+/// Number of PIX verification failures tolerated before the session is closed.
+///
+/// Zero: the first failure closes the session.
+///
+/// A failure now means a whole polynomial's share set did not open its commitment (or a single
+/// share that was not a valid field element), not an individual share caught by a per-share
+/// Feldman check — those were dropped along with the non-constant coefficient commitments, see
+/// [`hopr_protocol_pix::SsaPartCommitment`]. That changes what tolerating failures would buy:
+///
+/// * A failed polynomial already dooms the whole cycle, because the SSA is the sum of *every* polynomial's constant
+///   term. There is no partial recovery to preserve.
+/// * A share that fails to reconstruct implies a dishonest or broken Entry — the share arrives inside a
+///   Sphinx-authenticated SURB and is decrypted with the key its own acknowledgement challenge fixes, so there is no
+///   benign path to a corrupt one.
+///
+/// Detection is also later than it used to be: the failure surfaces on the `threshold`-th share of
+/// the polynomial, so the Exit has already served that many packets. Closing on the first failure
+/// is what keeps that exposure at `threshold` packets instead of a multiple of it.
+const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 0;
 
 /// Maximum number of SSA commitments an Entry will accept in a single [`SsaServerCommitmentMessage`].
 ///
@@ -251,16 +272,17 @@ impl std::fmt::Display for SessionHandles {
 #[derive(Clone)]
 struct SessionSsaState {
     current_index: Arc<std::sync::atomic::AtomicU32>,
-    /// Cumulative count of unverifiable PIX shares across all SSA cycles (intentional).
+    /// Cumulative count of PIX verification failures across all SSA cycles (intentional).
     ///
     /// This is *not* reset per SSA cycle: a steady trickle of 1 error per cycle
     /// should still escalate to session closure, since an unreliable channel is
     /// unlikely to improve on its own. The session closes once the *total* number
-    /// of unverifiable shares across all SSA cycles exceeds
-    /// `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`. An
-    /// `AtomicUsize` is safe here because duplicates are already rejected by the
-    /// moka cache (keyed by `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by
-    /// share identifier), so no share triggers two errors.
+    /// across all SSA cycles exceeds `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`, which is
+    /// currently 0 — so the counter is really a tripwire, kept as a counter so the
+    /// tolerance remains a one-constant decision. An `AtomicUsize` is safe here
+    /// because duplicates are already rejected by the moka cache (keyed by
+    /// `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by share identifier), and a
+    /// failed polynomial reports once and then goes quiet, so nothing double-counts.
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
     polys_per_ssa: u16,
     shares_per_poly: u16,
@@ -842,11 +864,12 @@ impl PixToolbox {
 ///
 /// ### 6. Unverifiable Shares
 ///
-/// If the reconstructor receives a share whose proof-of-correspondence cannot be verified
-/// against its polynomial commitment, an [`HoprSessionInPixEvent::UnverifiableShare`]
-/// event fires. After `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES` (3) such events, the
-/// Session is forcefully closed to prevent a malicious Entry from wasting the Exit's
-/// resources.
+/// Shares are not checked individually. Once a polynomial has collected `threshold` of them,
+/// the reconstructor interpolates its constant term and compares it against the commitment; if
+/// they disagree, at least one of those shares did not come from the committed polynomial and an
+/// [`HoprSessionInPixEvent::UnverifiableShare`] event fires. `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`
+/// is 0, so the first such event closes the Session — the cycle is already unrecoverable, and
+/// closing immediately caps what a malicious Entry is served at `threshold` packets.
 ///
 /// ### Configuring PIX at the Exit
 ///
@@ -5147,20 +5170,20 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a session is automatically closed after receiving more than the allowed number
-    /// of `UnverifiableShare` PIX events (the configurable fault tolerance threshold).
+    /// Verifies that a session is closed on the very first `UnverifiableShare` PIX event.
+    ///
+    /// An event now means a whole polynomial failed to open its commitment, which already dooms
+    /// the cycle — so [`MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`] is 0 and there is nothing to
+    /// tolerate. See that constant for the reasoning.
     ///
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
     ///    via `handle_incoming_session_initiation`.
-    /// 2. The test dispatches four `UnverifiableShare` events for the same `SsaId` in a loop, calling
-    ///    `dispatch_pix_event` each time.
-    /// 3. After the first 3 events, `num_active_sessions` is still 1 and `active_sessions` is non-empty — the session
-    ///    remains open (below the fault threshold).
-    /// 4. After the 4th event, the session is closed. `active_sessions` is empty and `num_active_sessions` is 0,
-    ///    confirming the kill switch fired.
+    /// 2. One `UnverifiableShare` event is dispatched for the session's `SsaId`.
+    /// 3. The session is closed: `active_sessions` is empty and `num_active_sessions` is 0, confirming the kill switch
+    ///    fired.
     #[test_log::test(tokio::test)]
-    async fn session_is_closed_after_too_many_unverifiable_shares() -> anyhow::Result<()> {
+    async fn session_is_closed_on_the_first_unverifiable_share() -> anyhow::Result<()> {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
@@ -5213,22 +5236,15 @@ mod tests {
         )
         .await?;
 
+        assert_eq!(mgr.num_active_sessions(), 1, "the session must start out open");
+
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::MIN);
-        for i in 1..=4 {
-            mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
-                .await?;
-            if i < 4 {
-                assert!(
-                    !mgr.active_sessions().is_empty(),
-                    "session should remain open after {i} error(s)"
-                );
-                assert_eq!(mgr.num_active_sessions(), 1);
-            }
-        }
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+            .await?;
 
         assert!(
             mgr.active_sessions().is_empty(),
-            "session must be closed after 4 unverifiable shares"
+            "session must be closed by the first unverifiable share"
         );
         assert_eq!(mgr.num_active_sessions(), 0);
 
@@ -6361,13 +6377,14 @@ mod tests {
 
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
 
-        // `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES = 3`, so 4 dispatch events close the session.
-        // The first 3 increment the counter; the 4th exceeds the limit.
+        // One more event than the tolerance allows. At the current tolerance of 0 that is a single
+        // event; the loop is written against the constant so lifting the tolerance would not
+        // silently turn this into a test of nothing.
         for _ in 0..=MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES {
             let result = mgr
                 .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
                 .await;
-            // The first 3 succeed; the 4th also "succeeds" because closing the session returns Ok.
+            // The closing event also "succeeds" because closing the session returns Ok.
             assert!(result.is_ok(), "dispatch_pix_event should not return an error");
         }
 

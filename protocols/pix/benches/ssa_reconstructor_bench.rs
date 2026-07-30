@@ -27,9 +27,10 @@ use std::time::{Duration, Instant};
 use common::TestSpec;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
-    CoefficientIndex, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    PartialSsaShareVerifier, PixGroupRepr, PolynomialIndex, ShareResolution, SsaCommitmentProof, SsaGeneratorConfig,
-    SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    CONSTANT_TERM_COEFFICIENT, CoefficientIndex, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
+    ExitAcknowledgementShareProcessor, PixGroupRepr, PolynomialIndex, ShareResolution, SsaCommitmentProof,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaPartCommitment, SsaReconstructor, SsaReconstructorConfig,
+    SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -121,19 +122,12 @@ const PRE_FILL_POLYS: u16 = 256;
 /// still measured for the sustained-rate group under `all-benchmarks`.
 const ACK_BENCH_POLYS: u16 = 512;
 
-/// Polynomial count for the groups that time a *whole* commitment matrix.
+/// Polynomial count for the deferred-drain group.
 ///
-/// A production matrix is `8192 × 64 = 524 288` commitments. At the cost this benchmark
-/// measures — around 150 µs each, dominated by point decompression and the cofactor-8
-/// subgroup check in `decode_commitment` — inserting one takes well over a minute, so ten
-/// criterion samples of a single parameter point would run for a quarter of an hour.
-///
-/// These groups therefore keep the production *threshold* (which is what determines verifier
-/// size and when a polynomial row completes) but narrow the polynomial count. The reported
-/// figure is per commitment and is essentially independent of how many polynomials are in
-/// flight, so multiplying by `PROD_POLYS_PER_SSA / FULL_MATRIX_POLYS` gives the whole-cycle
-/// cost. The production width is still available under `all-benchmarks`.
-const FULL_MATRIX_POLYS: u16 = 512;
+/// Narrower than production on purpose: the cost isolated there is per deferred
+/// acknowledgement, not per commitment, so it does not depend on how many polynomials the
+/// cycle has — and the whole fixture is rebuilt per iteration.
+const DEFERRED_DRAIN_POLYS: u16 = 512;
 
 /// Reconstructor configuration for benchmarks.
 ///
@@ -165,97 +159,69 @@ fn gen_cfg(polys: u16, threshold: u16) -> SsaGeneratorConfig {
 /// `(polynomial index, commitment)` pairs.
 type CommitMessage<'a> = (CoefficientIndex, &'a [(PolynomialIndex, PixGroupRepr<TestSpec>)]);
 
-/// A whole commitment matrix, indexed by coefficient, each row sorted by polynomial index.
-type CommitmentMatrix = Vec<Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>>;
+/// A cycle's whole commitment set: one constant term per polynomial, sorted by polynomial index.
+///
+/// PIX commits to nothing else — the non-constant coefficient commitments were dropped, taking
+/// `polys × (threshold - 1)` decodes per cycle with them.
+type ConstantTerms = Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>;
 
 /// A generated cycle: the generator holding the polynomials, the pseudonym it belongs to, the
-/// commitment matrix the Exit has to be fed, and the proof of knowledge that accompanies the
-/// constant terms — without which the Exit refuses the cycle.
+/// commitments the Exit has to be fed, and the proof of knowledge that accompanies them —
+/// without which the Exit refuses the cycle.
 type GeneratedCycle = (
     SsaShareGenerator<TestSpec>,
     SimplePseudonym,
-    CommitmentMatrix,
+    ConstantTerms,
     SsaCommitmentProof<TestSpec>,
 );
 
-/// Orders a whole commitment matrix into the sequence of `SsaCommit` messages the Exit
-/// actually receives.
+/// Chunks a cycle's commitments into the sequence of `SsaCommit` messages the Exit receives.
 ///
-/// Replicates `SsaClientCommitmentMessage::new_multiple` (`protocols/start/src/lib.rs`),
-/// which cannot be called from here because `hopr-protocol-start` depends on this crate:
+/// Replicates `SsaClientCommitmentMessage::new_multiple` (`protocols/start/src/lib.rs`), which
+/// cannot be called from here because `hopr-protocol-start` depends on this crate. That is now a
+/// single pass over the constant terms; the block-major second phase it used to have has nothing
+/// left to emit.
 ///
-/// 1. coefficient 0 for every polynomial, chunked into packet-sized messages, then
-/// 2. for each block of [`COMMITMENTS_PER_SSA_COMMIT_MSG`] polynomials, every remaining coefficient's slice for that
-///    block.
-///
-/// The order matters: it is what makes individual polynomial rows complete progressively,
-/// so verifiers are installed a row at a time instead of all at once at the end.
-/// `commitments` must already be sorted by polynomial index within each coefficient.
-fn wire_order(
-    commitments: &[Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>],
-    num_polys: usize,
-) -> Vec<CommitMessage<'_>> {
-    let mut msgs = Vec::new();
-
-    // Phase 1: the constant terms, which is what lets the SSA commitment be computed.
-    if let Some(constants) = commitments.first() {
-        for chunk in constants.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
-            msgs.push((0 as CoefficientIndex, chunk));
-        }
-    }
-
-    // Phase 2: block-major over the remaining coefficients, so each block of polynomials
-    // is completed before moving on to the next.
-    for block_start in (0..num_polys).step_by(COMMITMENTS_PER_SSA_COMMIT_MSG) {
-        let block_end = (block_start + COMMITMENTS_PER_SSA_COMMIT_MSG).min(num_polys);
-        for (coeff_index, coeff) in commitments.iter().enumerate().skip(1) {
-            if block_start < coeff.len() {
-                let end = block_end.min(coeff.len());
-                msgs.push((coeff_index as CoefficientIndex, &coeff[block_start..end]));
-            }
-        }
-    }
-
-    msgs
+/// `constant_terms` must already be sorted by polynomial index.
+fn wire_order(constant_terms: &[(PolynomialIndex, PixGroupRepr<TestSpec>)]) -> Vec<CommitMessage<'_>> {
+    constant_terms
+        .chunks(COMMITMENTS_PER_SSA_COMMIT_MSG)
+        .map(|chunk| (CONSTANT_TERM_COEFFICIENT, chunk))
+        .collect()
 }
 
-/// Generates a commitment matrix once, sorted by polynomial index within each coefficient
-/// so it can be handed to [`wire_order`].
+/// Generates a cycle's commitments once, sorted by polynomial index so they can be handed to
+/// [`wire_order`].
 ///
 /// Returns the pseudonym it was generated for, the generator (which now holds the
-/// polynomials and can produce shares), and the matrix indexed by coefficient.
+/// polynomials and can produce shares), and one constant-term commitment per polynomial.
 fn generate_commitment_matrix(polys: u16, threshold: u16) -> GeneratedCycle {
     let generator = SsaShareGenerator::<TestSpec>::new(gen_cfg(polys, threshold));
     let pseudonym = SimplePseudonym::random();
     let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
     let proof = commitment.commitment_proof;
 
-    let mut matrix = vec![Vec::new(); threshold as usize];
-    for (coeff_index, mut poly_commitments) in commitment.verifiers {
-        poly_commitments.sort_unstable_by_key(|(poly_index, _)| *poly_index);
-        matrix[coeff_index as usize] = poly_commitments;
-    }
+    let mut constant_terms = commitment
+        .verifiers
+        .get(&CONSTANT_TERM_COEFFICIENT)
+        .cloned()
+        .unwrap_or_default();
+    constant_terms.sort_unstable_by_key(|(poly_index, _)| *poly_index);
+    assert_eq!(polys as usize, constant_terms.len());
 
-    (generator, pseudonym, matrix, proof)
+    (generator, pseudonym, constant_terms, proof)
 }
 
-/// Feeds a whole commitment matrix into a reconstructor in wire order.
+/// Feeds a whole cycle's commitments into a reconstructor in wire order.
 fn install_commitment(
     reconstructor: &SsaReconstructor<TestSpec>,
     ssa_id: SsaId<SimplePseudonym>,
-    matrix: &[Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>],
-    num_polys: usize,
+    constant_terms: &[(PolynomialIndex, PixGroupRepr<TestSpec>)],
     proof: SsaCommitmentProof<TestSpec>,
 ) {
-    for (coeff_index, chunk) in wire_order(matrix, num_polys) {
+    for (coeff_index, chunk) in wire_order(constant_terms) {
         reconstructor
-            .insert_coefficient_commitments(
-                ssa_id,
-                coeff_index,
-                // Mirrors the wire: only constant-term messages carry it.
-                (coeff_index == 0).then_some(proof),
-                chunk.iter().copied(),
-            )
+            .insert_coefficient_commitments(ssa_id, coeff_index, Some(proof), chunk.iter().copied())
             .unwrap();
     }
 }
@@ -301,14 +267,14 @@ fn bench_decode_commitment(c: &mut Criterion) {
     // decompressing a serialized group element and rejecting points outside the prime-order
     // subgroup. There are `polys × threshold` of these per cycle — over half a million — so
     // this is the figure to attribute before trying to make commitment ingest cheaper.
-    let mut group = c.benchmark_group("PartialSsaShareVerifier::decode_commitment");
+    let mut group = c.benchmark_group("SsaPartCommitment::decode_commitment");
     group.throughput(Throughput::Elements(1));
     group.measurement_time(Duration::from_secs(5));
 
     // A small matrix is plenty: the cost is per element and independent of how many there are.
-    let (_generator, _pseudonym, matrix, _proof) = generate_commitment_matrix(PRE_FILL_POLYS, PROD_THRESHOLD);
-    let reprs: Vec<PixGroupRepr<TestSpec>> = matrix[0].iter().map(|(_, repr)| *repr).collect();
-    assert!(!reprs.is_empty(), "matrix must contain constant terms");
+    let (_generator, _pseudonym, constant_terms, _proof) = generate_commitment_matrix(PRE_FILL_POLYS, PROD_THRESHOLD);
+    let reprs: Vec<PixGroupRepr<TestSpec>> = constant_terms.iter().map(|(_, repr)| *repr).collect();
+    assert!(!reprs.is_empty(), "the cycle must contain constant terms");
 
     group.bench_function("single_commitment", |b| {
         let mut i = 0usize;
@@ -317,7 +283,7 @@ fn bench_decode_commitment(c: &mut Criterion) {
             // repeatedly decoding one cached value.
             let repr = &reprs[i % reprs.len()];
             i += 1;
-            PartialSsaShareVerifier::<TestSpec>::decode_commitment(repr).unwrap()
+            SsaPartCommitment::<TestSpec>::decode_commitment(repr).unwrap()
         });
     });
     group.finish();
@@ -349,11 +315,12 @@ fn bench_new_exit_commitment(c: &mut Criterion) {
     group.finish();
 }
 
-/// Parameter points for the constant-term group.
+/// Parameter points for the commitment-ingest group.
 ///
-/// The constant-term pass is only `polys` commitments, so the production width is cheap
-/// enough to always measure.
-fn constant_term_points() -> Vec<(u16, u16)> {
+/// A whole cycle is now only `polys` commitments, so the production width is cheap enough to
+/// always measure — it used to be `polys × threshold`, which at ~150 µs each ran for a quarter
+/// of an hour and had to be narrowed.
+fn whole_cycle_points() -> Vec<(u16, u16)> {
     let mut points = vec![(PROD_POLYS_PER_SSA, PROD_THRESHOLD)];
     if cfg!(feature = "all-benchmarks") {
         points.extend([(128u16, PROD_THRESHOLD), (512, PROD_THRESHOLD), (2048, PROD_THRESHOLD)]);
@@ -361,29 +328,20 @@ fn constant_term_points() -> Vec<(u16, u16)> {
     points
 }
 
-/// Parameter points for the groups that time a whole `polys × threshold` matrix.
-///
-/// See [`FULL_MATRIX_POLYS`] for why the default point is narrower than production.
-fn full_matrix_points() -> Vec<(u16, u16)> {
-    let mut points = vec![(FULL_MATRIX_POLYS, PROD_THRESHOLD)];
-    if cfg!(feature = "all-benchmarks") {
-        points.extend([(128u16, PROD_THRESHOLD), (PROD_POLYS_PER_SSA, PROD_THRESHOLD)]);
-    }
-    points
-}
-
-fn bench_insert_coefficient_commitments_constant_terms(c: &mut Criterion) {
-    // Inserts only the constant terms (coefficient 0) of every polynomial — phase 1 of the
-    // wire order. Completing it lets the Exit derive the SSA commitment and publish the
-    // part accumulator, but installs no verifiers (no polynomial row is complete yet), so
-    // this isolates the decode-and-accumulate cost from verifier construction.
-    let mut group = c.benchmark_group("SsaReconstructor::insert_coefficient_commitments/constant_terms");
+fn bench_insert_coefficient_commitments(c: &mut Criterion) {
+    // Inserts a whole cycle's commitments in the order the Exit receives them: one constant
+    // term per polynomial, chunked into packet-sized messages. Completing the set is what lets
+    // the Exit derive the SSA commitment, publish the part accumulator and install every part
+    // builder — all on the final message.
+    //
+    // Reported per commitment, so dividing by `COMMITMENTS_PER_SSA_COMMIT_MSG` gives the cost of
+    // handling one `SsaCommit` packet, and the group total is the whole-cycle cost.
+    let mut group = c.benchmark_group("SsaReconstructor::insert_coefficient_commitments");
     group.measurement_time(Duration::from_secs(10));
     group.sample_size(10);
 
-    for (polys, threshold) in constant_term_points() {
-        let (_generator, pseudonym, matrix, proof) = generate_commitment_matrix(polys, threshold);
-        let constants = matrix[0].clone();
+    for (polys, threshold) in whole_cycle_points() {
+        let (_generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, threshold);
 
         // One "element" is one coefficient commitment.
         group.throughput(Throughput::Elements(polys as u64));
@@ -401,52 +359,7 @@ fn bench_insert_coefficient_commitments_constant_terms(c: &mut Criterion) {
                         (reconstructor, ssa_id)
                     },
                     |(reconstructor, ssa_id)| {
-                        for chunk in constants.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
-                            reconstructor
-                                .insert_coefficient_commitments(ssa_id, 0, Some(proof), chunk.iter().copied())
-                                .unwrap();
-                        }
-                    },
-                    BatchSize::SmallInput,
-                );
-            },
-        );
-    }
-    group.finish();
-}
-
-fn bench_insert_coefficient_commitments_full(c: &mut Criterion) {
-    // Inserts a whole commitment matrix in the order the Exit receives it, which is the
-    // full per-cycle commitment cost: `polys × threshold` point decompressions plus
-    // `polys` verifier constructions, the latter now spread across the run as individual
-    // rows complete rather than batched at the end.
-    //
-    // Reported per commitment, so dividing by `COMMITMENTS_PER_SSA_COMMIT_MSG` gives the
-    // cost of handling one `SsaCommit` packet, and multiplying by the production commitment
-    // count gives the per-cycle cost.
-    let mut group = c.benchmark_group("SsaReconstructor::insert_coefficient_commitments/full_wire_order");
-    group.measurement_time(Duration::from_secs(10));
-    group.sample_size(10);
-
-    for (polys, threshold) in full_matrix_points() {
-        let (_generator, pseudonym, matrix, proof) = generate_commitment_matrix(polys, threshold);
-
-        group.throughput(Throughput::Elements(polys as u64 * threshold as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("t{threshold}_p{polys}")),
-            &(polys, threshold),
-            |b, _| {
-                b.iter_batched(
-                    || {
-                        let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
-                        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
-                        reconstructor
-                            .new_exit_commitment(ssa_id, polys as usize, threshold as usize)
-                            .unwrap();
-                        (reconstructor, ssa_id)
-                    },
-                    |(reconstructor, ssa_id)| {
-                        install_commitment(&reconstructor, ssa_id, &matrix, polys as usize, proof);
+                        install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
                     },
                     BatchSize::SmallInput,
                 );
@@ -528,12 +441,12 @@ fn bench_acknowledge_batch(
     // Exit does between cycles in production.
     let shares_per_cycle = polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
     let new_cycle = || {
-        let (generator, pseudonym, matrix, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
+        let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
         reconstructor
             .new_exit_commitment(ssa_id, polys as usize, PROD_THRESHOLD as usize)
             .unwrap();
-        install_commitment(&reconstructor, ssa_id, &matrix, polys as usize, proof);
+        install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
         (generator, pseudonym)
     };
 
@@ -650,12 +563,12 @@ fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
         let peer = OffchainKeypair::random();
         let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
         let new_cycle = || {
-            let (generator, pseudonym, matrix, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
+            let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
             let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
             reconstructor
                 .new_exit_commitment(ssa_id, polys as usize, PROD_THRESHOLD as usize)
                 .unwrap();
-            install_commitment(&reconstructor, ssa_id, &matrix, polys as usize, proof);
+            install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
             (generator, pseudonym)
         };
 
@@ -730,16 +643,12 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
         max_awaiting_acks: 100_000,
         ..bench_recon_cfg(true)
     });
-    let (generator, pseudonym, matrix, proof) = generate_commitment_matrix(PROD_POLYS_PER_SSA, PROD_THRESHOLD);
+    let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(PROD_POLYS_PER_SSA, PROD_THRESHOLD);
     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
     reconstructor
         .new_exit_commitment(ssa_id, PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize)
         .unwrap();
-    for chunk in matrix[0].chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
-        reconstructor
-            .insert_coefficient_commitments(ssa_id, 0, Some(proof), chunk.iter().copied())
-            .unwrap();
-    }
+    install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
 
     let shares_per_commitment =
         PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
@@ -791,31 +700,33 @@ fn bench_drain_deferred_acks(c: &mut Criterion) {
     group.throughput(Throughput::Elements(DEFERRED_ACKS as u64));
 
     let peer = OffchainKeypair::random();
-    // Narrower than production for the same reason as the other whole-matrix groups (see
-    // `FULL_MATRIX_POLYS`): the drain cost isolated here is per deferred acknowledgement, not
-    // per commitment, so it does not depend on the matrix width.
-    let polys = FULL_MATRIX_POLYS as usize;
+    let polys = DEFERRED_DRAIN_POLYS as usize;
 
     for (label, deferred) in [("with_deferred", DEFERRED_ACKS), ("baseline", 0)] {
         group.bench_function(BenchmarkId::from_parameter(label), |b| {
             b.iter_custom(|iters| {
                 let mut total = Duration::ZERO;
                 for _ in 0..iters {
-                    // The whole fixture is rebuilt per iteration. Installing verifiers and
+                    // The whole fixture is rebuilt per iteration. Installing part builders and
                     // draining buckets are both one-shot, so reconstructor state cannot be
                     // reused; and the staged shares must belong to the same cycle as the
-                    // matrix being installed, so the generator cannot be reused either.
+                    // commitments being installed, so the generator cannot be reused either.
                     // At this width that costs a fraction of the timed section.
-                    let (generator, pseudonym, matrix, proof) =
-                        generate_commitment_matrix(FULL_MATRIX_POLYS, PROD_THRESHOLD);
+                    let (generator, pseudonym, constant_terms, proof) =
+                        generate_commitment_matrix(DEFERRED_DRAIN_POLYS, PROD_THRESHOLD);
                     let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
                     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                     reconstructor
                         .new_exit_commitment(ssa_id, polys, PROD_THRESHOLD as usize)
                         .unwrap();
-                    for chunk in matrix[0].chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
+
+                    // Everything but the final message, so the cycle is still incomplete and no
+                    // part builder exists — every share staged below has to be deferred.
+                    let msgs = wire_order(&constant_terms);
+                    let (last, leading) = msgs.split_last().expect("at least one commit message");
+                    for (coeff_index, chunk) in leading {
                         reconstructor
-                            .insert_coefficient_commitments(ssa_id, 0, Some(proof), chunk.iter().copied())
+                            .insert_coefficient_commitments(ssa_id, *coeff_index, Some(proof), chunk.iter().copied())
                             .unwrap();
                     }
 
@@ -826,15 +737,12 @@ fn bench_drain_deferred_acks(c: &mut Criterion) {
                         assert!(resolutions.is_empty(), "acks must have been deferred");
                     }
 
-                    // Time only the remaining coefficients: that is where verifiers get
+                    // Time only the closing message: that is where every part builder gets
                     // installed and the deferred buckets get drained.
-                    let msgs = wire_order(&matrix, polys);
                     let start = Instant::now();
-                    for (coeff_index, chunk) in msgs.iter().filter(|(c, _)| *c != 0) {
-                        reconstructor
-                            .insert_coefficient_commitments(ssa_id, *coeff_index, None, chunk.iter().copied())
-                            .unwrap();
-                    }
+                    reconstructor
+                        .insert_coefficient_commitments(ssa_id, last.0, Some(proof), last.1.iter().copied())
+                        .unwrap();
                     total += start.elapsed();
                 }
                 total
@@ -926,8 +834,7 @@ criterion_group!(
     benches,
     bench_decode_commitment,
     bench_new_exit_commitment,
-    bench_insert_coefficient_commitments_constant_terms,
-    bench_insert_coefficient_commitments_full,
+    bench_insert_coefficient_commitments,
     bench_insert_encrypted_share,
     bench_acknowledge_shares,
     bench_acknowledge_shares_sustained,

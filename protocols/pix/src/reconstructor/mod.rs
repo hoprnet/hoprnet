@@ -129,7 +129,8 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// polynomial can never be denied a bucket by another polynomial's traffic. That headroom is
     /// deliberate: a size eviction here silently drops real shares, and only the surplus absorbs
     /// that. In practice the `max_ack_await_time` TTL is the operative bound, since a bucket only
-    /// exists at all when shares outrun the commitment row they belong to.
+    /// exists at all when shares outrun the constant-term pass that makes their polynomial
+    /// reconstructible.
     pending_acks: moka::sync::Cache<SsaPolynomialId<S::Pseudonym>, DeferredAckBucket>,
     /// Resolutions produced by draining deferred-ack buckets at verifier-installation time, waiting
     /// to be picked up by the next [`acknowledge_shares`] call.
@@ -311,8 +312,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let spi = share.ssa_polynomial_id().ok_or(PixError::ShareIsEmpty)?;
 
         let Some(reconstructor) = self.ssa_verifiers.get(&spi) else {
-            // Not an error: this polynomial's commitment row has not arrived yet. Leave the share
-            // in `awaiting_acks` and hand the caller the key it needs to bucket the ack.
+            // Not an error: the constant-term set is still incomplete, so no part builder exists
+            // yet. Leave the share in `awaiting_acks` and hand the caller the key it needs to
+            // bucket the ack.
             return Ok(ProcessedAckResult::VerifierNotReady(spi));
         };
 
@@ -343,8 +345,13 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             }
             Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
                 // We need to treat this error differently, because it is critical
-                // and may be differently handled by the upper-layer components
-                tracing::error!(%spi, "share verification failed");
+                // and may be differently handled by the upper-layer components.
+                //
+                // Almost always this means the polynomial's reconstructed constant term did not
+                // open its commitment, in which case the offending share is one of the `threshold`
+                // that went into it and cannot be singled out. The whole cycle is lost either way,
+                // since the SSA needs every polynomial.
+                tracing::error!(%spi, "ssa part failed to open its commitment");
                 return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
             }
             Err(e) => return Err(e),
@@ -471,8 +478,8 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
     /// Takes any resolutions parked by [`drain_deferred_acks`](Self::drain_deferred_acks).
     ///
-    /// One relaxed load in the common case — the buckets are empty whenever the Entry delivers a
-    /// polynomial's commitment row before the shares that reference it.
+    /// One relaxed load in the common case — the buckets are empty whenever the Entry finishes the
+    /// constant-term pass before the shares that reference it arrive.
     fn take_ready_resolutions(&self) -> Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> {
         if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) == 0 {
             return Vec::new();
@@ -803,14 +810,24 @@ mod tests {
 
         reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // 1. Invalid coefficient index (>= threshold)
-        let result = reconstructor.insert_coefficient_commitments(
-            ssa_id,
-            2, // threshold is 2, so 2 is invalid
-            None,
-            HashMap::new().into_iter(),
+        // 1. Any non-constant coefficient index is ignored rather than rejected, whether or not it is within the
+        //    threshold — PIX commits to nothing but the constant term, and a peer that still sends a full Feldman
+        //    matrix must not be treated as hostile.
+        for coeff_index in [1, 2, CoefficientIndex::MAX] {
+            let ignored =
+                reconstructor.insert_coefficient_commitments(ssa_id, coeff_index, None, HashMap::new().into_iter())?;
+            assert!(ignored.ssa_deposit_address.is_none());
+            assert!(!ignored.is_verifiable);
+        }
+        assert!(
+            reconstructor
+                .commitment_builder
+                .get(&ssa_id)
+                .ok_or_else(|| anyhow::anyhow!("missing builder"))?
+                .lock()
+                .is_empty(),
+            "ignored commitments must not enter the builder's state"
         );
-        assert!(matches!(result, Err(PixError::InvalidInput)));
 
         // 2. Invalid polynomial index (>= polys_per_ssa)
         let mut invalid_poly_map = HashMap::new();
@@ -847,55 +864,59 @@ mod tests {
 
         reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // Fill all commitments
-        for coeff in 0..2 {
-            let mut poly_map = HashMap::new();
-            for poly in 0..2 {
-                poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
-            }
-            reconstructor.insert_coefficient_commitments(
-                ssa_id,
-                coeff as CoefficientIndex,
-                (coeff == 0).then(|| identity_proof(&ssa_id)),
-                poly_map.into_iter(),
-            )?;
+        // Fill every constant term, which is the whole commitment
+        let mut poly_map = HashMap::new();
+        for poly in 0..2 {
+            poly_map.insert(poly as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         }
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(identity_proof(&ssa_id)), poly_map.into_iter())?;
 
         // Now adding more should fail with DuplicateCommitment
         let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, HashMap::new().into_iter());
         assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
+        // A trailing non-constant coefficient, on the other hand, is simply ignored: a peer that
+        // still emits the full Feldman matrix sends the bulk of it *after* the constant-term pass
+        // has completed, and that must not read as a duplicate-commitment attack.
+        let mut trailing = HashMap::new();
+        trailing.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        let ignored = reconstructor.insert_coefficient_commitments(ssa_id, 1, None, trailing.into_iter())?;
+        assert!(
+            ignored.is_verifiable,
+            "ignoring a message must not make a completed cycle look incomplete"
+        );
+
         Ok(())
     }
 
     #[test]
-    fn reconstructor_duplicate_per_cell_commitment() -> anyhow::Result<()> {
-        // Regression test for the per-cell duplicate check inside add_transposed.
-        // Previously the same (poly_index, coeff_index) slot silently overwrote;
-        // now it returns DuplicateCommitment.
+    fn reconstructor_duplicate_per_polynomial_commitment() -> anyhow::Result<()> {
+        // Regression test for the per-polynomial duplicate check inside add_transposed.
+        // Previously the same polynomial's slot silently overwrote; now it returns
+        // DuplicateCommitment.
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
         reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // Insert coeff_index=0 for poly 0
+        // Insert the constant term of poly 0
         let mut poly_map_1 = HashMap::new();
         poly_map_1.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_1.into_iter())?;
 
-        // Insert coeff_index=0 for the same poly 0 again — should now fail
+        // Insert the constant term of poly 0 again — must fail
         let mut poly_map_2 = HashMap::new();
         poly_map_2.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         let result = reconstructor.insert_coefficient_commitments(ssa_id, 0, None, poly_map_2.into_iter());
         assert!(matches!(result, Err(PixError::DuplicateCommitment)));
 
-        // But coeff_index=1 for the same poly should still succeed
+        // Poly 1's constant term is a different slot and must still be accepted
         let mut poly_map_3 = HashMap::new();
-        poly_map_3.insert(0 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
+        poly_map_3.insert(1 as PolynomialIndex, PixGroupRepr::<TestSpec>::default());
         assert!(
             reconstructor
-                .insert_coefficient_commitments(ssa_id, 1, None, poly_map_3.into_iter())
+                .insert_coefficient_commitments(ssa_id, 0, Some(identity_proof(&ssa_id)), poly_map_3.into_iter())
                 .is_ok()
         );
 
@@ -1293,94 +1314,81 @@ mod tests {
         // After submitting malformed bytes, a retry with correct bytes must
         // succeed and complete the SSA.
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
-            polynomials_per_ssa: 1,
+            polynomials_per_ssa: 2,
             threshold: 2,
             surplus_shares: 0,
         });
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
-        let mut commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-
-        // Extract the constant term (coeff 0) and the final coefficient (coeff 1).
-        let constant_term = commitment
-            .verifiers
-            .remove(&0)
-            .ok_or_else(|| anyhow::anyhow!("missing constant-term commitment"))?
-            .into_iter()
-            .collect::<Vec<_>>();
-        assert_eq!(constant_term.len(), 1);
-
-        let final_coefficient = commitment
-            .verifiers
-            .remove(&1)
-            .ok_or_else(|| anyhow::anyhow!("missing final coefficient commitment"))?
-            .into_iter()
-            .collect::<Vec<_>>();
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // Step 1: Submit constant term — must succeed, produce a deposit address,
-        // but NOT be verifiable (coefficient 1 is still missing).
+        // Step 1: Submit polynomial 0's constant term — must succeed, but the SSA commitment needs
+        // every constant term, so no deposit address yet.
         let partial = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
-            Some(commitment.commitment_proof),
-            constant_term.into_iter(),
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, Some(0))?.into_iter(),
         )?;
         assert!(
-            partial.ssa_deposit_address.is_some(),
-            "constant term alone should yield a deposit address"
+            partial.ssa_deposit_address.is_none(),
+            "the deposit address needs every constant term"
         );
         assert!(!partial.is_verifiable, "not yet complete");
 
-        // Step 2: Submit a malformed coefficient (bytes with an invalid EC
+        // Step 2: Submit a malformed constant term for polynomial 1 (bytes with an invalid EC
         // compressed-point prefix of 0xff) — must return InvalidInput.
         let mut malformed = PixGroupRepr::<TestSpec>::default(); // zero-filled
         AsMut::<[u8]>::as_mut(&mut malformed).fill(0xff);
-        let malformed_result =
-            reconstructor.insert_coefficient_commitments(ssa_id, 1, None, [(0, malformed)].into_iter());
+        let malformed_result = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            [(1, malformed)].into_iter(),
+        );
         assert!(
             matches!(&malformed_result, Err(crate::errors::PixError::InvalidInput)),
             "malformed commitment must be rejected, got {malformed_result:?}"
         );
 
-        // Step 3: Retry with the correct bytes — must succeed and produce a
-        // verifiable SSA commitment.
-        let retry = reconstructor.insert_coefficient_commitments(ssa_id, 1, None, final_coefficient.into_iter());
+        // Step 3: Retry with the correct bytes — must succeed and complete the SSA commitment.
+        let retry = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
+        );
         assert!(
-            matches!(&retry, Ok(state) if state.is_verifiable),
+            matches!(&retry, Ok(state) if state.is_verifiable && state.ssa_deposit_address.is_some()),
             "corrected retransmission must complete the SSA, got {retry:?}"
         );
 
         Ok(())
     }
 
-    /// Regression test for M13: the validation applied when a commitment *arrives* must be exactly
-    /// the validation the verifiers apply, i.e. [`PartialSsaShareVerifier::decode_commitment`].
+    /// Regression test for M13: the validation applied when a commitment *arrives* is the only
+    /// validation it ever gets, so it must include the prime-order-subgroup test.
     ///
-    /// A commitment that passes the arrival check occupies its `(poly, coeff)` cell permanently —
-    /// re-insertion is rejected as a duplicate. So if the arrival check were weaker than the
-    /// verifier check (e.g. decode-only, without the prime-order-subgroup test), a decodable
-    /// small-order point would take a cell and then make the completion step fail unconditionally,
-    /// with no way to retransmit a correction. This matters in practice: the default build uses
-    /// BabyJubJub, whose cofactor is 8, so small-order points do exist and do pass a plain
-    /// on-curve check.
-    ///
-    /// The two paths cannot be compared by construction in a test, so this pins the contract of the
-    /// shared decode helper that both of them call.
+    /// A commitment that passes occupies its polynomial's slot permanently — re-insertion is
+    /// rejected as a duplicate. A decodable-but-small-order point admitted here would take the
+    /// slot and then make every reconstruction of that polynomial fail, with no way to retransmit
+    /// a correction. This matters in practice: the default build uses BabyJubJub, whose cofactor is
+    /// 8, so small-order points do exist and do pass a plain on-curve check.
     #[test]
     fn decode_commitment_is_the_single_validation_point() {
         use vsss_rs::elliptic_curve::group::GroupEncoding;
 
-        use crate::PartialSsaShareVerifier;
+        use crate::SsaPartCommitment;
 
         // A well-formed commitment (the generator) decodes.
         let generator_repr = PixGroup::<TestSpec>::generator().to_bytes();
         assert!(
-            PartialSsaShareVerifier::<TestSpec>::decode_commitment(&generator_repr).is_ok(),
-            "the generator is a valid coefficient commitment (scalar coefficient 1)"
+            SsaPartCommitment::<TestSpec>::decode_commitment(&generator_repr).is_ok(),
+            "the generator is a valid constant-term commitment (scalar coefficient 1)"
         );
 
         // Undecodable bytes are rejected.
@@ -1388,78 +1396,18 @@ mod tests {
         AsMut::<[u8]>::as_mut(&mut malformed).fill(0xff);
         assert!(
             matches!(
-                PartialSsaShareVerifier::<TestSpec>::decode_commitment(&malformed),
+                SsaPartCommitment::<TestSpec>::decode_commitment(&malformed),
                 Err(PixError::InvalidInput)
             ),
             "undecodable bytes must be rejected"
         );
-
-        // Whatever `decode_commitment` accepts, building a verifier from the same bytes must also
-        // accept — and vice versa. This is the invariant `add_transposed` relies on.
-        for repr in [generator_repr, malformed] {
-            let decoded_ok = PartialSsaShareVerifier::<TestSpec>::decode_commitment(&repr).is_ok();
-            let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), SsaIndex::MIN), 0);
-            let verifier_ok =
-                PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, vec![repr, repr]).is_ok();
-            assert_eq!(
-                decoded_ok, verifier_ok,
-                "arrival-time validation and verifier-build validation must agree"
-            );
-        }
     }
 
-    /// `from_decoded_commitments` must produce exactly the same verifier as
-    /// `from_serializable_commitments` fed the serialized form of the same points.
+    /// A reconstructed polynomial part must release its collected shares, while **keeping its
+    /// cache entry**.
     ///
-    /// The reconstructor now decodes each commitment once, on arrival, and builds verifiers from
-    /// the stored group elements; that shortcut is only sound if it is observably identical to
-    /// decoding at build time.
-    #[test]
-    fn from_decoded_commitments_matches_from_serializable_commitments() -> anyhow::Result<()> {
-        use crate::PartialSsaShareVerifier;
-
-        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
-            polynomials_per_ssa: 1,
-            threshold: 4,
-            surplus_shares: 0,
-        });
-        let pseudonym = SimplePseudonym::random();
-        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-        let spi = SsaPolynomialId::new(SsaId::new(pseudonym, SsaIndex::MIN), 0);
-
-        // Collect the single polynomial's coefficients in coefficient order.
-        let mut reprs = Vec::new();
-        for coeff_idx in 0..4u16 {
-            let (_, repr) = commitment
-                .verifiers
-                .get(&coeff_idx)
-                .and_then(|v| v.first().copied())
-                .ok_or_else(|| anyhow::anyhow!("missing coefficient {coeff_idx}"))?;
-            reprs.push(repr);
-        }
-
-        let from_bytes = PartialSsaShareVerifier::<TestSpec>::from_serializable_commitments(spi, reprs.clone())?;
-        let decoded = reprs
-            .iter()
-            .map(PartialSsaShareVerifier::<TestSpec>::decode_commitment)
-            .collect::<crate::errors::Result<Vec<_>, _>>()?;
-        let from_points = PartialSsaShareVerifier::<TestSpec>::from_decoded_commitments(spi, decoded)?;
-
-        assert_eq!(from_bytes, from_points);
-        assert_eq!(from_bytes.min_shares(), from_points.min_shares());
-
-        // Too few commitments must still be rejected on the decoded path.
-        assert!(PartialSsaShareVerifier::<TestSpec>::from_decoded_commitments(spi, []).is_err());
-
-        Ok(())
-    }
-
-    /// A reconstructed polynomial part must release its commitment vector and its collected
-    /// shares, while **keeping its cache entry**.
-    ///
-    /// Those two allocations dominate reconstructor memory — `(threshold + 1)` group elements
-    /// plus `threshold` shares, held for every one of `polys` polynomials — and neither can be
-    /// read again once the part is reconstructed.
+    /// That buffer dominates reconstructor memory — `threshold` shares held for every one of
+    /// `polys` polynomials — and it cannot be read again once the part is reconstructed.
     ///
     /// Retaining the (now-stripped) cache entry is equally deliberate: evicting it would make every
     /// late or surplus share for that polynomial look like a not-yet-installed verifier, so the ack
@@ -1484,16 +1432,12 @@ mod tests {
         reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
         commitment.process_into_reconstructor(&reconstructor)?;
 
-        // Freshly installed: the verifier holds threshold + 1 commitments and no shares.
+        // Freshly installed: no shares collected yet.
         let builder = reconstructor
             .ssa_verifiers
             .get(&poly_0)
             .ok_or_else(|| anyhow::anyhow!("verifier for polynomial 0 must be installed"))?;
-        assert_eq!(
-            (3, 0),
-            builder.lock().verification_state_len(),
-            "a fresh verifier holds threshold + 1 commitments (incl. the generator) and no shares"
-        );
+        assert_eq!(0, builder.lock().verification_state_len());
         drop(builder);
 
         // Feed exactly enough shares to reconstruct polynomial 0. The generator drains the front
@@ -1527,20 +1471,17 @@ mod tests {
             .get(&poly_0)
             .ok_or_else(|| anyhow::anyhow!("a reconstructed polynomial must keep its cache entry"))?;
         assert_eq!(
-            (0, 0),
+            0,
             builder.lock().verification_state_len(),
-            "a reconstructed polynomial must hold neither commitments nor shares"
+            "a reconstructed polynomial must hold no shares"
         );
 
-        // Polynomial 1 is untouched and must still hold its full verification state.
-        let other = reconstructor
-            .ssa_verifiers
-            .get(&SsaPolynomialId::new(ssa_id, 1))
-            .ok_or_else(|| anyhow::anyhow!("verifier for polynomial 1 must be installed"))?;
-        assert_eq!(
-            (3, 0),
-            other.lock().verification_state_len(),
-            "an unreconstructed polynomial must keep its commitments"
+        // Polynomial 1 is untouched and must still be installed, awaiting its own shares.
+        assert!(
+            reconstructor
+                .ssa_verifiers
+                .contains_key(&SsaPolynomialId::new(ssa_id, 1)),
+            "verifier for polynomial 1 must be installed"
         );
 
         Ok(())
@@ -1730,11 +1671,15 @@ mod tests {
         Ok(())
     }
 
-    /// Verifiers must become available polynomial by polynomial as rows complete, not all at once
-    /// at the end of the cycle. This is the property the whole sliding-window behaviour rests on:
-    /// the live commitment set stays proportional to the polynomials still in flight.
+    /// Every polynomial becomes reconstructible on the call that completes the constant-term set,
+    /// and none before it.
+    ///
+    /// A polynomial's whole commitment *is* its constant term, so there is no partially committed
+    /// row to wait on; but a part builder is still useless until the [`SsaBuilder`] exists to
+    /// receive what it reconstructs, and that needs the constant terms of *all* polynomials.
+    /// The two therefore coincide, and this pins that they do.
     #[test]
-    fn verifiers_are_installed_as_individual_polynomial_rows_complete() -> anyhow::Result<()> {
+    fn verifiers_are_installed_when_the_constant_term_set_completes() -> anyhow::Result<()> {
         const POLYS: u16 = 6;
         const THRESHOLD: u16 = 4;
 
@@ -1750,60 +1695,45 @@ mod tests {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
         reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
 
-        // Constant-term pass across every polynomial: the deposit address becomes known, but no row
-        // is complete, so nothing is verifiable yet.
-        let state = reconstructor.insert_coefficient_commitments(
-            ssa_id,
-            0,
-            proof_of(&commitment, 0),
-            coefficient_of(&commitment, 0, None)?.into_iter(),
-        )?;
-        assert!(state.ssa_deposit_address.is_some());
-        assert!(!state.is_verifiable);
-        reconstructor.ssa_verifiers.run_pending_tasks();
-        assert_eq!(reconstructor.ssa_verifiers.entry_count(), 0);
-
-        // Now complete one polynomial at a time by sending its remaining coefficients, and watch
-        // exactly one verifier appear per completed row.
+        // One polynomial's constant term per call. Nothing is published until the last one.
         for poly in 0..POLYS as PolynomialIndex {
-            for coeff in 1..THRESHOLD as CoefficientIndex {
-                let state = reconstructor.insert_coefficient_commitments(
-                    ssa_id,
-                    coeff,
-                    proof_of(&commitment, coeff),
-                    coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
-                )?;
+            let state = reconstructor.insert_coefficient_commitments(
+                ssa_id,
+                0,
+                proof_of(&commitment, 0),
+                coefficient_of(&commitment, 0, Some(poly))?.into_iter(),
+            )?;
 
-                let row_complete = coeff == THRESHOLD as CoefficientIndex - 1;
-                let all_rows_complete = row_complete && poly == POLYS as PolynomialIndex - 1;
-                assert_eq!(
-                    state.is_verifiable, all_rows_complete,
-                    "is_verifiable must flip only when the last row completes (poly {poly}, coeff {coeff})"
-                );
+            let last = poly == POLYS as PolynomialIndex - 1;
+            assert_eq!(
+                state.ssa_deposit_address.is_some(),
+                last,
+                "the deposit address is the sum of every constant term (poly {poly})"
+            );
+            assert_eq!(
+                state.is_verifiable, last,
+                "the cycle becomes verifiable exactly when the constant-term set closes (poly {poly})"
+            );
 
-                reconstructor.ssa_verifiers.run_pending_tasks();
-                let expected = poly as u64 + u64::from(row_complete);
-                assert_eq!(
-                    reconstructor.ssa_verifiers.entry_count(),
-                    expected,
-                    "after poly {poly} coeff {coeff} there must be {expected} verifiers installed"
-                );
-            }
+            reconstructor.ssa_verifiers.run_pending_tasks();
+            let expected = if last { POLYS as u64 } else { 0 };
+            assert_eq!(
+                reconstructor.ssa_verifiers.entry_count(),
+                expected,
+                "after polynomial {poly} there must be {expected} verifiers installed"
+            );
         }
 
         Ok(())
     }
 
-    /// The Exit must not depend on the Entry's send order for correctness.
-    ///
-    /// A polynomial's verifier is withheld until the SSA commitment is known, because a
-    /// reconstructed part has nowhere to go before that. So an Entry that sends complete rows
-    /// *before* finishing the constant-term pass must still end up with every verifier installed —
-    /// released in one batch the moment the last constant term lands.
+    /// An Entry that still emits the full Feldman matrix must not break the cycle: the Exit ignores
+    /// every non-constant coefficient, whether it arrives before, during or after the constant-term
+    /// pass, and recovery proceeds unaffected.
     #[test]
-    fn rows_completed_before_the_constant_term_pass_are_released_together() -> anyhow::Result<()> {
-        const POLYS: u16 = 3;
-        const THRESHOLD: u16 = 3;
+    fn non_constant_coefficients_are_ignored_wherever_they_arrive() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -1811,65 +1741,142 @@ mod tests {
             surplus_shares: 0,
         });
         let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
-        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            early_recovery_threshold: 1.0,
+            ..Default::default()
+        });
         reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
 
-        // Fully commit polynomials 0 and 1 (all their coefficients, constant term included), while
-        // polynomial 2 gets nothing. Two rows are now complete but the SSA commitment is not known.
-        for poly in 0..2 as PolynomialIndex {
-            for coeff in 0..THRESHOLD as CoefficientIndex {
-                let state = reconstructor.insert_coefficient_commitments(
-                    ssa_id,
-                    coeff,
-                    proof_of(&commitment, coeff),
-                    coefficient_of(&commitment, coeff, Some(poly))?.into_iter(),
-                )?;
-                assert!(
-                    state.ssa_deposit_address.is_none(),
-                    "the deposit address needs every constant term"
-                );
-                assert!(!state.is_verifiable);
-            }
-        }
-        reconstructor.ssa_verifiers.run_pending_tasks();
-        assert_eq!(
-            reconstructor.ssa_verifiers.entry_count(),
-            0,
-            "verifiers must be withheld while the SSA commitment is unknown, however complete the rows are"
-        );
+        // Stand-in for what a Feldman-emitting Entry would send: a well-formed commitment under a
+        // non-constant coefficient index, for every polynomial.
+        let higher: Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)> = (0..POLYS as PolynomialIndex)
+            .map(|poly| {
+                (
+                    poly,
+                    PixGroup::<TestSpec>::mul_by_generator(&PixScalar::<TestSpec>::random(
+                        &mut hopr_types::crypto_random::rng(),
+                    ))
+                    .to_bytes(),
+                )
+            })
+            .collect();
 
-        // Polynomial 2's constant term completes the SSA commitment and releases the two rows that
-        // were already waiting.
+        // Before the constant-term pass.
+        reconstructor.insert_coefficient_commitments(ssa_id, 1, None, higher.clone().into_iter())?;
+
+        // Interleaved with it.
+        reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, Some(0))?.into_iter(),
+        )?;
+        reconstructor.insert_coefficient_commitments(ssa_id, 1, None, higher.clone().into_iter())?;
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
             proof_of(&commitment, 0),
-            coefficient_of(&commitment, 0, Some(2))?.into_iter(),
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
         )?;
-        assert!(state.ssa_deposit_address.is_some());
-        assert!(!state.is_verifiable, "polynomial 2's row is still incomplete");
-        reconstructor.ssa_verifiers.run_pending_tasks();
-        assert_eq!(
-            reconstructor.ssa_verifiers.entry_count(),
-            2,
-            "both waiting rows must be released as soon as the SSA commitment is known"
+        assert!(state.is_verifiable, "the constant-term pass alone completes the cycle");
+
+        // And after it — the bulk of what such an Entry sends. Must not read as a duplicate.
+        reconstructor.insert_coefficient_commitments(ssa_id, 1, None, higher.into_iter())?;
+
+        // Recovery is unaffected.
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let enc_share = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack.to_challenge()?,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &peer).leak());
+        }
+
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+        assert!(
+            resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
+            "the SSA must recover from the constant terms alone, got {resolutions:?}"
         );
 
-        // Finish polynomial 2.
-        for coeff in 1..THRESHOLD as CoefficientIndex {
-            let state = reconstructor.insert_coefficient_commitments(
-                ssa_id,
-                coeff,
-                proof_of(&commitment, coeff),
-                coefficient_of(&commitment, coeff, Some(2))?.into_iter(),
+        Ok(())
+    }
+
+    /// A single corrupted share is invisible until the polynomial is interpolated — that is the
+    /// price of dropping the per-coefficient commitments — and it must surface exactly then, once,
+    /// with no further noise from the shares that follow it.
+    #[test]
+    fn a_corrupted_share_is_reported_once_at_the_threshold_th_share() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 4;
+        const SURPLUS: usize = 2;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: SURPLUS,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        generator
+            .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+            .process_into_reconstructor(&reconstructor)?;
+
+        // Corrupt the very first share of polynomial 0, then feed its whole budget one at a time.
+        let mut invalid_reports = 0;
+        for i in 0..THRESHOLD as usize + SURPLUS {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let mut share = generator
+                .next_share(&pseudonym, &msg)?
+                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+            assert_eq!(0, share.id.poly_index(), "shares arrive polynomial-major");
+
+            if i == 0 {
+                // Flip a low bit of the share value. It stays a valid field element, so nothing
+                // rejects it on arrival — only the interpolation notices.
+                AsMut::<[u8]>::as_mut(&mut share.share.0)[31] ^= 1;
+            }
+
+            let ack = HalfKey::random();
+            let enc = share.share.clone().encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack.to_challenge()?,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
             )?;
-            assert_eq!(state.is_verifiable, coeff == THRESHOLD as CoefficientIndex - 1);
+            let resolutions = reconstructor
+                .acknowledge_shares(*peer.public(), vec![VerifiedAcknowledgement::new(ack, &peer).leak()])?;
+
+            let reported = resolutions
+                .iter()
+                .filter(|r| matches!(r, ShareResolution::InvalidShare(_, id) if *id == ssa_id))
+                .count();
+            if i + 1 < THRESHOLD as usize {
+                assert_eq!(0, reported, "share {i} must pass unremarked — nothing checks it yet");
+            }
+            invalid_reports += reported;
         }
-        reconstructor.ssa_verifiers.run_pending_tasks();
-        assert_eq!(reconstructor.ssa_verifiers.entry_count(), POLYS as u64);
+
+        assert_eq!(
+            1, invalid_reports,
+            "the corrupted set must be reported exactly once, at the threshold-th share"
+        );
 
         Ok(())
     }
@@ -1896,13 +1903,13 @@ mod tests {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
         reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
 
-        // Only the constant-term pass so far: the cycle is live, but no row is committed, so no
-        // share can be verified yet.
+        // Only part of the constant-term pass so far, so the SSA commitment is still unknown and no
+        // part builder can be installed — a recovered part would have nowhere to go.
         reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
             proof_of(&commitment, 0),
-            coefficient_of(&commitment, 0, None)?.into_iter(),
+            coefficient_of(&commitment, 0, Some(0))?.into_iter(),
         )?;
 
         // All shares for the whole cycle arrive now — every one of them ahead of its verifier.
@@ -1938,12 +1945,13 @@ mod tests {
             "every early ack must be bucketed under its own polynomial"
         );
 
-        // Committing the rows installs the verifiers, which redeems the deferred acknowledgements.
+        // The last constant term closes the set, which installs every part builder and redeems the
+        // deferred acknowledgements.
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
-            1,
-            proof_of(&commitment, 1),
-            coefficient_of(&commitment, 1, None)?.into_iter(),
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
         )?;
         assert!(state.is_verifiable);
 
@@ -2161,11 +2169,11 @@ mod tests {
         Ok(())
     }
 
-    /// Tombstone guard on the *second* publication point: per-polynomial verifier installation.
+    /// Tombstone guard on verifier installation.
     ///
-    /// Retirement can land after the cycle has legitimately gone live but before its rows complete.
-    /// Every later row must then install nothing, on every subsequent call — the guard has to hold
-    /// per call now that installation is spread across many of them.
+    /// Verifiers and the part accumulator are now published by the same call, so retirement racing
+    /// it must withdraw both. The guard is checked *after* publishing — so that retirement cannot
+    /// slip between a check and a write — which means the withdrawal path is what this pins.
     #[test]
     fn retire_ssa_tombstone_prevents_verifier_installation() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -2180,39 +2188,29 @@ mod tests {
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
         reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
 
-        // Full constant-term pass: the cycle goes live, but no row is complete yet.
-        let state = reconstructor.insert_coefficient_commitments(
+        // Polynomial 0's constant term: nothing is published yet, the set is incomplete.
+        reconstructor.insert_coefficient_commitments(
             ssa_id,
             0,
             proof_of(&commitment, 0),
-            coefficient_of(&commitment, 0, None)?.into_iter(),
+            coefficient_of(&commitment, 0, Some(0))?.into_iter(),
         )?;
-        assert!(
-            state.ssa_deposit_address.is_some(),
-            "the full constant-term set must yield the deposit address"
-        );
-        assert!(!state.is_verifiable, "no polynomial is complete after coefficient 0");
-        reconstructor.ssa_builders.run_pending_tasks();
-        assert!(
-            reconstructor.ssa_builders.contains_key(&ssa_id),
-            "the cycle must go live as soon as the SSA commitment is known"
-        );
         reconstructor.ssa_verifiers.run_pending_tasks();
         assert_eq!(
             reconstructor.ssa_verifiers.entry_count(),
             0,
-            "no verifier may be installed before a row is complete"
+            "no verifier may be installed while the SSA commitment is unknown"
         );
 
         // Retirement lands here.
         reconstructor.retired_ssas.insert(ssa_id, ());
 
-        // Coefficient 1 completes both rows, so this call would install both verifiers.
+        // Polynomial 1's constant term closes the set, so this call would install both verifiers.
         let state = reconstructor.insert_coefficient_commitments(
             ssa_id,
-            1,
-            proof_of(&commitment, 1),
-            coefficient_of(&commitment, 1, None)?.into_iter(),
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, Some(1))?.into_iter(),
         )?;
         assert!(!state.is_verifiable, "a retired cycle is never verifiable");
 
@@ -2221,6 +2219,11 @@ mod tests {
             reconstructor.ssa_verifiers.entry_count(),
             0,
             "tombstone must withdraw every verifier installed after retirement"
+        );
+        reconstructor.ssa_builders.run_pending_tasks();
+        assert!(
+            !reconstructor.ssa_builders.contains_key(&ssa_id),
+            "tombstone must withdraw the part accumulator too"
         );
 
         Ok(())

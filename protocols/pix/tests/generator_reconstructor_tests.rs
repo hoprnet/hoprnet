@@ -51,50 +51,30 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
     let full_ssa_deposit_address = TestSpec::group_to_deposit_address(client_commitment + server_commitment)
         .ok_or(anyhow::anyhow!("Failed to convert to address"))?;
 
-    // In the transposed form, remove the first coefficient commitments of all polynomials
-    let mut first_coeffs = transposed.remove(&0).unwrap();
+    // The whole commitment is the constant-term row; there is nothing else on the wire.
+    assert_eq!(1, transposed.len(), "PIX commits to the constant term and nothing else");
+    let mut constant_terms = transposed.remove(&0).unwrap();
 
-    // Remove the first polynomial completely
-    let remainder = first_coeffs.remove(&0).unwrap();
+    // Hold back the first polynomial so the set can be completed in two steps.
+    let remainder = constant_terms.remove(&0).unwrap();
 
-    // Insert all constant term commitments, except the constant term commitments of the first polynomial.
-    // Every constant-term message carries the proof of knowledge, as it does on the wire.
+    // Insert every constant term except the first polynomial's. Every constant-term message
+    // carries the proof of knowledge, as it does on the wire.
     let res =
-        reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), first_coeffs.into_iter())?;
+        reconstructor.insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), constant_terms.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(res.is_first_encountered);
     assert!(res.ssa_deposit_address.is_none());
     assert!(!res.is_verifiable);
 
-    // Now add the constant term commitments of the first polynomial
+    // The last constant term closes the set: the deposit address becomes known and, in the same
+    // call, every polynomial becomes reconstructible.
     let res = reconstructor.insert_coefficient_commitments(
         ssa_id,
         0,
         Some(commitment_proof),
         HashMap::from([(0, remainder)]).into_iter(),
     )?;
-    assert_eq!(ssa_id, res.ssa_id);
-    assert!(!res.is_first_encountered);
-    assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
-    assert!(!res.is_verifiable);
-
-    // Add all the remaining coefficient commitments for all polynomials except one
-    let remainder = transposed.remove(&5).unwrap();
-    for (coeff_index, poly_coeff_commitments) in transposed {
-        let res = reconstructor.insert_coefficient_commitments(
-            ssa_id,
-            coeff_index,
-            None,
-            poly_coeff_commitments.into_iter(),
-        )?;
-        assert_eq!(ssa_id, res.ssa_id);
-        assert!(!res.is_first_encountered);
-        assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);
-        assert!(!res.is_verifiable);
-    }
-
-    // Now the SSA should be fully committed
-    let res = reconstructor.insert_coefficient_commitments(ssa_id, 5, None, remainder.into_iter())?;
     assert_eq!(ssa_id, res.ssa_id);
     assert!(!res.is_first_encountered);
     assert_eq!(Some(full_ssa_deposit_address), res.ssa_deposit_address);

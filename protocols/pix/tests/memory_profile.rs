@@ -28,9 +28,9 @@ use std::{
 
 use common::TestSpec;
 use hopr_protocol_pix::{
-    DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar,
-    PolynomialIndex, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig,
-    SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup,
+    PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor,
+    SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -122,37 +122,6 @@ fn report(label: &str, baseline: usize) {
         mib(live),
         mib(live) - mib(baseline)
     );
-}
-
-/// Feeds phase 2 of the wire order — every coefficient above the constant term, block-major
-/// over polynomials, one `SsaCommit` message at a time. See
-/// `SsaClientCommitmentMessage::new_multiple`.
-///
-/// Phase 1 (the constant terms) is driven separately by the caller so it can be measured on its
-/// own; inserting it twice would be rejected as a duplicate commitment.
-fn install_remaining_coefficients(
-    reconstructor: &SsaReconstructor<TestSpec>,
-    ssa_id: SsaId<SimplePseudonym>,
-    matrix: &[Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)>],
-    num_polys: usize,
-) {
-    for block_start in (0..num_polys).step_by(COMMITMENTS_PER_SSA_COMMIT_MSG) {
-        let block_end = (block_start + COMMITMENTS_PER_SSA_COMMIT_MSG).min(num_polys);
-        for (coeff_index, coeff) in matrix.iter().enumerate().skip(1) {
-            if block_start < coeff.len() {
-                let end = block_end.min(coeff.len());
-                reconstructor
-                    .insert_coefficient_commitments(
-                        ssa_id,
-                        coeff_index as u16,
-                        // Only constant-term messages carry the proof, and phase 1 already did.
-                        None,
-                        coeff[block_start..end].iter().copied(),
-                    )
-                    .unwrap();
-            }
-        }
-    }
 }
 
 /// Produces `count` shares, caches them as awaited encrypted shares, and returns the
@@ -256,11 +225,13 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     let peer = OffchainKeypair::random();
     let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
     let commitment_proof = commitment.commitment_proof;
-    let mut matrix = vec![Vec::new(); threshold];
-    for (coeff_index, mut poly_commitments) in commitment.verifiers {
-        poly_commitments.sort_unstable_by_key(|(poly_index, _)| *poly_index);
-        matrix[coeff_index as usize] = poly_commitments;
-    }
+    let mut constant_terms = commitment
+        .verifiers
+        .get(&CONSTANT_TERM_COEFFICIENT)
+        .cloned()
+        .unwrap_or_default();
+    constant_terms.sort_unstable_by_key(|(poly_index, _)| *poly_index);
+    assert_eq!(polys, constant_terms.len());
 
     let baseline = live_bytes();
     // Re-arm the high-water mark so "peak" means the Exit's peak, not the Entry-side
@@ -286,21 +257,17 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     reconstructor.new_exit_commitment(ssa_id, polys, threshold).unwrap();
     report("after new_exit_commitment", baseline);
 
-    // Phase 1 of the wire order: constant terms only. Publishes the SSA commitment and the part
-    // accumulator, installs no verifiers.
-    for chunk in matrix[0].chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
+    // The whole wire order: one constant term per polynomial. The closing message publishes the
+    // SSA commitment, the part accumulator and every part builder at once, so this is the
+    // expected peak. At the modelled line rate it lands inside the first fraction of a percent
+    // of the cycle: ~0.3 MiB of commitments against 519 MiB of payload.
+    for chunk in constant_terms.chunks(COMMITMENTS_PER_SSA_COMMIT_MSG) {
         reconstructor
             .insert_coefficient_commitments(ssa_id, 0, Some(commitment_proof), chunk.iter().copied())
             .unwrap();
     }
-    report("after constant-term pass", baseline);
-
-    // Remaining coefficients. Every verifier is installed here, which at the modelled line rate
-    // happens inside the first ~3 % of the cycle: 19 MiB of commitments against 519 MiB of
-    // payload. This is the expected peak.
-    install_remaining_coefficients(&reconstructor, ssa_id, &matrix, polys);
     let after_install = live_bytes();
-    report("after full commitment matrix (all verifiers)", baseline);
+    report("after the constant-term pass (all verifiers)", baseline);
 
     // Drain the cycle. Shares are produced in polynomial order, so parts complete progressively
     // and Tier 1 releases each verifier on reconstruction — the decay this profile is for.

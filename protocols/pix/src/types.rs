@@ -23,8 +23,8 @@ use hopr_types::{
 };
 
 use crate::{
-    ExitAcknowledgementShareProcessor, Group, GroupEncoding, PartialSsaShareVerifier, PixGroup, PixGroupRepr,
-    PixScalar, PixSpec, errors, errors::PixError,
+    ExitAcknowledgementShareProcessor, Group, GroupEncoding, PixGroup, PixGroupRepr, PixScalar, PixSpec,
+    SsaPartCommitment, errors, errors::PixError,
 };
 
 /// Raw zeroable SSA Index.
@@ -108,7 +108,13 @@ pub struct SsaPolynomialId<P> {
     poly_index: PolynomialIndex,
 }
 
-/// Transposed verifiers of the partial SSA shares.
+/// Polynomial coefficient commitments laid out coefficient-major, which is how the wire messages
+/// chunk them.
+///
+/// PIX only ever populates [`CONSTANT_TERM_COEFFICIENT`](crate::CONSTANT_TERM_COEFFICIENT), so in
+/// practice this holds exactly one key. The map shape is retained because the wire format still
+/// admits higher coefficient indices — see [`SsaPartCommitment`](crate::SsaPartCommitment) for why
+/// none are produced.
 pub type TransposedVerifiers<S> = HashMap<CoefficientIndex, Vec<(PolynomialIndex, PixGroupRepr<S>)>>;
 
 impl<P> SsaPolynomialId<P> {
@@ -617,7 +623,9 @@ pub struct SsaCommitment<S: PixSpec, P = <S as PixSpec>::Pseudonym> {
     /// Without it the recipient cannot tell a genuine commitment from one crafted so that the
     /// *combined* deposit key is known to the sender alone — see [`SsaCommitmentProof`].
     pub commitment_proof: SsaCommitmentProof<S>,
-    /// Verifiers of the partial SSA shares.
+    /// Commitments to the polynomials' constant terms, keyed by coefficient index.
+    ///
+    /// Always exactly one entry, at [`CONSTANT_TERM_COEFFICIENT`](crate::CONSTANT_TERM_COEFFICIENT).
     #[cfg_attr(
         feature = "serde",
         serde(bound(
@@ -638,21 +646,27 @@ impl<S: PixSpec, P> IntoIterator for SsaCommitment<S, P> {
 }
 
 impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
-    /// Reconstructs the verifiers from the internal transposed representation.
-    pub fn reconstruct_verifiers(self) -> errors::Result<Vec<PartialSsaShareVerifier<S>>, S::Pseudonym> {
-        let mut poly_coeffs: BTreeMap<PolynomialIndex, BTreeMap<CoefficientIndex, PixGroupRepr<S>>> = BTreeMap::new();
-        for (coeff_idx, coeffs) in self.verifiers {
-            for (poly_idx, commitment) in coeffs {
-                poly_coeffs.entry(poly_idx).or_default().insert(coeff_idx, commitment);
-            }
-        }
-
-        poly_coeffs
+    /// Reconstructs the per-polynomial commitments from the transposed representation, ordered by
+    /// polynomial index.
+    ///
+    /// Only the [`CONSTANT_TERM_COEFFICIENT`] row is read; any other coefficient index present is
+    /// ignored, matching what the Exit does with one on the wire.
+    pub fn reconstruct_part_commitments(self) -> errors::Result<Vec<SsaPartCommitment<S>>, S::Pseudonym> {
+        let constant_terms: BTreeMap<PolynomialIndex, PixGroupRepr<S>> = self
+            .verifiers
+            .get(&crate::CONSTANT_TERM_COEFFICIENT)
             .into_iter()
-            .map(|(poly_idx, coeffs)| {
-                let spi = SsaPolynomialId::new(self.ssa_id, poly_idx);
-                let sorted_coeffs: Vec<_> = coeffs.into_values().collect();
-                PartialSsaShareVerifier::from_serializable_commitments(spi, sorted_coeffs)
+            .flatten()
+            .copied()
+            .collect();
+
+        constant_terms
+            .into_iter()
+            .map(|(poly_idx, commitment)| {
+                Ok(SsaPartCommitment::from_decoded_commitment(
+                    SsaPolynomialId::new(self.ssa_id, poly_idx),
+                    SsaPartCommitment::<S>::decode_commitment(&commitment)?,
+                ))
             })
             .collect()
     }
@@ -660,6 +674,8 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
     /// Shorthand to pass all the coefficient commitments into the [reconstructor](ExitAcknowledgementShareProcessor).
     ///
     /// The proof accompanies the constant-term batch, mirroring how the wire messages carry it.
+    /// In practice that is the only batch there is — see [`SsaPartCommitment`] — but the loop is
+    /// kept over the whole map because the type still admits higher coefficient indices.
     pub fn process_into_reconstructor<R: ExitAcknowledgementShareProcessor<S>>(
         self,
         reconstructor: &R,
@@ -667,7 +683,7 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
         let ssa_id = self.ssa_id;
         let proof = self.commitment_proof;
         for (coeff_idx, coeffs) in self.verifiers {
-            let batch_proof = (coeff_idx == 0).then_some(proof);
+            let batch_proof = (coeff_idx == crate::CONSTANT_TERM_COEFFICIENT).then_some(proof);
             reconstructor.insert_coefficient_commitments(ssa_id, coeff_idx, batch_proof, coeffs.into_iter())?;
         }
         Ok(())

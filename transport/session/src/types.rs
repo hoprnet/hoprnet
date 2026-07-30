@@ -108,15 +108,26 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16
 ///
 /// ## Choosing the split
 ///
-/// For a fixed quota `Q = polys × threshold` the *product* is pinned, so the split between
-/// the two is free — but the two costs scale differently:
+/// For a fixed quota `Q = polys × threshold` the *product* is pinned, so the split between the two
+/// is free — but the costs scale differently, and dropping the non-constant coefficient
+/// commitments (see [`hopr_protocol_pix::SsaPartCommitment`]) changed which way they pull:
 ///
-/// * Reconstructor memory is `Q × size_of::<PixGroup>()`, i.e. **invariant** in the split.
-/// * Share verification is `O(threshold)` elliptic curve multiplications per share, and there are `Q` shares, so total
-///   verification work is `Q × threshold` — **linear in `threshold`**.
+/// * Commitment wire volume and Exit ingest are one commitment per polynomial — **linear in `polys`**, and formerly
+///   `polys × threshold`. Ingest is dominated by point decompression plus the cofactor-8 subgroup check.
+/// * Reconstructor commitment memory is likewise `polys`, no longer `Q`.
+/// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `Q ×
+///   threshold` and is now simply `polys`.
+/// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `Q × threshold`,
+///   **linear in `threshold`**. This is now the only cost that grows with the threshold, and it is field arithmetic
+///   rather than curve arithmetic.
+/// * Detection of a dishonest Entry takes `threshold` return packets, since a share set is only checked once it
+///   interpolates.
 ///
-/// The split is therefore chosen to keep `threshold` as small as the loss-tolerance design
-/// allows and put the remaining factor into the polynomial count.
+/// So raising `threshold` (and lowering `polys`) now buys a proportionally smaller commitment
+/// phase at the cost of more interpolation and later fault detection — the opposite of the old
+/// trade, where `threshold` was kept as small as loss tolerance allowed. The 8192 × 64 split is
+/// retained pending measurement of where the new optimum sits; the product is what fixes the
+/// quota, so the split can be re-tuned without touching session negotiation.
 pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = 8192;
 
 /// Default number of shares required to reconstruct a single SSA part.
