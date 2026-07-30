@@ -167,7 +167,7 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
-hopr-api = "1.15.0"
+hopr-api = "1.16.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.4.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
