@@ -208,7 +208,7 @@ fn main() -> anyhow::Result<()> {
             eprintln!("→ --out set but `profiling` feature is disabled; no flame graph written.");
         }
     }
-    drop(profiler); // stop sampling if active
+    let _ = profiler; // stop sampling if active (drops the guard)
 
     report.print_series();
 
