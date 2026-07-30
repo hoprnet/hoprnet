@@ -438,14 +438,19 @@ where
         "node is not started, please fund this node",
     );
 
-    crate::helpers::wait_for_funds(
-        *MIN_NATIVE_BALANCE,
-        *SUGGESTED_NATIVE_BALANCE,
-        Duration::from_secs(200),
-        me_onchain,
-        &chain_api,
-    )
-    .await?;
+    tracing::info!(
+        suggested_minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
+        "node about to start, checking for funds",
+    );
+    let funding_timeout = Duration::from_secs(200);
+    crate::helpers::wait_for_balance(*MIN_NATIVE_BALANCE, funding_timeout, me_onchain, &chain_api)
+        .await
+        .map_err(|_| {
+            HoprLibError::InsufficientFunds(format!(
+                "failed to fund the node within {} seconds",
+                funding_timeout.as_secs()
+            ))
+        })?;
 
     tracing::info!("starting HOPR node...");
     let balance: hopr_api::types::primitive::prelude::XDaiBalance =
@@ -534,6 +539,42 @@ where
         .filter(|a| !is_public_address(a))
         .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
 
+    // Preflight for the on-chain announcement
+    if ctx.cfg.publish {
+        let key_binding_fee = chain_api.key_binding_fee().await.map_err(HoprLibError::chain)?;
+        if !key_binding_fee.is_zero() {
+            let safe_hopr_balance: hopr_api::types::primitive::prelude::HoprBalance =
+                chain_api.balance(safe_addr).await.map_err(HoprLibError::chain)?;
+            // The key-binding is a persistent on-chain state: if this node was already bound in a
+            // previous run, the fee has already been paid and we can announce even if the safe has
+            // since been drained below the fee. Hence we only wait for funds when the safe is
+            // underfunded *and* the node is not yet key-bound.
+            if safe_hopr_balance < key_binding_fee
+                && chain_api
+                    .await_key_binding(transport_id.public(), Duration::from_secs(1))
+                    .await
+                    .is_err()
+            {
+                tracing::warn!(
+                    %safe_addr,
+                    safe_balance = %safe_hopr_balance,
+                    required = %key_binding_fee,
+                    "the safe does not hold enough wxHOPR to pay the node announcement (key-binding) fee, waiting for \
+                     it to be funded before announcing the node",
+                );
+                let announce_timeout = Duration::from_secs(200);
+                crate::helpers::wait_for_balance(key_binding_fee, announce_timeout, safe_addr, &chain_api)
+                    .await
+                    .map_err(|_| {
+                        HoprLibError::InsufficientFunds(format!(
+                            "the safe {safe_addr} does not hold enough wxHOPR (needs at least {key_binding_fee}) to \
+                             announce the node on chain; fund the safe with wxHOPR and restart the node"
+                        ))
+                    })?;
+            }
+        }
+    }
+
     let chain_api_clone = chain_api.clone();
     let me_offchain = *transport_id.public();
     let node_ready = spawn(async move {
@@ -546,7 +587,12 @@ where
     match chain_api.announce(&multiaddresses_to_announce, &transport_id).await {
         Ok(awaiter) => {
             awaiter.await.map_err(|error| {
-                tracing::error!(?multiaddresses_to_announce, %error, "node announcement failed");
+                tracing::error!(
+                    ?multiaddresses_to_announce,
+                    %error,
+                    "node announcement failed; this is commonly caused by the safe not holding enough wxHOPR to pay \
+                     the key-binding fee",
+                );
                 HoprLibError::chain(error)
             })?;
             tracing::info!(?multiaddresses_to_announce, "node announced successfully");
