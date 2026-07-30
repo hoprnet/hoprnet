@@ -35,6 +35,21 @@ const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
 
+/// Number of Rayon threads kept permanently free for outgoing packet encode (SURB generation).
+/// The ingress decode concurrency default is `pool_thread_count - ENCODE_RESERVED_THREADS` so
+/// that heavy download traffic cannot starve the upload/SURB replenishment path.
+const ENCODE_RESERVED_THREADS: usize = 2;
+
+/// Artificial per-packet delay injected into `wire_in` when the Rayon pool is detected as
+/// congested. 20 ms keeps the decode queue from growing while still allowing acks and keep-alive
+/// SURB packets to drain through at a reasonable pace.
+const INGRESS_THROTTLE_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
+
+/// Pool outstanding-task watermark factor: the gate trips when
+/// `outstanding_tasks > pool_thread_count * INGRESS_POOL_HIGH_WATERMARK_FACTOR`.
+/// A factor of 3 gives one full pool worth of headroom above the cap.
+const INGRESS_POOL_HIGH_WATERMARK_FACTOR: usize = 3;
+
 #[cfg(all(feature = "telemetry", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PACKET_COUNT:  hopr_api::types::telemetry::MultiCounter =  hopr_api::types::telemetry::MultiCounter::new(
@@ -746,8 +761,9 @@ where
     let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
-    // The default maximum concurrency (if not set or zero) is 8 times the number of available cores.
-    // Zero is normalized to the default to prevent deadlock (0 concurrent tasks = no work).
+    // `avail_concurrency` is used as a deep ready-queue for the encode (egress) path where deep
+    // queuing is harmless, and as a fallback when the Rayon pool has not been initialised yet.
+    // Zero is normalised to 1 to prevent deadlock (0 concurrent tasks = no work done ever).
     let avail_concurrency = std::thread::available_parallelism()
         .ok()
         .map(|n| n.get())
@@ -756,7 +772,40 @@ where
         * 8;
 
     let output_concurrency = cfg.output_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
-    let input_concurrency = cfg.input_concurrency.filter(|&n| n > 0).unwrap_or(avail_concurrency);
+
+    // The ingress decode concurrency is deliberately capped below the Rayon pool size so that
+    // ENCODE_RESERVED_THREADS are always available for outgoing encode / SURB generation.
+    // Without this cap the FIFO pool fills up with decode work under heavy download traffic and
+    // SURB replenishment starves, slowly collapsing the session's download throughput.
+    let pool_threads = hopr_utils::parallelize::cpu::pool_thread_count();
+    let default_input_concurrency = if pool_threads > ENCODE_RESERVED_THREADS {
+        pool_threads - ENCODE_RESERVED_THREADS
+    } else if pool_threads > 0 {
+        1 // pool is tiny but initialised — leave at least 1 decode slot
+    } else {
+        avail_concurrency // pool not initialised yet; fall back to the old behaviour
+    };
+    let input_concurrency = cfg
+        .input_concurrency
+        .filter(|&n| n > 0)
+        .unwrap_or(default_input_concurrency);
+
+    // --- Ingress gate (safety-net backpressure) ---
+    // outstanding_tasks() is a single atomic load, so checking it per-packet is cheaper than
+    // maintaining a sampler task + shared AtomicBool. The delay is only incurred when the pool is
+    // actually congested, which is also when packets arrive fastest.
+    let effective_pool = if pool_threads > 0 {
+        pool_threads
+    } else {
+        avail_concurrency.max(1)
+    };
+    let high_watermark = effective_pool * INGRESS_POOL_HIGH_WATERMARK_FACTOR;
+    let wire_in = wire_in.then(move |(peer, data)| async move {
+        if hopr_utils::parallelize::cpu::outstanding_tasks() > high_watermark {
+            hopr_utils::runtime::prelude::sleep(INGRESS_THROTTLE_DELAY).await;
+        }
+        (peer, data)
+    });
 
     processes.insert(
         PacketPipelineProcesses::MsgOut,
