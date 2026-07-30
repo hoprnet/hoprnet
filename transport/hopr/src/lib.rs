@@ -1216,9 +1216,9 @@ where
 ///
 /// Provides access to fixed packet-layer parameters (e.g. maximum payload size)
 /// without requiring a live transport instance or generic type parameters.
-pub struct TransportCharacteristics;
+pub struct HoprTransportCharacteristics;
 
-impl hopr_api::node::PacketTransport for TransportCharacteristics {
+impl hopr_api::node::PacketTransport for HoprTransportCharacteristics {
     fn packet_payload_size() -> usize {
         hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE
     }
