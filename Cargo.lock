@@ -4277,41 +4277,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-strategy"
-version = "0.20.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytesize",
- "chrono",
- "dashmap",
- "futures",
- "futures-concurrency",
- "futures-time",
- "hex-literal",
- "hopr-api",
- "hopr-chain-connector",
- "hopr-crypto-packet",
- "hopr-utilities",
- "humantime-serde",
- "insta",
- "lazy_static",
- "mockall",
- "moka",
- "multiaddr",
- "parking_lot",
- "serde",
- "serde_json",
- "serde_with",
- "smart-default",
- "test-log",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "hopr-ticket-manager"
 version = "0.5.1"
 dependencies = [

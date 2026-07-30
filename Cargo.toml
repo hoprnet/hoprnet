@@ -22,7 +22,6 @@ members = [
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
-  "impls/strategy",
   "impls/transport/p2p",
 ]
 
@@ -50,7 +49,6 @@ order = [
   "hopr-ct-full-network",
   "hopr-chain-connector",
   "hopr-transport-p2p",
-  "hopr-strategy",
   "hopr-session-server-forwarder",
   "hopr-transport",
   "hopr-lib",
@@ -182,7 +180,6 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
 hopr-transport = { version = "0.33.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
@@ -262,6 +259,5 @@ ignored = [
   "serde_bytes",
   "humantime-serde",
   "hopr-session-server-forwarder",
-  "hopr-strategy",
   "hopr-utils-session",
 ]
