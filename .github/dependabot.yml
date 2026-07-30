@@ -16,6 +16,11 @@ updates:
       timezone: "UTC"
     cooldown:
       default-days: 7
+    ignore:
+      # nix-lib uses version-pinned refs (github:hoprnet/nix-lib/vX.Y.Z) that
+      # Dependabot compares incorrectly and proposes as a downgrade. Version
+      # upgrades are managed manually alongside breaking API changes.
+      - dependency-name: "nix-lib"
     groups:
       nix-flake-inputs:
         patterns:
