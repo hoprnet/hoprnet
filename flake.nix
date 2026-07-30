@@ -354,6 +354,14 @@
                 language = "system";
                 pass_filenames = false;
               };
+              dependabot-validator = {
+                enable = true;
+                name = "Dependabot config validator";
+                entry = "${pkgs.check-jsonschema}/bin/check-jsonschema --builtin-schema vendor.dependabot";
+                files = "\\.github/dependabot\\.yml$";
+                language = "system";
+                pass_filenames = true;
+              };
             };
             excludes = [ ".gcloudignore" ];
           };
