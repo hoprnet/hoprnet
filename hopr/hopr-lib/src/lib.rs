@@ -70,7 +70,7 @@ use hopr_api::{
 ///
 /// Use this when sizing buffers or computing how many session frames a given
 /// wxHOPR balance can fund (together with the on-chain ticket price).
-pub use hopr_transport::{SESSION_MTU, HoprTransportCharacteristics};
+pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
@@ -732,6 +732,12 @@ where
 impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> hopr_api::node::PacketTransport for Hopr<Chain, Graph, Net, TMgr> {
+    fn packet_payload_size() -> usize {
+        hopr_transport::PACKET_PAYLOAD_SIZE
     }
 }
 
