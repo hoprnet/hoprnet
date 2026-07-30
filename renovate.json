@@ -16,66 +16,41 @@
   },
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": [
-      "security"
-    ],
-    "schedule": [
-      "at any time"
-    ],
+    "labels": ["security"],
+    "schedule": ["at any time"],
     "automerge": true
   },
   "packageRules": [
     {
-      "matchManagers": [
-        "github-actions"
-      ],
+      "matchManagers": ["github-actions"],
       "groupName": "github-actions",
       "pinDigests": true,
       "commitMessageTopic": "GitHub Actions"
     },
     {
-      "matchManagers": [
-        "cargo"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor", "patch"],
       "groupName": "cargo dependencies",
       "commitMessageTopic": "Cargo dependencies"
     },
     {
       "description": "Keep libc on a minor-only requirement",
-      "matchManagers": [
-        "cargo"
-      ],
-      "matchPackageNames": [
-        "libc"
-      ],
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["libc"],
       "rangeStrategy": "update-lockfile"
     },
     {
       "description": "Expedite cargo security updates \u2014 bypass weekly schedule",
-      "matchManagers": [
-        "cargo"
-      ],
-      "matchCategories": [
-        "security"
-      ],
-      "schedule": [
-        "at any time"
-      ],
+      "matchManagers": ["cargo"],
+      "matchCategories": ["security"],
+      "schedule": ["at any time"],
       "automerge": true,
-      "labels": [
-        "security"
-      ],
+      "labels": ["security"],
       "groupName": "cargo security updates",
       "commitMessageTopic": "Cargo security updates"
     },
     {
-      "matchCategories": [
-        "docker"
-      ],
+      "matchCategories": ["docker"],
       "pinDigests": true
     },
     {

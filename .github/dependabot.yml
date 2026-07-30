@@ -1,3 +1,4 @@
+---
 version: 2
 updates:
   # Renovate's nix manager cannot update flake.lock on Mend-hosted infrastructure:
