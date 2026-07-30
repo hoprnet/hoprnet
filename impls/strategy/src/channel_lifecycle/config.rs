@@ -1,10 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use bytesize::ByteSize;
-use hopr_api::{
-    chain::WinningProbability,
-    types::primitive::prelude::{Address, HoprBalance, U256, UnitaryFloatOps},
-};
+use hopr_api::types::primitive::prelude::{Address, HoprBalance, U256};
 use hopr_crypto_packet::prelude::HoprPacket;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -80,16 +77,17 @@ pub struct EligibilityConfig {
 /// data volumes.
 ///
 /// The strategy converts each capacity to a wxHOPR amount at runtime using the
-/// live on-chain ticket price and winning probability via [`FundingConfig::resolve`].
+/// live on-chain ticket price via [`FundingConfig::resolve`].
 ///
-/// **Conversion formula** (RFC-0005 §3.2):
+/// **Conversion formula**:
 /// ```text
 /// packets     = ceil(capacity_bytes / HoprPacket::PAYLOAD_SIZE)
-/// funding_wei = ticket_price_wei × packets × assumed_hops / win_prob
+/// funding_wei = ticket_price_wei × packets × assumed_hops
 /// ```
-/// `assumed_hops` is the number of paid downstream relay hops.  Defaulting to 3
-/// (the protocol maximum) ensures the channel is never under-funded when paths
-/// use the full relay depth.
+/// The channel stake covers ticket face value; winning probability does not
+/// affect the amount the sender locks per packet.  `assumed_hops` is the number
+/// of paid downstream relay hops.  Defaulting to 3 (the protocol maximum)
+/// ensures the channel is never under-funded when paths use the full relay depth.
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct FundingConfig {
     /// Data volume a newly opened channel's stake should be able to carry.
@@ -146,23 +144,15 @@ pub(crate) struct ResolvedFunding {
     pub min_safe_balance_required: HoprBalance,
 }
 
-/// Convert a data `capacity` to a wxHOPR balance using the live ticket economics.
+/// Convert a data `capacity` to a wxHOPR balance using the live ticket price.
 ///
-/// The formula matches the ticket-issuance math in `HoprTicketFactory`:
+/// The channel stake covers ticket face value:
 /// ```text
 /// packets     = ceil(capacity_bytes / HoprPacket::PAYLOAD_SIZE)
-/// funding_wei = ticket_price_wei × packets × hops / win_prob
+/// funding_wei = ticket_price_wei × packets × hops
 /// ```
 /// Returns [`HoprBalance::zero`] for zero capacity.
-/// Falls back to a `win_prob`-independent estimate (`price × packets × hops`)
-/// when `win_prob` is zero or converting it to f64 would produce a non-positive
-/// value, to avoid dividing by zero.
-pub(crate) fn capacity_to_balance(
-    capacity: ByteSize,
-    price: HoprBalance,
-    win_prob: WinningProbability,
-    hops: u32,
-) -> HoprBalance {
+pub(crate) fn capacity_to_balance(capacity: ByteSize, price: HoprBalance, hops: u32) -> HoprBalance {
     let bytes = capacity.as_u64();
     if bytes == 0 {
         return HoprBalance::zero();
@@ -173,35 +163,24 @@ pub(crate) fn capacity_to_balance(
     let packets = bytes.div_ceil(payload);
 
     // ticket_price_wei × packets × hops — saturating; overflow becomes U256::MAX
-    let wei_base = price
+    let wei = price
         .amount()
         .saturating_mul(U256::from(packets))
         .saturating_mul(U256::from(hops));
-
-    // Divide by win_prob (≤ 1.0); fall back to no division if prob is degenerate.
-    let wp: f64 = win_prob.into();
-    let wei = if wp > 0.0 {
-        match wei_base.div_f64(wp) {
-            Ok(v) => v,
-            Err(_) => wei_base, // degenerate: return undiscounted value
-        }
-    } else {
-        wei_base
-    };
 
     HoprBalance::from(wei)
 }
 
 impl FundingConfig {
     /// Resolve all data-capacity fields to wxHOPR amounts at the given ticket
-    /// economics.  Called once per pipeline tick.
-    pub(crate) fn resolve(&self, price: HoprBalance, win_prob: WinningProbability) -> ResolvedFunding {
+    /// price.  Called once per pipeline tick.
+    pub(crate) fn resolve(&self, price: HoprBalance) -> ResolvedFunding {
         let hops = self.assumed_hops;
         ResolvedFunding {
-            initial_balance: capacity_to_balance(self.initial_capacity, price, win_prob, hops),
-            topup_balance: capacity_to_balance(self.topup_capacity, price, win_prob, hops),
-            lower_balance_threshold: capacity_to_balance(self.lower_capacity_threshold, price, win_prob, hops),
-            min_safe_balance_required: capacity_to_balance(self.min_safe_capacity_required, price, win_prob, hops),
+            initial_balance: capacity_to_balance(self.initial_capacity, price, hops),
+            topup_balance: capacity_to_balance(self.topup_capacity, price, hops),
+            lower_balance_threshold: capacity_to_balance(self.lower_capacity_threshold, price, hops),
+            min_safe_balance_required: capacity_to_balance(self.min_safe_capacity_required, price, hops),
         }
     }
 }
@@ -497,36 +476,32 @@ mod config_tests {
     #[test]
     fn zero_capacity_returns_zero() -> anyhow::Result<()> {
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
-        assert_eq!(capacity_to_balance(ByteSize::b(0), price, wp, 3), HoprBalance::zero());
+        assert_eq!(capacity_to_balance(ByteSize::b(0), price, 3), HoprBalance::zero());
         Ok(())
     }
 
     #[test]
-    fn exact_packet_count_win_prob_one() -> anyhow::Result<()> {
+    fn exact_packet_count() -> anyhow::Result<()> {
         // capacity = 10 × PAYLOAD_SIZE → exactly 10 packets
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
-        let result = capacity_to_balance(capacity, price, wp, 3);
-        // expected: PRICE_WEI * 10 packets * 3 hops / 1.0
+        let result = capacity_to_balance(capacity, price, 3);
+        // expected: PRICE_WEI * 10 packets * 3 hops
         let expected = balance_from_wei(PRICE_WEI * 10 * 3);
-        assert_eq!(result, expected, "exact 10 packets, win_prob=1.0");
+        assert_eq!(result, expected, "exact 10 packets");
         Ok(())
     }
 
     #[test]
-    fn half_win_prob_doubles_funding() -> anyhow::Result<()> {
-        // win_prob = 0.5 → face-value doubles vs. win_prob = 1.0
+    fn funding_is_ticket_face_value() -> anyhow::Result<()> {
+        // Regression: funding must equal ticket_price × packets × hops, independent
+        // of winning probability. The previous formula divided by win_prob, which
+        // over-funded channels when win_prob < 1.
         let price = balance_from_wei(PRICE_WEI);
-        let wp_full = WinningProbability::try_from(1.0f64).context("create wp_full")?;
-        let wp_half = WinningProbability::try_from(0.5f64).context("create wp_half")?;
         let capacity = ByteSize::b((HoprPacket::PAYLOAD_SIZE * 10) as u64);
-        let full = capacity_to_balance(capacity, price, wp_full, 3);
-        let half = capacity_to_balance(capacity, price, wp_half, 3);
-        // half should be approximately double full
-        let ratio = half.amount().low_u128() as f64 / full.amount().low_u128() as f64;
-        assert!((ratio - 2.0).abs() < 0.01, "ratio={ratio}");
+        let result = capacity_to_balance(capacity, price, 3);
+        let expected = balance_from_wei(PRICE_WEI * 10 * 3);
+        assert_eq!(result, expected, "10 packets × price × 3 hops");
         Ok(())
     }
 
@@ -534,8 +509,7 @@ mod config_tests {
     fn sub_packet_capacity_rounds_up_to_one_packet() -> anyhow::Result<()> {
         // 1 byte → ceil(1 / PAYLOAD_SIZE) = 1 packet
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
-        let result = capacity_to_balance(ByteSize::b(1), price, wp, 1);
+        let result = capacity_to_balance(ByteSize::b(1), price, 1);
         let expected = balance_from_wei(PRICE_WEI * 1 * 1);
         assert_eq!(result, expected, "1 byte rounds up to 1 packet");
         Ok(())
@@ -544,10 +518,9 @@ mod config_tests {
     #[test]
     fn assumed_hops_scales_linearly() -> anyhow::Result<()> {
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
         let capacity = ByteSize::b(HoprPacket::PAYLOAD_SIZE as u64);
-        let h1 = capacity_to_balance(capacity, price, wp, 1);
-        let h3 = capacity_to_balance(capacity, price, wp, 3);
+        let h1 = capacity_to_balance(capacity, price, 1);
+        let h3 = capacity_to_balance(capacity, price, 3);
         assert_eq!(
             h3.amount(),
             h1.amount().saturating_mul(U256::from(3u64)),
@@ -562,25 +535,24 @@ mod config_tests {
     fn resolve_maps_all_four_fields() -> anyhow::Result<()> {
         let cfg = FundingConfig::default();
         let price = balance_from_wei(PRICE_WEI);
-        let wp = WinningProbability::try_from(1.0f64).context("create win_prob")?;
-        let resolved = cfg.resolve(price, wp);
+        let resolved = cfg.resolve(price);
 
         // Each resolved balance must match what capacity_to_balance produces independently.
         assert_eq!(
             resolved.initial_balance,
-            capacity_to_balance(cfg.initial_capacity, price, wp, cfg.assumed_hops)
+            capacity_to_balance(cfg.initial_capacity, price, cfg.assumed_hops)
         );
         assert_eq!(
             resolved.topup_balance,
-            capacity_to_balance(cfg.topup_capacity, price, wp, cfg.assumed_hops)
+            capacity_to_balance(cfg.topup_capacity, price, cfg.assumed_hops)
         );
         assert_eq!(
             resolved.lower_balance_threshold,
-            capacity_to_balance(cfg.lower_capacity_threshold, price, wp, cfg.assumed_hops)
+            capacity_to_balance(cfg.lower_capacity_threshold, price, cfg.assumed_hops)
         );
         assert_eq!(
             resolved.min_safe_balance_required,
-            capacity_to_balance(cfg.min_safe_capacity_required, price, wp, cfg.assumed_hops)
+            capacity_to_balance(cfg.min_safe_capacity_required, price, cfg.assumed_hops)
         );
         Ok(())
     }
