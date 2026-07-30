@@ -1,13 +1,19 @@
 // Reference cluster stress tests for the session-client feature.
 #![cfg(feature = "session-client")]
 
+use std::time::Duration;
+
 use futures::future::try_join_all;
 use hopr_chain_connector::blokli_client::BlokliQueryClient;
 use hopr_lib::{
     api::types::primitive::prelude::HoprBalance,
     testing::{
-        fixtures::{TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture},
+        fixtures::{
+            STRESS_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, chain_propagation_delay, cluster_fixture,
+            stress_cluster_fixture,
+        },
         hopr::ChannelGuard,
+        loadgen::{StressConfig, run_stress},
     },
 };
 use rstest::*;
@@ -95,10 +101,13 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
     let timeout = chain_propagation_delay(&chain_info) * 12;
     cluster.wait_for_channel_graph(src, channels.len(), timeout).await?;
 
-    // Create two sessions from src through relay to dst_a (different sessions, same path)
+    // Create two sessions from src through relay to dst_a (different sessions, same path).
+    // Disable the SURB balancer (None) so its background replenishment traffic does not
+    // exhaust the 100 wxHOPR channel funding before session_b can establish.  The intent
+    // of this test is deadlock / cross-contamination detection, not SURB replenishment.
     let path = [src, relay, dst_a];
-    let mut session_a = cluster.create_session(&path).await?;
-    let mut session_b = cluster.create_session(&path).await?;
+    let mut session_a = cluster.create_session_with(&path, Default::default(), None).await?;
+    let mut session_b = cluster.create_session_with(&path, Default::default(), None).await?;
 
     let payload_a: Vec<u8> = vec![0xAA; DATA_SIZE];
     let payload_b: Vec<u8> = vec![0xBB; DATA_SIZE];
@@ -127,6 +136,74 @@ async fn concurrent_sessions_independent_no_deadlock() -> anyhow::Result<()> {
             .map(|g| async move { g.try_close_channels_all_channels().await }),
     )
     .await?;
+
+    Ok(())
+}
+
+/// Parametric throughput matrix: 1/2/3 hops × 5/20/100 MB.
+///
+/// Each case boots its own cluster of `hops + 2` nodes, opens a full directed
+/// channel mesh (1 M wxHOPR per channel to cover both data and SURB return-path
+/// tickets at `STRESS_WIN_PROB = 0.001`), then streams the target volume through
+/// a single session and validates zero packet loss.
+///
+/// Run all 9 cases with:
+/// ```sh
+/// cargo nextest run -p hopr-lib --features session-client \
+///     --test 'stress_cluster-size3' -j 1 --run-ignored all -- --nocapture
+/// ```
+///
+/// Run a single case (e.g. 2-hop / 20 MB, case index 5):
+/// ```sh
+/// cargo nextest run -p hopr-lib --features session-client \
+///     --test 'stress_cluster-size3' -j 1 --run-ignored all \
+///     -- 'hop_mb_matrix::case_5' --nocapture
+/// ```
+#[rstest]
+// 1-hop: src → relay → dst  (3 nodes)
+#[case(1, 5)]
+#[case(1, 20)]
+#[case(1, 100)]
+// 2-hop: src → r1 → r2 → dst  (4 nodes)
+#[case(2, 5)]
+#[case(2, 20)]
+#[case(2, 100)]
+// 3-hop: src → r1 → r2 → r3 → dst  (5 nodes)
+#[case(3, 5)]
+#[case(3, 20)]
+#[case(3, 100)]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[ignore = "slow: requires cluster bootstrap (60–120 s); run with --run-ignored"]
+async fn hop_mb_matrix(#[case] hops: usize, #[case] mb: u64) -> anyhow::Result<()> {
+    let n_nodes = hops + 2;
+    let cluster = stress_cluster_fixture(STRESS_WIN_PROB, n_nodes);
+
+    let cfg = StressConfig {
+        hops,
+        total_bytes: mb * 1024 * 1024,
+        routes: 1,
+        msg_size_range: 4096..=32768,
+        sample_interval: Duration::from_millis(500),
+        seed: 42,
+        ..StressConfig::default()
+    };
+
+    let report = run_stress(&cluster, &cfg).await?;
+    report.print_series();
+
+    anyhow::ensure!(
+        report.total_bytes_delivered >= cfg.total_bytes,
+        "delivered {} bytes, expected at least {}",
+        report.total_bytes_delivered,
+        cfg.total_bytes,
+    );
+    anyhow::ensure!(!report.samples.is_empty(), "no throughput samples recorded");
+    anyhow::ensure!(
+        report.samples.iter().any(|s| s.recv_window_bytes > 0),
+        "no bytes received at destination — pipeline delivered nothing"
+    );
 
     Ok(())
 }
