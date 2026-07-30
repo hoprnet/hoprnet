@@ -50,7 +50,7 @@ For `hopr-lib` multi-node throughput cluster tests:
 cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size3' -j 1
 cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-size5' -j 1 --run-ignored all
 # OFAT matrices (all variants, ~60–120 s bootstrap):
-cargo nextest run -p hopr-lib --features session-client --test 'cluster_throughput-matrix' -j 1 --run-ignored all
+cargo nextest run -p hopr-lib --features testing --test 'cluster_throughput-matrix' -j 1 --run-ignored all
 ```
 
 For profiling the packet pipeline against a real-QUIC cluster (mock chain):
