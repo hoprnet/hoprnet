@@ -22,7 +22,6 @@ members = [
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
-  "impls/strategy",
   "impls/transport/p2p",
 ]
 
@@ -50,7 +49,6 @@ order = [
   "hopr-ct-full-network",
   "hopr-chain-connector",
   "hopr-transport-p2p",
-  "hopr-strategy",
   "hopr-session-server-forwarder",
   "hopr-transport",
   "hopr-lib",
@@ -78,10 +76,6 @@ bytesize = { version = "2.4.0", features = ["serde"] }
 bytes = "1.12.0"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
-chrono = { version = "0.4.45", default-features = false, features = [
-  "std",
-  "clock",
-] }
 clap = { version = "4.6.1", features = ["derive", "env", "string"] }
 const_format = "0.2.36"
 const-hex = "1.19.1"
@@ -169,22 +163,21 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
-hopr-api = "1.15.0"
+hopr-api = "1.16.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.3.0", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.4.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "4.0.2-rc.5", path = "hopr/hopr-lib", default-features = false }
+hopr-lib = { version = "4.0.2-rc.9", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.32.0", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.34.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
@@ -213,6 +206,13 @@ opt-level = 2
 [profile.test]
 opt-level = 1
 
+# CI keeps useful line-level backtraces while avoiding large incremental and
+# full debug-info artifacts in the Nix binary cache.
+[profile.ci-test]
+debug = 1
+incremental = false
+inherits = "test"
+
 # this profile focuses on the best runtime performance and the smallest binary size
 [profile.release]
 codegen-units = 1
@@ -234,6 +234,16 @@ debug = 2
 split-debuginfo = "off"
 strip = false
 
+# CPU profiling profile — release performance with full DWARF symbols.
+# Use with `cargo flamegraph --profile profiling` (Linux) or the pprof
+# in-process feature (`--features profiling`).  Mirrors [profile.memprof]
+# which is used for allocation profiling.
+[profile.profiling]
+inherits = "release"
+debug = 2
+strip = false
+split-debuginfo = "packed"
+
 # make insta snapshots faster
 [profile.dev.package]
 insta.opt-level = 3
@@ -245,6 +255,5 @@ ignored = [
   "serde_bytes",
   "humantime-serde",
   "hopr-session-server-forwarder",
-  "hopr-strategy",
   "hopr-utils-session",
 ]

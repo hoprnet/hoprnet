@@ -109,6 +109,35 @@ fn default_counter_flush_interval() -> Duration {
     DEFAULT_COUNTER_FLUSH_INTERVAL
 }
 
+/// Simulated per-packet transit latency inserted between the mixer and the wire.
+///
+/// When set on a node's config, every packet emitted by the mixer is held for a
+/// Gaussian-jittered delay before being forwarded to the transport layer.  The delay
+/// is **FIFO** (packets are never reordered): the release deadline is `max(prev_deadline,
+/// now) + sample`, so back-to-back bursts accumulate a monotonically non-decreasing
+/// offset rather than reordering.
+///
+/// **Intended for testing only** — simulates WAN-link transit latency (e.g. ~50 ms) in
+/// a local cluster.  Defaults to `None` (disabled; zero production overhead).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(deny_unknown_fields)
+)]
+pub struct TransitLatencyConfig {
+    /// Mean transit latency per packet.
+    #[default(Duration::from_millis(50))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    pub mean: Duration,
+    /// Standard deviation of the transit latency.
+    ///
+    /// Set to zero for a deterministic (fixed) delay equal to `mean`.
+    #[default(Duration::from_millis(5))]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    pub std_dev: Duration,
+}
+
 /// Complete configuration of the HOPR protocol stack.
 #[derive(Debug, smart_default::SmartDefault, Validate, Clone, PartialEq)]
 #[cfg_attr(
@@ -136,6 +165,13 @@ pub struct HoprProtocolConfig {
     /// Mixer configuration.
     #[cfg_attr(feature = "serde", serde(default))]
     pub mixer: MixerConfig,
+    /// Simulated transit latency shim between the mixer output and the wire.
+    ///
+    /// When `Some`, a Gaussian-jittered FIFO delay is inserted before every forwarded
+    /// packet — simulating WAN-link transit time in a local cluster test run.
+    /// Set `None` (the default) in production: zero overhead.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub transit_latency: Option<TransitLatencyConfig>,
     /// Per-peer egress stream configuration
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]

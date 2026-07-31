@@ -22,6 +22,10 @@ pub mod errors;
 pub mod path;
 /// Transport binary protocol layer (codec, pipeline, heartbeat, stream).
 pub mod protocol;
+/// Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
+/// Enabled by the `testing` feature; every item is a zero-cost no-op stub when absent.
+#[cfg(feature = "testing")]
+pub mod testing;
 
 mod multiaddrs;
 
@@ -522,20 +526,83 @@ where
             .unwrap_or(u64::MAX)
             .max(1);
         let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
+        let transit_latency_cfg = self.cfg.transit_latency;
         processes.insert(
             HoprTransportProcess::MixerForwarder,
             hopr_utils::spawn_as_abortable!(async move {
-                mix_rx
-                    .fold(wire_msg_tx, |mut sink, item| async move {
-                        if sink.send(item).await.is_err() {
+                let mut mix_rx = mix_rx;
+                let mut wire_sink = wire_msg_tx;
+
+                if let Some(lat) = transit_latency_cfg {
+                    // Concurrent transit-latency fan-out: spawn one short-lived task per
+                    // packet so each packet ages through its own ~mean delay independently.
+                    // A burst of N packets at mean=50 ms takes ~50 ms total, not N×50 ms.
+                    //
+                    // Without a tokio runtime the latency is silently skipped (pass-through).
+                    #[cfg(feature = "runtime-tokio")]
+                    {
+                        let (tx, rx) = futures::channel::mpsc::unbounded();
+                        let fan_out = async move {
+                            while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                                let mean_us = lat.mean.as_micros() as f64;
+                                let std_us = lat.std_dev.as_micros() as f64;
+                                let delay_us = if std_us > 0.0 {
+                                    use rand_distr::{Distribution, Normal};
+                                    Normal::new(mean_us, std_us)
+                                        .expect("transit latency Normal params are valid")
+                                        .sample(&mut rand::rng())
+                                        .max(0.0_f64)
+                                } else {
+                                    mean_us.max(0.0)
+                                };
+                                let delay = Duration::from_micros(delay_us as u64);
+                                let item_tx = tx.clone();
+                                hopr_utils::runtime::prelude::spawn(async move {
+                                    if !delay.is_zero() {
+                                        futures_timer::Delay::new(delay).await;
+                                    }
+                                    let _ = item_tx.unbounded_send(item);
+                                });
+                            }
+                            // `tx` drops here; the channel closes once all per-packet tasks send
+                        };
+                        let fan_in = async move {
+                            let mut rx = rx;
+                            while let Some(item) = futures::StreamExt::next(&mut rx).await {
+                                if wire_sink.send(item).await.is_err() {
+                                    tracing::error!(
+                                        task = %HoprTransportProcess::MixerForwarder,
+                                        "wire sink dropped — discarding transit-delayed packet"
+                                    );
+                                    break;
+                                }
+                            }
+                        };
+                        futures::join!(fan_out, fan_in);
+                    }
+                    #[cfg(not(feature = "runtime-tokio"))]
+                    {
+                        let _ = lat;
+                        while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                            if wire_sink.send(item).await.is_err() {
+                                tracing::error!(
+                                    task = %HoprTransportProcess::MixerForwarder,
+                                    "wire sink dropped — discarding mixed packet"
+                                );
+                            }
+                        }
+                    }
+                } else {
+                    while let Some(item) = futures::StreamExt::next(&mut mix_rx).await {
+                        if wire_sink.send(item).await.is_err() {
                             tracing::error!(
                                 task = %HoprTransportProcess::MixerForwarder,
                                 "wire sink dropped — discarding mixed packet"
                             );
                         }
-                        sink
-                    })
-                    .await;
+                    }
+                }
+
                 tracing::warn!(
                     task = %HoprTransportProcess::MixerForwarder,
                     "long-running background task finished"
@@ -635,6 +702,8 @@ where
                 move |(unresolved, mut data)| {
                     let path_planner = path_planner.clone();
                     async move {
+                        hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         trace!(?unresolved, "resolving routing for packet");
                         match path_planner
                             .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
@@ -668,6 +737,8 @@ where
                                 Some((resolved, data))
                             }
                             Err(error) => {
+                                hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 error!(%error, "failed to resolve routing");
                                 None
                             }
@@ -810,7 +881,20 @@ where
                 probe_classifier
                     .filter_stream(unresolved_routing_msg_tx_for_task, rx_from_protocol)
                     .filter_map(move |(pseudonym, data)| {
-                        futures::future::ready(match smgr.dispatch_message(pseudonym, data) {
+                        hopr_transport_session::counters::DISPATCH_MESSAGE_CALLS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        // `dispatch_message` is synchronous and lock-free (moka::sync + crossfire
+                        // try_send); it never blocks. However, the crossfire stream that feeds
+                        // this loop does not participate in tokio's cooperative budget, so
+                        // `future::ready` — which is always Poll::Ready — would let this task
+                        // monopolize its worker thread under a saturated inbound queue (Processed
+                        // items are filtered to None before the fold's tx.send().await, the only
+                        // other suspension point on the hot path). Calling consume_budget() here
+                        // integrates this loop into tokio's coop scheduler: it is a cheap
+                        // thread-local decrement on the fast path and only actually yields
+                        // (~every 128 polls) when the budget is exhausted, giving co-located
+                        // tasks (including the SPHINX-crypto Rayon pipeline) a chance to run.
+                        let result = match smgr.dispatch_message(pseudonym, data) {
                             Ok(DispatchResult::Processed) => {
                                 tracing::trace!("message dispatch completed");
                                 None
@@ -823,7 +907,11 @@ where
                                 tracing::error!(%error, "error while dispatching packet in the session manager");
                                 None
                             }
-                        })
+                        };
+                        async move {
+                            hopr_utils::runtime::prelude::consume_budget().await;
+                            result
+                        }
                     })
                     .fold(on_incoming_data_tx, |mut tx, data| async move {
                         if tx.send(data).await.is_err() {
@@ -1117,5 +1205,98 @@ where
 
     async fn observed_multiaddresses(&self, key: &OffchainPublicKey) -> Vec<Multiaddr> {
         self.network_observed_multiaddresses(key).await
+    }
+}
+
+/// Maximum application-layer payload that fits in a single HOPR sphinx packet (bytes).
+pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE;
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    };
+
+    use futures::StreamExt;
+    use hopr_utils::runtime::prelude::{consume_budget, spawn, yield_now};
+
+    /// Verifies that the `filter_map` closure in `SessionsManagement(0)` does not monopolize
+    /// the tokio worker thread under a continuously saturated inbound stream.
+    ///
+    /// ### Background
+    ///
+    /// The inbound dispatch loop (`transport/hopr/src/lib.rs`) drives:
+    ///
+    /// ```text
+    /// rx_from_protocol (crossfire, no coop budget)
+    ///   → filter_stream
+    ///   → filter_map(sync dispatch_message + consume_budget().await)
+    ///   → fold(tx.send().await)          ← only fires for Unrelated items
+    /// ```
+    ///
+    /// On the `Processed` hot path (common case), items become `None` and are filtered
+    /// out before the `fold`'s `tx.send().await`, so the only suspension point is the
+    /// `consume_budget()` call inside `filter_map`.
+    ///
+    /// ### What this test proves
+    ///
+    /// On a `current_thread` runtime (single worker, fully cooperative scheduling) a tight
+    /// stream loop that never returns `Poll::Pending` starves every other spawned task until
+    /// the stream is drained.  By replacing `future::ready(result)` with an `async` block
+    /// that calls `consume_budget().await` before returning, we give the scheduler a chance
+    /// to preempt the loop every ≈128 polls.  The "canary" task — a plain `yield_now` loop —
+    /// *must* make forward progress while the dispatch stream is draining for the fix to be
+    /// considered effective.
+    ///
+    /// Reverting the `consume_budget().await` to `future::ready(result)` will make this
+    /// test fail: the canary will never be scheduled and its counter will remain 0.
+    #[tokio::test(flavor = "current_thread")]
+    async fn sessions_management_dispatch_loop_yields_to_scheduler() {
+        // N large enough to trigger ≥1 genuine yield (budget = 128 per reset).
+        const N: usize = 1_000;
+
+        // Canary: counts how many times it was scheduled during the dispatch run.
+        let counter = Arc::new(AtomicU64::new(0));
+        let counter_clone = counter.clone();
+        let canary = spawn(async move {
+            loop {
+                counter_clone.fetch_add(1, Ordering::Relaxed);
+                yield_now().await;
+            }
+        });
+
+        // Dispatch loop — same shape as the fixed SessionsManagement(0) hot path:
+        //   sync compute → consume_budget().await → None (Processed path)
+        let unrelated_count = futures::stream::iter(0..N)
+            .filter_map(|_item| {
+                // Dispatch result computed synchronously (no clone); budget consumed async.
+                let result: Option<()> = None; // every item is "Processed"
+                async move {
+                    consume_budget().await;
+                    result
+                }
+            })
+            .fold(0u64, |acc, _| async move { acc + 1 })
+            .await;
+
+        assert_eq!(
+            unrelated_count, 0,
+            "all Processed items should be filtered out by filter_map"
+        );
+
+        // The canary must have been scheduled at least once while the dispatch loop ran.
+        // If consume_budget() is removed and future::ready() is used instead, the loop
+        // never returns Poll::Pending on the current_thread executor and this assertion fails.
+        let progress = counter.load(Ordering::Relaxed);
+        assert!(
+            progress > 0,
+            "canary task made no forward progress during the {N}-item dispatch run (counter = {progress}); the \
+             dispatch loop is monopolizing the executor thread — ensure filter_map returns `async move {{ \
+             consume_budget().await; result }}` rather than `future::ready(result)`"
+        );
+
+        canary.abort();
+        canary.await.ok();
     }
 }

@@ -19,7 +19,7 @@ use tracing::info;
 #[allow(deprecated)]
 use crate::HoprSessionClientExplicitPathConfig;
 use crate::{
-    HopRouting, HoprSessionClientConfig,
+    HopRouting, HoprSessionClientConfig, SessionCapabilities, SurbBalancerConfig,
     api::{
         network::NetworkView,
         node::{HasNetworkView, HoprNodeOperations, HoprSessionClientOperations, HoprState},
@@ -32,6 +32,7 @@ use crate::{
             primitive::prelude::{Address, HoprBalance, XDaiBalance},
         },
     },
+    config::TransitLatencyConfig,
     exports::{
         network::types::prelude::{IpOrHost, SealedHost},
         transport::{HoprSession, SessionTarget},
@@ -58,6 +59,9 @@ pub fn chain_propagation_delay(chain_info: &hopr_chain_connector::blokli_client:
 pub struct ClusterGuard {
     pub cluster: Vec<TestedHopr>,
     pub chain_client: BlokliTestClient<FullStateEmulator>,
+    /// Aggregate bytes received by all EchoServer sessions across every cluster node.
+    /// Incremented progressively as bytes arrive — suitable for throughput sampling.
+    pub echo_received: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::ops::Deref for ClusterGuard {
@@ -159,6 +163,22 @@ impl ClusterGuard {
     ///
     /// Channels must already be open before calling this method.
     pub async fn create_session(&self, path: &[&TestedHopr]) -> anyhow::Result<HoprSession> {
+        self.create_session_with(path, Default::default(), Some(SurbBalancerConfig::default()))
+            .await
+    }
+
+    /// Create a session with explicit capability and SURB-management configuration.
+    ///
+    /// `capabilities` controls session-level flags such as `SessionCapability::NoRateControl`.
+    /// `surb_management` sets the SURB balancer config (`None` disables the balancer).
+    ///
+    /// Channels must already be open before calling this method.
+    pub async fn create_session_with(
+        &self,
+        path: &[&TestedHopr],
+        capabilities: SessionCapabilities,
+        surb_management: Option<SurbBalancerConfig>,
+    ) -> anyhow::Result<HoprSession> {
         debug_assert!(path.len() >= 2, "path must contain at least source and destination");
 
         let chain_info = self.chain_client.query_chain_info().await?;
@@ -178,9 +198,9 @@ impl ClusterGuard {
                 HoprSessionClientConfig {
                     forward_path: routing,
                     return_path: routing,
-                    capabilities: Default::default(),
+                    capabilities,
                     pseudonym: None,
-                    surb_management: None,
+                    surb_management,
                     always_max_out_surbs: false,
                 },
             )
@@ -227,7 +247,7 @@ impl ClusterGuard {
                     return_path,
                     capabilities: Default::default(),
                     pseudonym: None,
-                    surb_management: None,
+                    surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
                 },
             )
@@ -406,22 +426,53 @@ pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1_000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
+/// Outgoing win probability for stress test nodes (0.1% — realistic for a production network).
+///
+/// At this probability each winning ticket is worth `ticket_price / STRESS_WIN_PROB = 2000 wxHOPR`.
+/// Expected wins per 7811 packets (5 MB) ≈ 7.8, so the channel only needs to reserve ~15 600 wxHOPR
+/// in total — well within the `STRESS_INITIAL_SAFE_TOKEN` channel budget.
+pub const STRESS_WIN_PROB: f64 = 0.001;
+
+/// Safe balance seeded for each stress-test node (20 M wxHOPR).
+///
+/// Stress runs open 1 M wxHOPR channels to cover both data tickets AND SURB echo
+/// tickets on the return path.  For a 100 MB run at `STRESS_WIN_PROB = 0.001`:
+///   • ~175 000 data packets → 175 expected wins × 2 000 wxHOPR ≈ 350 000 wxHOPR forward
+///   • ~175 000 SURB echo packets on return path → same 350 000 wxHOPR return
+/// Per channel budget needed ≈ 700 000 wxHOPR; 1 M gives ~1.4× margin.
+/// A 5-node full-mesh cluster needs 4 outgoing channels × 1 M = 4 M per safe;
+/// the 20 M balance gives 5× headroom for path-selection variability and overhead.
+/// The production fixture (`INITIAL_SAFE_TOKEN = 1 000`) stays small for assertion tests.
+pub const STRESS_INITIAL_SAFE_TOKEN: u64 = 20_000_000;
+
 /// Per-node configuration for test clusters.
 #[derive(Debug, Clone, Copy)]
 pub struct TestNodeConfig {
     /// Outgoing winning probability for this node.
     pub win_prob: f64,
+    /// Optional simulated transit latency for this node's packet forwarder.
+    ///
+    /// When `Some`, each packet forwarded by this node is held for a
+    /// Gaussian-jittered FIFO delay (see [`TransitLatencyConfig`]) — simulating
+    /// WAN-link latency in a local cluster.  `None` (the default) means no extra delay.
+    pub transit_latency: Option<TransitLatencyConfig>,
 }
 
 impl Default for TestNodeConfig {
     fn default() -> Self {
-        Self { win_prob: 1.0 }
+        Self {
+            win_prob: 1.0,
+            transit_latency: None,
+        }
     }
 }
 
 impl TestNodeConfig {
     pub fn with_probability(win_prob: f64) -> Self {
-        Self { win_prob }
+        Self {
+            win_prob,
+            transit_latency: None,
+        }
     }
 }
 
@@ -439,6 +490,14 @@ fn alternating_configs(n: usize) -> Vec<TestNodeConfig> {
 }
 
 pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
+    build_blokli_client_impl(INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB)
+}
+
+fn build_stress_blokli_client() -> BlokliTestClient<FullStateEmulator> {
+    build_blokli_client_impl(STRESS_INITIAL_SAFE_TOKEN, STRESS_WIN_PROB)
+}
+
+fn build_blokli_client_impl(initial_safe_token: u64, min_win_prob: f64) -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
         .with_hopr_network_chain_info("anvil-localhost")
         .with_balances(
@@ -459,7 +518,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
         .with_balances(
             NODE_SAFES_MODULES
                 .iter()
-                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(INITIAL_SAFE_TOKEN))),
+                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(initial_safe_token))),
         )
         .with_safe_allowances(
             NODE_SAFES_MODULES
@@ -475,7 +534,7 @@ pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
                 deployer: chain_key.public().to_address(),
             },
         ))
-        .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
+        .with_minimum_win_prob(WinningProbability::try_from(min_win_prob).unwrap())
         .with_ticket_price(HoprBalance::new_base(1))
         .with_closure_grace_period(Duration::from_secs(1))
         .build_dynamic_client(Address::default()) // Placeholder module address, to be filled in later
@@ -500,18 +559,61 @@ pub fn size_5_cluster_fixture() -> ClusterGuard {
     cluster_fixture(alternating_configs(5))
 }
 
+/// Creates a stress-test cluster with `n` nodes each configured with `win_prob`.
+///
+/// Unlike [`cluster_fixture`], this uses a dedicated chain client seeded with
+/// [`STRESS_INITIAL_SAFE_TOKEN`] (1 M wxHOPR per safe) and a network-level minimum
+/// win probability of [`STRESS_WIN_PROB`] so that each channel can sustain the high
+/// face-value tickets that very low win-probability produces without exhausting
+/// before the workload completes.
+pub fn stress_cluster_fixture(win_prob: f64, n: usize) -> ClusterGuard {
+    cluster_fixture_inner(
+        vec![TestNodeConfig::with_probability(win_prob); n],
+        build_stress_blokli_client(),
+    )
+}
+
+/// Creates a stress-test cluster with simulated transit latency on every node.
+///
+/// Identical to [`stress_cluster_fixture`] but sets `transit_latency` on every
+/// node so the packet forwarder injects a Gaussian-jittered FIFO delay — simulating
+/// a WAN link (e.g. mean=50ms, std_dev=5ms) in a local cluster.
+pub fn stress_cluster_fixture_with_latency(win_prob: f64, n: usize, latency: TransitLatencyConfig) -> ClusterGuard {
+    let configs = vec![
+        TestNodeConfig {
+            win_prob,
+            transit_latency: Some(latency),
+        };
+        n
+    ];
+    cluster_fixture_inner(configs, build_stress_blokli_client())
+}
+
 #[fixture]
 pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: Vec<TestNodeConfig>) -> ClusterGuard {
+    cluster_fixture_inner(configs, build_blokli_client())
+}
+
+fn cluster_fixture_inner(
+    configs: Vec<TestNodeConfig>,
+    chain_client: BlokliTestClient<FullStateEmulator>,
+) -> ClusterGuard {
     let size = configs.len();
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
 
-    // Reduce mixer delay range to 0–20 ms so tests don't stall on mixing latency.
-    // SAFETY: called once before any threads are spawned for this cluster.
-    unsafe { std::env::set_var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS", "20") };
-
-    let chain_client = build_blokli_client();
+    // Initialize the global Rayon thread pool for SPHINX crypto operations.
+    // Without this, pool_thread_count() returns 0 and all pool-based concurrency
+    // limits (output_concurrency, input_concurrency, encode headroom) fall back to
+    // avail_parallelism * 8, allowing SURB bursts to flood Rayon and starve data.
+    // Using avail_parallelism / 2 so Rayon and Tokio don't compete for every core.
+    // Ignores the error: returns Err when the pool is already initialised (serial
+    // test runs), which is fine — pool_thread_count() already has the correct value.
+    let rayon_threads = std::thread::available_parallelism()
+        .map(|n| (n.get() / 2).max(1))
+        .unwrap_or(4);
+    let _ = hopr_utils::parallelize::cpu::init_thread_pool(rayon_threads);
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();
@@ -524,6 +626,9 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
         })
         .collect::<Vec<_>>();
 
+    // Shared counter: all EchoServer instances across all nodes write to this.
+    let echo_received = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+
     // Setup nodes
     let cluster: Vec<TestedHopr> = (0..size)
         .map(|i| {
@@ -531,6 +636,8 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
             let win_prob = configs[i].win_prob;
+            let transit_latency = configs[i].transit_latency;
+            let echo_counter = echo_received.clone();
 
             let blokli_client = chain_client
                 .clone()
@@ -571,7 +678,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
                     let connector = std::sync::Arc::new(connector);
 
-                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob);
+                    let config = create_hopr_instance_config(3001 + i as u16, safes[i], win_prob, transit_latency);
 
                     let instance = crate::testing::wiring::build_full_with_chain(
                         &onchain_keys[i],
@@ -582,7 +689,7 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
                             ..Default::default()
                         }), // moderate setting to allow probing without saturating relay traffic
                         connector.clone(),
-                        EchoServer::new(),
+                        EchoServer::with_counter(echo_counter),
                     )
                     .await?;
 
@@ -632,7 +739,11 @@ pub fn cluster_fixture(#[default(vec![TestNodeConfig::default(); 3])] configs: V
 
     info!(swarm_size, "CLUSTER STARTED");
 
-    ClusterGuard { cluster, chain_client }
+    ClusterGuard {
+        cluster,
+        chain_client,
+        echo_received,
+    }
 }
 
 async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {

@@ -73,7 +73,7 @@ use hopr_api::{
 pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
-use hopr_transport::{
+pub use hopr_transport::{
     HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
@@ -732,6 +732,12 @@ where
 impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMgr> {
     fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
+    }
+}
+
+impl<Chain, Graph, Net, TMgr> hopr_api::node::PacketTransport for Hopr<Chain, Graph, Net, TMgr> {
+    fn packet_payload_size() -> usize {
+        hopr_transport::PACKET_PAYLOAD_SIZE
     }
 }
 
