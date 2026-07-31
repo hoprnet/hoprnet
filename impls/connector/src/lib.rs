@@ -26,10 +26,13 @@ pub mod blokli_client {
     };
 }
 
+/// Default value of [`HoprBlokliClientConfig::request_timeout`].
+pub const DEFAULT_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
 /// Configuration for creating a [`blokli_client::BlokliClient`] via [`create_blokli_client`].
 ///
-/// The connector applies its own opinionated defaults for timeouts and reconnection behaviour;
-/// only `url` and `dns_override` are caller-controlled.
+/// The connector applies its own opinionated defaults for reconnection behaviour; `url`,
+/// `dns_override` and `request_timeout` are caller-controlled.
 ///
 /// # Examples
 ///
@@ -43,7 +46,15 @@ pub mod blokli_client {
 /// let client = create_blokli_client(HoprBlokliClientConfig {
 ///     url,
 ///     dns_override: Some((ip, Some(8545))),
+///     request_timeout: DEFAULT_REQUEST_TIMEOUT,
 /// });
+/// ```
+///
+/// With a longer request timeout, for links where the default is too tight:
+/// ```ignore
+/// let client = create_blokli_client(
+///     HoprBlokliClientConfig::new(url).with_request_timeout(Duration::from_secs(10)),
+/// );
 /// ```
 #[derive(Clone, Debug, validator::Validate)]
 pub struct HoprBlokliClientConfig {
@@ -56,27 +67,37 @@ pub struct HoprBlokliClientConfig {
     /// the given IP, while the original host is kept for the `Host` header and TLS SNI.
     /// `port` defaults to the URL's port when `None`.
     pub dns_override: Option<(std::net::IpAddr, Option<u16>)>,
+    /// Timeout for a single non-streaming request, and for SSE connection establishment.
+    pub request_timeout: std::time::Duration,
 }
 
 impl HoprBlokliClientConfig {
-    /// Creates a config with the given URL and no DNS override.
+    /// Creates a config with the given URL, no DNS override and the default request timeout.
     pub fn new(url: blokli_client::Url) -> Self {
         Self {
             url,
             dns_override: None,
+            request_timeout: DEFAULT_REQUEST_TIMEOUT,
         }
+    }
+
+    /// Sets the request timeout, replacing any previously configured one.
+    pub fn with_request_timeout(mut self, request_timeout: std::time::Duration) -> Self {
+        self.request_timeout = request_timeout;
+        self
     }
 }
 
 /// Creates a [`blokli_client::BlokliClient`] with the connector's opinionated defaults.
 ///
-/// Applies a 3 s general timeout and 30 s SSE reconnect timeout. Callers that need DNS
-/// pinning set [`HoprBlokliClientConfig::dns_override`]; all other settings are fixed.
+/// Applies a 30 s SSE reconnect timeout. Callers that need DNS pinning set
+/// [`HoprBlokliClientConfig::dns_override`] and callers on slow links raise
+/// [`HoprBlokliClientConfig::request_timeout`]; all other settings are fixed.
 pub fn create_blokli_client(cfg: HoprBlokliClientConfig) -> blokli_client::BlokliClient {
     blokli_client::BlokliClient::new(
         cfg.url,
         blokli_client::BlokliClientConfig {
-            timeout: std::time::Duration::from_secs(3),
+            timeout: cfg.request_timeout,
             stream_reconnect_timeout: std::time::Duration::from_secs(30),
             dns_override: cfg
                 .dns_override
@@ -248,4 +269,53 @@ where
         TempDbBackend::new().map_err(errors::ConnectorError::backend)?,
         payload_gen,
     ))
+}
+
+#[cfg(test)]
+mod blokli_client_tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    fn url() -> blokli_client::Url {
+        "https://blokli.example.com/".parse().expect("valid URL")
+    }
+
+    #[test]
+    fn new_defaults_to_the_connector_request_timeout() {
+        assert_eq!(
+            HoprBlokliClientConfig::new(url()).request_timeout,
+            DEFAULT_REQUEST_TIMEOUT
+        );
+    }
+
+    #[test]
+    fn create_blokli_client_applies_the_default_request_timeout() {
+        let client = create_blokli_client(HoprBlokliClientConfig::new(url()));
+
+        assert_eq!(client.config().timeout, DEFAULT_REQUEST_TIMEOUT);
+    }
+
+    #[test]
+    fn create_blokli_client_applies_a_caller_supplied_request_timeout() {
+        let cfg = HoprBlokliClientConfig::new(url()).with_request_timeout(Duration::from_secs(10));
+
+        let client = create_blokli_client(cfg);
+
+        assert_eq!(client.config().timeout, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn with_request_timeout_keeps_the_other_settings() {
+        let dns_override = (std::net::IpAddr::from([10, 1, 2, 1]), Some(3002));
+        let cfg = HoprBlokliClientConfig {
+            url: url(),
+            dns_override: Some(dns_override),
+            request_timeout: DEFAULT_REQUEST_TIMEOUT,
+        }
+        .with_request_timeout(Duration::from_secs(10));
+
+        assert_eq!(cfg.url, url());
+        assert_eq!(cfg.dns_override, Some(dns_override));
+    }
 }
