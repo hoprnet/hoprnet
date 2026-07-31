@@ -1,0 +1,27 @@
+---
+version: 2
+updates:
+  # Renovate's nix manager cannot update flake.lock on Mend-hosted infrastructure:
+  # it requires running `nix flake update` (to compute narHash values), but the
+  # sandboxed jr-microvm environment has no nix binary and allowedCommands is locked
+  # to git add/reset/pwd only. Every Monday run ends with "Digest is not updated" →
+  # level-40 "Error updating branch: update failure". Dependabot handles flake.lock
+  # instead; the nix manager is disabled in renovate.json.
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    ignore:
+      # nix-lib uses version-pinned refs (github:hoprnet/nix-lib/vX.Y.Z) that
+      # Dependabot compares incorrectly and proposes as a downgrade. Version
+      # upgrades are managed manually alongside breaking API changes.
+      - dependency-name: "nix-lib"
+    groups:
+      nix-flake-inputs:
+        patterns:
+          - "*"

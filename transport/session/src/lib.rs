@@ -8,6 +8,7 @@
 //! This crate implements [RFC-0007](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
 
 pub(crate) mod balancer;
+pub mod counters;
 pub mod errors;
 mod manager;
 #[cfg(feature = "telemetry")]

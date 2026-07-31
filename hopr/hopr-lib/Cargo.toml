@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "4.0.2-rc.5"
+version = "4.0.2-rc.9"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -29,7 +29,7 @@ name = "chain_operations-size3"
 required-features = ["testing"]
 
 [[test]]
-name = "stress_cluster-size3"
+name = "cluster_throughput-size3"
 required-features = ["testing"]
 
 [[test]]
@@ -50,6 +50,18 @@ required-features = ["testing"]
 
 [[test]]
 name = "transport_tickets"
+required-features = ["testing"]
+
+[[test]]
+name = "cluster_throughput-size5"
+required-features = ["testing"]
+
+[[test]]
+name = "cluster_throughput-matrix"
+required-features = ["testing"]
+
+[[example]]
+name = "cluster_throughput"
 required-features = ["testing"]
 
 
@@ -88,10 +100,15 @@ transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
 utils_futures = []  # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
+# In-process CPU profiling via pprof.  All ProfilerGuard methods are zero-cost
+# no-ops when this feature is absent so the crate compiles cleanly without it.
+profiling = ["dep:pprof"]
+
 testing = [
   "session-server",
   "session-client",
   "runtime-tokio",
+  "dep:bytesize",
   "dep:hex-literal",
   "dep:rand",
   "dep:rstest",
@@ -104,6 +121,7 @@ testing = [
   "hopr-chain-connector/testing",
   "hopr-chain-connector/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
+  "hopr-transport-p2p/testing",
   "hopr-transport-p2p/transport-quic",
   "hopr-network-graph/petgraph",
   "hopr-network-graph/graph-api",
@@ -132,8 +150,13 @@ tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+bytesize = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
+pprof = { version = "0.14", features = [
+  "flamegraph",
+  "frame-pointer",
+], optional = true }
+rand = { workspace = true, optional = true, features = ["std_rng"] }
 rstest = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 
@@ -166,7 +189,7 @@ rstest = { workspace = true }
 serial_test = { workspace = true }
 serde-saphyr = { workspace = true }
 test-log = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 opentelemetry-prometheus-text-exporter = { workspace = true }
 opentelemetry_sdk = { workspace = true, features = [
   "metrics",
@@ -183,7 +206,6 @@ hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde"]
-
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
+# humantime-serde: used via serde attribute macros, not a direct import.
+# pprof: used only behind #[cfg(feature = "profiling")], which machete may not scan.
+ignored = ["humantime-serde", "pprof"]

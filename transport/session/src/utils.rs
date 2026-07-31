@@ -186,6 +186,17 @@ where
     );
     hopr_utils::runtime::prelude::spawn(hopr_utils::runtime::diagnostics::instrument(
         ka_stream
+            // Back-pressure: delay each SURB keep-alive until the Rayon encode pool
+            // has headroom.  Using `.then` (sequential, blocking) instead of `.filter`
+            // (non-blocking drop) prevents burst flooding: the rate-limited stream is
+            // only polled after the previous item clears the gate, so at most one
+            // keep-alive can be in-flight waiting for a pool slot at any time.
+            .then(|msg| async {
+                while !hopr_utils::parallelize::encode_pool_has_headroom() {
+                    hopr_utils::runtime::prelude::sleep(std::time::Duration::from_millis(2)).await;
+                }
+                msg
+            })
             .map(move |msg| {
                 ApplicationData::try_from(msg)
                     .map(|data| (fwd_routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))

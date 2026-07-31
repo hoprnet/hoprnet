@@ -26,15 +26,8 @@ jobs:
       enable_benchmarks: false
       enable_unit_coverage: true
       enable_integration_coverage: true
-      unit_coverage_command: |
-        nix build -L .#coverage-unit
-        cp result coverage.lcov
-      integration_coverage_command: |
-        nix develop .#coverage -c env NEXTEST_HIDE_PROGRESS_BAR=1 cargo llvm-cov nextest \
-          --workspace \
-          --test '*' \
-          --lcov --output-path coverage.lcov \
-          -j 1
+      unit_coverage_command: "nix build -L .#coverage-unit -o coverage.lcov"
+      integration_coverage_command: "nix build -L .#coverage-integration -o coverage.lcov"
       runner_unit: depot-ubuntu-24.04-16
       runner_integration: depot-ubuntu-24.04-8
     secrets:

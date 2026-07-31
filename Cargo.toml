@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "utils",
   "crypto/packet",
   "hopr/hopr-lib",
   "impls/ticket-manager",
@@ -23,7 +22,6 @@ members = [
   "impls/ct/immediate",
   "impls/ct/full-network",
   "impls/graph",
-  "impls/strategy",
   "impls/transport/p2p",
 ]
 
@@ -37,7 +35,6 @@ repository = "https://github.com/hoprnet/hoprnet"
 
 [workspace.metadata.publish]
 order = [
-  "hopr-utils",
   "hopr-crypto-packet",
   "hopr-protocol-app",
   "hopr-protocol-start",
@@ -52,7 +49,6 @@ order = [
   "hopr-ct-full-network",
   "hopr-chain-connector",
   "hopr-transport-p2p",
-  "hopr-strategy",
   "hopr-session-server-forwarder",
   "hopr-transport",
   "hopr-lib",
@@ -63,11 +59,9 @@ order = [
 ahash = "0.8.12"
 anyhow = "1.0.103"
 aquamarine = "0.6.0"
-arrayvec = { version = "0.7.7" }
 assertables = "10.1.0"
 async-broadcast = "0.7.2"
 async_channel_io = "0.3.0"
-async-lock = "3.4.2"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0" }
 atomic_enum = "0.3.0"
@@ -82,10 +76,6 @@ bytesize = { version = "2.4.0", features = ["serde"] }
 bytes = "1.12.0"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
-chrono = { version = "0.4.45", default-features = false, features = [
-  "std",
-  "clock",
-] }
 clap = { version = "4.6.1", features = ["derive", "env", "string"] }
 const_format = "0.2.36"
 const-hex = "1.19.1"
@@ -96,7 +86,6 @@ criterion = { version = "0.8.2", default-features = false, features = [
 crossfire = { version = "3.1.18", default-features = false }
 dashmap = { version = "6.2.1", features = ["inline"] }
 flagset = "0.4.7"
-flume = { version = "0.12.0", default-features = false, features = ["async"] }
 futures = { version = "0.3.32", default-features = false, features = [
   "std",
   "async-await",
@@ -107,21 +96,12 @@ futures-timer = "3.0.4"
 halfbrown = "0.4.0"
 hashbrown = "0.17.1"
 hex-literal = "1.1.0"
-hickory-resolver = { version = "0.26.1", default-features = false, features = [
-  "system-config",
-] }
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 humantime-serde = "1.1.1"
 indexmap = { version = "2.14.0" }
 insta = { version = "1.48.0", features = ["yaml", "redactions"] }
 lazy_static = "1.5.0"
-libc = "0.2" # intentionally minor-pinned
 libp2p = { version = "0.56.0", default-features = false }
-libp2p-identity = { version = "0.2.14", features = [
-  "peerid",
-  "ed25519",
-  "rand",
-] }
 libp2p-stream = { version = "0.4.0-alpha" }
 mimalloc = { version = "0.1.52", default-features = false, features = [
   "secure",
@@ -148,7 +128,6 @@ proc-macro-regex = "~1.1.0"
 quinn-udp = { version = "0.6.1", default-features = false }
 rand = { version = "0.10.1", features = ["thread_rng"] }
 rand_distr = "0.6.0"
-rayon = "1.12.0"
 redb = "4.1.0"
 ringbuffer = "0.16.0"
 rstest = { version = "0.26.1" }
@@ -163,7 +142,6 @@ serde_with = { version = "3.21.0", features = ["base64"] }
 serial_test = "3.5.0"
 smallvec = "1.15.2"
 smart-default = "0.7.1"
-socket2 = "0.6.4"
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
 temp-env = "0.3.6"
@@ -185,22 +163,21 @@ tokio-util = { version = "0.7.18", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 
-hopr-api = "1.15.0"
+hopr-api = "1.16.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { version = "0.3.0", path = "utils", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.4.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "4.0.2-rc.5", path = "hopr/hopr-lib", default-features = false }
+hopr-lib = { version = "4.0.2-rc.9", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-strategy = { version = "0.19.2", path = "impls/strategy" }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.32.0", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.34.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
@@ -229,6 +206,13 @@ opt-level = 2
 [profile.test]
 opt-level = 1
 
+# CI keeps useful line-level backtraces while avoiding large incremental and
+# full debug-info artifacts in the Nix binary cache.
+[profile.ci-test]
+debug = 1
+incremental = false
+inherits = "test"
+
 # this profile focuses on the best runtime performance and the smallest binary size
 [profile.release]
 codegen-units = 1
@@ -250,6 +234,16 @@ debug = 2
 split-debuginfo = "off"
 strip = false
 
+# CPU profiling profile — release performance with full DWARF symbols.
+# Use with `cargo flamegraph --profile profiling` (Linux) or the pprof
+# in-process feature (`--features profiling`).  Mirrors [profile.memprof]
+# which is used for allocation profiling.
+[profile.profiling]
+inherits = "release"
+debug = 2
+strip = false
+split-debuginfo = "packed"
+
 # make insta snapshots faster
 [profile.dev.package]
 insta.opt-level = 3
@@ -261,6 +255,5 @@ ignored = [
   "serde_bytes",
   "humantime-serde",
   "hopr-session-server-forwarder",
-  "hopr-strategy",
   "hopr-utils-session",
 ]
