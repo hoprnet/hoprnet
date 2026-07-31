@@ -1208,6 +1208,9 @@ where
     }
 }
 
+/// Maximum application-layer payload that fits in a single HOPR sphinx packet (bytes).
+pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE;
+
 #[cfg(test)]
 mod tests {
     use std::sync::{
