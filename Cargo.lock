@@ -4348,12 +4348,8 @@ dependencies = [
  "parking_lot",
  "pcap-file",
  "proc-macro-regex",
-<<<<<<< HEAD
- "rayon",
-=======
  "rand 0.10.2",
  "rand_distr",
->>>>>>> origin/master
  "rstest",
  "rust-stream-ext-concurrent",
  "serde",

@@ -84,12 +84,8 @@ libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
-<<<<<<< HEAD
-rayon = "1.12.0"
-=======
 rand = { workspace = true }
 rand_distr = { workspace = true }
->>>>>>> origin/master
 rust-stream-ext-concurrent = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
