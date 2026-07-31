@@ -248,7 +248,6 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
         // Stretched so nothing expires mid-profile; the point here is the size of live state,
         // not the reclamation schedule.
         max_ack_await_time: std::time::Duration::from_secs(7200),
-        incomplete_ssa_lifetime: std::time::Duration::from_secs(7200),
         incomplete_commitment_lifetime: std::time::Duration::from_secs(7200),
         unused_verifier_lifetime: std::time::Duration::from_secs(7200),
         ..Default::default()

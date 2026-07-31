@@ -9,6 +9,82 @@ use crate::{
     types::SsaId,
 };
 
+/// All post-commitment state of one SSA cycle, held as a single unit.
+///
+/// ## Why one entry per cycle rather than one per polynomial
+///
+/// The accumulator and every part builder are produced by the same call — see
+/// [`CommitmentProgress`] — needed by the same code path, and dead at the same moment. Splitting
+/// them across caches previously required holding three lifetimes in lockstep by hand, and getting
+/// that wrong was **H8**: the part builders were keyed per polynomial with an idle timer, so the
+/// clock measured "time since a share for *this* polynomial arrived". Commitments land in a cycle's
+/// opening moments while shares arrive polynomial-major across all of it, so any polynomial late in
+/// the emission order had its builder reclaimed before its first share — unrecoverably, since the
+/// commitment cannot be retransmitted.
+///
+/// Keyed by [`SsaId`], the idle timer measures "time since the *cycle* was active", which is the
+/// property that actually matters and is correct at any line rate.
+///
+/// ## Locking
+///
+/// One mutex **per part**, plus one for the accumulator — never one around the whole cycle. A
+/// single cycle-wide lock would serialise every share of a Session behind one mutex. Callers take
+/// the part lock and the accumulator lock in that order, and never hold both.
+pub struct SsaCycle<S: PixSpec> {
+    builder: parking_lot::Mutex<SsaBuilder<S>>,
+    /// Part builders indexed by [`PolynomialIndex`]; length is always `num_polys`.
+    parts: Box<[parking_lot::Mutex<SsaPartBuilder<S>>]>,
+}
+
+impl<S: PixSpec> SsaCycle<S> {
+    /// Assembles a cycle from the accumulator and the full set of part builders.
+    ///
+    /// `parts` arrives in arbitrary order — it is drained from a `HashMap` — so each builder is
+    /// placed by its own polynomial index rather than by iteration order. A missing or duplicated
+    /// index is rejected here, which is what makes [`part`](Self::part) safe to index by an
+    /// untrusted value later.
+    pub fn new(builder: SsaBuilder<S>, parts: Vec<SsaPartBuilder<S>>) -> errors::Result<Self, S::Pseudonym> {
+        let num_polys = builder.num_polys();
+        let mut slots: Vec<Option<SsaPartBuilder<S>>> = (0..num_polys).map(|_| None).collect();
+
+        for part in parts {
+            let poly_index = part.spi().poly_index() as usize;
+            let slot = slots.get_mut(poly_index).ok_or(errors::PixError::InvalidInput)?;
+            if slot.replace(part).is_some() {
+                return Err(errors::PixError::DuplicateCommitment);
+            }
+        }
+
+        let parts = slots
+            .into_iter()
+            .map(|slot| slot.map(parking_lot::Mutex::new).ok_or(errors::PixError::InvalidInput))
+            .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
+
+        Ok(Self {
+            builder: parking_lot::Mutex::new(builder),
+            parts: parts.into_boxed_slice(),
+        })
+    }
+
+    /// Number of polynomials this cycle is composed of.
+    pub fn num_polys(&self) -> usize {
+        self.parts.len()
+    }
+
+    /// The part builder for one polynomial, or `None` if the index is out of range.
+    ///
+    /// The index originates from a peer-supplied share, so this is a checked lookup and must stay
+    /// one.
+    pub fn part(&self, poly_index: PolynomialIndex) -> Option<&parking_lot::Mutex<SsaPartBuilder<S>>> {
+        self.parts.get(poly_index as usize)
+    }
+
+    /// The accumulator that sums recovered parts into the SSA scalar.
+    pub fn builder(&self) -> &parking_lot::Mutex<SsaBuilder<S>> {
+        &self.builder
+    }
+}
+
 /// Reconstruct a single SSA from a set of SSA parts recovered from polynomials.
 pub struct SsaBuilder<S: PixSpec> {
     pub full_commitment: PixGroup<S>,
@@ -291,11 +367,6 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
 
     pub fn get_deposit_address(&self) -> Option<&S::DepositAddress> {
         self.full_ssa_commitment.as_ref().map(|(_, a)| a)
-    }
-
-    /// Number of polynomials this SSA commitment is composed of.
-    pub fn num_polys(&self) -> usize {
-        self.num_polys
     }
 
     pub fn add_transposed(

@@ -140,7 +140,6 @@ fn bench_recon_cfg(use_batch_verification: bool) -> SsaReconstructorConfig {
     SsaReconstructorConfig {
         use_batch_verification,
         max_ack_await_time: Duration::from_secs(3600),
-        incomplete_ssa_lifetime: Duration::from_secs(3600),
         incomplete_commitment_lifetime: Duration::from_secs(3600),
         unused_verifier_lifetime: Duration::from_secs(3600),
         ..Default::default()
