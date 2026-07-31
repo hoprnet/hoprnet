@@ -202,7 +202,12 @@ impl NetworkBehaviour for Behaviour {
 
                 if has_no_more_live_connections {
                     self.connected_peers.remove(&data.peer_id);
-                    self.schedule_dial_with(data.peer_id, initial_backoff());
+                    // Guard against duplicate heap entries: if a stale schedule_dial_with
+                    // call (e.g. from a racing Announce) already enqueued this peer, the
+                    // existing backoff entry will handle the reconnect.
+                    if !self.not_connected_peers.contains_key(&data.peer_id) {
+                        self.schedule_dial_with(data.peer_id, initial_backoff());
+                    }
                 }
             }
             libp2p::swarm::FromSwarm::DialFailure(DialFailure { peer_id, error, .. }) => {
@@ -236,7 +241,6 @@ impl NetworkBehaviour for Behaviour {
         // Nothing is necessary here, because no ConnectionHandler events should be generated
     }
 
-
     #[tracing::instrument(
         level = "debug",
         name = "Discovery::poll"
@@ -265,12 +269,13 @@ impl NetworkBehaviour for Behaviour {
                 }
 
                 // Store announced addresses for later dialing / protocol use.
-                // Only schedule a dial if the peer is not already connected;
-                // repeated announcements from a live peer must not re-enqueue
-                // dial attempts that flood the swarm and starve the ingress pipeline.
+                // Only schedule a dial if the peer is not already connected and not
+                // already queued: multiple rapid announcements for the same disconnected
+                // peer must not stack up N heap entries that all fire simultaneously,
+                // issuing N concurrent dials and perpetuating a dial storm.
                 if !multiaddresses.is_empty() {
                     self.bootstrap_peers.insert(peer, multiaddresses);
-                    if !self.connected_peers.contains_key(&peer) {
+                    if !self.connected_peers.contains_key(&peer) && !self.not_connected_peers.contains_key(&peer) {
                         self.schedule_dial_with(peer, initial_backoff());
                     }
                 }
@@ -375,9 +380,10 @@ mod tests {
 
     fn announce(b: &mut Behaviour, peer: PeerId) {
         let addr: Multiaddr = "/ip4/127.0.0.1/tcp/9000".parse().unwrap();
-        // Drive the announce through the internal state directly, bypassing poll().
+        // Mirrors the Announce branch in poll(): only schedule if not connected
+        // AND not already enqueued, to match the heap-deduplication invariant.
         b.bootstrap_peers.insert(peer, vec![addr]);
-        if !b.connected_peers.contains_key(&peer) {
+        if !b.connected_peers.contains_key(&peer) && !b.not_connected_peers.contains_key(&peer) {
             b.schedule_dial_with(peer, initial_backoff());
         }
     }
@@ -455,6 +461,36 @@ mod tests {
         assert!(
             b.not_connected_peers.contains_key(&peer),
             "DialFailure for a disconnected peer must reschedule a dial attempt"
+        );
+    }
+
+    // ── regression: repeated announces for disconnected peer must not accumulate ──
+
+    /// Before the fix, every `PeerDiscovery::Announce` for a disconnected peer
+    /// called `schedule_dial_with`, adding one heap entry per announce even though
+    /// the peer was already enqueued.  At backoff expiry, all N entries fired
+    /// simultaneously, issuing N concurrent dials → N DialFailure events → N new
+    /// entries → repeat.
+    #[test]
+    fn announce_does_not_stack_dials_for_disconnected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        // First announce: peer is unknown, so a dial must be scheduled.
+        announce(&mut b, peer);
+        assert!(b.not_connected_peers.contains_key(&peer));
+        let heap_len_after_first = b.next_dial_attempts.len();
+
+        // Subsequent announces while peer is still not connected and already
+        // enqueued must not add more heap entries.
+        announce(&mut b, peer);
+        announce(&mut b, peer);
+        announce(&mut b, peer);
+
+        assert_eq!(
+            b.next_dial_attempts.len(),
+            heap_len_after_first,
+            "repeated announces for disconnected peer must not accumulate heap entries"
         );
     }
 
