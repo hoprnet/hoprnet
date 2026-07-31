@@ -11,6 +11,15 @@ pub(crate) mod balancer;
 pub mod counters;
 pub mod errors;
 mod manager;
+/// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
+/// worker that drives them.
+///
+/// Nothing outside its own tests reaches this yet. `SessionManager` takes it over when the ad-hoc
+/// kill-switch and deposit-awaiter handles are replaced by supervisor actions, and the exemption
+/// below goes away with that change. Exempting the module is preferable to annotating two dozen
+/// items individually and then having to find them all again.
+#[allow(dead_code, unused_imports)]
+pub(crate) mod supervision;
 #[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
@@ -24,6 +33,7 @@ pub use manager::{
     DispatchResult, IncomingSessionPixConfig, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
     SessionManagerConfig,
 };
+pub use supervision::{SupervisorConfig, validate_pix_supervision};
 pub mod test_helpers;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
