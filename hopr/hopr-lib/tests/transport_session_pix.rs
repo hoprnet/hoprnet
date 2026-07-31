@@ -7,8 +7,7 @@
 //!   1. [Entry] `NewDepositAddress`   — deposit address generated
 //!   2. [Exit]  `DepositAddressReceived` — deposit needed, notifier provided
 //!   3. [Test]  Signal deposit via notifier
-//!   4. [Exit]  `PrivateKeyRecovered` — quota exhausted, key recovered
-//!   → SessionManager requests next SSA → goto 1
+//!   4. [Exit]  `PrivateKeyRecovered` — quota exhausted, key recovered → SessionManager requests next SSA → goto 1
 
 use hopr_lib::testing::fixtures::{
     MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, TestNodeConfig, build_role_cluster, chain_propagation_delay,
@@ -71,7 +70,6 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 num_ssa_parts: 8,
                 ssa_part_size: 2,
                 additional_shares: 2,
-                ..Default::default()
             }),
             ..Default::default()
         }, // Entry: win_prob=1.0
@@ -83,7 +81,6 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 enforce_pix: false,
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
-                ..Default::default()
             }),
             idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
             ..Default::default()
@@ -147,10 +144,9 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                     HoprSessionClientConfig {
                         forward_path: routing,
                         return_path: routing,
-                        capabilities: (SessionCapability::Segmentation
+                        capabilities: SessionCapability::Segmentation
                             | SessionCapability::NoRateControl
-                            | SessionCapability::UsePIX)
-                            .into(),
+                            | SessionCapability::UsePIX,
                         pseudonym: None,
                         surb_management: None,
                         always_max_out_surbs: false,

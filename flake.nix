@@ -8,7 +8,7 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/master";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.23.0";
-    nix-lib.url = "github:hoprnet/nix-lib/v1.1.0";
+    nix-lib.url = "github:hoprnet/nix-lib/v1.3.0";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     pre-commit.url = "github:cachix/git-hooks.nix";
@@ -52,6 +52,7 @@
       crane,
       nix-lib,
       foundry,
+      hopli,
       pre-commit,
       ...
     }@inputs:
@@ -166,17 +167,16 @@
                   // {
                     src = testSrc;
                     cargoExtraArgs = "-F allocator-jemalloc -F testing";
-                    runTests = true;
+                    runNextest = true;
+                    testCargoProfile = "ci-test";
                     prependPackageName = false;
-                    cargoTestExtraArgs = "--lib";
-                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
                   }
                 )
               )).overrideAttrs
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --lib
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --lib
                     runHook postCheck
                   '';
                 });
@@ -188,70 +188,74 @@
                   // {
                     src = testSrc;
                     cargoExtraArgs = "-F allocator-jemalloc -F testing";
-                    runTests = true;
+                    runNextest = true;
+                    testCargoProfile = "ci-test";
                     prependPackageName = false;
-                    cargoTestExtraArgs = "--test '*' -- --test-threads=1";
-                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
                   }
                 )
               )).overrideAttrs
                 (_: {
                   checkPhase = ''
                     runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -F allocator-jemalloc -F testing --test '*' -j 1
+                    cargo nextest run --cargo-profile ci-test -F allocator-jemalloc -F testing --test '*' -j 1
                     runHook postCheck
                   '';
                 });
 
-            test-nightly =
-              (fixUtoipaEmbedPaths (
-                rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
-                  libraryBuildArgs
-                  // {
-                    src = testSrc;
-                    cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
-                    runTests = true;
-                    prependPackageName = false;
-                    cargoTestExtraArgs = "--lib";
-                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
-                  }
-                )
-              )).overrideAttrs
-                (_: {
-                  checkPhase = ''
-                    runHook preCheck
-                    cargo nextest run ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} -Z panic-abort-tests -F allocator-jemalloc -F testing --lib
-                    runHook postCheck
-                  '';
-                });
+            test-nightly = fixUtoipaEmbedPaths (
+              rust-builder-local-nightly.callPackage nixLib.mkRustPackage (
+                libraryBuildArgs
+                // {
+                  src = testSrc;
+                  cargoExtraArgs = "-Z panic-abort-tests -F allocator-jemalloc -F testing";
+                  cargoNextestExtraArgs = "--lib";
+                  runNextest = true;
+                  testCargoProfile = "ci-test";
+                  prependPackageName = false;
+                }
+              )
+            );
 
             # Code coverage (outputs LCOV report)
-            coverage-unit =
-              (fixUtoipaEmbedPaths (
-                rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
-                  libraryBuildArgs
-                  // {
-                    src = testSrc;
-                    cargoExtraArgs = "-F allocator-jemalloc -F testing";
-                    runCoverage = true;
-                    prependPackageName = false;
-                    cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
-                    extraNativeBuildInputs = [ pkgs.cargo-nextest ];
-                  }
-                )
-              )).overrideAttrs
-                (_: {
-                  buildPhase = ''
-                    runHook preBuild
-                    cargo llvm-cov nextest --lcov --output-path $out --lib \
-                      ''${CARGO_PROFILE:+--cargo-profile $CARGO_PROFILE} \
-                      --workspace -F allocator-jemalloc -F testing
-                    runHook postBuild
-                  '';
-                });
+            coverage-unit = fixUtoipaEmbedPaths (
+              rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+                libraryBuildArgs
+                // {
+                  src = testSrc;
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  cargoLlvmCovCommand = "nextest";
+                  runCoverage = true;
+                  testCargoProfile = "ci-test";
+                  prependPackageName = false;
+                  cargoLlvmCovExtraArgs = "--lcov --output-path $out --lib";
+                  extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                }
+              )
+            );
+
+            coverage-integration = fixUtoipaEmbedPaths (
+              rust-builder-local-coverage.callPackage nixLib.mkRustPackage (
+                libraryBuildArgs
+                // {
+                  src = testSrc;
+                  cargoExtraArgs = "-F allocator-jemalloc -F testing";
+                  cargoLlvmCovCommand = "nextest";
+                  runCoverage = true;
+                  testCargoProfile = "ci-test";
+                  prependPackageName = false;
+                  cargoLlvmCovExtraArgs = "--lcov --output-path $out --test '*' -j 1";
+                  extraNativeBuildInputs = [ pkgs.cargo-nextest ];
+                }
+              )
+            );
 
             workspace-clippy = rust-builder-local.callPackage nixLib.mkRustPackage (
-              libraryBuildArgs // { runClippy = true; }
+              libraryBuildArgs
+              // {
+                cargoExtraArgs = "--workspace";
+                prependPackageName = false;
+                runClippy = true;
+              }
             );
 
             # Build all workspace benchmarks without running them; copies binaries to $out/bin
@@ -349,6 +353,14 @@
                 files = "^\\.github/workflows/.*\\.ya?ml$";
                 language = "system";
                 pass_filenames = false;
+              };
+              dependabot-validator = {
+                enable = true;
+                name = "Dependabot config validator";
+                entry = "${pkgs.check-jsonschema}/bin/check-jsonschema --builtin-schema vendor.dependabot";
+                files = "\\.github/dependabot\\.yml$";
+                language = "system";
+                pass_filenames = true;
               };
             };
             excludes = [ ".gcloudignore" ];
@@ -452,7 +464,7 @@
               uv
               python314
               foundry-bin
-              hopli.hopli
+              hopli.packages.${system}.hopli
             ];
             shellHook = ''
               uv sync --frozen

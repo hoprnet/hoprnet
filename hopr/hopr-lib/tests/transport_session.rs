@@ -85,7 +85,10 @@ async fn create_n_hop_session(#[case] hops: usize) -> anyhow::Result<()> {
         .chain(std::iter::once(dst))
         .collect();
 
-    let _session = cluster.create_session(&path).await?;
+    // Disable the SURB balancer so its background replenishment traffic does not
+    // exhaust the 100 wxHOPR channels (10 tickets at win_prob=0.2) before the
+    // handshake completes. This test verifies session establishment, not SURB management.
+    let _session = cluster.create_session_with(&path, Default::default(), None).await?;
 
     // TODO: check here that the destination sees the new session created
 
@@ -159,7 +162,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
             hopr_lib::HoprSessionClientConfig {
                 forward_path: 0.try_into()?,
                 return_path: 0.try_into()?,
-                capabilities: (SessionCapability::Segmentation | SessionCapability::NoRateControl).into(),
+                capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: true,
@@ -213,7 +216,7 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
             hopr_lib::HoprSessionClientConfig {
                 forward_path: 1.try_into()?,
                 return_path: 1.try_into()?,
-                capabilities: (SessionCapability::Segmentation | SessionCapability::NoRateControl).into(),
+                capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: true,

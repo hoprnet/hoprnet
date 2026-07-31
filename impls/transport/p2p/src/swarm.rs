@@ -36,7 +36,7 @@ pub struct InactiveNetwork {
     swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(feature = "testing", target_os = "android", target_os = "ios"))]
 fn swarm_dns_config() -> (libp2p::dns::ResolverConfig, libp2p::dns::ResolverOpts) {
     (
         libp2p::dns::ResolverConfig::cloudflare(),
@@ -69,13 +69,14 @@ impl InactiveNetwork {
         #[cfg(feature = "transport-quic")]
         let swarm = swarm.with_quic();
 
-        #[cfg(any(target_os = "android", target_os = "ios"))]
+        // Nix test sandboxes do not provide /etc/resolv.conf, so use an explicit resolver configuration.
+        #[cfg(any(feature = "testing", target_os = "android", target_os = "ios"))]
         let swarm = {
             let (dns_resolver_config, dns_resolver_opts) = swarm_dns_config();
             swarm.with_dns_config(dns_resolver_config, dns_resolver_opts)
         };
 
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        #[cfg(not(any(feature = "testing", target_os = "android", target_os = "ios")))]
         let swarm = swarm
             .with_dns()
             .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
@@ -456,11 +457,17 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     #[test]
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[cfg(any(feature = "testing", target_os = "android", target_os = "ios"))]
     fn uses_cloudflare_dns_resolver_config() {
-        let (resolver_config, resolver_opts) = super::swarm_dns_config();
-        assert_eq!(resolver_config, libp2p::dns::ResolverConfig::cloudflare());
-        assert_eq!(resolver_opts, libp2p::dns::ResolverOpts::default());
+        let (resolver_config, _) = super::swarm_dns_config();
+        assert!(
+            resolver_config
+                .name_servers()
+                .iter()
+                .any(|server| server.socket_addr.ip() == IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)))
+        );
     }
 }

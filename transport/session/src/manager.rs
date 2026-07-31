@@ -517,6 +517,17 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
 
+    /// Minimum interval at which an establishing Session's cache slot is refreshed
+    /// ("touched") to keep [`idle_timeout`](Self::idle_timeout) from evicting it while
+    /// SURBs pre-load.
+    ///
+    /// The touch period is [`idle_timeout`](Self::idle_timeout)` / 2`, floored to this
+    /// value so it never drops below a sane minimum for very short idle timeouts.
+    ///
+    /// Default is 100 milliseconds.
+    #[default(Duration::from_millis(100))]
+    pub min_session_touch_period: Duration,
+
     /// The sampling interval for SURB balancer.
     /// It will make SURB control decisions regularly at this interval.
     ///
@@ -1520,8 +1531,10 @@ where
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionHandles::Balancer, balancer_abort_handle);
 
-                    // Insert the slot and obtain a guard that rolls it back (also tearing
-                    // down the abort handles) if any subsequent setup step fails.
+                    // Insert the slot before the SURB readiness wait so any echo packets that
+                    // arrive during pre-loading are accepted rather than dropped as unknown.
+                    // Early return from the wait below drops slot_guard uncommitted, which removes
+                    // the slot and calls close_session → abort_all() on the spawned tasks.
                     let mut slot_guard = self
                         .allocate_session_slot(
                             session_id,
@@ -1540,19 +1553,28 @@ where
                             SessionManagerError::Loopback
                         })?;
 
-                    #[cfg(all(feature = "telemetry", not(test)))]
-                    METRIC_NUM_INITIATED_SESSIONS.increment();
+                    // Prevent the slot from being evicted by time_to_idle while SURBs are
+                    // pre-loading. Each `get()` call resets the idle timer; the task is
+                    // aborted as soon as the readiness wait resolves.
+                    let sessions_keepalive = self.sessions.clone();
+                    let touch_period = (self.cfg.idle_timeout / 2).max(self.cfg.min_session_touch_period);
+                    let slot_keepalive = hopr_utils::runtime::prelude::spawn(async move {
+                        loop {
+                            hopr_utils::runtime::prelude::sleep(touch_period).await;
+                            let _ = sessions_keepalive.get(&session_id);
+                        }
+                    });
 
-                    // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    match level_stream
+                    let wait_result = level_stream
                         .skip_while(|current_level| {
                             futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
                         })
                         .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
-                        .await
-                    {
+                        .await;
+                    slot_keepalive.abort();
+                    match wait_result {
                         Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
@@ -1565,6 +1587,9 @@ where
                             warn!(%session_id, "session didn't reach target SURB buffer size in time");
                         }
                     }
+
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
                     let session = HoprSession::new(
@@ -2028,15 +2053,19 @@ where
                     })
                     .map_err(|error| {
                         error!(%session_id, %error, "failed to dispatch session data");
+                        crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         SessionManagerError::other(error)
                     })?)
             } else {
                 error!(%session_id, "received data from an unestablished session");
+                crate::counters::SESSION_UNKNOWN_DATA_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 Err(TransportSessionError::UnknownData)
             };
         }
 
         trace!(tag = %in_data.data.application_tag, "received data not associated with session protocol or any existing session");
+
+        crate::counters::SESSION_UNRELATED_DATA_DISPATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_DISPATCHED_MSGS.increment_by(&["unrelated"], 1);

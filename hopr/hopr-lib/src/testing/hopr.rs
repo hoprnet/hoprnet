@@ -13,7 +13,7 @@ use crate::{
             primitive::prelude::{Address, HoprBalance},
         },
     },
-    config::{HoprLibConfig, SessionGlobalConfig},
+    config::{HoprLibConfig, SessionGlobalConfig, TransitLatencyConfig},
     testing::TestingHopr,
 };
 
@@ -30,6 +30,7 @@ pub fn create_hopr_instance_config(
     pix_config: Option<crate::exports::transport::session::IncomingSessionPixConfig>,
     idle_timeout_ms: u64,
     pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
+    transit_latency: Option<TransitLatencyConfig>,
 ) -> HoprLibConfig {
     HoprLibConfig {
         host: crate::config::HostConfig {
@@ -63,6 +64,7 @@ pub fn create_hopr_instance_config(
                 ..Default::default()
             },
             mixer: Default::default(),
+            transit_latency,
             stream: Default::default(),
             path_planner: Default::default(),
             counter_flush_interval: Default::default(),
