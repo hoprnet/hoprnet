@@ -1,6 +1,5 @@
 mod utils;
 
-use ahash::HashSetExt;
 use hopr_types::{
     crypto::{
         crypto_traits::elliptic_curve::Field,
@@ -8,13 +7,14 @@ use hopr_types::{
     },
     internal::prelude::Acknowledgement,
 };
-use utils::{SsaCommitmentBuilder, SsaCycle};
+use utils::{AddShareOutcome, SsaCommitmentBuilder, SsaCycle};
 use validator::Validate;
 
 use crate::{
     CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
     PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof,
-    SsaCommitmentState, SsaPolynomialId, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+    SsaCommitmentState, SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError,
+    types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -180,17 +180,67 @@ pub struct SsaReconstructor<S: PixSpec> {
 }
 
 /// Result of processing a single verified acknowledgement in the SSA reconstructor.
+///
+/// The counters behind [`SsaRecoveryProgress`] are updated by `process_verified_ack` itself, on the
+/// cycle it already holds, so these variants only have to say *whether* a snapshot is worth emitting
+/// — not what changed. That is why a duplicate, a surplus share and an unmatched acknowledgement all
+/// collapse into [`NoProgress`](Self::NoProgress): none of them moves a counter, so none of them can
+/// make a snapshot differ from the last one sent.
 enum ProcessedAckResult<S: PixSpec> {
-    /// No SSA recovery progress — still waiting for more polynomial parts.
+    /// Nothing to report: the acknowledgement matched no pending share, or the share was a
+    /// duplicate, a surplus, or absorbed by an already-failed polynomial.
     NoProgress,
     /// The share is valid but its polynomial's verifier is not installed yet, so it cannot be
     /// checked. Deferral, not failure: the ack is bucketed under this
     /// [`SsaPolynomialId`] and retried once the verifier arrives.
     VerifierNotReady(SsaPolynomialId<<S as PixSpec>::Pseudonym>),
-    /// The early recovery threshold was crossed (identified by SsaId).
-    EarlyRecovery(SsaId<<S as PixSpec>::Pseudonym>),
-    /// Full SSA was recovered.
-    FullRecovery(RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>),
+    /// The share advanced reconstruction without finishing it.
+    Progressed(SsaRecoveryProgress<<S as PixSpec>::Pseudonym>),
+    /// The share failed verification. Carries the SSA's aggregate fault total across all peers.
+    InvalidShare(SsaId<<S as PixSpec>::Pseudonym>, u64),
+    /// The early recovery threshold was crossed.
+    EarlyRecovery(SsaRecoveryProgress<<S as PixSpec>::Pseudonym>),
+    /// Full SSA was recovered. Carries the cycle's final progress, captured before its state was
+    /// released — afterwards there is nothing left to read it from.
+    FullRecovery(
+        RecoveredSsa<<S as PixSpec>::Pseudonym, <S as PixSpec>::AddressPrivateKey>,
+        SsaRecoveryProgress<<S as PixSpec>::Pseudonym>,
+    ),
+}
+
+/// Merges a snapshot into the batch's pending set, keeping the furthest-along one per SSA.
+///
+/// Concurrent batches share a cycle's counters, so snapshots taken microseconds apart can be
+/// unordered. Keeping the maximum means one batch never reports its own SSA going backwards.
+fn record_progress<P: PartialEq>(acc: &mut Vec<SsaRecoveryProgress<P>>, snapshot: SsaRecoveryProgress<P>) {
+    match acc.iter_mut().find(|p| p.ssa_id == snapshot.ssa_id) {
+        Some(existing) if existing.useful_shares >= snapshot.useful_shares => {}
+        Some(existing) => *existing = snapshot,
+        None => acc.push(snapshot),
+    }
+}
+
+/// One SSA's fault observation, with the relayer that carried the offending share.
+type FaultObservation<P> = (Box<OffchainPublicKey>, SsaId<P>, u64);
+
+/// Merges a fault observation into the batch's pending set, keeping the highest total per SSA.
+///
+/// The relayer travels with the total rather than being filled in at emission time: a batch can also
+/// carry faults redeemed from deferral, and those were relayed by whoever held the share at the time
+/// — not by the peer whose acknowledgements are being processed now.
+fn record_fault<P: PartialEq>(acc: &mut Vec<FaultObservation<P>>, observation: FaultObservation<P>) {
+    match acc.iter_mut().find(|(_, id, _)| *id == observation.1) {
+        Some(existing) if existing.2 >= observation.2 => {}
+        Some(existing) => *existing = observation,
+        None => acc.push(observation),
+    }
+}
+
+/// Appends a resolution unless an equal one is already present.
+fn push_unique<P: PartialEq, A>(acc: &mut Vec<ShareResolution<P, A>>, resolution: ShareResolution<P, A>) {
+    if !acc.contains(&resolution) {
+        acc.push(resolution);
+    }
 }
 
 impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
@@ -309,27 +359,50 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         // The share cannot be empty at this point because we prevent empty share insertions
         let partial_share = share.partial_share.decrypt(spi.pseudonym(), &ack)?;
 
+        let ssa_id = *spi.as_ref();
+
         // The part lock is released before the accumulator is taken below. That order is the one
         // callers must keep, and neither lock is ever held across the other.
         let ssa_part = match part.lock().add_share(share.nonce, partial_share) {
-            Ok(Some(share)) => {
+            Ok(AddShareOutcome::Completed(share)) => {
                 tracing::trace!(%spi, "ssa part complete");
+                cycle.record_useful_share();
+                cycle.record_completed_part();
                 share
             }
-            Ok(None) => {
+            Ok(AddShareOutcome::Useful) => {
                 tracing::trace!(%spi, "ssa part not yet complete, waiting for more shares");
+                cycle.record_useful_share();
+                // Snapshot here rather than making the caller look the cycle up again: this is the
+                // steady-state outcome for all but one share in `threshold`, so a second cache get
+                // would double the lookups on the hot path.
+                return Ok(ProcessedAckResult::Progressed(cycle.progress()));
+            }
+            // Expected traffic, not a fault: a conforming Entry emits `threshold + surplus` shares
+            // per polynomial, so every polynomial ends its life absorbing surplus.
+            Ok(AddShareOutcome::Surplus) => {
+                tracing::trace!(%spi, "share arrived after its polynomial was reconstructed");
+                return Ok(ProcessedAckResult::NoProgress);
+            }
+            Ok(AddShareOutcome::Duplicate) => {
+                tracing::trace!(%spi, "duplicate evaluation identifier");
+                return Ok(ProcessedAckResult::NoProgress);
+            }
+            Ok(AddShareOutcome::Absorbed) => {
+                tracing::trace!(%spi, "share for a polynomial that already failed its commitment");
                 return Ok(ProcessedAckResult::NoProgress);
             }
             Err(PixError::VsssError(vsss_rs::Error::InvalidShare)) => {
-                // We need to treat this error differently, because it is critical
-                // and may be differently handled by the upper-layer components.
+                // Counted rather than raised: the caller reports it as a resolution, and the count
+                // has to be taken here because the cycle that holds it is in hand.
                 //
                 // Almost always this means the polynomial's reconstructed constant term did not
                 // open its commitment, in which case the offending share is one of the `threshold`
                 // that went into it and cannot be singled out. The whole cycle is lost either way,
                 // since the SSA needs every polynomial.
-                tracing::error!(%spi, "ssa part failed to open its commitment");
-                return Err(PixError::InvalidShare(*spi.pseudonym(), spi.ssa_index()));
+                let observed_total = cycle.record_invalid_share();
+                tracing::error!(%spi, observed_total, "ssa part failed to open its commitment");
+                return Ok(ProcessedAckResult::InvalidShare(ssa_id, observed_total));
             }
             Err(e) => return Err(e),
         };
@@ -338,7 +411,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
         match ssa {
             Some(scalar) => {
-                let ssa_id = *spi.as_ref();
+                // Read the final progress while the cycle is still live: `remove_cycle` below drops
+                // the counters along with everything else, so this is the last chance to report them.
+                let progress = cycle.progress();
                 // Release the accumulator lock before retiring, so `remove_cycle` — which drops
                 // the last `Arc` to this very cycle — does not run while it is held.
                 drop(builder_guard);
@@ -350,17 +425,19 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 // Full recovery: this cycle's state is no longer needed.
                 self.remove_cycle(ssa_id);
                 tracing::info!(%ssa_id, "ssa recovered");
-                Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }))
+                Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }, progress))
             }
             None => {
                 tracing::trace!(%spi, "ssa not yet complete, waiting for more ssa parts");
                 // Check early threshold while we hold the lock
-                if builder_guard.check_early_threshold(self.cfg.early_recovery_threshold) {
-                    let ssa_id = *spi.as_ref();
+                let early = builder_guard.check_early_threshold(self.cfg.early_recovery_threshold);
+                drop(builder_guard);
+                let progress = cycle.progress();
+                if early {
                     tracing::info!(%ssa_id, "early recovery threshold reached");
-                    Ok(ProcessedAckResult::EarlyRecovery(ssa_id))
+                    Ok(ProcessedAckResult::EarlyRecovery(progress))
                 } else {
-                    Ok(ProcessedAckResult::NoProgress)
+                    Ok(ProcessedAckResult::Progressed(progress))
                 }
             }
         }
@@ -426,6 +503,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         }
 
         let mut resolved = Vec::new();
+        // The furthest-along snapshot any redeemed ack produced. Shares recovered here would
+        // otherwise be invisible to the consumer until some later batch happened to touch this same
+        // SSA, since only `acknowledge_shares` emits snapshots.
+        let mut progress = Vec::new();
         for (peer, challenge, ack) in deferred.into_values().flatten() {
             // The share lives in the peer's own awaiting-acks cache; if the peer entry is gone the
             // share has expired with it and the ack is dead.
@@ -433,9 +514,23 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 continue;
             };
             match self.process_verified_ack(ack, challenge, &awaiting) {
-                Ok(ProcessedAckResult::FullRecovery(ssa)) => resolved.push(ShareResolution::RecoveredSsa(ssa)),
-                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
-                    resolved.push(ShareResolution::AlmostRecoveredSsa(ssa_id))
+                Ok(ProcessedAckResult::FullRecovery(ssa, snapshot)) => {
+                    record_progress(&mut progress, snapshot);
+                    resolved.push(ShareResolution::RecoveredSsa(ssa));
+                }
+                Ok(ProcessedAckResult::EarlyRecovery(snapshot)) => {
+                    let id = snapshot.ssa_id;
+                    record_progress(&mut progress, snapshot);
+                    resolved.push(ShareResolution::AlmostRecoveredSsa(id));
+                }
+                Ok(ProcessedAckResult::Progressed(snapshot)) => record_progress(&mut progress, snapshot),
+                Ok(ProcessedAckResult::InvalidShare(id, observed_total)) => {
+                    tracing::error!(%id, observed_total, "deferred share could not be verified");
+                    resolved.push(ShareResolution::InvalidShares {
+                        peer: peer.into(),
+                        ssa_id: id,
+                        observed_total,
+                    });
                 }
                 Ok(ProcessedAckResult::NoProgress) => {}
                 Ok(ProcessedAckResult::VerifierNotReady(_)) => {
@@ -443,15 +538,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                     // retirement path does. Re-bucketing would leak, so drop.
                     tracing::trace!(%ssa_id, "cycle withdrawn while draining deferred acknowledgements");
                 }
-                Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
-                    tracing::error!(%pseudonym, ssa_index, "deferred share could not be verified");
-                    resolved.push(ShareResolution::InvalidShare(
-                        peer.into(),
-                        SsaId::new(pseudonym, ssa_index),
-                    ));
-                }
                 Err(error) => tracing::debug!(%ssa_id, %error, "failed to process deferred acknowledgement"),
             }
+        }
+
+        // Snapshots go in ahead of the terminal events they belong to, matching what
+        // `acknowledge_shares` emits — the consumer sees one order regardless of which path resolved
+        // a share.
+        if !progress.is_empty() {
+            let mut ordered = progress.into_iter().map(ShareResolution::Progress).collect::<Vec<_>>();
+            ordered.append(&mut resolved);
+            resolved = ordered;
         }
 
         if !resolved.is_empty() {
@@ -507,6 +604,111 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             .get(ssa_id)
             .map(|b| b.lock().values().map(Vec::len).sum())
             .unwrap_or(0)
+    }
+}
+
+/// Ownership of an Exit SSA commitment, released when dropped.
+///
+/// Registering an Exit commitment is the first fallible step of many: the request still has to be
+/// encoded, sent, and answered. Every early return between here and the point where a permanent
+/// owner takes over would otherwise strand the commitment in the reconstructor until its own
+/// lifetime expired, and a stranded commitment is not inert — its `SsaId` is occupied, so a retry at
+/// the same index is rejected as a duplicate.
+///
+/// Move-only by design: no `Clone`, no `Copy`, so there is exactly one release point. A success path
+/// hands ownership on with [`disarm`](Self::disarm) rather than letting the guard fall out of scope.
+///
+/// Dropping releases the registration **without** retiring the SSA, so the same index can be
+/// requested again — see [`release_abandoned_commitment`](SsaReconstructor::release_abandoned_commitment)
+/// for why that distinction is load-bearing.
+#[must_use = "dropping the guard immediately releases the SSA it owns"]
+pub struct SsaCommitmentGuard<S: PixSpec + Clone> {
+    /// `None` once disarmed, which is the only state in which `Drop` does nothing.
+    owned: Option<OwnedCommitment<S>>,
+}
+
+/// What an [`SsaCommitmentGuard`] needs to release its SSA: where it is registered, and which one.
+type OwnedCommitment<S> = (std::sync::Arc<SsaReconstructor<S>>, SsaId<<S as PixSpec>::Pseudonym>);
+
+/// A registered Exit commitment, paired with ownership of its lifetime.
+type GuardedExitCommitment<S> = (PixGroup<S>, SsaCommitmentGuard<S>);
+
+impl<S: PixSpec + Clone> std::fmt::Debug for SsaCommitmentGuard<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SsaCommitmentGuard")
+            .field("ssa_id", &self.owned.as_ref().map(|(_, id)| id))
+            .finish()
+    }
+}
+
+impl<S: PixSpec + Clone> SsaCommitmentGuard<S> {
+    /// The SSA this guard owns, or `None` if it has been disarmed.
+    pub fn ssa_id(&self) -> Option<&SsaId<S::Pseudonym>> {
+        self.owned.as_ref().map(|(_, id)| id)
+    }
+
+    /// Gives up ownership without retiring, returning the SSA that is now the caller's to release.
+    ///
+    /// Returns `None` if the guard was already disarmed.
+    pub fn disarm(mut self) -> Option<SsaId<S::Pseudonym>> {
+        self.owned.take().map(|(_, ssa_id)| ssa_id)
+    }
+}
+
+impl<S: PixSpec + Clone> Drop for SsaCommitmentGuard<S> {
+    fn drop(&mut self) {
+        if let Some((reconstructor, ssa_id)) = self.owned.take() {
+            reconstructor.release_abandoned_commitment(ssa_id);
+        }
+    }
+}
+
+impl<S: PixSpec + Clone> SsaReconstructor<S> {
+    /// Releases a commitment that was registered but never taken over by an owner.
+    ///
+    /// Deliberately **not** [`retire_ssa`](ExitAcknowledgementShareProcessor::retire_ssa), which
+    /// additionally writes the resurrection tombstone. The tombstone is permanent for that `SsaId`
+    /// for as long as it is retained, and it takes effect at the moment a cycle is *published* — so a
+    /// retry at the same index would re-register, accept the peer's commitments, publish a deposit
+    /// address, and then be silently undone at completion. The peer funds an SSA that can never be
+    /// reconstructed, and nothing on either side reports a failure.
+    ///
+    /// Same-index retry is not a corner case: the SSA index is advanced only after every fallible
+    /// step of a request has succeeded, so a request that failed keeps its index by design and the
+    /// next attempt reuses it.
+    ///
+    /// Escalates to a full retirement if a cycle did go live, which means the peer was asked and
+    /// answered — and therefore that ownership should already have been transferred with
+    /// [`disarm`](SsaCommitmentGuard::disarm). That branch is a caller error, and retiring is the
+    /// safe response to it, because a live cycle is exactly what the tombstone exists to protect.
+    fn release_abandoned_commitment(&self, ssa_id: SsaId<S::Pseudonym>) {
+        if self.ssa_cycles.contains_key(&ssa_id) {
+            tracing::warn!(%ssa_id, "abandoned ssa commitment was already live — retiring it");
+            self.retire_ssa(ssa_id);
+        } else {
+            tracing::debug!(%ssa_id, "releasing ssa commitment abandoned by its owner");
+            self.remove_cycle(ssa_id);
+        }
+    }
+
+    /// [`new_exit_commitment`](ExitAcknowledgementShareProcessor::new_exit_commitment), with the
+    /// registration owned by an [`SsaCommitmentGuard`].
+    ///
+    /// No guard is produced on failure, so a rejected duplicate never retires the registration that
+    /// caused the rejection.
+    pub fn new_guarded_exit_commitment(
+        self: &std::sync::Arc<Self>,
+        id: SsaId<S::Pseudonym>,
+        polys_per_ssa: usize,
+        shares_per_poly: usize,
+    ) -> Result<GuardedExitCommitment<S>, PixError<S::Pseudonym>> {
+        let exit_commitment = self.new_exit_commitment(id, polys_per_ssa, shares_per_poly)?;
+        Ok((
+            exit_commitment,
+            SsaCommitmentGuard {
+                owned: Some((self.clone(), id)),
+            },
+        ))
     }
 }
 
@@ -601,7 +803,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         // and the other is not, which used to be a permanent-drop hazard.
         let installed = if let Some(ssa_builder) = progress.ssa_builder {
             let num_polys = ssa_builder.num_polys();
-            let cycle = SsaCycle::new(ssa_builder, progress.new_verifiers)?;
+            let cycle = SsaCycle::new(ssa_id, ssa_builder, progress.new_verifiers)?;
             self.ssa_cycles.insert(ssa_id, std::sync::Arc::new(cycle));
             tracing::debug!(%ssa_id, num_polys, "ssa commitment known — cycle is live");
             true
@@ -671,21 +873,47 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::UnexpectedShare);
         };
 
-        // Feed output into HashSet, that deduplicates
-        let mut res = ahash::HashSet::with_capacity(half_keys_challenges.len());
+        // Three accumulators rather than one deduplicating set, because the emission contract is an
+        // ordering as well as a multiplicity: every SSA's counters precede its terminal event.
+        //
+        // All three are `Vec`s deduplicated by linear scan. A per-peer batch resolves shares for the
+        // cycle that peer is relaying for — one, or a small handful while a Session pipelines the
+        // next — so the scan is over a one- or two-element list and a hash set would cost more than
+        // it saves.
+        let mut progress: Vec<SsaRecoveryProgress<S::Pseudonym>> = Vec::new();
+        let mut faults: Vec<FaultObservation<S::Pseudonym>> = Vec::new();
+        let mut terminal: Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> = Vec::new();
 
         // Collect anything redeemed while verifiers were being installed. No retry scanning happens
         // here: a deferred ack is retried exactly once, by the installation of the verifier it was
         // waiting for (see `drain_deferred_acks`).
-        res.extend(self.take_ready_resolutions());
+        for resolution in self.take_ready_resolutions() {
+            match resolution {
+                ShareResolution::Progress(snapshot) => record_progress(&mut progress, snapshot),
+                ShareResolution::InvalidShares {
+                    peer,
+                    ssa_id,
+                    observed_total,
+                } => record_fault(&mut faults, (peer, ssa_id, observed_total)),
+                other => push_unique(&mut terminal, other),
+            }
+        }
 
         for (ack, ack_challenge) in half_keys_challenges {
             match self.process_verified_ack(ack, ack_challenge, &awaiting_ack_from_peer) {
-                Ok(ProcessedAckResult::FullRecovery(ssa)) => {
-                    res.insert(ShareResolution::RecoveredSsa(ssa));
+                Ok(ProcessedAckResult::FullRecovery(ssa, snapshot)) => {
+                    record_progress(&mut progress, snapshot);
+                    push_unique(&mut terminal, ShareResolution::RecoveredSsa(ssa));
                 }
-                Ok(ProcessedAckResult::EarlyRecovery(ssa_id)) => {
-                    res.insert(ShareResolution::AlmostRecoveredSsa(ssa_id));
+                Ok(ProcessedAckResult::EarlyRecovery(snapshot)) => {
+                    let ssa_id = snapshot.ssa_id;
+                    record_progress(&mut progress, snapshot);
+                    push_unique(&mut terminal, ShareResolution::AlmostRecoveredSsa(ssa_id));
+                }
+                Ok(ProcessedAckResult::Progressed(snapshot)) => record_progress(&mut progress, snapshot),
+                Ok(ProcessedAckResult::InvalidShare(ssa_id, observed_total)) => {
+                    tracing::error!(%ssa_id, observed_total, "encountered share that could not be verified");
+                    record_fault(&mut faults, (Box::new(peer), ssa_id, observed_total));
                 }
                 Ok(ProcessedAckResult::NoProgress) => {}
                 Ok(ProcessedAckResult::VerifierNotReady(spi)) => {
@@ -695,20 +923,25 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                     self.defer_ack(spi, (peer, ack_challenge, ack));
                 }
                 Err(PixError::ShareIsEmpty) => tracing::trace!(%peer, "received empty share"),
-                Err(PixError::InvalidShare(pseudonym, ssa_index)) => {
-                    tracing::error!(%pseudonym, ssa_index, "encountered share that could not be verified");
-                    res.insert(ShareResolution::InvalidShare(
-                        peer.into(),
-                        SsaId::new(pseudonym, ssa_index),
-                    ));
-                }
                 Err(error) => {
                     tracing::error!(%error, "failed to process acknowledgement");
                 }
             }
         }
 
-        Ok(res.into_iter().collect())
+        let mut res = Vec::with_capacity(progress.len() + faults.len() + terminal.len());
+        res.extend(progress.into_iter().map(ShareResolution::Progress));
+        res.extend(
+            faults
+                .into_iter()
+                .map(|(peer, ssa_id, observed_total)| ShareResolution::InvalidShares {
+                    peer,
+                    ssa_id,
+                    observed_total,
+                }),
+        );
+        res.append(&mut terminal);
+        Ok(res)
     }
 }
 
@@ -1079,15 +1312,17 @@ mod tests {
                 .ok_or(anyhow::anyhow!("missing peer"))?,
         )?;
         assert!(
-            matches!(resolution1, ProcessedAckResult::NoProgress),
-            "first share should not yet complete the SSA"
+            matches!(resolution1, ProcessedAckResult::Progressed(p) if p.useful_shares == 1),
+            "first share should count as progress without completing the SSA"
         );
 
         // --- Step 4: Process the duplicate ---
         // The SsaPartBuilder has 1/2 shares. The duplicate share has the same identifier
         // (same X-coordinate from msg1), so it hits the
-        // `any(|s| s.identifier == share.identifier)` check in SsaPartBuilder::add_share
-        // and returns Ok(None), which surfaces as NoProgress.
+        // `any(|s| s.identifier == share.identifier)` check in SsaPartBuilder::add_share.
+        //
+        // The point of the assertion is the contrast with step 3: a duplicate is not merely
+        // "incomplete", it is *not progress*, so it must leave the counters where they were.
         let resolution_dup = reconstructor.process_verified_ack(
             dup_ack,
             dup_challenge,
@@ -1099,7 +1334,16 @@ mod tests {
         )?;
         assert!(
             matches!(resolution_dup, ProcessedAckResult::NoProgress),
-            "duplicate share must return NoProgress during active reconstruction"
+            "duplicate share must not register as progress"
+        );
+        assert_eq!(
+            1,
+            reconstructor
+                .cycle(&ssa_id)
+                .ok_or(anyhow::anyhow!("cycle went away"))?
+                .progress()
+                .useful_shares,
+            "the duplicate must not have advanced the useful-share count"
         );
 
         // --- Step 5: Generate and process the second distinct share ---
@@ -1126,7 +1370,7 @@ mod tests {
                 .ok_or(anyhow::anyhow!("missing peer"))?,
         )?;
         assert!(
-            matches!(resolution2, ProcessedAckResult::FullRecovery(ref r) if r.ssa_id == ssa_id),
+            matches!(resolution2, ProcessedAckResult::FullRecovery(ref r, _) if r.ssa_id == ssa_id),
             "second unique share should complete SSA reconstruction"
         );
 
@@ -1292,6 +1536,329 @@ mod tests {
         assert!(has_early, "expected AlmostRecoveredSsa event");
         assert!(has_full, "expected RecoveredSsa event");
 
+        Ok(())
+    }
+
+    /// Sets up one fully committed cycle and returns every share's acknowledgement, unprocessed.
+    ///
+    /// Shares are inserted but not acknowledged, so the caller can feed acks in whatever grouping
+    /// the test needs and read the cycle's counters in between.
+    #[allow(clippy::type_complexity)]
+    fn cycle_with_pending_acks(
+        polys: u16,
+        threshold: u16,
+        surplus: usize,
+        peer: &OffchainKeypair,
+    ) -> anyhow::Result<(SsaReconstructor<TestSpec>, SsaId<SimplePseudonym>, Vec<Acknowledgement>)> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: polys,
+            threshold,
+            surplus_shares: surplus,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::default();
+        reconstructor.new_exit_commitment(ssa_id, polys as usize, threshold as usize)?;
+        commitment_msg.process_into_reconstructor(&reconstructor)?;
+
+        let mut acks = Vec::new();
+        while let Some((msg, share)) = {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            generator.next_share(&pseudonym, &msg).map(|v| v.map(|u| (msg, u)))
+        }? {
+            let ack = HalfKey::random();
+            let ack_challenge = ack.to_challenge()?;
+            let enc_share = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                ack_challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc_share)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, peer).leak());
+        }
+
+        Ok((reconstructor, ssa_id, acks))
+    }
+
+    #[test]
+    fn progress_counts_only_the_shares_that_advance_reconstruction() -> anyhow::Result<()> {
+        // 2 polynomials × threshold 2, plus 1 surplus share each: 6 shares on the wire, of which
+        // only 4 can ever be useful. The gap between those two numbers is the whole point — a
+        // consumer sizing a progress ratio against packets received would read 6/4.
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(POLYS, THRESHOLD, 1, &peer)?;
+        assert_eq!(
+            6,
+            acks.len(),
+            "generator should emit (threshold + surplus) per polynomial"
+        );
+
+        let mut snapshots = Vec::new();
+        let mut recovered = false;
+        // One ack at a time, so each share's individual contribution is observable.
+        for ack in acks {
+            for resolution in reconstructor.acknowledge_shares(*peer.public(), vec![ack])? {
+                match resolution {
+                    ShareResolution::Progress(p) => snapshots.push(p),
+                    ShareResolution::RecoveredSsa(r) => {
+                        assert_eq!(ssa_id, r.ssa_id);
+                        recovered = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        assert!(recovered, "the cycle must reconstruct from its own shares");
+
+        // Shares are emitted polynomial-major, so the useful ones are shares 1,2 and 4,5 — the
+        // third share of each polynomial arrives after that polynomial is already reconstructed.
+        assert_eq!(
+            vec![1, 2, 3, 4],
+            snapshots.iter().map(|p| p.useful_shares).collect::<Vec<_>>(),
+            "each snapshot must advance by exactly one, and surplus shares must emit none at all"
+        );
+        let last = snapshots.last().ok_or(anyhow::anyhow!("no progress emitted"))?;
+        assert_eq!(
+            (POLYS * THRESHOLD) as u64,
+            last.target_useful_shares,
+            "target must be polynomials × threshold, matching the negotiated dimensions"
+        );
+        assert_eq!(
+            last.useful_shares, last.target_useful_shares,
+            "a completed cycle must report itself as complete"
+        );
+        assert_eq!(
+            POLYS, last.recovered_polynomials,
+            "every polynomial must be accounted for"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn progress_precedes_the_terminal_event_it_belongs_to() -> anyhow::Result<()> {
+        // The emission order is a contract: a consumer that acts on RecoveredSsa must already have
+        // been told the counters that justify it, including for the batch that completes the cycle —
+        // the one whose snapshot is taken from a cycle that no longer exists by the time the batch
+        // returns.
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(2, 2, 0, &peer)?;
+
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+
+        let first_terminal = resolutions
+            .iter()
+            .position(|r| {
+                matches!(
+                    r,
+                    ShareResolution::RecoveredSsa(_) | ShareResolution::AlmostRecoveredSsa(_)
+                )
+            })
+            .ok_or(anyhow::anyhow!("expected a terminal resolution"))?;
+        let last_progress = resolutions
+            .iter()
+            .rposition(|r| matches!(r, ShareResolution::Progress(_)))
+            .ok_or(anyhow::anyhow!("expected a progress resolution"))?;
+        assert!(
+            last_progress < first_terminal,
+            "every Progress must precede every terminal event, got {resolutions:?}"
+        );
+
+        // Exactly one snapshot per SSA per batch, even though four shares moved the counters.
+        let progress = resolutions
+            .iter()
+            .filter_map(|r| match r {
+                ShareResolution::Progress(p) => Some(p),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(1, progress.len(), "one snapshot per SSA per batch, got {progress:?}");
+        assert_eq!(ssa_id, progress[0].ssa_id);
+        assert_eq!(
+            4, progress[0].useful_shares,
+            "the surviving snapshot must be the furthest-along one"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn an_abandoned_commitment_guard_releases_its_registration() -> anyhow::Result<()> {
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+        assert_eq!(Some(&ssa_id), guard.ssa_id());
+        assert!(
+            reconstructor.contains_builder(&ssa_id),
+            "the commitment must be registered while the guard holds it"
+        );
+
+        drop(guard);
+        assert!(
+            !reconstructor.contains_builder(&ssa_id),
+            "dropping the guard must release the registration it owned"
+        );
+
+        Ok(())
+    }
+
+    /// Abandoning a guard whose cycle already went live escalates to a full retirement.
+    ///
+    /// Reaching this is a caller error — a live cycle means the peer was asked and answered, so
+    /// ownership should already have been handed on with `disarm()`. Retiring is the safe response
+    /// rather than the merely tidy one: the tombstone is what stops a commitment completion racing
+    /// the teardown from republishing the cycle that was just dismantled.
+    #[test]
+    fn abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let (_commitment, guard) =
+            reconstructor.new_guarded_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+
+        // Take the cycle live under the guard, which is the state a correct caller would have
+        // disarmed out of.
+        generator
+            .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+            .process_into_reconstructor(reconstructor.as_ref())?;
+        assert!(reconstructor.cycle(&ssa_id).is_some(), "the cycle must be live");
+
+        drop(guard);
+        assert!(
+            reconstructor.cycle(&ssa_id).is_none(),
+            "abandoning a live cycle must tear it down"
+        );
+
+        // A tombstone was written, so this SsaId is spent: a fresh cycle at the same index is
+        // published and then withdrawn at completion. That is the retirement contract, and the
+        // contrast with `an_ssa_index_stays_usable_after_its_request_is_abandoned` is the point.
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        // A fresh generator: the original has already spent this pseudonym's index, and the identity
+        // of the replacement commitment is irrelevant to what is being tested.
+        let replacement = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        })
+        .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let mut final_state = None;
+        for (coeff_idx, coeffs) in replacement.verifiers.clone() {
+            let proof = (coeff_idx == crate::CONSTANT_TERM_COEFFICIENT).then_some(replacement.commitment_proof);
+            final_state =
+                Some(reconstructor.insert_coefficient_commitments(ssa_id, coeff_idx, proof, coeffs.into_iter())?);
+        }
+        assert!(
+            !final_state
+                .ok_or(anyhow::anyhow!("commitment carried no batches"))?
+                .is_verifiable,
+            "a retired SsaId must stay retired"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_disarmed_commitment_guard_leaves_its_ssa_alone() -> anyhow::Result<()> {
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+        assert_eq!(Some(ssa_id), guard.disarm());
+        assert!(
+            reconstructor.contains_builder(&ssa_id),
+            "a disarmed guard must not retire the commitment it handed on"
+        );
+
+        Ok(())
+    }
+
+    /// Abandoning a request must leave its SSA index usable, because that index is what the next
+    /// attempt will use — it is advanced only once every fallible step has succeeded.
+    ///
+    /// Releasing through the full retirement path instead writes the resurrection tombstone, and the
+    /// resulting failure is the quietest one in the protocol: the retry accepts the peer's
+    /// commitments and publishes a deposit address, then has its cycle undone at completion. The peer
+    /// funds an SSA that can never be reconstructed and neither side reports anything wrong.
+    #[test]
+    fn an_ssa_index_stays_usable_after_its_request_is_abandoned() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+
+        // First attempt is abandoned before the peer is ever asked for commitments.
+        let (_commitment, guard) =
+            reconstructor.new_guarded_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        drop(guard);
+
+        // Retry at the same index, which is what a failed request leaves behind.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let mut final_state = None;
+        for (coeff_idx, coeffs) in commitment.verifiers.clone() {
+            let proof = (coeff_idx == crate::CONSTANT_TERM_COEFFICIENT).then_some(commitment.commitment_proof);
+            final_state =
+                Some(reconstructor.insert_coefficient_commitments(ssa_id, coeff_idx, proof, coeffs.into_iter())?);
+        }
+        let state = final_state.ok_or(anyhow::anyhow!("commitment carried no batches"))?;
+
+        assert!(
+            state.is_verifiable,
+            "the retry must become verifiable — otherwise the peer is asked to fund a cycle that cannot reconstruct"
+        );
+        assert!(state.ssa_deposit_address.is_some(), "a verifiable cycle has an address");
+        assert!(
+            reconstructor.cycle(&ssa_id).is_some(),
+            "the retry's cycle must be live, not published and then withdrawn"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_rejected_duplicate_registration_does_not_retire_the_original() -> anyhow::Result<()> {
+        // The failure path must not produce a guard: if it did, dropping the error's guard would
+        // retire the very registration whose presence caused the rejection — turning a harmless
+        // duplicate request into the loss of a live cycle.
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+
+        assert!(
+            matches!(
+                reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2),
+                Err(PixError::DuplicateCommitment)
+            ),
+            "a second registration at the same index must be rejected"
+        );
+        assert!(
+            reconstructor.contains_builder(&ssa_id),
+            "the rejected duplicate must leave the original registration intact"
+        );
+
+        drop(guard);
         Ok(())
     }
 
@@ -1834,7 +2401,7 @@ mod tests {
             .process_into_reconstructor(&reconstructor)?;
 
         // Corrupt the very first share of polynomial 0, then feed its whole budget one at a time.
-        let mut invalid_reports = 0;
+        let mut invalid_reports: Vec<u64> = Vec::new();
         for i in 0..THRESHOLD as usize + SURPLUS {
             let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
             let mut share = generator
@@ -1860,17 +2427,109 @@ mod tests {
 
             let reported = resolutions
                 .iter()
-                .filter(|r| matches!(r, ShareResolution::InvalidShare(_, id) if *id == ssa_id))
-                .count();
+                .filter_map(|r| match r {
+                    ShareResolution::InvalidShares {
+                        ssa_id: id,
+                        observed_total,
+                        ..
+                    } if *id == ssa_id => Some(*observed_total),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
             if i + 1 < THRESHOLD as usize {
-                assert_eq!(0, reported, "share {i} must pass unremarked — nothing checks it yet");
+                assert!(
+                    reported.is_empty(),
+                    "share {i} must pass unremarked — nothing checks it yet"
+                );
             }
-            invalid_reports += reported;
+            invalid_reports.extend(reported);
         }
 
         assert_eq!(
-            1, invalid_reports,
-            "the corrupted set must be reported exactly once, at the threshold-th share"
+            vec![1],
+            invalid_reports,
+            "the corrupted set must be reported exactly once, at the threshold-th share, as the cycle's first fault"
+        );
+
+        Ok(())
+    }
+
+    /// The fault total is a property of the cycle, not of whoever relayed the offending share.
+    ///
+    /// A Session's shares reach the Exit through whichever relayer the return path happens to use,
+    /// so a per-peer total would let an Entry stay under any limit by spreading its bad shares —
+    /// and would make the number the consumer enforces on depend on routing rather than on conduct.
+    #[test]
+    fn fault_totals_aggregate_over_the_cycle_not_the_peer() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u16 = 2;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        // One relayer per polynomial, which is what shares arriving over different return paths
+        // looks like from here.
+        let relayers = [OffchainKeypair::random(), OffchainKeypair::random()];
+
+        let reconstructor = SsaReconstructor::<TestSpec>::default();
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        generator
+            .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+            .process_into_reconstructor(&reconstructor)?;
+
+        let mut totals = Vec::new();
+        for poly in 0..POLYS {
+            let relayer = &relayers[poly as usize];
+            for i in 0..THRESHOLD {
+                let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+                let mut share = generator
+                    .next_share(&pseudonym, &msg)?
+                    .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+                assert_eq!(poly, share.id.poly_index(), "shares arrive polynomial-major");
+
+                // Corrupt one share of each polynomial, so each one fails on its own threshold-th.
+                if i == 0 {
+                    AsMut::<[u8]>::as_mut(&mut share.share.0)[31] ^= 1;
+                }
+
+                let ack = HalfKey::random();
+                let enc = share.share.clone().encrypt(&share.id, &ack)?;
+                reconstructor.insert_encrypted_share(
+                    relayer.public(),
+                    ack.to_challenge()?,
+                    TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+                )?;
+                totals.extend(
+                    reconstructor
+                        .acknowledge_shares(
+                            *relayer.public(),
+                            vec![VerifiedAcknowledgement::new(ack, relayer).leak()],
+                        )?
+                        .into_iter()
+                        .filter_map(|r| match r {
+                            ShareResolution::InvalidShares { observed_total, .. } => Some(observed_total),
+                            _ => None,
+                        }),
+                );
+            }
+        }
+
+        assert_eq!(
+            vec![1, 2],
+            totals,
+            "the second relayer's fault must be charged to the cycle's running total, not restart it"
+        );
+        assert_eq!(
+            2,
+            reconstructor
+                .cycle(&ssa_id)
+                .ok_or(anyhow::anyhow!("cycle went away"))?
+                .invalid_shares(),
+            "the cycle must hold the aggregate"
         );
 
         Ok(())
@@ -1960,6 +2619,104 @@ mod tests {
                 .iter()
                 .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
             "deferred shares must recover the SSA once their verifiers install, got {resolutions:?}"
+        );
+
+        Ok(())
+    }
+
+    /// A fault found while draining deferred acknowledgements must stay attributed to the relayer
+    /// that carried the offending share.
+    ///
+    /// The drain runs on the commitment path, so its findings are handed to whichever
+    /// `acknowledge_shares` call happens to collect them next — routinely a different peer's. Filling
+    /// the relayer in at emission time would name that unrelated peer, which is worse than naming
+    /// none: the field exists to attribute misbehaviour.
+    #[test]
+    fn a_fault_redeemed_from_deferral_keeps_its_own_relayer() -> anyhow::Result<()> {
+        const POLYS: u16 = 1;
+        const THRESHOLD: u16 = 2;
+
+        // One surplus share, kept back to give `collector` an `awaiting_acks` entry.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 1,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        // `carrier` relays the shares; `collector` is an unrelated peer whose later batch picks up
+        // the parked resolutions.
+        let carrier = OffchainKeypair::random();
+        let collector = OffchainKeypair::random();
+
+        let reconstructor = SsaReconstructor::<TestSpec>::default();
+        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+
+        // Shares arrive over `carrier` before any commitment, so they defer. One is corrupted, so the
+        // drain is what discovers the fault.
+        let mut acks = Vec::new();
+        for i in 0..THRESHOLD {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let mut share = generator
+                .next_share(&pseudonym, &msg)?
+                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+            if i == 0 {
+                AsMut::<[u8]>::as_mut(&mut share.share.0)[31] ^= 1;
+            }
+            let ack = HalfKey::random();
+            let enc = share.share.clone().encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                carrier.public(),
+                ack.to_challenge()?,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            acks.push(VerifiedAcknowledgement::new(ack, &carrier).leak());
+        }
+        assert!(
+            reconstructor.acknowledge_shares(*carrier.public(), acks)?.is_empty(),
+            "shares must defer while the commitment is unknown"
+        );
+
+        // Completing the commitment installs the part builder and drains the bucket, which is where
+        // the corrupted set is detected.
+        reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        )?;
+
+        // The surplus share gives `collector` an entry in `awaiting_acks`, which is what makes its
+        // batch acceptable. It is never acknowledged — the batch below is empty, so the only thing
+        // `collector` contributes is being the wrong answer for the `peer` field.
+        let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        let surplus = generator
+            .next_share(&pseudonym, &msg)?
+            .ok_or_else(|| anyhow::anyhow!("generator must yield the surplus share"))?;
+        let filler = HalfKey::random();
+        reconstructor.insert_encrypted_share(
+            collector.public(),
+            filler.to_challenge()?,
+            TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, surplus.share.encrypt(&surplus.id, &filler)?)?,
+        )?;
+
+        let faults = reconstructor
+            .acknowledge_shares(*collector.public(), Vec::new())?
+            .into_iter()
+            .filter_map(|r| match r {
+                ShareResolution::InvalidShares { peer, ssa_id, .. } => Some((peer, ssa_id)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(1, faults.len(), "the drained fault must surface exactly once");
+        assert_eq!(ssa_id, faults[0].1);
+        assert_eq!(
+            carrier.public(),
+            faults[0].0.as_ref(),
+            "the fault must name the relayer that carried the share, not the peer that collected it"
         );
 
         Ok(())

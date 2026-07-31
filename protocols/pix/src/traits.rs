@@ -7,21 +7,43 @@ use hopr_types::{
 
 use crate::{
     CoefficientIndex, GeneratedShare, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex, RecoveredSsa, SsaCommitment,
-    SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, TaggedEncryptedPartialSsaShare,
+    SsaCommitmentProof, SsaCommitmentState, SsaId, SsaIndex, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
 };
 
 /// Possible resolutions of a received acknowledgement that might be bound to decrypt
 /// an encrypted PIX share.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.
+///
+/// ## Ordering and multiplicity within one batch
+///
+/// [`acknowledge_shares`](ExitAcknowledgementShareProcessor::acknowledge_shares) emits at most one
+/// [`Progress`](Self::Progress) and at most one [`InvalidShares`](Self::InvalidShares) per SSA per
+/// call, and orders them ahead of the terminal
+/// [`AlmostRecoveredSsa`](Self::AlmostRecoveredSsa)/[`RecoveredSsa`](Self::RecoveredSsa) for the
+/// same SSA. A consumer can therefore act on a terminal event knowing the counters it would have
+/// wanted first have already been delivered.
 #[derive(Clone, strum::EnumTryAs)]
 pub enum ShareResolution<P, A> {
     /// Full SSA was recovered.
     RecoveredSsa(RecoveredSsa<P, A>),
     /// The early recovery threshold was reached (SSA almost complete).
     AlmostRecoveredSsa(SsaId<P>),
-    /// An invalid share was encountered.
-    InvalidShare(Box<OffchainPublicKey>, SsaId<P>),
+    /// Absolute recovery progress for one SSA after this batch.
+    Progress(SsaRecoveryProgress<P>),
+    /// Invalid (unverifiable) shares were encountered for an SSA.
+    ///
+    /// `observed_total` is the **cross-peer aggregate** for the SSA, not a delta and not this peer's
+    /// share of it: the cycle is a single unit of accounting and any relayer can carry shares for it.
+    /// `peer` identifies who relayed the share that triggered this emission, for attribution only.
+    InvalidShares {
+        /// Relayer whose acknowledgement carried the offending share.
+        peer: Box<OffchainPublicKey>,
+        /// SSA the offending share belongs to.
+        ssa_id: SsaId<P>,
+        /// Total invalid shares seen for this SSA across all peers.
+        observed_total: u64,
+    },
 }
 
 impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
@@ -29,7 +51,19 @@ impl<P: PartialEq, A> PartialEq for ShareResolution<P, A> {
         match (self, other) {
             (Self::RecoveredSsa(a), Self::RecoveredSsa(b)) => a == b,
             (Self::AlmostRecoveredSsa(a), Self::AlmostRecoveredSsa(b)) => a == b,
-            (Self::InvalidShare(k1, id1), Self::InvalidShare(k2, id2)) => k1 == k2 && id1 == id2,
+            (Self::Progress(a), Self::Progress(b)) => a == b,
+            (
+                Self::InvalidShares {
+                    peer: p1,
+                    ssa_id: id1,
+                    observed_total: t1,
+                },
+                Self::InvalidShares {
+                    peer: p2,
+                    ssa_id: id2,
+                    observed_total: t2,
+                },
+            ) => p1 == p2 && id1 == id2 && t1 == t2,
             _ => false,
         }
     }
@@ -42,19 +76,36 @@ impl<P: std::fmt::Debug, A> std::fmt::Debug for ShareResolution<P, A> {
         match self {
             Self::RecoveredSsa(ssa) => f.debug_tuple("RecoveredSsa").field(ssa).finish(),
             Self::AlmostRecoveredSsa(id) => f.debug_tuple("AlmostRecoveredSsa").field(id).finish(),
-            Self::InvalidShare(key, id) => f.debug_tuple("InvalidShare").field(key).field(id).finish(),
+            Self::Progress(progress) => f.debug_tuple("Progress").field(progress).finish(),
+            Self::InvalidShares {
+                peer,
+                ssa_id,
+                observed_total,
+            } => f
+                .debug_struct("InvalidShares")
+                .field("peer", peer)
+                .field("ssa_id", ssa_id)
+                .field("observed_total", observed_total)
+                .finish(),
         }
     }
 }
 
 impl<P: std::hash::Hash, A> Hash for ShareResolution<P, A> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
         match self {
             Self::RecoveredSsa(recovered) => recovered.hash(state),
             Self::AlmostRecoveredSsa(id) => id.hash(state),
-            Self::InvalidShare(k, id) => {
-                k.hash(state);
-                id.hash(state);
+            Self::Progress(progress) => progress.hash(state),
+            Self::InvalidShares {
+                peer,
+                ssa_id,
+                observed_total,
+            } => {
+                peer.hash(state);
+                ssa_id.hash(state);
+                observed_total.hash(state);
             }
         }
     }

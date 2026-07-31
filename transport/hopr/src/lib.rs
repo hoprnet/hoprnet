@@ -1355,14 +1355,37 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
             }
             None
         }
-        ShareResolution::InvalidShare(peer, ssa_id) => {
-            error!(%peer, %ssa_id, "first RP relayer sent acknowledgement indicating invalid PIX share from Entry");
+        ShareResolution::InvalidShares {
+            peer,
+            ssa_id,
+            observed_total,
+        } => {
+            error!(
+                %peer, %ssa_id, observed_total,
+                "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
+            );
             if let Err(error) = smgr
                 .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
+            None
+        }
+        // Nothing consumes recovery progress yet — the Exit-side PIX supervisor is what will, and it
+        // is the only thing that can act on a running total. Dropped here rather than suppressed at
+        // the reconstructor so that the emission contract (and its tests) live with the producer.
+        //
+        // Cheap to discard: this branch awaits nothing, so the resolution channel is drained faster
+        // than the acknowledgement path can fill it.
+        ShareResolution::Progress(progress) => {
+            tracing::trace!(
+                ssa_id = %progress.ssa_id,
+                useful_shares = progress.useful_shares,
+                target = progress.target_useful_shares,
+                recovered_polynomials = progress.recovered_polynomials,
+                "pix recovery progress"
+            );
             None
         }
     }

@@ -721,6 +721,31 @@ impl<P, A> SsaCommitmentState<P, A> {
     }
 }
 
+/// Absolute recovery progress for a single SSA cycle.
+///
+/// Carries running totals rather than per-batch deltas, so a consumer can detect a stall, a
+/// completion, or a protocol violation without having received every snapshot. That matters because
+/// acknowledgement batches are processed concurrently: snapshots can arrive out of order, and one
+/// may be dropped under load. A consumer should keep the maximum it has seen and treat a lower or
+/// repeated `useful_shares` as benign noise.
+///
+/// `P` is the pseudonym type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SsaRecoveryProgress<P> {
+    /// The SSA this snapshot describes.
+    pub ssa_id: SsaId<P>,
+    /// Shares that advanced reconstruction — verified, distinct, and below their polynomial's
+    /// threshold when they arrived. Excludes duplicates and the surplus a conforming Entry sends.
+    pub useful_shares: u64,
+    /// Useful shares that constitute full recovery: `polynomials × threshold`.
+    ///
+    /// A consumer that negotiated the dimensions can compare this against its own expectation; a
+    /// mismatch is a protocol violation rather than drift.
+    pub target_useful_shares: u64,
+    /// Polynomial parts that have reconstructed and opened their commitment.
+    pub recovered_polynomials: u16,
+}
+
 /// Contains the already recovered secret scalar corresponding to a specific SSA.
 ///
 /// `P` is the pseudonym type, `A` is the private key type for SSA.

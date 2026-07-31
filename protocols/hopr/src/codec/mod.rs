@@ -444,20 +444,23 @@ mod tests {
                 vec![VerifiedAcknowledgement::new(fwd_packet.ack_key_prev_hop, &f.relay.offchain_key).leak()],
             )?;
 
+            // Every share that advances reconstruction reports progress, so what distinguishes the
+            // recovering share from the rest is the terminal resolution, not the resolution count.
+            let recovered = resolutions
+                .iter()
+                .filter_map(|r| r.clone().try_as_recovered_ssa())
+                .collect::<Vec<_>>();
+
             // Once enough shares have been received, the receiver can recover the SSA
             if i == recovery_at {
-                assert_eq!(1, resolutions.len());
-                let recovered_ssa = resolutions[0]
-                    .clone()
-                    .try_as_recovered_ssa()
-                    .ok_or(anyhow::anyhow!("share resolution is not recovered ssa"))?;
-                assert_eq!(recovered_ssa.ssa_id, ssa_id);
-            } else {
-                // Other resolution possibilities should not happen at this point
-                assert!(
-                    resolutions.is_empty(),
-                    "no resolutions must be present at #{i}: {resolutions:?}"
+                assert_eq!(
+                    1,
+                    recovered.len(),
+                    "expected exactly one recovery at #{i}: {resolutions:?}"
                 );
+                assert_eq!(recovered[0].ssa_id, ssa_id);
+            } else {
+                assert!(recovered.is_empty(), "no recovery must happen at #{i}: {resolutions:?}");
             }
 
             // Sender decodes the response packet
@@ -568,12 +571,14 @@ mod tests {
                     vec![VerifiedAcknowledgement::new(fwd_packet.ack_key_prev_hop, &f.relay.offchain_key).leak()],
                 )?;
 
-                for resolution in resolutions {
-                    let recovered = resolution
-                        .try_as_recovered_ssa()
-                        .ok_or(anyhow::anyhow!("share resolution is not recovered ssa at #{i}"))?;
-                    recovered_ssa_ids.push(recovered.ssa_id);
-                }
+                // Progress resolutions accompany every share that advances reconstruction; only a
+                // recovery is a milestone worth collecting here.
+                recovered_ssa_ids.extend(
+                    resolutions
+                        .into_iter()
+                        .filter_map(|r| r.try_as_recovered_ssa())
+                        .map(|r| r.ssa_id),
+                );
             } else {
                 // Gap phase — no PIX share
                 assert!(

@@ -476,7 +476,7 @@ fn bench_acknowledge_batch(
                 assert!(
                     !resolutions
                         .iter()
-                        .any(|r| matches!(r, ShareResolution::InvalidShare(..))),
+                        .any(|r| matches!(r, ShareResolution::InvalidShares { .. })),
                     "shares must verify"
                 );
             }
@@ -642,12 +642,18 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
         max_awaiting_acks: 100_000,
         ..bench_recon_cfg(true)
     });
-    let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(PROD_POLYS_PER_SSA, PROD_THRESHOLD);
+    let (generator, pseudonym, _constant_terms, _proof) =
+        generate_commitment_matrix(PROD_POLYS_PER_SSA, PROD_THRESHOLD);
     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+    // Register the Exit side but install *no* commitment: the constant-term set stays incomplete, so
+    // no cycle is published and every acknowledgement below has to defer. Installing it — as this
+    // benchmark used to — makes the first cycle's shares resolve normally instead, which is the path
+    // the sustained group already measures. That went unnoticed because a resolving share below its
+    // polynomial's threshold produced no resolution at all, so the `is_empty` guard below held for
+    // the wrong reason.
     reconstructor
         .new_exit_commitment(ssa_id, PROD_POLYS_PER_SSA as usize, PROD_THRESHOLD as usize)
         .unwrap();
-    install_commitment(&reconstructor, ssa_id, &constant_terms, proof);
 
     let shares_per_commitment =
         PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);

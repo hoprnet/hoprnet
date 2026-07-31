@@ -102,14 +102,33 @@ fn test_generator_reconstructor_stepwise() -> anyhow::Result<()> {
 
     let one_ack = acks.remove(0);
 
-    assert!(reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty());
+    // Every share that lands advances reconstruction, so this batch reports progress — but nothing
+    // terminal, because one share is still outstanding.
+    let partial = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+    assert!(
+        partial.iter().all(|r| matches!(r, ShareResolution::Progress(_))),
+        "nothing can resolve while a share is still missing, got {partial:?}"
+    );
 
     let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
-    assert!(!res.is_empty());
 
-    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
-        if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
-    ));
+    // The batch that completes the cycle must still report its counters, and must report them ahead
+    // of the recovery they justify — even though the cycle's state is released in the same call.
+    assert!(
+        matches!(res.first(), Some(ShareResolution::Progress(p))
+            if p.ssa_id == ssa_id && p.useful_shares == p.target_useful_shares),
+        "the completing batch must lead with a complete progress snapshot, got {res:?}"
+    );
+
+    let recovered = res
+        .iter()
+        .find_map(|r| r.clone().try_as_recovered_ssa())
+        .ok_or_else(|| anyhow::anyhow!("expected a RecoveredSsa resolution"))?;
+    assert_eq!(recovered.ssa_id, ssa_id);
+    assert_eq!(
+        <TestSpec as PixSpec>::DepositAddress::from(&recovered.ssa),
+        full_ssa_deposit_address
+    );
 
     Ok(())
 }
@@ -163,14 +182,33 @@ fn test_generator_reconstructor_basic() -> anyhow::Result<()> {
 
     let one_ack = acks.remove(0);
 
-    assert!(reconstructor.acknowledge_shares(*peer.public(), acks)?.is_empty());
+    // Every share that lands advances reconstruction, so this batch reports progress — but nothing
+    // terminal, because one share is still outstanding.
+    let partial = reconstructor.acknowledge_shares(*peer.public(), acks)?;
+    assert!(
+        partial.iter().all(|r| matches!(r, ShareResolution::Progress(_))),
+        "nothing can resolve while a share is still missing, got {partial:?}"
+    );
 
     let res = reconstructor.acknowledge_shares(*peer.public(), vec![one_ack])?;
-    assert!(!res.is_empty());
 
-    assert!(matches!(&res[0], ShareResolution::RecoveredSsa(res)
-        if res.ssa_id == ssa_id && <TestSpec as PixSpec>::DepositAddress::from(&res.ssa) == full_ssa_deposit_address
-    ));
+    // The batch that completes the cycle must still report its counters, and must report them ahead
+    // of the recovery they justify — even though the cycle's state is released in the same call.
+    assert!(
+        matches!(res.first(), Some(ShareResolution::Progress(p))
+            if p.ssa_id == ssa_id && p.useful_shares == p.target_useful_shares),
+        "the completing batch must lead with a complete progress snapshot, got {res:?}"
+    );
+
+    let recovered = res
+        .iter()
+        .find_map(|r| r.clone().try_as_recovered_ssa())
+        .ok_or_else(|| anyhow::anyhow!("expected a RecoveredSsa resolution"))?;
+    assert_eq!(recovered.ssa_id, ssa_id);
+    assert_eq!(
+        <TestSpec as PixSpec>::DepositAddress::from(&recovered.ssa),
+        full_ssa_deposit_address
+    );
 
     Ok(())
 }

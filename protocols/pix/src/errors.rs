@@ -7,6 +7,13 @@ pub enum PixError<P: std::fmt::Display> {
     InvalidInput,
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
+    /// No longer produced by the reconstructor: a share failing verification is expected adversarial
+    /// input rather than a fault in the call, and the caller needs the cycle's running fault total
+    /// along with it — which an error cannot carry without becoming a telemetry channel. It surfaces
+    /// as [`ShareResolution::InvalidShares`](crate::ShareResolution::InvalidShares) instead.
+    ///
+    /// Retained because it is what makes [`PixError`] generic over the pseudonym; dropping the
+    /// parameter touches every signature in the crate and is its own change.
     #[error("received an ssa share from pseudonym {0} #{1} that could not be verified")]
     InvalidShare(P, SsaIndex),
     #[error("encrypted partial ssa share is empty")]

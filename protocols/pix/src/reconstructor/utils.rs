@@ -5,9 +5,18 @@ use vsss_rs::{
 
 use crate::{
     CONSTANT_TERM_COEFFICIENT, CoefficientIndex, CompletedShare, PartialSsaShare, PixGroup, PixGroupRepr, PixScalar,
-    PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPartCommitment, SsaPolynomialId, errors, into_completed_share,
-    types::SsaId,
+    PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPartCommitment, SsaPolynomialId, SsaRecoveryProgress, errors,
+    into_completed_share, types::SsaId,
 };
+
+/// Relaxed ordering suffices for every progress counter in [`SsaCycle`].
+///
+/// The counters are pure telemetry: they are never read to decide whether a share may be applied,
+/// and the [supervisor](SsaRecoveryProgress) that consumes them keeps its own monotonic maximum and
+/// treats a stale snapshot as benign. So no counter needs to be ordered against the reconstruction
+/// state it describes, and a snapshot taken while a concurrent batch is mid-flight is allowed to
+/// straddle it.
+const PROGRESS_ORDERING: std::sync::atomic::Ordering = std::sync::atomic::Ordering::Relaxed;
 
 /// All post-commitment state of one SSA cycle, held as a single unit.
 ///
@@ -31,9 +40,27 @@ use crate::{
 /// single cycle-wide lock would serialise every share of a Session behind one mutex. Callers take
 /// the part lock and the accumulator lock in that order, and never hold both.
 pub struct SsaCycle<S: PixSpec> {
+    id: SsaId<S::Pseudonym>,
     builder: parking_lot::Mutex<SsaBuilder<S>>,
     /// Part builders indexed by [`PolynomialIndex`]; length is always `num_polys`.
     parts: Box<[parking_lot::Mutex<SsaPartBuilder<S>>]>,
+    /// Shares that advanced reconstruction: new, distinct, and below their part's threshold when
+    /// they arrived. Duplicates, surplus shares and shares absorbed by a failed part are excluded,
+    /// so this is the numerator of a progress ratio rather than a received-packet count.
+    useful_shares: std::sync::atomic::AtomicU64,
+    /// Parts whose constant term has been reconstructed and opened its commitment.
+    recovered_polynomials: std::sync::atomic::AtomicU32,
+    /// Shares that failed verification, aggregated across every peer that relayed for this cycle.
+    ///
+    /// A failure is charged once per offending share, not once per polynomial: a part reports its
+    /// failure exactly once and absorbs everything after it as
+    /// [`AddShareOutcome::Absorbed`](AddShareOutcome::Absorbed).
+    invalid_shares: std::sync::atomic::AtomicU64,
+    /// `num_polys × poly_threshold` — the useful-share count that constitutes full recovery.
+    ///
+    /// Fixed at construction, and must equal the dimensions negotiated at session establishment:
+    /// the consumer treats a mismatch as a protocol violation rather than as drift.
+    target_useful_shares: u64,
 }
 
 impl<S: PixSpec> SsaCycle<S> {
@@ -42,14 +69,24 @@ impl<S: PixSpec> SsaCycle<S> {
     /// `parts` arrives in arbitrary order — it is drained from a `HashMap` — so each builder is
     /// placed by its own polynomial index rather than by iteration order. A missing or duplicated
     /// index is rejected here, which is what makes [`part`](Self::part) safe to index by an
-    /// untrusted value later.
-    pub fn new(builder: SsaBuilder<S>, parts: Vec<SsaPartBuilder<S>>) -> errors::Result<Self, S::Pseudonym> {
+    /// untrusted value later. Each builder is also checked to belong to `id`, so a part cannot be
+    /// filed under a cycle it does not describe.
+    pub fn new(
+        id: SsaId<S::Pseudonym>,
+        builder: SsaBuilder<S>,
+        parts: Vec<SsaPartBuilder<S>>,
+    ) -> errors::Result<Self, S::Pseudonym> {
         let num_polys = builder.num_polys();
         let mut slots: Vec<Option<SsaPartBuilder<S>>> = (0..num_polys).map(|_| None).collect();
 
         for part in parts {
-            let poly_index = part.spi().poly_index() as usize;
-            let slot = slots.get_mut(poly_index).ok_or(errors::PixError::InvalidInput)?;
+            let spi = part.spi();
+            if spi.as_ref() != &id {
+                return Err(errors::PixError::InvalidInput);
+            }
+            let slot = slots
+                .get_mut(spi.poly_index() as usize)
+                .ok_or(errors::PixError::InvalidInput)?;
             if slot.replace(part).is_some() {
                 return Err(errors::PixError::DuplicateCommitment);
             }
@@ -57,18 +94,61 @@ impl<S: PixSpec> SsaCycle<S> {
 
         let parts = slots
             .into_iter()
-            .map(|slot| slot.map(parking_lot::Mutex::new).ok_or(errors::PixError::InvalidInput))
+            .map(|slot| slot.ok_or(errors::PixError::InvalidInput))
             .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
+        // Every part builder was handed the same `SsaCommitmentBuilder::poly_threshold`, so any of
+        // them reports the negotiated threshold. Read it before the builders are wrapped in mutexes,
+        // which would otherwise make this a lock acquisition.
+        let poly_threshold = parts.first().ok_or(errors::PixError::InvalidInput)?.min_shares() as u64;
+
         Ok(Self {
+            id,
             builder: parking_lot::Mutex::new(builder),
-            parts: parts.into_boxed_slice(),
+            parts: parts.into_iter().map(parking_lot::Mutex::new).collect(),
+            useful_shares: Default::default(),
+            recovered_polynomials: Default::default(),
+            invalid_shares: Default::default(),
+            target_useful_shares: num_polys as u64 * poly_threshold,
         })
     }
 
     /// Number of polynomials this cycle is composed of.
     pub fn num_polys(&self) -> usize {
         self.parts.len()
+    }
+
+    /// Records a share that advanced reconstruction.
+    pub fn record_useful_share(&self) {
+        self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    /// Records a polynomial part that reconstructed and opened its commitment.
+    pub fn record_completed_part(&self) {
+        self.recovered_polynomials.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    /// Records a share that failed verification, returning the cycle's total afterwards.
+    pub fn record_invalid_share(&self) -> u64 {
+        self.invalid_shares.fetch_add(1, PROGRESS_ORDERING) + 1
+    }
+
+    /// Shares that have failed verification for this cycle so far, across all peers.
+    #[cfg(test)]
+    pub fn invalid_shares(&self) -> u64 {
+        self.invalid_shares.load(PROGRESS_ORDERING)
+    }
+
+    /// Absolute recovery progress for this cycle.
+    pub fn progress(&self) -> SsaRecoveryProgress<S::Pseudonym> {
+        SsaRecoveryProgress {
+            ssa_id: self.id,
+            useful_shares: self.useful_shares.load(PROGRESS_ORDERING),
+            target_useful_shares: self.target_useful_shares,
+            // Bounded by `num_polys`, itself bounded by `MAX_POLYS_PER_SSA`, so the saturation
+            // below is unreachable rather than lossy.
+            recovered_polynomials: self.recovered_polynomials.load(PROGRESS_ORDERING).min(u16::MAX as u32) as u16,
+        }
     }
 
     /// The part builder for one polynomial, or `None` if the index is out of range.
@@ -154,6 +234,26 @@ impl<S: PixSpec> SsaBuilder<S> {
     }
 }
 
+/// What a share contributed to its polynomial.
+///
+/// The three non-contributing outcomes are kept apart from one another because they are not
+/// equivalent to a caller counting progress: a `Duplicate` says the peer re-sent an evaluation
+/// point, a `Surplus` says it is still emitting for a polynomial that is already done (expected —
+/// the Entry sends `threshold + surplus` shares per polynomial), and `Absorbed` says the polynomial
+/// has already failed and nothing can change that.
+pub enum AddShareOutcome<S: PixSpec> {
+    /// Same evaluation identifier as a share already collected for this polynomial.
+    Duplicate,
+    /// Arrived after the polynomial was already reconstructed.
+    Surplus,
+    /// Arrived after the polynomial failed to open its commitment, and was discarded.
+    Absorbed,
+    /// New and distinct, but the threshold is not reached yet.
+    Useful,
+    /// Reached the threshold; the constant term reconstructed and opened its commitment.
+    Completed(PixScalar<S>),
+}
+
 /// Collects shares of a single polynomial and reconstructs its constant term.
 ///
 /// ## Where verification happens
@@ -199,6 +299,11 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         self.commitment.spi
     }
 
+    /// Shares needed to interpolate this polynomial — the negotiated threshold.
+    pub(crate) fn min_shares(&self) -> usize {
+        self.min_shares
+    }
+
     /// Frees the collected shares, which are only needed until the part is reconstructed.
     ///
     /// After that point they cannot be read again — the early returns in
@@ -226,12 +331,12 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         &mut self,
         msg: PixScalar<S>,
         share: PartialSsaShare<S>,
-    ) -> errors::Result<Option<PixScalar<S>>, S::Pseudonym> {
-        if let Some(reconstructed) = self.reconstructed {
-            return Ok(Some(reconstructed));
+    ) -> errors::Result<AddShareOutcome<S>, S::Pseudonym> {
+        if self.reconstructed.is_some() {
+            return Ok(AddShareOutcome::Surplus);
         }
         if self.failed {
-            return Ok(None);
+            return Ok(AddShareOutcome::Absorbed);
         }
 
         let share = into_completed_share(msg, &share)?;
@@ -246,14 +351,19 @@ impl<S: PixSpec> SsaPartBuilder<S> {
 
         // Reject duplicate shares — the same identifier is the same X-coordinate, which carries no
         // new information and makes the interpolation singular.
+        //
+        // Scanning the collected shares is sufficient to classify duplicates, and no separate set of
+        // seen identifiers is needed: `self.shares` is only released once the part is reconstructed
+        // or has failed, and both of those short-circuit above. So every call that reaches here
+        // still has the full set in hand.
         if self.shares.iter().any(|s| s.identifier == share.identifier) {
-            return Ok(None);
+            return Ok(AddShareOutcome::Duplicate);
         }
 
         self.shares.push(share);
 
         if self.shares.len() < self.min_shares {
-            return Ok(None);
+            return Ok(AddShareOutcome::Useful);
         }
 
         let reconstructed = self.shares.combine()?.0;
@@ -267,7 +377,7 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         }
 
         self.reconstructed = Some(reconstructed);
-        Ok(Some(reconstructed))
+        Ok(AddShareOutcome::Completed(reconstructed))
     }
 }
 
