@@ -145,7 +145,7 @@ rust-stream-ext-concurrent = "2.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
-serde_json = "1.0.150"
+serde_json = "1.0.151"
 serde_repr = "0.1.20"
 serde-saphyr = "0.0.29"
 serde_with = { version = "3.21.0", features = ["base64"] }
@@ -174,7 +174,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
-hopr-api = "1.15.0"
+hopr-api = "1.16.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.4.1", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
