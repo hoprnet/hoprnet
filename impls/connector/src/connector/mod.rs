@@ -844,7 +844,7 @@ pub(crate) mod tests {
                         .into())
                     }
                 },
-                FullStateEmulator(MODULE_ADDR.into(), None),
+                FullStateEmulator::new(MODULE_ADDR.into()),
             ))
             .with_tx_simulation_delay(Duration::from_millis(100))
             .with_use_internal_txs(true);

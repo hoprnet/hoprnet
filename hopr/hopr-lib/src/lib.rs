@@ -782,6 +782,12 @@ impl<Chain, Graph, Net, TMgr> HoprNodeOperations for Hopr<Chain, Graph, Net, TMg
     }
 }
 
+impl<Chain, Graph, Net, TMgr> hopr_api::node::PacketTransport for Hopr<Chain, Graph, Net, TMgr> {
+    fn packet_payload_size() -> usize {
+        hopr_transport::PACKET_PAYLOAD_SIZE
+    }
+}
+
 /// Prometheus-formatted metrics collected by the hopr-lib components.
 ///
 /// Only available when compiled with the `telemetry` feature.

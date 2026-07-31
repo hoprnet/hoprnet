@@ -77,11 +77,6 @@ bytesize = { version = "2.4.2", features = ["serde"] }
 bytes = "1.12.1"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
-chacha20poly1305 = "0.10.1"
-chrono = { version = "0.4.45", default-features = false, features = [
-  "std",
-  "clock",
-] }
 clap = { version = "4.6.1", features = ["derive", "env", "string"] }
 const_format = "0.2.36"
 const-hex = "1.19.1"
@@ -174,14 +169,14 @@ vsss-rs = { version = "6.0.0-rc2", default-features = false }
 
 hopr-api = "1.16.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.4.1", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.5.1", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
   "bjj",
 ] }
-hopr-lib = { version = "4.0.2-rc.7", path = "hopr/hopr-lib", default-features = false }
+hopr-lib = { version = "4.0.2-rc.9", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false, features = [
   "rayon",
@@ -192,7 +187,7 @@ hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-feature
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.33.0", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.34.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
@@ -269,6 +264,5 @@ ignored = [
   "oas3",
   "serde_bytes",
   "hopr-session-server-forwarder",
-  "hopr-strategy",
   "hopr-utils-session",
 ]
