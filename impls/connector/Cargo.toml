@@ -15,7 +15,7 @@ include = ["README.md", "src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [features]
 runtime-tokio = ["hopr-utils/runtime-tokio"]
-testing = ["dep:const-hex", "blokli-client/testing"]
+testing = ["hopr-utils/testing-blokli"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -28,7 +28,6 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
-const-hex = { workspace = true, optional = true }
 moka = { workspace = true, features = ["future", "sync"] }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
@@ -48,14 +47,20 @@ hopr-api = { workspace = true, features = [
   "serde",
   "types-with-bindings",
 ] }
-hopr-utils = { workspace = true }
+hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 [dev-dependencies]
 blokli-client = { workspace = true, features = ["testing"] }
 const-hex = { workspace = true }
-hopr-utils = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils = { workspace = true, features = [
+  "runtime-tokio",
+  "testing-blokli",
+] }
 hex-literal = { workspace = true }
 insta = { workspace = true }
 lazy_static = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
+
+[lib]
+doctest = false
