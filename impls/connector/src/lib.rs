@@ -3,7 +3,7 @@ mod connector;
 pub mod errors;
 mod reader;
 #[cfg(any(test, feature = "testing"))]
-pub mod testing;
+pub use hopr_utils::testing::blokli as testing;
 
 pub(crate) mod utils;
 
