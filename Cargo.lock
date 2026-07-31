@@ -3983,7 +3983,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "ahash",
  "anyhow",
