@@ -87,7 +87,6 @@ use hopr_utils::{
     runtime::AbortableList,
 };
 pub use multiaddr::Protocol;
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, trace, warn};
 
 #[cfg(feature = "runtime-tokio")]
@@ -339,7 +338,7 @@ where
                     .ok()
                     .and_then(|s| s.parse::<usize>().ok())
                     .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                    .max(ApplicationData::PAYLOAD_SIZE),
+                    .max(SESSION_MTU),
                 max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
                     .ok()
                     .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
@@ -355,7 +354,13 @@ where
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
                 maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                surb_balance_notify_period: cfg.session.surb_balance_notify_period,
+                // The lower bound is enforced once in `SessionManager::new` via
+                // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
+                surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(|ms| Some(Duration::from_millis(ms)))
+                    .unwrap_or(cfg.session.surb_balance_notify_period),
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 ..Default::default()
@@ -698,15 +703,32 @@ where
                 .unwrap_or(avail)
         };
         let all_resolved_external_msg_rx = merged_unresolved_output_data
-            .then_concurrent(
-                move |(unresolved, mut data)| {
-                    let path_planner = path_planner.clone();
-                    async move {
+            .map(move |(unresolved, mut data)| {
+                let path_planner = path_planner.clone();
+                async move {
+                    // Retry on SURB starvation: the SURB pool on the exit side
+                    // refills asynchronously (target 600, ~300/sec via keep-alive).
+                    // Silently dropping return-path packets when the pool is
+                    // momentarily empty causes irreversible data loss; instead we
+                    // yield briefly so the pool can replenish before retrying.
+                    //
+                    // We use `map().buffered()` (ordered) rather than `then_concurrent`
+                    // (unordered) so that routing resolution preserves the original
+                    // packet sequence.  Out-of-order delivery to the ENTRY reassembler
+                    // causes the sequencer to discard frames that arrive after
+                    // `frame_timeout`.  The retry loop bounds any head-of-line delay
+                    // to ~5 ms per SURB-arrival cycle, which is far below the 3 s
+                    // frame timeout.
+                    loop {
                         hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         trace!(?unresolved, "resolving routing for packet");
                         match path_planner
-                            .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
+                            .resolve_routing(
+                                data.data.total_len(),
+                                data.estimate_surbs_with_msg(),
+                                unresolved.clone(),
+                            )
                             .await
                         {
                             Ok((resolved, rem_surbs)) => {
@@ -734,20 +756,25 @@ where
 
                                 data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
                                 trace!(?resolved, "resolved routing for packet");
-                                Some((resolved, data))
+                                return Some((resolved, data));
+                            }
+                            Err(error) if error.is_surb() => {
+                                // No SURB available yet (possibly cache-wrapped); yield briefly so the
+                                // pool can refill.
+                                futures_timer::Delay::new(std::time::Duration::from_millis(5)).await;
                             }
                             Err(error) => {
                                 hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 error!(%error, "failed to resolve routing");
-                                None
+                                return None;
                             }
                         }
                     }
-                    .in_current_span()
-                },
-                routing_concurrency,
-            )
+                }
+                .in_current_span()
+            })
+            .buffered(routing_concurrency)
             .filter_map(futures::future::ready);
 
         let channels_dst = self
@@ -1207,6 +1234,9 @@ where
         self.network_observed_multiaddresses(key).await
     }
 }
+
+/// Maximum application-layer payload that fits in a single HOPR sphinx packet (bytes).
+pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE;
 
 #[cfg(test)]
 mod tests {
