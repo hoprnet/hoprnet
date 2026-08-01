@@ -16,21 +16,26 @@
 //! of payload* (RFC-0005 §3.2). SURBs are therefore prepaid value a greedy EXIT can harvest
 //! without serving us; the SURB balancer is the anti-grief throttle. Consequently:
 //!
-//! 1. **The window only opens on HONEST delivery** — data proven to have reached us: reliable-mode
-//!    frame acknowledgements ([`crate::socket::ack_state`]) or application-verified return bytes.
-//!    Nothing else authorizes speeding up. See [`WindowController::on_delivered`].
-//! 2. **SURB state may only slow us down, never speed us up.** [`SupplyConstraint`] can shrink or
-//!    cap the window; it can never grow it. The SURB `buffer_level` is partly counterparty-reported
-//!    and dead-reckoned, so a hostile or lossy peer must not be able to accelerate us or make us
-//!    overspend.
-//! 3. **A malicious counterparty can only ever make us slower** — never faster, never draining our
-//!    SURBs beyond the client-configured ceiling.
-//! 4. **1–20 % path loss is expected and recovered** (reliable mode retransmits; the window
-//!    multiplicatively decreases and re-grows on delivery).
-//! 5. **The anti-grief ⇄ throughput trade is the client's dial** ([`FlowControlConfig`]), set
-//!    explicitly — SURB supply is never silently widened for speed.
+//! 1. **The window only opens on HONEST delivery** — data proven to have reached us: reliable-mode frame
+//!    acknowledgements ([`crate::socket::ack_state`]) or application-verified return bytes. Nothing else authorizes
+//!    speeding up. See [`WindowController::on_delivered`].
+//! 2. **SURB state may only slow us down, never speed us up.** [`SupplyConstraint`] can shrink or cap the window; it
+//!    can never grow it. The SURB `buffer_level` is partly counterparty-reported and dead-reckoned, so a hostile or
+//!    lossy peer must not be able to accelerate us or make us overspend.
+//! 3. **A malicious counterparty can only ever make us slower** — never faster, never draining our SURBs beyond the
+//!    client-configured ceiling.
+//! 4. **1–20 % path loss is expected and recovered** (reliable mode retransmits; the window multiplicatively decreases
+//!    and re-grows on delivery).
+//! 5. **The anti-grief ⇄ throughput trade is the client's dial** ([`FlowControlConfig`]), set explicitly — SURB supply
+//!    is never silently widened for speed.
 
-use std::time::Duration;
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 /// How the send window learns that data was delivered (its "honest clock").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -51,6 +56,13 @@ pub enum FlowControlMode {
 /// (anti-grief-preserving): the window starts at the floor and only grows on proven delivery.
 #[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct FlowControlConfig {
+    /// Whether the send window is active at all. **Opt-in** (default `false`): when disabled the
+    /// writer is a transparent pass-through with today's behaviour, so existing sessions are
+    /// unaffected and only a client that explicitly wants adaptive pacing (e.g. GnosisVPN) turns it
+    /// on. This is the top-level of invariant 5's "the client's dial".
+    #[default(false)]
+    pub enabled: bool,
+
     /// Honest-clock mode. Default [`FlowControlMode::Reliable`].
     pub mode: FlowControlMode,
 
@@ -91,6 +103,7 @@ impl FlowControlConfig {
     fn normalized(self) -> FlowControlConfig {
         let min_win = self.min_win.max(1);
         FlowControlConfig {
+            enabled: self.enabled,
             mode: self.mode,
             min_win,
             max_win: self.max_win.max(min_win),
@@ -273,9 +286,7 @@ impl WindowController {
     /// Effective window against a SURB-supply ceiling: `min(cwnd, ceiling)`, but never below
     /// `min_win` (duplex floor). The ceiling can only shrink the result — invariant 2.
     pub fn effective_window(&self, supply: &impl SupplyConstraint) -> usize {
-        self.cwnd
-            .min(supply.max_admissible_inflight())
-            .max(self.cfg.min_win)
+        self.cwnd.min(supply.max_admissible_inflight()).max(self.cfg.min_win)
     }
 
     /// Bytes that may be admitted right now against `supply`: `effective_window − inflight`
@@ -289,6 +300,114 @@ impl WindowController {
         let reduced = (self.cwnd as f64 * factor) as usize;
         self.cwnd = reduced.max(self.cfg.min_win);
         self.ai_accum = 0;
+    }
+}
+
+/// Shared, lock-free honest-clock meter. Producers bump it **in place** with a single atomic add —
+/// the reliable ack machinery on ack / retransmission-exhaustion (impl A), or an
+/// application-return-byte reader (impl B). The window driver reads byte deltas via [`DeliveryClock`].
+/// No channel, no per-frame allocation, no dedup bookkeeping (a duplicate ack merely over-credits by
+/// one frame, which the SURB ceiling and `cwnd` still bound). Modelled on the existing atomic
+/// `BalancerStateValues`.
+#[derive(Clone, Default)]
+pub struct DeliveryMeter(Arc<DeliveryAtomics>);
+
+#[derive(Default)]
+struct DeliveryAtomics {
+    acked_bytes: AtomicU64,
+    lost_bytes: AtomicU64,
+}
+
+impl DeliveryMeter {
+    /// Records `bytes` proven delivered — a received frame ack, or application-verified return bytes.
+    #[inline]
+    pub fn record_acked(&self, bytes: usize) {
+        self.0.acked_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+    }
+
+    /// Records `bytes` proven lost — sender-side retransmissions exhausted.
+    #[inline]
+    pub fn record_lost(&self, bytes: usize) {
+        self.0.lost_bytes.fetch_add(bytes as u64, Ordering::Relaxed);
+    }
+
+    #[inline]
+    fn load(&self) -> (u64, u64) {
+        (
+            self.0.acked_bytes.load(Ordering::Relaxed),
+            self.0.lost_bytes.load(Ordering::Relaxed),
+        )
+    }
+}
+
+/// Frame-granular tap installed into the reliable socket: it pairs a [`DeliveryMeter`] with a frame's
+/// byte size, so the ack machinery can report deliveries in place without tracking byte counts.
+/// Cheap to clone (`Arc` + `usize`).
+#[derive(Clone)]
+pub struct DeliveryTap {
+    meter: DeliveryMeter,
+    bytes_per_frame: usize,
+}
+
+impl DeliveryTap {
+    /// Pairs `meter` with the socket's frame byte size.
+    pub fn new(meter: DeliveryMeter, bytes_per_frame: usize) -> Self {
+        Self {
+            meter,
+            bytes_per_frame: bytes_per_frame.max(1),
+        }
+    }
+
+    /// The receiver acknowledged a frame — proof of delivery (impl A).
+    #[inline]
+    pub fn on_acked_frame(&self) {
+        self.meter.record_acked(self.bytes_per_frame);
+    }
+
+    /// A frame's sender-side retransmissions were exhausted — given up as lost (impl A).
+    #[inline]
+    pub fn on_lost_frame(&self) {
+        self.meter.record_lost(self.bytes_per_frame);
+    }
+}
+
+/// Delta reader over a shared [`DeliveryMeter`], implementing [`DeliverySignal`]. Each poll returns
+/// bytes delivered/lost since the previous poll. One reader serves either clock — impl A (reliable
+/// acks via [`DeliveryTap`]) or impl B (return bytes via [`DeliveryMeter::record_acked`]) — because
+/// both simply add to the same meter.
+pub struct DeliveryClock {
+    meter: DeliveryMeter,
+    seen_acked: u64,
+    seen_lost: u64,
+    rtt_hint: Option<Duration>,
+}
+
+impl DeliveryClock {
+    /// Creates a reader over `meter`. `rtt_hint` seeds the BDP ceiling when known.
+    pub fn new(meter: DeliveryMeter, rtt_hint: Option<Duration>) -> Self {
+        Self {
+            meter,
+            seen_acked: 0,
+            seen_lost: 0,
+            rtt_hint,
+        }
+    }
+}
+
+impl DeliverySignal for DeliveryClock {
+    fn poll_delivered(&mut self) -> Delivered {
+        let (acked, lost) = self.meter.load();
+        let d = Delivered {
+            acked_bytes: acked.saturating_sub(self.seen_acked) as usize,
+            lost_bytes: lost.saturating_sub(self.seen_lost) as usize,
+        };
+        self.seen_acked = acked;
+        self.seen_lost = lost;
+        d
+    }
+
+    fn rtt_hint(&self) -> Option<Duration> {
+        self.rtt_hint
     }
 }
 
@@ -314,6 +433,7 @@ mod tests {
         fn max_admissible_inflight(&self) -> usize {
             self.ceiling
         }
+
         fn backoff_hint(&self) -> Option<Backoff> {
             self.backoff
         }
@@ -521,6 +641,69 @@ mod tests {
         w.on_sent(500);
         w.on_delivered(10_000); // more than in-flight → saturates at 0, no underflow
         assert_eq!(w.inflight(), 0);
+    }
+
+    // ---- DeliveryMeter + DeliveryClock: the in-place atomic honest clock ----
+
+    #[test]
+    fn delivery_clock_reports_byte_deltas() {
+        let meter = DeliveryMeter::default();
+        let mut clock = DeliveryClock::new(meter.clone(), Some(Duration::from_millis(50)));
+        meter.record_acked(2_000);
+        meter.record_lost(1_000);
+        let d = clock.poll_delivered();
+        assert_eq!(d.acked_bytes, 2_000);
+        assert_eq!(d.lost_bytes, 1_000);
+        assert_eq!(clock.rtt_hint(), Some(Duration::from_millis(50)));
+        // Only the delta is reported next poll.
+        assert_eq!(clock.poll_delivered(), Delivered::default());
+        meter.record_acked(300);
+        assert_eq!(clock.poll_delivered().acked_bytes, 300);
+    }
+
+    #[test]
+    fn delivery_tap_reports_whole_frames() {
+        // impl A: the reliable ack tap reports one frame's bytes per event.
+        let meter = DeliveryMeter::default();
+        let tap = DeliveryTap::new(meter.clone(), 1_000);
+        let mut clock = DeliveryClock::new(meter, None);
+        tap.on_acked_frame();
+        tap.on_acked_frame();
+        tap.on_lost_frame();
+        let d = clock.poll_delivered();
+        assert_eq!(d.acked_bytes, 2_000);
+        assert_eq!(d.lost_bytes, 1_000);
+    }
+
+    #[test]
+    fn delivery_clock_drives_window_growth() {
+        let meter = DeliveryMeter::default();
+        let tap = DeliveryTap::new(meter.clone(), 1_000);
+        let mut clock = DeliveryClock::new(meter, None);
+        let mut w = WindowController::new(cfg());
+        let supply = FixedSupply::generous();
+        let start = w.window();
+        // Deliver a full window's worth of frames via the tap.
+        let frames = start / 1_000 + 1;
+        for _ in 0..frames {
+            w.on_sent(1_000);
+            tap.on_acked_frame();
+        }
+        w.apply_delivery(clock.poll_delivered());
+        assert!(w.window() > start, "honest acks must open the window");
+        assert!(w.admissible(&supply) > 0);
+    }
+
+    #[test]
+    fn return_bytes_share_the_same_meter() {
+        // impl B: the application-return-byte reader bumps the same meter directly.
+        let meter = DeliveryMeter::default();
+        let mut clock = DeliveryClock::new(meter.clone(), None);
+        meter.record_acked(1_500);
+        meter.record_acked(500);
+        let d = clock.poll_delivered();
+        assert_eq!(d.acked_bytes, 2_000, "sum of returned bytes since last poll");
+        assert_eq!(d.lost_bytes, 0);
     }
 
     #[test]
