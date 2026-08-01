@@ -28,8 +28,8 @@ mod tests {
     fn outgoing_buffer_size_within_backpressure_limit() {
         assert!(
             MAXIMUM_MSG_OUTGOING_BUFFER_SIZE <= 256,
-            "MAXIMUM_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_MSG_OUTGOING_BUFFER_SIZE} exceeds the \
-             safe threshold; tail packets will exceed PACKET_ENCODING_TIMEOUT under burst writes"
+            "MAXIMUM_MSG_OUTGOING_BUFFER_SIZE={MAXIMUM_MSG_OUTGOING_BUFFER_SIZE} exceeds the safe threshold; tail \
+             packets will exceed PACKET_ENCODING_TIMEOUT under burst writes"
         );
     }
 
@@ -38,8 +38,10 @@ mod tests {
     /// receiving an unbounded burst.
     #[test]
     fn outgoing_channel_signals_backpressure_when_full() {
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
+        use std::{
+            pin::Pin,
+            task::{Context, Poll},
+        };
 
         use futures::Sink;
         use hopr_utils::network_types::crossfire_sink::bounded_sink_channel;
@@ -64,7 +66,9 @@ mod tests {
         );
 
         // One extra item: buffer it, then poll_ready must indicate the channel is saturated.
-        Pin::new(&mut sink).start_send(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE).unwrap();
+        Pin::new(&mut sink)
+            .start_send(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE)
+            .unwrap();
         assert!(
             matches!(Pin::new(&mut sink).poll_ready(&mut cx), Poll::Pending),
             "CrossfireSink must return Poll::Pending when channel is at capacity ({})",
