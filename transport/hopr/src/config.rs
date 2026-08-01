@@ -21,6 +21,7 @@ const DEFAULT_COUNTER_FLUSH_INTERVAL: Duration = Duration::from_secs(15);
 const DEFAULT_PER_PEER_CHANNEL_CAPACITY: usize = 5_000;
 const DEFAULT_STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(2);
 const DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES: usize = 131_072;
+const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
@@ -35,6 +36,10 @@ fn default_stream_open_timeout() -> Duration {
 
 fn default_frame_writer_backpressure_bytes() -> usize {
     DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
+}
+
+fn default_egress_backpressure_timeout() -> Duration {
+    DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT
 }
 
 fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError> {
@@ -53,18 +58,20 @@ fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError>
     serde(deny_unknown_fields)
 )]
 pub struct StreamProtocolConfig {
-    /// Capacity of the per-peer drop-oldest ring buffer (in packets).
+    /// Capacity of the per-peer egress channel (in packets).
     ///
-    /// The egress drain is fully non-blocking: it enqueues each outgoing packet
-    /// via `try_send`. When the ring is full the oldest buffered packet is evicted
-    /// and the newest enqueued (drop-oldest). The ring absorbs bursts while a
-    /// stream is being opened; once open the write pump continuously drains it,
-    /// so the ring stays near-empty under normal load.
+    /// The egress drain enqueues each outgoing packet via `try_send`. When the
+    /// channel is full the behaviour depends on the stream state: while the stream
+    /// is still opening it drops the newest packet (a slow open for one peer must
+    /// not head-of-line-block others); once the stream is open and its write pump
+    /// is draining, it instead applies bounded backpressure — waiting up to
+    /// `EGRESS_BACKPRESSURE_TIMEOUT` for space so wire-rate backpressure propagates
+    /// upstream — and only drops the newest packet if the peer stays full past that
+    /// timeout. The channel absorbs bursts while a stream is being opened; once open
+    /// the write pump continuously drains it, so it stays near-empty under normal load.
     ///
     /// Sized to absorb a typical SURB pre-fill burst (default SurbBalancer:
-    /// target 7 000 / max 5 000/s). If the producer consistently outruns the
-    /// underlying transport, older packets are dropped as intentional transport
-    /// loss.
+    /// target 7 000 / max 5 000/s).
     ///
     /// Defaults to 5 000.
     #[validate(range(min = 1))]
@@ -103,6 +110,21 @@ pub struct StreamProtocolConfig {
     #[default(default_frame_writer_backpressure_bytes())]
     #[cfg_attr(feature = "serde", serde(default = "default_frame_writer_backpressure_bytes"))]
     pub frame_writer_backpressure_bytes: usize,
+
+    /// Maximum time the egress drain waits on a full — but open and draining — per-peer channel
+    /// before falling back to drop-newest.
+    ///
+    /// While the stream is open, a full channel means the wire is slower than the producer, so
+    /// waiting here propagates wire-rate backpressure up through the mixer and session socket to the
+    /// application writer (no packet loss). The bound ensures a single permanently-stalled peer cannot
+    /// head-of-line-block delivery to other peers indefinitely: after this timeout the packet is
+    /// dropped and the drain moves on. Healthy peers drain far faster than this, so the timeout is not
+    /// hit in normal operation.
+    ///
+    /// Defaults to 2 seconds.
+    #[default(default_egress_backpressure_timeout())]
+    #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
+    pub egress_backpressure_timeout: Duration,
 }
 
 fn default_counter_flush_interval() -> Duration {
