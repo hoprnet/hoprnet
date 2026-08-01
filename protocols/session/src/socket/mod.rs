@@ -128,9 +128,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
-        // The maximum frame size in a stateless socket is only bounded by the size of the SeqIndicator
+        // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
+        // The maximum is bounded by the SeqIndicator capacity.
         let frame_size = cfg.frame_size.clamp(
-            C,
+            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
             (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
         );
 
@@ -275,9 +276,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
-        // The maximum frame size is reduced due to the size of the missing segment bitmap in SegmentRequests
+        // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
+        // The maximum is reduced due to the size of the missing segment bitmap in SegmentRequests.
         let frame_size = cfg.frame_size.clamp(
-            C,
+            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
             (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
                 * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
         );

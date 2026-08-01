@@ -20,7 +20,6 @@ use hopr_utils::{
     network_types::timeout::{SinkTimeoutError, TimeoutSinkExt, TimeoutStreamExt},
     runtime::AbortableList,
 };
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 
 use crate::PeerProtocolCounterRegistry;
@@ -32,8 +31,20 @@ const DEFAULT_ACK_INPUT_CONCURRENCY: usize = 10;
 /// via [`AcknowledgementPipelineConfig::ack_output_concurrency`].
 const DEFAULT_ACK_OUTPUT_CONCURRENCY: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
-const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
-const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
+// Set well above the worst-case rayon queue wait so packets are never silently
+// dropped due to CPU contention.  The formula (Sphinx ~21 ms/packet, up to 64
+// concurrent tasks, 8-core rayon pool) gives a worst-case queue wait of
+// 56 × 21 ms / 8 ≈ 147 ms — uncomfortably close to the old 150 ms ceiling.
+// Under any real CPU load (container overhead, background node traffic) encoding
+// regularly exceeded 150 ms, causing FuturesOrdered to emit None and silently
+// drop the packet, which then caused the session sequencer on the far side to
+// discard the next in-order frame after frame_timeout.
+//
+// 5 s gives headroom for sustained saturation while still providing a safety
+// net against truly hung encoding futures.  Normal encoding (~21 ms) is
+// unaffected; only pathological cases hit the ceiling.
+const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const PACKET_ENCODING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Number of Rayon threads kept permanently free for outgoing packet encode (SURB generation).
 /// The ingress decode concurrency default is `pool_thread_count - ENCODE_RESERVED_THREADS` so
@@ -119,55 +130,56 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut, WOutErr>(
     WOutErr: std::error::Error,
 {
     let res = app_outgoing
-        .then_concurrent(
-            |(routing, data)| {
-                let encoder = encoder.clone();
-                let counters = counters.clone();
-                async move {
-                    hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    match hopr_utils::parallelize::cpu::spawn_encode_blocking(
-                        move || {
-                            encoder.encode_packet(
-                                data.data.to_bytes(),
-                                routing,
-                                data.packet_info
-                                    .map(|data| data.signals_to_destination)
-                                    .unwrap_or_default(),
-                            )
-                        },
-                        "packet_encode",
-                    )
-                    .timeout(futures_time::time::Duration::from(PACKET_ENCODING_TIMEOUT))
-                    .await
-                    {
-                        Ok(Ok(Ok(packet))) => {
-                            #[cfg(all(feature = "telemetry", not(test)))]
-                            METRIC_PACKET_COUNT.increment(&["sent"]);
+        // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
+        // so that encoded packets are emitted in submission order, preserving session frame sequence.
+        // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
+        .map(|(routing, data)| {
+            let encoder = encoder.clone();
+            let counters = counters.clone();
+            async move {
+                hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                match hopr_utils::parallelize::cpu::spawn_encode_blocking(
+                    move || {
+                        encoder.encode_packet(
+                            data.data.to_bytes(),
+                            routing,
+                            data.packet_info
+                                .map(|data| data.signals_to_destination)
+                                .unwrap_or_default(),
+                        )
+                    },
+                    "packet_encode",
+                )
+                .timeout(futures_time::time::Duration::from(PACKET_ENCODING_TIMEOUT))
+                .await
+                {
+                    Ok(Ok(Ok(packet))) => {
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_PACKET_COUNT.increment(&["sent"]);
 
-                            counters.get_or_create(&packet.next_hop).record_message_sent();
-                            tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
-                            Some((packet.next_hop.into(), packet.data))
-                        }
-                        Ok(Ok(Err(error))) => {
-                            tracing::error!(%error, "outgoing packet could not be encoded");
-                            None
-                        }
-                        Ok(Err(error)) => {
-                            tracing::error!(%error, "parallel processing of the outgoing packet failed");
-                            None
-                        }
-                        Err(error) => {
-                            tracing::error!(%error, "timeout while processing the outgoing packet");
-                            hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
-                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            None
-                        }
+                        counters.get_or_create(&packet.next_hop).record_message_sent();
+                        tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
+                        Some((packet.next_hop.into(), packet.data))
+                    }
+                    Ok(Ok(Err(error))) => {
+                        tracing::error!(%error, "outgoing packet could not be encoded");
+                        None
+                    }
+                    Ok(Err(error)) => {
+                        tracing::error!(%error, "parallel processing of the outgoing packet failed");
+                        None
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, "timeout while processing the outgoing packet");
+                        hopr_utils::parallelize::cpu::ENCODE_TIMEOUT_DROPS
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        None
                     }
                 }
-            },
-            concurrency,
-        )
+            }
+        })
+        .buffered(concurrency)
         .filter_map(futures::future::ready)
         .map(Ok)
         .forward_to_timeout(wire_outgoing)
@@ -224,7 +236,11 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
     let ticket_proc_success = ticket_proc;
 
     let res = wire_incoming
-        .then_concurrent(move |(peer, data)| {
+        // Use `map().buffered()` (FuturesOrdered) instead of `then_concurrent()` (FuturesUnordered)
+        // so that decoded packets are emitted in the same order they arrive from the transport.
+        // Concurrent decode on rayon is preserved; only the output ordering guarantee changes.
+        // Out-of-order delivery was the root cause of session reassembler/sequencer discards.
+        .map(move |(peer, data)| {
             let decoder = decoder.clone();
             let mut ack_outgoing_failure = ack_outgoing_failure.clone();
             let mut ticket_events_reject = ticket_events.clone();
@@ -312,12 +328,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }
                 }
             }.instrument(tracing::debug_span!("incoming_packet_decode", %peer))
-        }, concurrency)
+        })
+        .buffered(concurrency)
         .filter_map(futures::future::ready)
         // Branch on the packet type BEFORE building the async future so each arm only clones
         // the handles it actually needs. `futures::future::Either` lets us return three
         // distinct async blocks from one closure without boxing.
-        .then_concurrent(move |packet| {
+        // FuturesOrdered: preserve decode-stage order so session segments reach the socket in sequence.
+        .map(move |packet| {
             match packet {
                 IncomingPacket::Acknowledgement(ack) => {
                     let mut ack_incoming = ack_incoming.clone();
@@ -428,7 +446,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, TEvt, AckIn, AckOut, Ap
                     }))
                 }
             }
-        }, concurrency)
+        })
+        .buffered(concurrency)
         .filter_map(|maybe_data| futures::future::ready(
             // Create the ApplicationDataIn data structure for incoming data
             maybe_data
@@ -1036,5 +1055,48 @@ mod tests {
             .await
             .context("dispatcher must complete when upstream closes, even with disconnected sink")?;
         Ok(())
+    }
+
+    /// Contract test pinning the ordering semantics the decode stages rely on.
+    ///
+    /// The incoming/outgoing packet decode stages use `map(..).buffered(concurrency)`
+    /// (`FuturesOrdered`) rather than `then_concurrent(..)` (`FuturesUnordered`) precisely so decoded
+    /// packets are emitted in arrival order even when per-packet decode latencies differ. Out-of-order
+    /// emission was the root cause of session reassembler/sequencer frame discards under burst.
+    ///
+    /// NOTE: this reconstructs the `map(..).buffered(..).filter_map(ready)` shape locally rather than
+    /// driving `start_incoming_packet_pipeline` (which would require mocking `PacketDecoder`, the
+    /// ticket processor and five sinks plus constructing valid `IncomingFinalPacket` crypto types). It
+    /// therefore documents and locks the ordering *contract* of the combinator the stage is built from,
+    /// not the production wiring itself — a change from `buffered` to `then_concurrent` in the pipeline
+    /// is caught end-to-end by the session loopback e2e test, not here. Latency is *inverted* w.r.t.
+    /// position (item 0 slowest, last fastest) so completion order is the reverse of arrival order;
+    /// `buffered` must still yield arrival order, whereas `FuturesUnordered` would yield completion
+    /// order and fail this assertion.
+    #[tokio::test]
+    async fn buffered_decode_preserves_arrival_order_under_inverted_latency() {
+        use std::time::Duration;
+
+        const N: usize = 16;
+        let concurrency = N; // all decode futures in flight simultaneously
+
+        let output: Vec<usize> = futures::stream::iter(0..N)
+            .map(|i| async move {
+                // Invert latency: earlier items complete later than later items.
+                tokio::time::sleep(Duration::from_millis(((N - i) * 4) as u64)).await;
+                // `None` models an undecodable packet dropped by the `filter_map` below.
+                if i == 3 { None } else { Some(i) }
+            })
+            .buffered(concurrency)
+            .filter_map(futures::future::ready)
+            .collect()
+            .await;
+
+        let expected: Vec<usize> = (0..N).filter(|&i| i != 3).collect();
+        assert_eq!(
+            output, expected,
+            "buffered(concurrency) must emit decoded packets in arrival order regardless of decode latency; got \
+             {output:?}. A regression to then_concurrent()/FuturesUnordered would emit completion order and fail here."
+        );
     }
 }
