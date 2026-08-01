@@ -45,6 +45,11 @@ pub fn create_hopr_instance_config(
             },
             session: SessionGlobalConfig {
                 idle_timeout: Duration::from_millis(2500),
+                // Disable EXIT→ENTRY SURB level notifications in test clusters.
+                // With the default notify period (2 s) less than idle_timeout (2.5 s),
+                // each notification resets the moka TTI and prevents session expiration tests
+                // from working correctly.
+                surb_balance_notify_period: None,
                 ..Default::default()
             },
             probe: crate::config::ProbeConfig {

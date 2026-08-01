@@ -13,6 +13,7 @@ ignore = [
   "RUSTSEC-2026-0185", # needs libp2p-quic and reqwest patch
   "RUSTSEC-2026-0194", # quick-xml 0.26.0 via pprof → inferno; pprof is dev-only (profiling feature); not reachable in production
   "RUSTSEC-2026-0195", # quick-xml 0.26.0 via pprof → inferno; same root cause as 0194 (different advisory DB entry); dev-only
+  "RUSTSEC-2026-0220", # ruint <1.20.0 pulled transitively by nybbles → alloy-trie → alloy; upgrade blocked on alloy bump
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

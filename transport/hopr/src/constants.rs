@@ -6,7 +6,7 @@ pub const PACKET_QUEUE_TIMEOUT_MILLISECONDS: std::time::Duration = std::time::Du
 /// Maximum number of outgoing application-layer packets buffered before the writer
 /// observes backpressure (`Poll::Pending` on `poll_write`).
 ///
-/// Caps the burst submitted to `then_concurrent(8×N_cpus)` so tail packets never
+/// Caps the burst submitted to `buffered(8×N_cpus)` so tail packets never
 /// exceed `PACKET_ENCODING_TIMEOUT` (150 ms). With Sphinx encoding at ~21 ms/packet
 /// and 256 slots, the worst-case Rayon queue depth stays well under the timeout on
 /// machines with up to ~36 cores. Safe formula: `≤ 7 × available_parallelism()`.

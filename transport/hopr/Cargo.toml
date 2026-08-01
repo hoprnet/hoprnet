@@ -1,7 +1,7 @@
 [package]
 name = "hopr-transport"
 description = "Implements the main HOPR transport interface for the core library"
-version = "0.34.0"
+version = "0.34.1"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -85,7 +85,6 @@ multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }

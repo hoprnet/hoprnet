@@ -441,8 +441,12 @@ fn default_max_managed_sessions() -> usize {
     DEFAULT_MAXIMUM_MANAGED_SESSIONS
 }
 
+/// Transport-layer default for the SURB balance notification period. Deliberately overrides the
+/// `SessionManagerConfig` default (60s) with a tighter 2s cadence so the Entry's dead-reckoned
+/// estimate of the Exit's SURB buffer is corrected quickly. The 1s floor is enforced downstream by
+/// `SessionManager::new` (`MIN_SURB_BUFFER_NOTIFICATION_PERIOD`).
 fn default_session_surb_balance_notify_period() -> Option<Duration> {
-    Some(Duration::from_secs(60))
+    Some(Duration::from_secs(2))
 }
 
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
