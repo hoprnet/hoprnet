@@ -249,16 +249,55 @@ impl hopr_api::node::HoprSessionServer for HoprServerIpForwardingReactor {
                 #[cfg(all(feature = "telemetry", not(test)))]
                 let _g = hopr_api::types::telemetry::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["loopback"], 1.0);
 
-                // Uses 4 kB buffer for copying
-                match tokio::io::copy(&mut reader, &mut writer).await {
-                    Ok(copied) => tracing::info!(?session_id, copied, "server loopback session service ended"),
-                    Err(error) => tracing::error!(
-                        ?session_id,
-                        %error,
-                        "server loopback session service ended with an error"
-                    ),
-                }
+                // Use an unbounded channel so the reader always drains EXIT's incoming
+                // forward-channel at full network speed, regardless of how long the writer
+                // stalls waiting for SURBs.  A bounded pipe would fill when the writer
+                // retries (no SURB available), which would block the reader, fill the
+                // forward-channel, saturate ENTRY's TCP send buffer, and prevent ENTRY
+                // from delivering new SURBs — creating a permanent deadlock.  With an
+                // unbounded pipe ENTRY's TCP is never blocked by a SURB stall, so fresh
+                // SURBs always reach EXIT and the writer eventually unblocks.
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
+                let reader_session_id = session_id;
+                let read_task = tokio::spawn(async move {
+                    use tokio::io::AsyncReadExt as _;
+                    let mut buf = vec![0u8; HOPR_TCP_BUFFER_SIZE];
+                    loop {
+                        match reader.read(&mut buf).await {
+                            Ok(0) => break,
+                            Ok(n) => {
+                                if tx.send(buf[..n].to_vec()).is_err() {
+                                    break;
+                                }
+                            }
+                            Err(error) => {
+                                tracing::debug!(?reader_session_id, %error, "loopback reader error");
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                let writer_session_id = session_id;
+                let write_task = tokio::spawn(async move {
+                    use tokio::io::AsyncWriteExt as _;
+                    while let Some(data) = rx.recv().await {
+                        if let Err(error) = writer.write_all(&data).await {
+                            tracing::debug!(?writer_session_id, %error, "loopback writer error");
+                            break;
+                        }
+                    }
+                });
+
+                let (read_res, write_res) = tokio::join!(read_task, write_task);
+                if let Err(error) = read_res {
+                    tracing::warn!(?session_id, %error, "loopback read task terminated abnormally");
+                }
+                if let Err(error) = write_res {
+                    tracing::warn!(?session_id, %error, "loopback write task terminated abnormally");
+                }
+                tracing::info!(?session_id, "server loopback session service ended");
                 Ok(())
             }
             SessionTarget::ExitNode(_) => Err(ForwarderError::General(

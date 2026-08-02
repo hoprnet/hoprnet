@@ -491,8 +491,15 @@ pub struct SessionManagerConfig {
 
     /// The maximum time for an incomplete frame to stay in the Session's output buffer.
     ///
-    /// Default is 800 ms.
-    #[default(Duration::from_millis(800))]
+    /// Must exceed the worst-case SURB replenishment latency on the return path.
+    /// The SURB balancer replenishes via KeepAlive every ~2 s; the retry loop in
+    /// the routing resolver sleeps 5 ms per attempt and can block for the full
+    /// replenishment cycle.  Setting this below the KeepAlive period causes the
+    /// sequencer to discard frames that arrive after a SURB-starved peer finally
+    /// gets new SURBs and sends its echo.
+    ///
+    /// Default is 3 s.
+    #[default(Duration::from_secs(3))]
     pub max_frame_timeout: Duration,
 
     /// Maximum number of segments to buffer in the downstream transport of a Session's socket.

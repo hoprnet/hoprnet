@@ -58,12 +58,11 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     fn new(inner: S, frame_size: usize, send_terminating_segment: bool) -> Self {
-        // We must clamp to at most SeqIndicator::MAX + 1 segments per frame.
-        // This is true for Session protocol without partial acknowledgements.
-        // When partial acknowledgements are enabled, the maximum frame size is less,
-        // and the caller must take care of it.
+        // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
+        // Minimum is SESSION_MTU (= C - SEGMENT_OVERHEAD) so that a single frame fits in one
+        // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
         let frame_size = frame_size.clamp(
-            C,
+            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
             (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
         );
 
