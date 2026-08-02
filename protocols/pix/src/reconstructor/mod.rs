@@ -2067,6 +2067,66 @@ mod tests {
         Ok(())
     }
 
+    /// A failed interpolation must leave the part terminal, exactly as a failed commitment opening
+    /// does.
+    ///
+    /// The two paths were asymmetric: the commitment mismatch released the share buffer and set
+    /// `failed`, while a `combine()` error propagated with `?` and did neither. That left the part
+    /// holding a full share set with no terminal flag, so neither early return in `add_share`
+    /// fired and every remaining share for the polynomial was pushed and re-ran the interpolation
+    /// over a larger set — `O(threshold²)` per share, against a buffer that should already have
+    /// been released, re-reporting the same fault each time.
+    ///
+    /// The interpolation is forced to fail here by giving the builder a one-share threshold, which
+    /// `vsss_rs` rejects outright. How the failure arises is not the property under test; that the
+    /// part is left terminal either way is.
+    #[test]
+    fn a_failed_interpolation_leaves_the_part_terminal() -> anyhow::Result<()> {
+        use utils::{AddShareOutcome, SsaPartBuilder};
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 2,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let spi = SsaPolynomialId::new(SsaId::new(pseudonym, SsaIndex::MIN), 0);
+        generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+
+        // The commitment is never reached — `verify_reconstructed` runs only on a value that
+        // interpolated — so the generator is a stand-in for any well-formed constant term.
+        let mut part = SsaPartBuilder::<TestSpec>::new(
+            crate::SsaPartCommitment::from_decoded_commitment(spi, PixGroup::<TestSpec>::generator()),
+            1,
+        );
+
+        let mut rng = hopr_types::crypto_random::rng();
+        let (_, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
+        assert!(
+            part.add_share(PixScalar::<TestSpec>::random(&mut rng), share.share)
+                .is_err(),
+            "one share is below what `combine` accepts, so the interpolation must fail"
+        );
+        assert_eq!(
+            0,
+            part.verification_state_len(),
+            "a part that can never reconstruct must release its share buffer"
+        );
+
+        // Every later share is absorbed instead of re-running the interpolation and re-reporting.
+        let (_, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
+        assert!(
+            matches!(
+                part.add_share(PixScalar::<TestSpec>::random(&mut rng), share.share)?,
+                AddShareOutcome::Absorbed
+            ),
+            "a failed part must absorb later shares silently"
+        );
+        assert_eq!(0, part.verification_state_len());
+
+        Ok(())
+    }
+
     #[test]
     fn full_recovery_retires_all_reconstructor_state() -> anyhow::Result<()> {
         // 4 polynomials, threshold 4, no surplus → 16 shares, fully recoverable.
