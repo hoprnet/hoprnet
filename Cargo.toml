@@ -133,7 +133,6 @@ rand_distr = "0.6.0"
 redb = "4.1.0"
 ringbuffer = "0.16.0"
 rstest = { version = "0.26.1" }
-scrypt = "0.12.0"
 rust-stream-ext-concurrent = "2.0.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_bytes = "0.11.19"
@@ -260,9 +259,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = [
-  "oas3",
-  "serde_bytes",
-  "hopr-session-server-forwarder",
-  "hopr-utils-session",
-]
+ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
