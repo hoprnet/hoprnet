@@ -551,8 +551,8 @@ mod tests {
             );
         }
 
-        // All-ones is not a valid encoding of any point, so the subgroup filter has nothing to
-        // accept. Baby JubJub's cofactor of 8 is why the filter exists at all.
+        // All-ones does not decode to any point at all, so this never reaches the subgroup filter.
+        // That case is `pix_group_element_rejects_a_small_order_point`.
         let mut garbage_repr = HoprPixGroupRepr::default();
         AsMut::<[u8]>::as_mut(&mut garbage_repr).fill(0xFF);
         assert!(HoprPixGroupElement(garbage_repr).try_into_pix_group().is_err());
@@ -572,6 +572,50 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    /// **M13.** A well-formed encoding of a point outside the prime-order subgroup must not parse
+    /// into a PIX group element. Baby JubJub is the production curve — `bjj` is a default feature —
+    /// and its cofactor is 8, so such points exist.
+    ///
+    /// This pins the *property*, not the mechanism, and deliberately so. The subgroup check in
+    /// [`HoprPixGroupElement::try_into_pix_group`] is not the step that rejects here: the backend's
+    /// own `GroupEncoding::from_bytes` already refuses a non-prime-order point, so the encoding
+    /// below never reaches `is_torsion_free`. That makes the filter unpinnable — no test can tell
+    /// whether it is present — and it is retained as defence in depth against a backend or curve
+    /// change that stops checking, which on a cofactor-8 curve is a real hazard rather than a
+    /// hypothetical one.
+    ///
+    /// On secp256k1 the cofactor is 1, no such point exists, and the case is vacuous.
+    #[cfg(feature = "bjj")]
+    #[test]
+    fn pix_group_element_rejects_a_small_order_point() {
+        use hopr_protocol_pix::Group;
+        type Affine = <BabyJubJub as crypto_traits::elliptic_curve::CurveArithmetic>::AffinePoint;
+
+        // In twisted Edwards coordinates the identity is (0, 1), and (0, -1) is the unique point of
+        // order 2: it satisfies a·0² + (−1)² = 1 = 1 + d·0²·(−1)², and doubling it gives the
+        // identity. Reading the coordinates off the identity keeps the base field unnamed, so this
+        // needs no direct dependency on the curve backend.
+        //
+        // Built from the fields rather than through `AffinePoint::new`, which is a *safe*
+        // constructor and rejects exactly the points this test is about.
+        let identity = PixGroup::<HoprPixSpec>::identity().to_affine();
+        let order_two = Affine {
+            x: identity.x,
+            y: -identity.y,
+        };
+        assert!(order_two.is_on_curve(), "(0, -1) must be a valid curve point");
+        assert!(
+            !order_two.is_in_prime_order_subgroup(),
+            "a point of order 2 must not be in the prime-order subgroup"
+        );
+
+        let repr = hopr_protocol_pix::GroupEncoding::to_bytes(&PixGroup::<HoprPixSpec>::from(order_two));
+        assert!(
+            HoprPixGroupElement(repr).try_into_pix_group().is_err(),
+            "a small-order point must not parse into a pix group element"
+        );
     }
 
     #[test]
