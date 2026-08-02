@@ -514,4 +514,94 @@ mod tests {
 
         Ok(())
     }
+
+    fn random_pix_group_element() -> HoprPixGroupElement {
+        use hopr_protocol_pix::Group;
+
+        let scalar = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
+            &mut hopr_types::crypto_random::rng(),
+        );
+        HoprPixGroupElement(hopr_protocol_pix::GroupEncoding::to_bytes(
+            &PixGroup::<HoprPixSpec>::mul_by_generator(&scalar),
+        ))
+    }
+
+    /// The wire wrapper is what the Start protocol carries, so its parse must reject anything the
+    /// typed group would not accept — a wrong length, and a point outside the prime-order subgroup.
+    #[test]
+    fn pix_group_element_round_trips_and_rejects_bad_input() -> anyhow::Result<()> {
+        let element = random_pix_group_element();
+
+        let point = element.try_into_pix_group()?;
+        assert_eq!(
+            HoprPixGroupElement::from(hopr_protocol_pix::GroupEncoding::to_bytes(&point)),
+            element,
+            "converting to the typed group and back must be lossless"
+        );
+
+        let bytes: &[u8] = element.as_ref();
+        assert_eq!(HoprPixGroupElement::try_from(bytes)?, element);
+        for wrong in [&bytes[..bytes.len() - 1], &[][..]] {
+            assert!(
+                HoprPixGroupElement::try_from(wrong).is_err(),
+                "a {}-byte buffer must not parse as a group element",
+                wrong.len()
+            );
+        }
+
+        // All-ones is not a valid encoding of any point, so the subgroup filter has nothing to
+        // accept. Baby JubJub's cofactor of 8 is why the filter exists at all.
+        let mut garbage_repr = HoprPixGroupRepr::default();
+        garbage_repr.as_mut().fill(0xFF);
+        assert!(HoprPixGroupElement(garbage_repr).try_into_pix_group().is_err());
+
+        // Hex, so a commitment is greppable in a log line.
+        assert_eq!(element.to_string(), const_hex::encode(bytes));
+
+        // Hashed by bytes: the wrapper is used as a map key on the reconstructor's insert path.
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        std::hash::Hash::hash(&element, &mut h1);
+        std::hash::Hash::hash(&HoprPixGroupElement::try_from(bytes)?, &mut h2);
+        assert_eq!(
+            std::hash::Hasher::finish(&h1),
+            std::hash::Hasher::finish(&h2),
+            "equal elements must hash equal"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn pix_commitment_proof_wire_wrapper_round_trips() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{Group, SsaId};
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let secret = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
+            &mut hopr_types::crypto_random::rng(),
+        );
+        let commitment = PixGroup::<HoprPixSpec>::mul_by_generator(&secret);
+        let proof = SsaCommitmentProof::<HoprPixSpec>::prove(&ssa_id, &secret, &commitment)?;
+
+        let wire = HoprPixCommitmentProof::from(proof);
+        assert_eq!(wire.as_ref().len(), HOPR_PIX_COMMITMENT_PROOF_SIZE);
+        assert_eq!(wire.to_string(), const_hex::encode(wire.as_ref()));
+
+        let recovered = wire.try_into_pix_proof()?;
+        assert_eq!(recovered, proof);
+        assert!(
+            recovered.verify(&ssa_id, &commitment),
+            "the proof must survive the wire"
+        );
+
+        assert_eq!(HoprPixCommitmentProof::try_from(wire.as_ref())?, wire);
+        for wrong in [&wire.as_ref()[..HOPR_PIX_COMMITMENT_PROOF_SIZE - 1], &[][..]] {
+            assert!(
+                HoprPixCommitmentProof::try_from(wrong).is_err(),
+                "only the exact length may parse"
+            );
+        }
+
+        Ok(())
+    }
 }
