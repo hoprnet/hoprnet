@@ -341,8 +341,6 @@ where
                         // Fall back to drop-newest only if the peer stays full past the timeout,
                         // so a stalled peer cannot head-of-line-block other peers forever.
                         use futures_time::future::FutureExt as _;
-                        // Wrap in an async block so `timeout` applies to an opaque std future
-                        // (crossfire's concrete SendFuture does not satisfy the combinator bound).
                         match async { sink.tx.send(msg).await }
                             .timeout(futures_time::time::Duration::from(egress_backpressure_timeout))
                             .await
