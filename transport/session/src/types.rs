@@ -617,6 +617,7 @@ mod tests {
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
+            ClosureReason::UnrealizedDeposit,
         ];
         insta::assert_debug_snapshot!(reasons);
     }

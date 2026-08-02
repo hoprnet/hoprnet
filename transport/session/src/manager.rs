@@ -87,12 +87,33 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Release reconstructor state for every live SSA cycle of a session (indices
-/// 1 through `peek_index()`).  Called from session teardown paths to ensure no
-/// builder, verifier, or liveness entry is stranded.
+/// How many of a session's most recent SSA cycles teardown sweeps.
+///
+/// Only unrecovered cycles hold reconstructor state — a recovered one removes itself — and the
+/// generator pipelines at most a couple ahead, so the live set is one or two. The window is far
+/// above that because the cost of being wrong is asymmetric in one direction only: a cycle missed
+/// here is still reclaimed by `unused_verifier_lifetime`, whereas sweeping every index a session
+/// ever used is unbounded work on the eviction listener, and leaves a tombstone per index behind it.
+const SSA_TEARDOWN_SWEEP_WINDOW: u32 = 64;
+
+/// Release reconstructor state for the SSA cycles of a session that may still be live.
+///
+/// Called from teardown paths so no builder, verifier or liveness entry is stranded. Bounded to the
+/// most recent [`SSA_TEARDOWN_SWEEP_WINDOW`] indices: the sweep runs inside the moka eviction
+/// listener and in `close_session`, and the index grows with every completed cycle, so an unbounded
+/// walk makes teardown cost proportional to how long the session lived.
 fn retire_all_live_ssa_cycles(session_id: SessionId, ssa_state: &SessionSsaState, pix_toolbox: &PixToolbox) {
-    let current = ssa_state.peek_index();
-    for i in 1..=current.get() {
+    let current = ssa_state.peek_index().get();
+    let oldest = current.saturating_sub(SSA_TEARDOWN_SWEEP_WINDOW - 1).max(1);
+    if oldest > 1 {
+        trace!(
+            %session_id,
+            oldest,
+            current,
+            "sweeping only the most recent ssa cycles at teardown; older ones expire on their own timer"
+        );
+    }
+    for i in oldest..=current {
         if let Some(idx) = SsaIndex::new(i) {
             pix_toolbox.share_processor.retire_ssa(SsaId::new(session_id, idx));
         }
@@ -151,6 +172,15 @@ const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
 /// (session initiations, establishments, errors, keep-alives).
 const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 
+/// Ceiling on the per-session term of [`start_protocol_channel_capacity`].
+///
+/// A session contributes to this channel only while its Start exchange is in flight — a handful of
+/// messages between initiation and establishment — after which it is silent apart from PIX, which
+/// the commitment term already covers. So the queue depth tracks concurrent *handshakes*, not the
+/// total number of sessions the node may manage, and `maximum_managed_sessions` (validated up to
+/// 100 000) is the wrong quantity to size a pre-allocated ring from.
+const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
+
 /// Capacity of the Start protocol ingress channel.
 ///
 /// This channel is fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow
@@ -177,6 +207,12 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// bound — at `quota_range.end() = 1e13` it asks for 77 GB. Over-provisioning is still the safe
 /// direction within the clamp, and the surviving margin is large: the default dimensions burst
 /// ≈ 320 messages against a capacity term of ≈ 648.
+///
+/// The session term is clamped for the same reason. `maximum_managed_sessions` validates up to
+/// 100 000, and one slot holds a `(HoprPseudonym, HoprStartProtocol)` sized by the enum's largest
+/// variant, so an operator raising the session limit would silently buy a multi-megabyte startup
+/// allocation. Ordinary Start traffic is one message per session *in flight*, not one per session
+/// the node will ever manage, so [`MAX_CONCURRENT_START_EXCHANGES`] is the honest bound.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     let max_commitments =
         (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
@@ -185,7 +221,7 @@ fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
     usize::try_from(max_commit_msgs)
         .unwrap_or(usize::MAX)
-        .saturating_add(cfg.maximum_sessions)
+        .saturating_add(cfg.maximum_sessions.min(MAX_CONCURRENT_START_EXCHANGES))
         .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
 }
 
@@ -6104,6 +6140,18 @@ mod tests {
                 "quota_range end {quota_end} must not grow the commitment term past the polynomial ceiling"
             );
         }
+
+        // The session term is reserved for exactly the same reason, and `maximum_managed_sessions`
+        // validates up to 100 000 — so it needs its own ceiling, not just the commitment one.
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 100_000,
+            ..Default::default()
+        };
+        assert_eq!(
+            start_protocol_channel_capacity(&cfg),
+            saturated + MAX_CONCURRENT_START_EXCHANGES + START_PROTOCOL_CHANNEL_RESERVE,
+            "a large session limit must not grow the pre-allocated ring past the handshake ceiling"
+        );
     }
 
     /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient

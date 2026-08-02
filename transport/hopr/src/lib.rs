@@ -846,9 +846,14 @@ where
         // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
         // a subset of what the global generator covers, so one generator suffices.
         //
-        // SAFETY: SsaGeneratorConfig fields come from PixGlobalConfig which is
-        // validated via #[validate(nested)] before this code runs, so the
-        // constructor's validate().expect() cannot panic.
+        // `SsaShareGenerator::new` validates its config and *panics* on failure, so the ranges are
+        // checked here and the error propagated instead. This used to be a SAFETY comment asserting
+        // that `PixGlobalConfig` had already been validated "before this code runs" via
+        // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
+        // rested entirely on every caller remembering to, and a programmatically built config turned
+        // node startup into a panic.
+        validator::Validate::validate(&self.cfg.pix)
+            .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,

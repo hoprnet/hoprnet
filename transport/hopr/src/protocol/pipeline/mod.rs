@@ -1239,8 +1239,9 @@ mod tests {
 
         assert!(noop.acknowledge_shares(peer, vec![])?.is_empty());
 
-        // The default is `false`, and the no-op processor does not override it: `Infallible` has no
-        // value to classify, so nothing can ever be downgraded to a debug log.
+        // `is_expected_error` keeps its trait default of `false`, which the no-op processor does not
+        // override: `Infallible` has no value to classify, so nothing can ever be downgraded to a
+        // debug log. (`has_pending_shares` *is* overridden — asserted above.)
         Ok(())
     }
 

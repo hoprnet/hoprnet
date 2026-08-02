@@ -470,9 +470,10 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
 
     drop(new_session_rx_alice);
 
-    // Cleanup: close sender and await handle
+    // Cleanup: close sender and await handle. Checked rather than discarded — `mock_packet_planning`
+    // returns a `Result` precisely so a dispatch failure inside the mock cannot pass silently.
     alice_sender.close_channel();
-    let _ = alice_handle.await;
+    alice_handle.await??;
 
     Ok(())
 }
