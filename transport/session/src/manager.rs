@@ -205,7 +205,7 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// **drops** the message. For most Start messages that is recoverable, but a dropped `SsaCommit`
 /// is not: there is no NACK or retransmission, so the corresponding coefficient cell stays empty
 /// forever, the commitment never completes, every subsequent share fails to verify, and the cycle
-/// dies on the deposit kill switch.
+/// dies on the supervisor's `max_deposit_wait` deadline.
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
 /// set of an SSA cycle, chunked into packet-sized messages. The capacity is derived from the
@@ -243,7 +243,7 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
 /// Maximum number of SSA commitments an Entry will accept in a single [`SsaServerCommitmentMessage`].
 ///
-/// [`request_next_ssa`](SessionManager::request_next_ssa) always requests exactly one SSA, and
+/// `send_ssa_request` puts exactly one SSA on the wire per supervisor `RequestSsa` action, and
 /// pipelining needs at most one cycle in flight ahead of the active one, so 2 leaves room for a
 /// batching Exit without turning one inbound packet into an unbounded amount of Entry work and
 /// on-chain deposits. This is deliberately far below the wire limit
@@ -433,7 +433,7 @@ pub struct IncomingSessionPixConfig {
     /// the incoming Session will be rejected.
     ///
     /// The default is derived from the default PIX dimensions
-    /// ([`DEFAULT_PIX_POLYS_PER_SSA`] × [`DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
+    /// ([`crate::DEFAULT_PIX_POLYS_PER_SSA`] × [`crate::DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
     /// so that an Entry running the default configuration is always accepted. The upper bound is
     /// exactly [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing
     /// to serve unincentivized per SSA cycle, and accepting more than our own nominal dimensions
@@ -448,7 +448,7 @@ pub struct IncomingSessionPixConfig {
     /// Session.
     ///
     /// These live together rather than spread across this struct because they are only meaningful
-    /// as a set: [`validate_pix_supervision`] checks them against each other and against the
+    /// as a set: [`crate::validate_pix_supervision`] checks them against each other and against the
     /// reconstructor's lifetimes, and the node's config validator runs that at load time.
     pub supervision: SupervisorConfig,
 }
@@ -807,14 +807,14 @@ impl PixToolbox {
 ///
 /// ### 2. Exit SSA Request (`SsaRequest` → Entry)
 ///
-/// Once the PIX parameters are accepted, the Exit spawns a [`SessionPixSupervisor`], whose opening
+/// Once the PIX parameters are accepted, the Exit spawns a `SessionPixSupervisor`, whose opening
 /// `RequestSsa` action has `send_ssa_request` create a new SSA commitment via the server-side
 /// [`SsaReconstructor`]. This produces an *Exit commitment* (a group element) that is sent back to
 /// the Entry as a [`SsaServerCommitmentMessage`].
 ///
 /// From here the supervisor owns the cycle's deadlines: `max_ssa_delivery_time` for the Entry's
 /// commitment, then `max_deposit_wait` for the funds, then the recovery deadlines. Missing any of
-/// them closes the Session with [`ClosureReason::PixFailure`].
+/// them closes the Session with `ClosureReason::PixFailure`.
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -835,32 +835,53 @@ impl PixToolbox {
 /// It emits [`HoprSessionOutPixEvent::DepositNeeded`] to the upper layer with the
 /// [`AgreedSsaQuota`] and a channel to confirm the deposit.
 ///
-/// A *deposit awaiter* task waits for the deposit confirmation. Once confirmed, the PIX
-/// kill switch is aborted. If the deposit times out, the kill switch closes the Session.
+/// A verifiable commitment is what starts the deposit clock, so the supervisor is told
+/// (`CommitmentVerified`) before anything can be reported against it. A `PixDepositObserver` task
+/// then forwards every confirmation arriving on that channel as `DepositConfirmed`: top-ups
+/// accumulate, and the supervisor is what decides when enough has landed. The observer carries no
+/// timeout of its own — `max_deposit_wait` is the deadline, and a second authority racing the
+/// first is exactly what the supervisor exists to prevent. If the upper layer drops the sender
+/// without ever confirming, the observer reports that (`DepositObserverClosed`) rather than
+/// letting the deadline run out on a deposit that is never coming.
+///
+/// Once the deposit suffices, the SSA moves to *recovering* and its recovery deadlines start. The
+/// first sufficient deposit on a Session also releases the egress gate, which is what lets the
+/// Session be served at all; later cycles inherit that release.
 ///
 /// ### 5. SSA Collection, Recovery and Pipelining
 ///
 /// As the Entry sends return-path SURBs during the Session, each SURB can carry a PIX
 /// share generated from the client's polynomial set. The Exit's [`SsaReconstructor`]
-/// collects these shares.
+/// collects these shares and reports how far the cycle has got via
+/// [`HoprSessionInPixEvent::RecoveryProgress`]; `dispatch_pix_event` forwards those snapshots to
+/// the supervisor, which uses them both to reset `max_recovery_idle` and to keep the gate serving.
 ///
 /// When the reconstructor reaches the *early recovery threshold* (≈85%), an
-/// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires, which triggers
-/// `request_next_ssa` for the next SSA index — pipelining the costly
-/// commitment exchange with the tail of the share collection for the current SSA.
+/// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires and the supervisor answers with a
+/// `RequestSsa` action for the next index — pipelining the costly commitment exchange with the
+/// tail of the share collection for the current SSA. If the current cycle is still awaiting its
+/// own commitment or deposit, the request is deferred until that clears, so a Session never has
+/// two unfunded cycles outstanding.
 ///
-/// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the
-/// Exit to unlock and redeem the deposited funds. The deposit awaiter for the next SSA
-/// replaces the kill switch aborted for the previous one.
+/// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the Exit to
+/// unlock and redeem the deposited funds. The supervisor tombstones the cycle and emits
+/// `RetireSsa`, which drops that cycle's [`SsaCommitmentGuard`] and aborts its deposit observer;
+/// the next SSA is requested here if `SsaAlmostRecovered` has not already done so. Observers are
+/// keyed by SSA index, so retiring one cycle never cancels a pipelined successor's.
 ///
 /// ### 6. Unverifiable Shares
 ///
 /// Shares are not checked individually. Once a polynomial has collected `threshold` of them,
 /// the reconstructor interpolates its constant term and compares it against the commitment; if
 /// they disagree, at least one of those shares did not come from the committed polynomial and an
-/// [`HoprSessionInPixEvent::UnverifiableShare`] event fires. `MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`
-/// is 0, so the first such event closes the Session — the cycle is already unrecoverable, and
-/// closing immediately caps what a malicious Entry is served at `threshold` packets.
+/// [`HoprSessionInPixEvent::UnverifiableShares`] event fires, carrying the reconstructor's running
+/// total for the SSA rather than a delta.
+/// [`SupervisorConfig::max_unverifiable_shares_per_ssa`] is 0 by default, so the first such report
+/// closes the Session — the cycle is already unrecoverable, and closing immediately caps what a
+/// malicious Entry is served at `threshold` packets.
+/// [`SupervisorConfig::max_unverifiable_shares_per_session`] bounds the same across cycles, so a
+/// steady trickle of one failure per SSA still escalates; at the default per-SSA limit of zero it
+/// never gets the chance to fire.
 ///
 /// ### Configuring PIX at the Exit
 ///
@@ -5343,18 +5364,18 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a session is closed on the very first `UnverifiableShare` PIX event.
+    /// Verifies that a session is closed on the very first `UnverifiableShares` PIX event.
     ///
     /// An event now means a whole polynomial failed to open its commitment, which already dooms
-    /// the cycle — so [`MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES`] is 0 and there is nothing to
-    /// tolerate. See that constant for the reasoning.
+    /// the cycle — so [`SupervisorConfig::max_unverifiable_shares_per_ssa`] is 0 and there is
+    /// nothing to tolerate. See that field for the reasoning.
     ///
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
     ///    via `handle_incoming_session_initiation`.
-    /// 2. One `UnverifiableShare` event is dispatched for the session's `SsaId`.
-    /// 3. The session is closed: `active_sessions` is empty and `num_active_sessions` is 0, confirming the kill switch
-    ///    fired.
+    /// 2. One `UnverifiableShares` event is dispatched for the session's `SsaId`.
+    /// 3. The session is closed: `active_sessions` is empty and `num_active_sessions` is 0, confirming the supervisor
+    ///    closed it.
     #[test_log::test(tokio::test)]
     async fn session_is_closed_on_the_first_unverifiable_share() -> anyhow::Result<()> {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
@@ -6167,7 +6188,7 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that dispatching too many `UnverifiableShare` events closes the session.
+    /// Verifies that dispatching too many `UnverifiableShares` events closes the session.
     #[test_log::test(tokio::test)]
     async fn too_many_unverifiable_shares_closes_session() -> anyhow::Result<()> {
         let ssa_gen_config = SsaGeneratorConfig {

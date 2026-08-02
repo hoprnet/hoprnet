@@ -226,7 +226,7 @@ mod worker;
 // SupervisorConfig
 // ---------------------------------------------------------------------------
 
-/// Configuration for the [`SessionPixSupervisor`].
+/// Configuration for the `SessionPixSupervisor`.
 ///
 /// Reachable from a node's configuration file as
 /// `incoming_session_pix_config.supervision`. The fields interact — with each other and with the
@@ -312,8 +312,9 @@ pub struct SupervisorConfig {
     /// Maximum packets served without SSA recovery progress before the gate
     /// blocks further service as a defense-in-depth backstop.
     ///
-    /// This is a ceiling enforced by [`ServiceGate::acquire`] after the gate is
-    /// funded. Each [`RecoveryProgress`] event resets the ceiling counter.
+    /// This is a ceiling enforced by `ServiceGate::acquire` after the gate is
+    /// funded. Each [`crate::HoprSessionInPixEvent::RecoveryProgress`] event resets the ceiling
+    /// counter.
     ///
     /// Default: 2048 packets.
     #[default(2048)]

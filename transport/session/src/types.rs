@@ -197,7 +197,7 @@ pub enum HoprSessionInPixEvent {
     /// Unlike the others this is paced by traffic rather than by lifecycle transitions, and it is
     /// what keeps a funded Session's egress flowing — the gate stops serving a cycle that shows no
     /// progress. Delivered without backpressure for that reason; see
-    /// [`SessionPixSupervisorHandle::try_send_progress`](crate::supervision::SessionPixSupervisorHandle::try_send_progress).
+    /// `SessionPixSupervisorHandle::try_send_progress`.
     RecoveryProgress(SsaRecoveryProgress<HoprPseudonym>),
 }
 
