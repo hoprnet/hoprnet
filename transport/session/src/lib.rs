@@ -19,7 +19,7 @@ mod utils;
 
 pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 use hopr_api::types::internal::routing::RoutingOptions;
-pub use hopr_protocol_session::AcknowledgementMode;
+pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
 #[cfg(feature = "benchmark")]
 pub use manager::SESSION_FORWARD_CAPACITY;
@@ -105,6 +105,14 @@ pub struct SessionClientConfig {
     /// Default is `false`.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// Opt-in client-side send-window flow control for this session.
+    ///
+    /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the
+    /// adaptive AIMD window on the entry (sending) side; use [`FlowControlConfig::default`] for the
+    /// verified clean profile or [`FlowControlConfig::robust`] for the tail-tolerance bundle. This is
+    /// the client's explicit dial (only meaningful on a reliable / `RetransmissionAck` session).
+    #[default(None)]
+    pub flow_control: Option<FlowControlConfig>,
 }
 
 #[cfg(test)]

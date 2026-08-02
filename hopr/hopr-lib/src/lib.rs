@@ -74,7 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+    FlowControlConfig, HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget,
+    SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -153,6 +154,11 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
+    /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
+    /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
+    #[default(None)]
+    pub flow_control: Option<FlowControlConfig>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -175,6 +181,8 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     pub always_max_out_surbs: bool,
+    /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
+    pub flow_control: Option<FlowControlConfig>,
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
@@ -188,6 +196,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
+            flow_control: None,
         }
     }
 }
@@ -202,6 +211,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            flow_control: value.flow_control,
         }
     }
 }
@@ -223,6 +233,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            flow_control: value.flow_control,
         })
     }
 }

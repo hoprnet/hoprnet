@@ -52,16 +52,14 @@ pub enum FlowControlMode {
 }
 
 /// Client-tunable flow-control parameters. Defaults are deliberately conservative
-/// (anti-grief-preserving): the window starts at the floor and only grows on proven delivery.
+/// (anti-grief-preserving): the window starts at the floor and only grows on proven delivery, and
+/// the opt-in robustness knobs are off. This is the **clean** profile.
+///
+/// Flow control is enabled per-session by *providing* this config (the transport's
+/// `SessionClientConfig::flow_control` is an `Option` — `None` leaves the session unpaced with
+/// today's behaviour), so there is no separate `enabled` flag.
 #[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct FlowControlConfig {
-    /// Whether the send window is active at all. **Opt-in** (default `false`): when disabled the
-    /// writer is a transparent pass-through with today's behaviour, so existing sessions are
-    /// unaffected and only a client that explicitly wants adaptive pacing (e.g. GnosisVPN) turns it
-    /// on. This is the top-level of invariant 5's "the client's dial".
-    #[default(false)]
-    pub enabled: bool,
-
     /// Honest-clock mode. Default [`FlowControlMode::Reliable`].
     pub mode: FlowControlMode,
 
@@ -93,6 +91,22 @@ pub struct FlowControlConfig {
     /// parks before it re-checks the ceiling / makes keep-progress at the floor. Default 250 ms.
     #[default(Duration::from_millis(250))]
     pub no_honest_deadline: Duration,
+
+    /// **Persist probe (opt-in robustness).** Consecutive no-progress parks before the writer admits
+    /// a bounded `min_window_size` beyond `cwnd` (still SURB-capped) to break an end-of-stream tail deadlock
+    /// on a slow/throttled return path. `0` **disables** it — the default, i.e. the verified clean
+    /// behaviour. A robust profile (e.g. for deliberately SURB-throttled paths) sets ~8 (≈2 s at the
+    /// default keep-progress deadline). See the `PacedWriter` admission logic.
+    #[default(0)]
+    pub persist_stall_parks: u32,
+
+    /// **Frame retransmission budget under flow control (opt-in robustness).** Applied to the
+    /// reliable socket's `max_outgoing_frame_retries` when flow control is enabled. `2` (the
+    /// original) is the default; a robust profile raises it (~8) so a merely-*delayed* ack on a
+    /// temporarily-starved return path recovers the frame instead of abandoning it (an abandoned
+    /// frame leaves a gap → stream corruption).
+    #[default(2)]
+    pub frame_retries: u32,
 }
 
 impl FlowControlConfig {
@@ -102,7 +116,6 @@ impl FlowControlConfig {
     fn normalized(self) -> FlowControlConfig {
         let min_window_size = self.min_window_size.max(1);
         FlowControlConfig {
-            enabled: self.enabled,
             mode: self.mode,
             min_window_size,
             max_window_size: self.max_window_size.max(min_window_size),
@@ -113,6 +126,19 @@ impl FlowControlConfig {
                 0.5
             },
             no_honest_deadline: self.no_honest_deadline.max(Duration::from_millis(1)),
+            persist_stall_parks: self.persist_stall_parks,
+            frame_retries: self.frame_retries,
+        }
+    }
+
+    /// The **robust** profile: the clean defaults plus the opt-in tail-tolerance bundle (persist
+    /// probe + larger retransmission budget) for deliberately SURB-throttled / high-latency return
+    /// paths. See [`Self::persist_stall_parks`] and [`Self::frame_retries`].
+    pub fn robust() -> Self {
+        Self {
+            persist_stall_parks: 8,
+            frame_retries: 8,
+            ..Self::default()
         }
     }
 
@@ -229,6 +255,12 @@ impl WindowController {
         self.cfg.mode
     }
 
+    /// The configured minimum window (duplex floor / persist-probe size).
+    #[inline]
+    pub fn min_window_size(&self) -> usize {
+        self.cfg.min_window_size
+    }
+
     /// Records `bytes` admitted onto the wire. Increases the in-flight accounting only; never grows
     /// the window.
     #[inline]
@@ -282,18 +314,28 @@ impl WindowController {
         }
     }
 
-    /// Effective window against a SURB-supply ceiling: `min(cwnd, ceiling)`, but never below
-    /// `min_window_size` (duplex floor). The ceiling can only shrink the result — invariant 2.
-    pub fn effective_window(&self, supply: &impl SupplyConstraint) -> usize {
-        self.cwnd
-            .min(supply.max_admissible_inflight())
-            .max(self.cfg.min_window_size)
+    /// Effective window against a raw ceiling value (bytes): `min(cwnd, ceiling)`, but never below
+    /// `min_window_size` (duplex floor). The ceiling can only shrink the result — invariant 2 — and it
+    /// does **not** mutate `cwnd`, so a transient dip is fully recovered the instant the ceiling lifts.
+    pub fn effective_window_for(&self, ceiling: usize) -> usize {
+        self.cwnd.min(ceiling).max(self.cfg.min_window_size)
     }
 
-    /// Bytes that may be admitted right now against `supply`: `effective_window − inflight`
-    /// (saturating). Zero means park until delivery retires in-flight bytes.
+    /// Bytes admissible now against a raw ceiling value: `effective_window − inflight` (saturating).
+    pub fn admissible_for(&self, ceiling: usize) -> usize {
+        self.effective_window_for(ceiling).saturating_sub(self.inflight)
+    }
+
+    /// Effective window against a [`SupplyConstraint`] (convenience wrapper over
+    /// [`effective_window_for`](Self::effective_window_for)).
+    pub fn effective_window(&self, supply: &impl SupplyConstraint) -> usize {
+        self.effective_window_for(supply.max_admissible_inflight())
+    }
+
+    /// Bytes that may be admitted right now against `supply`. Zero means park until delivery retires
+    /// in-flight bytes (or the ceiling lifts).
     pub fn admissible(&self, supply: &impl SupplyConstraint) -> usize {
-        self.effective_window(supply).saturating_sub(self.inflight)
+        self.admissible_for(supply.max_admissible_inflight())
     }
 
     /// Multiplicative decrease helper, flooring at `min_window_size`.
@@ -579,6 +621,30 @@ mod tests {
             cwnd,
             "loose ceiling cannot raise above cwnd"
         );
+    }
+
+    // ---- Hysteresis: a supply-ceiling dip clamps the effective window but PRESERVES cwnd ----
+
+    #[test]
+    fn ceiling_clamp_preserves_cwnd() {
+        let mut w = WindowController::new(cfg());
+        // Grow the honest window well above the floor.
+        for _ in 0..30 {
+            let win = w.window();
+            w.on_sent(win);
+            w.on_delivered(win);
+        }
+        let grown = w.window();
+        assert!(grown > 10_000);
+
+        // A tight ceiling clamps the *effective* window right down...
+        assert_eq!(w.effective_window_for(1_000), 1_000);
+        // ...but must NOT destroy the learned cwnd (this is the whole fix — no cliff collapse).
+        assert_eq!(w.window(), grown, "ceiling clamp must not mutate cwnd");
+
+        // The instant the ceiling lifts, the full learned window is available again — no re-growth.
+        assert_eq!(w.effective_window_for(usize::MAX), grown);
+        assert_eq!(w.admissible_for(usize::MAX), grown);
     }
 
     #[test]
