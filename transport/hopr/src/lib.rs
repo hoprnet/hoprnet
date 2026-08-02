@@ -881,9 +881,12 @@ where
         let pix_toolbox = match (role, exit_ack_share) {
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default values (max_awaiting_acks=10_000_000,
-                    // early_recovery_threshold=0.85) are within validated range,
-                    // so the constructor's validate().expect() cannot panic.
+                    // SAFETY: `SsaReconstructorConfig`'s defaults sit inside the ranges its own
+                    // `Validate` derive enforces, so `validate().expect()` in the constructor
+                    // cannot panic. Stated as an invariant rather than by quoting the values —
+                    // the quoted version drifted (it claimed `max_awaiting_acks = 10_000_000`
+                    // against an actual default of 1_000_000) and nothing caught it, because a
+                    // comment naming a constant it does not reference cannot be checked.
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());

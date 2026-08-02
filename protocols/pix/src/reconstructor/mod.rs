@@ -28,7 +28,7 @@ pub struct SsaReconstructorConfig {
     /// Maximum time an SSA cycle can go without progress before it is discarded.
     ///
     /// Measured from the last acknowledged share *anywhere* in the cycle, not per polynomial — see
-    /// [`SsaCycle`] for why that distinction is load-bearing. A cycle that is still being served
+    /// `SsaCycle` for why that distinction is load-bearing. A cycle that is still being served
     /// therefore never expires, whatever the line rate.
     ///
     /// Default is 30 minutes.
@@ -619,8 +619,8 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 /// hands ownership on with [`disarm`](Self::disarm) rather than letting the guard fall out of scope.
 ///
 /// Dropping releases the registration **without** retiring the SSA, so the same index can be
-/// requested again — see [`release_abandoned_commitment`](SsaReconstructor::release_abandoned_commitment)
-/// for why that distinction is load-bearing.
+/// requested again — see `SsaReconstructor::release_abandoned_commitment` for why that
+/// distinction is load-bearing.
 #[must_use = "dropping the guard immediately releases the SSA it owns"]
 pub struct SsaCommitmentGuard<S: PixSpec + Clone> {
     /// `None` once disarmed, which is the only state in which `Drop` does nothing.

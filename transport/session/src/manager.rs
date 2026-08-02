@@ -451,7 +451,7 @@ pub struct IncomingSessionPixConfig {
     /// the incoming Session will be rejected.
     ///
     /// The default is derived from the default PIX dimensions
-    /// ([`DEFAULT_PIX_POLYS_PER_SSA`] × [`DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
+    /// ([`crate::DEFAULT_PIX_POLYS_PER_SSA`] × [`crate::DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
     /// so that an Entry running the default configuration is always accepted. The upper bound is
     /// exactly [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing
     /// to serve unincentivized per SSA cycle, and accepting more than our own nominal dimensions

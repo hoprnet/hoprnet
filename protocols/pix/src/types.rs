@@ -649,7 +649,7 @@ impl<S: PixSpec> SsaCommitment<S, S::Pseudonym> {
     /// Reconstructs the per-polynomial commitments from the transposed representation, ordered by
     /// polynomial index.
     ///
-    /// Only the [`CONSTANT_TERM_COEFFICIENT`] row is read; any other coefficient index present is
+    /// Only the [`crate::CONSTANT_TERM_COEFFICIENT`] row is read; any other coefficient index is
     /// ignored, matching what the Exit does with one on the wire.
     pub fn reconstruct_part_commitments(self) -> errors::Result<Vec<SsaPartCommitment<S>>, S::Pseudonym> {
         let constant_terms: BTreeMap<PolynomialIndex, PixGroupRepr<S>> = self
