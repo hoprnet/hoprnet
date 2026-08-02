@@ -22,6 +22,11 @@ include = [
 
 [lib]
 crate-type = ["rlib"]
+# Matches the other library crates in this workspace. Not accidental: the crate's documentation is
+# prose and diagrams rather than runnable examples — the only fenced block in `src/` is ```text — and
+# a runnable one here would need a live runtime, a chain connector and a network to reach anything
+# interesting. If a genuinely executable example is ever added, drop this line rather than marking
+# that one example `no_run`.
 doctest = false
 
 [features]

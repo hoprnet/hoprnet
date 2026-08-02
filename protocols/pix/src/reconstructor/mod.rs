@@ -314,8 +314,17 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .build(),
             ready_resolutions: parking_lot::Mutex::new(Vec::new()),
             ready_resolutions_len: std::sync::atomic::AtomicUsize::new(0),
-            // Tombstone set: only needs to cover the window between `retire_ssa` running and a
-            // concurrent commitment completion publishing its cycle.
+            // Tombstone set. Its immediate job is the window between `retire_ssa` running and a
+            // concurrent commitment completion publishing its cycle — but the TTL must outlive that
+            // by a long way, because retirement is also permanent: a cycle re-registered at the same
+            // `SsaId` after being abandoned must stay retired, which is what
+            // `abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it` asserts. Shortening
+            // this to the width of the race would break that contract silently.
+            //
+            // Unbounded in count, deliberately for now: a size eviction here permits exactly the
+            // resurrection the tombstone prevents, so a capacity has to be chosen against the
+            // concurrent-Session budget rather than picked. That belongs with the global admission
+            // control the memory work still owes.
             retired_ssas: moka::sync::Cache::builder()
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
@@ -3303,7 +3312,19 @@ mod tests {
     fn a_cycle_stays_live_while_a_single_polynomial_goes_untouched() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
         const THRESHOLD: u16 = 4;
-        const VERIFIER_LIFETIME: std::time::Duration = std::time::Duration::from_millis(500);
+        /// Bounded on **both** sides, which is why this is not simply "as large as possible":
+        ///
+        /// * above `SHARE_SPACING`, or the cycle idles out between two consecutive shares and the test fails for a
+        ///   reason unrelated to H8. Each iteration does rather more than sleep — polynomial evaluation, encryption,
+        ///   insertion, and at the threshold a Lagrange combine and a scalar multiplication — so on a contended runner
+        ///   the margin needs to be several times the sleep, not the 2× it used to be;
+        /// * below `(THRESHOLD + 1) × SHARE_SPACING` ≈ 1250 ms, or the assertion below stops holding and the test
+        ///   exercises nothing.
+        ///
+        /// 1000 ms sits inside that window with the slack on the side that grows under load:
+        /// cumulative elapsed time only ever overshoots, while a single iteration would have to
+        /// take four times its sleep to expire the cycle.
+        const VERIFIER_LIFETIME: std::time::Duration = std::time::Duration::from_millis(1000);
         /// Comfortably inside the lifetime, so no *cycle* is ever idle long enough to expire.
         const SHARE_SPACING: std::time::Duration = std::time::Duration::from_millis(250);
 

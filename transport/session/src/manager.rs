@@ -2286,9 +2286,6 @@ where
             .cloned()
             .ok_or(SessionManagerError::NotStarted)?;
 
-        // Reply routing uses SURBs only with the pseudonym of this Session's ID
-        let reply_routing = DestinationRouting::Return(pseudonym.into());
-
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
 
@@ -5154,6 +5151,66 @@ mod tests {
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
         assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
         assert_eq!(mgr.num_active_sessions(), 0);
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A node with no `PixToolbox` must refuse an incoming session that asks for `UsePIX`, rather
+    /// than establish one it cannot run the PIX state machine for.
+    ///
+    /// This is the guard at the top of `handle_incoming_session_initiation`, and it was untested:
+    /// the integration test named for it never negotiated PIX at all, so the absent toolbox was not
+    /// the operative cause of anything it observed.
+    #[test_log::test(tokio::test)]
+    async fn incoming_usepix_session_is_rejected_when_no_pix_toolbox_is_installed() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_start::{StartErrorReason, StartInitiation};
+        use tokio::sync::oneshot;
+
+        // Quota deliberately acceptable and PIX not enforced, so the only thing that can reject this
+        // is the missing toolbox.
+        let mgr = SessionManager::new(SessionManagerConfig::default());
+
+        let mut bob_transport = MockMsgSender::new();
+        let (tx, rx) = oneshot::channel();
+        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        // No toolbox — the third argument is what a relay that does not participate in PIX gets.
+        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        let err = rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0, "no slot may be created for a refusal");
 
         bob_sender.close_channel();
         bob_handle.await??;

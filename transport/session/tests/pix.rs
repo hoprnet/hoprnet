@@ -397,17 +397,22 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
     Ok(())
 }
 
-/// Verifies that when neither side has a `PixToolbox`, the session establishes without any SSA
-/// exchange — the PIX protocol is simply skipped.
+/// Verifies that a session which does not ask for PIX establishes in exactly two messages, with no
+/// SSA exchange anywhere in between.
 ///
 /// ## Steps
 /// 1. Both managers are started without a `PixToolbox`.
-/// 2. Alice initiates a session without `Capability::UsePIX` — neither side can run the PIX state machine.
-/// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice.
-/// 4. No `SsaRequest` is sent by Bob (Bob has no toolbox to generate one).
-/// 5. Both sessions are established and both sides receive a session handle.
+/// 2. Alice initiates with `Capability::Segmentation` only and `pix_ssa_quota: None`, so PIX is never negotiated.
+/// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice, and the `.times(1)`
+///    expectations are what pin the absence of a third message.
+/// 4. Both sessions are established and both sides receive a session handle.
+///
+/// Note what this does *not* show: the absent `PixToolbox` is not the operative cause here, because
+/// no `SsaRequest` would be sent for an un-negotiated session in any case. Refusal on a missing
+/// toolbox is covered by `incoming_usepix_session_is_rejected_when_no_pix_toolbox_is_installed` in
+/// `transport/session/src/manager.rs`.
 #[test(tokio::test)]
-async fn exit_without_pix_toolbox_does_not_send_ssa_request() -> Result<()> {
+async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()> {
     let alice_pseudonym = HoprPseudonym::random();
     let bob_peer: Address = (&ChainKeypair::random()).into();
 

@@ -914,6 +914,17 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
         false
     }
 
+    /// Returns the identity element, which is **only** sound because the value is never consumed.
+    ///
+    /// This processor is installed exactly where PIX is not negotiated, so nothing ever combines
+    /// this with a client commitment. If it ever were on a live path, the combined SSA would be
+    /// `client_commitment + identity` — leaving the Entry as the sole holder of the deposit private
+    /// key, which is precisely the rogue-key outcome the Schnorr proof of knowledge on the client
+    /// commitment exists to prevent, and the Exit would hold no share of it.
+    ///
+    /// `Infallible` is what forces the identity here: there is no error to return. Widening the
+    /// error type so this can refuse outright is the better shape, and is worth doing if this
+    /// processor ever becomes reachable with PIX negotiated.
     fn new_exit_commitment(
         &self,
         _: SsaId<HoprPseudonym>,
@@ -1251,6 +1262,10 @@ mod tests {
     struct ScriptedExitProc {
         outcome: std::sync::Arc<dyn Fn() -> Result<Vec<HoprShareResolution>, ScriptedError> + Send + Sync>,
         calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        /// What `has_pending_shares` reports. A field rather than a wrapper type, so the pipeline's
+        /// guard can be exercised without a second processor whose only difference is one method
+        /// and which would drift out of step every time the trait grows one.
+        pending: bool,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -1266,7 +1281,14 @@ mod tests {
             Self {
                 outcome: std::sync::Arc::new(outcome),
                 calls: Default::default(),
+                pending: true,
             }
+        }
+
+        /// Reports no pending shares, so the pipeline's cheap guard short-circuits.
+        fn never_pending(mut self) -> Self {
+            self.pending = false;
+            self
         }
 
         fn calls(&self) -> usize {
@@ -1276,6 +1298,10 @@ mod tests {
 
     impl ExitAcknowledgementShareProcessor<HoprPixSpec> for ScriptedExitProc {
         type Error = ScriptedError;
+
+        fn has_pending_shares(&self, _: &OffchainPublicKey) -> bool {
+            self.pending
+        }
 
         fn is_expected_error(&self, error: &Self::Error) -> bool {
             matches!(error, ScriptedError::Expected)
@@ -1376,63 +1402,12 @@ mod tests {
     /// round-trip it has no shares for. If it says no, `acknowledge_shares` must not be called.
     #[tokio::test]
     async fn exit_ack_pipeline_skips_peers_with_no_pending_shares() {
-        #[derive(Clone)]
-        struct NeverPending(ScriptedExitProc);
-
-        impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NeverPending {
-            type Error = ScriptedError;
-
-            fn has_pending_shares(&self, _: &OffchainPublicKey) -> bool {
-                false
-            }
-
-            fn new_exit_commitment(
-                &self,
-                id: SsaId<HoprPseudonym>,
-                p: usize,
-                s: usize,
-            ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
-                self.0.new_exit_commitment(id, p, s)
-            }
-
-            fn insert_coefficient_commitments(
-                &self,
-                ssa_id: SsaId<SimplePseudonym>,
-                i: CoefficientIndex,
-                proof: Option<SsaCommitmentProof<HoprPixSpec>>,
-                c: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
-            ) -> Result<HoprSsaCommitmentState, Self::Error> {
-                self.0.insert_coefficient_commitments(ssa_id, i, proof, c)
-            }
-
-            fn retire_ssa(&self, id: SsaId<HoprPseudonym>) {
-                self.0.retire_ssa(id)
-            }
-
-            fn insert_encrypted_share(
-                &self,
-                p: &OffchainPublicKey,
-                c: HalfKeyChallenge,
-                s: TaggedEncryptedPartialSsaShare<HoprPixSpec>,
-            ) -> Result<(), Self::Error> {
-                self.0.insert_encrypted_share(p, c, s)
-            }
-
-            fn acknowledge_shares(
-                &self,
-                p: OffchainPublicKey,
-                a: Vec<Acknowledgement>,
-            ) -> Result<Vec<HoprShareResolution>, Self::Error> {
-                self.0.acknowledge_shares(p, a)
-            }
-        }
-
-        let inner = ScriptedExitProc::new(|| Ok(vec![]));
+        let proc = ScriptedExitProc::new(|| Ok(vec![])).never_pending();
         let (tx, _rx) = mpsc::channel::<HoprShareResolution>(4);
-        start_exit_incoming_ack_pipeline(futures::stream::iter(one_batch()), NeverPending(inner.clone()), tx, 4).await;
+        let proc = run_exit_pipeline(proc, tx).await;
 
         assert_eq!(
-            inner.calls(),
+            proc.calls(),
             0,
             "a peer with no pending shares must not reach the thread pool"
         );
