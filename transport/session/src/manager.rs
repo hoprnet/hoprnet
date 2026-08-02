@@ -160,16 +160,26 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// dies on the deposit kill switch.
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
-/// set of an SSA cycle, chunked into packet-sized messages. The capacity is derived from the
-/// largest quota this node will accept ([`IncomingSessionPixConfig::quota_range`]), since
-/// `quota / PAYLOAD_SIZE` is `polys × threshold`, plus a reserve for ordinary Start traffic.
+/// set of an SSA cycle, chunked into packet-sized messages, plus a reserve for ordinary Start
+/// traffic.
 ///
-/// That is now a `threshold`-fold over-estimate — a cycle only carries `polys` commitments, one
-/// constant term each — because the quota alone does not reveal how the product splits. Left as
-/// is: over-provisioning is the safe direction for a channel whose overflow silently kills a
-/// cycle, and the capacity only bounds the queue, it does not reserve it.
+/// The burst is bounded by two independent limits, and the capacity takes the smaller:
+///
+/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × threshold`, a `threshold`-fold over-estimate, since a cycle carries
+///   one constant term per polynomial and nothing else. The quota alone does not reveal how the product splits, so the
+///   over-estimate cannot be undone from it.
+/// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
+///   quota says. It therefore bounds the commitments a cycle can ever deliver.
+///
+/// Clamping to the second matters because this capacity is *reserved*, not merely enforced:
+/// `crossfire`'s array flavour pre-allocates every slot when the channel is built. An
+/// operator-settable `quota_range` feeding an unclamped derivation is an allocation with no upper
+/// bound — at `quota_range.end() = 1e13` it asks for 77 GB. Over-provisioning is still the safe
+/// direction within the clamp, and the surviving margin is large: the default dimensions burst
+/// ≈ 320 messages against a capacity term of ≈ 648.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
-    let max_commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+    let max_commitments =
+        (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
 
     // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
@@ -6028,14 +6038,17 @@ mod tests {
     /// single SSA cycle, not for the number of sessions.
     ///
     /// A dropped `SsaCommit` is unrecoverable — there is no retransmission — so the queue has to
-    /// absorb the whole `polys × threshold` commitment set implied by the largest accepted quota.
+    /// absorb the whole commitment set a cycle can deliver, capped by the polynomial ceiling
+    /// `check_pix_params` enforces.
     #[test]
     fn start_protocol_channel_is_sized_for_the_worst_case_commitment_burst() {
         let cfg = SessionManagerConfig::default();
         let capacity = start_protocol_channel_capacity(&cfg);
 
-        // Number of commitments implied by the largest quota this node accepts.
-        let commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+        // Number of commitments implied by the largest quota this node accepts, clamped by the
+        // number of polynomials it would actually admit.
+        let commitments =
+            (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
         let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
 
         assert!(
@@ -6060,6 +6073,37 @@ mod tests {
         // Guards against a units mistake (e.g. counting bytes rather than messages) turning this
         // into a multi-gigabyte ring allocation.
         assert!(capacity < 1_000_000, "capacity {capacity} is implausibly large");
+    }
+
+    /// `quota_range` is operator-settable and the capacity it feeds is *reserved*, not merely
+    /// enforced — `crossfire`'s array flavour pre-allocates every slot. So the derivation must be
+    /// bounded independently of the configured quota.
+    ///
+    /// Regression test: an unclamped derivation asked for ~4.2e8 slots here (77 GB), which aborted
+    /// the whole unit test binary with an allocation failure rather than failing one assertion. The
+    /// sizing test above never caught it because it only exercises the default config.
+    #[test]
+    fn start_protocol_channel_capacity_is_bounded_for_any_quota_range() {
+        // The commitment term saturates once the quota admits more commitments than there are
+        // polynomials, so this is the largest value it can ever take.
+        let saturated = (MAX_POLYS_PER_SSA as u64).div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
+
+        for quota_end in [10_u64.pow(13), u64::MAX] {
+            let cfg = SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=quota_end,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let capacity = start_protocol_channel_capacity(&cfg);
+
+            assert_eq!(
+                capacity,
+                saturated + cfg.maximum_sessions + START_PROTOCOL_CHANNEL_RESERVE,
+                "quota_range end {quota_end} must not grow the commitment term past the polynomial ceiling"
+            );
+        }
     }
 
     /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient
