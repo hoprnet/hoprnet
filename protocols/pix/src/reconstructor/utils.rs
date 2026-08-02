@@ -558,8 +558,17 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         }
 
         // Check for duplicate occupancy before any insertion (transactional).
+        //
+        // A repeat *within* the batch counts. Testing only against `committed_polynomials` would let
+        // two entries sharing a polynomial index both see a vacant slot: the second insert would
+        // silently rebind the first — the single-assignment invariant this two-phase check exists to
+        // enforce — and `total_committed` would count two occupants of one slot, so a batch of
+        // `num_polys` entries containing a repeat could never complete the set and every retry would
+        // be rejected as a duplicate against the slots it did fill. The wire decoder rejects
+        // intra-message duplicates today, but this builder is not meant to depend on that.
+        let mut seen = std::collections::HashSet::with_capacity(validated.len());
         for (polynomial_index, _) in &validated {
-            if self.committed_polynomials.contains_key(polynomial_index) {
+            if self.committed_polynomials.contains_key(polynomial_index) || !seen.insert(*polynomial_index) {
                 return Err(errors::PixError::DuplicateCommitment);
             }
         }

@@ -435,7 +435,22 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         };
 
         let mut builder_guard = cycle.builder().lock();
-        let ssa = builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part)?;
+        let ssa = match builder_guard.add_recovered_ssa_part(spi.poly_index(), ssa_part) {
+            Ok(ssa) => ssa,
+            Err(error) => {
+                // As terminal as `scalar_to_private_key` returning `None` below, and torn down the
+                // same way. Propagating alone would leave the accumulator and every part builder in
+                // place, and each further share for the cycle would refresh the idle timer that is
+                // supposed to reclaim them — so a Session that keeps sending holds a cycle that can
+                // never reconstruct for as long as it likes.
+                //
+                // The lock goes first: `remove_cycle` drops the last `Arc` to this very cycle.
+                drop(builder_guard);
+                tracing::error!(%spi, %error, "ssa part could not be added to its accumulator");
+                self.remove_cycle(ssa_id);
+                return Err(error);
+            }
+        };
         match ssa {
             Some(scalar) => {
                 // Read the final progress while the cycle is still live: `remove_cycle` below drops
@@ -1992,6 +2007,60 @@ mod tests {
         );
 
         drop(guard);
+        Ok(())
+    }
+
+    #[test]
+    /// **L2 regression.** A polynomial index repeated inside one batch must be rejected, not merely
+    /// one repeated across batches.
+    ///
+    /// The two-phase check tested each entry against `committed_polynomials`, which holds only what
+    /// earlier calls inserted, so two entries sharing an index both found the slot vacant. The
+    /// second insert then rebound the first — the single-assignment invariant the two phases exist
+    /// to enforce — and `total_committed` counted two occupants of one slot. The practical bite:
+    /// a batch carrying every polynomial with a repeat among them can never complete the set, and
+    /// the peer has no way to supply the one it displaced, because every retry is rejected as a
+    /// duplicate against the slots the batch did fill.
+    ///
+    /// The wire decoder rejects intra-message duplicates today. This builder is not meant to depend
+    /// on that, which is why the check is here.
+    #[test]
+    fn a_polynomial_repeated_within_one_batch_is_rejected() -> anyhow::Result<()> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
+        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+
+        // Polynomial 0 twice, and polynomial 1 not at all — the shape that would otherwise leave the
+        // set permanently one short while reporting two commitments received.
+        let mut batch = coefficient_of(&commitment, 0, Some(0))?;
+        batch.push(batch[0]);
+        let result =
+            reconstructor.insert_coefficient_commitments(ssa_id, 0, proof_of(&commitment, 0), batch.into_iter());
+        assert!(
+            matches!(&result, Err(crate::errors::PixError::DuplicateCommitment)),
+            "a repeat inside the batch must be rejected, got {result:?}"
+        );
+
+        // Rejected transactionally: neither entry was written, so the honest batch still lands.
+        let retry = reconstructor.insert_coefficient_commitments(
+            ssa_id,
+            0,
+            proof_of(&commitment, 0),
+            coefficient_of(&commitment, 0, None)?.into_iter(),
+        )?;
+        assert!(
+            retry.is_verifiable && retry.ssa_deposit_address.is_some(),
+            "the corrected batch must complete the commitment"
+        );
+
         Ok(())
     }
 
