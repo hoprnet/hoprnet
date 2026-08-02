@@ -1194,6 +1194,7 @@ where
 #[cfg(test)]
 mod tests {
     use futures::channel::mpsc;
+    use hopr_api::types::crypto_random::Randomizable;
 
     use super::*;
 
@@ -1204,6 +1205,235 @@ mod tests {
         assert!(
             !noop.has_pending_shares(&dummy),
             "NopExitAcknowledgementShareProcessor must always report no pending shares"
+        );
+    }
+
+    /// The no-op processor stands in wherever a node is not an Exit, so it is on the hot path of
+    /// every relay. Every method must succeed and do nothing — an error from any of them would be
+    /// logged once per acknowledgement batch.
+    #[test]
+    fn noop_exit_proc_succeeds_on_every_method() -> anyhow::Result<()> {
+        let noop = NopExitAcknowledgementShareProcessor;
+        let peer = *OffchainKeypair::random().public();
+        let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
+
+        assert_eq!(
+            noop.new_exit_commitment(ssa_id, 2, 2)?,
+            PixGroup::<HoprPixSpec>::default()
+        );
+
+        let state = noop.insert_coefficient_commitments(ssa_id, 0, None, std::iter::empty())?;
+        assert_eq!(state, SsaCommitmentState::new(ssa_id));
+
+        noop.retire_ssa(ssa_id);
+
+        noop.insert_encrypted_share(
+            &peer,
+            HalfKey::random().to_challenge()?,
+            TaggedEncryptedPartialSsaShare {
+                pseudonym: HoprPseudonym::random(),
+                nonce: Default::default(),
+                partial_share: Default::default(),
+            },
+        )?;
+
+        assert!(noop.acknowledge_shares(peer, vec![])?.is_empty());
+
+        // The default is `false`, and the no-op processor does not override it: `Infallible` has no
+        // value to classify, so nothing can ever be downgraded to a debug log.
+        Ok(())
+    }
+
+    /// A processor whose `acknowledge_shares` returns whatever the test wants, so the four arms of
+    /// the exit acknowledgement pipeline can each be reached.
+    #[derive(Clone)]
+    struct ScriptedExitProc {
+        outcome: std::sync::Arc<dyn Fn() -> Result<Vec<HoprShareResolution>, ScriptedError> + Send + Sync>,
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+    enum ScriptedError {
+        #[error("nothing was expected from this peer")]
+        Expected,
+        #[error("the reconstructor is broken")]
+        Unexpected,
+    }
+
+    impl ScriptedExitProc {
+        fn new(outcome: impl Fn() -> Result<Vec<HoprShareResolution>, ScriptedError> + Send + Sync + 'static) -> Self {
+            Self {
+                outcome: std::sync::Arc::new(outcome),
+                calls: Default::default(),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl ExitAcknowledgementShareProcessor<HoprPixSpec> for ScriptedExitProc {
+        type Error = ScriptedError;
+
+        fn is_expected_error(&self, error: &Self::Error) -> bool {
+            matches!(error, ScriptedError::Expected)
+        }
+
+        fn new_exit_commitment(
+            &self,
+            _: SsaId<HoprPseudonym>,
+            _: usize,
+            _: usize,
+        ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+            Ok(PixGroup::<HoprPixSpec>::default())
+        }
+
+        fn insert_coefficient_commitments(
+            &self,
+            ssa_id: SsaId<SimplePseudonym>,
+            _: CoefficientIndex,
+            _: Option<SsaCommitmentProof<HoprPixSpec>>,
+            _: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
+        ) -> Result<HoprSsaCommitmentState, Self::Error> {
+            Ok(SsaCommitmentState::new(ssa_id))
+        }
+
+        fn retire_ssa(&self, _: SsaId<HoprPseudonym>) {}
+
+        fn insert_encrypted_share(
+            &self,
+            _: &OffchainPublicKey,
+            _: HalfKeyChallenge,
+            _: TaggedEncryptedPartialSsaShare<HoprPixSpec>,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn acknowledge_shares(
+            &self,
+            _: OffchainPublicKey,
+            _: Vec<Acknowledgement>,
+        ) -> Result<Vec<HoprShareResolution>, Self::Error> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            (self.outcome)()
+        }
+    }
+
+    fn one_batch() -> Vec<(OffchainPublicKey, Vec<Acknowledgement>)> {
+        vec![(*OffchainKeypair::random().public(), vec![])]
+    }
+
+    async fn run_exit_pipeline(proc: ScriptedExitProc, evt: mpsc::Sender<HoprShareResolution>) -> ScriptedExitProc {
+        start_exit_incoming_ack_pipeline(futures::stream::iter(one_batch()), proc.clone(), evt, 4).await;
+        proc
+    }
+
+    /// Resolutions are forwarded to the event sink, and a dead sink is logged rather than
+    /// propagated: the acknowledgement pipeline is a long-running task with nowhere to return to.
+    #[tokio::test]
+    async fn exit_ack_pipeline_survives_a_dead_resolution_sink() {
+        let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into().expect("non-zero"));
+        let proc = ScriptedExitProc::new(move || Ok(vec![HoprShareResolution::AlmostRecoveredSsa(ssa_id)]));
+
+        let (tx, rx) = mpsc::channel::<HoprShareResolution>(4);
+        drop(rx);
+
+        let proc = run_exit_pipeline(proc, tx).await;
+        assert_eq!(proc.calls(), 1, "the batch must still have been processed");
+    }
+
+    #[tokio::test]
+    async fn exit_ack_pipeline_forwards_resolutions_to_the_sink() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
+        let proc = ScriptedExitProc::new(move || Ok(vec![HoprShareResolution::AlmostRecoveredSsa(ssa_id)]));
+
+        let (tx, mut rx) = mpsc::channel::<HoprShareResolution>(4);
+        run_exit_pipeline(proc, tx).await;
+
+        let received = rx
+            .next()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("no resolution forwarded"))?;
+        assert_eq!(received, HoprShareResolution::AlmostRecoveredSsa(ssa_id));
+        Ok(())
+    }
+
+    /// Both error kinds must keep the pipeline running; only their log level differs. An expected
+    /// error means "no acks from this peer were pending", which is ordinary relay traffic.
+    #[tokio::test]
+    async fn exit_ack_pipeline_survives_both_error_kinds() {
+        for error in [ScriptedError::Expected, ScriptedError::Unexpected] {
+            let proc = ScriptedExitProc::new(move || Err(error));
+            let (tx, _rx) = mpsc::channel::<HoprShareResolution>(4);
+            let proc = run_exit_pipeline(proc, tx).await;
+            assert_eq!(proc.calls(), 1, "{error:?} must not abort the pipeline");
+        }
+    }
+
+    /// The cheap `has_pending_shares` check exists so a relay never pays for a thread-pool
+    /// round-trip it has no shares for. If it says no, `acknowledge_shares` must not be called.
+    #[tokio::test]
+    async fn exit_ack_pipeline_skips_peers_with_no_pending_shares() {
+        #[derive(Clone)]
+        struct NeverPending(ScriptedExitProc);
+
+        impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NeverPending {
+            type Error = ScriptedError;
+
+            fn has_pending_shares(&self, _: &OffchainPublicKey) -> bool {
+                false
+            }
+
+            fn new_exit_commitment(
+                &self,
+                id: SsaId<HoprPseudonym>,
+                p: usize,
+                s: usize,
+            ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+                self.0.new_exit_commitment(id, p, s)
+            }
+
+            fn insert_coefficient_commitments(
+                &self,
+                ssa_id: SsaId<SimplePseudonym>,
+                i: CoefficientIndex,
+                proof: Option<SsaCommitmentProof<HoprPixSpec>>,
+                c: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<HoprPixSpec>)>,
+            ) -> Result<HoprSsaCommitmentState, Self::Error> {
+                self.0.insert_coefficient_commitments(ssa_id, i, proof, c)
+            }
+
+            fn retire_ssa(&self, id: SsaId<HoprPseudonym>) {
+                self.0.retire_ssa(id)
+            }
+
+            fn insert_encrypted_share(
+                &self,
+                p: &OffchainPublicKey,
+                c: HalfKeyChallenge,
+                s: TaggedEncryptedPartialSsaShare<HoprPixSpec>,
+            ) -> Result<(), Self::Error> {
+                self.0.insert_encrypted_share(p, c, s)
+            }
+
+            fn acknowledge_shares(
+                &self,
+                p: OffchainPublicKey,
+                a: Vec<Acknowledgement>,
+            ) -> Result<Vec<HoprShareResolution>, Self::Error> {
+                self.0.acknowledge_shares(p, a)
+            }
+        }
+
+        let inner = ScriptedExitProc::new(|| Ok(vec![]));
+        let (tx, _rx) = mpsc::channel::<HoprShareResolution>(4);
+        start_exit_incoming_ack_pipeline(futures::stream::iter(one_batch()), NeverPending(inner.clone()), tx, 4).await;
+
+        assert_eq!(
+            inner.calls(),
+            0,
+            "a peer with no pending shares must not reach the thread pool"
         );
     }
 
