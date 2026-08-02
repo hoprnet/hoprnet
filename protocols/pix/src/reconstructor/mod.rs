@@ -780,11 +780,50 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     }
 }
 
+impl<S: PixSpec> Drop for SsaReconstructor<S> {
+    /// Reports terminal resolutions that were never collected.
+    ///
+    /// [`ready_resolutions`](Self::ready_resolutions) is a hand-off the *commitment* path fills and
+    /// only `acknowledge_shares` empties, so delivery waits on the next acknowledgement batch from
+    /// any peer. That is the common case and not the guaranteed one: a Session whose final cycle
+    /// recovers through the deferred-ack drain, and which then stops sending because the cycle it
+    /// was funding is complete, leaves the last resolution sitting here.
+    ///
+    /// Retirement is not the deadline — a retired cycle's resolution stays collectable, since the
+    /// buffer is global and its entries name their own `SsaId`. This is, and nothing here can
+    /// deliver: the commitment path has no route to the upper layer, which is why these were parked
+    /// rather than returned. So the most that can be done is to refuse to lose them quietly. A
+    /// `RecoveredSsa` reported here is a deposit key the Exit held and never handed on.
+    ///
+    /// The real fix is for the reconstructor to push rather than be pulled, which needs a sink on
+    /// its constructor; that is bundled with threading a real `SsaReconstructorConfig` through the
+    /// three sites in `hopr-transport` that hard-code `::default()`.
+    fn drop(&mut self) {
+        if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) == 0 {
+            return;
+        }
+        for resolution in self.ready_resolutions.lock().drain(..) {
+            tracing::error!(
+                ?resolution,
+                "pix resolution was never collected and is lost with the reconstructor"
+            );
+        }
+    }
+}
+
 impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstructor<S> {
     type Error = PixError<S::Pseudonym>;
 
     fn has_pending_shares(&self, peer: &OffchainPublicKey) -> bool {
-        self.awaiting_acks.contains_key(peer)
+        // The parked-resolution check is not redundant with the per-peer one. Callers use this to
+        // skip `acknowledge_shares` entirely, and that is the only thing which ever collects
+        // `ready_resolutions` — a buffer the *commitment* path fills, holding terminal events up
+        // to and including a recovered deposit key. It is global rather than per-peer and its
+        // contents name their own `SsaId`, so any batch can correctly carry it out; gating it
+        // behind the producing peer's `awaiting_acks` entry, which expires on its own timer,
+        // would strand it for no reason.
+        self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) > 0
+            || self.awaiting_acks.contains_key(peer)
     }
 
     fn is_expected_error(&self, error: &Self::Error) -> bool {
@@ -3047,6 +3086,113 @@ mod tests {
                 .iter()
                 .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(_))),
             "the acknowledgement must have been redeemed inline, not lost with the bucket"
+        );
+
+        Ok(())
+    }
+
+    /// Drives a cycle to full recovery entirely through the deferral path, so the `RecoveredSsa` it
+    /// produces ends up parked in `ready_resolutions` rather than returned from `acknowledge_shares`.
+    ///
+    /// Both shares arrive before the commitment does, which is the ordering the emission window
+    /// makes routine near a cycle boundary, so both acknowledgements defer and the drain that
+    /// installs the cycle is what reconstructs.
+    fn park_a_recovered_ssa() -> anyhow::Result<(SsaReconstructor<TestSpec>, SsaId<SimplePseudonym>)> {
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+
+        for _ in 0..2 {
+            let (msg, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let enc = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            reconstructor.acknowledge_shares(*peer.public(), vec![VerifiedAcknowledgement::new(ack, &peer).leak()])?;
+        }
+
+        commitment.process_into_reconstructor(&reconstructor)?;
+        assert_ne!(
+            0,
+            reconstructor
+                .ready_resolutions_len
+                .load(std::sync::atomic::Ordering::Acquire),
+            "the drain must have parked the recovery"
+        );
+
+        Ok((reconstructor, ssa_id))
+    }
+
+    /// A parked resolution must not be gated behind the peer whose shares produced it.
+    ///
+    /// The pipelines call `has_pending_shares` to decide whether to hand a batch to
+    /// `acknowledge_shares` at all, and `acknowledge_shares` is the only thing that ever collects
+    /// `ready_resolutions`. Answering purely from `awaiting_acks` therefore made delivery of a
+    /// recovered deposit key depend on the producing peer sending more traffic before its own cache
+    /// entry idled out — while the buffer is global, and any batch could have carried it.
+    #[test]
+    fn a_parked_resolution_is_collectable_through_any_peer() -> anyhow::Result<()> {
+        let (reconstructor, _) = park_a_recovered_ssa()?;
+
+        // A peer this reconstructor has never seen: no shares, no `awaiting_acks` entry.
+        let bystander = *OffchainKeypair::random().public();
+        assert!(
+            !reconstructor.awaiting_acks.contains_key(&bystander),
+            "the bystander must have no pending shares of its own"
+        );
+        assert!(
+            reconstructor.has_pending_shares(&bystander),
+            "a parked resolution must let any batch through to collect it"
+        );
+
+        // And once collected, the guard goes back to answering per-peer.
+        assert!(
+            reconstructor
+                .take_ready_resolutions()
+                .iter()
+                .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(_)))
+        );
+        assert!(
+            !reconstructor.has_pending_shares(&bystander),
+            "with nothing parked the guard must not admit an unrelated peer"
+        );
+
+        Ok(())
+    }
+
+    /// Retiring a cycle must not consume the resolution it already produced.
+    ///
+    /// `ready_resolutions` is global and its entries name their own `SsaId`, so a parked
+    /// `RecoveredSsa` stays collectable after its cycle is torn down — and it is worth collecting:
+    /// the deposit key is what pays the Exit, whether or not the Session that earned it is still
+    /// open. Draining at retirement would destroy that, and would take unrelated cycles'
+    /// resolutions with it, since nothing in the buffer is keyed by cycle. The only point at which
+    /// delivery genuinely becomes impossible is `Drop`, which reports whatever is left.
+    #[test]
+    fn retiring_a_cycle_leaves_its_resolution_collectable() -> anyhow::Result<()> {
+        let (reconstructor, ssa_id) = park_a_recovered_ssa()?;
+
+        reconstructor.retire_ssa(ssa_id);
+
+        assert!(
+            reconstructor
+                .take_ready_resolutions()
+                .iter()
+                .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(_))),
+            "retirement must not swallow a recovered deposit key"
         );
 
         Ok(())
