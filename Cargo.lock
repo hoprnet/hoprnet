@@ -4225,7 +4225,6 @@ dependencies = [
  "moka",
  "parameterized",
  "parking_lot",
- "ringbuffer",
  "serde",
  "serde_with",
  "smart-default",
