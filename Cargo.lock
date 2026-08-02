@@ -4296,6 +4296,7 @@ dependencies = [
  "rand 0.10.2",
  "serde",
  "serde_bytes",
+ "serde_cbor_2",
  "smart-default",
  "strum",
  "thiserror 2.0.19",

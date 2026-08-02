@@ -247,15 +247,266 @@ pub trait EntryShareGenerator<S: PixSpec> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash as _, Hasher},
+    };
+
     use hopr_types::{
         crypto::{
-            keypairs::Keypair,
+            keypairs::{Keypair, OffchainKeypair},
             prelude::{ChainKeypair, SimplePseudonym},
         },
         crypto_random::Randomizable,
     };
 
     use super::*;
+    use crate::SsaRecoveryProgress;
+
+    /// `ShareResolution`'s `PartialEq`, `Debug` and `Hash` are hand-written rather than derived,
+    /// because a derive would demand `A: PartialEq + Hash + Debug` — and `A` is the recovered SSA
+    /// private key, which must stay both unconstrained and redacted. Hand-written means unchecked
+    /// by the compiler, so each arm is exercised below.
+    type Resolution = ShareResolution<SimplePseudonym, ChainKeypair>;
+
+    fn ssa_id(index: u32) -> SsaId<SimplePseudonym> {
+        SsaId::new(SimplePseudonym::random(), index.try_into().expect("non-zero index"))
+    }
+
+    fn progress(id: SsaId<SimplePseudonym>, useful: u64) -> SsaRecoveryProgress<SimplePseudonym> {
+        SsaRecoveryProgress {
+            ssa_id: id,
+            useful_shares: useful,
+            target_useful_shares: 128,
+            recovered_polynomials: 2,
+        }
+    }
+
+    fn invalid(peer: OffchainPublicKey, id: SsaId<SimplePseudonym>, total: u64) -> Resolution {
+        ShareResolution::InvalidShares {
+            peer: Box::new(peer),
+            ssa_id: id,
+            observed_total: total,
+        }
+    }
+
+    fn hash_of(value: &Resolution) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn share_resolution_equality_compares_every_field_of_every_variant() {
+        let id = ssa_id(1);
+        let other_id = ssa_id(2);
+        let peer = *OffchainKeypair::random().public();
+        let other_peer = *OffchainKeypair::random().public();
+
+        // `RecoveredSsa` delegates to `RecoveredSsa`'s own `PartialEq`, which compares the id only —
+        // the key is not comparable and two recoveries of the same SSA are the same event.
+        let recovered = |id| {
+            Resolution::RecoveredSsa(RecoveredSsa {
+                ssa_id: id,
+                ssa: ChainKeypair::random(),
+            })
+        };
+        assert_eq!(recovered(id), recovered(id));
+        assert_ne!(recovered(id), recovered(other_id));
+
+        assert_eq!(Resolution::AlmostRecoveredSsa(id), Resolution::AlmostRecoveredSsa(id));
+        assert_ne!(
+            Resolution::AlmostRecoveredSsa(id),
+            Resolution::AlmostRecoveredSsa(other_id)
+        );
+
+        assert_eq!(
+            Resolution::Progress(progress(id, 10)),
+            Resolution::Progress(progress(id, 10))
+        );
+        assert_ne!(
+            Resolution::Progress(progress(id, 10)),
+            Resolution::Progress(progress(id, 11)),
+            "a progress snapshot differing only in useful_shares must not compare equal"
+        );
+
+        assert_eq!(invalid(peer, id, 3), invalid(peer, id, 3));
+        assert_ne!(
+            invalid(peer, id, 3),
+            invalid(other_peer, id, 3),
+            "peer must be compared"
+        );
+        assert_ne!(
+            invalid(peer, id, 3),
+            invalid(peer, other_id, 3),
+            "ssa_id must be compared"
+        );
+        assert_ne!(
+            invalid(peer, id, 3),
+            invalid(peer, id, 4),
+            "observed_total must be compared"
+        );
+    }
+
+    #[test]
+    fn share_resolution_of_different_variants_is_never_equal() {
+        let id = ssa_id(1);
+        let peer = *OffchainKeypair::random().public();
+
+        let all: [Resolution; 4] = [
+            Resolution::RecoveredSsa(RecoveredSsa {
+                ssa_id: id,
+                ssa: ChainKeypair::random(),
+            }),
+            Resolution::AlmostRecoveredSsa(id),
+            Resolution::Progress(progress(id, 10)),
+            invalid(peer, id, 3),
+        ];
+
+        // Every cross-variant pair must fall through to the catch-all arm, even though all four
+        // carry the same `SsaId`.
+        for (i, left) in all.iter().enumerate() {
+            for (j, right) in all.iter().enumerate() {
+                if i != j {
+                    assert_ne!(left, right, "variants {i} and {j} must not compare equal");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn share_resolution_debug_names_its_variant_and_fields() {
+        let id = ssa_id(1);
+        let peer = *OffchainKeypair::random().public();
+
+        let almost = format!("{:?}", Resolution::AlmostRecoveredSsa(id));
+        assert_eq!(almost, format!("AlmostRecoveredSsa({id:?})"));
+
+        let snapshot = progress(id, 10);
+        let progress_debug = format!("{:?}", Resolution::Progress(snapshot));
+        assert_eq!(progress_debug, format!("Progress({snapshot:?})"));
+
+        let invalid_debug = format!("{:?}", invalid(peer, id, 3));
+        assert!(invalid_debug.starts_with("InvalidShares {"), "got {invalid_debug}");
+        for field in ["peer", "ssa_id", "observed_total"] {
+            assert!(invalid_debug.contains(field), "{field} missing from {invalid_debug}");
+        }
+    }
+
+    #[test]
+    fn share_resolution_hash_agrees_with_equality() {
+        let id = ssa_id(1);
+        let other_id = ssa_id(2);
+        let peer = *OffchainKeypair::random().public();
+
+        // Equal values hash equal, for every variant.
+        assert_eq!(
+            hash_of(&Resolution::AlmostRecoveredSsa(id)),
+            hash_of(&Resolution::AlmostRecoveredSsa(id))
+        );
+        assert_eq!(
+            hash_of(&Resolution::Progress(progress(id, 10))),
+            hash_of(&Resolution::Progress(progress(id, 10)))
+        );
+        assert_eq!(hash_of(&invalid(peer, id, 3)), hash_of(&invalid(peer, id, 3)));
+        assert_eq!(
+            hash_of(&Resolution::RecoveredSsa(RecoveredSsa {
+                ssa_id: id,
+                ssa: ChainKeypair::random(),
+            })),
+            hash_of(&Resolution::RecoveredSsa(RecoveredSsa {
+                ssa_id: id,
+                ssa: ChainKeypair::random(),
+            })),
+            "RecoveredSsa hashes the id only, so the key must not perturb it"
+        );
+
+        // The discriminant is mixed in, so two variants carrying the same id do not collide.
+        assert_ne!(
+            hash_of(&Resolution::AlmostRecoveredSsa(id)),
+            hash_of(&Resolution::RecoveredSsa(RecoveredSsa {
+                ssa_id: id,
+                ssa: ChainKeypair::random(),
+            })),
+            "the discriminant must be hashed, or same-id variants collide"
+        );
+
+        // Differing payloads hash differently.
+        assert_ne!(
+            hash_of(&Resolution::AlmostRecoveredSsa(id)),
+            hash_of(&Resolution::AlmostRecoveredSsa(other_id))
+        );
+        assert_ne!(
+            hash_of(&Resolution::Progress(progress(id, 10))),
+            hash_of(&Resolution::Progress(progress(id, 11)))
+        );
+        assert_ne!(hash_of(&invalid(peer, id, 3)), hash_of(&invalid(peer, id, 4)));
+    }
+
+    /// The two provided methods exist so an implementation can stay minimal; their defaults are the
+    /// conservative choice (assume shares may be pending, assume no error is expected) and no
+    /// concrete implementation exercises them.
+    #[test]
+    fn exit_processor_defaults_are_conservative() {
+        struct Minimal;
+
+        #[derive(Debug, thiserror::Error)]
+        #[error("nope")]
+        struct MinimalError;
+
+        impl ExitAcknowledgementShareProcessor<crate::tests::TestSpec> for Minimal {
+            type Error = MinimalError;
+
+            fn retire_ssa(&self, _ssa_id: SsaId<SimplePseudonym>) {}
+
+            fn new_exit_commitment(
+                &self,
+                _id: SsaId<SimplePseudonym>,
+                _polys_per_ssa: usize,
+                _shares_per_poly: usize,
+            ) -> Result<PixGroup<crate::tests::TestSpec>, Self::Error> {
+                Err(MinimalError)
+            }
+
+            fn insert_coefficient_commitments(
+                &self,
+                _ssa_id: SsaId<SimplePseudonym>,
+                _index: CoefficientIndex,
+                _proof: Option<SsaCommitmentProof<crate::tests::TestSpec>>,
+                _commitments: impl Iterator<Item = (PolynomialIndex, PixGroupRepr<crate::tests::TestSpec>)>,
+            ) -> Result<SsaCommitmentState<SimplePseudonym, hopr_types::primitive::prelude::Address>, Self::Error>
+            {
+                Err(MinimalError)
+            }
+
+            fn insert_encrypted_share(
+                &self,
+                _peer: &OffchainPublicKey,
+                _challenge: HalfKeyChallenge,
+                _tagged_enc_share: TaggedEncryptedPartialSsaShare<crate::tests::TestSpec>,
+            ) -> Result<(), Self::Error> {
+                Err(MinimalError)
+            }
+
+            fn acknowledge_shares(
+                &self,
+                _peer: OffchainPublicKey,
+                _acks: Vec<Acknowledgement>,
+            ) -> Result<ShareResolutions<crate::tests::TestSpec>, Self::Error> {
+                Err(MinimalError)
+            }
+        }
+
+        let peer = *OffchainKeypair::random().public();
+        assert!(
+            Minimal.has_pending_shares(&peer),
+            "the default must assume shares may be pending, so the caller still calls in"
+        );
+        assert!(
+            !Minimal.is_expected_error(&MinimalError),
+            "the default must treat every error as unexpected, so nothing is silently downgraded"
+        );
+    }
 
     #[test]
     fn debug_redaction_share_resolution_recovered_ssa() {

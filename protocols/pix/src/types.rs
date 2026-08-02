@@ -917,4 +917,225 @@ mod tests {
             "RecoveredSsa Debug must expose only the ssa_id field"
         );
     }
+
+    /// `RecoveredSsa`'s `PartialEq` and `Hash` are hand-written to ignore the key, so that `A` need
+    /// not be comparable or hashable. Two recoveries of the same SSA are the same event.
+    #[test]
+    fn recovered_ssa_equality_and_hash_ignore_the_key() {
+        use std::hash::{Hash as _, Hasher as _};
+
+        use hopr_types::crypto::{keypairs::Keypair, prelude::ChainKeypair};
+
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into().unwrap());
+        let other_id = SsaId::new(SimplePseudonym::random(), 2.try_into().unwrap());
+
+        let hash_of = |r: &RecoveredSsa<SimplePseudonym, ChainKeypair>| {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            r.hash(&mut h);
+            h.finish()
+        };
+
+        let a = RecoveredSsa {
+            ssa_id,
+            ssa: ChainKeypair::random(),
+        };
+        let b = RecoveredSsa {
+            ssa_id,
+            ssa: ChainKeypair::random(),
+        };
+        let c = RecoveredSsa {
+            ssa_id: other_id,
+            ssa: ChainKeypair::random(),
+        };
+
+        assert_eq!(a, b, "two different keys for the same SSA must compare equal");
+        assert_eq!(hash_of(&a), hash_of(&b), "and must hash equal");
+        assert_ne!(a, c);
+        assert_ne!(hash_of(&a), hash_of(&c));
+    }
+
+    #[test]
+    fn ssa_ids_expose_their_parts_and_display_hierarchically() {
+        let pseudonym = SimplePseudonym::random();
+        let ssa_index: SsaIndex = 7.try_into().unwrap();
+        let ssa_id = SsaId::new(pseudonym, ssa_index);
+
+        assert_eq!(ssa_id.pseudonym(), &pseudonym);
+        assert_eq!(ssa_id.ssa_index(), ssa_index);
+        assert_eq!(ssa_id.to_string(), format!("{pseudonym}-ssa#7"));
+
+        let spi = SsaPolynomialId::new(ssa_id, 3);
+        assert_eq!(spi.pseudonym(), &pseudonym);
+        assert_eq!(spi.ssa_index(), ssa_index);
+        assert_eq!(spi.poly_index(), 3);
+        // The polynomial id borrows the SSA id it was built from, so cycle-scoped lookups can key
+        // off a polynomial-scoped value without rebuilding one.
+        assert_eq!(AsRef::<SsaId<_>>::as_ref(&spi), &ssa_id);
+        assert_eq!(spi.to_string(), format!("{ssa_id}:3"));
+    }
+
+    #[test]
+    fn encrypted_share_round_trips_through_bytes_and_rejects_the_wrong_length() {
+        let key = HalfKey::random();
+        let spi =
+            SsaPolynomialId::<SimplePseudonym>::new(SsaId::new(SimplePseudonym::random(), 5.try_into().unwrap()), 9);
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let encrypted = PartialSsaShare::<TestSpec>(scalar.to_repr())
+            .encrypt(&spi, &key)
+            .expect("encryption must succeed");
+
+        // The indices are carried in the clear as a prefix, so the Exit can route a share before it
+        // has the key to decrypt it.
+        assert_eq!(encrypted.indices(), Some((spi.ssa_index(), spi.poly_index())));
+        assert!(!encrypted.is_empty());
+
+        let bytes: &[u8] = encrypted.as_ref();
+        assert_eq!(bytes.len(), EncryptedPartialSsaShare::<TestSpec>::SIZE);
+        assert_eq!(
+            EncryptedPartialSsaShare::<TestSpec>::try_from(bytes).expect("exact length must parse"),
+            encrypted
+        );
+
+        for wrong in [&bytes[..bytes.len() - 1], &[][..]] {
+            assert!(
+                EncryptedPartialSsaShare::<TestSpec>::try_from(wrong).is_err(),
+                "a {}-byte buffer must not parse as a {}-byte share",
+                wrong.len(),
+                EncryptedPartialSsaShare::<TestSpec>::SIZE
+            );
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn encrypted_share_serde_round_trips_as_opaque_bytes() {
+        let key = HalfKey::random();
+        let spi =
+            SsaPolynomialId::<SimplePseudonym>::new(SsaId::new(SimplePseudonym::random(), 2.try_into().unwrap()), 1);
+        let scalar = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let encrypted = PartialSsaShare::<TestSpec>(scalar.to_repr())
+            .encrypt(&spi, &key)
+            .expect("encryption must succeed");
+
+        // Serialized as a byte string rather than a sequence of integers, so the encoding stays the
+        // same size on the wire as the share itself.
+        let encoded = serde_cbor_2::to_vec(&encrypted).expect("serialization must succeed");
+        let decoded: EncryptedPartialSsaShare<TestSpec> =
+            serde_cbor_2::from_slice(&encoded).expect("deserialization must succeed");
+        assert_eq!(decoded, encrypted);
+
+        // A short byte string must be rejected by the same length check `TryFrom` applies.
+        // `0x43` is a CBOR byte string of length 3.
+        let truncated = [0x43u8, 0x00, 0x00, 0x00];
+        assert!(serde_cbor_2::from_slice::<EncryptedPartialSsaShare<TestSpec>>(&truncated).is_err());
+    }
+
+    #[test]
+    fn commitment_proof_verifies_only_against_the_commitment_it_opens() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let secret = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let commitment = PixGroup::<TestSpec>::mul_by_generator(&secret);
+
+        let proof = SsaCommitmentProof::<TestSpec>::prove(&ssa_id, &secret, &commitment)?;
+        assert!(proof.verify(&ssa_id, &commitment));
+
+        // The challenge binds the SSA id, so a proof cannot be replayed onto another cycle.
+        let other_id = SsaId::new(*ssa_id.pseudonym(), 2.try_into()?);
+        assert!(!proof.verify(&other_id, &commitment), "the proof must bind the SSA id");
+
+        // ...and onto another commitment, which is the attack it exists to stop.
+        let other_secret = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let other_commitment = PixGroup::<TestSpec>::mul_by_generator(&other_secret);
+        assert!(
+            !proof.verify(&ssa_id, &other_commitment),
+            "the proof must bind the commitment"
+        );
+
+        // Two proofs of the same statement use fresh nonces, so they must differ. Reusing a nonce
+        // across differing challenges leaks the secret.
+        let again = SsaCommitmentProof::<TestSpec>::prove(&ssa_id, &secret, &commitment)?;
+        assert_ne!(proof, again, "the proof nonce must be fresh for every proof");
+        assert!(again.verify(&ssa_id, &commitment));
+
+        // Clone is a copy of two byte arrays; equality compares both components.
+        #[allow(clippy::clone_on_copy)]
+        let cloned = proof.clone();
+        assert_eq!(proof, cloned);
+
+        Ok(())
+    }
+
+    #[test]
+    fn commitment_proof_round_trips_through_bytes() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let secret = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let commitment = PixGroup::<TestSpec>::mul_by_generator(&secret);
+        let proof = SsaCommitmentProof::<TestSpec>::prove(&ssa_id, &secret, &commitment)?;
+
+        let bytes = proof.to_bytes();
+        assert_eq!(bytes.len(), SsaCommitmentProof::<TestSpec>::SIZE);
+
+        let parsed = SsaCommitmentProof::<TestSpec>::try_from_bytes(&bytes)?;
+        assert_eq!(parsed, proof);
+        assert!(parsed.verify(&ssa_id, &commitment));
+
+        for wrong in [&bytes[..bytes.len() - 1], &[][..]] {
+            assert!(
+                SsaCommitmentProof::<TestSpec>::try_from_bytes(wrong).is_err(),
+                "only the exact length may parse"
+            );
+        }
+
+        // Garbage of the right length parses but must not verify: `try_from_bytes` checks the
+        // length only, deliberately routing a malformed proof and an invalid one down one path.
+        let garbage =
+            SsaCommitmentProof::<TestSpec>::try_from_bytes(&vec![0xAA; SsaCommitmentProof::<TestSpec>::SIZE])?;
+        assert!(!garbage.verify(&ssa_id, &commitment));
+
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_commitment_iterates_its_transposed_verifiers() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let secret = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+        let ssa_commitment = PixGroup::<TestSpec>::mul_by_generator(&secret);
+        let commitment_proof = SsaCommitmentProof::<TestSpec>::prove(&ssa_id, &secret, &ssa_commitment)?;
+
+        let entries: Vec<(PolynomialIndex, PixGroupRepr<TestSpec>)> = (0..3u16)
+            .map(|poly_index| {
+                let s = PixScalar::<TestSpec>::random(&mut hopr_types::crypto_random::rng());
+                (poly_index, PixGroup::<TestSpec>::mul_by_generator(&s).to_bytes())
+            })
+            .collect();
+
+        let commitment = SsaCommitment::<TestSpec> {
+            ssa_id,
+            ssa_commitment,
+            commitment_proof,
+            verifiers: HashMap::from([(crate::CONSTANT_TERM_COEFFICIENT, entries.clone())]),
+        };
+
+        let collected: Vec<_> = commitment.into_iter().collect();
+        assert_eq!(collected.len(), 1, "PIX commits to the constant term and nothing else");
+        assert_eq!(collected[0].0, crate::CONSTANT_TERM_COEFFICIENT);
+        assert_eq!(collected[0].1, entries);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ssa_commitment_state_starts_unverifiable_and_unaddressed() {
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into().unwrap());
+        let state = SsaCommitmentState::<SimplePseudonym, hopr_types::primitive::prelude::Address>::new(ssa_id);
+
+        assert_eq!(state.ssa_id, ssa_id);
+        assert!(
+            state.ssa_deposit_address.is_none(),
+            "the address is the sum of constant terms, none of which have arrived yet"
+        );
+        assert!(!state.is_verifiable, "shares cannot verify before the commitment does");
+        assert!(state.is_first_encountered);
+        assert!(!state.deposit_address_first_encountered);
+    }
 }
