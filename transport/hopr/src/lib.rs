@@ -952,21 +952,15 @@ where
                 processes.insert(
                     HoprTransportProcess::PixEvents,
                     hopr_utils::spawn_as_abortable!(
+                        // The same mapping as the Exit and Relay arms, deliberately: `DepositNeeded`
+                        // is not *expected* here, but it is reachable. `SessionManager` has no
+                        // notion of node role and this one runs with a live toolbox — only the
+                        // incoming-session notification is drained below — so an inbound
+                        // `StartSession` carrying `UsePIX` is accepted and ends in
+                        // `handle_ssa_commit` emitting it. Panicking would take the whole PIX event
+                        // task with it, stranding this node's own outbound deposits.
                         session_pix_events
-                            .map(|session_pix_event| match session_pix_event {
-                                HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
-                                    ssa_id,
-                                    deposit_address,
-                                    quota_per_ssa,
-                                }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
-                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
-                                    address: deposit_address.into(),
-                                    quota: quota_per_ssa,
-                                }),
-                                HoprSessionOutPixEvent::DepositNeeded(..) => {
-                                    unreachable!("Entry received DepositNeeded PIX event")
-                                }
-                            })
+                            .map(session_pix_event_to_pix_event)
                             .map(Ok)
                             .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
                     ),
