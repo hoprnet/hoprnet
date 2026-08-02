@@ -1,9 +1,8 @@
 //! Client/ENTRY-side send-window flow control for Session sockets.
 //!
 //! A `Segmentation`-only Session has no end-to-end flow control: the ENTRY writer runs to
-//! completion and floods the return path (echoes + acknowledgements + SURB keep-alives), which is
-//! capped at the EXIT SURB-reply rate. Unpaced, this deterministically stalls once the in-flight
-//! backlog exceeds what the counterparty can drain.
+//! completion and floods the return path (data + acknowledgements + SURB replenishments), capped
+//! at the EXIT SURB-reply rate. Unpaced, this deterministically stalls.
 //!
 //! This module provides a self-adapting send window that replaces manual pacing. It speeds up
 //! **only** on *proven* delivery and slows down on congestion/loss, so throughput auto-tracks the
@@ -71,13 +70,13 @@ pub struct FlowControlConfig {
     /// is the hard floor a malicious peer can never push the window below — but also never above
     /// without honest delivery. Keep small (a few frames). Default 4 KiB.
     #[default(4 * 1024)]
-    pub min_win: usize,
+    pub min_window_size: usize,
 
     /// Hard ceiling on the send window, seeded from the bandwidth-delay product
     /// (`drain_rate_hint × rtt`). The window never opens past this even under sustained delivery.
     /// Default 2 MiB.
     #[default(2 * 1024 * 1024)]
-    pub max_win: usize,
+    pub max_window_size: usize,
 
     /// Additive-increase step (bytes added to the window per fully-delivered window) while in
     /// congestion avoidance. Default 16 KiB.
@@ -97,16 +96,16 @@ pub struct FlowControlConfig {
 }
 
 impl FlowControlConfig {
-    /// Clamps parameters into their valid ranges (`min_win ≤ max_win`, `md_factor ∈ (0,1)`,
+    /// Clamps parameters into their valid ranges (`min_window_size ≤ max_window_size`, `md_factor ∈ (0,1)`,
     /// `ai_step ≥ 1`). Called by [`WindowController::new`] so out-of-range config cannot violate
     /// the invariants.
     fn normalized(self) -> FlowControlConfig {
-        let min_win = self.min_win.max(1);
+        let min_window_size = self.min_window_size.max(1);
         FlowControlConfig {
             enabled: self.enabled,
             mode: self.mode,
-            min_win,
-            max_win: self.max_win.max(min_win),
+            min_window_size,
+            max_window_size: self.max_window_size.max(min_window_size),
             ai_step: self.ai_step.max(1),
             md_factor: if self.md_factor.is_finite() {
                 self.md_factor.clamp(0.01, 0.99)
@@ -117,14 +116,14 @@ impl FlowControlConfig {
         }
     }
 
-    /// Convenience constructor seeding [`max_win`](Self::max_win) from a bandwidth-delay product.
+    /// Convenience constructor seeding [`max_window_size`](Self::max_window_size) from a bandwidth-delay product.
     ///
     /// `drain_rate_bytes_per_sec` is the estimated rate at which the counterparty can drain the
     /// return path (for a SURB-capped echo: `max_surbs_per_sec / surbs_per_reply_packet ×
     /// bytes_per_packet`). `rtt` is the round-trip delivery latency.
     pub fn with_bdp(mut self, drain_rate_bytes_per_sec: u64, rtt: Duration) -> Self {
         let bdp = (drain_rate_bytes_per_sec as f64 * rtt.as_secs_f64()) as usize;
-        self.max_win = bdp.max(self.min_win);
+        self.max_window_size = bdp.max(self.min_window_size);
         self
     }
 }
@@ -190,24 +189,24 @@ pub trait SupplyConstraint {
 #[derive(Clone, Debug)]
 pub struct WindowController {
     cfg: FlowControlConfig,
-    /// Current congestion window in bytes, always within `[min_win, max_win]`.
+    /// Current congestion window in bytes, always within `[min_window_size, max_window_size]`.
     cwnd: usize,
     /// Bytes sent but not yet delivered or lost.
     inflight: usize,
     /// Bytes delivered toward the next additive-increase step (Reno-style congestion avoidance).
-    ai_accum: usize,
+    ai_accumulated_size: usize,
 }
 
 impl WindowController {
-    /// Creates a controller with the window at the floor (`min_win`). The window can only grow from
+    /// Creates a controller with the window at the floor (`min_window_size`). The window can only grow from
     /// here via proven delivery — so before any honest signal, the peer cannot make it exceed
-    /// `min_win` (invariant 1 & 3).
+    /// `min_window_size` (invariant 1 & 3).
     pub fn new(cfg: FlowControlConfig) -> Self {
         let cfg = cfg.normalized();
         Self {
-            cwnd: cfg.min_win,
+            cwnd: cfg.min_window_size,
             inflight: 0,
-            ai_accum: 0,
+            ai_accumulated_size: 0,
             cfg,
         }
     }
@@ -239,26 +238,26 @@ impl WindowController {
 
     /// **The only path that grows the window.** Retires `bytes` of proven-delivered data and
     /// performs Reno congestion avoidance: roughly `+ai_step` per fully-delivered window, capped at
-    /// `max_win`.
+    /// `max_window_size`.
     pub fn on_delivered(&mut self, bytes: usize) {
         self.inflight = self.inflight.saturating_sub(bytes);
-        if self.cwnd >= self.cfg.max_win {
+        if self.cwnd >= self.cfg.max_window_size {
             return;
         }
-        self.ai_accum = self.ai_accum.saturating_add(bytes);
+        self.ai_accumulated_size = self.ai_accumulated_size.saturating_add(bytes);
         // Emit one additive step per window's worth of delivered bytes.
-        while self.ai_accum >= self.cwnd {
-            self.ai_accum -= self.cwnd;
-            self.cwnd = self.cwnd.saturating_add(self.cfg.ai_step).min(self.cfg.max_win);
-            if self.cwnd >= self.cfg.max_win {
-                self.ai_accum = 0;
+        while self.ai_accumulated_size >= self.cwnd {
+            self.ai_accumulated_size -= self.cwnd;
+            self.cwnd = self.cwnd.saturating_add(self.cfg.ai_step).min(self.cfg.max_window_size);
+            if self.cwnd >= self.cfg.max_window_size {
+                self.ai_accumulated_size = 0;
                 break;
             }
         }
     }
 
     /// Retires `bytes` of proven-lost data and multiplicatively decreases the window (never below
-    /// `min_win`). Loss recovery itself (retransmission) is the reliable socket's job.
+    /// `min_window_size`). Loss recovery itself (retransmission) is the reliable socket's job.
     pub fn on_lost(&mut self, bytes: usize) {
         self.inflight = self.inflight.saturating_sub(bytes);
         self.decrease(self.cfg.md_factor);
@@ -279,14 +278,16 @@ impl WindowController {
     pub fn apply_backoff(&mut self, b: Backoff) {
         match b {
             Backoff::Soft => self.decrease(self.cfg.md_factor),
-            Backoff::Hard => self.cwnd = self.cfg.min_win,
+            Backoff::Hard => self.cwnd = self.cfg.min_window_size,
         }
     }
 
     /// Effective window against a SURB-supply ceiling: `min(cwnd, ceiling)`, but never below
-    /// `min_win` (duplex floor). The ceiling can only shrink the result — invariant 2.
+    /// `min_window_size` (duplex floor). The ceiling can only shrink the result — invariant 2.
     pub fn effective_window(&self, supply: &impl SupplyConstraint) -> usize {
-        self.cwnd.min(supply.max_admissible_inflight()).max(self.cfg.min_win)
+        self.cwnd
+            .min(supply.max_admissible_inflight())
+            .max(self.cfg.min_window_size)
     }
 
     /// Bytes that may be admitted right now against `supply`: `effective_window − inflight`
@@ -295,11 +296,11 @@ impl WindowController {
         self.effective_window(supply).saturating_sub(self.inflight)
     }
 
-    /// Multiplicative decrease helper, flooring at `min_win`.
+    /// Multiplicative decrease helper, flooring at `min_window_size`.
     fn decrease(&mut self, factor: f64) {
         let reduced = (self.cwnd as f64 * factor) as usize;
-        self.cwnd = reduced.max(self.cfg.min_win);
-        self.ai_accum = 0;
+        self.cwnd = reduced.max(self.cfg.min_window_size);
+        self.ai_accumulated_size = 0;
     }
 }
 
@@ -441,8 +442,8 @@ mod tests {
 
     fn cfg() -> FlowControlConfig {
         FlowControlConfig {
-            min_win: 1_000,
-            max_win: 100_000,
+            min_window_size: 1_000,
+            max_window_size: 100_000,
             ai_step: 1_000,
             md_factor: 0.5,
             ..Default::default()
@@ -452,20 +453,20 @@ mod tests {
     #[test]
     fn starts_at_floor() {
         let w = WindowController::new(cfg());
-        assert_eq!(w.window(), 1_000, "window must start at min_win, not above");
+        assert_eq!(w.window(), 1_000, "window must start at min_window_size, not above");
     }
 
     #[test]
     fn normalization_clamps_out_of_range_config() {
         let w = WindowController::new(FlowControlConfig {
-            min_win: 5_000,
-            max_win: 1_000, // below min_win → must be raised to min_win
-            ai_step: 0,     // → 1
-            md_factor: 2.0, // → clamped into (0,1)
+            min_window_size: 5_000,
+            max_window_size: 1_000, // below min_window_size → must be raised to min_window_size
+            ai_step: 0,             // → 1
+            md_factor: 2.0,         // → clamped into (0,1)
             ..Default::default()
         });
         assert_eq!(w.window(), 5_000);
-        assert!(w.cfg.max_win >= w.cfg.min_win);
+        assert!(w.cfg.max_window_size >= w.cfg.min_window_size);
         assert!(w.cfg.md_factor > 0.0 && w.cfg.md_factor < 1.0);
         assert!(w.cfg.ai_step >= 1);
     }
@@ -488,7 +489,7 @@ mod tests {
             w.on_sent(win);
             w.on_delivered(win);
         }
-        assert_eq!(w.window(), 100_000, "must not exceed max_win");
+        assert_eq!(w.window(), 100_000, "must not exceed max_window_size");
     }
 
     #[test]
@@ -512,7 +513,7 @@ mod tests {
         for _ in 0..100 {
             w.on_lost(0);
         }
-        assert_eq!(w.window(), 1_000, "must never shrink below min_win");
+        assert_eq!(w.window(), 1_000, "must never shrink below min_window_size");
     }
 
     // ---- Invariant 1 & 3: adversarial peer cannot open the window ----
@@ -531,7 +532,7 @@ mod tests {
         assert_eq!(
             w.window(),
             1_000,
-            "no honest delivery ⇒ window must stay pinned at min_win regardless of reported supply"
+            "no honest delivery ⇒ window must stay pinned at min_window_size regardless of reported supply"
         );
         // And it must never admit more than one floor-window of unacked data.
         assert_eq!(
@@ -602,7 +603,7 @@ mod tests {
     // ---- Invariant 4: loss is recovered (window re-grows after decrease) ----
 
     #[test]
-    fn recovers_after_loss_burst() {
+    fn should_recover_after_loss_burst() {
         let mut w = WindowController::new(cfg());
         for _ in 0..30 {
             let win = w.window();
@@ -711,6 +712,6 @@ mod tests {
         // 700 pkt/s × ~1 KB × 0.1 s ≈ 70 KB ceiling.
         let rate: u64 = 700 * 1024;
         let cfg = FlowControlConfig::default().with_bdp(rate, Duration::from_millis(100));
-        assert_eq!(cfg.max_win, (rate as f64 * 0.1) as usize);
+        assert_eq!(cfg.max_window_size, (rate as f64 * 0.1) as usize);
     }
 }

@@ -513,17 +513,19 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
-        // Frame acknowledged, we will not need to resend it
+        // Honest-clock tap: every received frame acknowledgement is proof of delivery, and must feed
+        // the flow-control window regardless of the ack mode. `full_ack` only governs whether we
+        // *also* cancel the outgoing full-frame retransmission below (in `Partial` mode the receiver
+        // drives retransmission, so there is nothing to cancel here — but the acks still arrive).
+        if let Some(tap) = &tap {
+            (0..ack.len()).for_each(|_| tap.on_acked_frame());
+        }
+
+        // Frame acknowledged, we will not need to resend it (full-ack mode only).
         if full_ack
             && let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
                 ack.into_iter()
-                    .inspect(move |frame_id| {
-                        tracing::trace!(frame_id, "frame acknowledged");
-                        // Honest-clock tap: a received ack is proof the frame was delivered.
-                        if let Some(tap) = &tap {
-                            tap.on_acked_frame();
-                        }
-                    })
+                    .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
                     .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
             )
         {

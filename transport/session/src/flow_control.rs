@@ -78,7 +78,7 @@ impl SupplyConstraint for SurbSupply {
 
 /// Wraps a Session socket, admitting writes only while the [`WindowController`] has room against the
 /// honest delivery clock and the SURB ceiling. Reads are delegated untouched (never gated), so the
-/// duplex socket cannot deadlock; the window always keeps at least `min_win` admissible.
+/// duplex socket cannot deadlock; the window always keeps at least `min_window_size` admissible.
 ///
 /// `S` is `Unpin` (the boxed Session socket is), so this needs no pin projection.
 pub struct PacedWriter<S> {
@@ -120,6 +120,11 @@ impl<S> PacedWriter<S> {
 
 impl<S: futures::AsyncWrite + Unpin> futures::AsyncWrite for PacedWriter<S> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        // An empty write carries no bytes and must never be flow-controlled (otherwise it would park
+        // on the timer and return `Pending` forever). Complete it immediately.
+        if buf.is_empty() {
+            return Pin::new(&mut self.get_mut().inner).poll_write(cx, buf);
+        }
         let this = self.get_mut();
         loop {
             this.refresh_window();
@@ -245,8 +250,8 @@ mod tests {
     fn small_cfg() -> FlowControlConfig {
         FlowControlConfig {
             enabled: true,
-            min_win: 1_000,
-            max_win: 100_000,
+            min_window_size: 1_000,
+            max_window_size: 100_000,
             ai_step: 1_000,
             md_factor: 0.5,
             no_honest_deadline: Duration::from_millis(5),

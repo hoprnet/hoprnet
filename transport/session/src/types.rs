@@ -107,13 +107,13 @@ fn flow_control_from_env() -> Option<FlowControlConfig> {
         .unwrap_or_default()
         .parse()
     {
-        cfg.min_win = n;
+        cfg.min_window_size = n;
     }
     if let Ok(n) = std::env::var("HOPR_SESSION_FLOW_CONTROL_MAX_WIN")
         .unwrap_or_default()
         .parse()
     {
-        cfg.max_win = n;
+        cfg.max_window_size = n;
     }
     Some(cfg)
 }
