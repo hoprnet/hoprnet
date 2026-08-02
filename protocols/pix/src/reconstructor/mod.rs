@@ -783,7 +783,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 impl<S: PixSpec> Drop for SsaReconstructor<S> {
     /// Reports terminal resolutions that were never collected.
     ///
-    /// [`ready_resolutions`](Self::ready_resolutions) is a hand-off the *commitment* path fills and
+    /// `ready_resolutions` is a hand-off the *commitment* path fills and
     /// only `acknowledge_shares` empties, so delivery waits on the next acknowledgement batch from
     /// any peer. That is the common case and not the guaranteed one: a Session whose final cycle
     /// recovers through the deferred-ack drain, and which then stops sending because the cycle it
