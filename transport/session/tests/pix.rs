@@ -22,7 +22,7 @@ use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
     SessionManagerConfig, SessionTarget, SurbBalancerConfig,
-    test_helpers::{mock_packet_planning, msg_type},
+    testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
