@@ -199,6 +199,15 @@ const MIN_COMMITMENTS_PER_SSA_COMMIT_MSG: usize = {
 /// (session initiations, establishments, errors, keep-alives).
 const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 
+/// Ceiling on the per-session term of [`start_protocol_channel_capacity`].
+///
+/// A session contributes to this channel only while its Start exchange is in flight — a handful of
+/// messages between initiation and establishment — after which it is silent apart from PIX, which
+/// the commitment term already covers. So the queue depth tracks concurrent *handshakes*, not the
+/// total number of sessions the node may manage, and `maximum_managed_sessions` (validated up to
+/// 100 000) is the wrong quantity to size a pre-allocated ring from.
+const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
+
 /// Capacity of the Start protocol ingress channel.
 ///
 /// This channel is fed by [`SessionManager::dispatch_message`] with `try_send`, and an overflow
@@ -208,22 +217,38 @@ const START_PROTOCOL_CHANNEL_RESERVE: usize = 10;
 /// dies on the supervisor's `max_deposit_wait` deadline.
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
-/// set of an SSA cycle, chunked into packet-sized messages. The capacity is derived from the
-/// largest quota this node will accept ([`IncomingSessionPixConfig::quota_range`]), since
-/// `quota / PAYLOAD_SIZE` is `polys × threshold`, plus a reserve for ordinary Start traffic.
+/// set of an SSA cycle, chunked into packet-sized messages, plus a reserve for ordinary Start
+/// traffic.
 ///
-/// That is now a `threshold`-fold over-estimate — a cycle only carries `polys` commitments, one
-/// constant term each — because the quota alone does not reveal how the product splits. Left as
-/// is: over-provisioning is the safe direction for a channel whose overflow silently kills a
-/// cycle, and the capacity only bounds the queue, it does not reserve it.
+/// The burst is bounded by two independent limits, and the capacity takes the smaller:
+///
+/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × threshold`, a `threshold`-fold over-estimate, since a cycle carries
+///   one constant term per polynomial and nothing else. The quota alone does not reveal how the product splits, so the
+///   over-estimate cannot be undone from it.
+/// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
+///   quota says. It therefore bounds the commitments a cycle can ever deliver.
+///
+/// Clamping to the second matters because this capacity is *reserved*, not merely enforced:
+/// `crossfire`'s array flavour pre-allocates every slot when the channel is built. An
+/// operator-settable `quota_range` feeding an unclamped derivation is an allocation with no upper
+/// bound — at `quota_range.end() = 1e13` it asks for 77 GB. Over-provisioning is still the safe
+/// direction within the clamp, and the surviving margin is large: the default dimensions burst
+/// ≈ 320 messages against a capacity term of ≈ 648.
+///
+/// The session term is clamped for the same reason. `maximum_managed_sessions` validates up to
+/// 100 000, and one slot holds a `(HoprPseudonym, HoprStartProtocol)` sized by the enum's largest
+/// variant, so an operator raising the session limit would silently buy a multi-megabyte startup
+/// allocation. Ordinary Start traffic is one message per session *in flight*, not one per session
+/// the node will ever manage, so [`MAX_CONCURRENT_START_EXCHANGES`] is the honest bound.
 fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
-    let max_commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+    let max_commitments =
+        (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
 
     // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
     usize::try_from(max_commit_msgs)
         .unwrap_or(usize::MAX)
-        .saturating_add(cfg.maximum_sessions)
+        .saturating_add(cfg.maximum_sessions.min(MAX_CONCURRENT_START_EXCHANGES))
         .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
 }
 
@@ -2364,9 +2389,6 @@ where
             .get()
             .cloned()
             .ok_or(SessionManagerError::NotStarted)?;
-
-        // Reply routing uses SURBs only with the pseudonym of this Session's ID
-        let reply_routing = DestinationRouting::Return(pseudonym.into());
 
         // Use constant application tag for all sessions
         self.sessions.run_pending_tasks();
@@ -5279,6 +5301,66 @@ mod tests {
         Ok(())
     }
 
+    /// A node with no `PixToolbox` must refuse an incoming session that asks for `UsePIX`, rather
+    /// than establish one it cannot run the PIX state machine for.
+    ///
+    /// This is the guard at the top of `handle_incoming_session_initiation`, and it was untested:
+    /// the integration test named for it never negotiated PIX at all, so the absent toolbox was not
+    /// the operative cause of anything it observed.
+    #[test_log::test(tokio::test)]
+    async fn incoming_usepix_session_is_rejected_when_no_pix_toolbox_is_installed() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_start::{StartErrorReason, StartInitiation};
+        use tokio::sync::oneshot;
+
+        // Quota deliberately acceptable and PIX not enforced, so the only thing that can reject this
+        // is the missing toolbox.
+        let mgr = SessionManager::new(SessionManagerConfig::default());
+
+        let mut bob_transport = MockMsgSender::new();
+        let (tx, rx) = oneshot::channel();
+        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                if let Ok(HoprStartProtocol::SessionError(err)) =
+                    HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
+                    && let Some(tx) = tx.lock().unwrap().take()
+                {
+                    let _ = tx.send(err);
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, _) = futures::channel::mpsc::channel(1);
+        // No toolbox — the third argument is what a relay that does not participate in PIX gets.
+        mgr.start(bob_sender.clone(), new_session_tx, None)?;
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        let err = rx.await.context("send_message was never called")?;
+        assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
+        assert_eq!(err.identifier, ErrorIdentifier::Challenge(MIN_CHALLENGE));
+        assert_eq!(mgr.num_active_sessions(), 0, "no slot may be created for a refusal");
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     /// Verifies that the exit/responder (Bob) rejects an `SsaCommit` for a session that has no PIX
     /// state — i.e., the SSA commit is delivered with a session ID that Bob does not hold.
     ///
@@ -5852,14 +5934,17 @@ mod tests {
     /// single SSA cycle, not for the number of sessions.
     ///
     /// A dropped `SsaCommit` is unrecoverable — there is no retransmission — so the queue has to
-    /// absorb the whole `polys × threshold` commitment set implied by the largest accepted quota.
+    /// absorb the whole commitment set a cycle can deliver, capped by the polynomial ceiling
+    /// `check_pix_params` enforces.
     #[test]
     fn start_protocol_channel_is_sized_for_the_worst_case_commitment_burst() {
         let cfg = SessionManagerConfig::default();
         let capacity = start_protocol_channel_capacity(&cfg);
 
-        // Number of commitments implied by the largest quota this node accepts.
-        let commitments = *cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+        // Number of commitments implied by the largest quota this node accepts, clamped by the
+        // number of polynomials it would actually admit.
+        let commitments =
+            (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
         let min_expected = commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
 
         assert!(
@@ -5884,6 +5969,49 @@ mod tests {
         // Guards against a units mistake (e.g. counting bytes rather than messages) turning this
         // into a multi-gigabyte ring allocation.
         assert!(capacity < 1_000_000, "capacity {capacity} is implausibly large");
+    }
+
+    /// `quota_range` is operator-settable and the capacity it feeds is *reserved*, not merely
+    /// enforced — `crossfire`'s array flavour pre-allocates every slot. So the derivation must be
+    /// bounded independently of the configured quota.
+    ///
+    /// Regression test: an unclamped derivation asked for ~4.2e8 slots here (77 GB), which aborted
+    /// the whole unit test binary with an allocation failure rather than failing one assertion. The
+    /// sizing test above never caught it because it only exercises the default config.
+    #[test]
+    fn start_protocol_channel_capacity_is_bounded_for_any_quota_range() {
+        // The commitment term saturates once the quota admits more commitments than there are
+        // polynomials, so this is the largest value it can ever take.
+        let saturated = (MAX_POLYS_PER_SSA as u64).div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64) as usize;
+
+        for quota_end in [10_u64.pow(13), u64::MAX] {
+            let cfg = SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=quota_end,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let capacity = start_protocol_channel_capacity(&cfg);
+
+            assert_eq!(
+                capacity,
+                saturated + cfg.maximum_sessions + START_PROTOCOL_CHANNEL_RESERVE,
+                "quota_range end {quota_end} must not grow the commitment term past the polynomial ceiling"
+            );
+        }
+
+        // The session term is reserved for exactly the same reason, and `maximum_managed_sessions`
+        // validates up to 100 000 — so it needs its own ceiling, not just the commitment one.
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 100_000,
+            ..Default::default()
+        };
+        assert_eq!(
+            start_protocol_channel_capacity(&cfg),
+            saturated + MAX_CONCURRENT_START_EXCHANGES + START_PROTOCOL_CHANNEL_RESERVE,
+            "a large session limit must not grow the pre-allocated ring past the handshake ceiling"
+        );
     }
 
     /// Verifies that once the exit/responder (Bob) has set up the SSA state, delivering coefficient

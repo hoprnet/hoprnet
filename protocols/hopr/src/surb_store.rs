@@ -82,12 +82,14 @@ pub struct SurbStoreConfig {
     /// targets — see `maximum_surb_buffer_size` in `hopr-transport`, which is derived from this
     /// value with headroom left for balancer overshoot.
     ///
-    /// This is a ceiling rather than a reservation: [`SurbRingBuffer`] allocates with occupancy, so
-    /// a pseudonym holding three SURBs costs three, and only one that genuinely fills up pays
-    /// `rb_capacity` × ~400 B. That property is what makes a large default safe here — see
-    /// [`SurbRingBuffer`] for why an upfront allocation would not be.
+    /// This is a ceiling rather than a reservation: the internal `SurbRingBuffer` allocates with
+    /// occupancy, so a pseudonym holding three SURBs costs three, and only one that genuinely fills
+    /// up pays `rb_capacity` × ~400 B. That property is what makes a large default safe here — see
+    /// the "Why the capacity is a ceiling, not a reservation" section on `SurbRingBuffer`.
     ///
     /// Default is 100 000.
+    // `SurbRingBuffer` is deliberately unlinked above: it is crate-private, so an intra-doc link
+    // from this public field trips `rustdoc::private_intra_doc_links`, which CI builds as an error.
     #[default(default_rb_capacity())]
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]

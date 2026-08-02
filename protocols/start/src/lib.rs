@@ -1046,18 +1046,23 @@ mod tests {
             33,
             StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::PIX_COEFF_COMMITMENT_REPR_SIZE
         );
-        // MAX_SSAS_PER_REQUEST must never drop below 25, which is the number of SSA
-        // commitments the existing test at `start_protocol_new_multiple_messages_should_encode_and_decode`
-        // encodes without a session_id trailer.
+        // MAX_SSAS_PER_REQUEST must never drop below 25, which is the number of SSA commitments
+        // `start_protocol_messages_must_fit_within_hopr_packet` packs into an `SsaRequest`.
         let ssas_per_request = StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::MAX_SSAS_PER_REQUEST;
         assert!(
             ssas_per_request >= 25,
             "MAX_SSAS_PER_REQUEST={ssas_per_request} is too small to encode 25 SSA commitments",
         );
 
+        // An `SsaCommit` entry is `(PolynomialIndex, commitment)`, and `PolynomialIndex` is a `u16`
+        // — the encoder writes `index.to_be_bytes()` and the decoder consumes
+        // `size_of::<PolynomialIndex>()`. The four-byte prefix belongs to `SsaRequest`, whose
+        // entries carry an `SsaIndex`; using it here under-fills the message by two bytes an entry,
+        // so this would stop being the maximum-size encode it is written to be.
         let max_coeffs = (ApplicationData::PAYLOAD_SIZE
             - StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::START_HEADER_SIZE)
-            / (size_of::<u32>() + StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::PIX_COEFF_COMMITMENT_REPR_SIZE);
+            / (size_of::<PolynomialIndex>()
+                + StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::PIX_COEFF_COMMITMENT_REPR_SIZE);
 
         // A non-zero coefficient index, so this message carries no proof and the entry budget is
         // the full one.

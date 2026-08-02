@@ -267,11 +267,14 @@ pub struct PixGlobalConfig {
     /// other side to reconstruct the entire SSA from all its parts. This is because if
     /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
     ///
-    /// Defaults to half of [`DEFAULT_PIX_SHARES_PER_POLY`], i.e. a surplus factor of 1.5×.
-    /// It is expressed as a fraction of the part size rather than an absolute count so that
-    /// re-tuning [`ssa_part_size`](Self::ssa_part_size) cannot silently change the surplus
-    /// factor: the peer only learns the part size, never the surplus, so the ratio is what
-    /// determines how much unbilled data is delivered per SSA cycle.
+    /// **This is an absolute share count, not a ratio.** The default happens to be half of
+    /// [`DEFAULT_PIX_SHARES_PER_POLY`] — a surplus factor of 1.5× — but it is a constant computed
+    /// once, so raising [`ssa_part_size`](Self::ssa_part_size) and leaving this alone lowers the
+    /// surplus factor, and lowering it raises it. Re-tune the two together.
+    ///
+    /// The factor is what matters, because it is what the peer never learns: only the part size
+    /// goes on the wire, so the surplus is unpriced and determines how much data is delivered per
+    /// SSA cycle beyond the quota that was charged for it.
     #[validate(range(min = 0, max = 4096))]
     #[default((DEFAULT_PIX_SHARES_PER_POLY / 2) as usize)]
     pub additional_shares: usize,

@@ -846,9 +846,14 @@ where
         // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
         // a subset of what the global generator covers, so one generator suffices.
         //
-        // SAFETY: SsaGeneratorConfig fields come from PixGlobalConfig which is
-        // validated via #[validate(nested)] before this code runs, so the
-        // constructor's validate().expect() cannot panic.
+        // `SsaShareGenerator::new` validates its config and *panics* on failure, so the ranges are
+        // checked here and the error propagated instead. This used to be a SAFETY comment asserting
+        // that `PixGlobalConfig` had already been validated "before this code runs" via
+        // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
+        // rested entirely on every caller remembering to, and a programmatically built config turned
+        // node startup into a panic.
+        validator::Validate::validate(&self.cfg.pix)
+            .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,
@@ -944,21 +949,15 @@ where
                 processes.insert(
                     HoprTransportProcess::PixEvents,
                     hopr_utils::spawn_as_abortable!(
+                        // The same mapping as the Exit and Relay arms, deliberately: `DepositNeeded`
+                        // is not *expected* here, but it is reachable. `SessionManager` has no
+                        // notion of node role and this one runs with a live toolbox — only the
+                        // incoming-session notification is drained below — so an inbound
+                        // `StartSession` carrying `UsePIX` is accepted and ends in
+                        // `handle_ssa_commit` emitting it. Panicking would take the whole PIX event
+                        // task with it, stranding this node's own outbound deposits.
                         session_pix_events
-                            .map(|session_pix_event| match session_pix_event {
-                                HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
-                                    ssa_id,
-                                    deposit_address,
-                                    quota_per_ssa,
-                                }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
-                                    id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
-                                    address: deposit_address.into(),
-                                    quota: quota_per_ssa,
-                                }),
-                                HoprSessionOutPixEvent::DepositNeeded(..) => {
-                                    unreachable!("Entry received DepositNeeded PIX event")
-                                }
-                            })
+                            .map(session_pix_event_to_pix_event)
                             .map(Ok)
                             .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
                     ),

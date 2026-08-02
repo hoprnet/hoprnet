@@ -72,7 +72,12 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = []
+default = ["bjj"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `bjj`.
+# Consumers settling PIX deposits on-chain must build with `default-features = false`
+# and not re-enable this, or every deposit address will be a Baby JubJub public key that
+# no plain transfer can reach.
+bjj = ["hopr-transport/bjj"]
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-network-graph?/telemetry",
