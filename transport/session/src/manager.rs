@@ -444,43 +444,19 @@ pub struct IncomingSessionPixConfig {
     /// (≈ 130 MiB to ≈ 519 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
-    /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
+    /// Deadlines, fault limits and service budget the Exit-side PIX supervisor enforces on a
+    /// Session.
     ///
-    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
-    /// wait time because the Client has to be able to deliver its SSA commitment.
-    #[default(Duration::from_secs(20))]
-    #[serde(with = "humantime_serde")]
-    pub max_ssa_delivery_time: Duration,
-    /// Maximum time to wait for the funds to be deposited in the SSA.
-    ///
-    /// The Session is allowed to be used unincentivized for `max_deposit_time` + `max_ssa_delivery_time` the deposit
-    /// wait time because the Client has to be able to deliver its SSA commitment.
-    ///
-    /// Default is 1 minute.
-    #[default(Duration::from_secs(60))]
-    #[serde(with = "humantime_serde")]
-    pub max_deposit_wait: Duration,
+    /// These live together rather than spread across this struct because they are only meaningful
+    /// as a set: [`validate_pix_supervision`] checks them against each other and against the
+    /// reconstructor's lifetimes, and the node's config validator runs that at load time.
+    pub supervision: SupervisorConfig,
 }
 
 impl IncomingSessionPixConfig {
-    /// The supervisor configuration these Session settings imply.
-    ///
-    /// Only the two deadlines above are operator-settable. The supervisor's remaining parameters —
-    /// the recovery deadlines, the fault limits, the predeposit budget and the gate ceiling — are
-    /// protocol-safety values that interact with each other and with the reconstructor's own
-    /// lifetimes, which is why [`validate_pix_supervision`] exists at all. Deriving them keeps a
-    /// misconfiguration from being expressible; they can be surfaced later without breaking any
-    /// config file, since that is a purely additive change.
-    ///
-    /// Public so the node's config validator can check the pair this produces against the
-    /// reconstructor lifetimes, and reject a bad combination at config-load time rather than at
-    /// Session establishment.
+    /// The supervisor configuration for Sessions accepted under these settings.
     pub fn supervisor_config(&self) -> SupervisorConfig {
-        SupervisorConfig {
-            max_ssa_delivery_time: self.max_ssa_delivery_time,
-            max_deposit_wait: self.max_deposit_wait,
-            ..Default::default()
-        }
+        self.supervision.clone()
     }
 }
 
@@ -831,14 +807,14 @@ impl PixToolbox {
 ///
 /// ### 2. Exit SSA Request (`SsaRequest` → Entry)
 ///
-/// Once the PIX parameters are accepted, the Exit calls `request_next_ssa`
-/// to create a new SSA commitment via the server-side [`SsaReconstructor`]. This produces an
-/// *Exit commitment* (a group element) that is sent back to the Entry as a
-/// [`SsaServerCommitmentMessage`].
+/// Once the PIX parameters are accepted, the Exit spawns a [`SessionPixSupervisor`], whose opening
+/// `RequestSsa` action has `send_ssa_request` create a new SSA commitment via the server-side
+/// [`SsaReconstructor`]. This produces an *Exit commitment* (a group element) that is sent back to
+/// the Entry as a [`SsaServerCommitmentMessage`].
 ///
-/// The Exit also installs a *PIX kill switch* — a deadline (`max_deposit_wait` +
-/// `max_ssa_delivery_time`). If no deposit is observed before this deadline, the Session is
-/// closed with `ClosureReason::UnrealizedDeposit`.
+/// From here the supervisor owns the cycle's deadlines: `max_ssa_delivery_time` for the Entry's
+/// commitment, then `max_deposit_wait` for the funds, then the recovery deadlines. Missing any of
+/// them closes the Session with [`ClosureReason::PixFailure`].
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -6041,20 +6017,20 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a PIX session is closed automatically if the deposit is not realized within
-    /// the configured `max_deposit_wait` period.
+    /// Verifies that a PIX Session whose Entry never answers the `SsaRequest` is closed when the
+    /// commitment deadline expires.
     ///
-    /// ## Steps
-    /// 1. Bob's manager is configured with `max_deposit_wait: 50ms` and `max_ssa_delivery_time: 0` (total kill-switch
-    ///    window: 50ms).
-    /// 2. A `PixToolbox` is provided so the PIX state machine runs. Alice's session initiation is processed via
-    ///    `handle_incoming_session_initiation`.
-    /// 3. Immediately after establishment, `active_sessions` contains Alice's pseudonym — session is live.
-    /// 4. The test sleeps 100ms (past the 50ms deadline). No deposit is ever made.
-    /// 5. `active_sessions` is empty and `num_active_sessions` is 0, confirming the kill switch closed the session due
-    ///    to the unrealized deposit.
+    /// This used to be spelled as a deposit-timeout test, with `max_ssa_delivery_time: 0` and a
+    /// 50 ms `max_deposit_wait`. A zero delivery time makes the *commitment* deadline fire
+    /// immediately, so the assertion held whatever the deposit deadline did — it would have passed
+    /// with that deadline removed entirely. The deposit deadline cannot be reached from this
+    /// fixture at all: arming it needs a `CommitmentVerified`, and a mock transport has no Entry to
+    /// send one. That path is covered end-to-end by `hopr-lib`'s `deposit_timeout_closes_session`.
+    ///
+    /// So `max_deposit_wait` is set far out of reach here, leaving the commitment deadline as the
+    /// only thing that can close the Session.
     #[test_log::test(tokio::test)]
-    async fn session_is_closed_when_deposit_timeout_fires() -> anyhow::Result<()> {
+    async fn session_is_closed_when_the_entry_never_commits() -> anyhow::Result<()> {
         use std::time::Duration;
 
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
@@ -6071,12 +6047,16 @@ mod tests {
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
 
-        // Short timeouts so the kill switch fires quickly.
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
-                max_deposit_wait: Duration::from_millis(50),
-                max_ssa_delivery_time: Duration::ZERO,
+                supervision: SupervisorConfig {
+                    // Short, so the deadline under test fires quickly.
+                    max_ssa_delivery_time: Duration::from_millis(50),
+                    // Far out of reach, so it cannot be what closes the Session.
+                    max_deposit_wait: Duration::from_secs(3600),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             ..Default::default()
@@ -6115,16 +6095,17 @@ mod tests {
         // Session is active after establishment.
         assert_eq!(vec![alice_pseudonym], mgr.active_sessions());
 
-        // Wait for the kill switch to fire (max_deposit_wait + max_ssa_delivery_time = 50ms + 0 = 50ms).
-        // Add a 100ms buffer to be safe.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // The supervisor arms the commitment deadline once the `SsaRequest` goes out and closes the
+        // Session 50 ms later; the teardown that follows is asynchronous.
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while mgr.num_active_sessions() > 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("session should be closed once the commitment deadline expires")?;
 
-        // Session must be closed due to unrealized deposit.
-        assert!(
-            mgr.active_sessions().is_empty(),
-            "session should be closed after deposit timeout"
-        );
-        assert_eq!(mgr.num_active_sessions(), 0);
+        assert!(mgr.active_sessions().is_empty());
 
         bob_sender.close_channel();
         bob_handle.await??;
@@ -6204,7 +6185,10 @@ mod tests {
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
                 pix_config: IncomingSessionPixConfig {
                     quota_range: 0..=10_000_000_000_000,
-                    max_deposit_wait: Duration::from_secs(1),
+                    supervision: SupervisorConfig {
+                        max_deposit_wait: Duration::from_secs(1),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 ..Default::default()

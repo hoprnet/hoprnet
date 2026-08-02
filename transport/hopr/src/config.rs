@@ -733,11 +733,16 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn pix_configs_are_reachable_from_serialized_config() {
-        // Regression guard: these two fields used to be `serde(skip)`, which pinned them to
-        // their defaults and made PIX unconfigurable.
+        // Regression guard: these fields used to be `serde(skip)`, which pinned them to their
+        // defaults and made PIX unconfigurable. The supervision block is checked here too, since
+        // `deny_unknown_fields` on both levels means a rename on either side fails this loudly
+        // rather than silently ignoring an operator's setting.
         let json = r#"{
             "pix": { "num_ssa_parts": 2048 },
-            "incoming_session_pix_config": { "enforce_pix": true, "max_deposit_wait": "90s" }
+            "incoming_session_pix_config": {
+                "enforce_pix": true,
+                "supervision": { "max_deposit_wait": "90s", "min_deposit": "5 wxHOPR" }
+            }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
 
@@ -751,7 +756,17 @@ mod tests {
         assert!(cfg.incoming_session_pix_config.enforce_pix);
         assert_eq!(
             Duration::from_secs(90),
-            cfg.incoming_session_pix_config.max_deposit_wait
+            cfg.incoming_session_pix_config.supervision.max_deposit_wait
+        );
+        assert_eq!(
+            "5 wxHOPR".parse::<hopr_api::HoprBalance>().unwrap(),
+            cfg.incoming_session_pix_config.supervision.min_deposit,
+            "a balance must be settable in its human-readable spelling"
+        );
+        assert_eq!(
+            hopr_transport_session::SupervisorConfig::default().max_recovery_time,
+            cfg.incoming_session_pix_config.supervision.max_recovery_time,
+            "unspecified supervision fields must fall back to their defaults"
         );
         assert_eq!(
             IncomingSessionPixConfig::default().quota_range,

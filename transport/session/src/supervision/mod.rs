@@ -227,18 +227,31 @@ mod worker;
 // ---------------------------------------------------------------------------
 
 /// Configuration for the [`SessionPixSupervisor`].
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault)]
+///
+/// Reachable from a node's configuration file as
+/// `incoming_session_pix_config.supervision`. The fields interact — with each other and with the
+/// reconstructor's own lifetimes — so a set of them is only meaningful as a whole; that is what
+/// [`validate_pix_supervision`] checks, and the node's config validator runs it at load time.
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct SupervisorConfig {
     /// Maximum time to wait for the SSA to be fully committed.
     ///
+    /// Together with [`max_deposit_wait`](Self::max_deposit_wait) this bounds how long a Session may
+    /// be served unincentivized: the Entry has to be able to deliver its SSA commitment before it
+    /// can be asked to pay for it.
+    ///
     /// Default: 20 s.
     #[default(Duration::from_secs(20))]
+    #[serde(with = "humantime_serde")]
     pub max_ssa_delivery_time: Duration,
 
     /// Maximum time to wait for a deposit after the commitment is verifiable.
     ///
     /// Default: 60 s.
     #[default(Duration::from_secs(60))]
+    #[serde(with = "humantime_serde")]
     pub max_deposit_wait: Duration,
 
     /// Maximum idle time during recovery when service is being consumed.
@@ -248,6 +261,7 @@ pub struct SupervisorConfig {
     ///
     /// Default: 60 s.
     #[default(Duration::from_secs(60))]
+    #[serde(with = "humantime_serde")]
     pub max_recovery_idle: Duration,
 
     /// Absolute per-SSA recovery deadline (immutable once set).
@@ -257,6 +271,7 @@ pub struct SupervisorConfig {
     ///
     /// Default: 1 hour.
     #[default(Duration::from_secs(3600))]
+    #[serde(with = "humantime_serde")]
     pub max_recovery_time: Duration,
 
     /// Unverifiable shares tolerated for one SSA before the session is closed.
@@ -310,6 +325,7 @@ pub struct SupervisorConfig {
     ///
     /// Default: 30 s.
     #[default(Duration::from_secs(30))]
+    #[serde(with = "humantime_serde")]
     pub tombstone_retention_window: Duration,
 
     /// Minimum deposit amount required before the gate is released.
@@ -320,6 +336,7 @@ pub struct SupervisorConfig {
     ///
     /// Default: zero (accepts any deposit).
     #[default(HoprBalance::zero())]
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub min_deposit: HoprBalance,
 }
 
