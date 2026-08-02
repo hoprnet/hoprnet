@@ -22,6 +22,7 @@ serde = [
   "dep:serde_bytes",
   "vsss-rs/serde",
   "hopr-types/serde",
+  "vsss-rs/curve-serde",
 ]
 
 [dependencies]
@@ -41,6 +42,7 @@ validator = { workspace = true }
 vsss-rs = { workspace = true, features = [
   "alloc",
   "std",
+  "curve",
 ], default-features = false }
 
 hopr-utils = { workspace = true }
