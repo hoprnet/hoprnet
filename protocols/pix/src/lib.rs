@@ -26,7 +26,7 @@ mod reconstructor;
 mod traits;
 mod types;
 
-pub use generator::{SsaGeneratorConfig, SsaShareGenerator};
+pub use generator::{SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
 pub use reconstructor::{SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{

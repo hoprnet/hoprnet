@@ -964,6 +964,28 @@ mod tests {
         traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
     };
 
+    /// Pulls from the generator until it yields a share for `poly_index`, discarding the rest.
+    ///
+    /// Shares are emitted round-robin across [`crate::SHARE_EMISSION_WINDOW`] polynomials, so a test
+    /// that needs to drive one polynomial to its threshold cannot assume consecutive calls stay on
+    /// it. Discarding the others is sound here: these tests assert on one polynomial's behaviour,
+    /// and a polynomial that never receives its shares simply stays incomplete.
+    fn next_share_for_poly(
+        generator: &SsaShareGenerator<TestSpec>,
+        pseudonym: &SimplePseudonym,
+        poly_index: PolynomialIndex,
+    ) -> anyhow::Result<([u8; 20], crate::GeneratedShare<TestSpec>)> {
+        loop {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let share = generator
+                .next_share(pseudonym, &msg)?
+                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+            if share.id.poly_index() == poly_index {
+                return Ok((msg, share));
+            }
+        }
+    }
+
     /// The proof a generated commitment carries, attached only to the constant-term batch — the
     /// shape the wire uses, since that batch is what determines the commitment being opened.
     fn proof_of(
@@ -2001,14 +2023,10 @@ mod tests {
         );
         drop(cycle);
 
-        // Feed exactly enough shares to reconstruct polynomial 0. The generator drains the front
-        // polynomial first, so the first `threshold` shares all belong to polynomial 0.
+        // Feed exactly enough shares to reconstruct polynomial 0, skipping the ones the round-robin
+        // emission hands out for polynomial 1 in between.
         for _ in 0..2 {
-            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
-            let share = generator
-                .next_share(&pseudonym, &msg)?
-                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
-            assert_eq!(0, share.id.poly_index(), "shares must arrive polynomial-major");
+            let (msg, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
 
             let ack = HalfKey::random();
             let challenge = ack.to_challenge()?;
@@ -2403,11 +2421,7 @@ mod tests {
         // Corrupt the very first share of polynomial 0, then feed its whole budget one at a time.
         let mut invalid_reports: Vec<u64> = Vec::new();
         for i in 0..THRESHOLD as usize + SURPLUS {
-            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
-            let mut share = generator
-                .next_share(&pseudonym, &msg)?
-                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
-            assert_eq!(0, share.id.poly_index(), "shares arrive polynomial-major");
+            let (msg, mut share) = next_share_for_poly(&generator, &pseudonym, 0)?;
 
             if i == 0 {
                 // Flip a low bit of the share value. It stays a valid field element, so nothing
@@ -2481,16 +2495,26 @@ mod tests {
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
 
+        // Emission is round-robin across the window, and with no surplus every share matters — so
+        // the cycle's whole budget is drawn first and grouped, rather than filtered as it comes.
+        let mut by_poly: std::collections::BTreeMap<PolynomialIndex, Vec<_>> = Default::default();
+        for _ in 0..POLYS * THRESHOLD {
+            let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+            let share = generator
+                .next_share(&pseudonym, &msg)?
+                .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
+            by_poly.entry(share.id.poly_index()).or_default().push((msg, share));
+        }
+
         let mut totals = Vec::new();
         for poly in 0..POLYS {
             let relayer = &relayers[poly as usize];
-            for i in 0..THRESHOLD {
-                let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
-                let mut share = generator
-                    .next_share(&pseudonym, &msg)?
-                    .ok_or_else(|| anyhow::anyhow!("generator must yield a share"))?;
-                assert_eq!(poly, share.id.poly_index(), "shares arrive polynomial-major");
+            let shares = by_poly
+                .remove(&poly)
+                .ok_or_else(|| anyhow::anyhow!("no shares for polynomial {poly}"))?;
+            assert_eq!(THRESHOLD as usize, shares.len());
 
+            for (i, (msg, mut share)) in shares.into_iter().enumerate() {
                 // Corrupt one share of each polynomial, so each one fails on its own threshold-th.
                 if i == 0 {
                     AsMut::<[u8]>::as_mut(&mut share.share.0)[31] ^= 1;

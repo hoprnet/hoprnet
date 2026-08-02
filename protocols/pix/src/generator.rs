@@ -39,7 +39,34 @@ impl<S: PixSpec> IndexedPolynomial<S> {
 struct SsaPseudonymEntry<S: PixSpec> {
     ssa_index: SsaIndex,
     poly_queue: VecDeque<IndexedPolynomial<S>>,
+    /// Position within the emission window, i.e. into the first
+    /// [`SHARE_EMISSION_WINDOW`] entries of `poly_queue`.
+    cursor: usize,
 }
+
+/// Number of polynomials the generator emits shares for concurrently.
+///
+/// Shares are emitted round-robin across the first `SHARE_EMISSION_WINDOW` polynomials of the
+/// queue rather than draining one polynomial to exhaustion before starting the next. Both orderings
+/// emit exactly the same shares — every share carries its own [`SsaPolynomialId`], which the Exit
+/// files by, so arrival order is irrelevant to reconstruction — but they fail very differently.
+///
+/// A share only reaches the reconstructor when the Exit *uses* the SURB carrying it, so a SURB
+/// dropped from the Exit's per-pseudonym ring buffer is a permanently lost share. That buffer
+/// overwrites its oldest entries, which is a *contiguous* run of the emission order. Draining one
+/// polynomial at a time makes such a run land on a single polynomial: lose more than
+/// `surplus_shares` of it and it can never reach `threshold`, and since the SSA is the sum of
+/// *every* polynomial's constant term, the whole cycle becomes unrecoverable — silently, because a
+/// starved polynomial never fails a check, it simply never completes. Round-robin spreads the same
+/// run across the window, so a contiguous loss of up to `surplus_shares × SHARE_EMISSION_WINDOW`
+/// shares is absorbed by the surplus that exists for exactly this purpose.
+///
+/// The window is bounded rather than spanning the whole SSA because the Exit holds a part builder's
+/// collected shares until that part reconstructs (`release_verification_state`). One polynomial at
+/// a time keeps one part live; the full 8192 would keep every part live at once, `polys × threshold`
+/// shares of peak memory. 256 keeps that peak around a megabyte while covering a contiguous loss
+/// far larger than the ring buffer's entire overshoot allowance.
+pub const SHARE_EMISSION_WINDOW: usize = 256;
 
 /// Builds a Shamir polynomial of degree `t - 1` over `secret` and commits to its constant term.
 ///
@@ -141,31 +168,50 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         pseudonym: &S::Pseudonym,
         msg: &impl AsRef<[u8]>,
     ) -> errors::Result<Option<GeneratedShare<S>>, S::Pseudonym> {
-        if let Some(entry) = self.polynomials.get(pseudonym) {
-            let polys = &mut entry.lock().poly_queue;
-            while !polys.is_empty() {
-                if let Some(poly) = polys.front_mut()
-                    && poly.shares_generated < self.cfg.threshold as usize + self.cfg.surplus_shares
-                {
-                    let x = S::msg_to_scalar(&poly.spi, msg)?;
-                    // Zero would disclose the secret, so we disallow it.
-                    // The chance is practically impossible.
-                    if x.is_zero().into() {
-                        return Err(errors::PixError::InvalidInput);
-                    }
+        let Some(entry) = self.polynomials.get(pseudonym) else {
+            return Ok(None);
+        };
 
-                    return Ok(Some(GeneratedShare {
-                        id: poly.spi,
-                        share: poly.next_share(x),
-                    }));
-                }
-                // If we replaced VecDeque with a lock-free alternative, we could remove
-                // the mutex, but the alternative would need to effectively deallocate,
-                // so the polynomials do not grow indefinitely when new commitments are
-                // being added.
-                polys.pop_front();
+        // If we replaced VecDeque with a lock-free alternative, we could remove the mutex, but the
+        // alternative would need to effectively deallocate, so the polynomials do not grow
+        // indefinitely when new commitments are being added.
+        let mut entry = entry.lock();
+        let SsaPseudonymEntry { poly_queue, cursor, .. } = &mut *entry;
+        let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares;
+
+        while !poly_queue.is_empty() {
+            // The window is always the front of the queue, which is what keeps it from straddling
+            // an SSA boundary: `new_ssa_commitment` appends, and an exhausted polynomial is removed
+            // in place so its immediate successor shifts in. The next cycle's polynomials are
+            // therefore only reached once the current one is fully emitted.
+            let window = poly_queue.len().min(SHARE_EMISSION_WINDOW.max(1));
+            if *cursor >= window {
+                *cursor = 0;
             }
+            let idx = *cursor;
+
+            if poly_queue[idx].shares_generated >= max_shares_per_poly {
+                // O(window) element moves, but paid once per polynomial rather than once per share.
+                poly_queue.remove(idx);
+                continue;
+            }
+
+            let poly = &mut poly_queue[idx];
+            let x = S::msg_to_scalar(&poly.spi, msg)?;
+            // Zero would disclose the secret, so we disallow it.
+            // The chance is practically impossible.
+            if x.is_zero().into() {
+                return Err(errors::PixError::InvalidInput);
+            }
+
+            let generated = GeneratedShare {
+                id: poly.spi,
+                share: poly.next_share(x),
+            };
+            *cursor = (idx + 1) % window;
+            return Ok(Some(generated));
         }
+
         Ok(None)
     }
 
@@ -227,6 +273,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                     Ok::<_, PixError<S::Pseudonym>>(moka::ops::compute::Op::Put(std::sync::Arc::new(
                         parking_lot::Mutex::new(SsaPseudonymEntry {
                             ssa_index,
+                            cursor: 0,
                             poly_queue: raw_polynomials
                                 .into_iter()
                                 .enumerate()
@@ -361,8 +408,10 @@ mod tests {
         Ok(())
     }
 
+    /// With fewer polynomials than [`SHARE_EMISSION_WINDOW`] the whole SSA is one window, so
+    /// emission cycles through every polynomial before returning to any of them.
     #[test]
-    fn ssa_generator_should_return_shares_in_order() -> anyhow::Result<()> {
+    fn ssa_generator_should_round_robin_within_the_emission_window() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 3,
             threshold: 3,
@@ -378,10 +427,12 @@ mod tests {
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(g.id.pseudonym(), &p1);
             assert_eq!(g.id.ssa_index(), 1.try_into()?);
-            assert_eq!(g.id.poly_index(), i / 4);
+            assert_eq!(g.id.poly_index(), i % 3);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
 
+        // A new cycle is appended, and the window does not reach into it until the previous one is
+        // fully emitted — so indices restart from the beginning of the new SSA.
         generator.new_ssa_commitment(&p1, 2.try_into()?)?;
 
         for i in 0..12_u16 {
@@ -390,9 +441,67 @@ mod tests {
                 .ok_or(anyhow::anyhow!("failed to generate share"))?;
             assert_eq!(g.id.pseudonym(), &p1);
             assert_eq!(g.id.ssa_index(), 2.try_into()?);
-            assert_eq!(g.id.poly_index(), i / 4);
+            assert_eq!(g.id.poly_index(), i % 3);
         }
         assert!(generator.next_share(&p1, &20_u32.to_be_bytes())?.is_none());
+
+        Ok(())
+    }
+
+    /// The property that actually protects an SSA cycle from SURB ring-buffer eviction.
+    ///
+    /// Evictions take a *contiguous* run of the emission order, and a polynomial dies if it loses
+    /// more than `surplus_shares`. Spreading every run across the window is what keeps a burst from
+    /// concentrating on one polynomial — with more polynomials than the window, any run of `n`
+    /// shares must touch at least `min(n, window)` distinct ones.
+    #[test]
+    fn contiguous_runs_must_spread_across_the_emission_window() -> anyhow::Result<()> {
+        // Deliberately more polynomials than the window, so the window is the binding constraint.
+        let polynomials_per_ssa = (SHARE_EMISSION_WINDOW * 2) as u16;
+        let cfg = SsaGeneratorConfig {
+            polynomials_per_ssa,
+            threshold: 2,
+            surplus_shares: 1,
+        };
+        let generator = SsaShareGenerator::<TestSpec>::new(cfg);
+
+        let p = SimplePseudonym::random();
+        generator.new_ssa_commitment(&p, 1.try_into()?)?;
+
+        let mut emitted = Vec::new();
+        for i in 0..(polynomials_per_ssa as usize * 3) {
+            let g = generator
+                .next_share(&p, &(i as u32).to_be_bytes())?
+                .ok_or(anyhow::anyhow!("failed to generate share"))?;
+            emitted.push(g.id.poly_index());
+        }
+        assert!(generator.next_share(&p, &u32::MAX.to_be_bytes())?.is_none());
+
+        for run in [2_usize, 17, SHARE_EMISSION_WINDOW] {
+            for window_start in (0..emitted.len().saturating_sub(run)).step_by(run.max(1)) {
+                let distinct = emitted[window_start..window_start + run]
+                    .iter()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len();
+                assert_eq!(
+                    run, distinct,
+                    "a contiguous run of {run} shares starting at {window_start} hit only {distinct} distinct \
+                     polynomials; an eviction of that run would concentrate on too few of them"
+                );
+            }
+        }
+
+        // Every polynomial still receives exactly `threshold + surplus` shares.
+        let mut per_poly = std::collections::HashMap::new();
+        for poly_index in &emitted {
+            *per_poly.entry(*poly_index).or_insert(0_usize) += 1;
+        }
+        assert_eq!(polynomials_per_ssa as usize, per_poly.len());
+        assert!(
+            per_poly
+                .values()
+                .all(|n| *n == cfg.threshold as usize + cfg.surplus_shares)
+        );
 
         Ok(())
     }
@@ -416,23 +525,23 @@ mod tests {
         let commitments = c.reconstruct_part_commitments().map_err(anyhow::Error::msg)?;
         assert_eq!(cfg.polynomials_per_ssa as usize, commitments.len());
 
+        // Shares are emitted round-robin across the window, so they are grouped by polynomial here
+        // rather than assumed to arrive in consecutive runs.
+        let by_poly = drain_shares_by_polynomial(&generator, &p, &cfg)?;
+        assert_eq!(cfg.polynomials_per_ssa as usize, by_poly.len());
+
         for commitment in &commitments {
-            // Only `threshold` shares are consumed; the surplus is drained afterwards so the
-            // generator advances to the next polynomial.
-            let mut shares = Vec::new();
-            for i in 0..(cfg.threshold as usize + cfg.surplus_shares) {
-                let x = hopr_types::crypto_random::random_bytes::<10>();
-                let g = generator
-                    .next_share(&p, &x)?
-                    .ok_or(anyhow::anyhow!("failed to generate share"))?;
-                assert_eq!(commitment.spi(), &g.id);
+            let shares = by_poly
+                .get(&commitment.spi().poly_index())
+                .ok_or(anyhow::anyhow!("no shares for polynomial"))?;
+            assert_eq!(cfg.threshold as usize + cfg.surplus_shares, shares.len());
 
-                if i < cfg.threshold as usize {
-                    shares.push(completed_share(&g, &x)?);
-                }
-            }
-
-            let reconstructed = shares.combine().map_err(anyhow::Error::msg)?.0;
+            // Only `threshold` shares are needed; the surplus stands in for any that are lost.
+            let reconstructed = shares[..cfg.threshold as usize]
+                .to_vec()
+                .combine()
+                .map_err(anyhow::Error::msg)?
+                .0;
             assert!(
                 commitment.verify_reconstructed(&reconstructed),
                 "polynomial {} did not open its commitment",
@@ -456,17 +565,16 @@ mod tests {
         let c = generator.new_ssa_commitment(&p, 1.try_into()?)?;
         let orig_commitment = c.ssa_commitment;
 
+        let by_poly = drain_shares_by_polynomial(&generator, &p, &cfg)?;
+        assert_eq!(cfg.polynomials_per_ssa as usize, by_poly.len());
+
         let mut recovered_secret = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::default();
-        for _ in 0..cfg.polynomials_per_ssa {
-            let mut shares = Vec::new();
-            for _ in 0..(cfg.threshold as usize + cfg.surplus_shares) {
-                let x = hopr_types::crypto_random::random_bytes::<10>();
-                let g = generator
-                    .next_share(&p, &x)?
-                    .ok_or(anyhow::anyhow!("failed to generate share"))?;
-                shares.push(completed_share(&g, &x)?);
-            }
-            recovered_secret += shares.combine().map_err(anyhow::Error::msg)?.0;
+        for shares in by_poly.values() {
+            recovered_secret += shares[..cfg.threshold as usize]
+                .to_vec()
+                .combine()
+                .map_err(anyhow::Error::msg)?
+                .0;
         }
 
         assert_eq!(
@@ -479,6 +587,40 @@ mod tests {
 
     /// Turns a generated share plus the nonce it was derived from into the `(x, y)` pair the
     /// interpolation consumes, exactly as the reconstructor does.
+    /// Drains the generator and buckets every share by its polynomial index.
+    ///
+    /// Emission is round-robin across [`SHARE_EMISSION_WINDOW`], so a polynomial's shares are not
+    /// contiguous in the output stream; anything reconstructing a polynomial has to group first.
+    /// Within a bucket the order is preserved, which is what lets a caller take the first
+    /// `threshold` and treat the rest as surplus.
+    #[allow(clippy::type_complexity)]
+    fn drain_shares_by_polynomial(
+        generator: &SsaShareGenerator<TestSpec>,
+        p: &SimplePseudonym,
+        cfg: &SsaGeneratorConfig,
+    ) -> anyhow::Result<std::collections::BTreeMap<PolynomialIndex, Vec<crate::CompletedShare<TestSpec>>>> {
+        let expected = cfg.polynomials_per_ssa as usize * (cfg.threshold as usize + cfg.surplus_shares);
+        let mut by_poly: std::collections::BTreeMap<PolynomialIndex, Vec<_>> = std::collections::BTreeMap::new();
+
+        for _ in 0..expected {
+            let x = hopr_types::crypto_random::random_bytes::<10>();
+            let g = generator
+                .next_share(p, &x)?
+                .ok_or(anyhow::anyhow!("failed to generate share"))?;
+            by_poly
+                .entry(g.id.poly_index())
+                .or_default()
+                .push(completed_share(&g, &x)?);
+        }
+        // The generator must be exhausted after exactly the expected number of shares.
+        anyhow::ensure!(
+            generator.next_share(p, &u32::MAX.to_be_bytes())?.is_none(),
+            "generator emitted more shares than the configured dimensions allow"
+        );
+
+        Ok(by_poly)
+    }
+
     fn completed_share(
         g: &GeneratedShare<TestSpec>,
         x: &impl AsRef<[u8]>,

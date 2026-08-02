@@ -132,6 +132,26 @@ lazy_static::lazy_static! {
     static ref RANDOM_DATA: [u8; 400] = hopr_api::types::crypto_random::random_bytes();
 }
 
+/// Fraction of the SURB ring buffer a Session's balancer target may occupy.
+///
+/// The remainder is headroom for balancer overshoot. The target used to be the ring buffer capacity
+/// itself, which left none: a Session whose buffer sat at target — the normal state when Entry → Exit
+/// traffic far exceeds the reverse, since the Exit then drains almost nothing — turned every
+/// overshot SURB into an immediate eviction of the oldest entry. Under PIX that is a lost SSA share,
+/// not just a lost SURB, because a share reaches the reconstructor only when its SURB is used.
+const SURB_BUFFER_TARGET_NUMERATOR: usize = 2;
+const SURB_BUFFER_TARGET_DENOMINATOR: usize = 3;
+
+/// Largest SURB buffer target a Session may request, given the ring buffer capacity backing it.
+///
+/// Kept strictly below `rb_capacity` so the balancer has somewhere to overshoot into before the
+/// ring buffer starts overwriting. See [`SURB_BUFFER_TARGET_NUMERATOR`].
+const fn surb_buffer_target_ceiling(rb_capacity: usize) -> usize {
+    // Saturating rather than wrapping: an operator-supplied capacity is only range-validated at the
+    // low end, and the multiplication would otherwise overflow on an absurd value.
+    rb_capacity.saturating_mul(SURB_BUFFER_TARGET_NUMERATOR) / SURB_BUFFER_TARGET_DENOMINATOR
+}
+
 /// PeerId -> OffchainPublicKey is a CPU-intensive blocking operation.
 ///
 /// This helper uses a cached static object to speed up the lookup and avoid blocking the async
@@ -365,7 +385,7 @@ where
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
-                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                maximum_surb_buffer_size: surb_buffer_target_ceiling(cfg.packet.surb_store.rb_capacity),
                 // The lower bound is enforced once in `SessionManager::new` via
                 // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
                 surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")

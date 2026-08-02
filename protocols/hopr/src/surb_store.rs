@@ -32,7 +32,7 @@ fn validate_reply_opener_lifetime(lifetime: &Duration) -> Result<(), ValidationE
 }
 
 fn default_rb_capacity() -> usize {
-    15_000
+    100_000
 }
 
 fn default_distress_threshold() -> usize {
@@ -76,7 +76,17 @@ pub struct SurbStoreConfig {
     /// This indicates how many SURBs can be at most held to be used to send a reply
     /// back to the sending side.
     ///
-    /// Default is 15 000.
+    /// Once the buffer is full, a push overwrites the oldest SURBs, which are then never used.
+    /// With PIX that is not merely a wasted SURB: each one carries a partial SSA share that is only
+    /// delivered to the reconstructor when the SURB is *used*, so an overwrite is a permanently
+    /// lost share. The capacity is therefore sized well above what any Session's SURB balancer
+    /// targets — see `maximum_surb_buffer_size` in `hopr-transport`, which is derived from this
+    /// value with headroom left for balancer overshoot.
+    ///
+    /// The allocation is made upfront per pseudonym but is only paged in as SURBs are stored:
+    /// an idle ring buffer measures ~7 KB resident, a full one holds `rb_capacity` × ~400 B.
+    ///
+    /// Default is 100 000.
     #[default(default_rb_capacity())]
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
