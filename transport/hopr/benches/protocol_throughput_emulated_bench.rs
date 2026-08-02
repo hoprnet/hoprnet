@@ -20,19 +20,22 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
-use hopr_protocol_pix::{EntryShareGenerator, MAX_POLYS_PER_SSA, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
+use hopr_protocol_pix::{
+    DEFAULT_POLY_THRESHOLD, EntryShareGenerator, MAX_POLYS_PER_SSA, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
+};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport::testing::harness::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
 
-/// Deployed polynomial threshold, mirroring `DEFAULT_PIX_SHARES_PER_POLY` in
-/// `transport/session/src/types.rs`.
+/// Deployed polynomial threshold. `DEFAULT_PIX_SHARES_PER_POLY`
+/// (`transport/session/src/types.rs`) is an alias of [`DEFAULT_POLY_THRESHOLD`], so this is the
+/// negotiated value by construction.
 ///
 /// This is what sets the per-share cost: `next_share` is a Horner evaluation over `threshold`
-/// coefficients. Deliberately not the pix crate's `DEFAULT_POLY_THRESHOLD`, which is 128.
-const PIX_THRESHOLD: u16 = 64;
+/// coefficients.
+const PIX_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
 
 /// Whether the PIX share generator handed to the encoder has a committed SSA.
 ///

@@ -157,7 +157,7 @@ validator = { workspace = true }
 
 bytesize = { workspace = true, optional = true }
 hex-literal = { workspace = true, optional = true }
-pprof = { version = "0.14", features = [
+pprof = { version = "0.15.0", features = [
   "flamegraph",
   "frame-pointer",
 ], optional = true }

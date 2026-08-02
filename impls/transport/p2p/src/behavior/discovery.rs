@@ -202,19 +202,30 @@ impl NetworkBehaviour for Behaviour {
 
                 if has_no_more_live_connections {
                     self.connected_peers.remove(&data.peer_id);
-                    self.schedule_dial_with(data.peer_id, initial_backoff());
+                    // Guard against duplicate heap entries: if a stale schedule_dial_with
+                    // call (e.g. from a racing Announce) already enqueued this peer, the
+                    // existing backoff entry will handle the reconnect.
+                    if !self.not_connected_peers.contains_key(&data.peer_id) {
+                        self.schedule_dial_with(data.peer_id, initial_backoff());
+                    }
                 }
             }
             libp2p::swarm::FromSwarm::DialFailure(DialFailure { peer_id, error, .. }) => {
                 tracing::debug!(?peer_id, %error, "Failed to dial peer");
 
-                // on a failed dial get the next scheduled dial using the backoff
+                // on a failed dial get the next scheduled dial using the backoff,
+                // but only if the peer hasn't already connected via an inbound
+                // connection that raced with our outbound dial attempt.
                 if let Some(peer) = peer_id {
-                    let backoff = self.not_connected_peers.remove(&peer).unwrap_or_else(|| {
-                        tracing::debug!(%peer, "no backoff for a failed dial, creating new backoff");
-                        initial_backoff()
-                    });
-                    self.schedule_dial_with(peer, backoff);
+                    if self.connected_peers.contains_key(&peer) {
+                        self.not_connected_peers.remove(&peer);
+                    } else {
+                        let backoff = self.not_connected_peers.remove(&peer).unwrap_or_else(|| {
+                            tracing::debug!(%peer, "no backoff for a failed dial, creating new backoff");
+                            initial_backoff()
+                        });
+                        self.schedule_dial_with(peer, backoff);
+                    }
                 }
             }
             _ => {}
@@ -257,10 +268,16 @@ impl NetworkBehaviour for Behaviour {
                     });
                 }
 
-                // Store announced addresses for later dialing / protocol use
+                // Store announced addresses for later dialing / protocol use.
+                // Only schedule a dial if the peer is not already connected and not
+                // already queued: multiple rapid announcements for the same disconnected
+                // peer must not stack up N heap entries that all fire simultaneously,
+                // issuing N concurrent dials and perpetuating a dial storm.
                 if !multiaddresses.is_empty() {
                     self.bootstrap_peers.insert(peer, multiaddresses);
-                    self.schedule_dial_with(peer, initial_backoff());
+                    if !self.connected_peers.contains_key(&peer) && !self.not_connected_peers.contains_key(&peer) {
+                        self.schedule_dial_with(peer, initial_backoff());
+                    }
                 }
             }
         });
@@ -301,5 +318,212 @@ impl NetworkBehaviour for Behaviour {
         } else {
             std::task::Poll::Pending
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::stream;
+    use libp2p::{
+        Multiaddr,
+        core::{ConnectedPoint, Endpoint},
+        swarm::{
+            ConnectionId, DialError, FromSwarm,
+            behaviour::{ConnectionClosed, ConnectionEstablished, DialFailure},
+        },
+    };
+
+    use super::*;
+
+    fn make_behaviour() -> Behaviour {
+        Behaviour::new(PeerId::random(), stream::empty())
+    }
+
+    fn connected_point() -> ConnectedPoint {
+        ConnectedPoint::Dialer {
+            address: "/ip4/127.0.0.1/tcp/9000".parse::<Multiaddr>().unwrap(),
+            role_override: Endpoint::Dialer,
+            port_use: libp2p::core::transport::PortUse::Reuse,
+        }
+    }
+
+    fn simulate_established(b: &mut Behaviour, peer: PeerId) {
+        let endpoint = connected_point();
+        b.on_swarm_event(FromSwarm::ConnectionEstablished(ConnectionEstablished {
+            peer_id: peer,
+            connection_id: ConnectionId::new_unchecked(0),
+            endpoint: &endpoint,
+            failed_addresses: &[],
+            other_established: 0,
+        }));
+    }
+
+    fn simulate_closed(b: &mut Behaviour, peer: PeerId, remaining: usize) {
+        let endpoint = connected_point();
+        b.on_swarm_event(FromSwarm::ConnectionClosed(ConnectionClosed {
+            peer_id: peer,
+            connection_id: ConnectionId::new_unchecked(0),
+            endpoint: &endpoint,
+            cause: None,
+            remaining_established: remaining,
+        }));
+    }
+
+    fn simulate_dial_failure(b: &mut Behaviour, peer: PeerId) {
+        let error = DialError::NoAddresses;
+        b.on_swarm_event(FromSwarm::DialFailure(DialFailure {
+            peer_id: Some(peer),
+            error: &error,
+            connection_id: ConnectionId::new_unchecked(0),
+        }));
+    }
+
+    fn announce(b: &mut Behaviour, peer: PeerId) {
+        let addr: Multiaddr = "/ip4/127.0.0.1/tcp/9000".parse().unwrap();
+        // Mirrors the Announce branch in poll(): only schedule if not connected
+        // AND not already enqueued, to match the heap-deduplication invariant.
+        b.bootstrap_peers.insert(peer, vec![addr]);
+        if !b.connected_peers.contains_key(&peer) && !b.not_connected_peers.contains_key(&peer) {
+            b.schedule_dial_with(peer, initial_backoff());
+        }
+    }
+
+    // ── regression: announce must not re-enqueue dial for a connected peer ──
+
+    /// Before the fix, every `PeerDiscovery::Announce` for an already-connected
+    /// peer would call `schedule_dial_with`, which unconditionally inserts the
+    /// peer into `not_connected_peers`.  The stale-skip guard in `poll()` then
+    /// races with the reconnect queue and issues spurious dials.
+    #[test]
+    fn announce_does_not_schedule_dial_for_connected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        simulate_established(&mut b, peer);
+        assert!(b.connected_peers.contains_key(&peer));
+        assert!(!b.not_connected_peers.contains_key(&peer));
+
+        // Announce the peer again (as happens continuously from the network graph).
+        announce(&mut b, peer);
+
+        assert!(
+            !b.not_connected_peers.contains_key(&peer),
+            "connected peer must not be added to not_connected_peers on re-announce"
+        );
+    }
+
+    /// A disconnected peer that gets re-announced must still be scheduled for dialing.
+    #[test]
+    fn announce_schedules_dial_for_disconnected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        announce(&mut b, peer);
+
+        assert!(
+            b.not_connected_peers.contains_key(&peer),
+            "disconnected peer must be queued for dialing on announce"
+        );
+    }
+
+    // ── regression: DialFailure must not re-enqueue if peer is now connected ──
+
+    /// Before the fix, a `DialFailure` for a peer that had already established
+    /// an inbound connection (racing with our outbound dial) would call
+    /// `schedule_dial_with` and insert the peer back into `not_connected_peers`,
+    /// triggering a further dial storm.
+    #[test]
+    fn dial_failure_does_not_reschedule_already_connected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        // Peer connects inbound while our outbound dial is in flight.
+        simulate_established(&mut b, peer);
+        // Outbound dial fails after the inbound connection is up.
+        simulate_dial_failure(&mut b, peer);
+
+        assert!(
+            !b.not_connected_peers.contains_key(&peer),
+            "DialFailure for an already-connected peer must not re-enqueue a dial"
+        );
+    }
+
+    /// A dial failure for a peer that is genuinely not connected must reschedule.
+    #[test]
+    fn dial_failure_reschedules_genuinely_disconnected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        // Queue the peer for dialing (as if it was announced but never connected).
+        b.not_connected_peers.insert(peer, initial_backoff());
+        simulate_dial_failure(&mut b, peer);
+
+        assert!(
+            b.not_connected_peers.contains_key(&peer),
+            "DialFailure for a disconnected peer must reschedule a dial attempt"
+        );
+    }
+
+    // ── regression: repeated announces for disconnected peer must not accumulate ──
+
+    /// Before the fix, every `PeerDiscovery::Announce` for a disconnected peer
+    /// called `schedule_dial_with`, adding one heap entry per announce even though
+    /// the peer was already enqueued.  At backoff expiry, all N entries fired
+    /// simultaneously, issuing N concurrent dials → N DialFailure events → N new
+    /// entries → repeat.
+    #[test]
+    fn announce_does_not_stack_dials_for_disconnected_peer() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        // First announce: peer is unknown, so a dial must be scheduled.
+        announce(&mut b, peer);
+        assert!(b.not_connected_peers.contains_key(&peer));
+        let heap_len_after_first = b.next_dial_attempts.len();
+
+        // Subsequent announces while peer is still not connected and already
+        // enqueued must not add more heap entries.
+        announce(&mut b, peer);
+        announce(&mut b, peer);
+        announce(&mut b, peer);
+
+        assert_eq!(
+            b.next_dial_attempts.len(),
+            heap_len_after_first,
+            "repeated announces for disconnected peer must not accumulate heap entries"
+        );
+    }
+
+    // ── existing correct behaviour: disconnect triggers reconnect ───────────
+
+    #[test]
+    fn connection_closed_schedules_reconnect() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        simulate_established(&mut b, peer);
+        simulate_closed(&mut b, peer, 0);
+
+        assert!(
+            b.not_connected_peers.contains_key(&peer),
+            "after disconnect with no remaining connections, peer must be queued for reconnect"
+        );
+    }
+
+    #[test]
+    fn connection_closed_does_not_schedule_reconnect_while_other_connections_live() {
+        let mut b = make_behaviour();
+        let peer = PeerId::random();
+
+        // Two connections established.
+        simulate_established(&mut b, peer);
+        simulate_established(&mut b, peer);
+        // One closes, one remains.
+        simulate_closed(&mut b, peer, 1);
+
+        assert!(
+            !b.not_connected_peers.contains_key(&peer),
+            "peer with remaining connections must not be queued for reconnect"
+        );
     }
 }
