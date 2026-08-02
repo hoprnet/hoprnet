@@ -109,12 +109,16 @@ struct DeferredAcks {
 type DeferredAckBucket = std::sync::Arc<parking_lot::Mutex<DeferredAcks>>;
 
 /// What became of an acknowledgement handed to [`defer_ack`](SsaReconstructor::defer_ack).
+///
+/// Fieldless — the caller still owns the acknowledgement, since [`DeferredAck`] is `Copy` — so this
+/// stays a discriminant rather than carrying 264 bytes back out of the critical section.
+#[derive(Clone, Copy)]
 enum Deferral {
     /// Appended to a live bucket. The drain that installs the cycle will redeem it.
     Buffered,
     /// The bucket had already been drained, so no drain will come for this one. The caller must
     /// redeem it inline; parking it would be silent loss.
-    Orphaned(DeferredAck),
+    Orphaned,
     /// Over one of the two caps. Already warned about, and deliberately discarded.
     Dropped,
 }
@@ -487,7 +491,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let outcome = {
             let mut bucket = bucket.lock();
             if bucket.drained {
-                Deferral::Orphaned(deferred)
+                Deferral::Orphaned
             } else if bucket.by_poly.values().map(Vec::len).sum::<usize>() >= MAX_DEFERRED_ACKS_PER_CYCLE {
                 // The cycle as a whole is holding more than the shares it could plausibly have
                 // received inside `max_ack_await_time`, so the excess cannot be redeemable.
@@ -520,9 +524,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // The drain took this bucket while we were on our way into it. Redeeming here is what
             // makes the mutex the whole synchronisation point: the drain's take and this append
             // are serialised by it, so exactly one of them owns the ack.
-            Deferral::Orphaned(ack) => {
+            Deferral::Orphaned => {
                 tracing::trace!(%spi, "redeeming an acknowledgement deferred into a drained bucket");
-                self.redeem_deferred_acks(&ssa_id, std::iter::once(ack));
+                self.redeem_deferred_acks(&ssa_id, std::iter::once(deferred));
             }
             // Close the race against a concurrent installation. The decision to defer was made on
             // a cycle lookup that missed; if the cycle has appeared since, the drain that would
