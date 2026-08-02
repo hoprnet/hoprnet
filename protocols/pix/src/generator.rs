@@ -110,7 +110,7 @@ pub struct SsaGeneratorConfig {
     /// that reach it, so any of the surplus can stand in for one that never arrives. It does not
     /// cover *corrupt* shares — nothing checks a share on arrival any more, so a bad one is only
     /// noticed once it has already poisoned the interpolation. See
-    /// [`SsaPartCommitment`](crate::SsaPartCommitment).
+    /// [`SsaPartCommitment`].
     ///
     /// Default is 20, must be between 0 and 4096.
     #[default(20)]

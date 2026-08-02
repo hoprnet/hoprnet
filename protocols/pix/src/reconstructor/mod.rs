@@ -140,8 +140,8 @@ pub struct SsaReconstructor<S: PixSpec> {
     ///
     /// The bucket key is exactly the thing whose arrival unblocks the entries inside it, so a
     /// bucket is drained once, by the installation of its own cycle, and never scanned
-    /// speculatively. That is what keeps [`acknowledge_shares`] free of retry work: it only ever
-    /// *appends* to a bucket.
+    /// speculatively. That is what keeps [`Self::acknowledge_shares`] free of retry work: it only
+    /// ever *appends* to a bucket.
     ///
     /// The original per-peer stash had to be re-scanned in full on every `acknowledge_shares` call,
     /// because a per-peer key says nothing about which entries have become viable. That is
@@ -162,7 +162,7 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// `max_ack_await_time` TTL is the operative bound.
     pending_acks: moka::sync::Cache<SsaId<S::Pseudonym>, DeferredAckBucket>,
     /// Resolutions produced by draining deferred-ack buckets at verifier-installation time, waiting
-    /// to be picked up by the next [`acknowledge_shares`] call.
+    /// to be picked up by the next [`Self::acknowledge_shares`] call.
     ///
     /// Draining happens on the commitment path (`insert_coefficient_commitments`), which is where
     /// the verifier that unblocks the acks is installed. That deliberately keeps the share

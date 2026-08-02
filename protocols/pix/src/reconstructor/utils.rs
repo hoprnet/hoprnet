@@ -54,7 +54,7 @@ pub struct SsaCycle<S: PixSpec> {
     ///
     /// A failure is charged once per offending share, not once per polynomial: a part reports its
     /// failure exactly once and absorbs everything after it as
-    /// [`AddShareOutcome::Absorbed`](AddShareOutcome::Absorbed).
+    /// [`AddShareOutcome::Absorbed`].
     invalid_shares: std::sync::atomic::AtomicU64,
     /// `num_polys × poly_threshold` — the useful-share count that constitutes full recovery.
     ///

@@ -113,7 +113,7 @@ pub struct SsaPolynomialId<P> {
 ///
 /// PIX only ever populates [`CONSTANT_TERM_COEFFICIENT`](crate::CONSTANT_TERM_COEFFICIENT), so in
 /// practice this holds exactly one key. The map shape is retained because the wire format still
-/// admits higher coefficient indices — see [`SsaPartCommitment`](crate::SsaPartCommitment) for why
+/// admits higher coefficient indices — see [`SsaPartCommitment`] for why
 /// none are produced.
 pub type TransposedVerifiers<S> = HashMap<CoefficientIndex, Vec<(PolynomialIndex, PixGroupRepr<S>)>>;
 
