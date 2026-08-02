@@ -240,7 +240,7 @@ impl HoprSession {
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state so that opt-in client-side flow
-    /// control (see [`flow_control_from_env`]) can use it as the anti-grief down-only ceiling. The
+    /// control (see `flow_control_from_env`) can use it as the anti-grief down-only ceiling. The
     /// entry (sending) side passes `Some(..)`; sites without balancer state pass `None`.
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(

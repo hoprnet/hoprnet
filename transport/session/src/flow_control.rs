@@ -286,4 +286,16 @@ mod tests {
         let second = w.write(&[0u8; 10_000]).await.unwrap();
         assert!(second > 0, "delivery must reopen the window");
     }
+
+    #[tokio::test]
+    async fn paced_writer_empty_write_completes_immediately() {
+        // An empty write must never be flow-controlled: even with the window pinned to the floor and
+        // no delivery, writing an empty slice returns `Ok(0)` right away (no park).
+        let meter = DeliveryMeter::default();
+        let clock = DeliveryClock::new(meter, None);
+        let supply = SurbSupply::new(balancer(0, 0), 1_000);
+        let mut w = PacedWriter::new(Sink::default(), small_cfg(), clock, supply);
+        let n = w.write(&[]).await.unwrap();
+        assert_eq!(n, 0);
+    }
 }
