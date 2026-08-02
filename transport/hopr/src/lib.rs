@@ -118,6 +118,7 @@ use hopr_api::{
     types::internal::routing::DestinationRouting,
 };
 use hopr_crypto_packet::HoprShareResolution;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {

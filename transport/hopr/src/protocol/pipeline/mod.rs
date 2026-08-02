@@ -146,7 +146,7 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
         // Out-of-order sends to QUIC were causing frame reassembler discards on the receiver side.
         .map(|(routing, data)| {
             let encoder = encoder.clone();
-                let exit_ack_proc = exit_ack_proc.clone();
+            let exit_ack_proc = exit_ack_proc.clone();
             let counters = counters.clone();
             async move {
                 hopr_transport_session::counters::ENCODE_STAGE_ENTRIES
@@ -171,36 +171,36 @@ async fn start_outgoing_packet_pipeline<AppOut, A, E, WOut, WOutErr>(
                         METRIC_PACKET_COUNT.increment(&["sent"]);
                         counters.get_or_create(&packet.next_hop).record_message_sent();
 
-                            // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
-                            // and the packet contains a non-empty encrypted partial SSA share (it is therefore an RP
-                            // packet), add it to the exit acknowledgement processor.
-                            if let Some(exit_ack_proc) = exit_ack_proc.as_ref()
-                                && let Some(encrypted_pix_share) =
-                                    packet.encrypted_pix_share.filter(|s| !s.partial_share.is_empty())
-                            // Fail-safe to skip empty shares
-                            {
-                                let spi = encrypted_pix_share.ssa_polynomial_id();
-                                if let Err(error) = exit_ack_proc.insert_encrypted_share(
-                                    &packet.next_hop,
-                                    packet.ack_challenge,
-                                    encrypted_pix_share,
-                                ) {
-                                    #[cfg(all(feature = "telemetry", not(test)))]
-                                    METRIC_SHARE_INSERT_FAILURES.increment();
-                                    tracing::error!(
-                                        next_hop = packet.next_hop.to_peerid_str(),
-                                        ack_challenge = %packet.ack_challenge,
-                                        ssa_poly_id = ?spi,
-                                        %error,
-                                        "failed to insert encrypted share into the exit acknowledgement processor"
-                                    );
-                                } else {
-                                    tracing::trace!(
-                                        next_hop = packet.next_hop.to_peerid_str(),
-                                        "inserted new encrypted share into the exit acknowledgement processor"
-                                    );
-                                }
+                        // If the pipeline has an exit acknowledgement processor (i.e., on an Exit node),
+                        // and the packet contains a non-empty encrypted partial SSA share (it is therefore an RP
+                        // packet), add it to the exit acknowledgement processor.
+                        if let Some(exit_ack_proc) = exit_ack_proc.as_ref()
+                            && let Some(encrypted_pix_share) =
+                                packet.encrypted_pix_share.filter(|s| !s.partial_share.is_empty())
+                        // Fail-safe to skip empty shares
+                        {
+                            let spi = encrypted_pix_share.ssa_polynomial_id();
+                            if let Err(error) = exit_ack_proc.insert_encrypted_share(
+                                &packet.next_hop,
+                                packet.ack_challenge,
+                                encrypted_pix_share,
+                            ) {
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_SHARE_INSERT_FAILURES.increment();
+                                tracing::error!(
+                                    next_hop = packet.next_hop.to_peerid_str(),
+                                    ack_challenge = %packet.ack_challenge,
+                                    ssa_poly_id = ?spi,
+                                    %error,
+                                    "failed to insert encrypted share into the exit acknowledgement processor"
+                                );
+                            } else {
+                                tracing::trace!(
+                                    next_hop = packet.next_hop.to_peerid_str(),
+                                    "inserted new encrypted share into the exit acknowledgement processor"
+                                );
                             }
+                        }
 
                         tracing::trace!(peer = packet.next_hop.to_peerid_str(), "protocol message out");
                         Some((packet.next_hop.into(), packet.data))

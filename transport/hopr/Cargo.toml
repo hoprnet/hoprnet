@@ -86,6 +86,7 @@ multiaddr = { workspace = true }
 proc-macro-regex = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
