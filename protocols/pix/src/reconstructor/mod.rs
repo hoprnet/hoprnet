@@ -93,8 +93,31 @@ type DeferredAck = (OffchainPublicKey, HalfKeyChallenge, HalfKey);
 /// then drained whole, so per-entry cache bookkeeping (and its ~200 B overhead per entry) buys
 /// nothing. The mutex serialises deferrals *within one cycle* only, and deferral is O(1) work off
 /// the steady-state path.
-type DeferredAckBucket =
-    std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<PolynomialIndex, Vec<DeferredAck>>>>;
+#[derive(Default)]
+struct DeferredAcks {
+    by_poly: std::collections::HashMap<PolynomialIndex, Vec<DeferredAck>>,
+    /// Set by the one drain this bucket will ever get, in the same critical section as the take.
+    ///
+    /// A bucket is reachable through two routes: the `pending_acks` key, and an `Arc` a
+    /// [`defer_ack`](SsaReconstructor::defer_ack) already holds. The drain removes the first but
+    /// cannot revoke the second, so an append that lands after it would sit in a bucket nothing
+    /// will ever read again. This flag is how such an append notices — see
+    /// [`Deferral::Orphaned`].
+    drained: bool,
+}
+
+type DeferredAckBucket = std::sync::Arc<parking_lot::Mutex<DeferredAcks>>;
+
+/// What became of an acknowledgement handed to [`defer_ack`](SsaReconstructor::defer_ack).
+enum Deferral {
+    /// Appended to a live bucket. The drain that installs the cycle will redeem it.
+    Buffered,
+    /// The bucket had already been drained, so no drain will come for this one. The caller must
+    /// redeem it inline; parking it would be silent loss.
+    Orphaned(DeferredAck),
+    /// Over one of the two caps. Already warned about, and deliberately discarded.
+    Dropped,
+}
 
 /// Cap on deferred acknowledgements held for a single polynomial.
 ///
@@ -447,13 +470,25 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     ///
     /// O(1) — this is the entire cost the acknowledgement path pays for a deferral.
     fn defer_ack(&self, spi: SsaPolynomialId<S::Pseudonym>, deferred: DeferredAck) {
-        let ssa_id = *spi.as_ref();
-        let bucket = self.pending_acks.get_with(ssa_id, || {
+        let bucket = self.pending_acks.get_with(*spi.as_ref(), || {
             std::sync::Arc::new(parking_lot::Mutex::new(Default::default()))
         });
-        {
+        self.defer_ack_into(&bucket, spi, deferred);
+    }
+
+    /// The bucket half of [`defer_ack`](Self::defer_ack), taking the bucket rather than looking it
+    /// up.
+    ///
+    /// Split out so a test can hold a handle across the drain that invalidates the cache key,
+    /// which is the interleaving this guards against and the one thing a single thread cannot
+    /// otherwise produce — after the invalidate, `get_with` hands out a *fresh* bucket.
+    fn defer_ack_into(&self, bucket: &DeferredAckBucket, spi: SsaPolynomialId<S::Pseudonym>, deferred: DeferredAck) {
+        let ssa_id = *spi.as_ref();
+        let outcome = {
             let mut bucket = bucket.lock();
-            if bucket.values().map(Vec::len).sum::<usize>() >= MAX_DEFERRED_ACKS_PER_CYCLE {
+            if bucket.drained {
+                Deferral::Orphaned(deferred)
+            } else if bucket.by_poly.values().map(Vec::len).sum::<usize>() >= MAX_DEFERRED_ACKS_PER_CYCLE {
                 // The cycle as a whole is holding more than the shares it could plausibly have
                 // received inside `max_ack_await_time`, so the excess cannot be redeemable.
                 tracing::warn!(
@@ -461,27 +496,43 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                     cap = MAX_DEFERRED_ACKS_PER_CYCLE,
                     "dropping deferred acknowledgement: cycle bucket is full"
                 );
-                return;
+                Deferral::Dropped
+            } else {
+                let per_poly = bucket.by_poly.entry(spi.poly_index()).or_default();
+                if per_poly.len() >= MAX_DEFERRED_ACKS_PER_POLYNOMIAL {
+                    // Only reachable if the peer emits more shares for one polynomial than its own
+                    // `threshold + surplus` budget allows, so the excess is almost certainly
+                    // duplicate.
+                    tracing::warn!(
+                        %spi,
+                        cap = MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+                        "dropping deferred acknowledgement: polynomial bucket is full"
+                    );
+                    Deferral::Dropped
+                } else {
+                    per_poly.push(deferred);
+                    Deferral::Buffered
+                }
             }
-            let per_poly = bucket.entry(spi.poly_index()).or_default();
-            if per_poly.len() >= MAX_DEFERRED_ACKS_PER_POLYNOMIAL {
-                // Only reachable if the peer emits more shares for one polynomial than its own
-                // `threshold + surplus` budget allows, so the excess is almost certainly duplicate.
-                tracing::warn!(
-                    %spi,
-                    cap = MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
-                    "dropping deferred acknowledgement: polynomial bucket is full"
-                );
-                return;
-            }
-            per_poly.push(deferred);
-        }
+        };
 
-        // Close the race against a concurrent installation. The decision to defer was made on a
-        // cycle lookup that missed; if the cycle has appeared since, the drain that would have
-        // redeemed this ack has already run and nothing else will come for it.
-        if self.ssa_cycles.contains_key(&ssa_id) {
-            self.drain_deferred_acks(&ssa_id);
+        match outcome {
+            // The drain took this bucket while we were on our way into it. Redeeming here is what
+            // makes the mutex the whole synchronisation point: the drain's take and this append
+            // are serialised by it, so exactly one of them owns the ack.
+            Deferral::Orphaned(ack) => {
+                tracing::trace!(%spi, "redeeming an acknowledgement deferred into a drained bucket");
+                self.redeem_deferred_acks(&ssa_id, std::iter::once(ack));
+            }
+            // Close the race against a concurrent installation. The decision to defer was made on
+            // a cycle lookup that missed; if the cycle has appeared since, the drain that would
+            // have redeemed this ack may already have run against a bucket we never saw.
+            Deferral::Buffered => {
+                if self.ssa_cycles.contains_key(&ssa_id) {
+                    self.drain_deferred_acks(&ssa_id);
+                }
+            }
+            Deferral::Dropped => {}
         }
     }
 
@@ -497,17 +548,34 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         };
         self.pending_acks.invalidate(ssa_id);
 
-        let deferred = std::mem::take(&mut *bucket.lock());
+        // Take and tombstone in one critical section. A `defer_ack_into` that looked this bucket
+        // up before the invalidate still holds an `Arc` to it; the flag is what stops its append
+        // from disappearing into a bucket nothing will read again.
+        let deferred = {
+            let mut bucket = bucket.lock();
+            bucket.drained = true;
+            std::mem::take(&mut bucket.by_poly)
+        };
         if deferred.is_empty() {
             return;
         }
 
+        self.redeem_deferred_acks(ssa_id, deferred.into_values().flatten());
+    }
+
+    /// Processes acknowledgements whose verifier has since been installed, parking whatever they
+    /// resolve to.
+    ///
+    /// Shared by the two routes that can redeem a deferral — the drain on the commitment path and
+    /// an [`orphaned`](Deferral::Orphaned) append — so both produce the same resolutions in the
+    /// same order.
+    fn redeem_deferred_acks(&self, ssa_id: &SsaId<S::Pseudonym>, deferred: impl IntoIterator<Item = DeferredAck>) {
         let mut resolved = Vec::new();
         // The furthest-along snapshot any redeemed ack produced. Shares recovered here would
         // otherwise be invisible to the consumer until some later batch happened to touch this same
         // SSA, since only `acknowledge_shares` emits snapshots.
         let mut progress = Vec::new();
-        for (peer, challenge, ack) in deferred.into_values().flatten() {
+        for (peer, challenge, ack) in deferred {
             // The share lives in the peer's own awaiting-acks cache; if the peer entry is gone the
             // share has expired with it and the ack is dead.
             let Some(awaiting) = self.awaiting_acks.get(&peer) else {
@@ -602,7 +670,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     fn deferred_ack_count(&self, ssa_id: &SsaId<S::Pseudonym>) -> usize {
         self.pending_acks
             .get(ssa_id)
-            .map(|b| b.lock().values().map(Vec::len).sum())
+            .map(|b| b.lock().by_poly.values().map(Vec::len).sum())
             .unwrap_or(0)
     }
 }
@@ -2285,12 +2353,12 @@ mod tests {
             let bucket = bucket.lock();
             assert_eq!(
                 2,
-                bucket.get(&0).map(Vec::len).unwrap_or(0),
+                bucket.by_poly.get(&0).map(Vec::len).unwrap_or(0),
                 "one sub-bucket holds both peers' acks"
             );
             assert_eq!(
                 1,
-                bucket.get(&1).map(Vec::len).unwrap_or(0),
+                bucket.by_poly.get(&1).map(Vec::len).unwrap_or(0),
                 "a different polynomial keeps its own sub-bucket"
             );
         }
@@ -2897,6 +2965,88 @@ mod tests {
             MAX_DEFERRED_ACKS_PER_CYCLE,
             reconstructor.deferred_ack_count(&ssa_id),
             "the cycle total must not grow past the ceiling"
+        );
+
+        Ok(())
+    }
+
+    /// An acknowledgement appended to a bucket the drain has already taken must still be redeemed.
+    ///
+    /// A bucket is reachable two ways — through the `pending_acks` key, and through an `Arc` a
+    /// `defer_ack` obtained before the drain invalidated that key. The drain can only remove the
+    /// first. The `ssa_cycles` re-probe was supposed to cover the resulting window, but it called
+    /// `drain_deferred_acks`, which returns early on a cache miss — and a miss is exactly what this
+    /// interleaving produces. The append landed in an orphaned bucket, and the share sat in
+    /// `awaiting_acks` until `max_ack_await_time` discarded it. Silently: no error, no counter, and
+    /// a polynomial losing more than `surplus_shares` this way strands the whole cycle without any
+    /// check ever failing.
+    ///
+    /// Forcing the interleaving needs the stale handle, which is why `defer_ack_into` takes the
+    /// bucket: after the invalidate, `defer_ack`'s own `get_with` would hand out a fresh one and
+    /// the window would close by accident.
+    #[test]
+    fn an_acknowledgement_deferred_into_a_drained_bucket_is_still_redeemed() -> anyhow::Result<()> {
+        // One polynomial at threshold 2, so the two deferred acknowledgements below are exactly
+        // what the cycle needs: the second one landing makes the difference between a recovered
+        // SSA and a stranded one.
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 1,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        let pseudonym = SimplePseudonym::random();
+        let peer = OffchainKeypair::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+
+        let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
+        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+
+        // Both shares reach the Exit ahead of the commitment, so neither has a verifier yet.
+        let mut pending = Vec::new();
+        for _ in 0..2 {
+            let (msg, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
+            let ack = HalfKey::random();
+            let challenge = ack.to_challenge()?;
+            let enc = share.share.encrypt(&share.id, &ack)?;
+            reconstructor.insert_encrypted_share(
+                peer.public(),
+                challenge,
+                TaggedEncryptedPartialSsaShare::new(pseudonym, &msg, enc)?,
+            )?;
+            pending.push((share.id, challenge, ack));
+        }
+
+        // The first acknowledgement takes the ordinary deferral path and creates the bucket.
+        let (_, _, first_ack) = pending[0];
+        reconstructor.acknowledge_shares(
+            *peer.public(),
+            vec![VerifiedAcknowledgement::new(first_ack, &peer).leak()],
+        )?;
+        let bucket = reconstructor
+            .pending_acks
+            .get(&ssa_id)
+            .ok_or_else(|| anyhow::anyhow!("the first acknowledgement must have created a bucket"))?;
+
+        // Installing the cycle drains that bucket and invalidates its key. Our handle survives.
+        commitment.process_into_reconstructor(&reconstructor)?;
+        assert!(
+            reconstructor.pending_acks.get(&ssa_id).is_none(),
+            "the drain must have taken the cache key"
+        );
+
+        // The racing append: a `defer_ack` that looked the bucket up before the drain ran.
+        let (spi, challenge, ack) = pending[1];
+        reconstructor.defer_ack_into(&bucket, spi, (*peer.public(), challenge, ack));
+
+        // Two shares interpolate the only polynomial, so the SSA is recovered — but only if the
+        // second acknowledgement was redeemed rather than parked in the orphan.
+        assert!(
+            reconstructor
+                .take_ready_resolutions()
+                .iter()
+                .any(|resolution| matches!(resolution, ShareResolution::RecoveredSsa(_))),
+            "the acknowledgement must have been redeemed inline, not lost with the bucket"
         );
 
         Ok(())
