@@ -203,17 +203,32 @@ pub struct HoprProtocolConfig {
     pub counter_flush_interval: Duration,
 }
 
-/// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything.
+/// Rejects an [`IncomingSessionPixConfig`] that cannot work.
+///
+/// Two independent failures, both of which would otherwise only show up at runtime:
 ///
 /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
 /// `UnacceptablePixParams` errors at Session establishment time.
+///
+/// The deadlines the Exit-side supervisor derives from this config have to agree with the
+/// reconstructor's own lifetimes — a supervisor that waits longer than the reconstructor keeps state
+/// would be waiting on an SSA that can no longer be completed. Checked against the value the three
+/// `SsaReconstructor::new` sites actually receive, not against whatever the default happens to be.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
     if cfg.quota_range.is_empty() {
         return Err(ValidationError::new(
             "pix quota_range must be non-empty (start must not exceed end)",
         ));
     }
+
+    hopr_transport_session::validate_pix_supervision(&cfg.supervisor_config(), &crate::ssa_reconstructor_config())
+        .map_err(|error| {
+            let mut e = ValidationError::new("pix supervision deadlines conflict with the reconstructor's lifetimes");
+            e.message = Some(error.to_string().into());
+            e
+        })?;
+
     Ok(())
 }
 

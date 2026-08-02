@@ -436,7 +436,7 @@ pub enum SessionPixCloseReason {
 // Re-exports from submodules
 // ---------------------------------------------------------------------------
 
-pub use gate::ServiceGate;
+pub use gate::{GateClosed, ServiceGate};
 pub use worker::{ActionRx, SessionPixSupervisorHandle, spawn_supervisor_worker};
 
 // ---------------------------------------------------------------------------

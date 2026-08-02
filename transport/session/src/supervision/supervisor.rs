@@ -301,10 +301,16 @@ impl SessionPixSupervisor {
     // Internal event handlers
     // ------------------------------------------------------------------
 
+    /// Arms the commitment deadline once the request this SSA was registered for has gone out.
+    ///
+    /// The record itself is created by [`emit_request_next_ssa`](Self::emit_request_next_ssa); this
+    /// only starts the clock, because the Entry cannot be late answering a request it has not been
+    /// sent yet.
     fn on_ssa_request_sent(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
-        // Guard: ignore if we already have state (idempotent).
-        if self.find_ssa(ssa_id).is_some() {
-            return Vec::new();
+        // Validate pseudonym. Checked before the lookup: a foreign pseudonym never matches a record
+        // of ours, so looking first would answer a cross-session confusion with silence.
+        if ssa_id.pseudonym() != &self.pseudonym {
+            return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
         }
 
         // Guard: reject if this SSA index was already retired.
@@ -312,16 +318,16 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Validate pseudonym.
-        if ssa_id.pseudonym() != &self.pseudonym {
+        let Some(idx) = self.find_ssa_idx(ssa_id) else {
+            // A confirmation for an SSA we never asked for.
             return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
-        }
+        };
 
-        let target = self.dims.target_useful_shares();
-        let deadline = now.checked_add(self.cfg.max_ssa_delivery_time);
-        let mut state = PerSsaState::new(*ssa_id, target, now);
-        state.commitment_deadline = deadline;
-        self.ssas.push(state);
+        // Idempotent: a repeated confirmation must not extend the deadline, and one arriving after
+        // the SSA has moved on must not resurrect a phase it has left.
+        if self.ssas[idx].phase == SsaPhase::AwaitingCommitment && self.ssas[idx].commitment_deadline.is_none() {
+            self.ssas[idx].commitment_deadline = now.checked_add(self.cfg.max_ssa_delivery_time);
+        }
 
         Vec::new()
     }
@@ -710,7 +716,7 @@ impl SessionPixSupervisor {
         vec![SessionPixAction::RetireSsa(retired)]
     }
 
-    fn emit_request_next_ssa(&mut self, _now: Instant) -> Vec<SessionPixAction> {
+    fn emit_request_next_ssa(&mut self, now: Instant) -> Vec<SessionPixAction> {
         let index = self.next_ssa_index;
 
         let ssa_index = match SsaIndex::try_from(index) {
@@ -730,6 +736,18 @@ impl SessionPixSupervisor {
         }
 
         let ssa_id = SsaId::new(self.pseudonym, ssa_index);
+
+        // Register the SSA now rather than on `SsaRequestSent`. Carrying out the action registers
+        // an Exit commitment, which is what makes shares for this SSA processable — so observations
+        // about it can reach us before the confirmation that we asked for it does. Every handler
+        // ignores an SSA it has no record of, and for `UnverifiableShares` that would mean failing
+        // open on exactly the signal that must fail closed.
+        //
+        // No deadline yet: the request has not gone out, so there is nothing to be late for. That
+        // is what `SsaRequestSent` adds.
+        self.ssas
+            .push(PerSsaState::new(ssa_id, self.dims.target_useful_shares(), now));
+
         vec![SessionPixAction::RequestSsa {
             ssa_id,
             polys: self.dims.polys,
@@ -739,10 +757,6 @@ impl SessionPixSupervisor {
 
     fn find_ssa_idx(&self, ssa_id: &SsaId<HoprPseudonym>) -> Option<usize> {
         self.ssas.iter().position(|s| s.ssa_id == *ssa_id)
-    }
-
-    fn find_ssa(&self, ssa_id: &SsaId<HoprPseudonym>) -> Option<&PerSsaState> {
-        self.ssas.iter().find(|s| s.ssa_id == *ssa_id)
     }
 }
 
@@ -798,6 +812,11 @@ mod tests {
 
     use super::*;
 
+    /// A permissive baseline for the state-machine tests — *not* [`SupervisorConfig::default`].
+    ///
+    /// The shipped fault tolerances are zero, which would close a Session on the first unverifiable
+    /// share and so make every multi-fault transition here unreachable. Tests that care about the
+    /// shipped values say so by name.
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
             max_ssa_delivery_time: Duration::from_secs(20),
@@ -872,7 +891,15 @@ mod tests {
 
         assert_eq!(sup.next_ssa_index, 2);
         assert!(!sup.closed);
-        assert!(sup.ssas.is_empty());
+
+        // The SSA is tracked from the moment it is requested, so that an observation about it
+        // cannot arrive before there is anywhere to record it.
+        assert_eq!(sup.ssas.len(), 1);
+        assert_eq!(sup.ssas[0].phase, SsaPhase::AwaitingCommitment);
+        assert!(
+            sup.ssas[0].commitment_deadline.is_none(),
+            "the delivery clock starts when the request goes out, not when it is queued"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -1750,8 +1777,46 @@ mod tests {
     // Fault tests
     // ---------------------------------------------------------------
 
+    /// A fault reported before the request confirmation still counts.
+    ///
+    /// Carrying out `RequestSsa` registers the Exit commitment, which is what makes shares for that
+    /// SSA processable — so a share can fail verification and be reported before `SsaRequestSent`
+    /// gets back. Every handler ignores an SSA it has no record of, which on this event would mean
+    /// failing open on the one signal that has to fail closed.
     #[test]
-    fn fourth_invalid_per_ssa_closes_at_defaults() {
+    fn an_unverifiable_share_counts_even_before_the_request_is_confirmed() {
+        let p = pseudonym();
+        let (mut sup, actions) = SessionPixSupervisor::new(SupervisorConfig::default(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        let id = match actions.as_slice() {
+            [SessionPixAction::RequestSsa { ssa_id, .. }] => *ssa_id,
+            other => panic!("expected one RequestSsa, got {other:?}"),
+        };
+
+        // No `SsaRequestSent` — the confirmation is still in flight.
+        let actions = sup.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id: id,
+                observed_total: 1,
+            },
+            now,
+            0,
+        );
+
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(
+                    SessionPixCloseReason::TooManyUnverifiableShares
+                )]
+            ),
+            "expected a close, got {actions:?}"
+        );
+    }
+
+    #[test]
+    fn invalid_share_past_a_configured_tolerance_closes() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
@@ -2126,28 +2191,33 @@ mod tests {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
-        let id = ssa_id(p, 1);
 
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        // Two SSAs in flight with deadlines 40 s apart: the later one is armed second, so returning
+        // the earliest is a real choice rather than the only candidate.
+        let id1 = ssa_id(p, 1);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
+        let id2 = ssa_id(p, 2);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), now + Duration::from_secs(40), 0);
+
         let dl = sup.next_deadline().unwrap();
 
         let expected = now + Duration::from_secs(20);
         assert!((dl - expected).as_millis() < 10, "expected {expected:?}, got {dl:?}");
     }
 
-    // ---------------------------------------------------------------
-    // SsaIndex overflow
-    // ---------------------------------------------------------------
-
+    /// Pipelining a second SSA must not disturb the first one's deadlines.
+    ///
+    /// This used to be a `SessionManager` test asserting that two per-index `PixKillSwitch` abort
+    /// handles coexisted. The deadlines are the supervisor's now, so the invariant is stated here
+    /// against the state it actually lives in — and it is stronger, because a shared timer would
+    /// satisfy "both handles present" but not "both instants unchanged".
     #[test]
-    fn ssa_index_overflow_fails_closed() {
+    fn pipelining_a_second_ssa_leaves_the_first_ones_deadlines_alone() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
 
-        sup.next_ssa_index = u32::MAX;
-
-        let id1 = ssa_id(p, u32::MAX);
+        let id1 = ssa_id(p, 1);
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::CommitmentVerified {
@@ -2166,9 +2236,96 @@ mod tests {
             0,
         );
 
+        let before = sup.ssas.iter().find(|s| s.ssa_id == id1).unwrap();
+        assert_eq!(before.phase, SsaPhase::Recovering);
+        let (hard_before, idle_before) = (before.recovery_hard_deadline, before.recovery_idle_deadline);
+
+        // Early recovery on a funded SSA is what pipelines the next one.
+        let later = now + Duration::from_secs(5);
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), later, 0);
+        let id2 = match actions.as_slice() {
+            [SessionPixAction::RequestSsa { ssa_id, .. }] => *ssa_id,
+            other => panic!("expected exactly one RequestSsa, got {other:?}"),
+        };
+        assert_eq!(id2.ssa_index().get(), 2, "the pipelined SSA must take the next index");
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), later, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id2,
+                expected_deposit: None,
+            },
+            later,
+            0,
+        );
+
+        let after = sup.ssas.iter().find(|s| s.ssa_id == id1).unwrap();
+        assert_eq!(
+            after.phase,
+            SsaPhase::Recovering,
+            "pipelining moved the first SSA's phase"
+        );
+        assert_eq!(
+            after.recovery_hard_deadline, hard_before,
+            "pipelining moved the first SSA's hard recovery deadline"
+        );
+        assert_eq!(
+            after.recovery_idle_deadline, idle_before,
+            "pipelining moved the first SSA's idle recovery deadline"
+        );
+
+        // ...and the second one is independently armed rather than sharing the first's timers.
+        let second = sup.ssas.iter().find(|s| s.ssa_id == id2).unwrap();
+        assert_eq!(second.phase, SsaPhase::AwaitingDeposit);
+        assert!(second.deposit_deadline.is_some());
+    }
+
+    // ---------------------------------------------------------------
+    // SsaIndex overflow
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn ssa_index_overflow_fails_closed() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        let id1 = ssa_id(p, 1);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id1,
+                expected_deposit: None,
+            },
+            now,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id1,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+
+        // Wind the allocator to the last usable index, so pipelining the next one overflows.
+        sup.next_ssa_index = u32::MAX;
+
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
-        assert!(!actions.is_empty());
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)]
+            ),
+            "expected a single Close, got {actions:?}"
+        );
         assert!(sup.closed);
+        assert_eq!(
+            sup.ssas.len(),
+            1,
+            "an index that could not be allocated must not leave a record behind"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -2227,29 +2384,29 @@ mod tests {
             start,
             0,
         );
+        // Recovery pipelines the next SSA, which is tracked from the moment it is requested.
         sup.handle_event(&SessionPixEvent::Recovered(id), start, 0);
-
-        assert_eq!(sup.ssas.len(), 1);
+        assert_eq!(sup.ssas.len(), 2, "the recovered SSA's tombstone plus its successor");
 
         // Before tombstone expires — still present.
         let actions = sup.handle_deadline(start + Duration::from_secs(5), 0);
         assert!(actions.is_empty());
-        assert_eq!(sup.ssas.len(), 1);
+        assert_eq!(sup.ssas.len(), 2);
 
-        // After tombstone expires — RetireSsa emitted, then Close because no SSAs remain.
+        // After tombstone expires — RetireSsa, and nothing else: the successor is still pending, so
+        // the Session has not run out of SSAs. Closing here would kill a Session over a request
+        // that is merely in flight.
         let actions = sup.handle_deadline(start + Duration::from_secs(11), 5);
-        assert_eq!(actions.len(), 2, "expected RetireSsa + Close");
+        assert_eq!(actions.len(), 1, "expected RetireSsa alone, got {actions:?}");
         assert!(
             matches!(&actions[0], SessionPixAction::RetireSsa(rid) if *rid == id),
-            "first action should be RetireSsa({id}), got {:?}",
+            "action should be RetireSsa({id}), got {:?}",
             actions[0]
         );
-        assert!(
-            matches!(
-                actions[1],
-                SessionPixAction::Close(SessionPixCloseReason::NoSsaRemaining)
-            ),
-            "second action should be Close"
+        assert_eq!(
+            sup.ssas.len(),
+            1,
+            "the successor must survive its predecessor's retirement"
         );
     }
 

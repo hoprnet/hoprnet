@@ -216,12 +216,16 @@ impl ServiceGate {
         self.notify.notify_waiters();
     }
 
-    /// Non-blocking try-acquire for tests and sync-only callers.
+    /// Non-blocking try-acquire — the egress fast path.
     ///
     /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
     /// exhausted (and gate not yet funded) or the ceiling is exceeded (gate
     /// funded), or `Err(())` if poisoned.
-    #[cfg(test)]
+    ///
+    /// Every outgoing data packet of a supervised Session comes through here, and service is
+    /// available for all but a vanishing fraction of them, so this answering synchronously is what
+    /// keeps gating off the allocator: only [`acquire`](Self::acquire)'s parking path needs a future
+    /// large enough to box, and that path is about to block anyway.
     pub fn try_acquire_sync(&self) -> Result<bool, ()> {
         if self.poisoned.load(Ordering::Acquire) {
             return Err(());

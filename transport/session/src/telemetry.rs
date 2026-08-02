@@ -194,6 +194,21 @@ lazy_static::lazy_static! {
         "Session egress packets",
         &["session_id"]
     ).unwrap();
+    static ref METRIC_SESSION_PIX_GATE_MODE: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_gate_mode",
+        "PIX egress gate mode encoded as Predeposit=0, Funded=1",
+        &["session_id"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_CLOSURES_TOTAL: hopr_api::types::telemetry::MultiCounter = hopr_api::types::telemetry::MultiCounter::new(
+        "hopr_session_pix_closures_total",
+        "Sessions closed by the PIX supervisor, by reason",
+        &["reason"]
+    ).unwrap();
+    static ref METRIC_SESSION_PIX_RECOVERY_PROGRESS: hopr_api::types::telemetry::MultiGauge = hopr_api::types::telemetry::MultiGauge::new(
+        "hopr_session_pix_recovery_progress",
+        "Recovery progress of a session's most recently advanced SSA, as a ratio of useful shares to target",
+        &["session_id"]
+    ).unwrap();
     static ref SESSION_RUNTIME: parking_lot::Mutex<HashMap<SessionId, SessionRuntimeState>> = parking_lot::Mutex::new(HashMap::new());
 }
 
@@ -281,9 +296,15 @@ pub fn initialize_session_metrics(session_id: SessionId, cfg: HoprSessionConfig)
     refresh_lifetime_metrics(&session_id, now, now, now);
 }
 
-pub fn remove_session_metrics_state(session_id: &SessionId) {
+pub fn remove_session_metrics_state(session_id: &SessionId, has_pix: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_FRAME_BEING_ASSEMBLED.set(&[session_id_str], 0.0);
+    if has_pix {
+        // Only for a Session that had a gate: setting these unconditionally would mint a
+        // `hopr_session_pix_*` series for every non-PIX Session that ever closed.
+        METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], 0.0);
+        METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], 0.0);
+    }
     SESSION_RUNTIME.lock().remove(session_id);
 }
 
@@ -366,6 +387,39 @@ pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_SURB_CONSUMED_TOTAL.increment_by(&[session_id_str], by);
     touch_session_activity(session_id);
+}
+
+/// Records that a PIX Session's egress gate left the predeposit budget for funded service.
+///
+/// One-way in practice: the supervisor releases service once per Session, on the first sufficient
+/// deposit. `false` exists so the gauge can be reset when the Session goes away.
+pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
+    let session_id_str: &str = session_id.as_ref();
+    METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], if funded { 1.0 } else { 0.0 });
+    touch_session_activity(session_id);
+}
+
+/// Reports how far a Session's most recently advanced SSA has got towards recovery.
+///
+/// Keyed by Session, not by `(session, ssa_index)`. The index rises for the lifetime of a Session
+/// and never repeats, so labelling by it would mint a new time series per SSA cycle and never
+/// retire any of them. A Session runs at most a few cycles concurrently and they advance together,
+/// so the latest snapshot is a fair summary of where recovery stands.
+pub fn set_pix_recovery_progress(session_id: &SessionId, useful_shares: u64, target_useful_shares: u64) {
+    if target_useful_shares == 0 {
+        return;
+    }
+    let session_id_str: &str = session_id.as_ref();
+    let ratio = (useful_shares as f64 / target_useful_shares as f64).clamp(0.0, 1.0);
+    METRIC_SESSION_PIX_RECOVERY_PROGRESS.set(&[session_id_str], ratio);
+}
+
+/// Counts a Session closed by the PIX supervisor, labelled by why.
+///
+/// Labelled by reason rather than by Session: the reasons are a closed enum, so the cardinality is
+/// bounded, which is what makes this safe to keep after the Session is gone.
+pub fn record_pix_closure(reason: &str) {
+    METRIC_SESSION_PIX_CLOSURES_TOTAL.increment(&[reason]);
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {
