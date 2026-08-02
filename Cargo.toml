@@ -171,9 +171,13 @@ hopr-types = { version = "2.0.2", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.5.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
+# `bjj` is deliberately not enabled here. Hard-enabling it on the workspace dependency
+# makes it unreachable for downstream consumers — Cargo features are additive, so no
+# dependent can turn it back off. It is instead forwarded through `hopr-transport` and
+# `hopr-lib`, both of which keep it in their `default` set, so building any hoprnet
+# crate directly is unchanged.
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
-  "bjj",
 ] }
 hopr-lib = { version = "4.0.2-rc.9", path = "hopr/hopr-lib", default-features = false }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }

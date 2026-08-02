@@ -261,7 +261,9 @@ pub struct HoprPixGroupElement(pub HoprPixGroupRepr);
 
 impl std::hash::Hash for HoprPixGroupElement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.as_ref().hash(state);
+        // Spelled out because the secp256k1 `HoprPixGroupRepr` is a `hybrid_array::Array`,
+        // which has several `AsRef` impls and cannot infer the target here.
+        AsRef::<[u8]>::as_ref(&self.0).hash(state);
     }
 }
 
@@ -298,7 +300,7 @@ impl<'a> TryFrom<&'a [u8]> for HoprPixGroupElement {
             return Err(GeneralError::ParseError("pix repr length".into()));
         }
         let mut arr = HoprPixGroupRepr::default();
-        arr.as_mut().copy_from_slice(value);
+        AsMut::<[u8]>::as_mut(&mut arr).copy_from_slice(value);
         Ok(Self(arr))
     }
 }
@@ -552,7 +554,7 @@ mod tests {
         // All-ones is not a valid encoding of any point, so the subgroup filter has nothing to
         // accept. Baby JubJub's cofactor of 8 is why the filter exists at all.
         let mut garbage_repr = HoprPixGroupRepr::default();
-        garbage_repr.as_mut().fill(0xFF);
+        AsMut::<[u8]>::as_mut(&mut garbage_repr).fill(0xFF);
         assert!(HoprPixGroupElement(garbage_repr).try_into_pix_group().is_err());
 
         // Hex, so a commitment is greppable in a log line.

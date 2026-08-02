@@ -25,7 +25,16 @@ crate-type = ["rlib"]
 doctest = false
 
 [features]
-default = []
+default = ["bjj"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
+# Baby JubJub public keys instead of Ethereum addresses.
+#
+# Forwarded from here rather than pinned on the workspace dependency so a consumer can
+# opt out: Cargo features are additive, so a hard-enabled `hopr-crypto-packet/bjj` could
+# never be turned off downstream. Consumers that settle PIX deposits with plain on-chain
+# transfers — `hopr-strategy`'s `NonAnonymousPix`, for one — need the secp256k1 variant,
+# because a Baby JubJub public key is not an account that can receive a transfer.
+bjj = ["hopr-crypto-packet/bjj"]
 all-benchmarks = []
 capture = ["dep:pcap-file"]
 # Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
