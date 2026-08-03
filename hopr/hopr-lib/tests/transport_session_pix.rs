@@ -150,7 +150,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         pseudonym: None,
                         surb_management: None,
                         always_max_out_surbs: false,
-                        pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
+                        pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
                     },
                 )
                 .await

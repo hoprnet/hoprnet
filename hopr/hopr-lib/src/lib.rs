@@ -74,7 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
+    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SsaDimensions,
+    SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -153,10 +154,10 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
-    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    /// If set, sets the PIX dimensions for the Session.
     ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<(u16, u16)>,
+    pub pix_ssa_quota: Option<SsaDimensions>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -241,7 +242,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
                             hopr_api::types::primitive::errors::GeneralError::NonSpecificError(e.to_string())
                         })
                     };
-                    Ok((to_u16(p)?, to_u16(s)?))
+                    Ok(SsaDimensions::new(to_u16(p)?, to_u16(s)?))
                 })
                 .transpose()?,
         })

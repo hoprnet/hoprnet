@@ -157,6 +157,41 @@ pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(DEFAULT_PIX_POLY
 /// Preserves the 4× span the range had when its bounds were hard-coded.
 pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
 
+/// PIX dimensions a Session offers: how many polynomials an SSA is split into, and how many shares
+/// reconstruct each one.
+///
+/// Named fields rather than a `(u16, u16)` tuple, because the two are interchangeable to the type
+/// system and *not* interchangeable to the protocol — while their product, which is all the Exit
+/// compares, is identical either way. A transposition therefore announced valid-looking dimensions
+/// against a correct quota. The only thing that caught it was
+/// [`SessionManager::new_session`](crate::SessionManager::new_session) requiring both to match the
+/// locally installed generator exactly, which is a check about something else entirely and would not
+/// survive a caller that took its dimensions from elsewhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SsaDimensions {
+    /// Number of polynomials the SSA secret is split across.
+    pub polys_per_ssa: u16,
+    /// Shares required to reconstruct one polynomial.
+    pub shares_per_poly: u16,
+}
+
+impl SsaDimensions {
+    /// The dimensions implied by [`DEFAULT_PIX_POLYS_PER_SSA`] and [`DEFAULT_PIX_SHARES_PER_POLY`].
+    pub const DEFAULT: Self = Self::new(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
+
+    pub const fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
+        Self {
+            polys_per_ssa,
+            shares_per_poly,
+        }
+    }
+
+    /// Per-SSA data quota these dimensions imply.
+    pub const fn quota(&self) -> SsaQuota {
+        pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
+    }
+}
+
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgreedSsaQuota {

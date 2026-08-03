@@ -80,7 +80,7 @@ use hopr_transport_session::{
 };
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SsaDimensions, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 #[cfg(feature = "telemetry")]

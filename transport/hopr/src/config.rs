@@ -266,8 +266,8 @@ pub struct PixGlobalConfig {
     /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
     ///
     /// The range below bounds this field alone. What actually costs is the *product* with
-    /// [`ssa_part_size`](Self::ssa_part_size), separately bounded by
-    /// [`validate_pix_dimension_product`].
+    /// [`ssa_part_size`](Self::ssa_part_size), which validation bounds separately at 4× the profiled
+    /// operating point — see `validate_pix_dimension_product`.
     #[validate(range(min = 8, max = 16192))]
     #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
     pub num_ssa_parts: usize,
@@ -278,7 +278,7 @@ pub struct PixGlobalConfig {
     ///
     /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
     /// for the interaction with the Exit's accepted quota range, and
-    /// [`validate_pix_dimension_product`] for the bound on the two together.
+    /// `validate_pix_dimension_product` for the bound on the two together.
     #[validate(range(min = 2, max = 4096))]
     #[default(DEFAULT_PIX_SHARES_PER_POLY as usize)]
     pub ssa_part_size: usize,
