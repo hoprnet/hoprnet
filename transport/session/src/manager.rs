@@ -5170,6 +5170,13 @@ mod tests {
     /// This is the guard at the top of `handle_incoming_session_initiation`, and it was untested:
     /// the integration test named for it never negotiated PIX at all, so the absent toolbox was not
     /// the operative cause of anything it observed.
+    ///
+    /// The offered dimensions have to be ones `check_pix_params` *accepts*, and the test asserts
+    /// that before exercising the handler. The fallthrough from a rejected `check_pix_params` emits
+    /// the identical `StartErrorReason::UnacceptablePixParams` under the identical
+    /// `ErrorIdentifier::Challenge` and creates no session either, so with unacceptable dimensions
+    /// nothing here could tell the two refusals apart — the guard could be deleted outright and
+    /// this would still pass.
     #[test_log::test(tokio::test)]
     async fn incoming_usepix_session_is_rejected_when_no_pix_toolbox_is_installed() -> anyhow::Result<()> {
         use std::sync::Arc;
@@ -5177,8 +5184,8 @@ mod tests {
         use hopr_protocol_start::{StartErrorReason, StartInitiation};
         use tokio::sync::oneshot;
 
-        // Quota deliberately acceptable and PIX not enforced, so the only thing that can reject this
-        // is the missing toolbox.
+        // PIX not enforced, and the default `quota_range` ends exactly on the quota the default
+        // dimensions imply, so the offer below sits inside it.
         let mgr = SessionManager::new(SessionManagerConfig::default());
 
         let mut bob_transport = MockMsgSender::new();
@@ -5203,16 +5210,21 @@ mod tests {
         // No toolbox — the third argument is what a relay that does not participate in PIX gets.
         mgr.start(bob_sender.clone(), new_session_tx, None)?;
 
-        mgr.handle_incoming_session_initiation(
-            HoprPseudonym::random(),
-            StartInitiation {
-                challenge: MIN_CHALLENGE,
-                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-                additional_data: 0,
-            },
-        )
-        .await?;
+        let req = StartInitiation {
+            challenge: MIN_CHALLENGE,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
+            additional_data: (u64::from(DEFAULT_POLYS_PER_SSA) << 48) | (u64::from(DEFAULT_POLY_THRESHOLD) << 32),
+        };
+
+        // What makes the missing toolbox the sole remaining cause of the refusal below.
+        assert!(
+            mgr.check_pix_params(&req).is_some(),
+            "the offered dimensions must be acceptable, or the refusal cannot be attributed to the guard"
+        );
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), req)
+            .await?;
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);
