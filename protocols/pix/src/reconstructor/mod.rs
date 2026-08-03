@@ -96,6 +96,15 @@ type DeferredAck = (OffchainPublicKey, HalfKeyChallenge, HalfKey);
 #[derive(Default)]
 struct DeferredAcks {
     by_poly: std::collections::HashMap<PolynomialIndex, Vec<DeferredAck>>,
+    /// Running sum of the `by_poly` lengths, maintained so the per-cycle cap is an O(1) check.
+    ///
+    /// Recomputing it would walk every sub-bucket inside the mutex on every deferral, and there
+    /// can be one sub-bucket per entry: filling a bucket to
+    /// [`MAX_DEFERRED_ACKS_PER_CYCLE`] would then cost ~33M map-entry visits, on the path every
+    /// acknowledgement takes during the commitment window. The invariant
+    /// `total == by_poly.values().map(Vec::len).sum()` has one increment site and one reset site,
+    /// both under this mutex.
+    total: usize,
     /// Set by the one drain this bucket will ever get, in the same critical section as the take.
     ///
     /// A bucket is reachable through two routes: the `pending_acks` key, and an `Arc` a
@@ -522,7 +531,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             let mut bucket = bucket.lock();
             if bucket.drained {
                 Deferral::Orphaned
-            } else if bucket.by_poly.values().map(Vec::len).sum::<usize>() >= MAX_DEFERRED_ACKS_PER_CYCLE {
+            } else if bucket.total >= MAX_DEFERRED_ACKS_PER_CYCLE {
                 // The cycle as a whole is holding more than the shares it could plausibly have
                 // received inside `max_ack_await_time`, so the excess cannot be redeemable.
                 tracing::warn!(
@@ -532,6 +541,8 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 );
                 Deferral::Dropped
             } else {
+                // Reborrowed off the guard so `by_poly` and `total` are disjoint field borrows.
+                let bucket = &mut *bucket;
                 let per_poly = bucket.by_poly.entry(spi.poly_index()).or_default();
                 if per_poly.len() >= MAX_DEFERRED_ACKS_PER_POLYNOMIAL {
                     // Only reachable if the peer emits more shares for one polynomial than its own
@@ -545,6 +556,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                     Deferral::Dropped
                 } else {
                     per_poly.push(deferred);
+                    bucket.total += 1;
                     Deferral::Buffered
                 }
             }
@@ -588,6 +600,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         let deferred = {
             let mut bucket = bucket.lock();
             bucket.drained = true;
+            bucket.total = 0;
             std::mem::take(&mut bucket.by_poly)
         };
         if deferred.is_empty() {
@@ -700,6 +713,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     }
 
     /// Total deferred acknowledgements bucketed for a cycle.
+    ///
+    /// Recomputed from `by_poly` rather than read off `DeferredAcks::total` deliberately: a
+    /// counter that has drifted from the map is exactly what this should catch, and an accessor
+    /// reading the counter would agree with it whatever it said.
     #[cfg(test)]
     fn deferred_ack_count(&self, ssa_id: &SsaId<S::Pseudonym>) -> usize {
         self.pending_acks
