@@ -346,18 +346,12 @@ pub struct SupervisorConfig {
 // ---------------------------------------------------------------------------
 
 /// PIX dimensions agreed upon during session negotiation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SsaDimensions {
-    pub polys: u16,
-    pub threshold: u16,
-}
-
-impl SsaDimensions {
-    /// Number of useful shares needed for full recovery.
-    pub fn target_useful_shares(&self) -> u64 {
-        self.polys as u64 * self.threshold as u64
-    }
-}
+///
+/// Re-exported rather than defined here: this supervisor once carried its own `polys`/`threshold`
+/// pair, which meant the same thing as the one a Session offers but named it differently and could
+/// not be handed across the boundary without a field-by-field copy. `target_useful_shares` moved
+/// onto the shared type with it.
+pub use crate::types::SsaDimensions;
 
 // ---------------------------------------------------------------------------
 // SessionPixEvent
@@ -707,10 +701,7 @@ mod tests {
 
         let pseudonym = HoprPseudonym::random();
         let ssa_id = SsaId::new(pseudonym, hopr_protocol_pix::SsaIndex::MIN);
-        let dims = SsaDimensions {
-            polys: 10,
-            threshold: 5,
-        };
+        let dims = SsaDimensions::new(10, 5);
         let now = std::time::Instant::now();
 
         let (mut supervisor, _) = SessionPixSupervisor::new(SupervisorConfig::default(), dims, pseudonym, now);

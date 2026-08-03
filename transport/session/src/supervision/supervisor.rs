@@ -750,8 +750,8 @@ impl SessionPixSupervisor {
 
         vec![SessionPixAction::RequestSsa {
             ssa_id,
-            polys: self.dims.polys,
-            threshold: self.dims.threshold,
+            polys: self.dims.polys_per_ssa,
+            threshold: self.dims.shares_per_poly,
         }]
     }
 
@@ -833,7 +833,7 @@ mod tests {
     }
 
     fn dims(polys: u16, threshold: u16) -> SsaDimensions {
-        SsaDimensions { polys, threshold }
+        SsaDimensions::new(polys, threshold)
     }
 
     fn pseudonym() -> HoprPseudonym {

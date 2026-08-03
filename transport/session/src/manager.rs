@@ -50,11 +50,12 @@ use crate::{
     errors::{self, SessionManagerError, TransportSessionError},
     supervision::{
         ActionRx, ServiceGate, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SessionPixSupervisorHandle,
-        SsaDimensions, SupervisorConfig, spawn_supervisor_worker,
+        SupervisorConfig, spawn_supervisor_worker,
     },
     types::{
         ClosureReason, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprSessionCapabilities, HoprSessionConfig,
-        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaDimensions, SsaQuota,
+        pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -1353,7 +1354,10 @@ where
                 .into());
             }
 
-            let (polys_per_ssa, shares_per_ssa) = cfg
+            let SsaDimensions {
+                polys_per_ssa,
+                shares_per_poly: shares_per_ssa,
+            } = cfg
                 .pix_ssa_quota
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
 
@@ -1623,7 +1627,7 @@ where
                     METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
-                    let session = HoprSession::new(
+                    let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
                         session_config(&self.cfg, cfg.capabilities),
@@ -1640,6 +1644,9 @@ where
                             }),
                         ),
                         Some(notifier),
+                        // Entry (sending) side: give flow control the SURB balancer state as its
+                        // anti-grief down-only ceiling.
+                        Some(surb_mgmt.clone()),
                     )?;
 
                     #[cfg(feature = "telemetry")]
@@ -2457,10 +2464,7 @@ where
 
             let (handle, action_rx) = spawn_supervisor_worker(
                 self.cfg.pix_config.supervisor_config(),
-                SsaDimensions {
-                    polys: client_polys_per_ssa,
-                    threshold: client_shares_per_ssa,
-                },
+                SsaDimensions::new(client_polys_per_ssa, client_shares_per_ssa),
                 session_id,
                 std::time::Instant::now(),
             );
@@ -5051,7 +5055,7 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some((2, 2)),
+                    pix_ssa_quota: Some(SsaDimensions::new(2, 2)),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(0.try_into()?),
                     ..Default::default()
@@ -5086,8 +5090,8 @@ mod tests {
     /// ## Steps
     /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
     /// 2. Start the manager with that toolbox installed.
-    /// 3. Call `new_session` requesting `pix_ssa_quota: Some((10, 10))` — both values are within protocol bounds but
-    ///    mismatch the generator.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some(SsaDimensions::new(10, 10))` — both values are within
+    ///    protocol bounds but mismatch the generator.
     /// 4. Assert the error identifies which dimension doesn't match.
     /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
     #[test_log::test(tokio::test)]
@@ -5124,7 +5128,7 @@ mod tests {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
                     // Both values pass protocol bounds but polys=10 != generator's 5
-                    pix_ssa_quota: Some((10, 10)),
+                    pix_ssa_quota: Some(SsaDimensions::new(10, 10)),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
                     ..Default::default()
@@ -5307,6 +5311,13 @@ mod tests {
     /// This is the guard at the top of `handle_incoming_session_initiation`, and it was untested:
     /// the integration test named for it never negotiated PIX at all, so the absent toolbox was not
     /// the operative cause of anything it observed.
+    ///
+    /// The offered dimensions have to be ones `check_pix_params` *accepts*, and the test asserts
+    /// that before exercising the handler. The fallthrough from a rejected `check_pix_params` emits
+    /// the identical `StartErrorReason::UnacceptablePixParams` under the identical
+    /// `ErrorIdentifier::Challenge` and creates no session either, so with unacceptable dimensions
+    /// nothing here could tell the two refusals apart — the guard could be deleted outright and
+    /// this would still pass.
     #[test_log::test(tokio::test)]
     async fn incoming_usepix_session_is_rejected_when_no_pix_toolbox_is_installed() -> anyhow::Result<()> {
         use std::sync::Arc;
@@ -5314,8 +5325,8 @@ mod tests {
         use hopr_protocol_start::{StartErrorReason, StartInitiation};
         use tokio::sync::oneshot;
 
-        // Quota deliberately acceptable and PIX not enforced, so the only thing that can reject this
-        // is the missing toolbox.
+        // PIX not enforced, and the default `quota_range` ends exactly on the quota the default
+        // dimensions imply, so the offer below sits inside it.
         let mgr = SessionManager::new(SessionManagerConfig::default());
 
         let mut bob_transport = MockMsgSender::new();
@@ -5340,16 +5351,21 @@ mod tests {
         // No toolbox — the third argument is what a relay that does not participate in PIX gets.
         mgr.start(bob_sender.clone(), new_session_tx, None)?;
 
-        mgr.handle_incoming_session_initiation(
-            HoprPseudonym::random(),
-            StartInitiation {
-                challenge: MIN_CHALLENGE,
-                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-                capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-                additional_data: 0,
-            },
-        )
-        .await?;
+        let req = StartInitiation {
+            challenge: MIN_CHALLENGE,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
+            additional_data: (u64::from(DEFAULT_POLYS_PER_SSA) << 48) | (u64::from(DEFAULT_POLY_THRESHOLD) << 32),
+        };
+
+        // What makes the missing toolbox the sole remaining cause of the refusal below.
+        assert!(
+            mgr.check_pix_params(&req).is_some(),
+            "the offered dimensions must be acceptable, or the refusal cannot be attributed to the guard"
+        );
+
+        mgr.handle_incoming_session_initiation(HoprPseudonym::random(), req)
+            .await?;
 
         let err = rx.await.context("send_message was never called")?;
         assert_eq!(err.reason, StartErrorReason::UnacceptablePixParams);

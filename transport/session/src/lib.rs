@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod counters;
 pub mod errors;
+pub mod flow_control;
 mod manager;
 /// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
 /// worker that drives them.
@@ -28,16 +29,18 @@ pub use manager::{
     SessionManagerConfig,
 };
 pub use supervision::{SupervisorConfig, validate_pix_supervision};
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
+#[cfg(any(test, feature = "testing"))]
 pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
     AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA, HoprSession,
     HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprSessionOutPixEvent, HoprStartProtocol,
-    IncomingSession, ServiceId, SessionId, SessionTarget,
+    IncomingSession, ServiceId, SessionId, SessionTarget, SsaDimensions,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
@@ -122,7 +125,6 @@ pub struct SessionClientConfig {
     pub always_max_out_surbs: bool,
     /// PIX parameters for SSAs.
     ///
-    /// This is a tuple `(polys_per_ssa, shares_per_poly)`.
     /// When not set, the Session will not advertise any PIX capability and may
     /// get refused by the Exit (if it requires PIX).
     ///
@@ -130,7 +132,7 @@ pub struct SessionClientConfig {
     /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
     ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<(u16, u16)>,
+    pub pix_ssa_quota: Option<SsaDimensions>,
 }
 
 #[cfg(test)]

@@ -385,6 +385,19 @@ mod tests {
         // `threshold` — exactly the `polys × threshold` packets the agreed quota is priced on.
         // Draining one polynomial at a time instead spent earlier polynomials' surplus before the
         // last one had any shares at all, pushing recovery out to nearly the whole budget.
+        //
+        // That holds only while the *whole* SSA fits in one emission window. Above it the window
+        // covers a prefix of the queue, later polynomials do not start until earlier ones are drained
+        // to `threshold + surplus`, and recovery moves out to
+        // `(polys − window)(threshold + surplus) + window × threshold`. This fixture is well under
+        // the window; the assertion keeps a future widening from silently making the expectation
+        // wrong rather than loudly failing.
+        assert!(
+            num_polys <= hopr_protocol_pix::SHARE_EMISSION_WINDOW,
+            "recovery_at assumes the whole SSA fits in one emission window ({num_polys} polynomials against a window \
+             of {})",
+            hopr_protocol_pix::SHARE_EMISSION_WINDOW
+        );
         let recovery_at = num_polys * threshold - 1;
 
         let num_msgs_to_recover_ssa = num_polys * (threshold + surplus);

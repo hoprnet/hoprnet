@@ -1,7 +1,16 @@
 //! Test helpers for `hopr-transport-session`.
 //!
-//! This module is compiled unconditionally so integration tests can always use it
-//! without requiring a test build of the rlib.
+//! Gated on `cfg(any(test, feature = "testing"))`, and the two halves of that are both load-bearing:
+//! `test` covers the crate's own unit tests, and the feature covers the integration tests in
+//! `tests/`, which link the rlib as an ordinary dependency. The crate's dev-dependency on itself
+//! enables the feature for both builds — without it, `cfg(test)` would compile this module while
+//! `mockall` and `tokio` stayed switched off, which is the state `hopr-lib`'s own `testing` module is
+//! still stuck in.
+//!
+//! It used to be compiled unconditionally, so that integration tests needed nothing. The cost was
+//! that `mockall` and `tokio` had to be non-optional dependencies: a release build of the crate
+//! linked a mocking framework, and `tokio` moving out of `runtime-tokio` took the crate's
+//! runtime-agnostic boundary with it.
 
 #![allow(clippy::type_complexity)]
 

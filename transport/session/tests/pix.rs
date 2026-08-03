@@ -21,7 +21,7 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    SessionManagerConfig, SessionTarget, SsaDimensions, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -259,7 +259,10 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
+                    pix_ssa_quota: Some(SsaDimensions::new(
+                        ssa_gen_config.polynomials_per_ssa,
+                        ssa_gen_config.threshold,
+                    )),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -406,8 +409,8 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 /// ## Steps
 /// 1. Both managers are started without a `PixToolbox`.
 /// 2. Alice initiates with `Capability::Segmentation` only and `pix_ssa_quota: None`, so PIX is never negotiated.
-/// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice, and the `.times(1)`
-///    expectations are what pin the absence of a third message.
+/// 3. The mock captures and delivers `StartSession` → Bob and `SessionEstablished` → Alice, and the `.times(1)` on
+///    *both* transports is what pins the absence of a third message.
 /// 4. Both sessions are established and both sides receive a session handle.
 ///
 /// Note what this does *not* show: the absent `PixToolbox` is not the operative cause here, because
@@ -433,19 +436,26 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
 
     let bob_mgr_clone = Arc::new(bob_mgr.clone());
     let alice_pseudonym_for_alice_start = alice_pseudonym;
-    alice_transport.expect_send_message().returning(move |_, data| {
-        let bob_mgr_clone = bob_mgr_clone.clone();
-        Box::pin(async move {
-            bob_mgr_clone.dispatch_message(
-                alice_pseudonym_for_alice_start,
-                ApplicationDataIn {
-                    data: data.data,
-                    packet_info: Default::default(),
-                },
-            )?;
-            Ok(())
-        })
-    });
+    // `.times(1)`: Alice must send `StartSession` and nothing else. Bob's own `.times(1)` bounds
+    // this only indirectly — an `SsaCommit` can just about be argued impossible because it must
+    // follow an `SsaRequest` from Bob — and an unexpected `SsaCommit` is the regression this test
+    // exists to catch, so the bound belongs on the side that would emit it.
+    alice_transport
+        .expect_send_message()
+        .times(1)
+        .returning(move |_, data| {
+            let bob_mgr_clone = bob_mgr_clone.clone();
+            Box::pin(async move {
+                bob_mgr_clone.dispatch_message(
+                    alice_pseudonym_for_alice_start,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                )?;
+                Ok(())
+            })
+        });
 
     let alice_mgr_session_established = Arc::new(alice_mgr.clone());
     let alice_pseudonym_ret_est = alice_pseudonym;

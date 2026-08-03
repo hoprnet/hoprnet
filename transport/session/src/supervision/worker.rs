@@ -343,10 +343,7 @@ mod tests {
     }
 
     fn dims() -> SsaDimensions {
-        SsaDimensions {
-            polys: 10,
-            threshold: 5,
-        }
+        SsaDimensions::new(10, 5)
     }
 
     #[tokio::test]

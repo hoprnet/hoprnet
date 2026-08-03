@@ -135,7 +135,7 @@ async fn establish_pix_session(
                 pseudonym: None,
                 surb_management: None,
                 always_max_out_surbs: false,
-                pix_ssa_quota: Some((PIX_POLYS, PIX_SHARES)),
+                pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
             },
         ),
     )

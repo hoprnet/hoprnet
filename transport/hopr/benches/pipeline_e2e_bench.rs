@@ -241,6 +241,14 @@ fn pipeline_e2e_forward(c: &mut Criterion) {
 
                         let ticket_mgr = std::sync::Arc::new(HoprTicketFactory::new(MemoryStore::default()));
 
+                        // **This benchmark measures the PIX-off path.** No SSA is committed for the
+                        // sending pseudonym, so `next_share` short-circuits to `Ok(None)` and no
+                        // share is embedded — even though the routing below does supply a return
+                        // path and SURBs are genuinely built. So these numbers are not comparable
+                        // with `protocol_throughput_pipeline/pix_on`, which carries both modes and is
+                        // where the Entry-side PIX cost is measured. Committing an SSA here would
+                        // make this the only benchmark exercising PIX over the full forward pipeline,
+                        // which is worth doing if that cost ever needs isolating.
                         let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
 
                         let encoder = HoprEncoder::new(

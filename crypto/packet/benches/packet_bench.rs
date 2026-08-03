@@ -74,10 +74,18 @@ impl PixMode {
         }
     }
 
+    /// The generator for this mode, with the `pix_on` share budget topped up first.
+    ///
+    /// Called once per benchmark input, outside any timed unit, which is the point of doing it here:
+    /// criterion sizes warm-up by time, so how many shares an input draws varies with the machine
+    /// and cannot be predicted up front.
     fn generator(&self) -> &'static SsaShareGenerator<HoprPixSpec> {
         match self {
             PixMode::Off => &PIX_GEN_OFF,
-            PixMode::On => &PIX_GEN_ON,
+            PixMode::On => {
+                top_up_pix_budget();
+                &PIX_GEN_ON
+            }
         }
     }
 }
@@ -122,19 +130,28 @@ lazy_static::lazy_static! {
     };
 }
 
-/// Asserts that the `pix_on` generator still has shares left.
+/// Next SSA index to commit for [`PSEUDONYM`]. Advanced by [`top_up_pix_budget`].
+static PIX_NEXT_SSA_INDEX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(2);
+
+/// Commits a further SSA for [`PSEUDONYM`], widening the `pix_on` share budget.
 ///
-/// If the budget ran out mid-run, `next_share` starts returning `Ok(None)` and `pix_on`
-/// silently degrades into `pix_off` — the comparison would then report that PIX is free.
-fn assert_pix_budget_remaining(context: &str) {
-    let probe = hopr_types::crypto_random::random_bytes::<16>();
-    assert!(
-        PIX_GEN_ON
-            .next_share(&*PSEUDONYM, &probe)
-            .expect("probe must not error")
-            .is_some(),
-        "pix_on share budget exhausted during {context}; results are not comparable"
-    );
+/// Called between benchmark inputs, never inside a timed unit. `new_ssa_commitment` *appends* to the
+/// pseudonym's polynomial queue, so budgets accumulate and no unit is ever measured against an
+/// exhausted generator.
+///
+/// This replaces an assertion that ran *after* a group's measurements and probed the budget by
+/// drawing a share from it. Both halves were wrong: by the time it fired, `next_share` had already
+/// been returning `Ok(None)` for the rest of the group — `pix_on` silently degraded into `pix_off`
+/// and criterion had recorded and reported those numbers — and the probe itself consumed from the
+/// budget it was checking, a budget shared with `packet_precompute_bench`, so each group's starting
+/// position depended on whether the other had run.
+fn top_up_pix_budget() {
+    let index = PIX_NEXT_SSA_INDEX.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // Explicit deref: `new_ssa_commitment` takes `&S::Pseudonym` in a generic position, where the
+    // lazy_static wrapper would not deref-coerce on its own.
+    PIX_GEN_ON
+        .new_ssa_commitment(&*PSEUDONYM, SsaIndex::new(index).expect("ssa index must be non-zero"))
+        .expect("pix commitment must succeed");
 }
 
 pub fn packet_sending_bench(c: &mut Criterion) {
@@ -201,7 +218,6 @@ pub fn packet_sending_bench(c: &mut Criterion) {
             );
         }
     }
-    assert_pix_budget_remaining("packet_sending_no_precomputation");
     group.finish();
 
     let mut group = c.benchmark_group("packet_sending_precomputed");
@@ -309,7 +325,6 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
             );
         }
     }
-    assert_pix_budget_remaining("packet_precompute");
     group.finish();
 }
 
