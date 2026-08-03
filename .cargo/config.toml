@@ -1,8 +1,24 @@
-# [build]
-# rustflags = ["-Wunused-crate-dependencies"]
 # Nightly only
 #rustflags = [ "-Zlocation-detail=none" ]
 #rustdocflags = ["--enable-index-page", "-Z", "unstable-options"]
+
+[build]
+# Build the whole workspace (and its dependencies) with `--cfg tokio_unstable`.
+#
+# This unlocks Tokio's unstable APIs — in particular the cooperative-scheduling
+# primitives (`tokio::task::coop`) that `hopr-utilities` uses for improved,
+# budget-aware yielding on the async hot paths (transport, session, mixer). The
+# flag has to be set for the *whole* build because a Tokio feature toggled by a
+# downstream crate only takes effect if the `tokio` crate itself is compiled
+# with the same cfg — so setting it here propagates it to `hopr-utilities` and
+# every other crate in the graph.
+#
+# `--check-cfg` declares `tokio_unstable` as an expected cfg so the workspace
+# stays clean under `-D warnings` (otherwise every crate would emit an
+# `unexpected_cfgs` lint). If you override `RUSTFLAGS` on the command line
+# (e.g. for flamegraph/linker flags), remember to re-add both flags — env
+# `RUSTFLAGS` replaces, rather than extends, this list.
+rustflags = ["--cfg", "tokio_unstable", "--check-cfg", "cfg(tokio_unstable)"]
 
 [install]
 root = ".cargo/"
