@@ -18,15 +18,15 @@
 //! 1. **The window only opens on HONEST delivery** — data proven to have reached us: reliable-mode frame
 //!    acknowledgements (the `ack_state` machinery) or application-verified return bytes. Nothing else authorizes
 //!    speeding up. See `WindowController::on_delivered`.
-//! 2. **SURB state may only slow us down, never speed us up.** `SupplyConstraint` can shrink or cap the window; it
-//!    can never grow it. The SURB `buffer_level` is partly counterparty-reported and dead-reckoned, so a hostile or
-//!    lossy peer must not be able to accelerate us or make us overspend.
+//! 2. **SURB state may only slow us down, never speed us up.** `SupplyConstraint` can shrink or cap the window; it can
+//!    never grow it. The SURB `buffer_level` is partly counterparty-reported and dead-reckoned, so a hostile or lossy
+//!    peer must not be able to accelerate us or make us overspend.
 //! 3. **A malicious counterparty can only ever make us slower** — never faster, never draining our SURBs beyond the
 //!    client-configured ceiling.
 //! 4. **1–20 % path loss is expected and recovered** (reliable mode retransmits; the window multiplicatively decreases
 //!    and re-grows on delivery).
-//! 5. **The anti-grief ⇄ throughput trade is the client's dial** (`FlowControlConfig`), set explicitly — SURB supply
-//!    is never silently widened for speed.
+//! 5. **The anti-grief ⇄ throughput trade is the client's dial** (`FlowControlConfig`), set explicitly — SURB supply is
+//!    never silently widened for speed.
 
 use std::{
     sync::{
