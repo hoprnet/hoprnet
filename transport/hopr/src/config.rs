@@ -631,7 +631,7 @@ pub struct SessionGlobalConfig {
     /// silently inflates the estimate until the Exit runs out of SURBs and can no longer
     /// send reply data.
     ///
-    /// Default is 60 seconds. Set to `null` to disable; minimum effective period is 1 second.
+    /// Default is 60 seconds. Set to `None` to disable; minimum effective period is 1 second.
     #[validate(custom(function = "validate_surb_balance_notify_period"))]
     #[default(default_session_surb_balance_notify_period())]
     #[cfg_attr(
