@@ -884,6 +884,7 @@ where
         // reconstructor) to handle SsaRequest, but do not use the
         // reconstructor for SSA recovery.
         let pix_toolbox = match (role, exit_ack_share) {
+            // Keep in step with the `(Relay, Some)` arm below, which is the same wiring.
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                     // SAFETY: `SsaReconstructorConfig`'s defaults sit inside the ranges its own
@@ -923,6 +924,12 @@ where
             (protocol::NodeType::Relay, Some(ref ssa_events)) => {
                 // A relay that also acts as an Exit (has exit_ack_share) needs
                 // a full PixToolbox to handle the PIX handshake.
+                //
+                // Identical to the `(Exit, Some)` arm above apart from the terminal `build_for_*` and
+                // the `with_ticket_events` step — including the `bounded_sink_channel` capacity
+                // literal, which is what will drift if only one arm is ever edited. Left duplicated
+                // rather than extracted because threading a real `SsaReconstructorConfig` through the
+                // three `::default()` sites reworks both arms anyway; extract then.
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
                     // SAFETY: Default config values are within validated range.
                     hopr_protocol_pix::SsaReconstructorConfig::default(),
