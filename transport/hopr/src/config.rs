@@ -26,6 +26,9 @@ const DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
 /// Minimum accepted value for [`StreamProtocolConfig::stream_open_timeout`].
 pub const MIN_STREAM_OPEN_TIMEOUT: Duration = Duration::from_millis(1);
 
+/// Minimum accepted value for [`StreamProtocolConfig::egress_backpressure_timeout`].
+pub const MIN_EGRESS_BACKPRESSURE_TIMEOUT: Duration = Duration::from_millis(1);
+
 fn default_per_peer_channel_capacity() -> usize {
     DEFAULT_PER_PEER_CHANNEL_CAPACITY
 }
@@ -38,6 +41,7 @@ fn default_frame_writer_backpressure_bytes() -> usize {
     DEFAULT_FRAME_WRITER_BACKPRESSURE_BYTES
 }
 
+#[inline]
 fn default_egress_backpressure_timeout() -> Duration {
     DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT
 }
@@ -47,6 +51,18 @@ fn validate_stream_open_timeout(value: &Duration) -> Result<(), ValidationError>
         Ok(())
     } else {
         Err(ValidationError::new("stream open timeout must be at least 1 ms"))
+    }
+}
+
+fn validate_egress_backpressure_timeout(value: &Duration) -> Result<(), ValidationError> {
+    if MIN_EGRESS_BACKPRESSURE_TIMEOUT <= *value {
+        Ok(())
+    } else {
+        // A zero (or sub-millisecond) timeout would make every full channel fall straight into
+        // drop-newest, silently defeating the backpressure feature — reject it at config time.
+        Err(ValidationError::new(
+            "egress backpressure timeout must be at least 1 ms",
+        ))
     }
 }
 
@@ -121,7 +137,8 @@ pub struct StreamProtocolConfig {
     /// dropped and the drain moves on. Healthy peers drain far faster than this, so the timeout is not
     /// hit in normal operation.
     ///
-    /// Defaults to 2 seconds.
+    /// Defaults to 2 seconds. Must be at least 1 ms — a zero value would defeat the feature.
+    #[validate(custom(function = "validate_egress_backpressure_timeout"))]
     #[default(default_egress_backpressure_timeout())]
     #[cfg_attr(feature = "serde", serde(default = "default_egress_backpressure_timeout"))]
     pub egress_backpressure_timeout: Duration,
@@ -606,6 +623,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn egress_backpressure_timeout_rejects_sub_minimum_values() {
+        assert!(validate_egress_backpressure_timeout(&Duration::ZERO).is_err());
+        assert!(validate_egress_backpressure_timeout(&Duration::from_micros(500)).is_err());
+        assert!(validate_egress_backpressure_timeout(&MIN_EGRESS_BACKPRESSURE_TIMEOUT).is_ok());
+        assert!(validate_egress_backpressure_timeout(&DEFAULT_EGRESS_BACKPRESSURE_TIMEOUT).is_ok());
+    }
+
+    #[test]
+    fn stream_protocol_config_default_is_valid() {
+        assert!(StreamProtocolConfig::default().validate().is_ok());
+    }
+
+    #[test]
     fn test_valid_domains_for_looks_like_a_domain() {
         assert!(looks_like_domain("localhost"));
         assert!(looks_like_domain("hoprnet.org"));
@@ -834,6 +864,18 @@ mod tests {
     fn stream_protocol_config_zero_stream_open_timeout_is_rejected() {
         let cfg = StreamProtocolConfig {
             stream_open_timeout: Duration::ZERO,
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn stream_protocol_config_zero_backpressure_timeout_is_rejected() {
+        // Proves the field `#[validate(custom)]` attribute is actually wired into the derived
+        // `StreamProtocolConfig::validate()` — which the parent `HoprProtocolConfig`/`HoprLibConfig`
+        // invoke via `#[validate(nested)]` at node build time (builder.rs `cfg.validate()?`).
+        let cfg = StreamProtocolConfig {
+            egress_backpressure_timeout: Duration::ZERO,
             ..Default::default()
         };
         assert!(cfg.validate().is_err());
