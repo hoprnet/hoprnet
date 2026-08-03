@@ -13,6 +13,7 @@ use tracing::Instrument;
 
 use crate::{
     errors::SessionError,
+    flow_control::DeliveryTap,
     processing::types::FrameInspector,
     protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SessionMessage},
     socket::{SocketState, state::SocketComponents},
@@ -222,6 +223,10 @@ pub struct AcknowledgementState<const C: usize> {
     cfg: AcknowledgementStateConfig,
     context: Option<AcknowledgementStateContext<C>>,
     started: std::sync::Arc<AtomicBool>,
+    /// Optional honest-clock tap for client-side flow control. Purely observational: acknowledged
+    /// and retransmission-exhausted frames bump the tap's atomic meter, but acknowledgement and
+    /// retransmission behaviour is unchanged whether or not it is installed.
+    delivery_tap: Option<DeliveryTap>,
 }
 
 impl<const C: usize> AcknowledgementState<C> {
@@ -231,7 +236,17 @@ impl<const C: usize> AcknowledgementState<C> {
             cfg: cfg.normalize(),
             context: Default::default(),
             started: std::sync::Arc::new(AtomicBool::new(false)),
+            delivery_tap: None,
         }
+    }
+
+    /// Installs a read-only honest-clock tap. Each acknowledged frame bumps the tap's acked-bytes
+    /// counter; each frame whose sender-side retransmissions are exhausted bumps its lost-bytes
+    /// counter. This drives the client-side flow-control window ([`crate::flow_control`]) and never
+    /// alters delivery semantics.
+    pub fn with_delivery_tap(mut self, tap: DeliveryTap) -> Self {
+        self.delivery_tap = Some(tap);
+        self
     }
 }
 
@@ -331,6 +346,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctl_tx_clone = context.ctl_tx.clone();
         let rb_rx_clone = context.rb_rx.clone();
         let cfg = self.cfg;
+        let delivery_tap = self.delivery_tap.clone();
         hopr_utils::runtime::prelude::spawn(
             outgoing_frame_retries_rx
                 .map(move |rf: RetriedFrameId| {
@@ -347,6 +363,12 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                         }
                     } else {
                         tracing::debug!(frame_id, "last outgoing retry of frame");
+                        // Honest-clock tap: retransmissions exhausted → treat the frame as lost.
+                        // An earlier ack cancels this retry (Skip), so a delivered frame never
+                        // reaches here; a late ack after give-up is harmless (bounded over-credit).
+                        if let Some(tap) = &delivery_tap {
+                            tap.on_lost_frame();
+                        }
                     }
                     tracing::trace!(frame_id, "going to re-send entire frame");
                     frame_id
@@ -479,6 +501,11 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         tracing::trace!(count = ack.len(), "frame acknowledgements received");
 
+        // Cloned out before the mutable `ctx` borrow so the honest-clock tap can run inside the
+        // acknowledgement iteration without conflicting with the retry-cancel borrow.
+        let tap = self.delivery_tap.clone();
+        let full_ack = self.cfg.mode.is_full_ack_enabled();
+
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -486,8 +513,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
-        // Frame acknowledged, we will not need to resend it
-        if self.cfg.mode.is_full_ack_enabled()
+        // Honest-clock tap: every received frame acknowledgement is proof of delivery, and must feed
+        // the flow-control window regardless of the ack mode. `full_ack` only governs whether we
+        // *also* cancel the outgoing full-frame retransmission below (in `Partial` mode the receiver
+        // drives retransmission, so there is nothing to cancel here — but the acks still arrive).
+        if let Some(tap) = &tap {
+            (0..ack.len()).for_each(|_| tap.on_acked_frame());
+        }
+
+        // Frame acknowledged, we will not need to resend it (full-ack mode only).
+        if full_ack
             && let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
                 ack.into_iter()
                     .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))

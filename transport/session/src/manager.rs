@@ -1101,7 +1101,7 @@ where
                     METRIC_NUM_INITIATED_SESSIONS.increment();
 
                     let surb_estimator_for_rx = surb_estimator.clone();
-                    let session = HoprSession::new(
+                    let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
                         session_config(&self.cfg, cfg.capabilities),
@@ -1118,6 +1118,9 @@ where
                             }),
                         ),
                         Some(notifier),
+                        // Entry (sending) side: give flow control the SURB balancer state as its
+                        // anti-grief down-only ceiling.
+                        Some(surb_mgmt.clone()),
                     )?;
 
                     #[cfg(feature = "telemetry")]
