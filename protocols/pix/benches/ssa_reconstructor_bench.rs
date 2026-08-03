@@ -28,9 +28,9 @@ use common::TestSpec;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
     CONSTANT_TERM_COEFFICIENT, CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
-    ExitAcknowledgementShareProcessor, PixGroupRepr, PolynomialIndex, ShareResolution, SsaCommitmentProof,
-    SsaGeneratorConfig, SsaId, SsaIndex, SsaPartCommitment, SsaReconstructor, SsaReconstructorConfig,
-    SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    ExitAcknowledgementShareProcessor, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, PixGroupRepr,
+    PolynomialIndex, ShareResolution, SsaCommitmentProof, SsaGeneratorConfig, SsaId, SsaIndex, SsaPartCommitment,
+    SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -659,22 +659,58 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
     let shares_per_commitment =
         PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
 
+    // How many acknowledgements one deferral bucket absorbs before the scenario rotates onto a fresh
+    // one.
+    //
+    // `defer_ack` buckets by `SsaId` and drops anything past `MAX_DEFERRED_ACKS_PER_CYCLE`, logging
+    // a warning — a far cheaper path than a real deferral. This group used to rotate its bucket only
+    // when the *generator's* share budget ran dry, which is `shares_per_commitment` = 688 128
+    // acknowledgements at these dimensions, so the cap was reached 84× earlier and every iteration
+    // after the first ~8 192 measured the drop branch. The `is_empty` guard below could not catch it:
+    // a dropped acknowledgement produces no resolution either, which is the same shape of false
+    // reassurance the comment above records having already been caught once here.
+    //
+    // Half the cap, so a full batch always fits underneath it. The per-polynomial cap cannot bind
+    // first: emission is round-robin over `SHARE_EMISSION_WINDOW` polynomials at
+    // `threshold + surplus` shares each, so no single polynomial accumulates more than 84 of these.
+    const ROTATE_BUCKET_AT: usize = MAX_DEFERRED_ACKS_PER_CYCLE / 2;
+    assert!(
+        batch <= ROTATE_BUCKET_AT && ROTATE_BUCKET_AT + batch <= MAX_DEFERRED_ACKS_PER_CYCLE,
+        "a batch must fit inside the deferral budget, or this group measures the drop path"
+    );
+    assert!(
+        PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares <= MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+        "a conforming Entry's per-polynomial share budget must fit under the per-polynomial cap"
+    );
+
     group.bench_function(BenchmarkId::from_parameter(format!("n{batch}")), |b| {
         let mut counter: u64 = 0;
+        let mut pseudonym = pseudonym;
         let mut remaining = shares_per_commitment;
-        let mut ssa_index = SsaIndex::MIN;
+        let mut deferred_in_bucket = 0usize;
         b.iter_custom(|iters| {
             let mut total = Duration::ZERO;
             for _ in 0..iters {
-                // The deferral path is cheap, so criterion runs a great many timed units and
-                // can outrun a single commitment's share budget. Top it up outside the timed
-                // section. Only the generator needs a new cycle: the reconstructor
-                // deliberately has no verifiers installed, so nothing on its side has to
-                // match for the acknowledgements to defer.
-                if remaining < batch {
-                    ssa_index = ssa_index.checked_add(1).unwrap();
-                    generator.new_ssa_commitment(&pseudonym, ssa_index).unwrap();
-                    remaining += shares_per_commitment;
+                // Rotate onto a fresh pseudonym — and therefore a fresh `SsaId`, and a fresh
+                // deferral bucket — before the current one reaches the cap. Rotating the pseudonym
+                // rather than the SSA index is what actually moves the bucket: `new_ssa_commitment`
+                // *appends* to the pseudonym's polynomial queue, so shares keep coming from the old
+                // cycle until it is drained, and the `SsaId` they carry would not change.
+                //
+                // Both sides are set up outside the timed section. The Exit commitment is registered
+                // but never completed, so no cycle is published and every acknowledgement defers.
+                if deferred_in_bucket + batch > ROTATE_BUCKET_AT || remaining < batch {
+                    pseudonym = SimplePseudonym::random();
+                    generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+                    reconstructor
+                        .new_exit_commitment(
+                            SsaId::new(pseudonym, SsaIndex::MIN),
+                            PROD_POLYS_PER_SSA as usize,
+                            PROD_THRESHOLD as usize,
+                        )
+                        .unwrap();
+                    remaining = shares_per_commitment;
+                    deferred_in_bucket = 0;
                 }
 
                 let acks = stage_shares(&reconstructor, &generator, &peer, pseudonym, &mut counter, batch);
@@ -683,6 +719,7 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
                 let start = Instant::now();
                 let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
                 total += start.elapsed();
+                deferred_in_bucket += batch;
 
                 // Nothing can resolve while the verifiers are missing; a non-empty result
                 // would mean the scenario is not actually exercising the deferral path.

@@ -105,6 +105,8 @@ fn assert_pix_budget_remaining(mode: PixMode, generator: &SsaShareGenerator<Hopr
 
 pub fn protocol_throughput_sender(c: &mut Criterion) {
     const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
+    /// Payload size `random_packets_of_count` produces, which decides how many SURBs fit alongside it.
+    const BENCH_PAYLOAD_SIZE: usize = 300;
     const PEER_COUNT: usize = 3;
     const TESTED_PEER_ID: usize = 0;
 
@@ -238,6 +240,16 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             // because `random_packets_of_count` produces 300-byte payloads and
                             // `HoprPacket::max_message_with_surbs(2)` is below that.
                             //
+                            // The fit is asserted rather than argued, because getting it wrong does
+                            // not fail — `assert!(v.await.is_ok())` below only checks the send into
+                            // `api_send_tx`, an encode failure inside the pipeline is logged and the
+                            // packet dropped, and `wire_out_rx.take(count)` then waits forever for
+                            // packets that will never arrive. A future change to `HoprSurb::SIZE`
+                            // would hang this benchmark instead of reporting its cause.
+                            assert!(
+                                BENCH_PAYLOAD_SIZE <= HoprPacket::max_message_with_surbs(1),
+                                "a {BENCH_PAYLOAD_SIZE}-byte payload must fit alongside one SURB"
+                            );
                             // The forward path is reused as the return path. A topologically correct
                             // return path is not constructible here: `MockPathResolver` resolves
                             // against `CHANNELS`, which is a one-directional chain

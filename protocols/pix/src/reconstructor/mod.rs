@@ -128,19 +128,25 @@ enum Deferral {
 /// A conforming Entry emits `threshold + surplus` shares per polynomial — 96 at the default
 /// dimensions — across all return paths combined, so this cannot be reached without the peer
 /// exceeding its own share budget. Anything above the cap is dropped rather than buffered.
-const MAX_DEFERRED_ACKS_PER_POLYNOMIAL: usize = 128;
+///
+/// Public because it is observable behaviour, not an implementation detail: past the cap an
+/// acknowledgement is discarded, so anything measuring or exercising the deferral path has to stay
+/// underneath it or it silently measures the discard instead.
+pub const MAX_DEFERRED_ACKS_PER_POLYNOMIAL: usize = 128;
 
 /// Cap on deferred acknowledgements held across all polynomials of one cycle.
 ///
 /// The per-polynomial cap alone leaves the cycle total at `num_polys × 128` — a million entries at
-/// production dimensions, which is no bound at all. This one is derived rather than chosen:
-/// [`drain_deferred_acks`](SsaReconstructor::drain_deferred_acks) discards any acknowledgement
-/// whose share has already left `awaiting_acks`, and that cache expires entries after
+/// production dimensions, which is no bound at all. This one is derived rather than chosen: the
+/// drain discards any acknowledgement whose share has already left `awaiting_acks`, and that cache
+/// expires entries after
 /// `max_ack_await_time` (30 s by default). An older deferral is therefore provably dead, so the
 /// ceiling only has to cover the shares one cycle can receive inside that window: ~181 shares/s at
 /// the deployed 1.5 Mbps per-Session cap, so ~5 400. 8192 leaves ~1.5× headroom and costs at most
 /// ~786 KB per cycle.
-const MAX_DEFERRED_ACKS_PER_CYCLE: usize = 8192;
+///
+/// Public for the same reason as [`MAX_DEFERRED_ACKS_PER_POLYNOMIAL`].
+pub const MAX_DEFERRED_ACKS_PER_CYCLE: usize = 8192;
 
 /// Allows server-side reconstruction of SSAs.
 ///
@@ -2019,7 +2025,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
     /// **L2 regression.** A polynomial index repeated inside one batch must be rejected, not merely
     /// one repeated across batches.
     ///
