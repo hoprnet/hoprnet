@@ -50,7 +50,8 @@ use crate::{
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
         ClosureReason, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprSessionCapabilities, HoprSessionConfig,
-        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaDimensions, SsaQuota,
+        pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -1379,7 +1380,10 @@ where
                 .into());
             }
 
-            let (polys_per_ssa, shares_per_ssa) = cfg
+            let SsaDimensions {
+                polys_per_ssa,
+                shares_per_poly: shares_per_ssa,
+            } = cfg
                 .pix_ssa_quota
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
 
@@ -4907,7 +4911,7 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some((2, 2)),
+                    pix_ssa_quota: Some(SsaDimensions::new(2, 2)),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(0.try_into()?),
                     ..Default::default()
@@ -4942,8 +4946,8 @@ mod tests {
     /// ## Steps
     /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
     /// 2. Start the manager with that toolbox installed.
-    /// 3. Call `new_session` requesting `pix_ssa_quota: Some((10, 10))` — both values are within protocol bounds but
-    ///    mismatch the generator.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some(SsaDimensions::new(10, 10))` — both values are within
+    ///    protocol bounds but mismatch the generator.
     /// 4. Assert the error identifies which dimension doesn't match.
     /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
     #[test_log::test(tokio::test)]
@@ -4980,7 +4984,7 @@ mod tests {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
                     // Both values pass protocol bounds but polys=10 != generator's 5
-                    pix_ssa_quota: Some((10, 10)),
+                    pix_ssa_quota: Some(SsaDimensions::new(10, 10)),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
                     ..Default::default()

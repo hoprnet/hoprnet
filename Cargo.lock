@@ -4578,6 +4578,7 @@ dependencies = [
  "hopr-protocol-pix",
  "hopr-protocol-session",
  "hopr-protocol-start",
+ "hopr-transport-session",
  "hopr-utilities",
  "humantime-serde",
  "insta",

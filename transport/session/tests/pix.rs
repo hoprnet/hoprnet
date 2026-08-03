@@ -21,7 +21,7 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SurbBalancerConfig,
+    SessionManagerConfig, SessionTarget, SsaDimensions, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -259,7 +259,10 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some((ssa_gen_config.polynomials_per_ssa, ssa_gen_config.threshold)),
+                    pix_ssa_quota: Some(SsaDimensions::new(
+                        ssa_gen_config.polynomials_per_ssa,
+                        ssa_gen_config.threshold,
+                    )),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },

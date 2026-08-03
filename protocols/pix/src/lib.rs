@@ -27,7 +27,10 @@ mod traits;
 mod types;
 
 pub use generator::{SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
-pub use reconstructor::{SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig};
+pub use reconstructor::{
+    MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard, SsaReconstructor,
+    SsaReconstructorConfig,
+};
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{
     CoefficientIndex, EncryptedPartialSsaShare, GeneratedShare, PartialSsaShare, PolynomialIndex, RawSsaIndex,

@@ -27,7 +27,20 @@ doctest = false
 default = []
 all-benchmarks = []
 benchmark = []
+# Test scaffolding: the manual `MsgSender` mock and the packet-planning driver, exposed as
+# `hopr_transport_session::testing`.
+#
+# Behind a feature because it is the only reason `mockall` and `tokio` would be needed at all: with
+# the module compiled unconditionally both had to be non-optional, so a release build linked a
+# mocking framework and `tokio` fell out of `runtime-tokio`, taking the crate's runtime-agnostic
+# boundary with it.
+#
+# The dev-dependency on this crate below is what makes `cargo test` work: `#[cfg(test)]` alone
+# enables no features, so the module would compile without its dependencies — which is exactly the
+# state `hopr-lib`'s `testing` module is stuck in.
+testing = ["dep:mockall", "dep:tokio"]
 runtime-tokio = [
+  "dep:tokio",
   "crossfire/tokio",
   "hopr-utils/network-types-runtime-tokio",
   "hopr-protocol-session/runtime-tokio",
@@ -64,8 +77,8 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true }
-mockall = { workspace = true }
+tokio = { workspace = true, optional = true }
+mockall = { workspace = true, optional = true }
 
 hopr-api = { workspace = true, features = ["types-random"] }
 hopr-utils = { workspace = true, features = [
@@ -79,6 +92,10 @@ hopr-protocol-session = { workspace = true, features = ["serde", "hashbrown"] }
 hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
+# Self dev-dependency, so the `testing` feature is on for the lib's own test target and for the
+# integration tests in `tests/`. Without it `#[cfg(test)]` would compile the module while `mockall`
+# and `tokio` stayed disabled.
+hopr-transport-session = { path = ".", features = ["testing"] }
 criterion = { workspace = true }
 futures-time = { workspace = true }
 hopr-api = { workspace = true, features = ["types-random"] }
