@@ -289,7 +289,9 @@ impl HoprSession {
                     // a genuine loss. The retry budget is a flow-control config knob (`frame_retries`,
                     // default 2 = original); a robust profile raises it so delayed frames recover
                     // instead of being abandoned (an abandoned frame leaves a gap → stream corruption).
-                    max_outgoing_frame_retries: fc.map(|c| c.frame_retries as usize).unwrap_or(2),
+                    // `.max(1)`: never drop the retry budget to 0 — an abandoned frame under
+                    // reliable-mode flow control leaves a gap and corrupts the stream.
+                    max_outgoing_frame_retries: fc.map(|c| c.frame_retries.max(1) as usize).unwrap_or(2),
                     ..Default::default()
                 };
 

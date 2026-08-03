@@ -127,7 +127,9 @@ impl FlowControlConfig {
             },
             no_honest_deadline: self.no_honest_deadline.max(Duration::from_millis(1)),
             persist_stall_parks: self.persist_stall_parks,
-            frame_retries: self.frame_retries,
+            // At least one retry: under reliable-mode flow control an abandoned frame leaves a gap
+            // (stream corruption), so `frame_retries` must never clamp the retry budget to 0.
+            frame_retries: self.frame_retries.max(1),
         }
     }
 
