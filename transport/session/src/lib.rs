@@ -24,11 +24,13 @@ pub use manager::{
     DispatchResult, IncomingSessionPixConfig, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
     SessionManagerConfig,
 };
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
 pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
+#[cfg(any(test, feature = "testing"))]
 pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
     AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA, HoprSession,
