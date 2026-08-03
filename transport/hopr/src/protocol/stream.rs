@@ -3,7 +3,7 @@
 
 use std::sync::{
     Arc,
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use crossfire::mpsc;
@@ -49,6 +49,11 @@ lazy_static::lazy_static! {
 struct PeerSink<T: Send + 'static> {
     tx: crossfire::MAsyncTx<mpsc::Array<T>>,
     token: Arc<()>,
+    /// `false` while the outgoing stream is still being opened, `true` once the write pump
+    /// is draining the channel. The egress drain only applies blocking backpressure on a full
+    /// channel when the stream is `ready`; while still opening it uses non-blocking drop-newest,
+    /// so a slow open for one peer never head-of-line-blocks other peers.
+    ready: Arc<AtomicBool>,
 }
 
 impl<T: Send + 'static> PeerSink<T> {
@@ -56,6 +61,7 @@ impl<T: Send + 'static> PeerSink<T> {
         Self {
             tx,
             token: Arc::new(()),
+            ready: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -78,6 +84,7 @@ fn spawn_stream_pumps<S, C>(
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
+    ready: Arc<AtomicBool>,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -101,20 +108,24 @@ fn spawn_stream_pumps<S, C>(
 
     // Write pump: drain the per-peer channel into the framed stream writer.
     hopr_utils::runtime::prelude::spawn(
-        rx.into_stream()
-            .map(Ok)
-            .forward(frame_writer)
-            .inspect(move |res| {
-                tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
-            })
-            .then(move |_| async move {
-                if cache_for_write
-                    .get(&peer)
-                    .is_some_and(|s| Arc::ptr_eq(&s.token, &token_write))
-                {
-                    cache_for_write.invalidate(&peer);
-                }
-            }),
+        futures::future::lazy(move |_| {
+            // Flip `ready` only once this task is actually running and about to drain the
+            // channel, so the egress drain never applies blocking backpressure on a peer whose
+            // write pump has not started draining yet.
+            ready.store(true, Ordering::Relaxed);
+        })
+        .then(move |_| rx.into_stream().map(Ok).forward(frame_writer))
+        .inspect(move |res| {
+            tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
+        })
+        .then(move |_| async move {
+            if cache_for_write
+                .get(&peer)
+                .is_some_and(|s| Arc::ptr_eq(&s.token, &token_write))
+            {
+                cache_for_write.invalidate(&peer);
+            }
+        }),
     );
 
     // Read pump: forward decoded frames to the ingress channel.
@@ -162,7 +173,8 @@ where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
-    <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + 'static,
+    // `Unpin` is required so the egress drain can `await` a crossfire `send` (backpressure path).
+    <C as Decoder>::Item: AsRef<[u8]> + Clone + Send + Unpin + 'static,
     V: NetworkStreamControl + Clone + Send + Sync + 'static,
 {
     let (tx_out, mut rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
@@ -187,6 +199,7 @@ where
     let stream_open_timeout = stream_cfg.stream_open_timeout;
     let frame_writer_backpressure_bytes = stream_cfg.frame_writer_backpressure_bytes;
     let per_peer_channel_capacity = stream_cfg.per_peer_channel_capacity;
+    let egress_backpressure_timeout = stream_cfg.egress_backpressure_timeout;
 
     let open_ctx = Arc::new((control, codec, tx_in));
 
@@ -206,6 +219,7 @@ where
                 let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
                 let sink = PeerSink::new(tx);
                 let token = sink.token.clone();
+                let ready = sink.ready.clone();
                 spawn_stream_pumps(
                     peer,
                     stream,
@@ -215,6 +229,7 @@ where
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
+                    ready,
                 );
                 cache.insert(peer, sink);
 
@@ -255,6 +270,7 @@ where
                     let (tx, rx) = mpsc::bounded_async::<<C as Decoder>::Item>(per_peer_channel_capacity);
                     let sink = PeerSink::new(tx);
                     let token = sink.token.clone();
+                    let ready = sink.ready.clone();
 
                     if open_count2.fetch_add(1, Ordering::Relaxed) < MAX_CONCURRENT_STREAM_OPENS {
                         hopr_utils::runtime::prelude::spawn(async move {
@@ -286,6 +302,7 @@ where
                                         codec.clone(),
                                         tx_in.clone(),
                                         frame_writer_backpressure_bytes,
+                                        ready,
                                     );
                                 }
                                 Err(error) => {
@@ -315,13 +332,46 @@ where
 
             match sink.tx.try_send(msg) {
                 Ok(()) => tracing::trace!(%peer, "message queued to peer channel"),
-                Err(crossfire::TrySendError::Full(_msg)) => {
-                    // Channel full: drop the newest packet and yield so the write
-                    // pump task can drain space before the next send.
-                    #[cfg(all(feature = "telemetry", not(test)))]
-                    METRIC_RING_BUFFER_DROPPED.increment();
-                    tracing::debug!(%peer, "per-peer egress channel full; dropping newest packet");
-                    hopr_utils::runtime::prelude::yield_now().await;
+                Err(crossfire::TrySendError::Full(msg)) => {
+                    if sink.ready.load(Ordering::Relaxed) {
+                        // Stream is open and draining; a full channel means the wire is slower
+                        // than the producer. Wait (bounded) for space so wire-rate backpressure
+                        // propagates upstream — through the mixer, the outgoing CrossfireSink and
+                        // the session socket — to the application writer, instead of dropping.
+                        // Fall back to drop-newest only if the peer stays full past the timeout,
+                        // so a stalled peer cannot head-of-line-block other peers forever.
+                        use futures_time::future::FutureExt as _;
+                        match async { sink.tx.send(msg).await }
+                            .timeout(futures_time::time::Duration::from(egress_backpressure_timeout))
+                            .await
+                        {
+                            Ok(Ok(())) => {
+                                tracing::trace!(%peer, "message queued to peer channel after backpressure")
+                            }
+                            Ok(Err(_disconnected)) => {
+                                tracing::debug!(%peer, "peer sink disconnected while awaiting space; invalidating cache");
+                                if cache_out.get(&peer).is_some_and(|s| Arc::ptr_eq(&s.token, &sink.token)) {
+                                    cache_out.invalidate(&peer);
+                                }
+                            }
+                            Err(_timeout) => {
+                                #[cfg(all(feature = "telemetry", not(test)))]
+                                METRIC_RING_BUFFER_DROPPED.increment();
+                                tracing::debug!(
+                                    %peer,
+                                    "per-peer egress channel full past backpressure timeout; dropping newest packet"
+                                );
+                            }
+                        }
+                    } else {
+                        // Stream still opening: never block — a slow open for this peer must not
+                        // head-of-line-block delivery to other peers. Drop newest and yield so the
+                        // opener task can make progress.
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_RING_BUFFER_DROPPED.increment();
+                        tracing::debug!(%peer, "per-peer egress channel full during open; dropping newest packet");
+                        hopr_utils::runtime::prelude::yield_now().await;
+                    }
                 }
                 Err(crossfire::TrySendError::Disconnected(_)) => {
                     // Receiver dropped (write pump died): invalidate and reopen on next send.
@@ -911,6 +961,153 @@ mod tests {
         assert!(
             received_bytes >= expected_bytes,
             "expected at least {expected_bytes} bytes to be delivered after stream open; got {received_bytes}"
+        );
+
+        Ok(())
+    }
+
+    /// A writer whose `poll_write` is gated shut until [`release`](GatedWriteIo::release) is called,
+    /// counting the bytes it accepts. This deterministically holds the per-peer channel full while the
+    /// stream is open (`ready == true`), so a burst is forced onto the ready+full egress path with no
+    /// dependence on scheduler/pipe-buffer timing.
+    #[derive(Clone, Default, Debug)]
+    struct GatedWriteIo {
+        open: Arc<std::sync::atomic::AtomicBool>,
+        written: Arc<AtomicUsize>,
+        waker: Arc<Mutex<Option<Waker>>>,
+    }
+
+    impl GatedWriteIo {
+        fn release(&self) {
+            self.open.store(true, Ordering::Relaxed);
+            if let Some(waker) = self.waker.lock().take() {
+                waker.wake();
+            }
+        }
+
+        fn written(&self) -> usize {
+            self.written.load(Ordering::Relaxed)
+        }
+    }
+
+    impl AsyncRead for GatedWriteIo {
+        fn poll_read(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>, _buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+            Poll::Pending
+        }
+    }
+
+    impl AsyncWrite for GatedWriteIo {
+        fn poll_write(self: Pin<&mut Self>, cx: &mut TaskContext<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            if self.open.load(Ordering::Relaxed) {
+                self.written.fetch_add(buf.len(), Ordering::Relaxed);
+                Poll::Ready(Ok(buf.len()))
+            } else {
+                *self.waker.lock() = Some(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct GatedControl {
+        io: GatedWriteIo,
+        open_calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for GatedControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, GatedWriteIo)>())
+        }
+
+        async fn open(self, _peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(self.io.clone())
+        }
+    }
+
+    /// Regression guard for the egress backpressure fix.
+    ///
+    /// Once the stream is open and draining, a burst that overflows the per-peer channel must apply
+    /// (bounded) backpressure so the producer is slowed to wire rate — no packet loss. Under the old
+    /// `try_send` + drop-newest behavior, every packet that arrived while the channel was full was
+    /// silently dropped.
+    ///
+    /// The [`GatedWriteIo`] writer is held shut so the per-peer channel is deterministically full while
+    /// the stream is open (`ready == true`) — the exact ready+full path — regardless of scheduler
+    /// timing. The writer is released *before* the backpressure timeout: with backpressure the queued
+    /// overflow then drains to the wire (zero loss); with drop-newest the overflow was already gone.
+    #[tokio::test]
+    async fn egress_backpressures_when_open_channel_full() -> anyhow::Result<()> {
+        let io = GatedWriteIo::default();
+        let open_calls = Arc::new(AtomicUsize::new(0));
+        let control = GatedControl {
+            io: io.clone(),
+            open_calls: open_calls.clone(),
+        };
+
+        // Small per-peer channel so a modest burst overflows it while the stream is open.
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control,
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 4,
+                // Flush every frame so the per-peer channel (not the FramedWrite buffer) is the
+                // bottleneck that fills — making the ready+full path unambiguous.
+                frame_writer_backpressure_bytes: 1,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"hello"[..]);
+        let n = 50usize;
+        let expected_bytes = n * msg.len();
+
+        // Burst far beyond the per-peer channel capacity while the writer is gated shut. The stream
+        // opens and the write pump starts (ready == true) but cannot drain, so the channel fills and the
+        // drain loop enters the ready+full path for the overflow.
+        for _ in 0..n {
+            tx_out
+                .send((peer, msg.clone()))
+                .await
+                .context("send into egress queue should succeed")?;
+        }
+        assert!(
+            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
+            "stream was never opened"
+        );
+
+        // Let the drain loop hit the full channel and enter the (bounded) backpressure wait — well under
+        // EGRESS_BACKPRESSURE_TIMEOUT. Under drop-newest the overflow is already dropped by now.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Release the writer: with backpressure the queued overflow now drains; with drop-newest only
+        // the few packets that fit the channel were ever kept.
+        io.release();
+
+        // Allow a single frame to remain buffered inside `FramedWrite` (flushed only on the next write
+        // cycle) — that is a framing artifact, not a drop. Drop-newest would lose the whole overflow
+        // (only ~`per_peer_channel_capacity` packets ever kept), which is far below this bound.
+        let min_delivered = expected_bytes - msg.len();
+        assert!(
+            wait_for(3, || io.written() >= min_delivered).await,
+            "essentially all {n} packets ({expected_bytes} bytes) must reach the wire under egress backpressure; a \
+             regression to drop-newest on a full open channel would lose the overflow (wrote {} bytes, need >= \
+             {min_delivered})",
+            io.written()
         );
 
         Ok(())
