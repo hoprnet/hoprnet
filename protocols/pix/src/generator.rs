@@ -110,7 +110,7 @@ pub struct SsaGeneratorConfig {
     /// that reach it, so any of the surplus can stand in for one that never arrives. It does not
     /// cover *corrupt* shares — nothing checks a share on arrival any more, so a bad one is only
     /// noticed once it has already poisoned the interpolation. See
-    /// [`SsaPartCommitment`](crate::SsaPartCommitment).
+    /// [`SsaPartCommitment`].
     ///
     /// Default is 20, must be between 0 and 4096.
     #[default(20)]
@@ -180,10 +180,21 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares;
 
         while !poly_queue.is_empty() {
-            // The window is always the front of the queue, which is what keeps it from straddling
-            // an SSA boundary: `new_ssa_commitment` appends, and an exhausted polynomial is removed
-            // in place so its immediate successor shifts in. The next cycle's polynomials are
-            // therefore only reached once the current one is fully emitted.
+            // The window is always the front of the queue: `new_ssa_commitment` appends, and an
+            // exhausted polynomial is removed in place so its immediate successor shifts in.
+            //
+            // It *can* straddle an SSA boundary, and routinely does. The width is recomputed here
+            // every call, so once the current cycle is down to fewer than `SHARE_EMISSION_WINDOW`
+            // live polynomials and the next has been appended, the window covers the tail of one and
+            // the head of the other — which is the normal state near a boundary, since
+            // `early_recovery_threshold` exists precisely to commit the next cycle before this one
+            // drains.
+            //
+            // Emission stays correct: every share carries its own `SsaPolynomialId` and the Exit
+            // files by it. What follows is that the next cycle's shares can reach the Exit before
+            // its constant terms do, so they take the deferral path — bear that in mind when sizing
+            // `MAX_DEFERRED_ACKS_PER_CYCLE`, which would otherwise look like it only has to cover
+            // the commitment window.
             let window = poly_queue.len().min(SHARE_EMISSION_WINDOW.max(1));
             if *cursor >= window {
                 *cursor = 0;

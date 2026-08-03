@@ -54,7 +54,7 @@ pub struct SsaCycle<S: PixSpec> {
     ///
     /// A failure is charged once per offending share, not once per polynomial: a part reports its
     /// failure exactly once and absorbs everything after it as
-    /// [`AddShareOutcome::Absorbed`](AddShareOutcome::Absorbed).
+    /// [`AddShareOutcome::Absorbed`].
     invalid_shares: std::sync::atomic::AtomicU64,
     /// `num_polys × poly_threshold` — the useful-share count that constitutes full recovery.
     ///
@@ -272,12 +272,14 @@ pub struct SsaPartBuilder<S: PixSpec> {
     min_shares: usize,
     shares: Vec<CompletedShare<S>>,
     reconstructed: Option<PixScalar<S>>,
-    /// Set when the reconstructed part failed to open [`Self::commitment`].
+    /// Set when the part could not be reconstructed — either the interpolation itself failed, or
+    /// the value it produced failed to open [`Self::commitment`].
     ///
     /// The failure is reported exactly once; every later share for this polynomial is absorbed
     /// silently. There is nothing to be gained from re-running the interpolation — the share set
     /// cannot be repaired without knowing *which* share is bad, and the cycle is already lost
-    /// because [`SsaBuilder`] needs every polynomial.
+    /// because [`SsaBuilder`] needs every polynomial. Both failure paths must therefore set this
+    /// *and* release the share buffer, or the "exactly once" only holds for one of them.
     failed: bool,
 }
 
@@ -366,7 +368,19 @@ impl<S: PixSpec> SsaPartBuilder<S> {
             return Ok(AddShareOutcome::Useful);
         }
 
-        let reconstructed = self.shares.combine()?.0;
+        let reconstructed = match self.shares.combine() {
+            Ok(combined) => combined.0,
+            Err(error) => {
+                // Terminal, exactly like a failed commitment opening below, so it has to be
+                // recorded the same way. Propagating with `?` alone would leave the part with a
+                // full share set, no `reconstructed` and no `failed`, so neither early return
+                // above would fire: every remaining share for this polynomial would be pushed and
+                // re-run the interpolation over a larger set, and would re-report the same fault.
+                self.release_verification_state();
+                self.failed = true;
+                return Err(error.into());
+            }
+        };
         self.release_verification_state();
 
         // The only elliptic curve operation on the share path: one fixed-base multiplication per
@@ -544,8 +558,17 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
         }
 
         // Check for duplicate occupancy before any insertion (transactional).
+        //
+        // A repeat *within* the batch counts. Testing only against `committed_polynomials` would let
+        // two entries sharing a polynomial index both see a vacant slot: the second insert would
+        // silently rebind the first — the single-assignment invariant this two-phase check exists to
+        // enforce — and `total_committed` would count two occupants of one slot, so a batch of
+        // `num_polys` entries containing a repeat could never complete the set and every retry would
+        // be rejected as a duplicate against the slots it did fill. The wire decoder rejects
+        // intra-message duplicates today, but this builder is not meant to depend on that.
+        let mut seen = std::collections::HashSet::with_capacity(validated.len());
         for (polynomial_index, _) in &validated {
-            if self.committed_polynomials.contains_key(polynomial_index) {
+            if self.committed_polynomials.contains_key(polynomial_index) || !seen.insert(*polynomial_index) {
                 return Err(errors::PixError::DuplicateCommitment);
             }
         }

@@ -169,6 +169,15 @@ impl Default for MsgSender {
 
 impl Drop for MsgSender {
     fn drop(&mut self) {
+        // Never panic while already unwinding: a failed assertion drops this sender on the way out,
+        // and a second panic during unwinding aborts the process — losing the original message and
+        // taking every other test in the binary with it. `mockall` guards its own `Drop` the same
+        // way. The unmet expectations are not worth reporting here anyway: the test has already
+        // failed, for a reason it did report.
+        if std::thread::panicking() {
+            return;
+        }
+
         // Only the last reference to the inner state validates expectations
         // so that all clones share the same counter.
         if std::sync::Arc::strong_count(&self.inner) != 1 {
@@ -178,7 +187,7 @@ impl Drop for MsgSender {
         let mut errors = Vec::new();
         for (i, e) in inner.expectations.iter().enumerate() {
             match &e.times {
-                Times::Exact(n) if e.times_remaining > 0 => {
+                Times::Exact(_) if e.times_remaining > 0 => {
                     errors.push(format!(
                         "expectation[{}]: expected {} more call(s)",
                         i, e.times_remaining
@@ -291,8 +300,13 @@ impl<'a> Expect<'a> {
 
     /// Add this expectation to a [`mockall::Sequence`].
     ///
-    /// No-op for this manual mock — the expectation ordering is enforced by
-    /// the order in which expectations are registered.
+    /// **No-op, and weaker than it looks.** Selection walks *this* `MsgSender`'s own expectation
+    /// vector, so registration order constrains the calls made through one sender and nothing else.
+    /// A `Sequence` shared across two senders — the usual reason to reach for one — imposes no
+    /// ordering between them at all: any interleaving of their calls is accepted.
+    ///
+    /// Kept so call sites read like `mockall`'s, but do not write a test whose correctness depends
+    /// on cross-sender ordering and expect this to enforce it.
     pub fn in_sequence(self, _seq: &mut mockall::Sequence) -> Self {
         self
     }

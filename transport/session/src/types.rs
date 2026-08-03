@@ -128,13 +128,22 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16
 /// trade, where `threshold` was kept as small as loss tolerance allowed. The 8192 × 64 split is
 /// retained pending measurement of where the new optimum sits; the product is what fixes the
 /// quota, so the split can be re-tuned without touching session negotiation.
-pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = 8192;
+///
+/// ## Why this is an alias
+///
+/// The generator that produces the shares lives in `hopr-protocol-pix` and carries its own
+/// defaults, so the split existed as two independent literals — and they drifted: this side was
+/// re-tuned to `8192 × 64` while the pix crate stayed at a threshold of 128, which made
+/// [`hopr_protocol_pix::SsaGeneratorConfig::default`] imply a 1.01 GiB quota, outside the very
+/// range derived below. Four benchmarks had grown comments explaining which of the two to
+/// believe. Aliasing removes the choice.
+pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = hopr_protocol_pix::DEFAULT_POLYS_PER_SSA;
 
 /// Default number of shares required to reconstruct a single SSA part.
 ///
-/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, and why it is
-/// kept small relative to the polynomial count.
-pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = 64;
+/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, why it is kept
+/// small relative to the polynomial count, and why it is an alias rather than a literal.
+pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
 
 /// Nominal per-SSA data quota implied by the default PIX dimensions.
 ///
@@ -608,6 +617,7 @@ mod tests {
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
+            ClosureReason::UnrealizedDeposit,
         ];
         insta::assert_debug_snapshot!(reasons);
     }

@@ -15,7 +15,7 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprStartProtocol, MockMsgSender, SessionClientConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
-    test_helpers::{mock_packet_planning, msg_type, start_msg_match},
+    testing::{mock_packet_planning, msg_type, start_msg_match},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -344,8 +344,21 @@ async fn session_manager_should_close_idle_session_automatically() -> Result<()>
     );
     assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
-    // Let the session timeout at Alice
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Let the session time out at Alice.
+    //
+    // Polled to a deadline rather than slept once: expiry is driven by the manager's background
+    // task, whose period is jittered and works out at 100–150 ms here, so a single 300 ms sleep
+    // leaves one or two ticks of slack on a loaded runner. `active_sessions` is the probe rather
+    // than `ping_session`, which would send a keep-alive on a session that has not expired yet and
+    // trip the mock. The deadline is generous because it is only reached when the test has failed.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !alice_mgr.active_sessions().is_empty() && std::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    assert!(
+        alice_mgr.active_sessions().is_empty(),
+        "the idle session must be evicted past its idle_timeout"
+    );
 
     assert!(matches!(
         alice_mgr.ping_session(alice_session.id()).await,
@@ -470,9 +483,10 @@ async fn session_manager_should_not_allow_loopback_sessions() -> Result<()> {
 
     drop(new_session_rx_alice);
 
-    // Cleanup: close sender and await handle
+    // Cleanup: close sender and await handle. Checked rather than discarded — `mock_packet_planning`
+    // returns a `Result` precisely so a dispatch failure inside the mock cannot pass silently.
     alice_sender.close_channel();
-    let _ = alice_handle.await;
+    alice_handle.await??;
 
     Ok(())
 }

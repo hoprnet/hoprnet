@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 use common::TestSpec;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_protocol_pix::{
-    CONSTANT_TERM_COEFFICIENT, CoefficientIndex, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
+    CONSTANT_TERM_COEFFICIENT, CoefficientIndex, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
     ExitAcknowledgementShareProcessor, PixGroupRepr, PolynomialIndex, ShareResolution, SsaCommitmentProof,
     SsaGeneratorConfig, SsaId, SsaIndex, SsaPartCommitment, SsaReconstructor, SsaReconstructorConfig,
     SsaShareGenerator, TaggedEncryptedPartialSsaShare,
@@ -40,16 +40,17 @@ use hopr_types::{
 
 /// Deployed number of polynomials per SSA.
 ///
-/// Mirrors `DEFAULT_PIX_POLYS_PER_SSA` (`transport/session/src/types.rs`), which currently
-/// coincides with the pix crate's own [`DEFAULT_POLYS_PER_SSA`].
+/// `DEFAULT_PIX_POLYS_PER_SSA` (`transport/session/src/types.rs`) is an alias of
+/// [`DEFAULT_POLYS_PER_SSA`], so this is the negotiated value by construction.
 const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 
 /// Deployed polynomial threshold (shares needed to reconstruct one polynomial).
 ///
-/// Mirrors `DEFAULT_PIX_SHARES_PER_POLY` (`transport/session/src/types.rs`). Deliberately
-/// **not** the pix crate's `DEFAULT_POLY_THRESHOLD`, which is still 128 — the negotiated
-/// session value is what nodes actually run with.
-const PROD_THRESHOLD: u16 = 64;
+/// `DEFAULT_PIX_SHARES_PER_POLY` (`transport/session/src/types.rs`) is an alias of
+/// [`DEFAULT_POLY_THRESHOLD`], so this is the negotiated value by construction. It was a
+/// literal 64 while the pix crate still said 128, which is exactly the drift the aliasing
+/// removed.
+const PROD_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
 
 /// Coefficient commitments carried by one `SsaCommit` message.
 ///

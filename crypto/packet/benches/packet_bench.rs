@@ -4,7 +4,9 @@ use anyhow::anyhow;
 use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::{prelude::*, sphinx::prelude::SimpleBiMapper};
-use hopr_protocol_pix::{EntryShareGenerator, MAX_POLYS_PER_SSA, SsaGeneratorConfig, SsaIndex, SsaShareGenerator};
+use hopr_protocol_pix::{
+    DEFAULT_POLY_THRESHOLD, EntryShareGenerator, MAX_POLYS_PER_SSA, SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
+};
 use hopr_types::{
     crypto::prelude::*,
     crypto_random::Randomizable,
@@ -42,13 +44,13 @@ const PACKET_BENCHMARK: &[(usize, usize)] = &[
     (3, 2), // 3-hop 2 SURBs = worst case
 ];
 
-/// Deployed polynomial threshold, mirroring `DEFAULT_PIX_SHARES_PER_POLY` in
-/// `transport/session/src/types.rs`.
+/// Deployed polynomial threshold. `DEFAULT_PIX_SHARES_PER_POLY`
+/// (`transport/session/src/types.rs`) is an alias of [`DEFAULT_POLY_THRESHOLD`], so this is
+/// the negotiated value by construction.
 ///
-/// This is what sets the per-share cost: `next_share` is a Horner evaluation over
-/// `threshold` coefficients. Deliberately not the pix crate's `DEFAULT_POLY_THRESHOLD`,
-/// which is still 128.
-const PIX_THRESHOLD: u16 = 64;
+/// This is what sets the per-share cost: `next_share` is a Horner evaluation over `threshold`
+/// coefficients.
+const PIX_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
 
 /// Whether the PIX share generator has a committed SSA.
 ///

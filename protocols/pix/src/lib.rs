@@ -52,9 +52,23 @@ pub mod prelude {
 pub const CONSTANT_TERM_COEFFICIENT: CoefficientIndex = 0;
 
 /// Number of polynomials per SSA.
+///
+/// This and [`DEFAULT_POLY_THRESHOLD`] are the **deployed** split, not merely a library
+/// convenience: `hopr-transport-session` aliases them as `DEFAULT_PIX_POLYS_PER_SSA` and
+/// `DEFAULT_PIX_SHARES_PER_POLY`, and the Exit's accepted quota range is derived from their
+/// product. Changing either changes what nodes negotiate, and a product that no longer matches
+/// the Exit's range makes every PIX Session fail to establish — so move them together.
 pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
-/// Minimum number of shares to recover a part of an SSA.
-pub const DEFAULT_POLY_THRESHOLD: u16 = 128;
+
+/// Minimum number of shares needed to recover one polynomial of an SSA.
+///
+/// 64 rather than the 128 this was before the split was re-tuned. Dropping the non-constant
+/// coefficient commitments (see [`SsaPartCommitment`]) put every commitment-side cost — wire
+/// volume, ingest, reconstructor memory, share verification — on `polys` alone, leaving
+/// interpolation (`O(threshold²)` per polynomial) and fault-detection latency (`threshold`
+/// return packets) as the only costs that grow with the threshold. The full cost model is
+/// documented on `DEFAULT_PIX_POLYS_PER_SSA` in `hopr-transport-session`.
+pub const DEFAULT_POLY_THRESHOLD: u16 = 64;
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
