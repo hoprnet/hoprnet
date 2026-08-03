@@ -168,7 +168,7 @@ vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = "1.17.0"
 hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.5.0", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.5.1", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 # `bjj` is deliberately not enabled here. Hard-enabling it on the workspace dependency
@@ -190,10 +190,10 @@ hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-feature
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.34.1", path = "transport/hopr", default-features = false }
+hopr-transport = { version = "0.35.0", path = "transport/hopr", default-features = false }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.23.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.24.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = { version = "0.22.0", path = "impls/connector" }
 

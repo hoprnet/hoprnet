@@ -10,6 +10,7 @@
 pub(crate) mod balancer;
 pub mod counters;
 pub mod errors;
+pub mod flow_control;
 mod manager;
 #[cfg(feature = "telemetry")]
 mod telemetry;

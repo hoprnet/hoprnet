@@ -33,6 +33,8 @@
 
 /// Contains errors thrown from this module.
 pub mod errors;
+/// Client/ENTRY-side send-window flow control (AIMD send window over the honest delivery clock).
+pub mod flow_control;
 #[allow(dead_code)]
 mod processing;
 mod protocol;

@@ -2,6 +2,7 @@ use std::{
     convert::Into,
     fmt::Debug,
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -25,6 +26,7 @@ use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
+    flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::{
@@ -33,7 +35,12 @@ use hopr_utils::network_types::{
 };
 use tracing::{debug, instrument};
 
-use crate::{Capabilities, Capability, errors::TransportSessionError};
+use crate::{
+    Capabilities, Capability,
+    balancer::BalancerStateValues,
+    errors::TransportSessionError,
+    flow_control::{PacedWriter, SurbSupply},
+};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -252,6 +259,39 @@ pub const SESSION_APPLICATION_TAG: Tag = Tag::Reserved(ReservedTag::Session as u
 /// application tag for all sessions instead of dynamically allocating tags.
 pub type SessionId = HoprPseudonym;
 
+/// Reads the opt-in client-side flow-control window configuration from the environment.
+///
+/// Returns `None` (today's unpaced behaviour) unless `HOPR_SESSION_FLOW_CONTROL` is truthy. This
+/// mirrors the existing env-driven session/balancer tuning (`HOPR_BALANCER_PID_*` etc.) and keeps
+/// the mechanism the client's explicit dial without threading a config field through the whole stack.
+/// Optional overrides: `HOPR_SESSION_FLOW_CONTROL_MIN_WIN`, `HOPR_SESSION_FLOW_CONTROL_MAX_WIN`
+/// (bytes).
+fn flow_control_from_env() -> Option<FlowControlConfig> {
+    let enabled = std::env::var("HOPR_SESSION_FLOW_CONTROL")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if !enabled {
+        return None;
+    }
+    let mut cfg = FlowControlConfig {
+        enabled: true,
+        ..Default::default()
+    };
+    if let Ok(n) = std::env::var("HOPR_SESSION_FLOW_CONTROL_MIN_WIN")
+        .unwrap_or_default()
+        .parse()
+    {
+        cfg.min_window_size = n;
+    }
+    if let Ok(n) = std::env::var("HOPR_SESSION_FLOW_CONTROL_MAX_WIN")
+        .unwrap_or_default()
+        .parse()
+    {
+        cfg.max_window_size = n;
+    }
+    Some(cfg)
+}
+
 pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
         AcknowledgementMode::Both
@@ -372,6 +412,26 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None)
+    }
+
+    /// Like [`new`](Self::new) but threads the SURB balancer state so that opt-in client-side flow
+    /// control (see `flow_control_from_env`) can use it as the anti-grief down-only ceiling. The
+    /// entry (sending) side passes `Some(..)`; sites without balancer state pass `None`.
+    #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
+    pub fn new_with_surb_state<Tx, Rx>(
+        id: SessionId,
+        routing: DestinationRouting,
+        cfg: HoprSessionConfig,
+        hopr: (Tx, Rx),
+        on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+        surb_mgmt: Option<Arc<BalancerStateValues>>,
+    ) -> Result<Self, TransportSessionError>
+    where
+        Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
+        Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
+        Tx::Error: std::error::Error + Send + Sync,
+    {
         let routing_clone = routing.clone();
 
         #[cfg(feature = "telemetry")]
@@ -435,13 +495,41 @@ impl HoprSession {
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
-                Box::new(ReliableSocket::new(
+                // Opt-in client-side flow control: when enabled, install the honest-clock tap on the
+                // ack state and keep the paired clock to drive the paced writer.
+                let (ack_state, flow_control) = match flow_control_from_env() {
+                    Some(fc_cfg) => {
+                        let meter = DeliveryMeter::default();
+                        let ack_state = AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg)
+                            .with_delivery_tap(DeliveryTap::new(meter.clone(), cfg.frame_mtu));
+                        let clock = DeliveryClock::new(meter, Some(ack_cfg.expected_packet_latency));
+                        (ack_state, Some((fc_cfg, clock)))
+                    }
+                    None => (
+                        AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
+                        None,
+                    ),
+                };
+
+                let socket = ReliableSocket::new(
                     transport,
-                    AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
+                    ack_state,
                     socket_cfg,
                     #[cfg(feature = "telemetry")]
                     NoopTracker,
-                )?)
+                )?;
+
+                match flow_control {
+                    Some((fc_cfg, clock)) => {
+                        let surb_state = surb_mgmt
+                            .clone()
+                            .unwrap_or_else(|| Arc::new(BalancerStateValues::default()));
+                        let supply = SurbSupply::new(surb_state, cfg.frame_mtu);
+                        debug!(?fc_cfg, "wrapping session socket with paced flow-control writer");
+                        Box::new(PacedWriter::new(socket, fc_cfg, clock, supply))
+                    }
+                    None => Box::new(socket),
+                }
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
