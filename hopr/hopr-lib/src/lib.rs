@@ -896,6 +896,7 @@ mod tests {
             pseudonym: None,
             surb_management: None,
             always_max_out_surbs: false,
+            flow_control: None,
         })
         .context("explicit path config conversion must succeed")?;
 
