@@ -133,6 +133,17 @@
             rustToolchainFile = ./rust-toolchain-nightly.toml;
           };
 
+          # Build the workspace with `--cfg tokio_unstable` so `hopr-utilities`
+          # (and the whole graph) gets Tokio's improved cooperative yielding.
+          # nix-lib's shells set CARGO_BUILD_RUSTFLAGS (linker flag), and Cargo
+          # lets that env var *replace* the .cargo/config.toml rustflags — so we
+          # append the cfg here rather than rely on the config file, which only
+          # covers non-Nix `cargo` invocations. `--check-cfg` keeps the workspace
+          # clean under `-D warnings`. See README "Build configuration".
+          tokioUnstableHook = ''
+            export CARGO_BUILD_RUSTFLAGS="''${CARGO_BUILD_RUSTFLAGS:-} --cfg tokio_unstable --check-cfg cfg(tokio_unstable)"
+          '';
+
           libraryBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "";
@@ -389,6 +400,7 @@
             ];
             shellHook = ''
               export GITHUB_TOKEN="''${GITHUB_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+              ${tokioUnstableHook}
               ${pre-commit-check.shellHook}
             '';
           };
@@ -412,6 +424,7 @@
             shellHook = ''
               # Fix macOS dylib loading for nightly rustfmt (rust-overlay symlink issue)
               export DYLD_LIBRARY_PATH="${nightlyToolchain}/lib:$DYLD_LIBRARY_PATH"
+              ${tokioUnstableHook}
               ${pre-commit-check.shellHook}
             '';
           };
@@ -436,6 +449,7 @@
               gnupg
               perl
             ];
+            shellHook = tokioUnstableHook;
           };
 
           testShell = nixLib.mkDevShell {
@@ -449,6 +463,7 @@
               foundry-bin
             ];
             shellHook = ''
+              ${tokioUnstableHook}
               uv sync --frozen
               unset SOURCE_DATE_EPOCH
               ${pkgs.lib.optionalString pkgs.stdenv.isLinux "autoPatchelf ./.venv"}
@@ -467,6 +482,7 @@
               hopli.packages.${system}.hopli
             ];
             shellHook = ''
+              ${tokioUnstableHook}
               uv sync --frozen
               unset SOURCE_DATE_EPOCH
               ${pkgs.lib.optionalString pkgs.stdenv.isLinux "autoPatchelf ./.venv"}
@@ -486,6 +502,7 @@
               cargo-shear
             ];
             shellHook = ''
+              ${tokioUnstableHook}
               ${pre-commit-check.shellHook}
             '';
             rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
@@ -498,6 +515,7 @@
               sqlite
               cargo-nextest
             ];
+            shellHook = tokioUnstableHook;
           };
 
           run-check = nixLib.mkCheckApp { inherit system; };

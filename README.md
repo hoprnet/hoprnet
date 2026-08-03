@@ -112,6 +112,36 @@ nix run .#check
 
 This will in particular run `clippy` for the entire Rust codebase.
 
+#### Build configuration (`tokio_unstable`)
+
+The workspace is built with `--cfg tokio_unstable`, configured centrally in
+[`.cargo/config.toml`](./.cargo/config.toml):
+
+```toml
+[build]
+rustflags = ["--cfg", "tokio_unstable", "--check-cfg", "cfg(tokio_unstable)"]
+```
+
+This enables Tokio's unstable cooperative-scheduling APIs (`tokio::task::coop`),
+which [`hopr-utilities`](https://github.com/hoprnet/hopr-utilities) uses for
+improved, budget-aware yielding on the async hot paths (transport, session,
+mixer). A Tokio feature toggled by a downstream crate only takes effect if the
+`tokio` crate itself is compiled with the same cfg, so the flag is applied to
+the entire build graph — which is what propagates the improved yielding down
+into `hopr-utilities`. The paired `--check-cfg` keeps the workspace warning-free
+under `-D warnings`.
+
+The Nix dev/CI shells set `CARGO_BUILD_RUSTFLAGS` themselves (for the linker),
+and Cargo lets that environment variable **replace** — not extend — the
+`.cargo/config.toml` value. So the flag is re-exported (appended to the existing
+rustflags) in each `mkDevShell` in [`flake.nix`](./flake.nix); the
+`.cargo/config.toml` entry is what covers a plain, non-Nix `cargo build`. If you
+export `RUSTFLAGS`/`CARGO_BUILD_RUSTFLAGS` yourself, re-add both flags, e.g.:
+
+```bash
+RUSTFLAGS="--cfg tokio_unstable --check-cfg cfg(tokio_unstable) -Clink-arg=-fuse-ld=lld" cargo bench --no-run -p hopr-crypto-packet
+```
+
 ## Test
 
 Run all tests: `cargo test`.
@@ -140,8 +170,11 @@ Coverage reports are generated using LLVM source-based instrumentation and uploa
 1. Perform a build of your chosen benchmark with `--no-rosegment` linker flag:
 
    ```
-   RUSTFLAGS="-Clink-arg=-fuse-ld=lld -Clink-arg=-Wl,--no-rosegment" cargo bench --no-run -p hopr-crypto-packet
+   RUSTFLAGS="--cfg tokio_unstable --check-cfg cfg(tokio_unstable) -Clink-arg=-fuse-ld=lld -Clink-arg=-Wl,--no-rosegment" cargo bench --no-run -p hopr-crypto-packet
    ```
+
+   > `RUSTFLAGS` replaces the `.cargo/config.toml` value, so the `tokio_unstable`
+   > flags are repeated here (see [Build configuration](#build-configuration-tokio_unstable)).
 
    Use `mold` instead of `lld` if needed.
 
