@@ -582,9 +582,12 @@ pub struct IncomingSessionPixConfig {
     /// the batch size — `StartSession.additional_data` is fully allocated (PIX dimensions in the
     /// upper 32 bits, SURB balancer target in the lower 32), so the Entry has no way to advertise its
     /// cap and this Exit has no way to learn it. An Entry that considers the batch too large rejects
-    /// the whole request, sends no commitments, and the Session then dies on the kill switch with no
-    /// diagnostic on this side. Raising this therefore requires raising `pix.max_ssas_per_request` on
-    /// every Entry that will use this Exit.
+    /// the whole request and replies with a
+    /// [`StartErrorReason::UnacceptablePixParams`] `SessionError`, which closes the Session on both
+    /// sides within about a round trip — see `refuse_ssa_request`. Every Session is still lost, so
+    /// raising this requires raising `pix.max_ssas_per_request` on every Entry that will use this
+    /// Exit; the reply only means the failure is immediate and reported rather than showing up as a
+    /// deposit timeout after the whole `ssas_per_request`-scaled window has elapsed.
     ///
     /// Clamped to `1..=`[`MAX_SSA_BATCH_SIZE`] in [`SessionManager::new`].
     ///
@@ -730,10 +733,11 @@ pub struct SessionManagerConfig {
     /// entry costs a full `new_ssa_commitment`, thousands of outbound `SsaCommit` packets and its own
     /// on-chain deposit, so without a cap one inbound packet amplifies into minutes of CPU, a large
     /// packet burst, and as many simultaneous deposits as the wire format admits. An over-cap request
-    /// is rejected in full, before any commitment is generated or any `ReadyToDeposit` is emitted.
+    /// is rejected in full, before any commitment is generated or any `ReadyToDeposit` is emitted, and
+    /// the Exit is told with a `SessionError` — see `refuse_ssa_request`.
     ///
     /// It must be at least the `ssas_per_request` of every Exit this node connects to — see
-    /// [`IncomingSessionPixConfig::ssas_per_request`] for why a mismatch is silently fatal.
+    /// [`IncomingSessionPixConfig::ssas_per_request`] for why a mismatch loses every Session.
     ///
     /// Clamped to `1..=`[`MAX_SSA_BATCH_SIZE`] in [`SessionManager::new`].
     ///
@@ -974,8 +978,10 @@ impl PixToolbox {
 /// One message can carry a whole batch of them:
 /// [`IncomingSessionPixConfig::ssas_per_request`] SSAs at contiguous indices, sharing the single
 /// `params` field, since every SSA in a Session uses the same negotiated dimensions. The Entry caps
-/// what it will accept at [`SessionManagerConfig::max_ssas_per_ssa_request`] and rejects an over-cap
-/// request in full. The default is a batch of one, which is byte-for-byte the unbatched exchange.
+/// what it will accept at [`SessionManagerConfig::max_ssas_per_ssa_request`], and rejects an over-cap
+/// request in full while replying with an `UnacceptablePixParams` [`StartErrorType`] so the Exit does
+/// not have to infer the refusal from its own deposit timeout. The default is a batch of one, which is
+/// byte-for-byte the unbatched exchange.
 ///
 /// The Exit also installs a *PIX kill switch* per requested index — one shared deadline of
 /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)`. Scaling it by the batch size is
@@ -2999,6 +3005,63 @@ where
         Ok(())
     }
 
+    /// Tells the Exit that its [`SsaServerCommitmentMessage`] was refused, and tears down this half
+    /// of the Session.
+    ///
+    /// Without the notification the refusal is invisible to the Exit, and it has no way to recover
+    /// from it: it armed one kill switch per requested index *before* sending, it will never receive
+    /// an `SsaCommit`, and no PIX event can fire to make it re-request — `request_next_ssa` is only
+    /// reached from establishment and from share-recovery events, and no shares are produced for a
+    /// cycle the Entry never committed to. So it serves the Session unincentivized for the whole
+    /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)` window and then closes it as
+    /// `UnrealizedDeposit` — a reason that names the deposit rather than the refusal, on the one node
+    /// whose operator can act on it. Telling it collapses that to roughly one round trip and puts the
+    /// cause in its log where the failure happens.
+    ///
+    /// The Exit's `handle_session_error` closes the Session on a `SessionId`-identified error, which
+    /// also retires the reconstructor cycles it registered for the batch rather than leaving them to
+    /// their own expiry. It sends nothing back, so there is no error exchange to loop.
+    ///
+    /// No new capability is handed to an attacker by closing on a refusal: an `SsaRequest` only
+    /// reaches here Sphinx-authenticated and with `pseudonym == session_id`, so only the Exit can
+    /// produce one — and the Exit can already close the Session whenever it likes.
+    ///
+    /// Best-effort. A failed send changes nothing, because the Exit's kill switch remains the
+    /// backstop; the local close is unconditional because a refused request is terminal for the
+    /// Session either way (the Exit re-derives every request from state that cannot drift within a
+    /// Session, so a later one would be refused identically), and leaving the slot up would keep an
+    /// unusable Session alive until the idle timeout.
+    async fn refuse_ssa_request(&self, session_id: SessionId, routing: DestinationRouting) {
+        let reason = StartErrorReason::UnacceptablePixParams;
+        if let Some(mut msg_sender) = self.msg_sender.get().cloned() {
+            match send_via_msg_sender(
+                &mut msg_sender,
+                routing,
+                HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::SessionId(session_id),
+                    reason,
+                }),
+                "session error message due to a refused SSA request",
+            )
+            .await
+            {
+                Ok(()) => {
+                    #[cfg(all(feature = "telemetry", not(test)))]
+                    METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                }
+                Err(error) => {
+                    warn!(%session_id, %error, "failed to notify the Exit about a refused SSA request");
+                }
+            }
+        } else {
+            warn!(%session_id, "cannot notify the Exit about a refused SSA request - manager not started");
+        }
+
+        if self.close_session(&session_id) {
+            error!(%session_id, "closed session after refusing the Exit's SSA request");
+        }
+    }
+
     /// Handled by the Entry, when the Exit sends PIX initiation request
     #[tracing::instrument(level = "debug", skip(self, msg))]
     async fn handle_ssa_request(
@@ -3097,11 +3160,13 @@ where
         // for, which its own kill switch then has to clean up.
         let max_ssas_per_request = self.cfg.max_ssas_per_ssa_request;
         if msg.commitments.len() > max_ssas_per_request {
-            return Err(SessionManagerError::Unacceptable(format!(
+            let error = SessionManagerError::Unacceptable(format!(
                 "Exit requested {} SSA commitments in a single request, at most {max_ssas_per_request} allowed",
                 msg.commitments.len()
-            ))
-            .into());
+            ));
+            self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                .await;
+            return Err(error.into());
         }
 
         let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
@@ -3125,10 +3190,12 @@ where
         // only come from an Exit running modified code, which would merely break its own recovery.
         let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
         if quota_per_ssa != server_quota {
-            return Err(SessionManagerError::Unacceptable(format!(
+            let error = SessionManagerError::Unacceptable(format!(
                 "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
-            ))
-            .into());
+            ));
+            self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                .await;
+            return Err(error.into());
         }
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
@@ -6244,8 +6311,16 @@ mod tests {
         use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
+        /// Outcome of offering a batch: what `handle_ssa_request` returned, how many `SessionError`
+        /// messages the Entry sent back, and whether it kept the Session.
+        struct Outcome {
+            result: errors::Result<()>,
+            session_errors: usize,
+            session_alive: bool,
+        }
+
         // `batch` entries offered against an Entry configured to accept at most `cap`.
-        async fn offer_batch(cap: usize, batch: u32) -> anyhow::Result<errors::Result<()>> {
+        async fn offer_batch(cap: usize, batch: u32) -> anyhow::Result<Outcome> {
             // The PIX event stream must stay alive: an accepted batch emits one `ReadyToDeposit` per
             // entry, and a dropped receiver would fail the send and mask the acceptance as an error.
             let (pix_toolbox, _pix_events) = PixToolbox::new(
@@ -6267,10 +6342,20 @@ mod tests {
                 ..Default::default()
             });
 
+            // Count the SessionError replies: a refusal has to be *told* to the Exit, which cannot
+            // otherwise observe it and has no path back to a new request.
+            let session_errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let session_errors_tx = session_errors.clone();
             let mut bob_transport = MockMsgSender::new();
             bob_transport
                 .expect_send_message()
-                .returning(|_, _| Box::pin(async { Ok(()) }));
+                .times(1..)
+                .returning(move |_, data| {
+                    if crate::testing::msg_type(&data, StartProtocolDiscriminants::SessionError) {
+                        session_errors_tx.fetch_add(1, Ordering::Relaxed);
+                    }
+                    Box::pin(async { Ok(()) })
+                });
 
             let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
             let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
@@ -6310,33 +6395,60 @@ mod tests {
                 )
                 .await;
 
+            let session_alive = mgr.active_sessions().contains(&session_id);
+
             bob_sender.close_channel();
             bob_handle.await??;
 
-            Ok(result)
+            Ok(Outcome {
+                result,
+                session_errors: session_errors.load(Ordering::Relaxed),
+                session_alive,
+            })
         }
 
         // One over the default cap is rejected...
-        let result = offer_batch(
+        let over_cap = offer_batch(
             DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
             DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32 + 1,
         )
         .await?;
         assert!(
             matches!(
-                result,
+                over_cap.result,
                 Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
             ),
-            "an over-cap SsaRequest must be rejected, got {result:?}"
+            "an over-cap SsaRequest must be rejected, got {:?}",
+            over_cap.result
+        );
+        // ...and the refusal must be reported rather than left for the Exit to infer from its own
+        // deposit timeout minutes later, and must not leave a Session behind that can never make PIX
+        // progress.
+        assert_eq!(
+            1, over_cap.session_errors,
+            "a refused SsaRequest must send exactly one SessionError back to the Exit"
+        );
+        assert!(
+            !over_cap.session_alive,
+            "a refused SsaRequest must tear down the Entry's half of the Session"
         );
 
         // ...and the very same batch is accepted once the cap is raised to admit it, proving the
         // rejection is the configured cap talking and not some other validation.
         let raised = DEFAULT_MAX_SSAS_PER_SSA_REQUEST + 1;
-        let result = offer_batch(raised, raised as u32).await?;
+        let accepted = offer_batch(raised, raised as u32).await?;
         assert!(
-            result.is_ok(),
-            "a batch at the configured cap of {raised} must be accepted, got {result:?}"
+            accepted.result.is_ok(),
+            "a batch at the configured cap of {raised} must be accepted, got {:?}",
+            accepted.result
+        );
+        assert_eq!(
+            0, accepted.session_errors,
+            "an accepted batch must not send a SessionError"
+        );
+        assert!(
+            accepted.session_alive,
+            "an accepted batch must leave the Session running"
         );
 
         Ok(())

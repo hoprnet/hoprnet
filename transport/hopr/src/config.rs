@@ -364,8 +364,9 @@ pub struct PixGlobalConfig {
     ///
     /// **Must be at least the `ssas_per_request` of every Exit this node uses.** The batch size is not
     /// negotiated — the Exit cannot learn this value — so an Exit batching above it has every request
-    /// rejected and its Sessions die on its own deposit kill switch. Raising the Exit side therefore
-    /// requires raising this in step.
+    /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
+    /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
+    /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
     ///
     /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
     ///
