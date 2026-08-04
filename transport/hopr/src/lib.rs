@@ -71,8 +71,9 @@ pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
+    IncomingSession, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
+    SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};

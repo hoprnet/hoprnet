@@ -202,6 +202,7 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management,
                     always_max_out_surbs: false,
+                    flow_control: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))
@@ -249,6 +250,7 @@ impl ClusterGuard {
                     pseudonym: None,
                     surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
+                    flow_control: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))

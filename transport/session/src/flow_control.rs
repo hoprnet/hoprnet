@@ -45,6 +45,11 @@ impl SurbSupply {
             low_watermark_frac: 0.25,
         }
     }
+
+    /// Raw SURB buffer level (for diagnostics).
+    fn buffer_level(&self) -> u64 {
+        self.state.buffer_level()
+    }
 }
 
 impl SupplyConstraint for SurbSupply {
@@ -87,11 +92,21 @@ pub struct PacedWriter<S> {
     clock: DeliveryClock,
     supply: SurbSupply,
     /// Keep-progress deadline: how long to park when the window is momentarily full before
-    /// re-checking. Bounds latency in `Segmentation` mode (no acks ⇒ only the SURB ceiling and this
-    /// timer can reopen the window).
+    /// re-checking, and the persist-probe interval (see `stalled_parks`).
     deadline: Duration,
     /// Pending park timer, recreated per park.
     park: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    /// Consecutive keep-progress parks that saw **no** honest delivery and admitted **no** bytes.
+    /// Reset to 0 on any admission or any delivery. When it reaches `persist_after` (> 0), the
+    /// persist probe fires (see [`Self::admissible`]).
+    stalled_parks: u32,
+    /// Persist-probe threshold (consecutive no-progress parks). `0` disables the probe — the default
+    /// clean behaviour; a robust profile sets it (~8). Sourced from [`FlowControlConfig`].
+    persist_after: u32,
+    /// Cumulative bytes admitted (diagnostics).
+    sent_total: u64,
+    /// `refresh_window` call counter, for throttling the diagnostic trace.
+    refreshes: u64,
 }
 
 impl<S> PacedWriter<S> {
@@ -105,17 +120,89 @@ impl<S> PacedWriter<S> {
             supply,
             deadline: cfg.no_honest_deadline,
             park: None,
+            stalled_parks: 0,
+            persist_after: cfg.persist_stall_parks,
+            sent_total: 0,
+            refreshes: 0,
         }
     }
 
-    /// Folds the latest honest delivery and SURB backoff into the window. Growth comes only from
-    /// delivery; the supply hint can only shrink.
+    /// Folds the latest honest delivery into the window. `cwnd` moves **only** on the honest delivery
+    /// clock (up on ack, down on loss); SURB supply never touches `cwnd` — so a transient
+    /// `buffer_level` dip cannot destroy the learned window (it can only clamp the effective window
+    /// down via the ceiling, in [`Self::admissible`]).
     fn refresh_window(&mut self) {
-        self.window.apply_delivery(self.clock.poll_delivered());
-        if let Some(b) = self.supply.backoff_hint() {
-            self.window.apply_backoff(b);
+        let delivered = self.clock.poll_delivered();
+        self.window.apply_delivery(delivered);
+        if delivered.acked_bytes > 0 || delivered.lost_bytes > 0 {
+            self.stalled_parks = 0;
+        }
+
+        self.refreshes = self.refreshes.wrapping_add(1);
+        if self.refreshes.is_multiple_of(256) {
+            tracing::debug!(
+                target: "hopr_flow_control",
+                sent_total = self.sent_total,
+                cwnd = self.window.window(),
+                inflight = self.window.inflight(),
+                raw_ceiling = self.supply.max_admissible_inflight(),
+                buffer_level = self.supply.buffer_level(),
+                stalled_parks = self.stalled_parks,
+                "flow-control state"
+            );
         }
     }
+
+    /// Bytes admissible right now, against the live SURB ceiling.
+    ///
+    /// Normally this is `min(cwnd, surb_ceiling) − inflight`: the AIMD window bounds the send rate to
+    /// the drain rate, and the SURB ceiling clamps it down when supply is low (never up — invariant 2).
+    ///
+    /// **Persist probe (opt-in, anti-deadlock).** At end-of-stream a HOPR session has no half-close,
+    /// so the final frames may be acked slowly (or their retransmissions must exhaust before their
+    /// bytes retire from `inflight`). Meanwhile `inflight` sits at `cwnd`, so the normal formula
+    /// admits 0 and the writer would park forever — the tail deadlock the 5-sample measurement
+    /// showed. When enabled (`persist_after > 0`), after that many consecutive no-progress parks we
+    /// admit a bounded `min_window_size` **beyond `cwnd` but still capped by the SURB ceiling**. This is the
+    /// classic TCP persist-timer escape, and it is invariant-safe: it never spends past the SURB
+    /// ceiling (anti-grief intact), and a peer withholding acks can extract at most `min_window_size` per
+    /// `persist_after × deadline` — it can only ever make us slower, never faster or over-spending.
+    /// `persist_after == 0` (the default) disables it entirely: the verified clean behaviour.
+    fn admissible(&self) -> usize {
+        let ceiling = self.supply.max_admissible_inflight();
+        admit_bytes(
+            self.window.admissible_for(ceiling),
+            self.stalled_parks,
+            self.persist_after,
+            self.window.inflight(),
+            self.window.min_window_size(),
+            ceiling,
+        )
+    }
+}
+
+/// Pure admission decision, including the persist probe. Extracted for unit testing.
+///
+/// * `normal` = the AIMD/ceiling-bounded admissible bytes. If positive, use it (no probe).
+/// * Otherwise, if the persist probe is enabled (`persist_after > 0`) and `stalled_parks` has reached it, admit up to
+///   `min_window_size` **beyond `inflight`**, but never past the SURB `ceiling` — the anti-deadlock persist probe.
+///   `persist_after == 0` disables the probe entirely (the default clean behaviour).
+fn admit_bytes(
+    normal: usize,
+    stalled_parks: u32,
+    persist_after: u32,
+    inflight: usize,
+    min_window_size: usize,
+    ceiling: usize,
+) -> usize {
+    if normal > 0 {
+        return normal;
+    }
+    if persist_after > 0 && stalled_parks >= persist_after {
+        let probe_target = inflight.saturating_add(min_window_size);
+        return probe_target.min(ceiling).saturating_sub(inflight);
+    }
+    0
 }
 
 impl<S: futures::AsyncWrite + Unpin> futures::AsyncWrite for PacedWriter<S> {
@@ -128,15 +215,17 @@ impl<S: futures::AsyncWrite + Unpin> futures::AsyncWrite for PacedWriter<S> {
         let this = self.get_mut();
         loop {
             this.refresh_window();
-            let admissible = this.window.admissible(&this.supply);
+            let admissible = this.admissible();
             if admissible == 0 {
-                // Window momentarily full: park on a keep-progress timer, then re-check.
+                // Window full and not yet stalled long enough to persist: park on the keep-progress
+                // timer, count the stall, then re-check.
                 let deadline = this.deadline;
                 let fut = this.park.get_or_insert_with(|| Box::pin(sleep(deadline)));
                 match fut.as_mut().poll(cx) {
                     Poll::Ready(()) => {
                         this.park = None;
-                        continue; // re-evaluate admission (delivery/ceiling may have moved)
+                        this.stalled_parks = this.stalled_parks.saturating_add(1);
+                        continue; // re-evaluate admission (delivery/ceiling/persist may have moved)
                     }
                     Poll::Pending => return Poll::Pending,
                 }
@@ -146,6 +235,8 @@ impl<S: futures::AsyncWrite + Unpin> futures::AsyncWrite for PacedWriter<S> {
             return match Pin::new(&mut this.inner).poll_write(cx, &buf[..to_write]) {
                 Poll::Ready(Ok(n)) => {
                     this.window.on_sent(n);
+                    this.sent_total = this.sent_total.wrapping_add(n as u64);
+                    this.stalled_parks = 0; // forward progress — reset the persist counter
                     Poll::Ready(Ok(n))
                 }
                 other => other,
@@ -194,6 +285,57 @@ mod tests {
             .buffer_level
             .store(buffer_level, std::sync::atomic::Ordering::Relaxed);
         state
+    }
+
+    // ---- Persist probe (anti-deadlock at the un-acked tail), configurable ----
+
+    const MIN_WIN: usize = 4_096;
+    const PERSIST: u32 = 8;
+
+    #[test]
+    fn persist_disabled_by_default_never_fires() {
+        // persist_after == 0 (default clean profile): the probe never fires, however long we stall.
+        assert_eq!(admit_bytes(0, 0, 0, 50_000, MIN_WIN, usize::MAX), 0);
+        assert_eq!(admit_bytes(0, 10_000, 0, 50_000, MIN_WIN, usize::MAX), 0);
+    }
+
+    #[test]
+    fn persist_inactive_when_window_has_room() {
+        // Normal admissible > 0 ⇒ probe never involved, whatever the stall count / profile.
+        assert_eq!(admit_bytes(10_000, 0, PERSIST, 50_000, MIN_WIN, usize::MAX), 10_000);
+        assert_eq!(admit_bytes(10_000, 999, PERSIST, 50_000, MIN_WIN, usize::MAX), 10_000);
+    }
+
+    #[test]
+    fn persist_holds_until_stall_threshold() {
+        // Window full (normal == 0) but not yet stalled long enough ⇒ admit nothing.
+        for parks in 0..PERSIST {
+            assert_eq!(
+                admit_bytes(0, parks, PERSIST, 50_000, MIN_WIN, usize::MAX),
+                0,
+                "parks={parks}"
+            );
+        }
+    }
+
+    #[test]
+    fn persist_fires_after_threshold_bounded_by_min_win() {
+        // At/after the threshold, admit exactly min_window_size (ceiling ample).
+        assert_eq!(admit_bytes(0, PERSIST, PERSIST, 50_000, MIN_WIN, usize::MAX), MIN_WIN);
+        assert_eq!(
+            admit_bytes(0, PERSIST + 5, PERSIST, 50_000, MIN_WIN, usize::MAX),
+            MIN_WIN
+        );
+    }
+
+    #[test]
+    fn persist_never_exceeds_surb_ceiling() {
+        // Anti-grief: the probe is still capped by the SURB ceiling.
+        // inflight 50_000, ceiling 52_000 ⇒ only 2_000 headroom even though min_window_size is 4_096.
+        assert_eq!(admit_bytes(0, PERSIST, PERSIST, 50_000, MIN_WIN, 52_000), 2_000);
+        // inflight already at/over the ceiling ⇒ probe admits nothing (never overspends SURBs).
+        assert_eq!(admit_bytes(0, PERSIST, PERSIST, 50_000, MIN_WIN, 50_000), 0);
+        assert_eq!(admit_bytes(0, PERSIST, PERSIST, 50_000, MIN_WIN, 40_000), 0);
     }
 
     #[test]
@@ -249,7 +391,6 @@ mod tests {
 
     fn small_cfg() -> FlowControlConfig {
         FlowControlConfig {
-            enabled: true,
             min_window_size: 1_000,
             max_window_size: 100_000,
             ai_step: 1_000,
