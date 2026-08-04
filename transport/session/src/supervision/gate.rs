@@ -328,6 +328,47 @@ mod tests {
         assert!(gate.funded.load(Ordering::Acquire));
     }
 
+    /// Strict prepay: a gate with no predeposit budget serves nothing until it is funded.
+    ///
+    /// Several tests above already happen to use a zero budget to reach some other behaviour, but
+    /// none of them states this configuration's contract, which is the whole of what an Exit
+    /// choosing `max_predeposit_packets = 0` is buying. A change that admitted even one packet
+    /// before funding would pass every one of those and fail only here.
+    #[tokio::test]
+    async fn a_zero_budget_gate_serves_nothing_until_funded() {
+        let gate = ServiceGate::new(0, 10);
+
+        // Nothing, on either path.
+        assert!(
+            !gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+            "the synchronous path must refuse while unfunded with no budget"
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), gate.acquire())
+                .await
+                .is_err(),
+            "the async path must park rather than admit"
+        );
+        assert_eq!(gate.served_total(), 0, "a refused packet must not be counted as served");
+
+        // A writer parked before funding is woken by it, not left pending.
+        let parked = {
+            let gate = gate.clone();
+            tokio::spawn(async move { gate.acquire().await })
+        };
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        gate.release_service();
+        parked
+            .await
+            .unwrap()
+            .expect("funding must wake the writer parked on an empty budget");
+
+        // Service is then ordinary, and the ceiling counts from funding rather than from a
+        // predeposit allowance that was never spent.
+        assert!(gate.try_acquire_sync().expect("a funded gate is not poisoned"));
+        assert_eq!(gate.served_total(), 2);
+    }
+
     #[tokio::test]
     async fn funded_gate_surrenders_at_ceiling() {
         let gate = ServiceGate::new(0, 10); // Ceiling of 10.

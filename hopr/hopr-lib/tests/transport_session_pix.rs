@@ -45,11 +45,17 @@ const PIX_SHARES: u16 = 2;
 ///
 /// The Entry's PIX dimensions are set to match what the session negotiates, so the Exit's
 /// `quota_range` check has something acceptable to accept.
+///
+/// `idle_timeout` applies to *both* ends. It has to: the fixture disables the Exit→Entry SURB
+/// keep-alive stream (so that eviction tests can work at all), and an Entry slot's idle timer is only
+/// reset by traffic arriving on it. Leaving the Entry at the fixture default of 2.5 s therefore
+/// evicts it a few seconds into any test where the Exit is legitimately quiet — which reads exactly
+/// like the Exit tearing the Session down.
 #[cfg(feature = "session-client")]
 async fn build_pix_cluster(
     hops: usize,
     exit_pix: IncomingSessionPixConfig,
-    exit_idle_timeout: Duration,
+    idle_timeout: Duration,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard> {
     let cluster = build_role_cluster(
         TestNodeConfig {
@@ -59,13 +65,14 @@ async fn build_pix_cluster(
                 ssa_part_size: PIX_SHARES as usize,
                 additional_shares: 2,
             }),
+            idle_timeout_ms: idle_timeout.as_millis() as u64,
             ..Default::default()
         },
         vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops],
         TestNodeConfig {
             win_prob: 1.0,
             incoming_pix_config: Some(exit_pix),
-            idle_timeout_ms: exit_idle_timeout.as_millis() as u64,
+            idle_timeout_ms: idle_timeout.as_millis() as u64,
             ..Default::default()
         },
     )
@@ -431,6 +438,128 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
     outcome.context("session outlived its deposit deadline")??;
 
     tracing::info!(hops, "deposit timeout test PASSED");
+    Ok(())
+}
+
+/// Verifies that an Exit configured for strict prepay (`max_predeposit_packets = 0`) serves nothing
+/// until the deposit is confirmed, and serves normally once it is.
+///
+/// The Exit-side unit tests reach the gate, but not the property that makes a zero budget a usable
+/// policy rather than a deadlock: the `SsaRequest` and the Entry's commitment both bypass the egress
+/// gate, so the Session can still become fundable while nothing at all is being served. Only a real
+/// Entry answering a real request exercises that — route either through the gate and this test hangs,
+/// where every unit test would still pass.
+///
+/// The third bypass, the SURB keep-alive stream, is *not* covered here: the test fixture disables it
+/// (`surb_balance_notify_period: None`) so that eviction tests can work. In production it is what
+/// keeps the Entry's own session slot from idling out while the Exit is quiet; here the long
+/// `idle_timeout` passed to `build_pix_cluster` stands in for it.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) -> anyhow::Result<()> {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                // The setting under test: not one packet before the deposit.
+                max_predeposit_packets: 0,
+                // Far out of reach, so the Session is still open to be funded after the stall window
+                // below. At its default this would be measuring the deposit deadline instead.
+                max_deposit_wait: Duration::from_secs(600),
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(120),
+    )
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    let session = establish_pix_session(&cluster, hops).await?;
+    tracing::info!("session established");
+    let (mut rd, mut wr) = session.split();
+
+    // Keep giving the Exit something it wants to answer, for the whole test. Writes towards the Exit
+    // are not gated, so this keeps running throughout the stall below — which is the point: the Exit
+    // is not quiet for want of anything to say.
+    let writer = tokio::spawn(async move {
+        loop {
+            let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
+            if wr.write_all(&msg).await.is_err() || wr.flush().await.is_err() {
+                tracing::warn!("writer: the Entry side stopped accepting writes");
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    });
+
+    // Drain the Exit's PIX events for the whole test, handing the first deposit notifier back and
+    // then carrying on draining. A client that stopped polling the stream mid-test would be a second
+    // variable in a test meant to isolate the gate.
+    let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
+    let drain = tokio::spawn(async move {
+        let mut notifier_tx = Some(notifier_tx);
+        while let Some(event) = exit_events.next().await {
+            match event {
+                PixEvent::DepositAddressReceived(data) => match (notifier_tx.take(), data.deposit_updated) {
+                    (Some(tx), Some(notifier)) => {
+                        tracing::info!(id = ?data.id, "Exit: DepositAddressReceived — withholding the deposit");
+                        let _ = tx.send((data.id, notifier));
+                    }
+                    _ => tracing::debug!(id = ?data.id, "further deposit request"),
+                },
+                other => tracing::debug!("Exit PixEvent: {other:?}"),
+            }
+        }
+    });
+
+    // The Exit asks for a deposit despite serving nothing, because the `SsaRequest` never touches the
+    // egress gate. Hold the notifier instead of answering it, so that the stall below is observed
+    // against a Session that is committed and merely unfunded — rather than one that never got as
+    // far as being asked to pay.
+    let (deposit_id, mut deposit_notifier) = tokio::time::timeout(Duration::from_secs(60), notifier_rx)
+        .await
+        .context("timed out waiting for the deposit request")?
+        .context("the Exit never asked for a deposit — a strict-prepay gate must not hold up the SsaRequest")?;
+
+    // Nothing may come back yet, however much the Entry sends.
+    let mut echoed = vec![0u8; 32];
+    match tokio::time::timeout(Duration::from_secs(15), rd.read_exact(&mut echoed)).await {
+        Err(_) => tracing::info!("nothing served before the deposit, as configured"),
+        Ok(Ok(())) => {
+            anyhow::bail!("the Exit served a packet before the deposit, with max_predeposit_packets = 0")
+        }
+        Ok(Err(error)) => anyhow::bail!("the Session failed instead of stalling on the gate: {error}"),
+    }
+
+    // Funding it must release the answer that was withheld, rather than merely stop refusing new
+    // ones: the packet parked on the gate has to be woken, not dropped.
+    deposit_notifier
+        .send((deposit_id, HoprBalance::new_base(1)))
+        .await
+        .context("failed to signal deposit via notifier")?;
+    tracing::info!(id = ?deposit_id, "deposit signalled");
+
+    tokio::time::timeout(Duration::from_secs(60), rd.read_exact(&mut echoed))
+        .await
+        .context("the Exit never served the probe after the deposit was confirmed")?
+        .context("the Session failed after funding")?;
+
+    writer.abort();
+    drain.abort();
+    tracing::info!(hops, "strict prepay test PASSED");
     Ok(())
 }
 

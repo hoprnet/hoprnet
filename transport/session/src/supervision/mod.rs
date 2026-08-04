@@ -88,16 +88,41 @@
 //!
 //! ### Pre-funding (predeposit)
 //!
-//! Before the first deposit is confirmed, a provisional budget
-//! (`max_predeposit_packets`) allows the Entry to send a limited number
-//! of reply packets.  This protects against fully unfunded sessions while
-//! still allowing bidirectional traffic during the setup phase.  The budget
-//! is capped at `min(target_useful_shares - 1, max_predeposit_packets)`.
+//! Before the first deposit is confirmed, a provisional budget lets the Exit answer the Entry for a
+//! bounded number of packets, so that the application's opening exchange is not held up for as long
+//! as an on-chain deposit takes to confirm.  The budget is
+//! `min(target_useful_shares - 1, max_predeposit_packets)`; at production dimensions the first term
+//! is in the hundreds of thousands, so the configured cap is what binds and the `min` only matters
+//! for the small dimensions used in tests.
 //!
 //! When the budget is exhausted, `acquire` parks the caller on a
 //! [`SlotNotify`] future.  A concurrent [`release_service`](ServiceGate::release_service),
 //! [`notify_progress`](ServiceGate::notify_progress), or [`poison`](ServiceGate::poison)
 //! wakes all parkers.
+//!
+//! ### Strict prepay (`max_predeposit_packets = 0`)
+//!
+//! Zero is a supported setting, and it means the Exit serves nothing at all until a sufficient
+//! deposit is confirmed: the first egress data packet parks, and the Entry has to commit and fund
+//! before a single payload byte flows back to it.
+//!
+//! This does not deadlock, because nothing on the path to funding passes through the gate:
+//!
+//! * The `SsaRequest` goes out on the [`SessionManager`](crate::SessionManager)'s own message sender, not the Session's
+//!   gated sink.
+//! * The Entry's commitment travels Entry→Exit, and the deposit is on-chain.
+//! * The SURB-level keep-alive stream is deliberately left ungated, precisely so an exhausted budget cannot silence the
+//!   signal that keeps the Session fundable. Under strict prepay this carries more weight than it does at a non-zero
+//!   budget: with no egress at all, the keep-alives are the *only* traffic reaching the Entry, and therefore the only
+//!   thing resetting the idle timer on the Entry's own session slot. An operator who both sets this budget to zero and
+//!   disables `surb_balance_notify_period` gives the Entry nothing to stay alive on, and it will evict the Session
+//!   before a deposit can land.
+//!
+//! So the Entry can always be asked for a deposit and can always answer, whatever the budget is.
+//! What a zero budget costs is latency, not liveness: the application stalls until the deposit
+//! confirms, instead of proceeding optimistically. If the deposit never arrives, the deposit
+//! deadline closes the Session and [`poison`](ServiceGate::poison) fails the parked writer rather
+//! than leaving it pending.
 //!
 //! ### Post-funding (ceiling)
 //!
@@ -304,6 +329,21 @@ pub struct SupervisorConfig {
     pub max_unverifiable_shares_per_session: u64,
 
     /// Cap on the provisional predeposit service budget.
+    ///
+    /// This buys the application its opening exchange while the deposit confirms on chain; it is not
+    /// needed for the Session to become fundable, so it is a latency-versus-exposure dial rather than
+    /// a correctness requirement.
+    ///
+    /// **Zero is supported and means strict prepay**: the Exit answers nothing until a sufficient
+    /// deposit is confirmed. Everything on the path to funding — the `SsaRequest`, the Entry's
+    /// commitment, the deposit itself, and the SURB keep-alive stream — bypasses the egress gate, so
+    /// a zero budget stalls the application without ever stalling the funding handshake. Deliberately
+    /// *not* rejected by [`validate_pix_supervision`] for that reason, unlike
+    /// [`max_served_without_progress`](Self::max_served_without_progress), where zero would wedge a
+    /// Session that has already paid.
+    ///
+    /// The effective budget is `min(target_useful_shares - 1, max_predeposit_packets)`, so this value
+    /// is the binding one at any realistic set of PIX dimensions.
     ///
     /// Default: 10000 packets.
     #[default(10000)]
@@ -623,6 +663,24 @@ mod tests {
         let mut cfg = valid_cfg();
         cfg.max_served_without_progress = 0;
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    /// Zero predeposit packets is strict prepay, and it has to stay a legal configuration.
+    ///
+    /// Worth an explicit test because the neighbouring zero-checks make rejecting this one look like
+    /// the consistent thing to do, and it is not: an Exit that declines to serve anything before the
+    /// deposit is expressing a policy, not misconfiguring itself. Nothing on the path to funding goes
+    /// through the egress gate, so the Session still becomes fundable on a zero budget — see
+    /// [`SupervisorConfig::max_predeposit_packets`]. Without this test, adding a
+    /// `max_predeposit_packets == 0` rejection alongside the others would silently remove the option.
+    #[test]
+    fn validation_accepts_zero_predeposit_packets_for_strict_prepay() {
+        let mut cfg = valid_cfg();
+        cfg.max_predeposit_packets = 0;
+        assert!(
+            validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_ok(),
+            "strict prepay (max_predeposit_packets = 0) must remain a supported configuration"
+        );
     }
 
     #[test]

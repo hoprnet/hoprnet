@@ -364,6 +364,60 @@ mod tests {
         }
     }
 
+    /// `max_predeposit_packets = 0` must reach the gate as a zero budget.
+    ///
+    /// The budget is computed here, not in the gate, and nothing else exercises that line with a
+    /// zero cap — every other config in the tree sets a four-figure allowance. A `max(1, ..)` or an
+    /// off-by-one creeping into it would hand an unfunded Entry service that the Exit had
+    /// explicitly declined to offer, and the gate's own tests would still pass.
+    #[tokio::test]
+    async fn zero_predeposit_config_reaches_the_gate_as_strict_prepay() {
+        let cfg = SupervisorConfig {
+            max_predeposit_packets: 0,
+            ..default_cfg()
+        };
+        let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
+
+        assert!(
+            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+            "a strict-prepay gate must refuse the first packet"
+        );
+        assert_eq!(handle.gate.served_total(), 0);
+
+        // What the action driver does when it carries out `ReleaseService`.
+        handle.gate.release_service();
+        assert!(
+            handle.gate.try_acquire_sync().expect("a funded gate is not poisoned"),
+            "funding must open a strict-prepay gate"
+        );
+        assert_eq!(handle.gate.served_total(), 1);
+    }
+
+    /// The configured cap can only lower the predeposit budget, never raise it.
+    ///
+    /// The other half of the same `min`: `dims()` is 10 × 5, so the dimensions bound the budget at 49
+    /// however generous the configuration is. Pinned alongside the zero case so the line is covered
+    /// from both directions rather than only where the cap happens to win.
+    #[tokio::test]
+    async fn predeposit_budget_is_bounded_by_the_ssa_dimensions() {
+        let cfg = SupervisorConfig {
+            max_predeposit_packets: 10_000,
+            ..default_cfg()
+        };
+        let (handle, _action_rx) = spawn_supervisor_worker(cfg, dims(), HoprPseudonym::random(), Instant::now());
+
+        for i in 0..49 {
+            assert!(
+                handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+                "packet {i} is within `target_useful_shares - 1` and must be served"
+            );
+        }
+        assert!(
+            !handle.gate.try_acquire_sync().expect("a fresh gate is not poisoned"),
+            "the budget must stop at `target_useful_shares - 1`, not at the configured cap"
+        );
+    }
+
     #[tokio::test]
     async fn dropped_action_driver_fails_closed_and_poisons_gate() {
         let p = HoprPseudonym::random();
