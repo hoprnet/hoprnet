@@ -23,7 +23,7 @@ use hopr_crypto_packet::{
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, SsaId, SsaIndex, SsaReconstructor,
+    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, RawSsaIndex, SsaId, SsaIndex, SsaReconstructor,
     SsaShareGenerator,
 };
 use hopr_protocol_start::{
@@ -90,11 +90,13 @@ lazy_static::lazy_static! {
 
 /// How many of a session's most recent SSA cycles teardown sweeps.
 ///
-/// Only unrecovered cycles hold reconstructor state — a recovered one removes itself — and the
-/// generator pipelines at most a couple ahead, so the live set is one or two. The window is far
-/// above that because the cost of being wrong is asymmetric in one direction only: a cycle missed
-/// here is still reclaimed by `unused_verifier_lifetime`, whereas sweeping every index a session
-/// ever used is unbounded work on the eviction listener, and leaves a tombstone per index behind it.
+/// Only unrecovered cycles hold reconstructor state — a recovered one removes itself. The live set is
+/// bounded by the batch size: pipelining runs at most one batch ahead of the active one, so at most
+/// `2 × `[`MAX_SSA_BATCH_SIZE`] indices can be unrecovered at once, which this window covers with
+/// room to spare. It is deliberately well above even that, because the cost of being wrong is
+/// asymmetric in one direction only: a cycle missed here is still reclaimed by
+/// `unused_verifier_lifetime`, whereas sweeping every index a session ever used is unbounded work on
+/// the eviction listener, and leaves a tombstone per index behind it.
 const SSA_TEARDOWN_SWEEP_WINDOW: u32 = 64;
 
 /// Release reconstructor state for the SSA cycles of a session that may still be live.
@@ -192,9 +194,11 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 ///
 /// PIX changed this channel's load from roughly one message per session to the *entire* commitment
 /// set of an SSA cycle, chunked into packet-sized messages, plus a reserve for ordinary Start
-/// traffic.
+/// traffic. Batching multiplies that: an Exit that asks for
+/// [`ssas_per_request`](IncomingSessionPixConfig::ssas_per_request) SSAs at once gets that many
+/// cycles' commitment sets back-to-back, all landing here, so the per-cycle term is scaled by it.
 ///
-/// The burst is bounded by two independent limits, and the capacity takes the smaller:
+/// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
 /// * `quota_range.end() / PAYLOAD_SIZE` is `polys × threshold`, a `threshold`-fold over-estimate, since a cycle carries
 ///   one constant term per polynomial and nothing else. The quota alone does not reveal how the product splits, so the
@@ -209,6 +213,10 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 /// direction within the clamp, and the surviving margin is large: the default dimensions burst
 /// ≈ 320 messages against a capacity term of ≈ 648.
 ///
+/// The batch factor is bounded by [`MAX_SSA_BATCH_SIZE`] for the same allocation reason, and is
+/// clamped here rather than being taken on trust from the config, so that callers which build a
+/// `SessionManagerConfig` without going through [`SessionManager::new`] cannot inflate it.
+///
 /// The session term is clamped for the same reason. `maximum_managed_sessions` validates up to
 /// 100 000, and one slot holds a `(HoprPseudonym, HoprStartProtocol)` sized by the enum's largest
 /// variant, so an operator raising the session limit would silently buy a multi-megabyte startup
@@ -218,9 +226,10 @@ fn start_protocol_channel_capacity(cfg: &SessionManagerConfig) -> usize {
     let max_commitments =
         (*cfg.pix_config.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64).min(MAX_POLYS_PER_SSA as u64);
     let max_commit_msgs = max_commitments.div_ceil(MIN_COMMITMENTS_PER_SSA_COMMIT_MSG as u64);
+    let ssas_per_request = cfg.pix_config.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u64;
 
     // `usize::try_from` cannot fail on 64-bit targets; saturate rather than panic on 32-bit ones.
-    usize::try_from(max_commit_msgs)
+    usize::try_from(max_commit_msgs.saturating_mul(ssas_per_request))
         .unwrap_or(usize::MAX)
         .saturating_add(cfg.maximum_sessions.min(MAX_CONCURRENT_START_EXCHANGES))
         .saturating_add(START_PROTOCOL_CHANNEL_RESERVE)
@@ -260,14 +269,37 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// is what keeps that exposure at `threshold` packets instead of a multiple of it.
 const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 0;
 
-/// Maximum number of SSA commitments an Entry will accept in a single [`SsaServerCommitmentMessage`].
+/// Hard ceiling on both SSA batch-size knobs, whatever the configuration says.
 ///
-/// [`request_next_ssa`](SessionManager::request_next_ssa) always requests exactly one SSA, and
-/// pipelining needs at most one cycle in flight ahead of the active one, so 2 leaves room for a
-/// batching Exit without turning one inbound packet into an unbounded amount of Entry work and
-/// on-chain deposits. This is deliberately far below the wire limit
-/// (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only bounds what can be *decoded*.
-const MAX_SSAS_PER_SSA_REQUEST: usize = 2;
+/// Deliberately far below the wire limit (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only
+/// bounds what can be *decoded*. The real cost is paid on both sides of the exchange, and neither is
+/// small at the profiled dimensions:
+///
+/// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
+///   burst of thousands of `SsaCommit` packets, and its own `ReadyToDeposit` — i.e. its own on-chain deposit.
+/// * Exit: every entry is a live reconstructor cycle, ≈49 MiB of peak state, held until that cycle recovers. At this
+///   ceiling that is ≈1 GB per Session.
+///
+/// Both [`IncomingSessionPixConfig::ssas_per_request`] and
+/// [`SessionManagerConfig::max_ssas_per_ssa_request`] are clamped to `1..=Self` in
+/// [`SessionManager::new`], so a programmatically built config that never calls `validate()` cannot
+/// exceed it.
+pub const MAX_SSA_BATCH_SIZE: usize = 20;
+
+/// Default for [`SessionManagerConfig::max_ssas_per_ssa_request`] — how many SSA commitments an Entry
+/// accepts in a single [`SsaServerCommitmentMessage`].
+///
+/// Pipelining needs at most one cycle in flight ahead of the active one, so 2 leaves room for an Exit
+/// batching at the default without turning one inbound packet into an unbounded amount of Entry work
+/// and on-chain deposits.
+pub const DEFAULT_MAX_SSAS_PER_SSA_REQUEST: usize = 2;
+
+/// Default for [`IncomingSessionPixConfig::ssas_per_request`] — how many SSAs an Exit asks for in a
+/// single [`SsaServerCommitmentMessage`].
+///
+/// One, so that the default configuration produces exactly the unbatched exchange: same wire bytes,
+/// same kill-switch deadline, same Start protocol channel capacity.
+pub const DEFAULT_SSAS_PER_SSA_REQUEST: usize = 1;
 
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
@@ -365,12 +397,21 @@ impl SessionSsaState {
         SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
     }
 
-    pub fn increment_index(&self) -> SsaIndex {
+    /// Advances the index past a batch of `n` allocated SSAs, returning the new next index.
+    ///
+    /// Call *after* every fallible step of the request has succeeded, so a failed request keeps its
+    /// indices for the retry.
+    ///
+    /// `n` is expected to be the batch size actually requested, which
+    /// [`request_next_ssa`](SessionManager::request_next_ssa) has already shrunk to fit inside `u32`
+    /// — hence the panic on overflow rather than a saturating advance: silently reusing an index
+    /// would collide with a live cycle.
+    pub fn advance_index(&self, n: u32) -> SsaIndex {
         let old = self
             .current_index
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |i| i.checked_add(n))
             .expect("SSA index overflow after u32::MAX cycles");
-        SsaIndex::new(old.checked_add(1).expect("just incremented")).expect("non-zero just incremented")
+        SsaIndex::new(old.checked_add(n).expect("just advanced")).expect("non-zero just advanced")
     }
 
     /// Returns the current SSA index value.
@@ -525,6 +566,32 @@ pub struct IncomingSessionPixConfig {
     #[default(Duration::from_secs(60))]
     #[serde(with = "humantime_serde")]
     pub max_deposit_wait: Duration,
+    /// Number of SSAs this Exit asks the Entry to commit to in a single
+    /// [`SsaServerCommitmentMessage`].
+    ///
+    /// Batching amortizes the round trip over several deposit cycles, at the cost of holding that
+    /// many live reconstructor cycles at once (≈49 MiB of peak state each at the profiled
+    /// dimensions) and fronting that many SSA quotas of unincentivized service before the first
+    /// deposit lands. It applies to every request, including the first one at Session establishment.
+    ///
+    /// The deposit deadline scales with it: each cycle in a batch gets a kill switch at
+    /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)`, and the deposit awaiter's
+    /// timeout is scaled by the same factor, so a batch is judged as a whole rather than per cycle.
+    ///
+    /// **This must not exceed the peer Entry's `max_ssas_per_request`.** There is no negotiation of
+    /// the batch size — `StartSession.additional_data` is fully allocated (PIX dimensions in the
+    /// upper 32 bits, SURB balancer target in the lower 32), so the Entry has no way to advertise its
+    /// cap and this Exit has no way to learn it. An Entry that considers the batch too large rejects
+    /// the whole request, sends no commitments, and the Session then dies on the kill switch with no
+    /// diagnostic on this side. Raising this therefore requires raising `pix.max_ssas_per_request` on
+    /// every Entry that will use this Exit.
+    ///
+    /// Clamped to `1..=`[`MAX_SSA_BATCH_SIZE`] in [`SessionManager::new`].
+    ///
+    /// Defaults to [`DEFAULT_SSAS_PER_SSA_REQUEST`] (1), which reproduces the unbatched exchange
+    /// exactly.
+    #[default(DEFAULT_SSAS_PER_SSA_REQUEST)]
+    pub ssas_per_request: usize,
 }
 
 /// Configuration for the [`SessionManager`].
@@ -655,6 +722,24 @@ pub struct SessionManagerConfig {
 
     /// Configuration of the PIX protocol for the Exit nodes.
     pub pix_config: IncomingSessionPixConfig,
+
+    /// Maximum number of SSA commitments this node, acting as an Entry, will accept in a single
+    /// [`SsaServerCommitmentMessage`].
+    ///
+    /// This is the Entry's protection against a misbehaving Exit, not a preference: every accepted
+    /// entry costs a full `new_ssa_commitment`, thousands of outbound `SsaCommit` packets and its own
+    /// on-chain deposit, so without a cap one inbound packet amplifies into minutes of CPU, a large
+    /// packet burst, and as many simultaneous deposits as the wire format admits. An over-cap request
+    /// is rejected in full, before any commitment is generated or any `ReadyToDeposit` is emitted.
+    ///
+    /// It must be at least the `ssas_per_request` of every Exit this node connects to — see
+    /// [`IncomingSessionPixConfig::ssas_per_request`] for why a mismatch is silently fatal.
+    ///
+    /// Clamped to `1..=`[`MAX_SSA_BATCH_SIZE`] in [`SessionManager::new`].
+    ///
+    /// Defaults to [`DEFAULT_MAX_SSAS_PER_SSA_REQUEST`] (2).
+    #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
+    pub max_ssas_per_ssa_request: usize,
 }
 
 // Type-erased sink used by the `SessionManager` to notify about newly incoming sessions.
@@ -886,9 +971,17 @@ impl PixToolbox {
 /// *Exit commitment* (a group element) that is sent back to the Entry as a
 /// [`SsaServerCommitmentMessage`].
 ///
-/// The Exit also installs a *PIX kill switch* — a deadline (`max_deposit_wait` +
-/// `max_ssa_delivery_time`). If no deposit is observed before this deadline, the Session is
-/// closed with `ClosureReason::UnrealizedDeposit`.
+/// One message can carry a whole batch of them:
+/// [`IncomingSessionPixConfig::ssas_per_request`] SSAs at contiguous indices, sharing the single
+/// `params` field, since every SSA in a Session uses the same negotiated dimensions. The Entry caps
+/// what it will accept at [`SessionManagerConfig::max_ssas_per_ssa_request`] and rejects an over-cap
+/// request in full. The default is a batch of one, which is byte-for-byte the unbatched exchange.
+///
+/// The Exit also installs a *PIX kill switch* per requested index — one shared deadline of
+/// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)`. Scaling it by the batch size is
+/// what lets an Entry work through a batch in order; any single deposit may be late as long as the
+/// batch lands inside the window. If a deposit is still missing when the deadline passes, the Session
+/// is closed with `ClosureReason::UnrealizedDeposit`.
 ///
 /// ### 3. Entry SSA Commitment (`SsaCommit` → Exit)
 ///
@@ -910,7 +1003,11 @@ impl PixToolbox {
 /// [`AgreedSsaQuota`] and a channel to confirm the deposit.
 ///
 /// A *deposit awaiter* task waits for the deposit confirmation. Once confirmed, the PIX
-/// kill switch is aborted. If the deposit times out, the kill switch closes the Session.
+/// kill switch is aborted. If the deposit times out, the kill switch closes the Session. The awaiter's
+/// own timeout is scaled by `ssas_per_request` too, and has to be: it is the only thing that aborts
+/// the kill switch, so an awaiter that gave up before the widened deadline would let a
+/// legitimately-late deposit go unobserved and the Session be closed for an unrealized deposit that
+/// was in fact realized.
 ///
 /// ### 5. SSA Collection, Recovery and Pipelining
 ///
@@ -1046,6 +1143,13 @@ where
         // Ensure the Frame MTU is at least the size of the Session segment MTU payload
         cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
         cfg.max_frame_timeout = cfg.max_frame_timeout.max(MIN_FRAME_TIMEOUT);
+
+        // Both SSA batch knobs are range-validated in `HoprProtocolConfig`, but nothing in this crate
+        // calls `validate()` — clamp here so a programmatically built config cannot ask for a batch of
+        // zero (no request would ever be sent) or one large enough to blow past what
+        // `MAX_SSA_BATCH_SIZE` exists to bound.
+        cfg.max_ssas_per_ssa_request = cfg.max_ssas_per_ssa_request.clamp(1, MAX_SSA_BATCH_SIZE);
+        cfg.pix_config.ssas_per_request = cfg.pix_config.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
 
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
@@ -1813,7 +1917,7 @@ where
         )))?;
 
         // Serialize the three call sites (establishment, SsaAlmostRecovered, SsaRecovered)
-        // so that peek_index → fallible work → increment_index is never interleaved.
+        // so that peek_index → fallible work → advance_index is never interleaved.
         // The 30-second timeout bounds waiting behind a genuinely slow in-flight request
         // (blocked commitment work or stalled send_via_msg_sender), returning an error
         // instead of waiting indefinitely.
@@ -1837,21 +1941,53 @@ where
 
         // Peek at the next SSA index *before* fallible operations so that a failed
         // commitment generation or send does not permanently consume it.
-        let ssa_index = current_ssa_state.peek_index();
+        let first_ssa_index = current_ssa_state.peek_index();
 
-        // TODO: based on the offered quota, the Exit can decide here whether to ask for more than just one SSA
-        // commitment
+        // Indices this request allocates: `first .. first + ssas_per_request`, contiguous. The Entry
+        // only requires strict monotonicity (gaps are legal), but there is no reason to leave any.
+        //
+        // `checked_add` rather than `+`: a wrapped index would be a *reused* index, colliding with a
+        // live cycle, and in release builds nothing would say so. Overflow truncates the batch
+        // instead, so `batch_size` below is what was actually allocated rather than what was asked
+        // for. Reaching this needs 2^32 cycles in one Session — the index is exhausted either way at
+        // that point, and `advance_index` reports it — but truncating keeps the failure loud.
+        let requested = self.cfg.pix_config.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
+        let ssa_indices = (0..requested as RawSsaIndex)
+            .map_while(|offset| first_ssa_index.get().checked_add(offset).and_then(SsaIndex::new))
+            .collect::<Vec<_>>();
+        let batch_size = ssa_indices.len();
+        if batch_size < requested {
+            warn!(
+                %session_id, %first_ssa_index, batch_size, requested,
+                "ssa batch truncated — index space exhausted"
+            );
+        }
+
         let (polys_per_ssa, shares_per_poly) = (current_ssa_state.polys_per_ssa, current_ssa_state.shares_per_poly);
-        let exit_commitment = hopr_utils::parallelize::cpu::spawn_blocking(
+        let indices_for_commitments = ssa_indices.clone();
+        // One blocking task for the whole batch rather than one per SSA: each commitment is a single
+        // random scalar and one generator multiplication, so the per-task overhead would dominate.
+        //
+        // Guarded, because registering the batch precedes the one fallible send that publishes it. A
+        // failure anywhere from here to the end of the send — including partway through the batch —
+        // drops the guards, which releases every registration *without* writing a resurrection
+        // tombstone. That distinction is what makes the retry work: the index is deliberately not
+        // advanced on failure, so the next attempt reuses these very indices and would otherwise be
+        // refused as a `DuplicateCommitment` by the registrations this attempt stranded.
+        let (exit_commitments, commitment_guards) = hopr_utils::parallelize::cpu::spawn_blocking(
             move || {
-                pix_toolbox
-                    .share_processor
-                    .new_exit_commitment(
+                let mut commitments = Vec::with_capacity(indices_for_commitments.len());
+                let mut guards = Vec::with_capacity(indices_for_commitments.len());
+                for ssa_index in indices_for_commitments {
+                    let (commitment, guard) = pix_toolbox.share_processor.new_guarded_exit_commitment(
                         SsaId::new(session_id, ssa_index),
                         polys_per_ssa as usize,
                         shares_per_poly as usize,
-                    )
-                    .map(|commitment| HoprPixGroupElement(commitment.to_bytes()))
+                    )?;
+                    commitments.push((ssa_index, HoprPixGroupElement(commitment.to_bytes())));
+                    guards.push(guard);
+                }
+                Ok::<_, hopr_protocol_pix::errors::PixError<HoprPseudonym>>((commitments, guards))
             },
             "server_ssa_commitment",
         )
@@ -1859,46 +1995,64 @@ where
         .map_err(SessionManagerError::other)?
         .map_err(SessionManagerError::PixError)?;
 
-        info!(%session_id, ?current_ssa_state, %exit_commitment, "generated exit commitment");
-
-        // Set up a kill switch before sending the SSA request so there is no
-        // window where the commitment is in flight but no timeout is installed.
-        let session_cache = self.sessions.clone();
-        let active_sessions_clone = self.active_sessions.clone();
-        // Snapshot the SSA state before the closure so peek_index remains
-        // available after close_session consumes the slot.
-        let ssa_state_snapshot = current_ssa_state.clone();
-        let session_deadline = std::time::Instant::now()
-            + self.cfg.pix_config.max_deposit_wait
-            + self.cfg.pix_config.max_ssa_delivery_time;
-        slot.abort_handles.lock().insert(
-            SessionHandles::PixKillSwitch(ssa_index.get()),
-            hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
-                move |_| async move {
-                    if let Some(session_slot) = session_cache.remove(&session_id) {
-                        active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
-                        close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
-                        // Release reconstructor state for all live cycles for this
-                        // session, not just the timed-out index.  Pipelining may have
-                        // created earlier unpaid cycles whose builders/verifiers must
-                        // also be cleaned up.
-                        retire_all_live_ssa_cycles(session_id, &ssa_state_snapshot, &pix_toolbox_killswitch);
-                        error!(%session_id, ssa_index, "pix session deposit timeout");
-                    } else {
-                        warn!(%session_id, "pix session deposit timeout - session not found");
-                    }
-                }
-            )),
+        info!(
+            %session_id, ?current_ssa_state, batch_size, %first_ssa_index,
+            "generated exit commitments for the SSA batch"
         );
-        info!(%session_id, "pix session deposit timeout set");
+
+        // Set up the kill switches before sending the SSA request so there is no
+        // window where the commitments are in flight but no timeout is installed.
+        //
+        // The whole batch shares one deadline, scaled by its size: the Entry has to deliver
+        // `batch_size` commitment sets and make `batch_size` deposits before any of them can be
+        // considered late, and holding each cycle to an unscaled window would kill the Session for a
+        // peer that is working through the batch in order. Any single deposit may therefore arrive
+        // late, as long as the batch as a whole lands inside the window.
+        let session_deadline = std::time::Instant::now()
+            + batch_size as u32 * (self.cfg.pix_config.max_deposit_wait + self.cfg.pix_config.max_ssa_delivery_time);
+        {
+            // Per-index keys, so each cycle's deadline is an independent entry that its own deposit
+            // awaiter can abort without touching the others.
+            let mut abort_handles = slot.abort_handles.lock();
+            for &ssa_index in &ssa_indices {
+                let session_cache = self.sessions.clone();
+                let active_sessions_clone = self.active_sessions.clone();
+                let pix_toolbox_killswitch = pix_toolbox_killswitch.clone();
+                // Snapshot the SSA state before the closure so peek_index remains
+                // available after close_session consumes the slot.
+                let ssa_state_snapshot = current_ssa_state.clone();
+                abort_handles.insert(
+                    SessionHandles::PixKillSwitch(ssa_index.get()),
+                    hopr_utils::spawn_as_abortable!(futures_time::task::sleep_until(session_deadline.into()).then(
+                        move |_| async move {
+                            if let Some(session_slot) = session_cache.remove(&session_id) {
+                                active_sessions_clone.fetch_sub(1, Ordering::Relaxed);
+                                close_session(session_id, session_slot, ClosureReason::UnrealizedDeposit);
+                                // Release reconstructor state for all live cycles for this
+                                // session, not just the timed-out index.  Pipelining and batching
+                                // may have created earlier unpaid cycles whose builders/verifiers
+                                // must also be cleaned up.
+                                retire_all_live_ssa_cycles(session_id, &ssa_state_snapshot, &pix_toolbox_killswitch);
+                                error!(%session_id, %ssa_index, "pix session deposit timeout");
+                            } else {
+                                warn!(%session_id, "pix session deposit timeout - session not found");
+                            }
+                        }
+                    )),
+                );
+            }
+        }
+        info!(%session_id, batch_size, "pix session deposit timeout set");
 
         // Construct and send the Exit SSA commitment request message
-        // The parameters were previously verified to be acceptable.
+        // The parameters were previously verified to be acceptable. One `params` field covers the
+        // whole batch, which is correct: every SSA in it uses the dimensions negotiated for this
+        // Session.
         let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
             session_id,
             current_ssa_state.polys_per_ssa,
             current_ssa_state.shares_per_poly,
-            [(ssa_index, exit_commitment)],
+            exit_commitments,
         ));
 
         send_via_msg_sender(
@@ -1910,8 +2064,12 @@ where
         .await
         .map_err(TransportSessionError::packet_sending)?;
 
-        // All fallible steps succeeded — commit the index advance.
-        current_ssa_state.increment_index();
+        // All fallible steps succeeded — commit the index advance past the whole batch, and hand the
+        // registrations over to the cycles they now belong to.
+        current_ssa_state.advance_index(batch_size as RawSsaIndex);
+        for guard in commitment_guards {
+            guard.disarm();
+        }
 
         Ok(())
     }
@@ -2775,7 +2933,14 @@ where
             && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
         {
             let slot_clone = session_slot.clone();
-            let max_deposit_wait = self.cfg.pix_config.max_deposit_wait;
+            // Scaled by the batch size for the same reason the kill switch is, and it has to be: this
+            // awaiter is the *only* thing that aborts `PixKillSwitch(ssa_index)`. If it gave up after
+            // an unscaled `max_deposit_wait` while the kill switch waited for the whole batch window,
+            // a deposit that arrived legitimately late — the N-th of a batch the Entry is funding in
+            // order — would land with nothing left to observe it, and the Session would be closed for
+            // an unrealized deposit that was in fact realized.
+            let max_deposit_wait = self.cfg.pix_config.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u32
+                * self.cfg.pix_config.max_deposit_wait;
             // TODO: generalize the awaiter into a perpetual Session task that either awaits for Deposit or a signal
             // that sends Exit commitment and reinstates the kill-switch.
             session_slot.abort_handles.lock().insert(
@@ -2926,9 +3091,14 @@ where
         // `ReadyToDeposit` — i.e. its own on-chain deposit. Without a cap, a single packet from a
         // misbehaving Exit amplifies into minutes of Entry CPU, a large packet burst, and up to 27
         // simultaneous deposits bounded only by the per-deposit allocation limit.
-        if msg.commitments.len() > MAX_SSAS_PER_SSA_REQUEST {
+        //
+        // Rejecting the whole message rather than the surplus is deliberate: a truncated batch would
+        // leave the Exit holding reconstructor cycles for indices it will never receive commitments
+        // for, which its own kill switch then has to clean up.
+        let max_ssas_per_request = self.cfg.max_ssas_per_ssa_request;
+        if msg.commitments.len() > max_ssas_per_request {
             return Err(SessionManagerError::Unacceptable(format!(
-                "Exit requested {} SSA commitments in a single request, at most {MAX_SSAS_PER_SSA_REQUEST} allowed",
+                "Exit requested {} SSA commitments in a single request, at most {max_ssas_per_request} allowed",
                 msg.commitments.len()
             ))
             .into());
@@ -6059,33 +6229,262 @@ mod tests {
         Ok(())
     }
 
-    /// An `SsaRequest` asking for more than [`MAX_SSAS_PER_SSA_REQUEST`] SSA commitments must be
-    /// rejected outright, before any commitment is generated or any `ReadyToDeposit` is emitted.
+    /// An `SsaRequest` asking for more than [`SessionManagerConfig::max_ssas_per_ssa_request`] SSA
+    /// commitments must be rejected outright, before any commitment is generated or any
+    /// `ReadyToDeposit` is emitted — and a batch *at* the configured cap must be accepted, so that
+    /// raising the knob is what actually admits a larger batch.
     ///
     /// Each accepted entry costs a full client commitment plus its own on-chain deposit, so without
     /// this cap one inbound packet could amplify into up to `MAX_SSAS_PER_REQUEST` (27) deposits.
     #[test_log::test(tokio::test)]
-    async fn entry_rejects_ssa_request_exceeding_ssa_cap() -> anyhow::Result<()> {
+    async fn entry_rejects_ssa_request_exceeding_configured_ssa_cap() -> anyhow::Result<()> {
         use std::collections::BTreeMap;
 
         use hopr_crypto_packet::prelude::HoprPixGroupElement;
         use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
-        let ssa_gen_config = SsaGeneratorConfig {
-            polynomials_per_ssa: 2,
-            threshold: 2,
-            surplus_shares: 1,
-        };
+        // `batch` entries offered against an Entry configured to accept at most `cap`.
+        async fn offer_batch(cap: usize, batch: u32) -> anyhow::Result<errors::Result<()>> {
+            // The PIX event stream must stay alive: an accepted batch emits one `ReadyToDeposit` per
+            // entry, and a dropped receiver would fail the send and mask the acceptance as an error.
+            let (pix_toolbox, _pix_events) = PixToolbox::new(
+                SsaShareGenerator::new(SsaGeneratorConfig {
+                    polynomials_per_ssa: 2,
+                    threshold: 2,
+                    surplus_shares: 1,
+                })
+                .into(),
+                SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            );
+
+            let mgr = SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=1024 * 1024 * 1024,
+                    ..Default::default()
+                },
+                max_ssas_per_ssa_request: cap,
+                ..Default::default()
+            });
+
+            let mut bob_transport = MockMsgSender::new();
+            bob_transport
+                .expect_send_message()
+                .returning(|_, _| Box::pin(async { Ok(()) }));
+
+            let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+            let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+            let _notifications = tokio::spawn(async move {
+                pin_mut!(new_session_rx);
+                while let Some(_session) = new_session_rx.next().await {}
+            });
+            mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+            let alice_pseudonym = HoprPseudonym::random();
+
+            mgr.handle_incoming_session_initiation(
+                alice_pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                    capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                    additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                },
+            )
+            .await?;
+
+            let session_id = alice_pseudonym;
+            let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+                .expect("identity element must be valid");
+
+            // Indices start above whatever the Exit-side establishment already allocated, so the
+            // accepted case is not rejected for non-monotonicity instead of for its size.
+            let commitments: BTreeMap<_, _> = (100..100 + batch)
+                .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+                .collect();
+
+            let result = mgr
+                .handle_ssa_request(
+                    alice_pseudonym,
+                    SsaServerCommitmentMessage::new(session_id, 2, 2, commitments),
+                )
+                .await;
+
+            bob_sender.close_channel();
+            bob_handle.await??;
+
+            Ok(result)
+        }
+
+        // One over the default cap is rejected...
+        let result = offer_batch(
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST,
+            DEFAULT_MAX_SSAS_PER_SSA_REQUEST as u32 + 1,
+        )
+        .await?;
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "an over-cap SsaRequest must be rejected, got {result:?}"
+        );
+
+        // ...and the very same batch is accepted once the cap is raised to admit it, proving the
+        // rejection is the configured cap talking and not some other validation.
+        let raised = DEFAULT_MAX_SSAS_PER_SSA_REQUEST + 1;
+        let result = offer_batch(raised, raised as u32).await?;
+        assert!(
+            result.is_ok(),
+            "a batch at the configured cap of {raised} must be accepted, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// The Exit must pack [`IncomingSessionPixConfig::ssas_per_request`] commitments into a *single*
+    /// `SsaRequest` at contiguous indices, and advance the SSA index past the whole batch.
+    ///
+    /// The index advance is what the pipelining guard reads: after a batch, `current_index - 1` must
+    /// be the *last* index of the batch, so that only that cycle's `SsaAlmostRecovered` triggers the
+    /// next batch and the earlier ones are correctly treated as stale.
+    #[test_log::test(tokio::test)]
+    async fn exit_batches_configured_number_of_ssas_into_one_request() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        const BATCH: usize = 3;
 
         let (pix_toolbox, _) = PixToolbox::new(
-            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
 
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
                 quota_range: 0..=1024 * 1024 * 1024,
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        // Capture the commitment sets of every SsaRequest that goes out.
+        let requested: Arc<std::sync::Mutex<Vec<Vec<u32>>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let requested_clone = requested.clone();
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport.expect_send_message().returning(move |_, data| {
+            if let Ok(HoprStartProtocol::SsaRequest(req)) = HoprStartProtocol::try_from(data.data) {
+                requested_clone
+                    .lock()
+                    .unwrap()
+                    .push(req.commitments.keys().map(|i| i.get()).collect());
+            }
+            Box::pin(async { Ok(()) })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let slot = mgr.sessions.get(&alice_pseudonym).context("session must exist")?;
+        let ssa_state = slot.current_ssa_state.get().context("pix state must be set")?;
+
+        // Batching happens on the first request too, not only on pipelined refills.
+        assert_eq!(
+            ssa_state.peek_index().get(),
+            BATCH as u32 + 1,
+            "index must advance past the whole batch"
+        );
+
+        // Only the last index of the batch may trigger the next one.
+        let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(BATCH as u32).expect("non-zero"));
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+            .await?;
+        assert_eq!(
+            ssa_state.peek_index().get(),
+            2 * BATCH as u32 + 1,
+            "the last index of a batch must trigger the next batch"
+        );
+
+        // An earlier index of the previous batch is stale and must not request anything.
+        let stale = SsaId::new(alice_pseudonym, SsaIndex::MIN);
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(stale))
+            .await?;
+        assert_eq!(
+            ssa_state.peek_index().get(),
+            2 * BATCH as u32 + 1,
+            "a stale index from an earlier batch must not trigger a request"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        let requested = requested.lock().unwrap().clone();
+        assert_eq!(
+            requested,
+            vec![vec![1, 2, 3], vec![4, 5, 6]],
+            "each request must carry the whole batch at contiguous indices, in one message"
+        );
+
+        Ok(())
+    }
+
+    /// Every index of a batch gets its own kill switch, and they all share one deadline scaled by the
+    /// batch size.
+    ///
+    /// Both halves matter: per-index handles are what let one cycle's deposit awaiter abort its own
+    /// deadline without touching its siblings', and the scaling is what stops the Session being closed
+    /// while the Entry is still legitimately working through the batch.
+    #[test_log::test(tokio::test)]
+    async fn batched_ssa_request_scales_the_deposit_deadline() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        const BATCH: usize = 3;
+        // One cycle's worth of window. At BATCH=3 the batch window is 150 ms, so an unscaled
+        // implementation would already have closed the Session by the 100 ms checkpoint below.
+        const UNIT: Duration = Duration::from_millis(50);
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ssas_per_request: BATCH,
+                max_deposit_wait: UNIT,
+                max_ssa_delivery_time: Duration::ZERO,
                 ..Default::default()
             },
             ..Default::default()
@@ -6105,7 +6504,6 @@ mod tests {
         mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
 
         let alice_pseudonym = HoprPseudonym::random();
-
         mgr.handle_incoming_session_initiation(
             alice_pseudonym,
             StartInitiation {
@@ -6117,32 +6515,123 @@ mod tests {
         )
         .await?;
 
-        let session_id = alice_pseudonym;
-        let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
-            .expect("identity element must be valid");
+        // One independent kill switch per requested index.
+        {
+            let slot = mgr.sessions.get(&alice_pseudonym).context("session must exist")?;
+            let handles = slot.abort_handles.lock();
+            for idx in 1..=BATCH as u32 {
+                assert!(
+                    handles.contains(&SessionHandles::PixKillSwitch(idx)),
+                    "every index of the batch needs its own kill switch, {idx} is missing"
+                );
+            }
+        }
 
-        // One more than the cap, with an otherwise perfectly valid quota.
-        let commitments: BTreeMap<_, _> = (1..=MAX_SSAS_PER_SSA_REQUEST as u32 + 1)
-            .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
-            .collect();
+        // Past one cycle's window, well short of the batch's. No deposit is ever made.
+        tokio::time::sleep(2 * UNIT).await;
+        assert_eq!(
+            vec![alice_pseudonym],
+            mgr.active_sessions(),
+            "the deadline must cover the whole batch, not a single cycle"
+        );
 
-        let result = mgr
-            .handle_ssa_request(
-                alice_pseudonym,
-                SsaServerCommitmentMessage::new(session_id, 2, 2, commitments),
-            )
-            .await;
+        // Past the batch window.
+        tokio::time::sleep(BATCH as u32 * UNIT).await;
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "session must close once the whole batch has missed its deposits"
+        );
 
         bob_sender.close_channel();
         bob_handle.await??;
 
-        assert!(
-            matches!(
-                result,
-                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
-            ),
-            "an over-cap SsaRequest must be rejected, got {result:?}"
+        Ok(())
+    }
+
+    /// A failed `SsaRequest` send must leave no Exit commitment registered for *any* index of the
+    /// batch, so that the retry — which reuses the very same indices, since the index advance is
+    /// deliberately deferred until the send succeeds — is not refused as a duplicate.
+    ///
+    /// This is what the `SsaCommitmentGuard` in `request_next_ssa` buys, and batching is what makes it
+    /// load-bearing: one failed send would otherwise strand every index of the batch permanently, and
+    /// the Session could never make progress again.
+    #[test_log::test(tokio::test)]
+    async fn failed_ssa_request_send_leaves_no_stranded_commitment() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        const BATCH: usize = 3;
+
+        let reconstructor = Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default()));
+        let (pix_toolbox, _pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            reconstructor.clone(),
         );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        // Closing the transport is what makes the send fail: the mock's own errors surface on the
+        // relay task's join handle, not at the `send_via_msg_sender` call inside `request_next_ssa`.
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let (dummy_tx, _dummy_rx) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(1);
+        let slot = SessionSlot {
+            session_tx: dummy_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+            abort_handles: Default::default(),
+            surb_mgmt: Default::default(),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+        };
+        slot.current_ssa_state
+            .set(SessionSsaState::new(2, 2))
+            .map_err(|_| anyhow!("pix state must be uninitialized"))?;
+        mgr.sessions.insert(alice_pseudonym, slot.clone());
+
+        // The failing send must surface as an error and must not consume the indices.
+        let result = mgr.request_next_ssa(alice_pseudonym, slot.clone(), None).await;
+        assert!(result.is_err(), "a failed send must be reported, got {result:?}");
+        assert_eq!(
+            slot.current_ssa_state.get().unwrap().peek_index().get(),
+            1,
+            "a failed request must not consume its indices"
+        );
+
+        // Every index the attempt registered must be free again. `new_exit_commitment` is exactly what
+        // the retry would call, and it rejects an index that is still registered with
+        // `DuplicateCommitment` — so a success here is the whole batch having been released.
+        for i in 1..=BATCH as u32 {
+            let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(i).expect("non-zero"));
+            reconstructor
+                .new_exit_commitment(ssa_id, 2, 2)
+                .with_context(|| format!("index {i} of the failed batch was left registered"))?;
+        }
 
         Ok(())
     }
@@ -6228,6 +6717,39 @@ mod tests {
             start_protocol_channel_capacity(&cfg),
             saturated + MAX_CONCURRENT_START_EXCHANGES + START_PROTOCOL_CHANNEL_RESERVE,
             "a large session limit must not grow the pre-allocated ring past the handshake ceiling"
+        );
+
+        // The batch factor is reserved too: a batch of N draws N cycles' commitment sets into this
+        // one channel, and a dropped `SsaCommit` is unrecoverable. It must scale the commitment term
+        // and nothing else, and must itself be bounded by `MAX_SSA_BATCH_SIZE` even when the config
+        // was never clamped by `SessionManager::new`.
+        let batched = |ssas_per_request| {
+            start_protocol_channel_capacity(&SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=u64::MAX,
+                    ssas_per_request,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+        };
+        let unbatched = SessionManagerConfig::default();
+        for ssas_per_request in [1, 2, MAX_SSA_BATCH_SIZE] {
+            assert_eq!(
+                batched(ssas_per_request),
+                saturated * ssas_per_request + unbatched.maximum_sessions + START_PROTOCOL_CHANNEL_RESERVE,
+                "the commitment term must scale with ssas_per_request = {ssas_per_request}"
+            );
+        }
+        assert_eq!(
+            batched(MAX_SSA_BATCH_SIZE + 1),
+            batched(MAX_SSA_BATCH_SIZE),
+            "an unclamped ssas_per_request must not inflate the pre-allocated ring"
+        );
+        assert_eq!(
+            batched(0),
+            batched(1),
+            "a zero ssas_per_request must not collapse the commitment term"
         );
     }
 

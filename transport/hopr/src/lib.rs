@@ -397,6 +397,7 @@ where
                 surb_target_notify: true,
                 maximum_sessions: cfg.session.maximum_managed_sessions,
                 pix_config: cfg.incoming_session_pix_config.clone(),
+                max_ssas_per_ssa_request: cfg.pix.max_ssas_per_request,
                 ..Default::default()
             })),
             chain_api: resolver,

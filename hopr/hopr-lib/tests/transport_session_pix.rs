@@ -70,6 +70,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 num_ssa_parts: 8,
                 ssa_part_size: 2,
                 additional_shares: 2,
+                ..Default::default()
             }),
             ..Default::default()
         }, // Entry: win_prob=1.0
@@ -81,6 +82,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 enforce_pix: false,
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
+                ..Default::default()
             }),
             idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
             ..Default::default()
