@@ -153,44 +153,87 @@ async fn establish_pix_session(
     Ok(session)
 }
 
-/// Keeps 32-byte echo traffic flowing and flips `session_died` when the Session stops answering.
+/// Keeps 32-byte echo traffic flowing, and records into `stopped` why it stopped.
 ///
 /// Shares only travel with data-packet acknowledgements, so a PIX cycle makes no progress without
-/// traffic — and a closed Session is observed here as a failed write or a read that never returns.
+/// traffic. The stop *reason* is reported rather than a bare "died" flag because the three ways this
+/// loop can end are not equivalent evidence — see [`EchoStop`].
 #[cfg(feature = "session-client")]
 fn spawn_echo_task(
     session: hopr_lib::HoprSession,
-    session_died: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    stopped: EchoStopCell,
     read_timeout: Duration,
 ) -> tokio::task::JoinHandle<()> {
-    use std::sync::atomic::Ordering;
-
     tokio::spawn(async move {
         let (mut rd, mut wr) = session.split();
         loop {
             let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
             if wr.write_all(&msg).await.is_err() || wr.flush().await.is_err() {
-                tracing::warn!("echo task: write failed, session is gone");
-                session_died.store(true, Ordering::SeqCst);
+                tracing::warn!("echo task: write failed, the Session is closed");
+                stopped.set(EchoStop::WriteFailed);
                 break;
             }
             let mut echoed = vec![0u8; 32];
             match tokio::time::timeout(read_timeout, rd.read_exact(&mut echoed)).await {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => {
-                    tracing::warn!(%error, "echo task: read failed, session is gone");
-                    session_died.store(true, Ordering::SeqCst);
+                    tracing::warn!(%error, "echo task: read failed, the Session is closed");
+                    stopped.set(EchoStop::ReadFailed);
                     break;
                 }
                 Err(_) => {
-                    tracing::warn!("echo task: read timed out, session is gone");
-                    session_died.store(true, Ordering::SeqCst);
+                    tracing::warn!("echo task: read timed out — not necessarily a closure");
+                    stopped.set(EchoStop::ReadTimedOut);
                     break;
                 }
             }
         }
         tracing::info!("echo task exited");
     })
+}
+
+/// Why [`spawn_echo_task`] stopped.
+///
+/// The distinction is load-bearing, not diagnostic. A test that treats "the echo stopped" as "the
+/// Session closed" can pass on a Session that is merely *quiet*, and on the PIX Exit quiet is a normal
+/// state: the egress gate parks the writer when the predeposit budget is spent, which stalls reads
+/// while the Session is very much alive. Only the write side distinguishes them — a PIX closure sends
+/// the Entry a `SessionError`, the Entry closes its own half, and the next write fails; a gate stall
+/// never fails a write.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EchoStop {
+    /// The Session is closed: the write half is gone.
+    WriteFailed,
+    /// The Session is closed: the read half reported an error.
+    ReadFailed,
+    /// No echo came back in time. Says nothing about whether the Session is open.
+    ReadTimedOut,
+}
+
+#[cfg(feature = "session-client")]
+impl EchoStop {
+    /// Whether this outcome actually establishes that the Session was closed.
+    fn is_closure(self) -> bool {
+        matches!(self, Self::WriteFailed | Self::ReadFailed)
+    }
+}
+
+/// Shared slot the echo task reports its stop reason into, with the instant it happened.
+#[cfg(feature = "session-client")]
+#[derive(Clone, Default)]
+struct EchoStopCell(std::sync::Arc<std::sync::Mutex<Option<(EchoStop, std::time::Instant)>>>);
+
+#[cfg(feature = "session-client")]
+impl EchoStopCell {
+    fn set(&self, stop: EchoStop) {
+        let mut guard = self.0.lock().expect("echo stop cell poisoned");
+        guard.get_or_insert((stop, std::time::Instant::now()));
+    }
+
+    fn get(&self) -> Option<(EchoStop, std::time::Instant)> {
+        *self.0.lock().expect("echo stop cell poisoned")
+    }
 }
 
 #[cfg(feature = "session-client")]
@@ -354,12 +397,26 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Verifies that the supervisor's deposit deadline closes a Session whose Entry commits but never
-/// funds.
+/// Verifies that the supervisor's deposit deadline — and specifically *that* deadline — closes a
+/// Session whose Entry commits but never funds.
 ///
 /// The Exit-side unit tests cannot reach this: arming the deposit deadline needs a
 /// `CommitmentVerified`, and that needs a real Entry to answer the `SsaRequest`. Here one does, and
 /// then the test simply declines to signal the deposit.
+///
+/// Two things make this a test of the deposit deadline rather than of "the Session died eventually",
+/// which is all it used to establish:
+///
+/// * **The stop reason has to be a closure.** The echo task also stops on a read timeout, and on a PIX Exit a stalled
+///   read is a normal state — the egress gate parks the writer once the predeposit budget is spent, which is exactly
+///   what happens here, since no deposit is ever made. Only the write side distinguishes a closed Session from a quiet
+///   one: the supervisor's close sends the Entry a `SessionError`, the Entry drops its half, and the next write fails.
+///   Accepting a read timeout let this pass on a gate stall.
+/// * **The timing has to match, and only one clock can produce it.** The interval from `DepositAddressReceived` (which
+///   is the Exit verifying the commitment, i.e. the moment the deposit clock is armed) to the closure is asserted
+///   against `max_deposit_wait`. Every other clock is configured far out of reach, so no other deadline can land inside
+///   the asserted window: the commitment clock is 60 s *and* was cleared when the commitment verified, recovery
+///   deadlines need a funded cycle, and the idle timeouts are 90 s.
 #[cfg(feature = "session-client")]
 #[rstest]
 #[case(1)]
@@ -367,10 +424,12 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<()> {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    };
+    // The deadline under test, and the slack allowed on observing it across a real cluster.
+    const MAX_DEPOSIT_WAIT: Duration = Duration::from_secs(5);
+    const OBSERVATION_SLACK: Duration = Duration::from_secs(20);
+    // Every other supervisor clock is set here, well clear of the window above, so that a Session
+    // dying inside it can only have died of the deposit deadline.
+    const OTHER_CLOCKS: Duration = Duration::from_secs(60);
 
     #[allow(unexpected_cfgs)]
     if cfg!(coverage) && hops > 1 {
@@ -383,9 +442,14 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
             quota_range: 0..=100_000,
             enforce_pix: false,
             supervision: SupervisorConfig {
-                max_ssa_delivery_time: Duration::from_secs(10),
                 // The deadline under test.
-                max_deposit_wait: Duration::from_secs(5),
+                max_deposit_wait: MAX_DEPOSIT_WAIT,
+                // Everything else pushed far out of reach, so the observed interval can only be the
+                // deposit clock. The commitment clock is additionally cleared the moment the
+                // commitment verifies, and the recovery clocks need a cycle that was funded.
+                max_ssa_delivery_time: OTHER_CLOCKS,
+                max_recovery_idle: OTHER_CLOCKS,
+                max_recovery_time: OTHER_CLOCKS,
                 ..Default::default()
             },
         },
@@ -398,29 +462,41 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
     let session = establish_pix_session(&cluster, hops).await?;
     tracing::info!("session established");
 
-    // Traffic keeps flowing so the closure shows up as a failed exchange rather than as silence.
-    let session_died = Arc::new(AtomicBool::new(false));
-    let _echo = spawn_echo_task(session, session_died.clone(), Duration::from_secs(8));
+    // Traffic keeps flowing so the closure shows up as a failed exchange rather than as silence. The
+    // read timeout is deliberately longer than the deadline under test: a read that times out first
+    // would stop the echo task without establishing anything, and is reported as such.
+    let stopped = EchoStopCell::default();
+    let _echo = spawn_echo_task(session, stopped.clone(), MAX_DEPOSIT_WAIT + OBSERVATION_SLACK);
 
-    let mut deposit_address_received = false;
+    // When the Exit verified the commitment — i.e. when the deposit clock was armed. Everything is
+    // measured from here rather than from establishment, because that is what the deadline is
+    // measured from.
+    let mut deposit_clock_armed: Option<std::time::Instant> = None;
 
-    // Consume events without ever signalling a deposit, until the Session dies. The window is kept
-    // close to `max_ssa_delivery_time + max_deposit_wait` so that a Session dying much later — of
-    // the idle timeout, say — fails rather than passes.
-    let outcome = tokio::time::timeout(Duration::from_secs(45), async {
+    // The deposit notifiers are *held*, never signalled. This is the difference between declining to
+    // deposit and going away: dropping a notifier is what the deposit observer reports as
+    // `DepositObserverClosed`, and the supervisor closes on it at once rather than waiting out a
+    // deadline for funds it has been told are not coming. Holding it keeps the observer alive with
+    // nothing to report, which is the only state in which the deposit deadline is what fires.
+    let mut held_notifiers = Vec::new();
+
+    // Consume events without ever signalling a deposit, until the echo task stops. Bounded well
+    // inside the other clocks, so a Session dying of one of those fails rather than passes.
+    let outcome = tokio::time::timeout(MAX_DEPOSIT_WAIT + OBSERVATION_SLACK, async {
         loop {
-            if session_died.load(Ordering::SeqCst) {
-                return Ok(());
+            if stopped.get().is_some() {
+                return Ok::<_, anyhow::Error>(());
             }
             tokio::select! {
                 biased;
-                _ = tokio::time::sleep(Duration::from_millis(500)) => {}
+                _ = tokio::time::sleep(Duration::from_millis(200)) => {}
                 Some(event) = exit_events.next() => {
                     match event {
                         PixEvent::DepositAddressReceived(data) => {
-                            deposit_address_received = true;
+                            deposit_clock_armed.get_or_insert_with(std::time::Instant::now);
+                            held_notifiers.extend(data.deposit_updated);
                             tracing::info!(id = ?data.id, quota = data.quota,
-                                "Exit: DepositAddressReceived — deliberately not signalling a deposit");
+                                "Exit: DepositAddressReceived — holding the notifier, never signalling a deposit");
                         }
                         PixEvent::PrivateKeyRecovered(data) => {
                             anyhow::bail!("recovery completed without a deposit: {:?}", data.id);
@@ -433,11 +509,37 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
     })
     .await;
 
-    assert!(
-        deposit_address_received,
-        "the Entry never committed, so the deposit deadline was never armed and this proves nothing"
-    );
+    let armed_at = deposit_clock_armed
+        .context("the Entry never committed, so the deposit deadline was never armed and this proves nothing")?;
     outcome.context("session outlived its deposit deadline")??;
+
+    let (stop, stopped_at) = stopped.get().context("the echo task never stopped")?;
+
+    // A read timeout means the Session went quiet, which on this Exit is what an exhausted predeposit
+    // budget looks like — not a closure. Only a failed write or a read error shows the Session gone.
+    assert!(
+        stop.is_closure(),
+        "the Session must be observed *closed*, not merely quiet; got {stop:?}"
+    );
+
+    // And it must have closed on the deposit clock: no earlier than the deadline, and far enough
+    // inside the others that none of them could have been what fired.
+    let elapsed = stopped_at.saturating_duration_since(armed_at);
+    assert!(
+        elapsed >= MAX_DEPOSIT_WAIT,
+        "closed {elapsed:?} after the deposit clock was armed, before its {MAX_DEPOSIT_WAIT:?} deadline could expire \
+         — so something other than the deposit deadline closed it"
+    );
+    assert!(
+        elapsed < OTHER_CLOCKS,
+        "closed {elapsed:?} after the deposit clock was armed, which is past the {OTHER_CLOCKS:?} the other clocks \
+         are set to — the closure cannot be attributed to the deposit deadline"
+    );
+    tracing::info!(?elapsed, ?stop, "closed on the deposit deadline");
+
+    // Explicit, so that nothing reorders the notifiers' drop above the assertions: dropping them
+    // early would close the Session by the observer path and invalidate everything measured here.
+    drop(held_notifiers);
 
     tracing::info!(hops, "deposit timeout test PASSED");
     Ok(())
@@ -578,11 +680,6 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::Result<()> {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    };
-
     #[allow(unexpected_cfgs)]
     if cfg!(coverage) && hops > 1 {
         return Ok(());
@@ -639,17 +736,24 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     // Wait out the recovery deadline with the Session idle.
     tokio::time::sleep(Duration::from_secs(20)).await;
 
-    // Now send: the Session must already be gone.
-    let session_died = Arc::new(AtomicBool::new(false));
-    let _echo = spawn_echo_task(session, session_died.clone(), Duration::from_secs(10));
+    // Now send: the Session must already be gone. The recovery deadline has passed, so the write half
+    // has to be closed — a read timeout would only show the Session quiet, which it has been all along.
+    let stopped = EchoStopCell::default();
+    let _echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(10));
 
     tokio::time::timeout(Duration::from_secs(30), async {
-        while !session_died.load(Ordering::SeqCst) {
+        while stopped.get().is_none() {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
     })
     .await
     .context("session survived its absolute recovery deadline")?;
+
+    let (stop, _) = stopped.get().context("the echo task never stopped")?;
+    assert!(
+        stop.is_closure(),
+        "the Session must be observed closed after its recovery deadline, not merely quiet; got {stop:?}"
+    );
 
     tracing::info!(hops, "recovery hard deadline test PASSED");
     Ok(())
