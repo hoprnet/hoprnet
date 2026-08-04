@@ -2018,24 +2018,55 @@ where
         }
     }
 
-    /// Best-effort notice to the Entry that this Session died for PIX reasons.
-    async fn notify_pix_failure(&self, session_id: SessionId, reply_routing: DestinationRouting) {
+    /// Best-effort `SessionError` for an already-established Session, identified by its `SessionId`.
+    ///
+    /// Best-effort in the strict sense: the outcome is logged and discarded. Every caller is on a path
+    /// that has already decided the Session is over, so there is nothing a failed send could change —
+    /// and the peer has a deadline of its own as the backstop either way. What the notice buys is
+    /// promptness and attribution: the peer tears down in about a round trip, with the reason in its
+    /// log, instead of waiting out a timer that names the timer rather than the cause.
+    ///
+    /// The peer's `handle_session_error` closes the Session on a `SessionId`-identified error and sends
+    /// nothing back, so there is no error exchange to loop.
+    async fn notify_session_error(
+        &self,
+        session_id: SessionId,
+        routing: DestinationRouting,
+        reason: StartErrorReason,
+        context: &'static str,
+    ) {
         let Some(mut msg_sender) = self.msg_sender.get().cloned() else {
+            warn!(%session_id, %reason, context, "cannot send session error - manager not started");
             return;
         };
-        if let Err(error) = send_via_msg_sender(
+        match send_via_msg_sender(
             &mut msg_sender,
-            reply_routing,
+            routing,
             HoprStartProtocol::SessionError(StartErrorType {
                 identifier: ErrorIdentifier::SessionId(session_id),
-                reason: StartErrorReason::Unknown,
+                reason,
             }),
-            "session error after pix failure",
+            context,
         )
         .await
         {
-            warn!(%session_id, %error, "failed to notify the Entry of a pix failure");
+            Ok(()) => {
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+            }
+            Err(error) => warn!(%session_id, %reason, %error, context, "failed to send session error"),
         }
+    }
+
+    /// Best-effort notice to the Entry that this Session died for PIX reasons.
+    async fn notify_pix_failure(&self, session_id: SessionId, reply_routing: DestinationRouting) {
+        self.notify_session_error(
+            session_id,
+            reply_routing,
+            StartErrorReason::Unknown,
+            "session error after pix failure",
+        )
+        .await;
     }
 
     /// Registers an Exit commitment for every index in `ssa_indices` and asks the Entry to commit to
@@ -3079,54 +3110,31 @@ where
     /// Tells the Exit that its [`SsaServerCommitmentMessage`] was refused, and tears down this half
     /// of the Session.
     ///
-    /// Without the notification the refusal is invisible to the Exit, and it has no way to recover
-    /// from it: it armed one kill switch per requested index *before* sending, it will never receive
-    /// an `SsaCommit`, and no PIX event can fire to make it re-request — `request_next_ssa` is only
-    /// reached from establishment and from share-recovery events, and no shares are produced for a
-    /// cycle the Entry never committed to. So it serves the Session unincentivized for the whole
-    /// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)` window and then closes it as
-    /// `UnrealizedDeposit` — a reason that names the deposit rather than the refusal, on the one node
-    /// whose operator can act on it. Telling it collapses that to roughly one round trip and puts the
-    /// cause in its log where the failure happens.
+    /// Without the notice the refusal is invisible to the Exit, and it has no way to recover from it.
+    /// Its supervisor registered an Exit commitment per requested index and armed each cycle's
+    /// commitment deadline the moment the request went out; it will never receive an `SsaCommit`, and
+    /// nothing can make it re-ask, because a new `RequestSsa` only comes from share-recovery events and
+    /// no shares exist for a cycle the Entry never committed to. So it serves the Session
+    /// unincentivized for the whole batch-scaled `max_ssa_delivery_time` and then closes it as
+    /// `CommitmentTimeout` — a reason that names the clock rather than the refusal, on the one node
+    /// whose operator can act on it.
     ///
-    /// The Exit's `handle_session_error` closes the Session on a `SessionId`-identified error, which
-    /// also retires the reconstructor cycles it registered for the batch rather than leaving them to
-    /// their own expiry. It sends nothing back, so there is no error exchange to loop.
+    /// Closing this half too is what stops the Entry sitting on a Session that can never make PIX
+    /// progress: a refusal is terminal either way, since the Exit re-derives every request from state
+    /// that cannot drift within a Session, so a later one would be refused identically. Left alone the
+    /// slot would survive until the idle timeout.
     ///
-    /// No new capability is handed to an attacker by closing on a refusal: an `SsaRequest` only
-    /// reaches here Sphinx-authenticated and with `pseudonym == session_id`, so only the Exit can
-    /// produce one — and the Exit can already close the Session whenever it likes.
-    ///
-    /// Best-effort. A failed send changes nothing, because the Exit's kill switch remains the
-    /// backstop; the local close is unconditional because a refused request is terminal for the
-    /// Session either way (the Exit re-derives every request from state that cannot drift within a
-    /// Session, so a later one would be refused identically), and leaving the slot up would keep an
-    /// unusable Session alive until the idle timeout.
+    /// No new capability is handed to an attacker by closing on a refusal: an `SsaRequest` only reaches
+    /// here Sphinx-authenticated and with `pseudonym == session_id`, so only the Exit can produce one —
+    /// and the Exit can already close the Session whenever it likes.
     async fn refuse_ssa_request(&self, session_id: SessionId, routing: DestinationRouting) {
-        let reason = StartErrorReason::UnacceptablePixParams;
-        if let Some(mut msg_sender) = self.msg_sender.get().cloned() {
-            match send_via_msg_sender(
-                &mut msg_sender,
-                routing,
-                HoprStartProtocol::SessionError(StartErrorType {
-                    identifier: ErrorIdentifier::SessionId(session_id),
-                    reason,
-                }),
-                "session error message due to a refused SSA request",
-            )
-            .await
-            {
-                Ok(()) => {
-                    #[cfg(all(feature = "telemetry", not(test)))]
-                    METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
-                }
-                Err(error) => {
-                    warn!(%session_id, %error, "failed to notify the Exit about a refused SSA request");
-                }
-            }
-        } else {
-            warn!(%session_id, "cannot notify the Exit about a refused SSA request - manager not started");
-        }
+        self.notify_session_error(
+            session_id,
+            routing,
+            StartErrorReason::UnacceptablePixParams,
+            "session error due to a refused SSA request",
+        )
+        .await;
 
         if self.close_session(&session_id) {
             error!(%session_id, "closed session after refusing the Exit's SSA request");
