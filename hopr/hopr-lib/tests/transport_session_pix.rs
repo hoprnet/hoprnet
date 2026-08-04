@@ -143,6 +143,7 @@ async fn establish_pix_session(
                 surb_management: None,
                 always_max_out_surbs: false,
                 pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
+                flow_control: None,
             },
         ),
     )
@@ -704,6 +705,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
                 surb_management: None,
                 always_max_out_surbs: false,
                 pix_ssa_quota: None,
+                flow_control: None,
             },
         ),
     )

@@ -74,8 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget, SsaDimensions,
-    SurbBalancerConfig,
+    FlowControlConfig, HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget,
+    SsaDimensions, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -158,6 +158,11 @@ pub struct HoprSessionClientConfig {
     ///
     /// Defaults to `None`.
     pub pix_ssa_quota: Option<SsaDimensions>,
+    /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
+    /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
+    /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
+    #[default(None)]
+    pub flow_control: Option<FlowControlConfig>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -184,6 +189,8 @@ pub struct HoprSessionClientExplicitPathConfig {
     ///
     /// Defaults to `None`.
     pub pix_ssa_quota: Option<(u32, u32)>,
+    /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
+    pub flow_control: Option<FlowControlConfig>,
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
@@ -198,6 +205,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
             pix_ssa_quota: None,
+            flow_control: None,
         }
     }
 }
@@ -213,6 +221,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
             pix_ssa_quota: value.pix_ssa_quota,
+            flow_control: value.flow_control,
         }
     }
 }
@@ -245,6 +254,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
                     Ok(SsaDimensions::new(to_u16(p)?, to_u16(s)?))
                 })
                 .transpose()?,
+            flow_control: value.flow_control,
         })
     }
 }
@@ -933,6 +943,8 @@ mod tests {
             pseudonym: None,
             surb_management: None,
             always_max_out_surbs: false,
+            pix_ssa_quota: None,
+            flow_control: None,
         })
         .context("explicit path config conversion must succeed")?;
 
