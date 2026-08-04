@@ -21,7 +21,7 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SsaDimensions, SurbBalancerConfig,
+    SessionManagerConfig, SessionTarget, SsaDimensions, SupervisorConfig, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -383,7 +383,10 @@ async fn dispatch_pix_event_returns_error_for_unknown_session() -> Result<()> {
 
     let unknown_pseudonym = HoprPseudonym::random();
     let ssa_id = SsaId::new(unknown_pseudonym, SsaIndex::new(1).expect("ssa index must be non-zero"));
-    let event = HoprSessionInPixEvent::UnverifiableShare(ssa_id);
+    let event = HoprSessionInPixEvent::UnverifiableShares {
+        ssa_id,
+        observed_total: 1,
+    };
 
     let result = mgr.dispatch_pix_event(event).await;
     assert!(result.is_err());
@@ -552,7 +555,10 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
             quota_range: 0..=2048 * 1024 * 1024,
-            ssas_per_request: BATCH,
+            supervision: SupervisorConfig {
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()
@@ -771,9 +777,13 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
     let bob_mgr = SessionManager::new(SessionManagerConfig {
         pix_config: IncomingSessionPixConfig {
             quota_range: 0..=2048 * 1024 * 1024,
-            ssas_per_request: 3,
-            // Left at the defaults (60 s + 20 s), so the kill-switch window is 3 × 80 s = 240 s and
-            // cannot be what closes the Session inside the assertions below.
+            supervision: SupervisorConfig {
+                ssas_per_request: 3,
+                // Deadlines left at their defaults, so the scaled commitment window is 3 × 20 s and the
+                // scaled deposit window 3 × 60 s — neither can be what closes the Session inside the
+                // assertions below.
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..Default::default()

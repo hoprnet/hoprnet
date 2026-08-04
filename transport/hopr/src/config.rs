@@ -12,7 +12,7 @@ pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
-    MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -242,30 +242,32 @@ pub struct HoprProtocolConfig {
     pub counter_flush_interval: Duration,
 }
 
-/// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything, or whose
-/// SSA batch size is outside what the protocol supports.
+/// Rejects an [`IncomingSessionPixConfig`] that cannot work.
+///
+/// Two independent failures, both of which would otherwise only show up at runtime:
 ///
 /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
 /// `UnacceptablePixParams` errors at Session establishment time.
 ///
-/// `ssas_per_request` is checked here rather than with a `range` attribute because
-/// `IncomingSessionPixConfig` lives in `hopr-transport-session` and carries no `Validate` derive of
-/// its own. Zero would mean no `SsaRequest` is ever sent, and above [`MAX_SSA_BATCH_SIZE`] the
-/// per-cycle reconstructor state and the Start protocol channel pre-allocation both grow past what
-/// that ceiling exists to bound. `SessionManager::new` clamps rather than trusting this check, since
-/// nothing forces a programmatically built config through it.
+/// The deadlines the Exit-side supervisor derives from this config have to agree with the
+/// reconstructor's own lifetimes — a supervisor that waits longer than the reconstructor keeps state
+/// would be waiting on an SSA that can no longer be completed. Checked against the value the three
+/// `SsaReconstructor::new` sites actually receive, not against whatever the default happens to be.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
     if cfg.quota_range.is_empty() {
         return Err(ValidationError::new(
             "pix quota_range must be non-empty (start must not exceed end)",
         ));
     }
-    if !(1..=MAX_SSA_BATCH_SIZE).contains(&cfg.ssas_per_request) {
-        return Err(ValidationError::new(
-            "pix ssas_per_request must be between 1 and MAX_SSA_BATCH_SIZE",
-        ));
-    }
+
+    hopr_transport_session::validate_pix_supervision(&cfg.supervisor_config(), &crate::ssa_reconstructor_config())
+        .map_err(|error| {
+            let mut e = ValidationError::new("pix supervision deadlines conflict with the reconstructor's lifetimes");
+            e.message = Some(error.to_string().into());
+            e
+        })?;
+
     Ok(())
 }
 
@@ -765,6 +767,8 @@ pub struct SessionGlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use hopr_transport_session::{MAX_SSA_BATCH_SIZE, SupervisorConfig};
+
     use super::*;
 
     /// The Exit computes the offered quota as `polys × shares × HoprPacket::PAYLOAD_SIZE` and
@@ -893,11 +897,16 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn pix_configs_are_reachable_from_serialized_config() {
-        // Regression guard: these two fields used to be `serde(skip)`, which pinned them to
-        // their defaults and made PIX unconfigurable.
+        // Regression guard: these fields used to be `serde(skip)`, which pinned them to their
+        // defaults and made PIX unconfigurable. The supervision block is checked here too, since
+        // `deny_unknown_fields` on both levels means a rename on either side fails this loudly
+        // rather than silently ignoring an operator's setting.
         let json = r#"{
             "pix": { "num_ssa_parts": 2048 },
-            "incoming_session_pix_config": { "enforce_pix": true, "max_deposit_wait": "90s" }
+            "incoming_session_pix_config": {
+                "enforce_pix": true,
+                "supervision": { "max_deposit_wait": "90s", "min_deposit": "5 wxHOPR" }
+            }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
 
@@ -911,7 +920,17 @@ mod tests {
         assert!(cfg.incoming_session_pix_config.enforce_pix);
         assert_eq!(
             Duration::from_secs(90),
-            cfg.incoming_session_pix_config.max_deposit_wait
+            cfg.incoming_session_pix_config.supervision.max_deposit_wait
+        );
+        assert_eq!(
+            "5 wxHOPR".parse::<hopr_api::HoprBalance>().unwrap(),
+            cfg.incoming_session_pix_config.supervision.min_deposit,
+            "a balance must be settable in its human-readable spelling"
+        );
+        assert_eq!(
+            hopr_transport_session::SupervisorConfig::default().max_recovery_time,
+            cfg.incoming_session_pix_config.supervision.max_recovery_time,
+            "unspecified supervision fields must fall back to their defaults"
         );
         assert_eq!(
             IncomingSessionPixConfig::default().quota_range,
@@ -922,11 +941,11 @@ mod tests {
         // other is a silently fatal misconfiguration and an operator needs to be able to do both.
         let json = r#"{
             "pix": { "max_ssas_per_request": 5 },
-            "incoming_session_pix_config": { "ssas_per_request": 5 }
+            "incoming_session_pix_config": { "supervision": { "ssas_per_request": 5 } }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("SSA batch config must deserialize");
         assert_eq!(5, cfg.pix.max_ssas_per_request);
-        assert_eq!(5, cfg.incoming_session_pix_config.ssas_per_request);
+        assert_eq!(5, cfg.incoming_session_pix_config.supervision.ssas_per_request);
         cfg.validate().expect("a matched pair of batch knobs must validate");
     }
 
@@ -966,9 +985,14 @@ mod tests {
             "an Entry accepting zero SSAs per request would reject every request"
         );
 
+        // The Exit-side knob now lives on `SupervisorConfig`, so it is `validate_pix_supervision`
+        // (reached through the incoming-config validator) that has to reject an out-of-range batch.
         for ssas_per_request in [0, MAX_SSA_BATCH_SIZE + 1] {
             let cfg = IncomingSessionPixConfig {
-                ssas_per_request,
+                supervision: SupervisorConfig {
+                    ssas_per_request,
+                    ..Default::default()
+                },
                 ..Default::default()
             };
             assert!(
@@ -978,7 +1002,10 @@ mod tests {
 
             let cfg = HoprProtocolConfig {
                 incoming_session_pix_config: IncomingSessionPixConfig {
-                    ssas_per_request,
+                    supervision: SupervisorConfig {
+                        ssas_per_request,
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -991,11 +1018,30 @@ mod tests {
 
         assert!(
             validate_incoming_session_pix_config(&IncomingSessionPixConfig {
-                ssas_per_request: MAX_SSA_BATCH_SIZE,
+                supervision: SupervisorConfig {
+                    ssas_per_request: MAX_SSA_BATCH_SIZE,
+                    ..Default::default()
+                },
                 ..Default::default()
             })
             .is_ok(),
             "the ceiling itself must be accepted"
+        );
+
+        // The scaled deadlines are what the supervisor actually arms, so the 24 h cap has to be
+        // applied to the product. A per-cycle duration that is fine alone must be rejected once the
+        // batch multiplies it past the cap.
+        assert!(
+            validate_incoming_session_pix_config(&IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    ssas_per_request: MAX_SSA_BATCH_SIZE,
+                    max_deposit_wait: Duration::from_secs(2 * 3600),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .is_err(),
+            "20 x 2 h of deposit wait exceeds the supervisor duration cap and must be rejected"
         );
     }
 

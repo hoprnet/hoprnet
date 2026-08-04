@@ -20,7 +20,7 @@ use hopr_crypto_packet::{
     prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
-use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
+use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex, SsaRecoveryProgress};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -197,6 +197,13 @@ impl SsaDimensions {
     pub const fn quota(&self) -> SsaQuota {
         pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
     }
+
+    /// Useful shares needed to recover the whole SSA.
+    ///
+    /// A share count, unlike [`quota`](Self::quota), which is the byte volume those shares pay for.
+    pub const fn target_useful_shares(&self) -> u64 {
+        self.polys_per_ssa as u64 * self.shares_per_poly as u64
+    }
 }
 
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
@@ -235,7 +242,21 @@ pub enum HoprSessionInPixEvent {
     /// for an SSA — the next SSA request can be made.
     SsaAlmostRecovered(SsaId<HoprPseudonym>),
     /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
-    UnverifiableShare(SsaId<HoprPseudonym>),
+    ///
+    /// Carries the reconstructor's running total for the SSA rather than a delta: shares for one
+    /// cycle reach the Exit over whichever return path is available, so no single relayer's count is
+    /// the whole story, and an absolute total makes a duplicated or reordered report harmless.
+    UnverifiableShares {
+        ssa_id: SsaId<HoprPseudonym>,
+        observed_total: u64,
+    },
+    /// Reports how far an SSA has got towards recovery.
+    ///
+    /// Unlike the others this is paced by traffic rather than by lifecycle transitions, and it is
+    /// what keeps a funded Session's egress flowing — the gate stops serving a cycle that shows no
+    /// progress. Delivered without backpressure for that reason; see
+    /// `SessionPixSupervisorHandle::try_send_progress`.
+    RecoveryProgress(SsaRecoveryProgress<HoprPseudonym>),
 }
 
 impl HoprSessionInPixEvent {
@@ -244,7 +265,8 @@ impl HoprSessionInPixEvent {
         match self {
             HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
             HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
-            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShares { ssa_id, .. } => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::RecoveryProgress(progress) => progress.ssa_id.pseudonym(),
         }
     }
 }
@@ -280,6 +302,13 @@ pub enum ClosureReason {
     Eviction,
     /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
     UnrealizedDeposit,
+    /// The PIX supervisor ended the Session — a recovery deadline elapsed, too many shares failed
+    /// verification, or the supervisor itself became unavailable.
+    ///
+    /// Distinct from [`UnrealizedDeposit`](Self::UnrealizedDeposit), which names the one PIX failure
+    /// an operator can act on directly; the rest are collapsed here and distinguished in telemetry by
+    /// the supervisor's own close reason.
+    PixFailure,
 }
 
 /// Helper trait to allow Box aliasing

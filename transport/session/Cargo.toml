@@ -73,6 +73,7 @@ pid = { workspace = true }
 pin-project = { workspace = true }
 serde = { workspace = true }
 serde_repr = { workspace = true }
+serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }

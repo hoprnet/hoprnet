@@ -4591,6 +4591,7 @@ dependencies = [
  "rand 0.10.2",
  "serde",
  "serde_repr",
+ "serde_with",
  "smart-default",
  "strum",
  "test-log",

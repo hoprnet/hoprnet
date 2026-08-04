@@ -25,7 +25,7 @@ use {
         },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
-            transport::session::IncomingSessionPixConfig,
+            transport::session::{IncomingSessionPixConfig, SupervisorConfig},
             transport::{SessionCapability, SessionTarget},
         },
     },
@@ -39,6 +39,202 @@ const FUNDING_AMOUNT: &str = "15000 wxHOPR";
 // PIX params: 8 polys × 2 shares × ~1440 bytes = ~23 KB per SSA cycle
 const PIX_POLYS: u16 = 8;
 const PIX_SHARES: u16 = 2;
+
+/// Builds an Entry → N relays → Exit cluster with the Exit's PIX config, opens bidirectional
+/// channels along the path, and waits for the graph to propagate.
+///
+/// The Entry's PIX dimensions are set to match what the session negotiates, so the Exit's
+/// `quota_range` check has something acceptable to accept.
+///
+/// `idle_timeout` applies to *both* ends. It has to: the fixture disables the Exit→Entry SURB
+/// keep-alive stream (so that eviction tests can work at all), and an Entry slot's idle timer is only
+/// reset by traffic arriving on it. Leaving the Entry at the fixture default of 2.5 s therefore
+/// evicts it a few seconds into any test where the Exit is legitimately quiet — which reads exactly
+/// like the Exit tearing the Session down.
+#[cfg(feature = "session-client")]
+async fn build_pix_cluster(
+    hops: usize,
+    exit_pix: IncomingSessionPixConfig,
+    idle_timeout: Duration,
+) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard> {
+    let cluster = build_role_cluster(
+        TestNodeConfig {
+            win_prob: 1.0,
+            pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
+                num_ssa_parts: PIX_POLYS as usize,
+                ssa_part_size: PIX_SHARES as usize,
+                additional_shares: 2,
+                ..Default::default()
+            }),
+            idle_timeout_ms: idle_timeout.as_millis() as u64,
+            ..Default::default()
+        },
+        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops],
+        TestNodeConfig {
+            win_prob: 1.0,
+            incoming_pix_config: Some(exit_pix),
+            idle_timeout_ms: idle_timeout.as_millis() as u64,
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    open_path_channels(&cluster, hops).await?;
+    Ok(cluster)
+}
+
+/// Opens bidirectional channels along Entry → relays → Exit and waits for the graph.
+#[cfg(feature = "session-client")]
+async fn open_path_channels(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+) -> anyhow::Result<()> {
+    tracing::info!("opening channels");
+    let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
+
+    macro_rules! open_chan {
+        ($from:expr, $to:expr) => {{
+            IncentiveChannelOperations::open_channel(&*$from.instance, $to.instance.identity().node_address, funding)
+                .await
+                .context("opening channel must succeed")?;
+        }};
+    }
+
+    // Forward: Entry → Relay[0] → ... → Exit
+    open_chan!(cluster.entry, cluster.relays[0]);
+    for i in 0..hops.saturating_sub(1) {
+        open_chan!(cluster.relays[i], cluster.relays[i + 1]);
+    }
+    open_chan!(cluster.relays[hops - 1], cluster.exit);
+
+    // Backward: Exit → Relay[N-1] → ... → Entry
+    open_chan!(cluster.exit, cluster.relays[hops - 1]);
+    for i in (1..hops).rev() {
+        open_chan!(cluster.relays[i], cluster.relays[i - 1]);
+    }
+    open_chan!(cluster.relays[0], cluster.entry);
+
+    let chain_info = cluster.chain_client.query_chain_info().await?;
+    tracing::info!("waiting for channel graph");
+    tokio::time::sleep(chain_propagation_delay(&chain_info) * 6).await;
+    tracing::info!("channel graph ready");
+    Ok(())
+}
+
+/// Connects Entry → Exit with PIX enabled.
+#[cfg(feature = "session-client")]
+async fn establish_pix_session(
+    cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
+    hops: usize,
+) -> anyhow::Result<hopr_lib::HoprSession> {
+    let routing = hops.try_into()?;
+    let ip = IpOrHost::from_str(":0")?;
+    let (session, _) = tokio::time::timeout(
+        Duration::from_secs(120),
+        cluster.entry.inner().connect_to(
+            cluster.exit.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            HoprSessionClientConfig {
+                forward_path: routing,
+                return_path: routing,
+                capabilities: SessionCapability::Segmentation
+                    | SessionCapability::NoRateControl
+                    | SessionCapability::UsePIX,
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: false,
+                pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
+                flow_control: None,
+            },
+        ),
+    )
+    .await
+    .context("session connection timed out after 120s")??;
+    Ok(session)
+}
+
+/// Keeps 32-byte echo traffic flowing, and records into `stopped` why it stopped.
+///
+/// Shares only travel with data-packet acknowledgements, so a PIX cycle makes no progress without
+/// traffic. The stop *reason* is reported rather than a bare "died" flag because the three ways this
+/// loop can end are not equivalent evidence — see [`EchoStop`].
+#[cfg(feature = "session-client")]
+fn spawn_echo_task(
+    session: hopr_lib::HoprSession,
+    stopped: EchoStopCell,
+    read_timeout: Duration,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let (mut rd, mut wr) = session.split();
+        loop {
+            let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
+            if wr.write_all(&msg).await.is_err() || wr.flush().await.is_err() {
+                tracing::warn!("echo task: write failed, the Session is closed");
+                stopped.set(EchoStop::WriteFailed);
+                break;
+            }
+            let mut echoed = vec![0u8; 32];
+            match tokio::time::timeout(read_timeout, rd.read_exact(&mut echoed)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    tracing::warn!(%error, "echo task: read failed, the Session is closed");
+                    stopped.set(EchoStop::ReadFailed);
+                    break;
+                }
+                Err(_) => {
+                    tracing::warn!("echo task: read timed out — not necessarily a closure");
+                    stopped.set(EchoStop::ReadTimedOut);
+                    break;
+                }
+            }
+        }
+        tracing::info!("echo task exited");
+    })
+}
+
+/// Why [`spawn_echo_task`] stopped.
+///
+/// The distinction is load-bearing, not diagnostic. A test that treats "the echo stopped" as "the
+/// Session closed" can pass on a Session that is merely *quiet*, and on the PIX Exit quiet is a normal
+/// state: the egress gate parks the writer when the predeposit budget is spent, which stalls reads
+/// while the Session is very much alive. Only the write side distinguishes them — a PIX closure sends
+/// the Entry a `SessionError`, the Entry closes its own half, and the next write fails; a gate stall
+/// never fails a write.
+#[cfg(feature = "session-client")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EchoStop {
+    /// The Session is closed: the write half is gone.
+    WriteFailed,
+    /// The Session is closed: the read half reported an error.
+    ReadFailed,
+    /// No echo came back in time. Says nothing about whether the Session is open.
+    ReadTimedOut,
+}
+
+#[cfg(feature = "session-client")]
+impl EchoStop {
+    /// Whether this outcome actually establishes that the Session was closed.
+    fn is_closure(self) -> bool {
+        matches!(self, Self::WriteFailed | Self::ReadFailed)
+    }
+}
+
+/// Shared slot the echo task reports its stop reason into, with the instant it happened.
+#[cfg(feature = "session-client")]
+#[derive(Clone, Default)]
+struct EchoStopCell(std::sync::Arc<std::sync::Mutex<Option<(EchoStop, std::time::Instant)>>>);
+
+#[cfg(feature = "session-client")]
+impl EchoStopCell {
+    fn set(&self, stop: EchoStop) {
+        let mut guard = self.0.lock().expect("echo stop cell poisoned");
+        guard.get_or_insert((stop, std::time::Instant::now()));
+    }
+
+    fn get(&self) -> Option<(EchoStop, std::time::Instant)> {
+        *self.0.lock().expect("echo stop cell poisoned")
+    }
+}
 
 #[cfg(feature = "session-client")]
 #[rstest]
@@ -62,69 +258,20 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     }
 
     // ── Role-typed cluster: Entry + N relays + Exit ─────────────────────────
-    let cluster = build_role_cluster(
-        TestNodeConfig {
-            win_prob: 1.0,
-            // Entry needs PIX global config matching session-negotiated (2,2)
-            pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
-                num_ssa_parts: 8,
-                ssa_part_size: 2,
-                additional_shares: 2,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }, // Entry: win_prob=1.0
-        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops], // N relays: win_prob=0.2
-        TestNodeConfig {
-            win_prob: 1.0,
-            incoming_pix_config: Some(IncomingSessionPixConfig {
-                quota_range: 0..=100_000,
-                enforce_pix: false,
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
                 ..Default::default()
-            }),
-            idle_timeout_ms: Duration::from_secs(90).as_millis() as u64,
-            ..Default::default()
-        }, /* Exit: win_prob=1.0, custom PIX
-                                                                                  * config */
+            },
+        },
+        Duration::from_secs(90),
     )
     .await?;
-
-    // ── Open bidirectional channels along the relay path ───────────────────
-    tracing::info!("opening channels");
-    let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
-
-    // Helper macro: open channel from `$from` to `$to` using IncentiveChannelOperations
-    macro_rules! open_chan {
-        ($from:expr, $to:expr) => {{
-            IncentiveChannelOperations::open_channel(&*$from.instance, $to.instance.identity().node_address, funding)
-                .await
-                .context("opening channel must succeed")?;
-        }};
-    }
-
-    // Forward: Entry → Relay[0] → Relay[1] → ... → Exit
-    open_chan!(cluster.entry, cluster.relays[0]);
-    for i in 0..hops.saturating_sub(1) {
-        open_chan!(cluster.relays[i], cluster.relays[i + 1]);
-    }
-    open_chan!(cluster.relays[hops - 1], cluster.exit);
-
-    // Backward: Exit → Relay[N-1] → ... → Relay[0] → Entry
-    open_chan!(cluster.exit, cluster.relays[hops - 1]);
-    for i in (1..hops).rev() {
-        open_chan!(cluster.relays[i], cluster.relays[i - 1]);
-    }
-    open_chan!(cluster.relays[0], cluster.entry);
-
-    let chain_info = cluster.chain_client.query_chain_info().await?;
-    tracing::info!("waiting for channel graph");
-
-    // Wait for channels to propagate
-    tokio::time::sleep(chain_propagation_delay(&chain_info) * 6).await;
-
-    tracing::info!("channel graph ready");
 
     // ── Subscribe to PixEvent streams BEFORE creating the session ─────────
     tracing::info!("subscribing to PIX events");
@@ -133,35 +280,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
 
     // ── Establish PIX-enabled session: Entry → Exit, n-hop ────────────────
     tracing::info!("establishing PIX session");
-    let routing = hops.try_into()?;
-    let connect_fut = {
-        let src_inner = cluster.entry.inner();
-        let dst_addr = cluster.exit.address();
-        let ip = IpOrHost::from_str(":0")?;
-        async move {
-            src_inner
-                .connect_to(
-                    dst_addr,
-                    SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                    HoprSessionClientConfig {
-                        forward_path: routing,
-                        return_path: routing,
-                        capabilities: SessionCapability::Segmentation
-                            | SessionCapability::NoRateControl
-                            | SessionCapability::UsePIX,
-                        pseudonym: None,
-                        surb_management: None,
-                        always_max_out_surbs: false,
-                        pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
-                        flow_control: None,
-                    },
-                )
-                .await
-        }
-    };
-    let (session, _) = tokio::time::timeout(Duration::from_secs(120), connect_fut)
-        .await
-        .context("session connection timed out after 120s")??;
+    let session = establish_pix_session(&cluster, hops).await?;
     tracing::info!("session established");
 
     // ── Background data task: keep traffic flowing symmetrically ──────────
@@ -275,5 +394,441 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
     bg_handle.abort();
 
     tracing::info!(hops, "PIX multi-cycle session test PASSED");
+    Ok(())
+}
+
+/// Verifies that the supervisor's deposit deadline — and specifically *that* deadline — closes a
+/// Session whose Entry commits but never funds.
+///
+/// The Exit-side unit tests cannot reach this: arming the deposit deadline needs a
+/// `CommitmentVerified`, and that needs a real Entry to answer the `SsaRequest`. Here one does, and
+/// then the test simply declines to signal the deposit.
+///
+/// Two things make this a test of the deposit deadline rather than of "the Session died eventually",
+/// which is all it used to establish:
+///
+/// * **The stop reason has to be a closure.** The echo task also stops on a read timeout, and on a PIX Exit a stalled
+///   read is a normal state — the egress gate parks the writer once the predeposit budget is spent, which is exactly
+///   what happens here, since no deposit is ever made. Only the write side distinguishes a closed Session from a quiet
+///   one: the supervisor's close sends the Entry a `SessionError`, the Entry drops its half, and the next write fails.
+///   Accepting a read timeout let this pass on a gate stall.
+/// * **The timing has to match, and only one clock can produce it.** The interval from `DepositAddressReceived` (which
+///   is the Exit verifying the commitment, i.e. the moment the deposit clock is armed) to the closure is asserted
+///   against `max_deposit_wait`. Every other clock is configured far out of reach, so no other deadline can land inside
+///   the asserted window: the commitment clock is 60 s *and* was cleared when the commitment verified, recovery
+///   deadlines need a funded cycle, and the idle timeouts are 90 s.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<()> {
+    // The deadline under test, and the slack allowed on observing it across a real cluster.
+    const MAX_DEPOSIT_WAIT: Duration = Duration::from_secs(5);
+    const OBSERVATION_SLACK: Duration = Duration::from_secs(20);
+    // Every other supervisor clock is set here, well clear of the window above, so that a Session
+    // dying inside it can only have died of the deposit deadline.
+    const OTHER_CLOCKS: Duration = Duration::from_secs(60);
+
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
+                // The deadline under test.
+                max_deposit_wait: MAX_DEPOSIT_WAIT,
+                // Everything else pushed far out of reach, so the observed interval can only be the
+                // deposit clock. The commitment clock is additionally cleared the moment the
+                // commitment verifies, and the recovery clocks need a cycle that was funded.
+                max_ssa_delivery_time: OTHER_CLOCKS,
+                max_recovery_idle: OTHER_CLOCKS,
+                max_recovery_time: OTHER_CLOCKS,
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(90),
+    )
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    let session = establish_pix_session(&cluster, hops).await?;
+    tracing::info!("session established");
+
+    // Traffic keeps flowing so the closure shows up as a failed exchange rather than as silence. The
+    // read timeout is deliberately longer than the deadline under test: a read that times out first
+    // would stop the echo task without establishing anything, and is reported as such.
+    let stopped = EchoStopCell::default();
+    let _echo = spawn_echo_task(session, stopped.clone(), MAX_DEPOSIT_WAIT + OBSERVATION_SLACK);
+
+    // When the Exit verified the commitment — i.e. when the deposit clock was armed. Everything is
+    // measured from here rather than from establishment, because that is what the deadline is
+    // measured from.
+    let mut deposit_clock_armed: Option<std::time::Instant> = None;
+
+    // The deposit notifiers are *held*, never signalled. This is the difference between declining to
+    // deposit and going away: dropping a notifier is what the deposit observer reports as
+    // `DepositObserverClosed`, and the supervisor closes on it at once rather than waiting out a
+    // deadline for funds it has been told are not coming. Holding it keeps the observer alive with
+    // nothing to report, which is the only state in which the deposit deadline is what fires.
+    let mut held_notifiers = Vec::new();
+
+    // Consume events without ever signalling a deposit, until the echo task stops. Bounded well
+    // inside the other clocks, so a Session dying of one of those fails rather than passes.
+    let outcome = tokio::time::timeout(MAX_DEPOSIT_WAIT + OBSERVATION_SLACK, async {
+        loop {
+            if stopped.get().is_some() {
+                return Ok::<_, anyhow::Error>(());
+            }
+            tokio::select! {
+                biased;
+                _ = tokio::time::sleep(Duration::from_millis(200)) => {}
+                Some(event) = exit_events.next() => {
+                    match event {
+                        PixEvent::DepositAddressReceived(data) => {
+                            deposit_clock_armed.get_or_insert_with(std::time::Instant::now);
+                            held_notifiers.extend(data.deposit_updated);
+                            tracing::info!(id = ?data.id, quota = data.quota,
+                                "Exit: DepositAddressReceived — holding the notifier, never signalling a deposit");
+                        }
+                        PixEvent::PrivateKeyRecovered(data) => {
+                            anyhow::bail!("recovery completed without a deposit: {:?}", data.id);
+                        }
+                        other => anyhow::bail!("unexpected Exit PixEvent: {other:?}"),
+                    }
+                }
+            }
+        }
+    })
+    .await;
+
+    let armed_at = deposit_clock_armed
+        .context("the Entry never committed, so the deposit deadline was never armed and this proves nothing")?;
+    outcome.context("session outlived its deposit deadline")??;
+
+    let (stop, stopped_at) = stopped.get().context("the echo task never stopped")?;
+
+    // A read timeout means the Session went quiet, which on this Exit is what an exhausted predeposit
+    // budget looks like — not a closure. Only a failed write or a read error shows the Session gone.
+    assert!(
+        stop.is_closure(),
+        "the Session must be observed *closed*, not merely quiet; got {stop:?}"
+    );
+
+    // And it must have closed on the deposit clock: no earlier than the deadline, and far enough
+    // inside the others that none of them could have been what fired.
+    let elapsed = stopped_at.saturating_duration_since(armed_at);
+    assert!(
+        elapsed >= MAX_DEPOSIT_WAIT,
+        "closed {elapsed:?} after the deposit clock was armed, before its {MAX_DEPOSIT_WAIT:?} deadline could expire \
+         — so something other than the deposit deadline closed it"
+    );
+    assert!(
+        elapsed < OTHER_CLOCKS,
+        "closed {elapsed:?} after the deposit clock was armed, which is past the {OTHER_CLOCKS:?} the other clocks \
+         are set to — the closure cannot be attributed to the deposit deadline"
+    );
+    tracing::info!(?elapsed, ?stop, "closed on the deposit deadline");
+
+    // Explicit, so that nothing reorders the notifiers' drop above the assertions: dropping them
+    // early would close the Session by the observer path and invalidate everything measured here.
+    drop(held_notifiers);
+
+    tracing::info!(hops, "deposit timeout test PASSED");
+    Ok(())
+}
+
+/// Verifies that an Exit configured for strict prepay (`max_predeposit_packets = 0`) serves nothing
+/// until the deposit is confirmed, and serves normally once it is.
+///
+/// The Exit-side unit tests reach the gate, but not the property that makes a zero budget a usable
+/// policy rather than a deadlock: the `SsaRequest` and the Entry's commitment both bypass the egress
+/// gate, so the Session can still become fundable while nothing at all is being served. Only a real
+/// Entry answering a real request exercises that — route either through the gate and this test hangs,
+/// where every unit test would still pass.
+///
+/// The third bypass, the SURB keep-alive stream, is *not* covered here: the test fixture disables it
+/// (`surb_balance_notify_period: None`) so that eviction tests can work. In production it is what
+/// keeps the Entry's own session slot from idling out while the Exit is quiet; here the long
+/// `idle_timeout` passed to `build_pix_cluster` stands in for it.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) -> anyhow::Result<()> {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                // The setting under test: not one packet before the deposit.
+                max_predeposit_packets: 0,
+                // Far out of reach, so the Session is still open to be funded after the stall window
+                // below. At its default this would be measuring the deposit deadline instead.
+                max_deposit_wait: Duration::from_secs(600),
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(120),
+    )
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    let session = establish_pix_session(&cluster, hops).await?;
+    tracing::info!("session established");
+    let (mut rd, mut wr) = session.split();
+
+    // Keep giving the Exit something it wants to answer, for the whole test. Writes towards the Exit
+    // are not gated, so this keeps running throughout the stall below — which is the point: the Exit
+    // is not quiet for want of anything to say.
+    let writer = tokio::spawn(async move {
+        loop {
+            let msg = hopr_lib::api::types::crypto_random::random_bytes::<32>();
+            if wr.write_all(&msg).await.is_err() || wr.flush().await.is_err() {
+                tracing::warn!("writer: the Entry side stopped accepting writes");
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    });
+
+    // Drain the Exit's PIX events for the whole test, handing the first deposit notifier back and
+    // then carrying on draining. A client that stopped polling the stream mid-test would be a second
+    // variable in a test meant to isolate the gate.
+    let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
+    let drain = tokio::spawn(async move {
+        let mut notifier_tx = Some(notifier_tx);
+        while let Some(event) = exit_events.next().await {
+            match event {
+                PixEvent::DepositAddressReceived(data) => match (notifier_tx.take(), data.deposit_updated) {
+                    (Some(tx), Some(notifier)) => {
+                        tracing::info!(id = ?data.id, "Exit: DepositAddressReceived — withholding the deposit");
+                        let _ = tx.send((data.id, notifier));
+                    }
+                    _ => tracing::debug!(id = ?data.id, "further deposit request"),
+                },
+                other => tracing::debug!("Exit PixEvent: {other:?}"),
+            }
+        }
+    });
+
+    // The Exit asks for a deposit despite serving nothing, because the `SsaRequest` never touches the
+    // egress gate. Hold the notifier instead of answering it, so that the stall below is observed
+    // against a Session that is committed and merely unfunded — rather than one that never got as
+    // far as being asked to pay.
+    let (deposit_id, mut deposit_notifier) = tokio::time::timeout(Duration::from_secs(60), notifier_rx)
+        .await
+        .context("timed out waiting for the deposit request")?
+        .context("the Exit never asked for a deposit — a strict-prepay gate must not hold up the SsaRequest")?;
+
+    // Nothing may come back yet, however much the Entry sends.
+    let mut echoed = vec![0u8; 32];
+    match tokio::time::timeout(Duration::from_secs(15), rd.read_exact(&mut echoed)).await {
+        Err(_) => tracing::info!("nothing served before the deposit, as configured"),
+        Ok(Ok(())) => {
+            anyhow::bail!("the Exit served a packet before the deposit, with max_predeposit_packets = 0")
+        }
+        Ok(Err(error)) => anyhow::bail!("the Session failed instead of stalling on the gate: {error}"),
+    }
+
+    // Funding it must release the answer that was withheld, rather than merely stop refusing new
+    // ones: the packet parked on the gate has to be woken, not dropped.
+    deposit_notifier
+        .send((deposit_id, HoprBalance::new_base(1)))
+        .await
+        .context("failed to signal deposit via notifier")?;
+    tracing::info!(id = ?deposit_id, "deposit signalled");
+
+    tokio::time::timeout(Duration::from_secs(60), rd.read_exact(&mut echoed))
+        .await
+        .context("the Exit never served the probe after the deposit was confirmed")?
+        .context("the Session failed after funding")?;
+
+    writer.abort();
+    drain.abort();
+    tracing::info!(hops, "strict prepay test PASSED");
+    Ok(())
+}
+
+/// Verifies that the supervisor's absolute recovery deadline closes a Session whose SSA is funded
+/// but never recovers.
+///
+/// Shares only travel with data-packet acknowledgements, so the deadline is provoked by funding the
+/// SSA while no traffic is flowing and then waiting it out. Recovery makes no progress in that
+/// window, and the backstop fires. Traffic starts afterwards purely to observe the closure.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::Result<()> {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    let cluster = build_pix_cluster(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                // Both far out of reach, so that neither can be what closes the Session: a deposit
+                // that silently failed to register would otherwise look exactly like the deadline
+                // under test firing.
+                max_deposit_wait: Duration::from_secs(600),
+                max_recovery_idle: Duration::from_secs(600),
+                // The deadline under test.
+                max_recovery_time: Duration::from_secs(15),
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(120),
+    )
+    .await?;
+
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    let session = establish_pix_session(&cluster, hops).await?;
+    tracing::info!("session established");
+
+    // Fund the SSA, with no traffic flowing: recovery enters its window and then stalls there.
+    tokio::time::timeout(Duration::from_secs(60), async {
+        while let Some(event) = exit_events.next().await {
+            match event {
+                PixEvent::DepositAddressReceived(data) => {
+                    if let Some(mut notifier) = data.deposit_updated {
+                        notifier
+                            .send((data.id, HoprBalance::new_base(1)))
+                            .await
+                            .context("failed to signal deposit via notifier")?;
+                        tracing::info!(id = ?data.id, "deposit signalled, no traffic flowing");
+                    }
+                    return anyhow::Ok(());
+                }
+                other => tracing::debug!("Exit PixEvent while awaiting the deposit request: {other:?}"),
+            }
+        }
+        anyhow::bail!("the Exit never asked for a deposit")
+    })
+    .await
+    .context("timed out waiting for the deposit request")??;
+
+    // Wait out the recovery deadline with the Session idle.
+    tokio::time::sleep(Duration::from_secs(20)).await;
+
+    // Now send: the Session must already be gone. The recovery deadline has passed, so the write half
+    // has to be closed — a read timeout would only show the Session quiet, which it has been all along.
+    let stopped = EchoStopCell::default();
+    let _echo = spawn_echo_task(session, stopped.clone(), Duration::from_secs(10));
+
+    tokio::time::timeout(Duration::from_secs(30), async {
+        while stopped.get().is_none() {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    })
+    .await
+    .context("session survived its absolute recovery deadline")?;
+
+    let (stop, _) = stopped.get().context("the echo task never stopped")?;
+    assert!(
+        stop.is_closure(),
+        "the Session must be observed closed after its recovery deadline, not merely quiet; got {stop:?}"
+    );
+
+    tracing::info!(hops, "recovery hard deadline test PASSED");
+    Ok(())
+}
+
+/// Verifies that an Exit configured with `enforce_pix` rejects a client that does not offer PIX.
+///
+/// `SessionManager` has a unit test for the rejection itself; what this adds is that it surfaces to
+/// the client as a failed `connect_to` rather than being swallowed somewhere in the Start protocol.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
+    #[allow(unexpected_cfgs)]
+    if cfg!(coverage) && hops > 1 {
+        return Ok(());
+    }
+
+    // No `pix_global_config` on the Entry: this client is not going to offer PIX at all.
+    let cluster = build_role_cluster(
+        TestNodeConfig {
+            win_prob: 1.0,
+            ..Default::default()
+        },
+        vec![TestNodeConfig::with_probability(MINIMUM_INCOMING_WIN_PROB); hops],
+        TestNodeConfig {
+            win_prob: 1.0,
+            incoming_pix_config: Some(IncomingSessionPixConfig {
+                enforce_pix: true,
+                ..Default::default()
+            }),
+            idle_timeout_ms: Duration::from_secs(30).as_millis() as u64,
+            ..Default::default()
+        },
+    )
+    .await?;
+    open_path_channels(&cluster, hops).await?;
+
+    let routing: hopr_lib::HopRouting = hops.try_into()?;
+    let ip = IpOrHost::from_str(":0")?;
+    let result = tokio::time::timeout(
+        Duration::from_secs(30),
+        cluster.entry.inner().connect_to(
+            cluster.exit.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            HoprSessionClientConfig {
+                forward_path: routing,
+                return_path: routing,
+                capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: false,
+                pix_ssa_quota: None,
+                flow_control: None,
+            },
+        ),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(_)) => anyhow::bail!("the Exit accepted a non-PIX session despite enforce_pix"),
+        Ok(Err(error)) => {
+            // The Exit answers with a Start-protocol rejection rather than dropping the request, so
+            // the client learns why instead of waiting out its own timeout.
+            tracing::info!(%error, "connection rejected as expected");
+        }
+        Err(_) => anyhow::bail!(
+            "connect_to neither succeeded nor failed — the Exit dropped the request instead of rejecting it, which \
+             leaves the client waiting out its own timeout"
+        ),
+    }
+
+    tracing::info!(hops, "enforce_pix rejection test PASSED");
     Ok(())
 }

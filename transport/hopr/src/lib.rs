@@ -889,13 +889,7 @@ where
             // Keep in step with the `(Relay, Some)` arm below, which is the same wiring.
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: `SsaReconstructorConfig`'s defaults sit inside the ranges its own
-                    // `Validate` derive enforces, so `validate().expect()` in the constructor
-                    // cannot panic. Stated as an invariant rather than by quoting the values —
-                    // the quoted version drifted (it claimed `max_awaiting_acks = 10_000_000`
-                    // against an actual default of 1_000_000) and nothing caught it, because a
-                    // comment naming a constant it does not reference cannot be checked.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    ssa_reconstructor_config(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
                 let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
@@ -933,8 +927,7 @@ where
                 // rather than extracted because threading a real `SsaReconstructorConfig` through the
                 // three `::default()` sites reworks both arms anyway; extract then.
                 let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default config values are within validated range.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    ssa_reconstructor_config(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
                 let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
@@ -959,8 +952,7 @@ where
                 // No SSA reconstruction needed on Entry — forward events to the
                 // PIX event broadcast so subscribers (e.g. tests) see them.
                 let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default config values are within validated range.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
+                    ssa_reconstructor_config(),
                 ));
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
                 processes.insert(
@@ -1356,12 +1348,26 @@ pub(crate) fn recovered_ssa_to_pix_event(
 
 /// How many PIX share resolutions may be dispatched into the [`SessionManager`] at once.
 ///
-/// A dispatch is not cheap: `SsaAlmostRecovered` / `SsaRecovered` reach `request_next_ssa`, which
-/// acquires a per-session lock (with a 30 s timeout), generates an Exit commitment on the blocking
-/// pool and sends an `SsaRequest` over the network. All sessions share this one stream, so
-/// dispatching sequentially lets a single slow or stalled session hold up PIX progress — and
+/// A dispatch can block: lifecycle events are delivered to a per-session supervisor over a bounded
+/// channel, so a session whose supervisor is busy backpressures its sender. All sessions share this
+/// one stream, so dispatching sequentially would let one such session hold up PIX progress — and
 /// therefore the pipelined next-SSA request — for every other session on the node.
 const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
+
+/// The [`SsaReconstructorConfig`](hopr_protocol_pix::SsaReconstructorConfig) every reconstructor on
+/// this node is built with.
+///
+/// A function rather than three `::default()` calls so that the value validated against the PIX
+/// supervisor's deadlines in
+/// [`validate_incoming_session_pix_config`](crate::config::validate_incoming_session_pix_config) is
+/// provably the same one the reconstructors get. Not operator-settable today; when it becomes so,
+/// this is the one place that has to learn about it.
+///
+/// SAFETY: the defaults (`max_awaiting_acks = 10_000_000`, `early_recovery_threshold = 0.85`) are
+/// within the validated range, so the constructor's `validate().expect()` cannot panic.
+pub(crate) fn ssa_reconstructor_config() -> hopr_protocol_pix::SsaReconstructorConfig {
+    hopr_protocol_pix::SsaReconstructorConfig::default()
+}
 
 /// Maps a [`HoprSessionOutPixEvent`] into the upper-layer [`PixEvent`] carrying the deposit
 /// instruction for the funding strategy.
@@ -1424,19 +1430,16 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 "first RP relayer sent acknowledgement indicating invalid PIX share from Entry"
             );
             if let Err(error) = smgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShare(ssa_id))
+                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
                 .await
             {
                 tracing::error!(%error, %ssa_id, "failed to dispatch invalid share PIX event to the SessionManager");
             }
             None
         }
-        // Nothing consumes recovery progress yet — the Exit-side PIX supervisor is what will, and it
-        // is the only thing that can act on a running total. Dropped here rather than suppressed at
-        // the reconstructor so that the emission contract (and its tests) live with the producer.
-        //
-        // Cheap to discard: this branch awaits nothing, so the resolution channel is drained faster
-        // than the acknowledgement path can fill it.
+        // Feeds the supervisor's recovery deadlines and the egress gate's progress ceiling. A funded
+        // Session that stops making progress stops being served, so dropping these outright would
+        // stall a healthy Session rather than merely lose a statistic.
         ShareResolution::Progress(progress) => {
             tracing::trace!(
                 ssa_id = %progress.ssa_id,
@@ -1445,6 +1448,12 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
             );
+            if let Err(error) = smgr
+                .dispatch_pix_event(HoprSessionInPixEvent::RecoveryProgress(progress))
+                .await
+            {
+                tracing::trace!(%error, ssa_id = %progress.ssa_id, "recovery progress for an unsupervised session");
+            }
             None
         }
     }
@@ -1456,10 +1465,11 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
 /// the packet pipeline. Share resolutions are dispatched into the `SessionManager` concurrently
 /// (see [`PIX_EVENT_DISPATCH_CONCURRENCY`]).
 ///
-/// Concurrency does not require ordering guarantees here: `request_next_ssa` serializes on a
-/// per-session lock and re-checks the SSA index under it, so of the events belonging to one cycle
-/// exactly one advances the index and the rest are recognised as stale and become no-ops,
-/// regardless of the order in which they arrive.
+/// Concurrency does not require ordering guarantees here: events for one session converge on that
+/// session's supervisor, which is a single-threaded state machine whose handlers are idempotent per
+/// phase and whose counters are absolute rather than incremental. Of the events belonging to one
+/// cycle exactly one advances it and the rest are recognised as stale, whatever order they arrive
+/// in.
 fn pix_event_stream(
     session_pix_events: impl futures::Stream<Item = HoprSessionOutPixEvent> + Send + 'static,
     ssa_share_resolutions: impl futures::Stream<Item = HoprShareResolution> + Send + 'static,

@@ -12,6 +12,9 @@ pub mod counters;
 pub mod errors;
 pub mod flow_control;
 mod manager;
+/// Exit-side PIX supervision: the lifecycle state machine, the egress gate, and the per-session
+/// worker that drives them.
+pub(crate) mod supervision;
 #[cfg(feature = "telemetry")]
 mod telemetry;
 mod types;
@@ -25,6 +28,7 @@ pub use manager::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, IncomingSessionPixConfig,
     MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig,
 };
+pub use supervision::{SupervisorConfig, validate_pix_supervision};
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 pub use hopr_api::types::internal::routing::DestinationRouting;
