@@ -11,8 +11,8 @@ pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorC
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL,
-    MIN_SURB_BUFFER_DURATION,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
+    MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -354,6 +354,28 @@ pub struct PixGlobalConfig {
     #[validate(range(min = 0, max = 4096))]
     #[default((DEFAULT_PIX_SHARES_PER_POLY / 2) as usize)]
     pub additional_shares: usize,
+
+    /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
+    /// `SsaRequest` from an Exit.
+    ///
+    /// This is a protection against a misbehaving Exit rather than a preference: each accepted entry
+    /// costs a full client commitment, its own burst of `SsaCommit` packets and its own on-chain
+    /// deposit, so an uncapped request would let one inbound packet amplify into minutes of CPU and
+    /// as many simultaneous deposits as the wire format admits (27). An over-cap request is rejected
+    /// in full before any of that work starts.
+    ///
+    /// **Must be at least the `ssas_per_request` of every Exit this node uses.** The batch size is not
+    /// negotiated — the Exit cannot learn this value — so an Exit batching above it has every request
+    /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
+    /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
+    /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
+    ///
+    /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
+    ///
+    /// Defaults to 2, minimum 1, maximum 20 (`MAX_SSA_BATCH_SIZE`).
+    #[validate(range(min = 1, max = 20))]
+    #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
+    pub max_ssas_per_request: usize,
 }
 
 /// Configuration of the HOPR packet pipeline.
@@ -745,6 +767,8 @@ pub struct SessionGlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use hopr_transport_session::{MAX_SSA_BATCH_SIZE, SupervisorConfig};
+
     use super::*;
 
     /// The Exit computes the offered quota as `polys × shares × HoprPacket::PAYLOAD_SIZE` and
@@ -911,6 +935,113 @@ mod tests {
         assert_eq!(
             IncomingSessionPixConfig::default().quota_range,
             cfg.incoming_session_pix_config.quota_range
+        );
+
+        // Both SSA batch knobs must be settable from a config file too, since raising one without the
+        // other is a silently fatal misconfiguration and an operator needs to be able to do both.
+        let json = r#"{
+            "pix": { "max_ssas_per_request": 5 },
+            "incoming_session_pix_config": { "supervision": { "ssas_per_request": 5 } }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("SSA batch config must deserialize");
+        assert_eq!(5, cfg.pix.max_ssas_per_request);
+        assert_eq!(5, cfg.incoming_session_pix_config.supervision.ssas_per_request);
+        cfg.validate().expect("a matched pair of batch knobs must validate");
+    }
+
+    /// Both SSA batch knobs are bounded by [`MAX_SSA_BATCH_SIZE`], and the `range` attribute on
+    /// `max_ssas_per_request` has to spell that ceiling out as a literal — so assert the two agree.
+    ///
+    /// Zero is rejected on both sides for different reasons: an Exit asking for zero SSAs would never
+    /// send an `SsaRequest` at all, and an Entry accepting zero would reject every request it ever
+    /// receives. Either way PIX silently stops working.
+    #[test]
+    fn ssa_batch_knobs_are_bounded_by_the_shared_ceiling() {
+        // The literal in the `range` attribute must track the constant it stands for.
+        let at_ceiling = PixGlobalConfig {
+            max_ssas_per_request: MAX_SSA_BATCH_SIZE,
+            ..Default::default()
+        };
+        assert!(
+            at_ceiling.validate().is_ok(),
+            "MAX_SSA_BATCH_SIZE itself must be accepted — the range literal has drifted below it"
+        );
+        let past_ceiling = PixGlobalConfig {
+            max_ssas_per_request: MAX_SSA_BATCH_SIZE + 1,
+            ..Default::default()
+        };
+        assert!(
+            past_ceiling.validate().is_err(),
+            "above MAX_SSA_BATCH_SIZE must be rejected — the range literal has drifted above it"
+        );
+
+        assert!(
+            PixGlobalConfig {
+                max_ssas_per_request: 0,
+                ..Default::default()
+            }
+            .validate()
+            .is_err(),
+            "an Entry accepting zero SSAs per request would reject every request"
+        );
+
+        // The Exit-side knob now lives on `SupervisorConfig`, so it is `validate_pix_supervision`
+        // (reached through the incoming-config validator) that has to reject an out-of-range batch.
+        for ssas_per_request in [0, MAX_SSA_BATCH_SIZE + 1] {
+            let cfg = IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    ssas_per_request,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                validate_incoming_session_pix_config(&cfg).is_err(),
+                "ssas_per_request of {ssas_per_request} is outside 1..={MAX_SSA_BATCH_SIZE} and must be rejected"
+            );
+
+            let cfg = HoprProtocolConfig {
+                incoming_session_pix_config: IncomingSessionPixConfig {
+                    supervision: SupervisorConfig {
+                        ssas_per_request,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                cfg.validate().is_err(),
+                "an out-of-range ssas_per_request must fail the whole protocol config"
+            );
+        }
+
+        assert!(
+            validate_incoming_session_pix_config(&IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    ssas_per_request: MAX_SSA_BATCH_SIZE,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .is_ok(),
+            "the ceiling itself must be accepted"
+        );
+
+        // The scaled deadlines are what the supervisor actually arms, so the 24 h cap has to be
+        // applied to the product. A per-cycle duration that is fine alone must be rejected once the
+        // batch multiplies it past the cap.
+        assert!(
+            validate_incoming_session_pix_config(&IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    ssas_per_request: MAX_SSA_BATCH_SIZE,
+                    max_deposit_wait: Duration::from_secs(2 * 3600),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .is_err(),
+            "20 x 2 h of deposit wait exceeds the supervisor duration cap and must be rejected"
         );
     }
 

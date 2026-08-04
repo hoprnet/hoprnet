@@ -261,11 +261,45 @@ mod worker;
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SupervisorConfig {
+    /// Number of SSAs the Exit asks the Entry to commit to in a single `SsaRequest`.
+    ///
+    /// Batching amortizes the request round trip over several deposit cycles. It lives here rather
+    /// than beside the other Exit settings because this is what acts on it: the supervisor allocates
+    /// the indices, and it scales both deadlines below by this factor.
+    ///
+    /// Two things it costs, both linear in the value:
+    ///
+    /// * The Exit holds that many live reconstructor cycles at once (≈49 MiB of peak state each at the profiled
+    ///   dimensions).
+    /// * The unfunded exposure. The supervisor never lets a *second* batch go out while the first is still unfunded,
+    ///   but within one batch every cycle is unfunded at once — so the ceiling is this many SSA quotas rather than
+    ///   one.
+    ///
+    /// **Must not exceed the peer Entry's `max_ssas_per_request`.** The batch size is not negotiated
+    /// — `StartSession.additional_data` is fully allocated (PIX dimensions in the upper 32 bits, SURB
+    /// balancer target in the lower 32), so the Entry cannot advertise its cap and the Exit cannot
+    /// learn it. An Entry that finds a batch too large refuses it in full and replies with an
+    /// `UnacceptablePixParams` `SessionError`, which closes the Session on both sides in about a round
+    /// trip. Every such Session is still lost; the reply only makes the failure immediate and
+    /// attributable instead of surfacing as a commitment timeout.
+    ///
+    /// Range-checked by [`validate_pix_supervision`] and clamped where it is read, so it can never
+    /// exceed `MAX_SSA_BATCH_SIZE`.
+    ///
+    /// Default: 1, which reproduces the unbatched exchange byte-for-byte.
+    #[default(1)]
+    pub ssas_per_request: usize,
+
     /// Maximum time to wait for the SSA to be fully committed.
     ///
     /// Together with [`max_deposit_wait`](Self::max_deposit_wait) this bounds how long a Session may
     /// be served unincentivized: the Entry has to be able to deliver its SSA commitment before it
     /// can be asked to pay for it.
+    ///
+    /// Multiplied by [`ssas_per_request`](Self::ssas_per_request) when the deadline is armed: a batch
+    /// asks the Entry for that many commitment sets in answer to one request, and all of their clocks
+    /// start together, so holding each to a single cycle's budget would fail an Entry that is
+    /// answering in order.
     ///
     /// Default: 20 s.
     #[default(Duration::from_secs(20))]
@@ -273,6 +307,11 @@ pub struct SupervisorConfig {
     pub max_ssa_delivery_time: Duration,
 
     /// Maximum time to wait for a deposit after the commitment is verifiable.
+    ///
+    /// Also multiplied by [`ssas_per_request`](Self::ssas_per_request). Each cycle's clock starts at
+    /// its own commitment, which staggers them somewhat — but a batch's commitments arrive
+    /// back-to-back while an Entry funding them serially finishes the last one that many deposits
+    /// later, so the stagger does not cover it.
     ///
     /// Default: 60 s.
     #[default(Duration::from_secs(60))]
@@ -434,9 +473,15 @@ pub enum SessionPixEvent {
 /// Actions emitted by the [`SessionPixSupervisor`] for the caller to execute.
 #[derive(Debug, Clone)]
 pub enum SessionPixAction {
-    /// Request a new SSA with the given dimensions.
+    /// Request one or more new SSAs with the given dimensions.
+    ///
+    /// Always non-empty, and always contiguous ascending indices. The whole batch travels in a single
+    /// `SsaRequest` — one message, one `params` field — because every SSA in a Session shares the
+    /// negotiated dimensions. Carrying the set rather than one id is what keeps the batch atomic:
+    /// the carrier either puts all of them on the wire or none, and a partial failure releases every
+    /// registration it made.
     RequestSsa {
-        ssa_id: SsaId<HoprPseudonym>,
+        ssa_ids: Vec<SsaId<HoprPseudonym>>,
         polys: u16,
         threshold: u16,
     },
@@ -503,6 +548,13 @@ pub fn validate_pix_supervision(
     cfg: &SupervisorConfig,
     reconstructor_cfg: &SsaReconstructorConfig,
 ) -> Result<(), TransportSessionError> {
+    if !(1..=crate::MAX_SSA_BATCH_SIZE).contains(&cfg.ssas_per_request) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "ssas_per_request ({}) must be between 1 and {}",
+            cfg.ssas_per_request,
+            crate::MAX_SSA_BATCH_SIZE
+        )));
+    }
     if cfg.max_ssa_delivery_time.is_zero() {
         return Err(TransportSessionError::InvalidConfig(
             "max_ssa_delivery_time must be non-zero".into(),
@@ -565,21 +617,43 @@ pub fn validate_pix_supervision(
     // deadlines. 24 h is a safe upper bound — no supervisor duration should
     // ever be this large, and the cap prevents silent deadline loss via
     // Instant::checked_add returning None.
+    //
+    // The first two are checked *as armed*, i.e. multiplied by the batch size, because that product
+    // is the duration a deadline is actually set to. Checking the unscaled value would let a config
+    // pass here and then be silently clamped at arming time, which is the failure mode this cap
+    // exists to make loud.
     const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
     for (name, dur) in [
-        ("max_ssa_delivery_time", &cfg.max_ssa_delivery_time),
-        ("max_deposit_wait", &cfg.max_deposit_wait),
-        ("max_recovery_idle", &cfg.max_recovery_idle),
-        ("max_recovery_time", &cfg.max_recovery_time),
-        ("tombstone_retention_window", &cfg.tombstone_retention_window),
+        (
+            "max_ssa_delivery_time",
+            scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request),
+        ),
+        (
+            "max_deposit_wait",
+            scaled_deadline(cfg.max_deposit_wait, cfg.ssas_per_request),
+        ),
+        ("max_recovery_idle", cfg.max_recovery_idle),
+        ("max_recovery_time", cfg.max_recovery_time),
+        ("tombstone_retention_window", cfg.tombstone_retention_window),
     ] {
-        if *dur > MAX_SUPERVISOR_DURATION {
+        if dur > MAX_SUPERVISOR_DURATION {
             return Err(TransportSessionError::InvalidConfig(format!(
-                "{name} ({dur:?}) must not exceed {MAX_SUPERVISOR_DURATION:?}"
+                "{name} ({dur:?}, as armed for a batch of {}) must not exceed {MAX_SUPERVISOR_DURATION:?}",
+                cfg.ssas_per_request
             )));
         }
     }
     Ok(())
+}
+
+/// A per-cycle deadline duration as it is actually armed for a batch of `ssas_per_request`.
+///
+/// One place computes this so the validator and the supervisor cannot disagree about what a
+/// configuration means. `ssas_per_request` is clamped rather than trusted, because a supervisor can be
+/// constructed from a config that never went through [`validate_pix_supervision`]; the multiplication
+/// saturates for the same reason.
+pub(crate) fn scaled_deadline(per_cycle: Duration, ssas_per_request: usize) -> Duration {
+    per_cycle.saturating_mul(ssas_per_request.clamp(1, crate::MAX_SSA_BATCH_SIZE) as u32)
 }
 
 // ---------------------------------------------------------------------------
@@ -597,6 +671,7 @@ mod tests {
 
     fn valid_cfg() -> SupervisorConfig {
         SupervisorConfig {
+            ssas_per_request: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),

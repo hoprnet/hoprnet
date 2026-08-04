@@ -64,6 +64,7 @@ async fn build_pix_cluster(
                 num_ssa_parts: PIX_POLYS as usize,
                 ssa_part_size: PIX_SHARES as usize,
                 additional_shares: 2,
+                ..Default::default()
             }),
             idle_timeout_ms: idle_timeout.as_millis() as u64,
             ..Default::default()

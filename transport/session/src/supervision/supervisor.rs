@@ -326,7 +326,10 @@ impl SessionPixSupervisor {
         // Idempotent: a repeated confirmation must not extend the deadline, and one arriving after
         // the SSA has moved on must not resurrect a phase it has left.
         if self.ssas[idx].phase == SsaPhase::AwaitingCommitment && self.ssas[idx].commitment_deadline.is_none() {
-            self.ssas[idx].commitment_deadline = now.checked_add(self.cfg.max_ssa_delivery_time);
+            self.ssas[idx].commitment_deadline = now.checked_add(crate::supervision::scaled_deadline(
+                self.cfg.max_ssa_delivery_time,
+                self.cfg.ssas_per_request,
+            ));
         }
 
         Vec::new()
@@ -348,7 +351,10 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        let deposit_deadline = now.checked_add(self.cfg.max_deposit_wait);
+        let deposit_deadline = now.checked_add(crate::supervision::scaled_deadline(
+            self.cfg.max_deposit_wait,
+            self.cfg.ssas_per_request,
+        ));
         ssa.phase = SsaPhase::AwaitingDeposit;
         ssa.expected_deposit = expected_deposit;
         ssa.deposit_deadline = deposit_deadline;
@@ -716,40 +722,56 @@ impl SessionPixSupervisor {
         vec![SessionPixAction::RetireSsa(retired)]
     }
 
+    /// Allocates the next batch of SSA indices and asks for all of them in one action.
+    ///
+    /// The batch size is [`SupervisorConfig::ssas_per_request`], clamped rather than trusted since a
+    /// supervisor can be built from a config that never went through `validate_pix_supervision`.
+    ///
+    /// Batching does not weaken the successor gate: `on_almost_recovered` still refuses to ask for
+    /// another batch while any cycle of this one is unfunded. What it does change is the exposure
+    /// *within* a batch — every cycle in it is unfunded at once, so the ceiling is `ssas_per_request`
+    /// SSA quotas rather than one. That is the trade the knob exists to make, and it is why both
+    /// deadlines are scaled by the same factor.
     fn emit_request_next_ssa(&mut self, now: Instant) -> Vec<SessionPixAction> {
-        let index = self.next_ssa_index;
+        let batch = self.cfg.ssas_per_request.clamp(1, crate::MAX_SSA_BATCH_SIZE);
+        let mut ssa_ids = Vec::with_capacity(batch);
 
-        let ssa_index = match SsaIndex::try_from(index) {
-            Ok(i) => i,
-            Err(_) => {
-                self.closed = true;
-                return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
-            }
-        };
+        for _ in 0..batch {
+            let index = self.next_ssa_index;
 
-        match index.checked_add(1) {
-            Some(next) => self.next_ssa_index = next,
-            None => {
-                self.closed = true;
-                return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
-            }
+            let Ok(ssa_index) = SsaIndex::try_from(index) else {
+                break;
+            };
+            let Some(next) = index.checked_add(1) else {
+                // Index space exhausted mid-batch. Stop here rather than wrapping: a reused index
+                // would collide with a live cycle. Whatever was allocated still goes out.
+                break;
+            };
+            self.next_ssa_index = next;
+
+            let ssa_id = SsaId::new(self.pseudonym, ssa_index);
+
+            // Register each SSA now rather than on `SsaRequestSent`. Carrying out the action registers
+            // an Exit commitment, which is what makes shares for that SSA processable — so
+            // observations about it can reach us before the confirmation that we asked for it does.
+            // Every handler ignores an SSA it has no record of, and for `UnverifiableShares` that
+            // would mean failing open on exactly the signal that must fail closed.
+            //
+            // No deadline yet: the request has not gone out, so there is nothing to be late for. That
+            // is what `SsaRequestSent` adds, per index.
+            self.ssas
+                .push(PerSsaState::new(ssa_id, self.dims.target_useful_shares(), now));
+            ssa_ids.push(ssa_id);
         }
 
-        let ssa_id = SsaId::new(self.pseudonym, ssa_index);
-
-        // Register the SSA now rather than on `SsaRequestSent`. Carrying out the action registers
-        // an Exit commitment, which is what makes shares for this SSA processable — so observations
-        // about it can reach us before the confirmation that we asked for it does. Every handler
-        // ignores an SSA it has no record of, and for `UnverifiableShares` that would mean failing
-        // open on exactly the signal that must fail closed.
-        //
-        // No deadline yet: the request has not gone out, so there is nothing to be late for. That
-        // is what `SsaRequestSent` adds.
-        self.ssas
-            .push(PerSsaState::new(ssa_id, self.dims.target_useful_shares(), now));
+        // Nothing allocated means the index space is spent, and no further cycle can ever be funded.
+        if ssa_ids.is_empty() {
+            self.closed = true;
+            return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
+        }
 
         vec![SessionPixAction::RequestSsa {
-            ssa_id,
+            ssa_ids,
             polys: self.dims.polys_per_ssa,
             threshold: self.dims.shares_per_poly,
         }]
@@ -819,6 +841,7 @@ mod tests {
     /// shipped values say so by name.
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
+            ssas_per_request: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
@@ -878,13 +901,14 @@ mod tests {
         assert_eq!(actions.len(), 1);
         match &actions[0] {
             SessionPixAction::RequestSsa {
-                ssa_id,
+                ssa_ids,
                 polys,
                 threshold,
             } => {
                 assert_eq!(*polys, 10);
                 assert_eq!(*threshold, 5);
-                assert_eq!(ssa_id.ssa_index(), SsaIndex::new(1).unwrap());
+                assert_eq!(ssa_ids.len(), 1, "the default batch is a single SSA");
+                assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(1).unwrap());
             }
             other => panic!("expected RequestSsa, got {other:?}"),
         }
@@ -900,6 +924,133 @@ mod tests {
             sup.ssas[0].commitment_deadline.is_none(),
             "the delivery clock starts when the request goes out, not when it is queued"
         );
+    }
+
+    /// A batch is allocated and asked for as a unit: one action, `ssas_per_request` contiguous
+    /// indices, one per-SSA record each, and the index counter advanced past all of them.
+    ///
+    /// One action rather than N is what puts the whole batch in a single `SsaRequest`, which is the
+    /// point of the knob — and what makes the Entry's per-message cap the thing that has to accept it.
+    #[test]
+    fn a_batch_is_allocated_and_requested_as_one_action() {
+        const BATCH: usize = 4;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            ..default_cfg()
+        };
+        let (sup, actions) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+
+        assert_eq!(actions.len(), 1, "the batch must travel as a single action");
+        match &actions[0] {
+            SessionPixAction::RequestSsa { ssa_ids, .. } => {
+                assert_eq!(
+                    ssa_ids.iter().map(|i| i.ssa_index().get()).collect::<Vec<_>>(),
+                    (1..=BATCH as u32).collect::<Vec<_>>(),
+                    "the batch must cover contiguous indices from 1"
+                );
+            }
+            other => panic!("expected RequestSsa, got {other:?}"),
+        }
+
+        assert_eq!(
+            sup.next_ssa_index,
+            BATCH as u32 + 1,
+            "the index counter must advance past the whole batch"
+        );
+        assert_eq!(
+            sup.ssas.len(),
+            BATCH,
+            "every SSA in the batch needs its own record, or observations about it fail open"
+        );
+        assert!(sup.ssas.iter().all(|s| s.phase == SsaPhase::AwaitingCommitment));
+        assert!(!sup.closed);
+    }
+
+    /// Both per-cycle deadlines are multiplied by the batch size.
+    ///
+    /// The commitment clock must scale because a batch's clocks all start together while the Entry has
+    /// that many commitment sets to produce; the deposit clock must scale because an Entry funding a
+    /// batch in order finishes the last one that many deposits after the first. Without either, a peer
+    /// answering correctly but in sequence is closed for being slow.
+    #[test]
+    fn batching_scales_both_per_cycle_deadlines() {
+        const BATCH: usize = 3;
+
+        let p = pseudonym();
+        let unit_commit = default_cfg().max_ssa_delivery_time;
+        let unit_deposit = default_cfg().max_deposit_wait;
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            ..default_cfg()
+        };
+        let now = Instant::now();
+        let (mut sup, actions) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let SessionPixAction::RequestSsa { ssa_ids, .. } = &actions[0] else {
+            panic!("expected RequestSsa");
+        };
+        let ssa_ids = ssa_ids.clone();
+
+        // Commitment clock: armed per index when the request goes out, at the scaled duration.
+        for id in &ssa_ids {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(*id), now, 0);
+        }
+        for (i, id) in ssa_ids.iter().enumerate() {
+            let idx = sup.find_ssa_idx(id).expect("record must exist");
+            assert_eq!(
+                sup.ssas[idx].commitment_deadline,
+                Some(now + BATCH as u32 * unit_commit),
+                "cycle {i} must get the batch-scaled commitment deadline"
+            );
+        }
+
+        // Deposit clock: armed when that cycle's commitment verifies, also at the scaled duration.
+        let later = now + Duration::from_secs(1);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: ssa_ids[0],
+                expected_deposit: None,
+            },
+            later,
+            0,
+        );
+        let idx = sup.find_ssa_idx(&ssa_ids[0]).expect("record must exist");
+        assert_eq!(sup.ssas[idx].phase, SsaPhase::AwaitingDeposit);
+        assert_eq!(
+            sup.ssas[idx].deposit_deadline,
+            Some(later + BATCH as u32 * unit_deposit),
+            "the deposit deadline must be batch-scaled too"
+        );
+    }
+
+    /// An unvalidated `ssas_per_request` must not reach the deadline arithmetic or the allocator.
+    ///
+    /// A supervisor can be built from a config that never went through `validate_pix_supervision`, so
+    /// zero must still request one SSA rather than none, and a value above the ceiling must be clamped
+    /// rather than allocating an arbitrary batch or scaling a deadline past the duration cap.
+    #[test]
+    fn an_unvalidated_batch_size_is_clamped() {
+        for (configured, expected) in [
+            (0usize, 1usize),
+            (crate::MAX_SSA_BATCH_SIZE + 5, crate::MAX_SSA_BATCH_SIZE),
+        ] {
+            let p = pseudonym();
+            let cfg = SupervisorConfig {
+                ssas_per_request: configured,
+                ..default_cfg()
+            };
+            let (sup, actions) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+            match &actions[0] {
+                SessionPixAction::RequestSsa { ssa_ids, .. } => assert_eq!(
+                    ssa_ids.len(),
+                    expected,
+                    "a configured batch of {configured} must be clamped to {expected}"
+                ),
+                other => panic!("expected RequestSsa, got {other:?}"),
+            }
+            assert_eq!(sup.ssas.len(), expected);
+        }
     }
 
     // ---------------------------------------------------------------
@@ -1790,7 +1941,7 @@ mod tests {
         let now = Instant::now();
 
         let id = match actions.as_slice() {
-            [SessionPixAction::RequestSsa { ssa_id, .. }] => *ssa_id,
+            [SessionPixAction::RequestSsa { ssa_ids, .. }] => ssa_ids[0],
             other => panic!("expected one RequestSsa, got {other:?}"),
         };
 
@@ -2005,8 +2156,8 @@ mod tests {
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert_eq!(actions.len(), 1);
         match &actions[0] {
-            SessionPixAction::RequestSsa { ssa_id, .. } => {
-                assert_eq!(ssa_id.ssa_index(), SsaIndex::new(2).unwrap());
+            SessionPixAction::RequestSsa { ssa_ids, .. } => {
+                assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(2).unwrap());
             }
             other => panic!("expected RequestSsa, got {other:?}"),
         }
@@ -2046,8 +2197,8 @@ mod tests {
         assert_eq!(actions.len(), 2);
         assert!(matches!(actions[0], SessionPixAction::ReleaseService));
         match &actions[1] {
-            SessionPixAction::RequestSsa { ssa_id, .. } => {
-                assert_eq!(ssa_id.ssa_index(), SsaIndex::new(2).unwrap());
+            SessionPixAction::RequestSsa { ssa_ids, .. } => {
+                assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(2).unwrap());
             }
             other => panic!("expected RequestSsa, got {other:?}"),
         }
@@ -2081,8 +2232,8 @@ mod tests {
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), now, 0);
         assert_eq!(actions.len(), 1);
         match &actions[0] {
-            SessionPixAction::RequestSsa { ssa_id, .. } => {
-                assert_eq!(ssa_id.ssa_index(), SsaIndex::new(2).unwrap());
+            SessionPixAction::RequestSsa { ssa_ids, .. } => {
+                assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(2).unwrap());
             }
             other => panic!("expected RequestSsa, got {other:?}"),
         }
@@ -2244,7 +2395,7 @@ mod tests {
         let later = now + Duration::from_secs(5);
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), later, 0);
         let id2 = match actions.as_slice() {
-            [SessionPixAction::RequestSsa { ssa_id, .. }] => *ssa_id,
+            [SessionPixAction::RequestSsa { ssa_ids, .. }] => ssa_ids[0],
             other => panic!("expected exactly one RequestSsa, got {other:?}"),
         };
         assert_eq!(id2.ssa_index().get(), 2, "the pipelined SSA must take the next index");
@@ -2340,7 +2491,7 @@ mod tests {
 
         let actions = sup.action_result(
             &SessionPixAction::RequestSsa {
-                ssa_id: ssa_id(p, 1),
+                ssa_ids: vec![ssa_id(p, 1)],
                 polys: 10,
                 threshold: 5,
             },
@@ -2606,7 +2757,7 @@ mod tests {
         assert!(
             actions
                 .iter()
-                .any(|a| matches!(a, SessionPixAction::RequestSsa { ssa_id, .. } if *ssa_id == next_id)),
+                .any(|a| matches!(a, SessionPixAction::RequestSsa { ssa_ids, .. } if ssa_ids.contains(&next_id))),
             "expected RequestSsa for SSA 2, got actions: {actions:?}"
         );
 

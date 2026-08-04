@@ -329,6 +329,7 @@ mod tests {
 
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
+            ssas_per_request: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(10),
@@ -357,8 +358,8 @@ mod tests {
             .expect("action stream ended");
 
         match action {
-            SessionPixAction::RequestSsa { ssa_id, .. } => {
-                assert_eq!(ssa_id.ssa_index(), SsaIndex::new(1).unwrap());
+            SessionPixAction::RequestSsa { ssa_ids, .. } => {
+                assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(1).unwrap());
             }
             other => panic!("expected RequestSsa, got {other:?}"),
         }
@@ -489,7 +490,7 @@ mod tests {
         handle
             .send_action_result(
                 SessionPixAction::RequestSsa {
-                    ssa_id: SsaId::new(p, SsaIndex::new(1).unwrap()),
+                    ssa_ids: vec![SsaId::new(p, SsaIndex::new(1).unwrap())],
                     polys: 10,
                     threshold: 5,
                 },
@@ -624,7 +625,7 @@ mod tests {
             handle
                 .send_action_result(
                     SessionPixAction::RequestSsa {
-                        ssa_id: id,
+                        ssa_ids: vec![id],
                         polys: 10,
                         threshold: 5,
                     },

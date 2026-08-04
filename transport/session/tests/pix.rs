@@ -21,7 +21,7 @@ use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SsaDimensions, SurbBalancerConfig,
+    SessionManagerConfig, SessionTarget, SsaDimensions, SupervisorConfig, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -507,6 +507,405 @@ async fn session_without_pix_establishes_without_an_ssa_exchange() -> Result<()>
     let _alice_session = alice_session?;
     let _bob_session = bob_session_option.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
 
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+
+    Ok(())
+}
+
+/// End-to-end check of a batched SSA exchange: one `SsaRequest` carrying several commitments must
+/// produce that many independent deposit cycles on both sides.
+///
+/// This is the whole point of the batching knobs, and it is only observable across the full exchange:
+/// the Exit packs `ssas_per_request` commitments into a single message, the Entry loops over them
+/// generating one client commitment and one deposit address each, and both sides then emit one event
+/// per cycle.
+///
+/// ## Steps
+/// 1. Bob (Exit) is configured with `ssas_per_request: 3`; Alice (Entry) with a matching `max_ssas_per_ssa_request: 3`,
+///    without which the request would be rejected wholesale.
+/// 2. Both transports relay every Start protocol message to the peer manager, counting how many of them are
+///    `SsaRequest`s.
+/// 3. Exactly one `SsaRequest` goes out — the batch is one message, not three.
+/// 4. Alice emits 3 `ReadyToDeposit` and Bob 3 `DepositNeeded`, at contiguous SSA indices 1..=3, with pairwise distinct
+///    deposit addresses. Distinctness is what shows the batch produced genuinely separate cycles rather than the same
+///    cycle reported repeatedly.
+#[test(tokio::test)]
+async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    const BATCH: usize = 3;
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    // Small dimensions keep the commitment exchange to a handful of messages.
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 8,
+        threshold: 2,
+        surplus_shares: 2,
+    };
+
+    let alice_mgr = SessionManager::new(SessionManagerConfig {
+        max_ssas_per_ssa_request: BATCH,
+        ..Default::default()
+    });
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=2048 * 1024 * 1024,
+            supervision: SupervisorConfig {
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // Plain relays in both directions — the message *ordering* is not what this test is about, so no
+    // mockall sequence; only the number of SsaRequests is pinned.
+    let mut alice_transport = MockMsgSender::new();
+    let mut bob_transport = MockMsgSender::new();
+
+    // `.times(1..)` rather than the default of exactly one: a batch of 3 puts an unbounded number of
+    // SsaCommit messages on the wire and the count is not what this test pins.
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let bob_mgr_relay = bob_mgr_relay.clone();
+            Box::pin(async move {
+                // Session data segments are unrelated here and are simply dropped by the dispatcher.
+                let _ = bob_mgr_relay.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let ssa_requests = Arc::new(AtomicUsize::new(0));
+    let ssa_requests_relay = ssa_requests.clone();
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            if msg_type(&data, StartProtocolDiscriminants::SsaRequest) {
+                ssa_requests_relay.fetch_add(1, Ordering::Relaxed);
+            }
+            let alice_mgr_relay = alice_mgr_relay.clone();
+            Box::pin(async move {
+                let _ = alice_mgr_relay.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+
+    let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+    pin_mut!(new_session_rx_bob);
+    let (alice_session, bob_session) = tokio::time::timeout(
+        Duration::from_secs(5),
+        futures::future::join(
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target.clone()),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                    surb_management: None,
+                    pix_ssa_quota: Some(SsaDimensions::new(
+                        ssa_gen_config.polynomials_per_ssa,
+                        ssa_gen_config.threshold,
+                    )),
+                    return_path_options: RoutingOptions::Hops(1.try_into()?),
+                    ..Default::default()
+                },
+            ),
+            new_session_rx_bob.next(),
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
+
+    let mut alice_session = alice_session?;
+    let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
+
+    pin_mut!(pix_alice_rx);
+    pin_mut!(pix_bob_rx);
+
+    // One cycle per requested SSA on the Entry side.
+    let mut entry_cycles = Vec::new();
+    for i in 0..BATCH {
+        let event = tokio_time::timeout(Duration::from_secs(5), pix_alice_rx.next())
+            .await
+            .map_err(|e| anyhow::anyhow!("timeout awaiting entry cycle {i}: {e}"))?
+            .ok_or(anyhow::anyhow!("entry must emit cycle {i}"))?;
+        let HoprSessionOutPixEvent::ReadyToDeposit(quota) = event else {
+            panic!("expected ReadyToDeposit, got {event:?}");
+        };
+        entry_cycles.push(quota);
+    }
+
+    // And one per requested SSA on the Exit side.
+    let mut exit_cycles = Vec::new();
+    for i in 0..BATCH {
+        let event = tokio_time::timeout(Duration::from_secs(5), pix_bob_rx.next())
+            .await
+            .map_err(|e| anyhow::anyhow!("timeout awaiting exit cycle {i}: {e}"))?
+            .ok_or(anyhow::anyhow!("exit must emit cycle {i}"))?;
+        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+            panic!("expected DepositNeeded, got {event:?}");
+        };
+        exit_cycles.push(quota);
+    }
+
+    assert_eq!(
+        1,
+        ssa_requests.load(Ordering::Relaxed),
+        "the whole batch must travel in a single SsaRequest"
+    );
+
+    // Contiguous indices starting at 1, and the two sides agree on every cycle.
+    let entry_indices: Vec<_> = entry_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
+    let exit_indices: Vec<_> = exit_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
+    assert_eq!(
+        entry_indices,
+        (1..=BATCH as u32).collect::<Vec<_>>(),
+        "the batch must cover contiguous SSA indices"
+    );
+    assert_eq!(
+        entry_indices, exit_indices,
+        "Entry and Exit must agree on which SSAs the batch covered"
+    );
+
+    // Distinct deposit addresses: each entry of the batch is its own cycle, hence its own deposit.
+    for (i, entry) in entry_cycles.iter().enumerate() {
+        assert_eq!(
+            entry.deposit_address, exit_cycles[i].deposit_address,
+            "Entry and Exit must derive the same deposit address for cycle {i}"
+        );
+        assert_eq!(
+            entry.quota_per_ssa, exit_cycles[i].quota_per_ssa,
+            "Entry and Exit must agree on the quota for cycle {i}"
+        );
+        for (j, other) in entry_cycles.iter().enumerate().skip(i + 1) {
+            assert_ne!(
+                entry.deposit_address, other.deposit_address,
+                "cycles {i} and {j} of the batch must have distinct deposit addresses"
+            );
+        }
+    }
+
+    alice_session.close().await?;
+    for ah in ahs {
+        ah.abort();
+    }
+    alice_sender.close_channel();
+    bob_sender.close_channel();
+    alice_handle.await??;
+    bob_handle.await??;
+
+    Ok(())
+}
+
+/// An Exit batching above the Entry's cap must fail fast on a `SessionError`, not linger until its own
+/// deposit kill switch fires.
+///
+/// The batch size is not negotiated — `StartSession.additional_data` has no room to advertise the
+/// Entry's cap — so this misconfiguration is reachable and, without the `SessionError`, silent: the
+/// Exit has armed its kill switches, will never receive an `SsaCommit`, and has no event that could
+/// make it re-request. It would serve the Session unincentivized for
+/// `ssas_per_request × (max_deposit_wait + max_ssa_delivery_time)` — 240 s at the defaults used here —
+/// and then blame the deposit.
+///
+/// ## Steps
+/// 1. Bob (Exit) batches 3 SSAs per request; Alice (Entry) accepts at most 1, so the very first request is refused.
+/// 2. Both transports relay Start protocol messages to the peer manager, counting `SessionError`s.
+/// 3. Alice sends exactly one `SessionError` and drops her half of the Session.
+/// 4. Bob's `handle_session_error` closes his half too. The 2 s bound is the whole point: Bob's kill-switch window is
+///    240 s, so closing this quickly can only be the `SessionError` doing it.
+#[test(tokio::test)]
+async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let alice_pseudonym = HoprPseudonym::random();
+    let bob_peer: Address = (&ChainKeypair::random()).into();
+
+    let ssa_gen_config = SsaGeneratorConfig {
+        polynomials_per_ssa: 8,
+        threshold: 2,
+        surplus_shares: 2,
+    };
+
+    // Alice accepts 1, Bob asks for 3 — the mismatch this test is about.
+    let alice_mgr = SessionManager::new(SessionManagerConfig {
+        max_ssas_per_ssa_request: 1,
+        ..Default::default()
+    });
+    let bob_mgr = SessionManager::new(SessionManagerConfig {
+        pix_config: IncomingSessionPixConfig {
+            quota_range: 0..=2048 * 1024 * 1024,
+            supervision: SupervisorConfig {
+                ssas_per_request: 3,
+                // Deadlines left at their defaults, so the scaled commitment window is 3 × 20 s and the
+                // scaled deposit window 3 × 60 s — neither can be what closes the Session inside the
+                // assertions below.
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    let alice_session_errors = Arc::new(AtomicUsize::new(0));
+    let alice_session_errors_tx = alice_session_errors.clone();
+    let bob_mgr_relay = Arc::new(bob_mgr.clone());
+    let mut alice_transport = MockMsgSender::new();
+    alice_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            if msg_type(&data, StartProtocolDiscriminants::SessionError) {
+                alice_session_errors_tx.fetch_add(1, Ordering::Relaxed);
+            }
+            let bob_mgr_relay = bob_mgr_relay.clone();
+            Box::pin(async move {
+                let _ = bob_mgr_relay.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let alice_mgr_relay = Arc::new(alice_mgr.clone());
+    let mut bob_transport = MockMsgSender::new();
+    bob_transport
+        .expect_send_message()
+        .times(1..)
+        .returning(move |_, data| {
+            let alice_mgr_relay = alice_mgr_relay.clone();
+            Box::pin(async move {
+                let _ = alice_mgr_relay.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+
+    let ssa_rec_config = SsaReconstructorConfig::default();
+    let (pix_toolbox_alice, _pix_alice_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+    let (pix_toolbox_bob, _pix_bob_rx) = PixToolbox::new(
+        SsaShareGenerator::new(ssa_gen_config).into(),
+        SsaReconstructor::new(ssa_rec_config).into(),
+    );
+
+    let mut ahs = Vec::new();
+    let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+    let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+    ahs.extend(alice_mgr.start(alice_sender.clone(), new_session_tx_alice, Some(pix_toolbox_alice))?);
+
+    let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+    let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+    ahs.extend(bob_mgr.start(bob_sender.clone(), new_session_tx_bob, Some(pix_toolbox_bob))?);
+
+    let _notifications = tokio::spawn(async move {
+        pin_mut!(new_session_rx_bob);
+        while let Some(_session) = new_session_rx_bob.next().await {}
+    });
+
+    // Establishment itself may or may not complete before the refusal lands — the refusal is racing
+    // `new_session`'s return, and either interleaving is fine. The end state is what matters.
+    let established = tokio::time::timeout(
+        Duration::from_secs(5),
+        alice_mgr.new_session(
+            bob_peer,
+            SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            SessionClientConfig {
+                pseudonym: alice_pseudonym.into(),
+                capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
+                surb_management: None,
+                pix_ssa_quota: Some(SsaDimensions::new(
+                    ssa_gen_config.polynomials_per_ssa,
+                    ssa_gen_config.threshold,
+                )),
+                return_path_options: RoutingOptions::Hops(1.try_into()?),
+                ..Default::default()
+            },
+        ),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("timeout: {e}"))?;
+    tracing::info!(?established, "new_session returned");
+
+    // Both halves must be gone well inside Bob's 240 s kill-switch window.
+    let closed = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if alice_mgr.active_sessions().is_empty() && bob_mgr.active_sessions().is_empty() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await;
+    assert!(
+        closed.is_ok(),
+        "both halves must close on the refusal, not on the deposit timeout — entry: {:?}, exit: {:?}",
+        alice_mgr.active_sessions(),
+        bob_mgr.active_sessions()
+    );
+
+    assert_eq!(
+        1,
+        alice_session_errors.load(Ordering::Relaxed),
+        "the Entry must tell the Exit exactly once why the batch was refused"
+    );
+
+    for ah in ahs {
+        ah.abort();
+    }
     alice_sender.close_channel();
     bob_sender.close_channel();
     alice_handle.await??;
