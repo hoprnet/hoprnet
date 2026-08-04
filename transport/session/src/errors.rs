@@ -1,3 +1,4 @@
+use hopr_api::types::crypto::prelude::SimplePseudonym;
 use thiserror::Error;
 
 /// Enumeration of errors thrown from this library.
@@ -60,6 +61,12 @@ pub enum SessionManagerError {
     TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
+    #[error("received a Start protocol message that is not supported")]
+    UnsupportedMessage,
+    #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
+    Unacceptable(String),
+    #[error(transparent)]
+    PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
     #[error(transparent)]
     Other(anyhow::Error),
 }

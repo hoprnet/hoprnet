@@ -1,6 +1,6 @@
 use std::{
     convert::Into,
-    fmt::{Debug, Formatter},
+    fmt::Debug,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -8,11 +8,19 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hopr_api::types::{
-    internal::{prelude::HoprPseudonym, routing::DestinationRouting},
-    primitive::errors::GeneralError,
+use hopr_api::{
+    HoprBalance,
+    types::{
+        internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+        primitive::errors::GeneralError,
+    },
+};
+use hopr_crypto_packet::{
+    HoprPixSpec,
+    prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
+use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -36,9 +44,15 @@ use crate::{
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ByteCapabilities(pub Capabilities);
+pub struct HoprSessionCapabilities(pub Capabilities);
 
-impl TryFrom<u8> for ByteCapabilities {
+impl HoprSessionCapabilities {
+    pub fn empty() -> Self {
+        Self(Capabilities::empty())
+    }
+}
+
+impl TryFrom<u8> for HoprSessionCapabilities {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -48,32 +62,192 @@ impl TryFrom<u8> for ByteCapabilities {
     }
 }
 
-impl From<ByteCapabilities> for u8 {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for u8 {
+    fn from(value: HoprSessionCapabilities) -> Self {
         *value.0.as_ref()
     }
 }
 
-impl From<ByteCapabilities> for Capabilities {
-    fn from(value: ByteCapabilities) -> Self {
+impl From<HoprSessionCapabilities> for Capabilities {
+    fn from(value: HoprSessionCapabilities) -> Self {
         value.0
     }
 }
 
-impl From<Capabilities> for ByteCapabilities {
+impl From<Capabilities> for HoprSessionCapabilities {
     fn from(value: Capabilities) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<Capabilities> for ByteCapabilities {
+impl AsRef<Capabilities> for HoprSessionCapabilities {
     fn as_ref(&self) -> &Capabilities {
         &self.0
     }
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
+pub type HoprStartProtocol =
+    StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement, HoprPixCommitmentProof>;
+
+/// Quota per single SSA in bytes.
+///
+/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent from
+/// Exit -> Entry before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred
+/// before SSA private key recovery at the Exit.
+///
+/// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
+pub type SsaQuota = u64;
+
+pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16) -> SsaQuota {
+    polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
+}
+
+/// Default number of polynomials ("SSA parts") a single SSA is split into.
+///
+/// This is the single source of truth for the Entry-side generator dimension
+/// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
+/// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
+/// Both must be derived from it so the two cannot drift apart: the Exit computes the
+/// offered quota as `polys × shares × PAYLOAD_SIZE` and rejects the Session if it falls
+/// outside its configured range, so a hard-coded range that no longer matches the
+/// dimension defaults makes every PIX Session fail to establish.
+///
+/// ## Choosing the split
+///
+/// For a fixed quota `Q = polys × threshold` the *product* is pinned, so the split between the two
+/// is free — but the costs scale differently, and dropping the non-constant coefficient
+/// commitments (see [`hopr_protocol_pix::SsaPartCommitment`]) changed which way they pull:
+///
+/// * Commitment wire volume and Exit ingest are one commitment per polynomial — **linear in `polys`**, and formerly
+///   `polys × threshold`. Ingest is dominated by point decompression plus the cofactor-8 subgroup check.
+/// * Reconstructor commitment memory is likewise `polys`, no longer `Q`.
+/// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `Q ×
+///   threshold` and is now simply `polys`.
+/// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `Q × threshold`,
+///   **linear in `threshold`**. This is now the only cost that grows with the threshold, and it is field arithmetic
+///   rather than curve arithmetic.
+/// * Detection of a dishonest Entry takes `threshold` return packets, since a share set is only checked once it
+///   interpolates.
+///
+/// So raising `threshold` (and lowering `polys`) now buys a proportionally smaller commitment
+/// phase at the cost of more interpolation and later fault detection — the opposite of the old
+/// trade, where `threshold` was kept as small as loss tolerance allowed. The 8192 × 64 split is
+/// retained pending measurement of where the new optimum sits; the product is what fixes the
+/// quota, so the split can be re-tuned without touching session negotiation.
+///
+/// ## Why this is an alias
+///
+/// The generator that produces the shares lives in `hopr-protocol-pix` and carries its own
+/// defaults, so the split existed as two independent literals — and they drifted: this side was
+/// re-tuned to `8192 × 64` while the pix crate stayed at a threshold of 128, which made
+/// [`hopr_protocol_pix::SsaGeneratorConfig::default`] imply a 1.01 GiB quota, outside the very
+/// range derived below. Four benchmarks had grown comments explaining which of the two to
+/// believe. Aliasing removes the choice.
+pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = hopr_protocol_pix::DEFAULT_POLYS_PER_SSA;
+
+/// Default number of shares required to reconstruct a single SSA part.
+///
+/// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, why it is kept
+/// small relative to the polynomial count, and why it is an alias rather than a literal.
+pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
+
+/// Nominal per-SSA data quota implied by the default PIX dimensions.
+///
+/// This is the amount of Exit → Entry data covered by a single SSA deposit when both
+/// nodes run the default PIX configuration.
+pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
+
+/// Divisor applied to [`DEFAULT_PIX_SSA_QUOTA`] to obtain the lower bound of the default
+/// [`quota_range`](crate::IncomingSessionPixConfig::quota_range).
+///
+/// Preserves the 4× span the range had when its bounds were hard-coded.
+pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
+
+/// PIX dimensions a Session offers: how many polynomials an SSA is split into, and how many shares
+/// reconstruct each one.
+///
+/// Named fields rather than a `(u16, u16)` tuple, because the two are interchangeable to the type
+/// system and *not* interchangeable to the protocol — while their product, which is all the Exit
+/// compares, is identical either way. A transposition therefore announced valid-looking dimensions
+/// against a correct quota. The only thing that caught it was
+/// [`SessionManager::new_session`](crate::SessionManager::new_session) requiring both to match the
+/// locally installed generator exactly, which is a check about something else entirely and would not
+/// survive a caller that took its dimensions from elsewhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SsaDimensions {
+    /// Number of polynomials the SSA secret is split across.
+    pub polys_per_ssa: u16,
+    /// Shares required to reconstruct one polynomial.
+    pub shares_per_poly: u16,
+}
+
+impl SsaDimensions {
+    /// The dimensions implied by [`DEFAULT_PIX_POLYS_PER_SSA`] and [`DEFAULT_PIX_SHARES_PER_POLY`].
+    pub const DEFAULT: Self = Self::new(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
+
+    pub const fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
+        Self {
+            polys_per_ssa,
+            shares_per_poly,
+        }
+    }
+
+    /// Per-SSA data quota these dimensions imply.
+    pub const fn quota(&self) -> SsaQuota {
+        pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
+    }
+}
+
+/// Representation of a data quota per SSA agreed upon during the Session establishment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AgreedSsaQuota {
+    /// ID of the SSA.
+    pub ssa_id: SsaId<HoprPseudonym>,
+    /// Deposit address of the SSA.
+    pub deposit_address: <HoprPixSpec as PixSpec>::DepositAddress,
+    /// Quota of the SSA in bytes.
+    pub quota_per_ssa: SsaQuota,
+}
+
+/// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
+#[derive(Debug)]
+pub enum HoprSessionOutPixEvent {
+    /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
+    /// agreed data quota.
+    ReadyToDeposit(AgreedSsaQuota),
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
+    /// funds to be deposited.
+    ///
+    /// The attached sender is used to deliver updates once the deposit is completed.
+    DepositNeeded(
+        AgreedSsaQuota,
+        futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
+    ),
+}
+
+/// Events received by the [`crate::manager::SessionManager`] in reaction to received shares from the packet pipeline.
+#[derive(Debug, Clone)]
+pub enum HoprSessionInPixEvent {
+    /// Informs the [`crate::manager::SessionManager`] that an SSA was fully recovered.
+    SsaRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that the early recovery threshold was reached
+    /// for an SSA — the next SSA request can be made.
+    SsaAlmostRecovered(SsaId<HoprPseudonym>),
+    /// Informs the [`crate::manager::SessionManager`] that unverifiable shares were encountered.
+    UnverifiableShare(SsaId<HoprPseudonym>),
+}
+
+impl HoprSessionInPixEvent {
+    /// Extracts the pseudonym of the SSA that might map to an existing Session.
+    pub fn pseudonym(&self) -> &HoprPseudonym {
+        match self {
+            HoprSessionInPixEvent::SsaRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id) => ssa_id.pseudonym(),
+            HoprSessionInPixEvent::UnverifiableShare(ssa_id) => ssa_id.pseudonym(),
+        }
+    }
+}
 
 /// Constant application tag used for all sessions.
 /// Previously tags were dynamically allocated per session.
@@ -104,6 +278,8 @@ pub enum ClosureReason {
     EmptyRead,
     /// Session has been evicted from the cache due to inactivity or capacity reasons.
     Eviction,
+    /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
+    UnrealizedDeposit,
 }
 
 /// Helper trait to allow Box aliasing
@@ -379,7 +555,7 @@ impl HoprSession {
 }
 
 impl std::fmt::Debug for HoprSession {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
             .field("routing", &self.routing)
@@ -466,8 +642,9 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_api::types::{
-        crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions, primitive::prelude::*,
+    use hopr_api::{
+        Address,
+        types::{crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions},
     };
 
     use super::*;
@@ -477,9 +654,9 @@ mod tests {
     #[test]
     fn byte_capabilities_roundtrip_via_u8() -> anyhow::Result<()> {
         let flags: Capabilities = Capability::Segmentation.into();
-        let caps = ByteCapabilities::from(flags);
+        let caps = HoprSessionCapabilities::from(flags);
         let byte_val: u8 = caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(caps, restored);
         Ok(())
     }
@@ -487,12 +664,12 @@ mod tests {
     #[test]
     fn byte_capabilities_invalid_bits_are_rejected() {
         // 0xFF has bits set that don't correspond to any Capability
-        assert!(ByteCapabilities::try_from(0xFF_u8).is_err());
+        assert!(HoprSessionCapabilities::try_from(0xFF_u8).is_err());
     }
 
     #[test]
     fn byte_capabilities_empty_is_zero() {
-        let caps = ByteCapabilities::from(Capabilities::empty());
+        let caps = HoprSessionCapabilities::from(Capabilities::empty());
         let byte_val: u8 = caps.into();
         assert_eq!(byte_val, 0);
     }
@@ -500,9 +677,9 @@ mod tests {
     #[test]
     fn byte_capabilities_combined_flags() -> anyhow::Result<()> {
         let caps: Capabilities = Capability::Segmentation | Capability::NoRateControl;
-        let byte_caps = ByteCapabilities::from(caps);
+        let byte_caps = HoprSessionCapabilities::from(caps);
         let byte_val: u8 = byte_caps.into();
-        let restored = ByteCapabilities::try_from(byte_val)?;
+        let restored = HoprSessionCapabilities::try_from(byte_val)?;
         assert_eq!(*restored.as_ref(), caps);
         Ok(())
     }
@@ -546,6 +723,7 @@ mod tests {
             ClosureReason::WriteClosed,
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
+            ClosureReason::UnrealizedDeposit,
         ];
         insta::assert_debug_snapshot!(reasons);
     }

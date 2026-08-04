@@ -3,7 +3,10 @@ use std::fmt::Formatter;
 use hopr_types::{
     crypto::prelude::*,
     crypto_random::Randomizable,
-    primitive::{prelude::*, typenum::Unsigned},
+    primitive::{
+        hybrid_array::{Array, typenum::Unsigned},
+        prelude::*,
+    },
 };
 use subtle::ConstantTimeEq;
 
@@ -150,13 +153,10 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
                 first_relayer: value[0..H::KEY_ID_SIZE.get()]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.first_relayer".into()))?,
-                alpha: {
-                    #[allow(deprecated)]
-                    Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
-                        &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
-                    )
-                    .clone()
-                },
+                alpha: Array::<u8, <S::G as GroupElement<S::E>>::AlphaLen>::try_from(
+                    &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
+                )
+                .map_err(|_| GeneralError::ParseError("SURB.alpha".into()))?,
                 header: value[H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.header".into()))?,
@@ -237,19 +237,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "x25519")]
     use hopr_types::crypto_random::Randomizable;
 
-    #[cfg(feature = "x25519")]
     use super::{super::tests::*, *};
-    #[cfg(feature = "x25519")]
-    use crate::sphinx::ec_groups::X25519Suite;
 
-    #[cfg(feature = "x25519")]
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
-    #[cfg(feature = "x25519")]
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
@@ -268,14 +262,22 @@ mod tests {
         )?)
     }
 
-    #[cfg(feature = "x25519")]
+    // Mutually exclusive cfg to prevent type alias collision under --all-features.
+    // Priority order: ed25519 > secp256k1 > x25519.
+    #[cfg(feature = "ed25519")]
+    use crate::sphinx::ec_groups::Ed25519Suite as CurrentSuite;
+    #[cfg(all(feature = "secp256k1", not(feature = "ed25519")))]
+    use crate::sphinx::ec_groups::Secp256k1Suite as CurrentSuite;
+    #[cfg(all(feature = "x25519", not(any(feature = "ed25519", feature = "secp256k1"))))]
+    use crate::sphinx::ec_groups::X25519Suite as CurrentSuite;
+
     #[test]
-    fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
-        let (surb_1, _) = generate_surbs::<X25519Suite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
+    fn surb_serialize_deserialize() -> anyhow::Result<()> {
+        let (surb_1, _) = generate_surbs::<CurrentSuite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
 
         let surb_1_enc = surb_1.into_boxed();
 
-        let surb_2 = SURB::<X25519Suite, HeaderSpec<X25519Suite>>::try_from(surb_1_enc.as_ref())?;
+        let surb_2 = SURB::<CurrentSuite, HeaderSpec<CurrentSuite>>::try_from(surb_1_enc.as_ref())?;
 
         assert_eq!(surb_1_enc, surb_2.into_boxed());
 

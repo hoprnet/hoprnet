@@ -66,7 +66,7 @@ pub fn proof_of_relay_bench(c: &mut Criterion) {
 
     group.bench_function("por_pre_verify", |b| {
         b.iter(|| {
-            pre_verify(&secrets[0], &pors[0], &porv.ticket_challenge()).unwrap();
+            pre_verify(&secrets[0], &pors[0], &porv.0.ticket_challenge()).unwrap();
         })
     });
     group.finish();

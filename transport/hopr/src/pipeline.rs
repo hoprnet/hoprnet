@@ -7,15 +7,16 @@ use hopr_api::{
         internal::{prelude::*, routing::ResolvedTransportRouting},
     },
 };
-use hopr_crypto_packet::HoprSurb;
+use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSurb};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use hopr_protocol_pix::{EntryShareGenerator, ExitAcknowledgementShareProcessor};
 use hopr_utils::runtime::AbortableList;
 
 use crate::{
     HoprTransportProcess, PeerProtocolCounterRegistry,
     config::HoprPacketPipelineConfig,
-    protocol::{PacketPipelineBuilder, Unset},
+    protocol::{NopExitAcknowledgementShareProcessor, PacketPipelineBuilder, Unset},
 };
 
 /// Builder for the HOPR packet pipeline.
@@ -51,9 +52,12 @@ pub struct HoprPacketPipelineBuilder<
     Chain,
     S,
     TFact,
+    G,
     AppOut,
     AppIn,
     TEvt = futures::sink::Drain<hopr_api::node::TicketEvent>,
+    A = NopExitAcknowledgementShareProcessor,
+    SEvt = futures::sink::Drain<HoprShareResolution>,
 > {
     packet_key: Option<OffchainKeypair>,
     chain_key: Option<ChainKeypair>,
@@ -62,10 +66,13 @@ pub struct HoprPacketPipelineBuilder<
     surb_store: S,
     chain_api: Chain,
     ticket_factory: TFact,
+    ssa_generator: G,
     counters: PeerProtocolCounterRegistry,
     channels_dst: Option<Hash>,
     cfg: HoprPacketPipelineConfig,
     ticket_events: Option<TEvt>,
+    exit_ack_proc: A,
+    ssa_events: SEvt,
 }
 
 impl Default
@@ -77,7 +84,10 @@ impl Default
         Unset,
         Unset,
         Unset,
+        Unset,
         futures::sink::Drain<hopr_api::node::TicketEvent>,
+        NopExitAcknowledgementShareProcessor,
+        futures::sink::Drain<HoprShareResolution>,
     >
 {
     fn default() -> Self {
@@ -94,7 +104,10 @@ impl
         Unset,
         Unset,
         Unset,
+        Unset,
         futures::sink::Drain<hopr_api::node::TicketEvent>,
+        NopExitAcknowledgementShareProcessor,
+        futures::sink::Drain<HoprShareResolution>,
     >
 {
     /// Creates a new empty builder. All required components must then be supplied via the
@@ -108,16 +121,19 @@ impl
             surb_store: Unset,
             chain_api: Unset,
             ticket_factory: Unset,
+            ssa_generator: Unset,
             counters: PeerProtocolCounterRegistry::default(),
             channels_dst: None,
             cfg: HoprPacketPipelineConfig::default(),
             ticket_events: None,
+            exit_ack_proc: NopExitAcknowledgementShareProcessor,
+            ssa_events: futures::sink::drain(),
         }
     }
 }
 
-impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
-    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
+impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
+    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 {
     /// Overrides the default [`HoprPacketPipelineConfig`].
     #[must_use]
@@ -157,7 +173,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn transport<WIn2, WOut2>(
         self,
         wire_msg: (WOut2, WIn2),
-    ) -> HoprPacketPipelineBuilder<WIn2, WOut2, Chain, S, TFact, AppOut, AppIn, TEvt> {
+    ) -> HoprPacketPipelineBuilder<WIn2, WOut2, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -166,10 +182,13 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store: self.surb_store,
             chain_api: self.chain_api,
             ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
         }
     }
 
@@ -178,7 +197,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn api<AppOut2, AppIn2>(
         self,
         api: (AppOut2, AppIn2),
-    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut2, AppIn2, TEvt> {
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut2, AppIn2, TEvt, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -187,10 +206,13 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store: self.surb_store,
             chain_api: self.chain_api,
             ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
         }
     }
 
@@ -199,7 +221,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn surb_store<S2>(
         self,
         surb_store: S2,
-    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S2, TFact, AppOut, AppIn, TEvt> {
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S2, TFact, G, AppOut, AppIn, TEvt, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -208,10 +230,13 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store,
             chain_api: self.chain_api,
             ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
         }
     }
 
@@ -220,7 +245,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn chain_api<Chain2>(
         self,
         chain_api: Chain2,
-    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain2, S, TFact, AppOut, AppIn, TEvt> {
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain2, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -229,10 +254,13 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store: self.surb_store,
             chain_api,
             ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
         }
     }
 
@@ -241,7 +269,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn ticket_factory<TFact2>(
         self,
         ticket_factory: TFact2,
-    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact2, AppOut, AppIn, TEvt> {
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact2, G, AppOut, AppIn, TEvt, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -250,10 +278,37 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store: self.surb_store,
             chain_api: self.chain_api,
             ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
+        }
+    }
+
+    /// Sets the SSA share generator used by the encoder.
+    #[must_use]
+    pub fn ssa_generator<G2>(
+        self,
+        ssa_generator: G2,
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G2, AppOut, AppIn, TEvt, A, SEvt> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api: self.api,
+            surb_store: self.surb_store,
+            chain_api: self.chain_api,
+            ticket_factory: self.ticket_factory,
+            ssa_generator,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
         }
     }
 
@@ -263,7 +318,7 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
     pub fn with_ticket_events<TEvt2>(
         self,
         ticket_events: TEvt2,
-    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt2> {
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt2, A, SEvt> {
         HoprPacketPipelineBuilder {
             packet_key: self.packet_key,
             chain_key: self.chain_key,
@@ -272,17 +327,51 @@ impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
             surb_store: self.surb_store,
             chain_api: self.chain_api,
             ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
             counters: self.counters,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: Some(ticket_events),
+            exit_ack_proc: self.exit_ack_proc,
+            ssa_events: self.ssa_events,
+        }
+    }
+
+    /// Attaches an exit-acknowledgement share processor and a recovered-SSA events sink to the
+    /// builder. Used by Relay and Exit nodes (see
+    /// [`HoprPacketPipelineBuilder::build_for_relay`] and
+    /// [`HoprPacketPipelineBuilder::build_for_exit`]); ignored by Entry nodes.
+    ///
+    /// Optional: when not called, the builder defaults to [`NopExitAcknowledgementShareProcessor`]
+    /// and a draining sink ([`futures::sink::drain`]).
+    #[must_use]
+    pub fn with_exit_ack_share_processing<A2, SEvt2>(
+        self,
+        exit_ack_proc: A2,
+        ssa_events: SEvt2,
+    ) -> HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A2, SEvt2> {
+        HoprPacketPipelineBuilder {
+            packet_key: self.packet_key,
+            chain_key: self.chain_key,
+            wire_msg: self.wire_msg,
+            api: self.api,
+            surb_store: self.surb_store,
+            chain_api: self.chain_api,
+            ticket_factory: self.ticket_factory,
+            ssa_generator: self.ssa_generator,
+            counters: self.counters,
+            channels_dst: self.channels_dst,
+            cfg: self.cfg,
+            ticket_events: self.ticket_events,
+            exit_ack_proc,
+            ssa_events,
         }
     }
 }
 
 // Implementation detail: codec, decoder and optional capture wiring shared by the three terminals.
-impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
-    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
+impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
+    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
@@ -297,6 +386,7 @@ where
         + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
+    G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -314,10 +404,12 @@ where
         PeerProtocolCounterRegistry,
         HoprUnacknowledgedTicketProcessor<Chain>,
         Option<TEvt>,
+        A,
+        SEvt,
         HoprPacketPipelineConfig,
         // Codec parts in their final shape (possibly wrapped by capture)
         AbortableList<HoprTransportProcess>,
-        BuiltCodec<Chain, S, TFact>,
+        BuiltCodec<Chain, G, S, TFact>,
     ) {
         let HoprPacketPipelineBuilder {
             packet_key,
@@ -327,10 +419,13 @@ where
             surb_store,
             chain_api,
             ticket_factory,
+            ssa_generator,
             counters,
             channels_dst,
             cfg,
             ticket_events,
+            exit_ack_proc,
+            ssa_events,
         } = self;
 
         let packet_key = packet_key.expect("identity() must be called before building the pipeline");
@@ -350,6 +445,7 @@ where
             surb_store.clone(),
             ticket_factory.clone(),
             channels_dst,
+            ssa_generator,
             cfg.codec,
         );
 
@@ -401,6 +497,8 @@ where
             counters,
             unack_ticket_proc,
             ticket_events,
+            exit_ack_proc,
+            ssa_events,
             cfg,
             processes,
             codec,
@@ -409,7 +507,7 @@ where
 }
 
 /// Internal helper to keep the codec types abstracted between the capture/no-capture builds.
-enum BuiltCodec<Chain, S, TFact>
+enum BuiltCodec<Chain, G, S, TFact>
 where
     Chain: ChainKeyOperations
         + ChainReadChannelOperations
@@ -419,21 +517,22 @@ where
         + Send
         + Sync
         + 'static,
+    G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
 {
     #[cfg(not(feature = "capture"))]
-    Plain(HoprEncoder<Chain, S, TFact>, HoprDecoder<Chain, S, TFact>),
+    Plain(HoprEncoder<Chain, G, S, TFact>, HoprDecoder<Chain, S, TFact>),
     #[cfg(feature = "capture")]
     Captured(
-        crate::capture::CapturePacketCodec<HoprEncoder<Chain, S, TFact>>,
+        crate::capture::CapturePacketCodec<HoprEncoder<Chain, G, S, TFact>>,
         crate::capture::CapturePacketCodec<HoprDecoder<Chain, S, TFact>>,
     ),
 }
 
 // Terminal: Relay
-impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
-    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
+impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
+    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
@@ -450,6 +549,10 @@ where
     TEvt: futures::Sink<hopr_api::node::TicketEvent> + Clone + Unpin + Send + 'static,
     TEvt::Error: std::error::Error,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
+    G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -459,8 +562,19 @@ where
     /// # Panics
     /// Panics if [`HoprPacketPipelineBuilder::with_ticket_events`] was not called.
     pub fn build_for_relay(self) -> AbortableList<HoprTransportProcess> {
-        let (packet_key, wire_msg, api, counters, unack_ticket_proc, ticket_events, _cfg, mut processes, codec) =
-            self.prepare();
+        let (
+            packet_key,
+            wire_msg,
+            api,
+            counters,
+            unack_ticket_proc,
+            ticket_events,
+            exit_ack_proc,
+            ssa_events,
+            _cfg,
+            mut processes,
+            codec,
+        ) = self.prepare();
 
         let ticket_events = ticket_events.expect("Relay node requires ticket events; call with_ticket_events() first");
 
@@ -473,6 +587,7 @@ where
                 .with_counters(counters)
                 .with_config(_cfg.pipeline)
                 .with_ticket_processing(unack_ticket_proc, ticket_events)
+                .with_exit_ack_share_processing(exit_ack_proc, ssa_events)
                 .build_for_relay(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
@@ -482,6 +597,7 @@ where
                 .with_counters(counters)
                 .with_config(_cfg.pipeline)
                 .with_ticket_processing(unack_ticket_proc, ticket_events)
+                .with_exit_ack_share_processing(exit_ack_proc, ssa_events)
                 .build_for_relay(),
         };
 
@@ -491,9 +607,12 @@ where
 }
 
 // Terminal: Entry / Exit (no ticket events required)
-impl<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
-    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, AppOut, AppIn, TEvt>
+impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
+    HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
 where
+    A: ExitAcknowledgementShareProcessor<HoprPixSpec> + Send + Sync + 'static,
+    SEvt: futures::Sink<HoprShareResolution> + Clone + Unpin + Send + 'static,
+    SEvt::Error: std::error::Error,
     WOut: futures::Sink<(PeerId, Bytes)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::error::Error,
     WIn: futures::Stream<Item = (PeerId, Bytes)> + Send + 'static,
@@ -507,6 +626,7 @@ where
         + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TFact: TicketFactory + Clone + Send + Sync + 'static,
+    G: EntryShareGenerator<HoprPixSpec> + Clone + Send + Sync + 'static,
     AppOut: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
     AppOut::Error: std::error::Error,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)> + Send + 'static,
@@ -515,7 +635,19 @@ where
     ///
     /// The incoming acknowledgement pipeline is not started; ticket events (if any) are ignored.
     pub fn build_for_entry(self) -> AbortableList<HoprTransportProcess> {
-        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, _cfg, mut processes, codec) = self.prepare();
+        let (
+            packet_key,
+            wire_msg,
+            api,
+            counters,
+            _unack,
+            _ticket_events,
+            _exit_ack_proc,
+            _ssa_events,
+            cfg,
+            mut processes,
+            codec,
+        ) = self.prepare();
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
@@ -524,7 +656,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_entry(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
@@ -532,7 +664,7 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
                 .build_for_entry(),
         };
 
@@ -545,7 +677,19 @@ where
     /// The incoming acknowledgement pipeline is started but its acknowledgements are drained
     /// (never forwarded to a ticket processor); ticket events (if any) are ignored.
     pub fn build_for_exit(self) -> AbortableList<HoprTransportProcess> {
-        let (packet_key, wire_msg, api, counters, _unack, _ticket_events, _cfg, mut processes, codec) = self.prepare();
+        let (
+            packet_key,
+            wire_msg,
+            api,
+            counters,
+            _unack,
+            _ticket_events,
+            exit_ack_proc,
+            ssa_events,
+            cfg,
+            mut processes,
+            codec,
+        ) = self.prepare();
 
         let inner = match codec {
             #[cfg(not(feature = "capture"))]
@@ -554,7 +698,8 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
+                .with_exit_ack_share_processing(exit_ack_proc, ssa_events)
                 .build_for_exit(),
             #[cfg(feature = "capture")]
             BuiltCodec::Captured(encoder, decoder) => PacketPipelineBuilder::new(packet_key.clone())
@@ -562,7 +707,8 @@ where
                 .codec((encoder, decoder))
                 .api(api)
                 .with_counters(counters)
-                .with_config(_cfg.pipeline)
+                .with_config(cfg.pipeline)
+                .with_exit_ack_share_processing(exit_ack_proc, ssa_events)
                 .build_for_exit(),
         };
 
