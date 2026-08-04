@@ -1667,8 +1667,9 @@ where
                         ),
                         Some(notifier),
                         // Entry (sending) side: give flow control the SURB balancer state as its
-                        // anti-grief down-only ceiling.
+                        // anti-grief down-only ceiling, and the client's opt-in flow-control config.
                         Some(surb_mgmt.clone()),
+                        cfg.flow_control,
                     )?;
 
                     #[cfg(feature = "telemetry")]

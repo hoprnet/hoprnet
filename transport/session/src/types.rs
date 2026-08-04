@@ -259,39 +259,6 @@ pub const SESSION_APPLICATION_TAG: Tag = Tag::Reserved(ReservedTag::Session as u
 /// application tag for all sessions instead of dynamically allocating tags.
 pub type SessionId = HoprPseudonym;
 
-/// Reads the opt-in client-side flow-control window configuration from the environment.
-///
-/// Returns `None` (today's unpaced behaviour) unless `HOPR_SESSION_FLOW_CONTROL` is truthy. This
-/// mirrors the existing env-driven session/balancer tuning (`HOPR_BALANCER_PID_*` etc.) and keeps
-/// the mechanism the client's explicit dial without threading a config field through the whole stack.
-/// Optional overrides: `HOPR_SESSION_FLOW_CONTROL_MIN_WIN`, `HOPR_SESSION_FLOW_CONTROL_MAX_WIN`
-/// (bytes).
-fn flow_control_from_env() -> Option<FlowControlConfig> {
-    let enabled = std::env::var("HOPR_SESSION_FLOW_CONTROL")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-    if !enabled {
-        return None;
-    }
-    let mut cfg = FlowControlConfig {
-        enabled: true,
-        ..Default::default()
-    };
-    if let Ok(n) = std::env::var("HOPR_SESSION_FLOW_CONTROL_MIN_WIN")
-        .unwrap_or_default()
-        .parse()
-    {
-        cfg.min_window_size = n;
-    }
-    if let Ok(n) = std::env::var("HOPR_SESSION_FLOW_CONTROL_MAX_WIN")
-        .unwrap_or_default()
-        .parse()
-    {
-        cfg.max_window_size = n;
-    }
-    Some(cfg)
-}
-
 pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
         AcknowledgementMode::Both
@@ -412,12 +379,13 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None)
     }
 
-    /// Like [`new`](Self::new) but threads the SURB balancer state so that opt-in client-side flow
-    /// control (see `flow_control_from_env`) can use it as the anti-grief down-only ceiling. The
-    /// entry (sending) side passes `Some(..)`; sites without balancer state pass `None`.
+    /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
+    /// flow-control config. `flow_control` = the client's [`FlowControlConfig`] for this session
+    /// (`None` leaves it unpaced); `surb_mgmt` gives the window its anti-grief down-only SURB ceiling.
+    /// The entry (sending) side passes `Some(..)`; sites without them pass `None`.
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
@@ -426,6 +394,7 @@ impl HoprSession {
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
+        flow_control: Option<FlowControlConfig>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -479,6 +448,8 @@ impl HoprSession {
             if cfg.capabilities.contains(Capability::RetransmissionAck)
                 || cfg.capabilities.contains(Capability::RetransmissionNack)
             {
+                let fc = flow_control;
+
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
@@ -489,15 +460,27 @@ impl HoprSession {
                     mode: caps_to_ack_mode(cfg.capabilities),
                     backoff_base: 0.2,
                     max_incoming_frame_retries: 1,
-                    max_outgoing_frame_retries: 2,
+                    // Under flow control the sender is paced to the SURB drain rate, so an un-acked
+                    // frame is usually just a *delayed* ack on a temporarily-starved return path, not
+                    // a genuine loss. The retry budget is a flow-control config knob (`frame_retries`,
+                    // default 2 = original); a robust profile raises it so delayed frames recover
+                    // instead of being abandoned (an abandoned frame leaves a gap → stream corruption).
+                    // `.max(1)`: never drop the retry budget to 0 — an abandoned frame under
+                    // reliable-mode flow control leaves a gap and corrupts the stream.
+                    max_outgoing_frame_retries: fc.map(|c| c.frame_retries.max(1) as usize).unwrap_or(2),
                     ..Default::default()
                 };
 
-                debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
+                debug!(
+                    ?socket_cfg,
+                    ?ack_cfg,
+                    flow_control = fc.is_some(),
+                    "opening new stateful session socket"
+                );
 
                 // Opt-in client-side flow control: when enabled, install the honest-clock tap on the
                 // ack state and keep the paired clock to drive the paced writer.
-                let (ack_state, flow_control) = match flow_control_from_env() {
+                let (ack_state, flow_control) = match fc {
                     Some(fc_cfg) => {
                         let meter = DeliveryMeter::default();
                         let ack_state = AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg)
