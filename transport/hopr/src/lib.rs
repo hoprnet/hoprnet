@@ -113,8 +113,8 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 
 pub use hopr_api as api;
 use hopr_api::{
-    chain::{ChainReadTicketOperations, ChainWriteTicketOperations},
-    node::{PixDepositAddressReceived, PixDepositSecret, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
+    chain::{ChainReadTicketOperations, ChainWriteTicketOperations, PixDepositSecret},
+    node::{PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
