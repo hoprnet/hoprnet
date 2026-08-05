@@ -6563,6 +6563,129 @@ mod tests {
         Ok(())
     }
 
+    /// Within a *live* batch, `SsaAlmostRecovered` for every index but the last must be a no-op.
+    ///
+    /// Nothing suppresses the earlier signals upstream: each SSA of a batch has its own builder and
+    /// its own `check_early_threshold` latch, and the Entry's polynomial queue is FIFO, so the Exit
+    /// reconstructs `[1, 2, 3]` in index order and genuinely raises the early-recovery signal for
+    /// each member in turn. The stale-cycle guard in `request_next_ssa` is the only thing that stops
+    /// each of them from allocating a batch of its own — which would burn `BATCH` indices and emit
+    /// `BATCH` deposits per member.
+    ///
+    /// This is the arrival order that [`exit_batches_configured_number_of_ssas_into_one_request`]
+    /// does not exercise: there the earlier index arrives only *after* the last one already advanced
+    /// the cycle, so it is stale against a superseded batch rather than an active one.
+    ///
+    /// `peek_index` is the mid-test signal rather than the captured traffic, because `advance_index`
+    /// runs inside the awaited `request_next_ssa` whereas the send only reaches
+    /// [`mock_packet_planning`]'s forwarding task afterwards. The requests are asserted at the end,
+    /// where they also prove no extra one slipped out.
+    #[test_log::test(tokio::test)]
+    async fn only_the_last_index_of_a_live_batch_triggers_the_next_one() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        const BATCH: usize = 3;
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ssas_per_request: BATCH,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let requested: Arc<std::sync::Mutex<Vec<Vec<u32>>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let requested_clone = requested.clone();
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport.expect_send_message().returning(move |_, data| {
+            if let Ok(HoprStartProtocol::SsaRequest(req)) = HoprStartProtocol::try_from(data.data) {
+                requested_clone
+                    .lock()
+                    .unwrap()
+                    .push(req.commitments.keys().map(|i| i.get()).collect());
+            }
+            Box::pin(async { Ok(()) })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let slot = mgr.sessions.get(&alice_pseudonym).context("session must exist")?;
+        let ssa_state = slot.current_ssa_state.get().context("pix state must be set")?;
+
+        let after_first_batch = BATCH as u32 + 1;
+        assert_eq!(
+            ssa_state.peek_index().get(),
+            after_first_batch,
+            "establishment must allocate the whole batch [1, 2, 3]"
+        );
+
+        // 1 and 2 cross their own early-recovery threshold first, in that order, while [1, 2, 3] is
+        // still the current batch. Neither may allocate anything.
+        for non_last in 1..BATCH as u32 {
+            let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(non_last).expect("non-zero"));
+            mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(ssa_id))
+                .await?;
+            assert_eq!(
+                ssa_state.peek_index().get(),
+                after_first_batch,
+                "SsaAlmostRecovered({non_last}) is not the last index of the live batch, so it must not request \
+                 anything"
+            );
+        }
+
+        // Only the last index pipelines the refill.
+        let last = SsaId::new(alice_pseudonym, SsaIndex::new(BATCH as u32).expect("non-zero"));
+        mgr.dispatch_pix_event(HoprSessionInPixEvent::SsaAlmostRecovered(last))
+            .await?;
+        assert_eq!(
+            ssa_state.peek_index().get(),
+            2 * BATCH as u32 + 1,
+            "SsaAlmostRecovered({BATCH}) must request the next batch [4, 5, 6]"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        let requested = requested.lock().unwrap().clone();
+        assert_eq!(
+            requested,
+            vec![vec![1, 2, 3], vec![4, 5, 6]],
+            "exactly two requests: the establishment batch, and the one the last index triggered"
+        );
+
+        Ok(())
+    }
+
     /// Every index of a batch gets its own kill switch, and they all share one deadline scaled by the
     /// batch size.
     ///
