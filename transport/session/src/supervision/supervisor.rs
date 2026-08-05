@@ -61,6 +61,18 @@ struct PerSsaState {
     // Overlap / deferred-request state.
     next_request_pending_deposit: bool,
     next_requested: bool,
+    /// Set on the last cycle allocated by [`SessionPixSupervisor::emit_request_next_ssa`], and only
+    /// on that one.
+    ///
+    /// The successor gate: a batch asks for its replacement once, when its *last* cycle is nearly
+    /// recovered. Every other flag here is per-cycle, so without this one each member of a batch
+    /// would answer its own `AlmostRecovered` with a whole batch of its own — `ssas_per_request`
+    /// batches per batch, compounding, each cycle a separate on-chain deposit for the Entry.
+    ///
+    /// The last cycle rather than the first because the batch is served in index order: gating on
+    /// the first would ask for the successor a whole batch too early, which is the exposure
+    /// `ssas_per_request` deliberately bounds.
+    is_batch_last: bool,
     /// Set when `Recovered` arrives before deposit confirms (i.e. during
     /// `AwaitingCommitment` or `AwaitingDeposit`). Once deposit is confirmed
     /// and the SSA enters `Recovering`, this flag triggers an immediate
@@ -88,6 +100,7 @@ impl PerSsaState {
             accumulated_deposit: HoprBalance::new_base(0),
             next_request_pending_deposit: false,
             next_requested: false,
+            is_batch_last: false,
             recovered_pending: false,
             served_total_at_last_progress: 0,
         }
@@ -513,6 +526,13 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
+        // The successor gate. A cycle in the middle of a batch reaching its early-recovery threshold
+        // says nothing about the batch as a whole: the ones behind it still have their full quota to
+        // serve. Only the last cycle standing in for the batch may ask for a replacement.
+        if !self.ssas[idx].is_batch_last {
+            return Vec::new();
+        }
+
         let next_requested = self.ssas[idx].next_requested;
         let phase = self.ssas[idx].phase;
 
@@ -565,8 +585,9 @@ impl SessionPixSupervisor {
                 // the transition immediately after entering Recovering.
                 self.ssas[idx].recovered_pending = true;
                 // Also ensure the next SSA request is deferred — the
-                // eventual tombstone will emit it.
-                if !self.ssas[idx].next_requested {
+                // eventual tombstone will emit it. Subject to the same successor gate as
+                // `on_almost_recovered`: a non-last cycle of a batch never asks, deferred or not.
+                if !self.ssas[idx].next_requested && self.ssas[idx].is_batch_last {
                     self.ssas[idx].next_request_pending_deposit = true;
                     self.ssas[idx].next_requested = true;
                 }
@@ -604,7 +625,9 @@ impl SessionPixSupervisor {
         self.ssas[idx].recovered_pending = false;
 
         let mut actions = Vec::new();
-        if !next_requested {
+        // Full recovery is the fallback trigger for the early signal, so it carries the same
+        // successor gate: a non-last cycle of a batch is tombstoned without asking for anything.
+        if !next_requested && self.ssas[idx].is_batch_last {
             self.ssas[idx].next_requested = true;
             actions.extend(self.emit_request_next_ssa(now));
         }
@@ -718,7 +741,28 @@ impl SessionPixSupervisor {
         // from resurrecting it.
         let retired = self.ssas[idx].ssa_id;
         self.retired_ssa_indices.push(retired.ssa_index());
+        let carried_successor_gate = self.ssas[idx].is_batch_last && !self.ssas[idx].next_requested;
         self.ssas.remove(idx);
+
+        // Retiring the cycle that carried the successor gate would strand the batch: its surviving
+        // siblings are barred from asking, so nothing would ever request a replacement and the
+        // Session would die on a recovery timeout that names the timer rather than the cause. Hand
+        // the gate to the newest cycle still standing, which is now the last of the batch that will
+        // actually serve its quota — so the request still cannot come early. `next_requested` guards
+        // it: a gate already spent must not be handed on and fire a second time.
+        if carried_successor_gate
+            && let Some(newest) = self
+                .ssas
+                .iter_mut()
+                .filter(|s| !s.is_terminal())
+                .max_by_key(|s| s.ssa_id.ssa_index())
+        {
+            tracing::debug!(
+                %retired, promoted = %newest.ssa_id,
+                "successor gate handed on from a retired cycle"
+            );
+            newest.is_batch_last = true;
+        }
         vec![SessionPixAction::RetireSsa(retired)]
     }
 
@@ -727,11 +771,14 @@ impl SessionPixSupervisor {
     /// The batch size is [`SupervisorConfig::ssas_per_request`], clamped rather than trusted since a
     /// supervisor can be built from a config that never went through `validate_pix_supervision`.
     ///
-    /// Batching does not weaken the successor gate: `on_almost_recovered` still refuses to ask for
-    /// another batch while any cycle of this one is unfunded. What it does change is the exposure
-    /// *within* a batch — every cycle in it is unfunded at once, so the ceiling is `ssas_per_request`
-    /// SSA quotas rather than one. That is the trade the knob exists to make, and it is why both
-    /// deadlines are scaled by the same factor.
+    /// Exactly one cycle of the batch — the last one allocated — carries
+    /// [`PerSsaState::is_batch_last`], and only that cycle may ask for the successor batch. Without
+    /// it every member would ask for one of its own, since the request flags are per-cycle; see that
+    /// field for why the last rather than the first.
+    ///
+    /// What batching does change is the exposure *within* a batch: every cycle in it is unfunded at
+    /// once, so the ceiling is `ssas_per_request` SSA quotas rather than one. That is the trade the
+    /// knob exists to make, and it is why both deadlines are scaled by the same factor.
     fn emit_request_next_ssa(&mut self, now: Instant) -> Vec<SessionPixAction> {
         let batch = self.cfg.ssas_per_request.clamp(1, crate::MAX_SSA_BATCH_SIZE);
         let mut ssa_ids = Vec::with_capacity(batch);
@@ -769,6 +816,13 @@ impl SessionPixSupervisor {
             self.closed = true;
             return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
         }
+
+        // The last cycle *actually* allocated carries the successor gate, which is what makes a
+        // batch truncated by index exhaustion still able to ask for the next one.
+        self.ssas
+            .last_mut()
+            .expect("a non-empty batch has just been pushed")
+            .is_batch_last = true;
 
         vec![SessionPixAction::RequestSsa {
             ssa_ids,
@@ -2164,6 +2218,172 @@ mod tests {
 
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert!(actions.is_empty());
+    }
+
+    /// At `ssas_per_request > 1`, only the batch's **last** SSA may ask for the successor batch.
+    ///
+    /// `next_requested` is per-`PerSsaState`, so without a batch-wide gate every member of a batch
+    /// answers its own `AlmostRecovered` with a fresh batch of `ssas_per_request`: one batch of 3
+    /// becomes three, then nine, each SSA a separate on-chain deposit demanded of the Entry. The
+    /// documented invariant on [`SessionPixSupervisor::emit_request_next_ssa`] is the opposite —
+    /// "refuses to ask for another batch while any cycle of this one is unfunded" — and at
+    /// `ssas_per_request == 1` the two readings coincide, which is why every other test here misses
+    /// it.
+    ///
+    /// All three cycles are funded and `Recovering` before the first event, i.e. the case where the
+    /// deferral in [`almost_recovered_while_awaiting_deposit_defers_request`] does *not* apply and
+    /// only the batch gate can hold the request back.
+    #[test]
+    fn only_the_last_ssa_of_a_batch_asks_for_the_next_one() {
+        const BATCH: usize = 3;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        // Fund every cycle of the batch, so each one is in `Recovering`.
+        for idx in 1..=BATCH as u32 {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: None,
+                },
+                now,
+                0,
+            );
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+        assert_eq!(sup.next_ssa_index, BATCH as u32 + 1, "one batch allocated so far");
+
+        // Every member but the last is silent, in the order the Exit actually reconstructs them.
+        for idx in 1..BATCH as u32 {
+            let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, idx)), now, 0);
+            assert!(
+                actions.is_empty(),
+                "SSA {idx} is not the last of the batch and must not ask for a successor, got {actions:?}"
+            );
+            assert_eq!(
+                sup.next_ssa_index,
+                BATCH as u32 + 1,
+                "SSA {idx} must not allocate any index"
+            );
+        }
+
+        // The last member is the one that pipelines the refill.
+        let last = ssa_id(p, BATCH as u32);
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(last), now, 0);
+        assert_eq!(actions.len(), 1, "the last SSA of the batch must ask exactly once");
+        match &actions[0] {
+            SessionPixAction::RequestSsa { ssa_ids, .. } => assert_eq!(
+                ssa_ids.iter().map(|i| i.ssa_index().get()).collect::<Vec<_>>(),
+                (BATCH as u32 + 1..=2 * BATCH as u32).collect::<Vec<_>>(),
+                "the successor batch must be the next contiguous run"
+            ),
+            other => panic!("expected RequestSsa, got {other:?}"),
+        }
+
+        // Once-only is preserved for the last member too.
+        assert!(
+            sup.handle_event(&SessionPixEvent::AlmostRecovered(last), now, 0)
+                .is_empty(),
+            "a repeated AlmostRecovered on the last member must not ask again"
+        );
+        assert_eq!(sup.next_ssa_index, 2 * BATCH as u32 + 1);
+    }
+
+    /// Retiring the cycle that holds the successor gate must hand it to the newest survivor.
+    ///
+    /// Otherwise the batch is stranded: its siblings are barred from asking, so no replacement is
+    /// ever requested and the Session dies on a recovery timeout instead of on its actual cause.
+    /// The promoted cycle is the last of the batch that will really serve its quota, so the request
+    /// still cannot come early.
+    #[test]
+    fn retiring_the_last_ssa_of_a_batch_hands_the_successor_gate_on() {
+        const BATCH: usize = 3;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        // Cycles 1 and 2 get funded; 3 — the gate holder — is left awaiting its deposit.
+        for idx in 1..BATCH as u32 {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: None,
+                },
+                now,
+                0,
+            );
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+        let last = ssa_id(p, BATCH as u32);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(last), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: last,
+                expected_deposit: Some(sufficient_balance()),
+            },
+            now,
+            0,
+        );
+
+        // Its deposit observer gives up, so the gate holder is retired mid-batch.
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(last), now, 0);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::RetireSsa(id) if *id == last)),
+            "the unfunded last cycle must be retired, not close the Session, got {actions:?}"
+        );
+        assert!(!sup.closed, "surviving siblings must keep the Session alive");
+
+        // The gate is now cycle 2's, and cycle 1 is still barred.
+        assert!(
+            sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 1)), now, 0)
+                .is_empty(),
+            "cycle 1 is still not the last survivor and must stay silent"
+        );
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 2)), now, 0);
+        assert_eq!(
+            actions.len(),
+            1,
+            "the newest survivor must have inherited the successor gate, got {actions:?}"
+        );
+        match &actions[0] {
+            SessionPixAction::RequestSsa { ssa_ids, .. } => assert_eq!(
+                ssa_ids.iter().map(|i| i.ssa_index().get()).collect::<Vec<_>>(),
+                (BATCH as u32 + 1..=2 * BATCH as u32).collect::<Vec<_>>(),
+                "the successor batch still starts past the whole retired batch"
+            ),
+            other => panic!("expected RequestSsa, got {other:?}"),
+        }
     }
 
     #[test]
