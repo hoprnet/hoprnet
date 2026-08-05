@@ -40,6 +40,28 @@ const FUNDING_AMOUNT: &str = "15000 wxHOPR";
 const PIX_POLYS: u16 = 8;
 const PIX_SHARES: u16 = 2;
 
+/// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
+///
+/// Deliberately above the Entry's default cap of 2, so the test also proves that
+/// `pix.max_ssas_per_request` is really plumbed from node configuration through to the
+/// `SessionManager`: a batch of 2 would be accepted even by an Entry that ignored the knob entirely,
+/// whereas a batch of 3 is refused outright unless the raised cap takes effect.
+const SSA_BATCH: usize = 3;
+
+/// Budget for observing two full SSA batches, measured from a live session.
+///
+/// Generous next to the ~3 cycles of traffic it actually takes — the 1-hop
+/// [`capture_n_hop_pix_session`] case completes 3 cycles well inside a minute — because the point of
+/// the bound is not to be tight. It is to turn "the Exit stopped requesting SSAs" into a named
+/// failure instead of a bare `rstest` timeout that says only that the test did not finish.
+#[cfg(feature = "session-client")]
+#[allow(unexpected_cfgs)]
+const BATCH_OBSERVATION_BUDGET: Duration = if cfg!(coverage) {
+    Duration::from_secs(300)
+} else {
+    Duration::from_secs(150)
+};
+
 /// Builds an Entry → N relays → Exit cluster with the Exit's PIX config, opens bidirectional
 /// channels along the path, and waits for the graph to propagate.
 ///
@@ -57,6 +79,22 @@ async fn build_pix_cluster(
     exit_pix: IncomingSessionPixConfig,
     idle_timeout: Duration,
 ) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard> {
+    let default_cap = hopr_lib::exports::transport::config::PixGlobalConfig::default().max_ssas_per_request;
+    build_pix_cluster_with_entry_cap(hops, exit_pix, idle_timeout, default_cap).await
+}
+
+/// As [`build_pix_cluster`], but with the Entry's `max_ssas_per_request` under the caller's control.
+///
+/// Only [`batched_ssa_request_drives_pix_cycles`] needs this. The batch size is not negotiated, so an
+/// Exit asking for more SSAs per request than the Entry accepts has every request refused — raising
+/// one side means raising the other in step, and this is the other side.
+#[cfg(feature = "session-client")]
+async fn build_pix_cluster_with_entry_cap(
+    hops: usize,
+    exit_pix: IncomingSessionPixConfig,
+    idle_timeout: Duration,
+    entry_max_ssas_per_request: usize,
+) -> anyhow::Result<hopr_lib::testing::fixtures::RoleClusterGuard> {
     let cluster = build_role_cluster(
         TestNodeConfig {
             win_prob: 1.0,
@@ -64,7 +102,7 @@ async fn build_pix_cluster(
                 num_ssa_parts: PIX_POLYS as usize,
                 ssa_part_size: PIX_SHARES as usize,
                 additional_shares: 2,
-                ..Default::default()
+                max_ssas_per_request: entry_max_ssas_per_request,
             }),
             idle_timeout_ms: idle_timeout.as_millis() as u64,
             ..Default::default()
@@ -830,5 +868,192 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
     }
 
     tracing::info!(hops, "enforce_pix rejection test PASSED");
+    Ok(())
+}
+
+/// 1-hop PIX session in which the Exit requests [`SSA_BATCH`] SSAs per `SsaRequest`.
+///
+/// The supervisor's own unit tests already pin the batch onto a single `RequestSsa` action, and
+/// `hopr-transport-session`'s integration tests pin that action onto a single `SsaRequest` message.
+/// What only a cluster shows is that the batch survives the real path: `SSA_BATCH` commitment sets
+/// burst back through a relay over QUIC into the Exit's *bounded* Start-protocol ingress channel, and
+/// every one of them has to land. A dropped `SsaCommit` has no NACK, so an ingress channel that was
+/// not sized for the batch would lose a cycle silently here and the Session would die on a deposit
+/// timeout minutes later.
+///
+/// It is also the only place the batch meets the supervisor's real per-cycle deadlines rather than a
+/// mocked clock. Those deadlines are scaled by `ssas_per_request`, and they have to be: the Entry
+/// works through a batch in order, so holding the last cycle to an unscaled window would close a
+/// Session whose peer is behaving perfectly.
+///
+/// Three properties are checked, each regressing differently:
+///
+///  1. **The batch is allocated up front** — at least `SSA_BATCH` deposit addresses reach the Exit before it recovers
+///     its first private key. Unbatched, the Exit learns of the next address only once the current cycle is nearly
+///     recovered, so this count would be one or two, never three.
+///  2. **Batch N+1 follows batch N** — enforced by [`BATCH_OBSERVATION_BUDGET`] rather than an `assert!`, since the
+///     failure mode is a stall, not a wrong value. A batch is requested once per recovered cycle at most, so an
+///     off-by-one in the supervisor's index bookkeeping leaves the Session with no further SSAs and it quietly stops
+///     rolling.
+///  3. **Indices are contiguous and addresses unique** across both batches — a batch is allocated as `first .. first +
+///     batch`, and a wrapped or reused index would collide with a live cycle.
+#[cfg(feature = "session-client")]
+#[rstest]
+#[case(1)]
+#[serial]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::Result<()> {
+    // Both PIX sides raised together: the Exit asks for SSA_BATCH per request, and the Entry has to
+    // accept that many or it refuses every request outright.
+    let cluster = build_pix_cluster_with_entry_cap(
+        hops,
+        IncomingSessionPixConfig {
+            quota_range: 0..=100_000,
+            enforce_pix: false,
+            supervision: SupervisorConfig {
+                max_ssa_delivery_time: Duration::from_secs(10),
+                max_deposit_wait: Duration::from_secs(60),
+                ssas_per_request: SSA_BATCH,
+                ..Default::default()
+            },
+        },
+        Duration::from_secs(90),
+        SSA_BATCH,
+    )
+    .await?;
+
+    // ── Subscribe to PixEvent streams BEFORE creating the session ─────────
+    let mut entry_events = Box::pin(cluster.entry.inner().subscribe_pix_events());
+    let mut exit_events = Box::pin(cluster.exit.inner().subscribe_pix_events());
+
+    tracing::info!("establishing PIX session");
+    let session = establish_pix_session(&cluster, hops).await?;
+    tracing::info!("session established");
+
+    // Traffic is what moves shares, so the cycles only advance while this runs. Why it eventually
+    // stops is not this test's subject — the assertions below are all about PIX events.
+    let echo_handle = spawn_echo_task(session, EchoStopCell::default(), Duration::from_secs(10));
+
+    // ── Observe two consecutive batches ───────────────────────────────────
+    let mut entry_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut exit_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    let mut exit_addresses = Vec::new();
+    let mut recovered_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
+    // Latched on the first recovery: how many addresses the Exit had been handed by the time it
+    // finished its first cycle. This is the establishment batch, counted from the Exit's own stream
+    // so no cross-stream ordering is involved.
+    let mut addresses_before_first_recovery: Option<usize> = None;
+
+    let observe = async {
+        loop {
+            tokio::select! {
+                event = entry_events.next() => {
+                    match event.context("Entry PIX event stream ended while the session was live")? {
+                        PixEvent::NewDepositAddress(data) => {
+                            assert!(
+                                !entry_ids.contains(&data.id),
+                                "duplicate NewDepositAddress for {:?} — every cycle in a batch needs its own SSA",
+                                data.id,
+                            );
+                            entry_ids.push(data.id);
+                            tracing::info!(id = ?data.id, quota = data.quota, "Entry: NewDepositAddress");
+                        }
+                        other => anyhow::bail!("unexpected Entry PixEvent: {other:?}"),
+                    }
+                }
+                event = exit_events.next() => {
+                    match event.context("Exit PIX event stream ended while the session was live")? {
+                        PixEvent::DepositAddressReceived(data) => {
+                            tracing::info!(id = ?data.id, quota = data.quota, "Exit: DepositAddressReceived");
+                            assert!(
+                                !exit_ids.contains(&data.id),
+                                "duplicate DepositAddressReceived for {:?} — a reused SSA index would \
+                                 collide with a live cycle",
+                                data.id,
+                            );
+                            assert!(
+                                !exit_addresses.contains(&data.address),
+                                "deposit address for {:?} was already used by an earlier cycle — each SSA \
+                                 in a batch must get its own",
+                                data.id,
+                            );
+                            exit_ids.push(data.id);
+                            exit_addresses.push(data.address);
+                            // Signal the deposit immediately so this cycle's deadline is disarmed.
+                            if let Some(mut notifier) = data.deposit_updated {
+                                notifier
+                                    .send((data.id, HoprBalance::new_base(1)))
+                                    .await
+                                    .context("failed to signal deposit via notifier")?;
+                            }
+                        }
+                        PixEvent::PrivateKeyRecovered(data) => {
+                            addresses_before_first_recovery.get_or_insert(exit_ids.len());
+                            assert!(
+                                !recovered_ids.contains(&data.id),
+                                "duplicate PrivateKeyRecovered for {:?}",
+                                data.id,
+                            );
+                            recovered_ids.push(data.id);
+                            tracing::info!(count = recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
+                        }
+                        other => anyhow::bail!("unexpected Exit PixEvent: {other:?}"),
+                    }
+                }
+            }
+
+            // Twice the batch size proves a *second* batch was requested, and `SSA_BATCH` recoveries
+            // prove the first batch's cycles actually reconstructed rather than merely being handed out.
+            if exit_ids.len() >= 2 * SSA_BATCH && recovered_ids.len() >= SSA_BATCH {
+                break;
+            }
+        }
+        anyhow::Ok(())
+    };
+
+    tokio::time::timeout(BATCH_OBSERVATION_BUDGET, observe).await.context(
+        "timed out observing two SSA batches — the Exit most likely stopped requesting SSAs after the first batch, \
+         which is how an off-by-one in the supervisor's index bookkeeping manifests",
+    )??;
+
+    // ── 1. The whole batch is allocated before the first cycle completes ──
+    let before_first_recovery = addresses_before_first_recovery.context("the Exit never recovered a key")?;
+    assert!(
+        before_first_recovery >= SSA_BATCH,
+        "the Exit was told about only {before_first_recovery} deposit address(es) before it recovered its first key; \
+         a batch of {SSA_BATCH} is allocated up front, so it should already know all {SSA_BATCH}. Getting one or two \
+         here means the batch size did not take effect. exit_ids={exit_ids:?}",
+    );
+
+    // ── 2. Contiguous indices from 1, across the batch boundary ───────────
+    let mut indices: Vec<u32> = exit_ids.iter().map(|(_, index)| index.get()).collect();
+    indices.sort_unstable();
+    assert_eq!(
+        indices,
+        (1..=exit_ids.len() as u32).collect::<Vec<_>>(),
+        "SSA indices must be contiguous from 1 both within a batch and from one batch to the next",
+    );
+
+    // ── 3. Every recovered cycle passed through all three stages ──────────
+    let fully_correlated = recovered_ids
+        .iter()
+        .filter(|id| entry_ids.contains(id) && exit_ids.contains(id))
+        .count();
+    assert!(
+        fully_correlated >= SSA_BATCH,
+        "expected at least {SSA_BATCH} SSA cycles seen at all three stages (NewDepositAddress, DepositAddressReceived \
+         AND PrivateKeyRecovered), got {fully_correlated}. entry_ids={entry_ids:?}, exit_ids={exit_ids:?}, \
+         recovered_ids={recovered_ids:?}",
+    );
+
+    echo_handle.abort();
+
+    tracing::info!(
+        batch = SSA_BATCH,
+        addresses = exit_ids.len(),
+        recovered = recovered_ids.len(),
+        "batched PIX session test PASSED"
+    );
     Ok(())
 }
