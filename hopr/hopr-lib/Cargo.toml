@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "4.0.2-rc.9"
+version = "4.0.2-rc.10"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -67,7 +67,7 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = []
+default = ["transport-announce-quic"]
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-network-graph?/telemetry",
