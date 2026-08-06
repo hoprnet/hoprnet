@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compute_paths","opt_min","prune_for_consistency"],"struct":["HoprGraphPathSelector","MetricsValueFn","PathCostWithMetrics"]};

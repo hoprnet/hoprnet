@@ -1,0 +1,2 @@
+window.ALL_CRATES = ["hopr_crypto_packet","hopr_lib","hopr_protocol_app","hopr_protocol_hopr","hopr_protocol_session","hopr_protocol_start","hopr_transport","hopr_transport_mixer","hopr_transport_probe","hopr_transport_session","hopr_transport_tag_allocator","hopr_utils_session"];
+//{"start":21,"fragment_lengths":[20,11,20,21,24,22,17,23,23,25,31,21]}
