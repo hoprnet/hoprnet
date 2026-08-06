@@ -367,50 +367,6 @@ pub struct SupervisorConfig {
     #[default(0)]
     pub max_unverifiable_shares_per_session: u64,
 
-    /// Useful shares tolerated on a cycle while an *earlier* cycle of the batch is still unrecovered,
-    /// across the whole session, before it is closed.
-    ///
-    /// A batch only de-risks the Exit if its cycles are served one at a time. An Entry that instead
-    /// spread shares across all `ssas_per_request` cycles could take `ssas_per_request × quota` of
-    /// service while leaving every one of them short of recovery — and a cycle short of recovery pays
-    /// nothing at all, since the SSA is the sum of *every* polynomial's constant term. That turns the
-    /// batch knob from cost-neutral into an `n`-fold amplifier of unpaid traffic, and none of the other
-    /// guards see it: the service gate and the idle deadline both measure the *absence* of progress,
-    /// and a spreading Entry makes progress on every cycle continuously — it simply never finishes one.
-    ///
-    /// A conforming Entry contributes nothing here. Its emission window is clamped to one cycle (see
-    /// [`hopr_protocol_pix::SHARE_EMISSION_WINDOW`]), and it keeps feeding a cycle's tail for
-    /// `surplus_shares` per polynomial *after* that cycle became reconstructable, so the earlier cycle
-    /// is terminal well before the next one's first share is emitted. What the allowance covers is
-    /// in-flight reordering: acknowledgements unlock shares, and a batch of them can be processed
-    /// after the following cycle's have already landed.
-    ///
-    /// Session-cumulative rather than per-cycle, because an Entry that misorders is misbehaving and
-    /// will not improve. What separates it from noise is rate, not total: a spreading Entry books
-    /// out-of-order shares at nearly its whole service rate and crosses any ceiling at once, while
-    /// reordering is a trickle.
-    ///
-    /// ## Why the ceiling is this large
-    ///
-    /// It is derived, not chosen, and the binding case is not reordering — it is a cycle that has
-    /// become *unrecoverable* through loss. A polynomial that loses more than `surplus_shares` of its
-    /// shares can never reach its threshold, so its cycle never completes and never goes terminal,
-    /// which makes every later cycle's progress count here. That cycle is not the Exit's problem to
-    /// close a Session over: it stops progressing, its
-    /// [`max_recovery_idle`](Self::max_recovery_idle) deadline expires, and it is retired — after
-    /// which the later cycles are the earliest live ones again and counting stops on its own. The
-    /// ceiling only has to outlast that window, or a single unlucky polynomial would close a Session
-    /// that the retirement path was about to fix by itself.
-    ///
-    /// At the deployed 1.5 Mbps per-Session cap that window admits ~181 shares/s × 60 s ≈ 10 900
-    /// shares, so 16 384 leaves ~1.5× headroom. It is still only ~3 % of one cycle's
-    /// `target_useful_shares` at deployed dimensions, which is the bound it puts on how much
-    /// misdirected service a spreading Entry can extract before the Session closes.
-    ///
-    /// Default: 16384 shares.
-    #[default(16384)]
-    pub max_out_of_order_shares_per_session: u64,
-
     /// Cap on the provisional predeposit service budget.
     ///
     /// This buys the application its opening exchange while the deposit confirms on chain; it is not
@@ -563,9 +519,6 @@ pub enum SessionPixCloseReason {
     RecoveryDeadline,
     /// Too many unverifiable shares (per-SSA or session-limit exceeded).
     TooManyUnverifiableShares,
-    /// The Entry served too many shares for a cycle while an earlier cycle of the batch was still
-    /// unrecovered — see [`SupervisorConfig::max_out_of_order_shares_per_session`].
-    TooManyOutOfOrderShares,
     /// A counter observation decreased (protocol violation).
     CounterRegression,
     /// Internal inconsistency (e.g., mismatched target, event on unknown SSA).
