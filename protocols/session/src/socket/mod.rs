@@ -28,6 +28,7 @@ use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
     protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
+    session_socket_mtu,
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -131,8 +132,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
         // The maximum is bounded by the SeqIndicator capacity.
         let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,
         );
 
         // Segment data incoming/outgoing using underlying transport
@@ -279,8 +280,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
         // The maximum is reduced due to the size of the missing segment bitmap in SegmentRequests.
         let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>()
                 * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
         );
 
