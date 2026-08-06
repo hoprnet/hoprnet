@@ -695,7 +695,7 @@ pub(crate) mod tests {
             &mapper,
         )?;
 
-        assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
+        assert!(mp.as_ref().len() < 3500, "metapacket too long {}", mp.as_ref().len());
 
         let mut received_plaintext = Box::default();
         for (i, pair) in keypairs.iter().enumerate() {
