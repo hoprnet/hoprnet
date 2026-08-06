@@ -113,7 +113,7 @@ serde_cbor_2 = "0.13.0"
 serde_repr = "0.1.21"
 serde-saphyr = "1.0.1"
 serde_with = { version = "3.21.0", features = ["base64"] }
-serial_test = "3.5.0"
+serial_test = "4.0.1"
 smart-default = "0.7.1"
 strum = { version = "0.28.0", features = ["derive"] }
 subtle = "2.6.1"
