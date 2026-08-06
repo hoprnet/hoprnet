@@ -1099,8 +1099,9 @@ mod tests {
             .await??;
 
         // The whole first frame is discarded due to the missing first segment
-        assert_eq!(data.len() - 1500, bob_data.len());
-        assert_eq!(&data[1500..], &bob_data);
+        let segment_payload = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+        assert_eq!(data.len() - segment_payload, bob_data.len());
+        assert_eq!(&data[segment_payload..], &bob_data);
 
         bob_socket.close().await?;
 
@@ -1262,11 +1263,12 @@ mod tests {
             .await??;
 
         // The whole first frame is discarded due to the missing first segment
-        assert_eq!(bob_sent_data.len() - 1500, alice_recv_data.len());
-        assert_eq!(&bob_sent_data[1500..], &alice_recv_data);
+        let segment_payload = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+        assert_eq!(bob_sent_data.len() - segment_payload, alice_recv_data.len());
+        assert_eq!(&bob_sent_data[segment_payload..], &alice_recv_data);
 
-        assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
-        assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+        assert_eq!(alice_sent_data.len() - segment_payload, bob_recv_data.len());
+        assert_eq!(&alice_sent_data[segment_payload..], &bob_recv_data);
 
         #[cfg(feature = "telemetry")]
         {
