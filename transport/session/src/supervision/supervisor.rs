@@ -166,7 +166,7 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        match ev {
+        let actions = match ev {
             SessionPixEvent::SsaRequestSent(ssa_id) => self.on_ssa_request_sent(ssa_id, now),
             SessionPixEvent::CommitmentVerified {
                 ssa_id,
@@ -182,7 +182,54 @@ impl SessionPixSupervisor {
             SessionPixEvent::UnverifiableShares { ssa_id, observed_total } => {
                 self.on_unverifiable_shares(ssa_id, *observed_total, now)
             }
+        };
+
+        self.arm_recovery_clocks_for_earliest(now, served_total);
+        actions
+    }
+
+    /// Starts the recovery clocks of the earliest unrecovered cycle, if they are not running yet.
+    ///
+    /// A batch's cycles are served strictly in index order — the Entry's emission window is clamped to
+    /// one cycle (see [`hopr_protocol_pix::SHARE_EMISSION_WINDOW`]) — so a cycle behind the front of
+    /// the batch is *queued*, not stalled. Starting its clocks when its deposit confirmed, as this used
+    /// to, measured the queue wait rather than the recovery: at deployed dimensions one cycle takes
+    /// ~72 min of emission to exhaust, so every cycle after the first was retired by
+    /// `max_recovery_time` — or, worse, by `max_recovery_idle` inside a minute, since the idle gate
+    /// compares against *session-wide* service and a queued cycle sees plenty of that without any of it
+    /// being its own.
+    ///
+    /// So the clock starts when the cycle reaches the front, which is when it can actually make
+    /// progress, and [`SupervisorConfig::max_recovery_time`] then means what its name says: the ceiling
+    /// on recovering a single cycle. `served_total_at_last_progress` is re-baselined at the same moment
+    /// for the same reason — otherwise the idle gate would charge the queue wait against it.
+    ///
+    /// Called after every event and every deadline sweep, so it covers each way a cycle can reach the
+    /// front: its predecessor recovering, or its predecessor being retired.
+    fn arm_recovery_clocks_for_earliest(&mut self, now: Instant, served_total: u64) {
+        if self.closed {
+            return;
         }
+        let Some(idx) = self
+            .ssas
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| !s.is_terminal())
+            .min_by_key(|(_, s)| s.ssa_id.ssa_index())
+            .map(|(i, _)| i)
+        else {
+            return;
+        };
+
+        let ssa = &mut self.ssas[idx];
+        if ssa.phase != SsaPhase::Recovering || ssa.recovery_hard_deadline.is_some() {
+            return;
+        }
+
+        ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
+        ssa.recovery_hard_deadline = now.checked_add(self.cfg.max_recovery_time);
+        ssa.served_total_at_last_progress = served_total;
+        tracing::debug!(ssa_id = %ssa.ssa_id, "recovery clocks started — cycle is at the front of the batch");
     }
 
     /// Check all deadlines and emit actions for any that have expired.
@@ -261,6 +308,9 @@ impl SessionPixSupervisor {
             ));
             self.closed = true;
         }
+
+        // Retiring or tombstoning a cycle can promote the next one to the front of the batch.
+        self.arm_recovery_clocks_for_earliest(now, served_total);
 
         actions
     }
@@ -406,12 +456,11 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Transition to Recovering.
+        // Transition to Recovering. The two recovery clocks are *not* started here — see
+        // `arm_recovery_clocks_for_earliest`, which starts them when this cycle's turn comes.
         let ssa = &mut self.ssas[idx];
         ssa.phase = SsaPhase::Recovering;
         ssa.deposit_deadline = None;
-        ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
-        ssa.recovery_hard_deadline = now.checked_add(self.cfg.max_recovery_time);
         ssa.served_total_at_last_progress = served_total;
 
         // If recovery completed before the deposit arrived, immediately
@@ -937,6 +986,30 @@ mod tests {
 
     fn sufficient_balance() -> HoprBalance {
         HoprBalance::new_base(1000)
+    }
+
+    /// Drives every cycle of a batch to `Recovering`, so only the batch's own gates hold anything back.
+    fn fund_batch(sup: &mut SessionPixSupervisor, p: HoprPseudonym, batch: u32, now: Instant) {
+        for idx in 1..=batch {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: None,
+                },
+                now,
+                0,
+            );
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
     }
 
     fn _small_balance() -> HoprBalance {
@@ -2218,6 +2291,101 @@ mod tests {
 
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert!(actions.is_empty());
+    }
+
+    /// A cycle queued behind the front of its batch must not be charged for the wait.
+    ///
+    /// The Entry serves a batch strictly in index order, so at deployed dimensions cycle 2 of a batch
+    /// sits idle for the ~72 min it takes cycle 1's shares to be emitted. Starting its recovery clocks
+    /// when its deposit confirmed measured that queue wait: `max_recovery_idle` would retire it inside
+    /// a minute — the idle gate compares against *session-wide* service, which is plentiful while cycle
+    /// 1 is served — and `max_recovery_time` would finish the job. Batching would have paid for
+    /// `ssas_per_request` deposits and been able to use one.
+    ///
+    /// So the clocks start when the cycle reaches the front, and `max_recovery_time` bounds the
+    /// recovery of a single cycle rather than its position in a queue.
+    #[test]
+    fn a_queued_cycle_starts_its_recovery_clocks_only_at_the_front_of_the_batch() {
+        const BATCH: u32 = 3;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            max_recovery_idle: Duration::from_secs(10),
+            max_recovery_time: Duration::from_secs(3600),
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        fund_batch(&mut sup, p, BATCH, start);
+        let target = sup.dims.target_useful_shares();
+
+        let armed = |sup: &SessionPixSupervisor, idx: u32| {
+            let ssa = sup
+                .ssas
+                .iter()
+                .find(|s| s.ssa_id == ssa_id(p, idx))
+                .expect("cycle must exist");
+            (
+                ssa.recovery_hard_deadline.is_some(),
+                ssa.recovery_idle_deadline.is_some(),
+            )
+        };
+
+        assert_eq!(
+            armed(&sup, 1),
+            (true, true),
+            "the front cycle's clocks run from funding"
+        );
+        for queued in 2..=BATCH {
+            assert_eq!(
+                armed(&sup, queued),
+                (false, false),
+                "cycle {queued} is queued behind the front and must not be on the clock yet"
+            );
+        }
+
+        // Cycle 1 is served for five times `max_recovery_idle`, with session-wide service climbing the
+        // whole way. Nothing queued may be retired for that.
+        for step in 1..=10u64 {
+            let at = start + Duration::from_secs(step * 5);
+            let served = step * 1000;
+            sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), step, target, 1)),
+                at,
+                served,
+            );
+            let actions = sup.handle_deadline(at, served);
+            assert!(
+                !actions
+                    .iter()
+                    .any(|a| matches!(a, SessionPixAction::Close(_) | SessionPixAction::RetireSsa(_))),
+                "no cycle may be closed or retired at +{}s, got {actions:?}",
+                step * 5
+            );
+        }
+        assert_eq!(sup.ssas.len(), BATCH as usize, "the whole batch must still be live");
+
+        // Cycle 1 recovers, so cycle 2 reaches the front and only then goes on the clock.
+        let handover = start + Duration::from_secs(60);
+        sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), handover, 10_000);
+        assert_eq!(armed(&sup, 2), (true, true), "cycle 2 is at the front now");
+        assert_eq!(
+            armed(&sup, 3),
+            (false, false),
+            "cycle 3 is still queued and must stay off the clock"
+        );
+
+        let ssa2 = sup.ssas.iter().find(|s| s.ssa_id == ssa_id(p, 2)).expect("cycle 2");
+        assert_eq!(
+            ssa2.recovery_hard_deadline,
+            handover.checked_add(Duration::from_secs(3600)),
+            "cycle 2's ceiling must be measured from its own turn, not from its deposit"
+        );
+        assert_eq!(
+            ssa2.served_total_at_last_progress, 10_000,
+            "the idle gate's baseline must be re-based at the handover, or the queue wait is charged to it"
+        );
     }
 
     /// At `ssas_per_request > 1`, only the batch's **last** SSA may ask for the successor batch.
