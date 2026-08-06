@@ -3277,6 +3277,32 @@ where
             return Err(error.into());
         }
 
+        // Successor gate, the Entry's half of the one in `SessionPixSupervisor`. A correct Exit asks
+        // for the next batch when the *last* cycle of the current one is nearly recovered, by which
+        // point we have long been emitting that cycle's shares. An Exit that asks while we are still
+        // serving an earlier cycle is asking for deposits it cannot have earned, so nothing here
+        // commits and nothing is deposited.
+        //
+        // Refused rather than fatal, and deliberately not via `refuse_ssa_request`, which closes the
+        // Session: this message is dropped and the Session left running. A correct Exit never lands
+        // here; one that does has its own deadline for the cycles it already allocated, and it can
+        // reach them without us having paid for anything.
+        //
+        // First index rather than each: `commitments` is a `BTreeMap`, so the lowest index leads, and
+        // checking it before the loop is also what stops a batch that fails partway from having
+        // already emitted `ReadyToDeposit` for its earlier members.
+        if let Some((emitted_for, last_committed)) = pix_toolbox.share_generator.emission_progress(&pseudonym)
+            && emitted_for.is_none_or(|emitted| emitted < last_committed)
+        {
+            let asked_first = msg.commitments.keys().next().copied();
+            let error = SessionManagerError::Unacceptable(format!(
+                "Exit asked for SSAs from {asked_first:?} while emission has only reached {emitted_for:?} of the \
+                 batch committed up to {last_committed}"
+            ));
+            warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
+            return Err(error.into());
+        }
+
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
         // The server can theoretically send multiple SSA commitments
@@ -6037,6 +6063,153 @@ mod tests {
             TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
         ));
 
+        Ok(())
+    }
+
+    /// The Entry's half of the successor gate: a batch asked for before emission has reached the last
+    /// cycle of the batch already committed must be refused, committing nothing and depositing
+    /// nothing — and the Session must survive it.
+    ///
+    /// The Exit-side gate in `SessionPixSupervisor` means a correct peer never lands here. This is
+    /// what makes a peer that *does* — an unpatched or hostile Exit answering every cycle's
+    /// early-recovery signal with a fresh batch — cost the Entry nothing rather than one on-chain
+    /// deposit per surplus request.
+    ///
+    /// Ordering across a batch is pinned where it lives, on the generator:
+    /// `emission_progress_lags_the_commitment_index_across_a_batch`. At the toy dimensions used here
+    /// every live cycle emits from the first share onwards, so what this test drives is the two ends
+    /// of the gate — nothing emitted yet, and emission having reached the last committed index.
+    #[test_log::test(tokio::test)]
+    async fn entry_refuses_a_batch_asked_for_before_emission_reaches_the_current_one() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        const BATCH: u32 = 3;
+
+        let generator = Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        }));
+        let (pix_toolbox, mut pix_events) = PixToolbox::new(
+            generator.clone(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            max_ssas_per_ssa_request: BATCH as usize,
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+            },
+        )
+        .await?;
+
+        let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+            .expect("identity element must be valid");
+        let batch = |from: u32| {
+            (from..from + BATCH)
+                .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+                .collect::<BTreeMap<_, _>>()
+        };
+        // Drains whatever the PIX event stream has ready, without awaiting more.
+        // `futures::FutureExt` is spelled out because `moka::future::FutureExt` is also in scope.
+        let drain_deposits = |events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)| {
+            let mut seen = 0;
+            while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
+                seen += 1;
+            }
+            seen
+        };
+
+        // The opening batch is accepted: nothing is committed yet, so there is nothing to be early for.
+        mgr.handle_ssa_request(pseudonym, SsaServerCommitmentMessage::new(pseudonym, 2, 2, batch(1)))
+            .await
+            .context("the opening batch must be accepted")?;
+        assert_eq!(
+            drain_deposits(&mut pix_events),
+            BATCH as usize,
+            "the opening batch must yield one deposit address per SSA"
+        );
+
+        // Asking again before a single share has gone out is a whole batch early.
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, 2, 2, batch(BATCH + 1)),
+            )
+            .await
+            .expect_err("a batch asked for before any share was emitted must be refused");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(
+            drain_deposits(&mut pix_events),
+            0,
+            "a refused batch must not emit a single ReadyToDeposit"
+        );
+        assert_eq!(
+            mgr.active_sessions(),
+            vec![pseudonym],
+            "refusing a request must not close the Session"
+        );
+
+        // Once emission has reached the last committed cycle, the same batch is admitted.
+        for msg in 0..64u32 {
+            generator.next_share(&pseudonym, &msg.to_be_bytes())?;
+            if generator
+                .emission_progress(&pseudonym)
+                .is_some_and(|(emitted, last)| emitted == Some(last))
+            {
+                break;
+            }
+        }
+        assert_eq!(
+            generator.emission_progress(&pseudonym),
+            Some((SsaIndex::new(BATCH), SsaIndex::new(BATCH).expect("non-zero"))),
+            "emission must have reached the last cycle of the committed batch"
+        );
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, 2, 2, batch(BATCH + 1)),
+        )
+        .await
+        .context("a batch asked for on time must be accepted")?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
         Ok(())
     }
 

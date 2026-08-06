@@ -42,6 +42,12 @@ struct SsaPseudonymEntry<S: PixSpec> {
     /// Position within the emission window, i.e. into the first
     /// [`SHARE_EMISSION_WINDOW`] entries of `poly_queue`.
     cursor: usize,
+    /// Highest SSA index a share has actually been emitted for, `None` until the first one goes out.
+    ///
+    /// Monotone, and deliberately *not* the front of `poly_queue`: the emission window straddles SSA
+    /// boundaries, so the front can still name an earlier cycle while shares of a later one are
+    /// already going out. See [`SsaShareGenerator::emission_progress`], which is what reads this.
+    highest_emitted: Option<SsaIndex>,
 }
 
 /// Number of polynomials the generator emits shares for concurrently.
@@ -146,6 +152,30 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     pub fn config(&self) -> &SsaGeneratorConfig {
         &self.cfg
     }
+
+    /// How far share emission has got for `pseudonym`, as
+    /// `(highest SSA index a share was emitted for, highest SSA index committed to)`.
+    ///
+    /// `None` when nothing has been committed for the pseudonym yet; the first element is `None`
+    /// until the first share goes out. Both are monotone for the life of the cache entry.
+    ///
+    /// Exists so an Entry can refuse to commit to another batch while emission has not yet reached
+    /// the last cycle of the batch it is already serving — an Exit asking that early is asking for
+    /// deposits it cannot have earned yet. Emission rather than the queue front because the window
+    /// straddles SSA boundaries; emission rather than reconstruction because the Entry never learns
+    /// what the Exit actually recovered.
+    ///
+    /// Note the resolution this has: it says a share for that cycle *went out*, not that the cycle is
+    /// nearly spent. At production dimensions those are close, because a cycle's polynomials only
+    /// enter the [`SHARE_EMISSION_WINDOW`] once its predecessor is nearly drained. When
+    /// `polynomials_per_ssa` is at or below the window — test dimensions, not deployed ones — every
+    /// live cycle emits from the first share onwards and the signal goes slack. It fails open, which
+    /// is the right direction: a legitimate request is never refused.
+    pub fn emission_progress(&self, pseudonym: &S::Pseudonym) -> Option<(Option<SsaIndex>, SsaIndex)> {
+        let entry = self.polynomials.get(pseudonym)?;
+        let entry = entry.lock();
+        Some((entry.highest_emitted, entry.ssa_index))
+    }
 }
 
 impl<S: PixSpec> Default for SsaShareGenerator<S> {
@@ -176,7 +206,12 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
         // alternative would need to effectively deallocate, so the polynomials do not grow
         // indefinitely when new commitments are being added.
         let mut entry = entry.lock();
-        let SsaPseudonymEntry { poly_queue, cursor, .. } = &mut *entry;
+        let SsaPseudonymEntry {
+            poly_queue,
+            cursor,
+            highest_emitted,
+            ..
+        } = &mut *entry;
         let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares;
 
         while !poly_queue.is_empty() {
@@ -219,6 +254,10 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 id: poly.spi,
                 share: poly.next_share(x),
             };
+            let emitted_for = poly.spi.as_ref().ssa_index();
+            if highest_emitted.is_none_or(|seen| emitted_for > seen) {
+                *highest_emitted = Some(emitted_for);
+            }
             *cursor = (idx + 1) % window;
             return Ok(Some(generated));
         }
@@ -285,6 +324,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                         parking_lot::Mutex::new(SsaPseudonymEntry {
                             ssa_index,
                             cursor: 0,
+                            highest_emitted: None,
                             poly_queue: raw_polynomials
                                 .into_iter()
                                 .enumerate()
@@ -382,6 +422,73 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// `emission_progress` must lag the commitment index across a batch, and catch up in order.
+    ///
+    /// `polynomials_per_ssa` is deliberately above [`SHARE_EMISSION_WINDOW`], which is the deployed
+    /// shape: the window then sits entirely inside one cycle, so emission reaches a cycle only once
+    /// its predecessors are drained. That ordering is what an Entry relies on to tell "the Exit is
+    /// asking for the next batch on time" from "the Exit is asking a whole batch early".
+    #[test]
+    fn emission_progress_lags_the_commitment_index_across_a_batch() -> anyhow::Result<()> {
+        const POLYS: u16 = SHARE_EMISSION_WINDOW as u16 + 44;
+        const THRESHOLD: u16 = 2;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: 0,
+        });
+
+        let p = SimplePseudonym::random();
+        assert!(
+            generator.emission_progress(&p).is_none(),
+            "an unknown pseudonym has no progress to report"
+        );
+
+        // One batch of three, as an Exit with `ssas_per_request = 3` would ask for.
+        for idx in 1..=3u32 {
+            generator.new_ssa_commitment(&p, idx.try_into()?)?;
+        }
+        assert_eq!(
+            generator.emission_progress(&p),
+            Some((None, 3.try_into()?)),
+            "the whole batch is committed, but nothing has been emitted yet"
+        );
+
+        let mut sent = 0u32;
+        let emit = |n: u32, sent: &mut u32| -> anyhow::Result<()> {
+            for _ in 0..n {
+                *sent += 1;
+                generator.next_share(&p, &sent.to_be_bytes())?;
+            }
+            Ok(())
+        };
+
+        emit(10, &mut sent)?;
+        assert_eq!(
+            generator.emission_progress(&p),
+            Some((Some(1.try_into()?), 3.try_into()?)),
+            "emission is still inside the first cycle of the batch"
+        );
+
+        // Drain the first cycle: every polynomial emits exactly `threshold` shares at zero surplus.
+        emit(POLYS as u32 * THRESHOLD as u32, &mut sent)?;
+        assert_eq!(
+            generator.emission_progress(&p),
+            Some((Some(2.try_into()?), 3.try_into()?)),
+            "emission moves to the next cycle only once its predecessor is drained"
+        );
+
+        emit(POLYS as u32 * THRESHOLD as u32, &mut sent)?;
+        assert_eq!(
+            generator.emission_progress(&p),
+            Some((Some(3.try_into()?), 3.try_into()?)),
+            "emission has reached the last cycle of the batch — the point an Exit may ask for the next"
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
