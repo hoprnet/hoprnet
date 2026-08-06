@@ -246,11 +246,11 @@ mod tests {
             10,
             SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
         );
-        assert_eq!(
+        assert!(
             session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>()
                 + SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
-                - SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::HEADER_SIZE,
-            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
+                - SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::HEADER_SIZE
+                < SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
         );
     }
 
