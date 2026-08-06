@@ -336,6 +336,7 @@ mod tests {
             max_recovery_time: Duration::from_secs(3600),
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
+            max_out_of_order_shares_per_session: 1024,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),

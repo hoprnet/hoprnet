@@ -124,6 +124,11 @@ pub struct SessionPixSupervisor {
     pub(crate) closed: bool,
     next_ssa_index: u32,
     session_invalid_total: u64,
+    /// Useful shares booked on a cycle while an earlier cycle of the batch was still unrecovered.
+    ///
+    /// See [`SupervisorConfig::max_out_of_order_shares_per_session`] for what this is defending and
+    /// why a conforming Entry never adds to it.
+    session_out_of_order_total: u64,
     release_service_emitted: bool,
     /// Ordered SSAs (oldest first, newest last). At most 2 live + 1 tombstone.
     ssas: Vec<PerSsaState>,
@@ -149,6 +154,7 @@ impl SessionPixSupervisor {
             pseudonym,
             next_ssa_index: 1,
             session_invalid_total: 0,
+            session_out_of_order_total: 0,
             closed: false,
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
@@ -481,6 +487,16 @@ impl SessionPixSupervisor {
             return vec![SessionPixAction::Close(SessionPixCloseReason::CounterRegression)];
         }
 
+        // Is an earlier cycle of the batch still owed to us? Read before the mutable borrow below.
+        // Progress booked here while that is true is progress the Entry should not have been able to
+        // make: it is serving out of order, and every such share is service the Exit cannot yet be
+        // paid for.
+        let this_index = progress.ssa_id.ssa_index();
+        let earlier_cycle_unrecovered = self
+            .ssas
+            .iter()
+            .any(|s| !s.is_terminal() && s.ssa_id.ssa_index() < this_index);
+
         let ssa = &mut self.ssas[idx];
         let new_useful = progress.useful_shares;
 
@@ -500,6 +516,7 @@ impl SessionPixSupervisor {
         }
 
         // Progress is strictly larger.
+        let delta = new_useful - ssa.largest_useful_shares;
         ssa.largest_useful_shares = new_useful;
         ssa.recovered_polynomials = progress.recovered_polynomials;
         ssa.served_total_at_last_progress = served_total;
@@ -507,6 +524,24 @@ impl SessionPixSupervisor {
         // Refresh recovery-idle only in Recovering phase.
         if ssa.phase == SsaPhase::Recovering {
             ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
+        }
+
+        if earlier_cycle_unrecovered {
+            self.session_out_of_order_total = self.session_out_of_order_total.saturating_add(delta);
+            tracing::debug!(
+                ssa_id = %progress.ssa_id, delta,
+                total = self.session_out_of_order_total,
+                "progress on a cycle while an earlier one is still unrecovered"
+            );
+            if self.session_out_of_order_total > self.cfg.max_out_of_order_shares_per_session {
+                tracing::error!(
+                    ssa_id = %progress.ssa_id,
+                    total = self.session_out_of_order_total,
+                    limit = self.cfg.max_out_of_order_shares_per_session,
+                    "entry is serving the batch out of order"
+                );
+                return vec![SessionPixAction::Close(SessionPixCloseReason::TooManyOutOfOrderShares)];
+            }
         }
 
         // Signal the gate to reset its served-without-progress ceiling.
@@ -902,6 +937,7 @@ mod tests {
             max_recovery_time: Duration::from_secs(3600),
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
+            max_out_of_order_shares_per_session: 1024,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
@@ -2218,6 +2254,155 @@ mod tests {
 
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert!(actions.is_empty());
+    }
+
+    /// Drives a whole batch to `Recovering`, so only the batch gate can hold anything back.
+    fn fund_batch(sup: &mut SessionPixSupervisor, p: HoprPseudonym, batch: u32, now: Instant) {
+        for idx in 1..=batch {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: None,
+                },
+                now,
+                0,
+            );
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+    }
+
+    /// Progress on a cycle while an earlier one is still unrecovered accumulates, and closes the
+    /// Session past the ceiling.
+    ///
+    /// This is the Exit's defence against an Entry that spreads a batch's shares across all its
+    /// cycles instead of serving them one at a time: that would take `ssas_per_request × quota` of
+    /// service while leaving every cycle short of recovery, and a cycle short of recovery pays
+    /// nothing. Neither the service gate nor the idle deadline can see it — both measure the
+    /// *absence* of progress, and a spreading Entry never stops making progress.
+    #[test]
+    fn out_of_order_progress_accumulates_and_closes_the_session() {
+        const BATCH: u32 = 3;
+        const CEILING: u64 = 5;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            max_out_of_order_shares_per_session: CEILING,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, BATCH, now);
+        let target = sup.dims.target_useful_shares();
+
+        // The earliest live cycle is where service belongs, however much of it there is.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), 40, target, 8)),
+            now,
+            0,
+        );
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "progress on the earliest live cycle is in order, got {actions:?}"
+        );
+        assert_eq!(sup.session_out_of_order_total, 0);
+
+        // Progress on the last cycle while 1 and 2 are owed: counted, but still under the ceiling.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, BATCH), 4, target, 0)),
+            now,
+            0,
+        );
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "under the ceiling the Session survives, got {actions:?}"
+        );
+        assert_eq!(sup.session_out_of_order_total, 4, "the delta must be booked");
+
+        // Crossing it closes.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, BATCH), 6, target, 0)),
+            now,
+            0,
+        );
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::TooManyOutOfOrderShares)]
+            ),
+            "crossing the ceiling must close the Session, got {actions:?}"
+        );
+        assert_eq!(sup.session_out_of_order_total, 6);
+    }
+
+    /// In-order service must never book a single out-of-order share, even at a zero ceiling.
+    ///
+    /// A conforming Entry serves a batch one cycle at a time and only moves on once the previous
+    /// cycle's last polynomial is exhausted — which is `surplus_shares` per polynomial *after* it
+    /// became recoverable. So the earliest live cycle advances, then goes terminal, then the next
+    /// advances. Anything stricter than this would close honest Sessions.
+    #[test]
+    fn in_order_progress_is_never_counted_as_out_of_order() {
+        const BATCH: u32 = 3;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            max_out_of_order_shares_per_session: 0,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, BATCH, now);
+        let target = sup.dims.target_useful_shares();
+
+        for useful in [10, 20, target] {
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), useful, target, 10)),
+                now,
+                0,
+            );
+            assert!(
+                matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+                "cycle 1 is the earliest live cycle throughout, got {actions:?}"
+            );
+        }
+
+        // Cycle 1 completes and tombstones, so cycle 2 becomes the earliest live one.
+        sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), now, 0);
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 2), 15, target, 3)),
+            now,
+            0,
+        );
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "cycle 2 takes over in order once cycle 1 is recovered, got {actions:?}"
+        );
+        assert_eq!(sup.session_out_of_order_total, 0, "nothing here is out of order");
+
+        // Negative control: cycle 2 is still owed, so cycle 3 is not allowed to advance.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 3), 1, target, 0)),
+            now,
+            0,
+        );
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::TooManyOutOfOrderShares)]
+            ),
+            "skipping past a live cycle must still be caught, got {actions:?}"
+        );
     }
 
     /// At `ssas_per_request > 1`, only the batch's **last** SSA may ask for the successor batch.
