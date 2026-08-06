@@ -68,7 +68,7 @@ const fn min(a: usize, b: usize) -> usize {
 }
 
 /// Maximum Session MTU even if the HOPR packet allows for more.
-pub const MAX_SESSION_MTU: usize = 1420;
+pub const MAX_SESSION_MTU: usize = 1452;
 
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {

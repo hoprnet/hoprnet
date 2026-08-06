@@ -1099,8 +1099,9 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        let segment_payload = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+        // The whole first frame is discarded due to the missing first segment.
+        // The actual data lost equals the frame size (a single segment when frame_size < segment_payload).
+        let segment_payload = FRAME_SIZE.min(MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD);
         assert_eq!(data.len() - segment_payload, bob_data.len());
         assert_eq!(&data[segment_payload..], &bob_data);
 
@@ -1263,8 +1264,9 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        let segment_payload = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+        // The whole first frame is discarded due to the missing first segment.
+        // The actual data lost equals the frame size (a single segment when frame_size < segment_payload).
+        let segment_payload = FRAME_SIZE.min(MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD);
         assert_eq!(bob_sent_data.len() - segment_payload, alice_recv_data.len());
         assert_eq!(&bob_sent_data[segment_payload..], &alice_recv_data);
 
