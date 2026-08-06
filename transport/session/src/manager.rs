@@ -6075,10 +6075,11 @@ mod tests {
     /// early-recovery signal with a fresh batch — cost the Entry nothing rather than one on-chain
     /// deposit per surplus request.
     ///
-    /// Ordering across a batch is pinned where it lives, on the generator:
-    /// `emission_progress_lags_the_commitment_index_across_a_batch`. At the toy dimensions used here
-    /// every live cycle emits from the first share onwards, so what this test drives is the two ends
-    /// of the gate — nothing emitted yet, and emission having reached the last committed index.
+    /// Ordering across a batch is pinned where it lives, on the generator, by
+    /// `emission_never_crosses_a_cycle_boundary_early` and
+    /// `emission_progress_lags_the_commitment_index_across_a_batch`. What this test drives is the
+    /// wiring and the two ends of the gate — nothing emitted yet, and emission having reached the last
+    /// committed index.
     #[test_log::test(tokio::test)]
     async fn entry_refuses_a_batch_asked_for_before_emission_reaches_the_current_one() -> anyhow::Result<()> {
         use std::collections::BTreeMap;

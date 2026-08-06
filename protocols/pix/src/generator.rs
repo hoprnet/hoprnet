@@ -44,10 +44,20 @@ struct SsaPseudonymEntry<S: PixSpec> {
     cursor: usize,
     /// Highest SSA index a share has actually been emitted for, `None` until the first one goes out.
     ///
-    /// Monotone, and deliberately *not* the front of `poly_queue`: the emission window straddles SSA
-    /// boundaries, so the front can still name an earlier cycle while shares of a later one are
-    /// already going out. See [`SsaShareGenerator::emission_progress`], which is what reads this.
+    /// Monotone. Equal to the index of the cycle at the front of `poly_queue` while that cycle is
+    /// being served, since the window no longer straddles cycle boundaries — see `front_run`. Kept as
+    /// its own field rather than derived, because it must survive the front cycle being drained and
+    /// removed. Read by [`SsaShareGenerator::emission_progress`].
     highest_emitted: Option<SsaIndex>,
+    /// Polynomials of the *front* cycle still in `poly_queue`, or `0` when that cycle is drained and
+    /// the next one has yet to be picked up.
+    ///
+    /// This is what confines the emission window to a single cycle. Refreshed lazily in
+    /// [`EntryShareGenerator::next_share`] rather than at commit time: removals only ever touch the
+    /// front cycle, so when it hits `0` the new front cycle is necessarily untouched and its run is a
+    /// full `polynomials_per_ssa` — which holds whether or not further cycles were committed in the
+    /// meantime.
+    front_run: usize,
 }
 
 /// Number of polynomials the generator emits shares for concurrently.
@@ -72,6 +82,22 @@ struct SsaPseudonymEntry<S: PixSpec> {
 /// a time keeps one part live; the full 8192 would keep every part live at once, `polys × threshold`
 /// shares of peak memory. 256 keeps that peak around a megabyte while covering a contiguous loss
 /// far larger than the ring buffer's entire overshoot allowance.
+///
+/// ## The window never crosses a cycle boundary
+///
+/// It is clamped to the polynomials of the cycle at the front of the queue, so no share for cycle
+/// `k + 1` is ever emitted while any polynomial of cycle `k` is unexhausted. That is what lets an
+/// Exit treat progress on a later cycle as misbehaviour rather than as a boundary artefact: a batch
+/// of `n` cycles is served as `n` separate quotas, so the Exit is exposed to one cycle's worth of
+/// unpaid traffic at a time instead of `n`. An Entry free to spread shares across a whole batch could
+/// take `n × quota` of service while leaving every cycle short of recovery — and since an SSA is the
+/// sum of *every* polynomial's constant term, a cycle short of recovery is worth nothing at all.
+///
+/// The clamp costs no loss tolerance while `polynomials_per_ssa` is a multiple of the window, which
+/// the deployed 8192 is: polynomials in the window advance in lockstep, so a cycle drains as
+/// `polys / window` full-width blocks and the last one is swept out inside a single `next_share`
+/// call. A cycle whose polynomial count is *not* a multiple runs its final partial block at that
+/// remainder's width, absorbing a proportionally shorter contiguous loss.
 pub const SHARE_EMISSION_WINDOW: usize = 256;
 
 /// Builds a Shamir polynomial of degree `t - 1` over `secret` and commits to its constant term.
@@ -161,16 +187,14 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     ///
     /// Exists so an Entry can refuse to commit to another batch while emission has not yet reached
     /// the last cycle of the batch it is already serving — an Exit asking that early is asking for
-    /// deposits it cannot have earned yet. Emission rather than the queue front because the window
-    /// straddles SSA boundaries; emission rather than reconstruction because the Entry never learns
-    /// what the Exit actually recovered.
+    /// deposits it cannot have earned yet. Emission rather than reconstruction because the Entry never
+    /// learns what the Exit actually recovered.
     ///
-    /// Note the resolution this has: it says a share for that cycle *went out*, not that the cycle is
-    /// nearly spent. At production dimensions those are close, because a cycle's polynomials only
-    /// enter the [`SHARE_EMISSION_WINDOW`] once its predecessor is nearly drained. When
-    /// `polynomials_per_ssa` is at or below the window — test dimensions, not deployed ones — every
-    /// live cycle emits from the first share onwards and the signal goes slack. It fails open, which
-    /// is the right direction: a legitimate request is never refused.
+    /// Because the window is clamped to one cycle (see [`SHARE_EMISSION_WINDOW`]), the first element
+    /// reaching the second means every earlier cycle is exhausted — exactly, at every dimension,
+    /// rather than approximately near a boundary. What it does *not* say is how much of that last
+    /// cycle is left, so the signal is "the Exit could legitimately be near the end of the batch",
+    /// not "it is".
     pub fn emission_progress(&self, pseudonym: &S::Pseudonym) -> Option<(Option<SsaIndex>, SsaIndex)> {
         let entry = self.polynomials.get(pseudonym)?;
         let entry = entry.lock();
@@ -210,6 +234,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             poly_queue,
             cursor,
             highest_emitted,
+            front_run,
             ..
         } = &mut *entry;
         let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares;
@@ -218,19 +243,20 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             // The window is always the front of the queue: `new_ssa_commitment` appends, and an
             // exhausted polynomial is removed in place so its immediate successor shifts in.
             //
-            // It *can* straddle an SSA boundary, and routinely does. The width is recomputed here
-            // every call, so once the current cycle is down to fewer than `SHARE_EMISSION_WINDOW`
-            // live polynomials and the next has been appended, the window covers the tail of one and
-            // the head of the other — which is the normal state near a boundary, since
-            // `early_recovery_threshold` exists precisely to commit the next cycle before this one
-            // drains.
+            // It never straddles a cycle boundary, though — see `SHARE_EMISSION_WINDOW` for why the
+            // Exit's exposure depends on that. `front_run` counts what is left of the front cycle,
+            // and the window cannot reach past it, so the next cycle's first share waits until this
+            // cycle's last polynomial is exhausted.
             //
-            // Emission stays correct: every share carries its own `SsaPolynomialId` and the Exit
-            // files by it. What follows is that the next cycle's shares can reach the Exit before
-            // its constant terms do, so they take the deferral path — bear that in mind when sizing
-            // `MAX_DEFERRED_ACKS_PER_CYCLE`, which would otherwise look like it only has to cover
-            // the commitment window.
-            let window = poly_queue.len().min(SHARE_EMISSION_WINDOW.max(1));
+            // The refresh happens here rather than at commit time because removals only ever touch
+            // the front cycle: reaching `0` therefore means the new front cycle is untouched and
+            // still has all `polynomials_per_ssa` of its polynomials queued.
+            if *front_run == 0 {
+                *front_run = (self.cfg.polynomials_per_ssa as usize).min(poly_queue.len());
+                *cursor = 0;
+            }
+
+            let window = (*front_run).min(SHARE_EMISSION_WINDOW).min(poly_queue.len()).max(1);
             if *cursor >= window {
                 *cursor = 0;
             }
@@ -239,6 +265,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             if poly_queue[idx].shares_generated >= max_shares_per_poly {
                 // O(window) element moves, but paid once per polynomial rather than once per share.
                 poly_queue.remove(idx);
+                *front_run = front_run.saturating_sub(1);
                 continue;
             }
 
@@ -325,6 +352,8 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                             ssa_index,
                             cursor: 0,
                             highest_emitted: None,
+                            // Picked up lazily by `next_share`, like every later cycle's.
+                            front_run: 0,
                             poly_queue: raw_polynomials
                                 .into_iter()
                                 .enumerate()
@@ -422,6 +451,84 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// No share for a cycle may be emitted while any polynomial of an earlier cycle is unexhausted.
+    ///
+    /// The dimensions here are the adversarial ones for the clamp: `polynomials_per_ssa` far below
+    /// [`SHARE_EMISSION_WINDOW`], so an unclamped positional window would span the *whole* batch and
+    /// serve all three cycles in lockstep from the first share — leaving the Exit `3 × quota` of
+    /// traffic short of recovering any single one of them.
+    ///
+    /// Also pins that the clamp did not degrade to one polynomial at a time: within a cycle the
+    /// emission is still round-robin, which is what spreads a contiguous SURB loss across the window
+    /// instead of starving one polynomial.
+    #[test]
+    fn emission_never_crosses_a_cycle_boundary_early() -> anyhow::Result<()> {
+        const POLYS: u16 = 4;
+        const THRESHOLD: u16 = 2;
+        const SURPLUS: usize = 1;
+        const BATCH: u32 = 3;
+        let per_poly = THRESHOLD as usize + SURPLUS;
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: POLYS,
+            threshold: THRESHOLD,
+            surplus_shares: SURPLUS,
+        });
+
+        let p = SimplePseudonym::random();
+        for idx in 1..=BATCH {
+            generator.new_ssa_commitment(&p, idx.try_into()?)?;
+        }
+        assert!(
+            POLYS as usize * BATCH as usize <= SHARE_EMISSION_WINDOW,
+            "the whole batch must fit one window, or this test is not exercising the clamp"
+        );
+
+        // Drain everything, recording which cycle each share belonged to, in order.
+        let mut emitted: Vec<(u32, u16)> = Vec::new();
+        for msg in 0..(POLYS as u32 * BATCH * per_poly as u32) {
+            let share = generator
+                .next_share(&p, &msg.to_be_bytes())?
+                .ok_or_else(|| anyhow::anyhow!("share {msg} must be available"))?;
+            emitted.push((share.id.ssa_index().get(), share.id.poly_index()));
+        }
+        assert!(
+            generator.next_share(&p, &u32::MAX.to_be_bytes())?.is_none(),
+            "the batch must be exactly spent"
+        );
+
+        let cycles: Vec<u32> = emitted.iter().map(|(ssa, _)| *ssa).collect();
+        assert!(
+            cycles.windows(2).all(|w| w[0] <= w[1]),
+            "cycle indices must never go backwards, got {cycles:?}"
+        );
+        for cycle in 1..=BATCH {
+            assert_eq!(
+                cycles.iter().filter(|c| **c == cycle).count(),
+                POLYS as usize * per_poly,
+                "cycle {cycle} must emit its whole share supply"
+            );
+        }
+
+        // Round-robin within a cycle: the first `POLYS` shares of a cycle cover every polynomial once.
+        let first_cycle: Vec<u16> = emitted
+            .iter()
+            .filter(|(ssa, _)| *ssa == 1)
+            .take(POLYS as usize)
+            .map(|(_, poly)| *poly)
+            .collect();
+        let mut distinct = first_cycle.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(
+            distinct.len(),
+            POLYS as usize,
+            "the first pass must touch every polynomial once, not drain one at a time — got {first_cycle:?}"
+        );
+
+        Ok(())
+    }
 
     /// `emission_progress` must lag the commitment index across a batch, and catch up in order.
     ///
