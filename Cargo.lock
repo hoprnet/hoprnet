@@ -40,9 +40,9 @@ dependencies = [
 
 [[package]]
 name = "aes"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1fc76eaeac4c9164506c466d4ffdd8ec9d0c5bf57ee97177c4d8eceb3a0e138"
+checksum = "f8eb277bec05f56a0e0591f155a484cbd0f4f07ff2905051a48c72f004f7ed58"
 dependencies = [
  "cipher 0.5.2",
  "cpubits",
@@ -1295,16 +1295,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "assertables"
-version = "10.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c16d80246a076246d8b525d9f404543e90fe0818636cd89c249c2a4bee3bb1"
-dependencies = [
- "regex",
- "walkdir",
 ]
 
 [[package]]
@@ -3937,9 +3927,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "1.16.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f8c7f28951b250cc61b68d8d06aa2d73fb05f96d19380325fc235924768f579"
+checksum = "aca8f552df157750ebad001edfa75851da1029461f3a60f60a41541dba39b3aa"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -3949,7 +3939,6 @@ dependencies = [
  "futures-concurrency",
  "hopr-types",
  "libp2p-identity",
- "multiaddr",
  "serde",
  "strum 0.28.0",
  "thiserror 2.0.19",
@@ -3958,9 +3947,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "4.12.0"
+version = "4.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0375fb0dc90a31484ae7620ce71681203f5ed1ee670cab51e02fb3b7a9d351dc"
+checksum = "9002389b5e9013a604cb654dc89152bd4c32ea64031f7f4837a8631c27ca2c51"
 dependencies = [
  "alloy",
  "anyhow",
@@ -3977,6 +3966,8 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff8326d358c768a169662397a7cd566a6fc4d4b8e394f285cd7cfcc7a6f6e866"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3984,16 +3975,12 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "blokli-client",
- "const-hex",
  "dashmap",
  "futures",
  "futures-concurrency",
  "futures-time",
- "hex-literal",
  "hopr-api",
  "hopr-utilities",
- "insta",
- "lazy_static",
  "moka",
  "parking_lot",
  "petgraph",
@@ -4002,9 +3989,7 @@ dependencies = [
  "serde_json",
  "smart-default",
  "tempfile",
- "test-log",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -4038,6 +4023,8 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c670d644ce0535d3fb6beb3b9ade0c67f0a24d6309b888f64f61dd0b9eb51eb3"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4046,30 +4033,8 @@ dependencies = [
  "hopr-api",
  "hopr-network-graph",
  "hopr-utilities",
- "humantime-serde",
- "lazy_static",
- "serde",
  "smart-default",
- "tokio",
  "tracing",
- "validator",
-]
-
-[[package]]
-name = "hopr-ct-immediate"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "futures",
- "hopr-api",
- "hopr-network-graph",
- "hopr-utilities",
- "humantime-serde",
- "lazy_static",
- "moka",
- "serde",
- "smart-default",
- "tokio",
  "validator",
 ]
 
@@ -4122,24 +4087,21 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ba5b6a91aeb80be5249798c975895d72d348c163317a3976359b5a10c89eb4b"
 dependencies = [
  "anyhow",
- "assertables",
  "bimap",
- "criterion",
  "futures",
- "hex-literal",
  "hopr-api",
  "hopr-utilities",
  "indexmap 2.14.0",
- "insta",
  "lazy_static",
  "parking_lot",
  "petgraph",
  "rand 0.10.2",
  "smallvec",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
@@ -4251,55 +4213,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-session-server-forwarder"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "hopr-api",
- "hopr-transport-session",
- "hopr-utilities",
- "lazy_static",
- "serde",
- "serde_with",
- "smart-default",
- "thiserror 2.0.19",
- "tokio",
- "tokio-retry",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "hopr-ticket-manager"
 version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8009dca8550d8803bc730bb89e26a68316df041d4a131287e79b5e4fc9d4a413"
 dependencies = [
  "ahash",
  "anyhow",
  "clap",
- "criterion",
  "dashmap",
  "futures",
  "hashbrown 0.17.1",
  "hopr-api",
- "hopr-chain-connector",
  "hopr-utilities",
  "parking_lot",
  "postcard",
- "rand 0.10.2",
  "redb",
- "serde",
- "serde_json",
  "strum 0.28.0",
  "tempfile",
- "test-log",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "hopr-transport"
-version = "0.36.0"
+version = "0.37.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4382,30 +4320,23 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.10.0"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68e553e6688d8bf422a47cf382673752fbe3086f168e33dde006160481ec317a"
 dependencies = [
- "anyhow",
  "async-broadcast",
  "async-trait",
- "async_channel_io",
  "backon",
- "bytes",
  "dashmap",
  "futures",
  "hopr-api",
- "hopr-crypto-packet",
- "hopr-transport",
- "hopr-transport-probe",
  "hopr-utilities",
- "lazy_static",
  "libp2p",
  "libp2p-stream",
- "more-asserts",
  "multiaddr",
  "pin-project",
  "quinn-udp 0.6.1",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
@@ -4443,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4495,11 +4426,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "2.0.2"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aabecd53d5211c4a81f046d27bad0f7ad64659afcb5b88e0e410ecaa8928bf3"
+checksum = "b1bff6165942aa235899cb5084a058db8a00b0885cfc41e8e0f5bf8b2cb007c6"
 dependencies = [
- "aes 0.9.1",
+ "aes 0.9.2",
  "anyhow",
  "aquamarine",
  "arrayvec",
@@ -4555,9 +4486,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3fb9c92de05424fd684bc1a0ac2f7df91ec2b6958f2733b2ff1c830a4390a34"
+checksum = "c557ecaad14224e4ae1df1be73449c24241f4b34e20129b11b8d0e38062eb6a6"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4685,9 +4616,9 @@ dependencies = [
 
 [[package]]
 name = "hybrid-array"
-version = "0.4.13"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "818356c5132c1fede50f837ca96afbe78ff42413047f4abb886217845e1b6c8c"
+checksum = "707114b52a152fa7bdb290cd7cd5912d9467273b6d74e21b8d81aca1f8533f6b"
 dependencies = [
  "serde",
  "subtle",
@@ -7236,9 +7167,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.13.0"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a0e75113e14dc5acb068cd0786884f214f1312650a3d36d269f5c4f3cdee8a2"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -7248,9 +7179,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.14"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -8712,17 +8643,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-retry"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a129d95275ebf4c493ec53bf0f8cd95f5ac161bc4f381700809a54f595d4470"
-dependencies = [
- "pin-project-lite",
- "rand 0.10.2",
- "tokio",
-]
-
-[[package]]
 name = "tokio-rustls"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9036,9 +8956,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.23.4"
+version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf80a72845275afea99e7f2b434723d3bc7e38470fcd1c7ed39a599c73319a53"
+checksum = "bf3923a6f5c4c6382e0b653c4117f48d631ea17f38ed86e2a828e6f7412f5239"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",

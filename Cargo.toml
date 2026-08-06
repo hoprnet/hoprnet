@@ -5,7 +5,6 @@ resolver = "2"
 members = [
   "crypto/packet",
   "hopr/hopr-lib",
-  "impls/ticket-manager",
   "protocols/app",
   "protocols/hopr",
   "protocols/session",
@@ -16,13 +15,6 @@ members = [
   "transport/session",
   "transport/tag-allocator",
   "utils-session",
-  # implementations
-  "impls/connector",
-  "impls/session-server-forwarder",
-  "impls/ct/immediate",
-  "impls/ct/full-network",
-  "impls/graph",
-  "impls/transport/p2p",
 ]
 
 [workspace.package]
@@ -40,16 +32,10 @@ order = [
   "hopr-protocol-start",
   "hopr-transport-tag-allocator",
   "hopr-transport-mixer",
-  "hopr-ticket-manager",
   "hopr-protocol-hopr",
   "hopr-protocol-session",
   "hopr-transport-probe",
   "hopr-transport-session",
-  "hopr-network-graph",
-  "hopr-ct-full-network",
-  "hopr-chain-connector",
-  "hopr-transport-p2p",
-  "hopr-session-server-forwarder",
   "hopr-transport",
   "hopr-lib",
   "hopr-utils-session",
@@ -163,9 +149,9 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = "1.16.0"
-hopr-types = { version = "2.0.2", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.5.1", default-features = false }
+hopr-api = "1.19.0"
+hopr-types = { version = "2.2.0", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.6.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -176,19 +162,19 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.5.0", path = "impls/ticket-manager" }
-hopr-transport = { version = "0.36.0", path = "transport/hopr" }
+hopr-ticket-manager = "0.5.1"
+hopr-transport = { version = "0.37.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.24.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.25.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.22.0", path = "impls/connector" }
+hopr-chain-connector = "0.22.1"
 
-# referential implementations
-hopr-session-server-forwarder = { version = "0.1.0", path = "impls/session-server-forwarder", default-features = false }
-hopr-transport-p2p = { version = "0.10.0", path = "impls/transport/p2p" }
-hopr-ct-full-network = { version = "0.3.0", path = "impls/ct/full-network", default-features = false }
-hopr-network-graph = { version = "0.3.0", path = "impls/graph", default-features = false }
+# referential implementations (published to crates.io)
+hopr-session-server-forwarder = { version = "0.1.0", default-features = false }
+hopr-transport-p2p = { version = "0.9.4", features = ["transport-quic"] }
+hopr-ct-full-network = { version = "0.3.0", default-features = false }
+hopr-network-graph = { version = "0.3.1", default-features = false }
 
 [profile.dev]
 panic = "abort"
