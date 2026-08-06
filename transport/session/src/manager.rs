@@ -1636,6 +1636,7 @@ where
 
         // Extract useful information about the session from the Start protocol message
         let incoming_session = IncomingSession {
+            id: session_id,
             session,
             target: session_req.target,
         };
