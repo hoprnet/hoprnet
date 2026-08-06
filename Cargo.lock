@@ -1298,16 +1298,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "assertables"
-version = "10.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c16d80246a076246d8b525d9f404543e90fe0818636cd89c249c2a4bee3bb1"
-dependencies = [
- "regex",
- "walkdir",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3976,6 +3966,8 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff8326d358c768a169662397a7cd566a6fc4d4b8e394f285cd7cfcc7a6f6e866"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3983,16 +3975,12 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "blokli-client",
- "const-hex",
  "dashmap",
  "futures",
  "futures-concurrency",
  "futures-time",
- "hex-literal",
  "hopr-api",
  "hopr-utilities",
- "insta",
- "lazy_static",
  "moka",
  "parking_lot",
  "petgraph",
@@ -4001,9 +3989,7 @@ dependencies = [
  "serde_json",
  "smart-default",
  "tempfile",
- "test-log",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
  "validator",
 ]
@@ -4037,6 +4023,8 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c670d644ce0535d3fb6beb3b9ade0c67f0a24d6309b888f64f61dd0b9eb51eb3"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4045,30 +4033,8 @@ dependencies = [
  "hopr-api",
  "hopr-network-graph",
  "hopr-utilities",
- "humantime-serde",
- "lazy_static",
- "serde",
  "smart-default",
- "tokio",
  "tracing",
- "validator",
-]
-
-[[package]]
-name = "hopr-ct-immediate"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "futures",
- "hopr-api",
- "hopr-network-graph",
- "hopr-utilities",
- "humantime-serde",
- "lazy_static",
- "moka",
- "serde",
- "smart-default",
- "tokio",
  "validator",
 ]
 
@@ -4121,24 +4087,21 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ba5b6a91aeb80be5249798c975895d72d348c163317a3976359b5a10c89eb4b"
 dependencies = [
  "anyhow",
- "assertables",
  "bimap",
- "criterion",
  "futures",
- "hex-literal",
  "hopr-api",
  "hopr-utilities",
  "indexmap 2.14.0",
- "insta",
  "lazy_static",
  "parking_lot",
  "petgraph",
  "rand 0.10.2",
  "smallvec",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
@@ -4250,55 +4213,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-session-server-forwarder"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "hopr-api",
- "hopr-transport-session",
- "hopr-utilities",
- "lazy_static",
- "serde",
- "serde_with",
- "smart-default",
- "thiserror 2.0.19",
- "tokio",
- "tokio-retry",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "hopr-ticket-manager"
 version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8009dca8550d8803bc730bb89e26a68316df041d4a131287e79b5e4fc9d4a413"
 dependencies = [
  "ahash",
  "anyhow",
  "clap",
- "criterion",
  "dashmap",
  "futures",
  "hashbrown 0.17.1",
  "hopr-api",
- "hopr-chain-connector",
  "hopr-utilities",
  "parking_lot",
  "postcard",
- "rand 0.10.2",
  "redb",
- "serde",
- "serde_json",
  "strum 0.28.0",
  "tempfile",
- "test-log",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "hopr-transport"
-version = "0.36.0"
+version = "0.37.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4381,30 +4320,23 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.10.0"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68e553e6688d8bf422a47cf382673752fbe3086f168e33dde006160481ec317a"
 dependencies = [
- "anyhow",
  "async-broadcast",
  "async-trait",
- "async_channel_io",
  "backon",
- "bytes",
  "dashmap",
  "futures",
  "hopr-api",
- "hopr-crypto-packet",
- "hopr-transport",
- "hopr-transport-probe",
  "hopr-utilities",
- "lazy_static",
  "libp2p",
  "libp2p-stream",
- "more-asserts",
  "multiaddr",
  "pin-project",
  "quinn-udp 0.6.1",
  "thiserror 2.0.19",
- "tokio",
  "tracing",
 ]
 
@@ -4442,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4554,9 +4486,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3fb9c92de05424fd684bc1a0ac2f7df91ec2b6958f2733b2ff1c830a4390a34"
+checksum = "c557ecaad14224e4ae1df1be73449c24241f4b34e20129b11b8d0e38062eb6a6"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -8708,17 +8640,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "tokio-retry"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a129d95275ebf4c493ec53bf0f8cd95f5ac161bc4f381700809a54f595d4470"
-dependencies = [
- "pin-project-lite",
- "rand 0.10.2",
- "tokio",
 ]
 
 [[package]]
