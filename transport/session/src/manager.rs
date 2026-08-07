@@ -987,23 +987,21 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
-                    // For standard Session data we first reduce the number of SURBs we want to produce,
-                    // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    // For standard Session data we set the number of SURBs we want to produce.
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
                         // NOTE: this is put in-front of the `full_surb_scoring_sender`,
                         // so that its estimate of SURBs gets automatically updated based on
                         // the `max_surbs_in_packets` set here.
                         move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            if !max_out_organic_surbs {
-                                // TODO: make this dynamic to honor the balancer target (#7439)
-                                data.packet_info
-                                    .get_or_insert_with(|| OutgoingPacketInfo {
-                                        max_surbs_in_packet: 1,
-                                        ..Default::default()
-                                    })
-                                    .max_surbs_in_packet = 1;
-                            }
+                            // TODO: make this dynamic to honor the balancer target (#7439)
+                            data.packet_info
+                                .get_or_insert_with(|| OutgoingPacketInfo {
+                                    max_surbs_in_packet,
+                                    ..Default::default()
+                                })
+                                .max_surbs_in_packet = max_surbs_in_packet;
+
                             futures::future::ok::<_, S::Error>((routing, data))
                         },
                     );
@@ -1162,17 +1160,15 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let max_surbs_in_packet = cfg.max_surbs_per_data_packet;
                     let reduced_surb_sender =
                         msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
-                            if !max_out_organic_surbs {
-                                data.packet_info
-                                    .get_or_insert_with(|| OutgoingPacketInfo {
-                                        max_surbs_in_packet: 1,
-                                        ..Default::default()
-                                    })
-                                    .max_surbs_in_packet = 1;
-                            }
+                            data.packet_info
+                                .get_or_insert_with(|| OutgoingPacketInfo {
+                                    max_surbs_in_packet,
+                                    ..Default::default()
+                                })
+                                .max_surbs_in_packet = max_surbs_in_packet;
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 

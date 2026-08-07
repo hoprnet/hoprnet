@@ -63,9 +63,16 @@ pub type UnreliableSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
 /// Represents a socket with reliable delivery.
 pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;
 
+const fn min(a: usize, b: usize) -> usize {
+    if a < b { a } else { b }
+}
+
+/// Maximum Session MTU even if the HOPR packet allows for more.
+pub const MAX_SESSION_MTU: usize = 1452;
+
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {
-    C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD
+    min(MAX_SESSION_MTU, C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD)
 }
 
 /// Adaptors for [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport to use Session protocol.

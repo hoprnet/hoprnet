@@ -28,6 +28,7 @@ use crate::{
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
     protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
+    session_socket_mtu,
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -131,8 +132,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
         // The maximum is bounded by the SeqIndicator capacity.
         let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,
         );
 
         // Segment data incoming/outgoing using underlying transport
@@ -279,8 +280,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
         // The maximum is reduced due to the size of the missing segment bitmap in SegmentRequests.
         let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>()
                 * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
         );
 
@@ -1098,9 +1099,11 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        assert_eq!(data.len() - 1500, bob_data.len());
-        assert_eq!(&data[1500..], &bob_data);
+        // The whole first frame is discarded due to the missing first segment.
+        // The actual data lost equals the frame size (a single segment when frame_size < segment_payload).
+        let segment_payload = FRAME_SIZE.min(MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD);
+        assert_eq!(data.len() - segment_payload, bob_data.len());
+        assert_eq!(&data[segment_payload..], &bob_data);
 
         bob_socket.close().await?;
 
@@ -1261,12 +1264,14 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        assert_eq!(bob_sent_data.len() - 1500, alice_recv_data.len());
-        assert_eq!(&bob_sent_data[1500..], &alice_recv_data);
+        // The whole first frame is discarded due to the missing first segment.
+        // The actual data lost equals the frame size (a single segment when frame_size < segment_payload).
+        let segment_payload = FRAME_SIZE.min(MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD);
+        assert_eq!(bob_sent_data.len() - segment_payload, alice_recv_data.len());
+        assert_eq!(&bob_sent_data[segment_payload..], &alice_recv_data);
 
-        assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
-        assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+        assert_eq!(alice_sent_data.len() - segment_payload, bob_recv_data.len());
+        assert_eq!(&alice_sent_data[segment_payload..], &bob_recv_data);
 
         #[cfg(feature = "telemetry")]
         {

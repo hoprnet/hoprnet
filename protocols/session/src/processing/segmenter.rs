@@ -9,6 +9,7 @@ use tracing::instrument;
 
 use crate::{
     protocol::{FrameId, Segment, SeqIndicator, SessionMessage},
+    session_socket_mtu,
     utils::segment_into,
 };
 
@@ -59,11 +60,11 @@ where
 {
     fn new(inner: S, frame_size: usize, send_terminating_segment: bool) -> Self {
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
-        // Minimum is SESSION_MTU (= C - SEGMENT_OVERHEAD) so that a single frame fits in one
+        // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
         let frame_size = frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+            session_socket_mtu::<C>(),
+            session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,
         );
 
         Self {

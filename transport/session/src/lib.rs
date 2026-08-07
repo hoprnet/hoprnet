@@ -94,17 +94,20 @@ pub struct SessionClientConfig {
     /// Enable automatic SURB management for the Session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
-    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
+    /// Sets the maximum number of possible SURBs which will always be sent with Session data packets (if they fit).
     ///
     /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
-    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
-    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    /// carry the maximum number of SURBs possible. Setting this to a higher number will put additional CPU
+    /// pressure on the local node as it will generate the given number of SURBs for each data packet.
     ///
-    /// Set this to `true` only when the underlying traffic is highly asymmetric.
+    /// Set this to more than 1 only if the underlying traffic is highly asymmetric. Setting
+    /// this to `0` will leave all the job of SURB production to the SURB balancer (if configured).
     ///
-    /// Default is `false`.
-    #[default(false)]
-    pub always_max_out_surbs: bool,
+    /// The maximum number is naturally limited by the maximum payload size of a HOPR packet.
+    ///
+    /// Default is `1`.
+    #[default(1)]
+    pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session.
     ///
     /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the
@@ -131,7 +134,7 @@ mod tests {
     #[test]
     fn test_session_mtu() {
         assert_eq!(SESSION_MTU, session_socket_mtu::<{ ApplicationData::PAYLOAD_SIZE }>());
-        assert_eq!(1020, SESSION_MTU); // Needs to be changed when HOPR packet payload size changes
+        assert_eq!(1452, SESSION_MTU); // Needs to be changed when HOPR packet payload size changes
     }
 
     #[test]

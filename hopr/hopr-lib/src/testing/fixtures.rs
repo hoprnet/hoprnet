@@ -201,7 +201,7 @@ impl ClusterGuard {
                     capabilities,
                     pseudonym: None,
                     surb_management,
-                    always_max_out_surbs: false,
+                    max_surbs_per_data_packet: 1,
                     flow_control: None,
                 },
             )

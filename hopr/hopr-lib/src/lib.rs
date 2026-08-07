@@ -151,9 +151,15 @@ pub struct HoprSessionClientConfig {
     /// Enable automatic SURB management for the session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
-    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
-    #[default(false)]
-    pub always_max_out_surbs: bool,
+    /// Sets the maximum number of possible SURBs that will always be sent with session data packets.
+    ///
+    /// Higher values add CPU strain, but reduce the workload of the SURB balancer (if configured).
+    /// The value is bounded by the packet size and will saturate there.
+    /// Setting to 0 will leave all the work to SURB balancer. If in that case no SURB balancer is
+    /// configured, there will be no SURBs produced at all, making the traffic only possible in
+    /// one direction.
+    #[default(1)]
+    pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
@@ -210,7 +216,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             capabilities: value.capabilities,
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
-            always_max_out_surbs: value.always_max_out_surbs,
+            max_surbs_per_data_packet: value.max_surbs_per_data_packet,
             flow_control: value.flow_control,
         }
     }
