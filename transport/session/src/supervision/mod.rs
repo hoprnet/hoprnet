@@ -70,16 +70,29 @@
 //! * **Recovery hard deadline** — absolute per-SSA backstop, never extended. This is a resource guard (session slot +
 //!   reconstructor memory), not a liveliness mechanism.
 //!
+//! Both recovery clocks start when the cycle reaches the **front of its batch**, not when its deposit
+//! confirms. A batch is served in index order — the Entry's emission window is clamped to one cycle —
+//! so a cycle behind the front is queued, not stalled, and arming at funding would measure the queue
+//! wait instead of the recovery. The front cycle is still on the clock from funding, so a
+//! funded-but-never-served cycle is caught as before.
+//!
 //! **Fault tracking** — the supervisor tracks unverifiable shares via the
 //! `UnverifiableShares` event (observed as absolute per-SSA totals that may
 //! arrive from multiple concurrent ack processing batches).  It charges only
 //! the delta from the maximum seen so far, preventing stale or out-of-order
 //! snapshots from double-counting.  Limits exist per-SSA and per-session.
 //!
-//! **Rolling SSAs** — to maintain continuity, the supervisor requests a
-//! *next* SSA when the current one is "almost recovered" (early threshold
-//! reached) or fully recovered.  It keeps at most two live SSAs in flight
-//! plus one in tombstone phase.
+//! **Rolling SSAs** — to maintain continuity, the supervisor requests the *next* batch when the
+//! current one is "almost recovered" (early threshold reached) or fully recovered, so the commitment
+//! and deposit work for the next cycle overlaps the tail of the current one. With a batch, only its
+//! **last** cycle may ask: the request flags are per-cycle, so without that gate every member would
+//! answer its own early signal with a batch of its own, compounding into `ssas_per_request` batches
+//! per batch. The last rather than the first, because a batch is served in index order and gating on
+//! the first would ask a whole batch too early. Retiring the cycle holding the gate hands it to the
+//! newest survivor, or a batch whose last cycle lost its deposit would strand with no successor.
+//!
+//! Live cycles at any moment are therefore `ssas_per_request` plus whatever the overlap has already
+//! requested, each with its own reconstructor state, plus tombstones inside their retention window.
 //!
 //! ## The [`ServiceGate`] — egress gating
 //!
@@ -235,6 +248,103 @@
 //! │  Action: Close               → poison + teardown   │
 //! └────────────────────────────────────────────────────┘
 //! ```
+//!
+//! # Configuration
+//!
+//! ## What each parameter prevents
+//!
+//! Every field of [`SupervisorConfig`], the failure it exists to stop, and what shipping default it
+//! carries. Nothing here is a preference: each one is the only thing standing between the Exit and a
+//! specific way of taking service without paying for it.
+//!
+//! | Parameter | Default | What it prevents |
+//! |---|---|---|
+//! | `ssas_per_request` | 1 | Nothing by itself — an exposure dial. Raising it amortises the request round trip over several cycles, at the price of multiplying the *unfunded* exposure to that many quotas, and it scales the two deadlines below. |
+//! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
+//! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
+//! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
+//! | `max_recovery_time` | 1 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. |
+//! | `max_unverifiable_shares_per_ssa` | 0 | Serving on past a polynomial whose share set failed to open its commitment. That already dooms the cycle, so tolerating it only buys the Entry more unpaid packets. |
+//! | `max_unverifiable_shares_per_session` | 0 | The same failure recurring once per cycle, which a per-cycle limit alone would reset each time. |
+//! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
+//! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
+//! | `max_predeposit_packets` | 10000 | Bounds what an Entry that never funds can extract. `0` is supported and means strict prepay. |
+//! | `max_served_without_progress` | 2048 | Packets served with no share coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. **Constrained by the PIX dimensions; see below.** |
+//! | `tombstone_retention_window` | 30 s | A late acknowledgement arriving after its cycle's record is gone, with nothing left to attribute it to. |
+//! | `min_deposit` | 0 | A dust deposit counting as funding and releasing service. Top-ups accumulate, so this is a floor on the total, not on any one transfer. |
+//!
+//! ## Constraints between parameters
+//!
+//! [`validate_pix_supervision`] enforces, at config-load time and against the reconstructor config
+//! actually in use: `max_recovery_idle >= max_ack_await_time`; `tombstone_retention_window >=
+//! max_ack_await_time`; `max_recovery_idle < unused_verifier_lifetime`; `ssas_per_request` in
+//! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
+//! `0.0..=1.0`; and non-zero `max_served_without_progress` and `min_share_order_sample`.
+//!
+//! Two more constraints cannot be checked there, because they depend on PIX dimensions negotiated
+//! per Session and on the Entry's `additional_shares`, which never goes on the wire. **Both are the
+//! same interaction, and an operator raising the PIX dimensions has to revisit them:**
+//!
+//! **(1)** `max_served_without_progress` must exceed
+//! `additional_shares × min(polynomials_per_ssa, SHARE_EMISSION_WINDOW)`.
+//!
+//! Emission is round-robin over a window of up to `hopr_protocol_pix::SHARE_EMISSION_WINDOW` (256)
+//! polynomials advancing in lockstep. They reach `threshold` on the same pass and then take their
+//! surplus shares together — so every block ends with `additional_shares × window` consecutive
+//! packets carrying no *useful* share, and no `ProgressNotification` for any of them. At the shipped
+//! `additional_shares = 32` that run is **8192 packets, four times the shipped ceiling of 2048**.
+//! Crossing the ceiling parks the writer; a parked writer spends no further SURBs, so no share can
+//! arrive to wake it, while the service-gated idle timer re-arms indefinitely because no service is
+//! being consumed. The Session hangs rather than closing. Only dimensions with `polynomials_per_ssa`
+//! at or below the window escape it, which is why the small-dimension cluster tests do not show it.
+//!
+//! **(2)** `max_recovery_idle` must exceed that same run in wall-clock terms —
+//! `additional_shares × min(polys, window) / packet rate` — because service *is* being consumed
+//! throughout it, so the timer does not re-arm. Equivalently, the configuration implies a minimum
+//! sustainable rate of `additional_shares × min(polys, window) / max_recovery_idle`.
+//!
+//! ## Worked example
+//!
+//! A profile of **5 Mbps sustained per direction** and **5–6 s on-chain settlement** for an SSA
+//! deposit. `HoprPacket::PAYLOAD_SIZE` is 1038 B, so 5 Mbps is ~602 packets/s of return traffic —
+//! one SURB and one share each.
+//!
+//! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` gives 131 072
+//! useful shares, a 129.8 MiB quota — the bottom of the default `quota_range`, so no range change is
+//! needed — and a cycle of 196 608 emitted packets, about **5.4 min** at this rate. The default
+//! `8192 × 64` would make that 21.8 min per cycle, which at 6 s settlement is a long time to leave one
+//! cycle's traffic unsettled for no benefit. Keep it a multiple of 256 so the emission window never
+//! narrows.
+//!
+//! | Parameter | Value | Why, at this profile |
+//! |---|---|---|
+//! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 129.8 MiB quota, 5.4 min cycle; multiple of the emission window |
+//! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | Shipped threshold; the product is what fixes the quota |
+//! | `PixGlobalConfig::additional_shares` (Entry) | 32 | 1.5× surplus, and the term in both constraints above |
+//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 32 768-packet runway — **54 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 129.8 MiB` |
+//! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
+//! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
+//! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is exactly what is lost to an Entry that never funds — 4.2 MB. Use `0` for strict prepay and accept a ~6 s stall at session start |
+//! | `max_served_without_progress` | **16384** | 2× the 8192-packet surplus run from constraint (1). **The shipped 2048 would hang this configuration** |
+//! | `max_recovery_idle` | 60 s | Covers the surplus run (13.6 s here) with margin, and satisfies `>= max_ack_await_time`. Implies a floor of ~137 packets/s (~1.1 Mbps) below which an honest Session is closed mid-block — acceptable when 5 Mbps is the operating point, and the reason to raise this if slow Sessions must be supported |
+//! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 327 s at full rate, so 2 h implies a floor of ~27 packets/s (~0.23 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
+//! | `max_off_front_share_fraction` | 0.25 | Shipped value. A conforming Entry sits near 0; two-way spreading is 0.5 |
+//! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
+//! | `max_unverifiable_shares_per_ssa` / `_per_session` | 0 / 0 | Shipped values; a failed polynomial has already doomed the cycle |
+//! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
+//! | `min_deposit` | ≥ one quota's value | 129.8 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
+//!
+//! Related settings outside [`SupervisorConfig`] that this profile also pins:
+//!
+//! | Parameter | Value | Why |
+//! |---|---|---|
+//! | `SurbStoreConfig::rb_capacity` | 100 000 | An overwritten SURB is a permanently lost share, so the buffer must clear the balancer's target with room for overshoot — 14× here |
+//! | `SurbBalancerConfig::target_surb_buffer_size` | 7 000 | ~11.6 s of return traffic at 5 Mbps; must cover the forward round trip or the Exit starves mid-cycle |
+//! | `SessionManagerConfig::maximum_surb_buffer_size` | 10 000 | Ceiling the balancer may be steered to |
+//! | `SsaReconstructorConfig::max_ack_await_time` | 30 s | Bounds how long an unacknowledged share is held; both `max_recovery_idle` and `tombstone_retention_window` must clear it |
+//! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
+//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the 54 s pipelining runway quoted above; lowering it buys runway at the cost of committing to the next cycle earlier |
+//! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
 
 use std::time::Duration;
 
@@ -257,6 +367,12 @@ mod worker;
 /// `incoming_session_pix_config.supervision`. The fields interact — with each other and with the
 /// reconstructor's own lifetimes — so a set of them is only meaningful as a whole; that is what
 /// [`validate_pix_supervision`] checks, and the node's config validator runs it at load time.
+///
+/// Two constraints it *cannot* check, because they depend on the PIX dimensions and on the Entry's
+/// `additional_shares`, bind [`max_served_without_progress`](Self::max_served_without_progress) and
+/// [`max_recovery_idle`](Self::max_recovery_idle). Both are written out under "Configuration" in the
+/// `supervision` module documentation, along with a worked set of values — the module is crate-private,
+/// so it is named rather than linked here.
 #[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
