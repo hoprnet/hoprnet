@@ -124,6 +124,18 @@ pub struct SessionPixSupervisor {
     pub(crate) closed: bool,
     next_ssa_index: u32,
     session_invalid_total: u64,
+    /// The cycle the two share-order counters below are measured against — the earliest unrecovered
+    /// cycle, i.e. the one the Entry should currently be serving. `None` before the first batch exists.
+    share_order_front: Option<SsaIndex>,
+    /// Useful shares booked on [`Self::share_order_front`] since it took the front.
+    front_useful: u64,
+    /// Useful shares booked on any *other* live cycle over that same span.
+    ///
+    /// `off_front_useful / (front_useful + off_front_useful)` is the share-order ratio — see
+    /// [`SupervisorConfig::max_off_front_share_fraction`] for what it detects and why it is a fraction
+    /// rather than a count. Both counters reset when the front changes, which is what keeps the window
+    /// bounded to a single cycle's service.
+    off_front_useful: u64,
     release_service_emitted: bool,
     /// Ordered SSAs (oldest first, newest last). At most 2 live + 1 tombstone.
     ssas: Vec<PerSsaState>,
@@ -149,6 +161,9 @@ impl SessionPixSupervisor {
             pseudonym,
             next_ssa_index: 1,
             session_invalid_total: 0,
+            share_order_front: None,
+            front_useful: 0,
+            off_front_useful: 0,
             closed: false,
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
@@ -157,6 +172,7 @@ impl SessionPixSupervisor {
         };
 
         let actions = s.emit_request_next_ssa(now);
+        s.refresh_share_order_front();
         (s, actions)
     }
 
@@ -185,7 +201,37 @@ impl SessionPixSupervisor {
         };
 
         self.arm_recovery_clocks_for_earliest(now, served_total);
+        self.refresh_share_order_front();
         actions
+    }
+
+    /// Index of the earliest cycle that has not finished recovering — the one the Entry should be
+    /// serving, given that emission is clamped to a single cycle.
+    fn earliest_live_idx(&self) -> Option<usize> {
+        self.ssas
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| !s.is_terminal())
+            .min_by_key(|(_, s)| s.ssa_id.ssa_index())
+            .map(|(i, _)| i)
+    }
+
+    /// Re-points the share-order accounting at the current front of the batch, clearing it if the front
+    /// moved.
+    ///
+    /// Clearing on a change of front is what bounds the measurement window to one cycle's service, and
+    /// it is why an Entry cannot launder a spree by eventually finishing a cycle: the reset is only
+    /// reached by the front cycle *completing*, which is the thing the Exit wanted all along.
+    ///
+    /// Called after every event and every deadline sweep, so it covers both ways the front can move —
+    /// the front cycle recovering, or being retired.
+    fn refresh_share_order_front(&mut self) {
+        let front = self.earliest_live_idx().map(|i| self.ssas[i].ssa_id.ssa_index());
+        if front != self.share_order_front {
+            self.share_order_front = front;
+            self.front_useful = 0;
+            self.off_front_useful = 0;
+        }
     }
 
     /// Starts the recovery clocks of the earliest unrecovered cycle, if they are not running yet.
@@ -210,14 +256,7 @@ impl SessionPixSupervisor {
         if self.closed {
             return;
         }
-        let Some(idx) = self
-            .ssas
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| !s.is_terminal())
-            .min_by_key(|(_, s)| s.ssa_id.ssa_index())
-            .map(|(i, _)| i)
-        else {
+        let Some(idx) = self.earliest_live_idx() else {
             return;
         };
 
@@ -549,6 +588,7 @@ impl SessionPixSupervisor {
         }
 
         // Progress is strictly larger.
+        let delta = new_useful - ssa.largest_useful_shares;
         ssa.largest_useful_shares = new_useful;
         ssa.recovered_polynomials = progress.recovered_polynomials;
         ssa.served_total_at_last_progress = served_total;
@@ -558,8 +598,55 @@ impl SessionPixSupervisor {
             ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
         }
 
+        if let Some(reason) = self.book_share_order_progress(&progress.ssa_id, delta) {
+            return vec![SessionPixAction::Close(reason)];
+        }
+
         // Signal the gate to reset its served-without-progress ceiling.
         vec![SessionPixAction::ProgressNotification]
+    }
+
+    /// Attributes `delta` useful shares to the front of the batch or behind it, and judges the ratio.
+    ///
+    /// The Entry serves a batch strictly in index order, so progress on anything but the front cycle is
+    /// service the Exit cannot yet be paid for. See
+    /// [`SupervisorConfig::max_off_front_share_fraction`] for the threat and for why this is measured
+    /// as a fraction; the judgement waits for
+    /// [`SupervisorConfig::min_share_order_sample`] shares of evidence.
+    fn book_share_order_progress(
+        &mut self,
+        ssa_id: &SsaId<HoprPseudonym>,
+        delta: u64,
+    ) -> Option<SessionPixCloseReason> {
+        let front = self.share_order_front?;
+        if ssa_id.ssa_index() == front {
+            self.front_useful = self.front_useful.saturating_add(delta);
+        } else {
+            self.off_front_useful = self.off_front_useful.saturating_add(delta);
+        }
+
+        // Judged on every event, not only off-front ones: the sample can cross the floor on a share
+        // that lands *on* the front cycle, and the ratio is already whatever it is by then. Waiting for
+        // the next off-front share would only delay the same verdict.
+        let total = self.front_useful.saturating_add(self.off_front_useful);
+        if total < self.cfg.min_share_order_sample || total == 0 {
+            return None;
+        }
+
+        let fraction = self.off_front_useful as f64 / total as f64;
+        if fraction > self.cfg.max_off_front_share_fraction {
+            tracing::error!(
+                %ssa_id, %front, fraction,
+                limit = self.cfg.max_off_front_share_fraction,
+                front_useful = self.front_useful,
+                off_front_useful = self.off_front_useful,
+                "entry is serving the batch out of order"
+            );
+            return Some(SessionPixCloseReason::BatchServedOutOfOrder);
+        }
+
+        tracing::trace!(%ssa_id, %front, fraction, "progress behind the front of the batch");
+        None
     }
 
     fn on_almost_recovered(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
@@ -951,6 +1038,8 @@ mod tests {
             max_recovery_time: Duration::from_secs(3600),
             max_unverifiable_shares_per_ssa: 3,
             max_unverifiable_shares_per_session: 10,
+            max_off_front_share_fraction: 0.25,
+            min_share_order_sample: 16384,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
@@ -2291,6 +2380,181 @@ mod tests {
 
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert!(actions.is_empty());
+    }
+
+    /// Config for the share-order tests: a batch of three, generous dimensions so a cycle can carry a
+    /// meaningful sample, and a small floor so the tests need few events.
+    fn share_order_cfg(sample: u64, fraction: f64) -> SupervisorConfig {
+        SupervisorConfig {
+            ssas_per_request: 3,
+            min_share_order_sample: sample,
+            max_off_front_share_fraction: fraction,
+            ..default_cfg()
+        }
+    }
+
+    /// Serving the front cycle, with only a trace of progress behind it, must never trip the ratio.
+    ///
+    /// The trace stands in for what the mixnet produces on its own: SURBs are permuted outbound and
+    /// their acknowledgements again inbound, so a conforming Entry still shows *some* off-front
+    /// progress at a cycle boundary. The point of measuring a fraction rather than a count is that a
+    /// bounded permutation stays a vanishing share of a growing window however the mixer is tuned.
+    #[test]
+    fn conforming_service_never_trips_the_share_order_ratio() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(share_order_cfg(1000, 0.25), dims(100, 10), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, 3, now);
+        let target = sup.dims.target_useful_shares();
+
+        for useful in [200, 400, 600, 800] {
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), useful, target, 10)),
+                now,
+                useful,
+            );
+            assert!(
+                matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+                "front-cycle service is what is supposed to happen, got {actions:?}"
+            );
+        }
+
+        // A boundary's worth of reordering: 50 shares against 800, far inside the ceiling.
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 2), 50, target, 1)),
+            now,
+            850,
+        );
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+            "a boundary's worth of reordering must not convict, got {actions:?}"
+        );
+        assert!(!sup.closed);
+    }
+
+    /// An Entry spreading a batch across all its cycles must be caught once the evidence is in.
+    ///
+    /// Three cycles served in parallel put two thirds of all progress behind the front — the signature
+    /// the ratio exists for, and one that neither the service gate nor `max_recovery_idle` can see,
+    /// since the front cycle keeps progressing and keeps refreshing its own idle timer.
+    #[test]
+    fn spreading_a_batch_across_its_cycles_trips_the_share_order_ratio() {
+        const SAMPLE: u64 = 1000;
+
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(share_order_cfg(SAMPLE, 0.25), dims(100, 10), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, 3, now);
+        let target = sup.dims.target_useful_shares();
+
+        let mut closed_at = None;
+        'outer: for round in 1..=5u64 {
+            for cycle in 1..=3u32 {
+                let actions = sup.handle_event(
+                    &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, cycle), round * 100, target, 10)),
+                    now,
+                    round * 300,
+                );
+                let sample = sup.front_useful + sup.off_front_useful;
+                if let [SessionPixAction::Close(reason)] = actions.as_slice() {
+                    assert_eq!(*reason, SessionPixCloseReason::BatchServedOutOfOrder);
+                    closed_at = Some(sample);
+                    break 'outer;
+                }
+                assert!(
+                    sample < SAMPLE,
+                    "at {sample} shares the evidence was in and the 2:1 split should have closed the Session"
+                );
+            }
+        }
+
+        let closed_at = closed_at.expect("spreading across three cycles must close the Session");
+        assert!(
+            closed_at >= SAMPLE,
+            "conviction at {closed_at} shares is below the evidence floor of {SAMPLE}"
+        );
+    }
+
+    /// The accounting is scoped to one cycle's service: completing the front cycle clears it.
+    ///
+    /// That bound is what stops an Entry laundering a spree of out-of-order service — the only way to
+    /// reach the reset is to finish the front cycle, which is to say to earn the traffic it took.
+    #[test]
+    fn share_order_accounting_resets_when_the_front_cycle_completes() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(share_order_cfg(1000, 0.25), dims(100, 10), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, 3, now);
+        let target = sup.dims.target_useful_shares();
+
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), 500, target, 50)),
+            now,
+            500,
+        );
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 2), 100, target, 10)),
+            now,
+            600,
+        );
+        assert_eq!(sup.share_order_front, Some(SsaIndex::new(1).unwrap()));
+        assert_eq!((sup.front_useful, sup.off_front_useful), (500, 100));
+
+        sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), now, 600);
+        assert_eq!(
+            sup.share_order_front,
+            Some(SsaIndex::new(2).unwrap()),
+            "cycle 2 is the front now"
+        );
+        assert_eq!(
+            (sup.front_useful, sup.off_front_useful),
+            (0, 0),
+            "the window is one cycle's service, so it starts empty on the new front"
+        );
+    }
+
+    /// Below the evidence floor nothing is judged, however lopsided the split.
+    ///
+    /// This is what keeps a cycle made unrecoverable by loss from convicting the Entry: it stops
+    /// progressing while later cycles continue, so the fraction goes to 1.0 — and the floor outlasts
+    /// the service-gated `max_recovery_idle` window that retires it, after which the front moves and
+    /// the accounting resets. The ceiling here is 0.0, the strictest possible, so only the floor can be
+    /// what holds the verdict back.
+    #[test]
+    fn no_verdict_is_reached_below_the_evidence_floor() {
+        const SAMPLE: u64 = 1000;
+
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(share_order_cfg(SAMPLE, 0.0), dims(100, 10), p, Instant::now());
+        let now = Instant::now();
+        fund_batch(&mut sup, p, 3, now);
+        let target = sup.dims.target_useful_shares();
+
+        // Every share lands behind the front, and still nothing is decided while the sample is thin.
+        for useful in [300, 600, 900] {
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 3), useful, target, 10)),
+                now,
+                useful,
+            );
+            assert!(
+                matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
+                "{useful} shares is below the floor of {SAMPLE} and must not convict, got {actions:?}"
+            );
+        }
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 3), SAMPLE, target, 10)),
+            now,
+            SAMPLE,
+        );
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(SessionPixCloseReason::BatchServedOutOfOrder)]
+            ),
+            "at the floor the verdict must be reached, got {actions:?}"
+        );
     }
 
     /// A cycle queued behind the front of its batch must not be charged for the wait.

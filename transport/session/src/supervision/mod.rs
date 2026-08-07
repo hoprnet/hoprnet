@@ -367,6 +367,78 @@ pub struct SupervisorConfig {
     #[default(0)]
     pub max_unverifiable_shares_per_session: u64,
 
+    /// Largest share of recovery progress that may land on a cycle *other* than the one at the front
+    /// of the batch, as a fraction of all progress since that cycle took the front.
+    ///
+    /// ## What it defends
+    ///
+    /// A batch only de-risks the Exit if its cycles are served one at a time, so that recovering the
+    /// first pays for the traffic that earned it. An Entry that instead spread a batch's shares across
+    /// all `ssas_per_request` cycles could take `ssas_per_request × quota` of service while leaving
+    /// every cycle short of recovery — and a cycle short of recovery pays nothing at all, since the SSA
+    /// is the sum of *every* polynomial's constant term. That turns the batch knob from cost-neutral
+    /// into an n-fold amplifier of unpaid traffic.
+    ///
+    /// Nothing else sees it. The service gate and [`max_recovery_idle`](Self::max_recovery_idle) both
+    /// measure the *absence* of progress, and a spreading Entry makes progress on every cycle
+    /// continuously — including the front one, whose idle timer it therefore keeps refreshing. It
+    /// simply never finishes one.
+    ///
+    /// ## Why a fraction and not a count
+    ///
+    /// Out-of-order *arrival* is not an Entry property. SURBs cross the mixnet outbound and their
+    /// acknowledgements cross it again inbound, so arrival order is a permutation of emission order
+    /// whose width is roughly `delay_range × packet rate`. An absolute tolerance would therefore have
+    /// to be re-derived every time the mixer is reconfigured, and — being cumulative — would drift
+    /// into closing honest Sessions given enough cycle boundaries.
+    ///
+    /// A ratio has neither problem: a permutation of bounded width is a vanishing *fraction* of a
+    /// growing window, so widening `delay_range` cannot move it, and the denominator grows with the
+    /// numerator so nothing accumulates. It is also independent of packet **rate** (both terms scale
+    /// together, so unlike a wall-clock bound it implies no throughput floor), of **loss** (which hits
+    /// every cycle alike), and of **`surplus_shares`** — which matters, because the surplus is
+    /// Entry-chosen and never goes on the wire, so the Exit cannot compute any expected
+    /// shares-per-packet ratio. Comparing the batch's cycles against each other cancels it.
+    ///
+    /// ## The value
+    ///
+    /// A conforming Entry sits at ~0: with emission clamped to one cycle
+    /// ([`hopr_protocol_pix::SHARE_EMISSION_WINDOW`]) the only off-front progress is boundary
+    /// reordering. Spreading across `n` cycles gives `(n − 1) / n` — 0.5 at two cycles, 0.67 at three.
+    /// 0.25 separates those with room on both sides.
+    ///
+    /// It bounds rather than eliminates: an Entry may divert up to this fraction and stay legal, so
+    /// worst-case unpaid exposure becomes ~`1 / (1 − f)` cycles instead of `n`. Alternating — serving
+    /// the front cycle honestly, then dumping on later ones — buys nothing, because the accounting only
+    /// resets when the front cycle *completes*, which means it was paid for.
+    ///
+    /// Default: 0.25.
+    #[default(0.25)]
+    pub max_off_front_share_fraction: f64,
+
+    /// Progress that must accumulate before
+    /// [`max_off_front_share_fraction`](Self::max_off_front_share_fraction) is judged at all, in useful
+    /// shares.
+    ///
+    /// A sample-size floor, not a tolerance: it does not bound how much a cheat can extract — the
+    /// fraction does that — it only refuses to convict on thin evidence.
+    ///
+    /// Sized by the one case that would otherwise produce a false positive: a cycle made
+    /// *unrecoverable* by loss. A polynomial that loses more than `surplus_shares` of its shares can
+    /// never reach its threshold, so its cycle stops progressing while later ones continue, and the
+    /// off-front fraction climbs to 1.0. That cycle is not something to close a Session over — it stops
+    /// progressing, its service-gated [`max_recovery_idle`](Self::max_recovery_idle) deadline expires,
+    /// it is retired, and the accounting resets on the new front. The sample floor only has to outlast
+    /// that window: ~181 shares/s at the deployed 1.5 Mbps cap over 60 s is ~10 900, so 16 384 leaves
+    /// ~1.5x headroom.
+    ///
+    /// Unlike an absolute tolerance this does not have to grow with Session length or track the mixer
+    /// configuration — it is a floor on evidence, evaluated once and then continuously.
+    ///
+    /// Default: 16384 shares.
+    #[default(16384)]
+    pub min_share_order_sample: u64,
+
     /// Cap on the provisional predeposit service budget.
     ///
     /// This buys the application its opening exchange while the deposit confirms on chain; it is not
@@ -519,6 +591,9 @@ pub enum SessionPixCloseReason {
     RecoveryDeadline,
     /// Too many unverifiable shares (per-SSA or session-limit exceeded).
     TooManyUnverifiableShares,
+    /// Too much of the batch's recovery progress landed on cycles behind the front one — see
+    /// [`SupervisorConfig::max_off_front_share_fraction`].
+    BatchServedOutOfOrder,
     /// A counter observation decreased (protocol violation).
     CounterRegression,
     /// Internal inconsistency (e.g., mismatched target, event on unknown SSA).
@@ -583,6 +658,20 @@ pub fn validate_pix_supervision(
     if cfg.max_served_without_progress == 0 {
         return Err(TransportSessionError::InvalidConfig(
             "max_served_without_progress must be non-zero".into(),
+        ));
+    }
+    // A fraction outside 0..=1 is unreachable rather than strict — the ratio can never exceed 1 — so a
+    // typo would silently disable the check instead of tightening it.
+    if !cfg.max_off_front_share_fraction.is_finite() || !(0.0..=1.0).contains(&cfg.max_off_front_share_fraction) {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "max_off_front_share_fraction ({}) must be a fraction between 0.0 and 1.0",
+            cfg.max_off_front_share_fraction
+        )));
+    }
+    // Zero would judge the very first off-front share, which mixnet reordering alone can produce.
+    if cfg.min_share_order_sample == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "min_share_order_sample must be non-zero".into(),
         ));
     }
     if cfg.max_recovery_idle < reconstructor_cfg.max_ack_await_time {
