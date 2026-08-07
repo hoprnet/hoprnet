@@ -10,6 +10,6 @@ errors: 0
 incoming_messages_Segment: 0
 incoming_messages_Request: 0
 incoming_messages_Acknowledge: 0
-outgoing_messages_Segment: 25
+outgoing_messages_Segment: 38
 outgoing_messages_Request: 0
 outgoing_messages_Acknowledge: 0
