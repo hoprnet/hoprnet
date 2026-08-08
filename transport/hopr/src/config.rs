@@ -242,9 +242,21 @@ pub struct HoprProtocolConfig {
     pub counter_flush_interval: Duration,
 }
 
+/// Per-Session return-path rate the recovery deadline is sized against, in packets per second.
+///
+/// 1.5 Mbps over a [`HoprPacket::PAYLOAD_SIZE`](hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE)
+/// payload — the per-Session cap documented throughout this repository, in
+/// `hopr_protocol_pix::reconstructor` and in the `supervision` module's worked profile.
+///
+/// An assumption rather than an enforced limit, and used in the only direction that is safe: a
+/// Session running *slower* needs a *longer* deadline, so checking against the cap is the loosest
+/// bound that still catches a `max_recovery_time` no Session could meet. It cannot certify that a
+/// slow Session will finish.
+const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+
 /// Rejects an [`IncomingSessionPixConfig`] that cannot work.
 ///
-/// Two independent failures, both of which would otherwise only show up at runtime:
+/// Three independent failures, all of which would otherwise only show up at runtime:
 ///
 /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
@@ -254,6 +266,12 @@ pub struct HoprProtocolConfig {
 /// reconstructor's own lifetimes — a supervisor that waits longer than the reconstructor keeps state
 /// would be waiting on an SSA that can no longer be completed. Checked against the value the three
 /// `SsaReconstructor::new` sites actually receive, not against whatever the default happens to be.
+///
+/// And `max_recovery_time` has to cover a whole cycle at the widest dimensions this Exit will
+/// *accept*, or it closes honest Sessions partway through one. That check is possible at all only
+/// because the quota now counts the surplus: `quota_range.end()` is the number of bytes a cycle
+/// actually puts on the wire, so the packet count follows by division with nothing left to guess.
+/// While the surplus was unpriced this needed the peer's `additional_shares`, which never travelled.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
     if cfg.quota_range.is_empty() {
         return Err(ValidationError::new(
@@ -267,6 +285,27 @@ fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Resul
             e.message = Some(error.to_string().into());
             e
         })?;
+
+    // The whole cycle rather than the point at which recovery completes: the quota does not reveal
+    // how the product splits between polynomials and threshold, so the emission-window arithmetic
+    // that puts the last useful share ~8192 packets early cannot be reproduced from it. Erring by
+    // that margin — ~45 s against a two-hour deadline — is the safe direction.
+    let worst_cycle_packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+    let needed = Duration::from_secs(worst_cycle_packets.div_ceil(ASSUMED_SESSION_PACKET_RATE));
+    if cfg.supervision.max_recovery_time < needed {
+        let mut e = ValidationError::new("pix max_recovery_time cannot cover one cycle at the accepted quota");
+        e.message = Some(
+            format!(
+                "max_recovery_time is {:?}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
+                 packets and needs at least {needed:?} at {ASSUMED_SESSION_PACKET_RATE} packets/s. Raise \
+                 max_recovery_time or lower the top of quota_range.",
+                cfg.supervision.max_recovery_time,
+                cfg.quota_range.end(),
+            )
+            .into(),
+        );
+        return Err(e);
+    }
 
     Ok(())
 }
@@ -304,6 +343,7 @@ fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), Validatio
             "num_ssa_parts * ssa_part_size exceeds the supported per-cycle dimension product",
         ));
     }
+
     Ok(())
 }
 
@@ -850,12 +890,13 @@ mod tests {
     /// against the run was never sound anyway: the run's length comes from the dimensions negotiated
     /// per Session, and this value is fixed at config load.
     ///
-    /// What is asserted instead is the property that replaced it, and the one the Session cannot
-    /// establish without: the run must be *survivable*, i.e. the deferral bucket a single polynomial
-    /// gets must hold everything the negotiated dimensions let the peer emit for it. Past
-    /// `MAX_DEFERRED_ACKS_PER_POLYNOMIAL` an acknowledgement is dropped rather than buffered, which
-    /// costs a share outright. Both halves of the sum are now a byte wide on the wire, so the sum
-    /// can reach 510 against a cap of 128 — the defaults must sit under it.
+    /// What is asserted instead is the shipping-default property the deferral path relies on: a
+    /// polynomial's whole emission fits one peer deferral bucket, so no acknowledgement for it can
+    /// ever be dropped for want of room. This is a *sufficient* condition for "never dropped", not a
+    /// requirement — the bucket only holds shares that arrive before the cycle's commitments
+    /// install, which is a prefix, so larger dimensions merely lose the guarantee rather than break.
+    /// That is why it is asserted on the defaults here and not enforced in `validate`, where it
+    /// would reject legitimate re-splits such as `4096 x 128`.
     ///
     /// The behavioural half of the original concern is pinned where it can actually be exercised:
     /// `a_surplus_only_snapshot_is_liveness_without_payment` in the supervisor, which drives a
@@ -867,8 +908,8 @@ mod tests {
         let emitted_per_poly = cfg.pix.ssa_part_size + cfg.pix.additional_shares;
         assert!(
             emitted_per_poly <= hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
-            "default emission of {emitted_per_poly} shares per polynomial must fit one deferral bucket ({}), or \
-             acknowledgements are dropped and the shares they carry are lost",
+            "default emission of {emitted_per_poly} shares per polynomial should fit one deferral bucket ({}), so \
+             that no acknowledgement can be dropped for want of room",
             hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL
         );
 
@@ -957,6 +998,56 @@ mod tests {
             "test case must sit over the ceiling"
         );
         assert!(past_ceiling.validate().is_err(), "past the ceiling must be rejected");
+    }
+
+    /// The hard recovery deadline must clear one whole cycle at the widest quota this Exit accepts.
+    ///
+    /// At the shipping defaults a cycle is 786 432 packets, about 72 minutes at the documented
+    /// 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped closed an honest,
+    /// fully saturated Session five sixths of the way through a cycle, which is worth nothing since
+    /// the SSA is the sum of every polynomial's constant term.
+    #[test]
+    fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() {
+        let cfg = IncomingSessionPixConfig::default();
+        let packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+        let needed = Duration::from_secs(packets.div_ceil(ASSUMED_SESSION_PACKET_RATE));
+
+        assert!(
+            needed > Duration::from_secs(3600),
+            "the previous 1 h default must be demonstrably too short ({needed:?} needed), or this test proves nothing"
+        );
+        assert!(
+            cfg.supervision.max_recovery_time >= needed,
+            "default max_recovery_time ({:?}) must cover one cycle at the top of the accepted quota ({needed:?})",
+            cfg.supervision.max_recovery_time
+        );
+        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+    }
+
+    /// And an operator who shortens it, or widens the quota past it, must be told at load time.
+    #[test]
+    fn a_recovery_deadline_below_one_cycle_is_rejected() {
+        let too_short = IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                max_recovery_time: Duration::from_secs(3600),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&too_short).is_err(),
+            "an hour cannot cover a 72-minute cycle and must be refused"
+        );
+
+        // The other way round: the deadline is fine, the operator widened what they accept.
+        let widened = IncomingSessionPixConfig {
+            quota_range: 1..=(*IncomingSessionPixConfig::default().quota_range.end() * 4),
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&widened).is_err(),
+            "accepting 4x the default quota needs a deadline raised to match"
+        );
     }
 
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an

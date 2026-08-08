@@ -263,7 +263,7 @@
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
-//! | `max_recovery_time` | 1 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. |
+//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 778 240 packets, ~72 min, at the defaults — or it closes honest Sessions instead. |
 //! | `max_unverifiable_shares_per_ssa` | 0 | Serving on past a polynomial whose share set failed to open its commitment. That already dooms the cycle, so tolerating it only buys the Entry more unpaid packets. |
 //! | `max_unverifiable_shares_per_session` | 0 | The same failure recurring once per cycle, which a per-cycle limit alone would reset each time. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
@@ -456,8 +456,37 @@ pub struct SupervisorConfig {
     /// This is a **resource backstop** (session slot + reconstructor memory),
     /// not the anti-drip mechanism. The service-gated idle rule is.
     ///
-    /// Default: 1 hour.
-    #[default(Duration::from_secs(3600))]
+    /// ## Why two hours, and not one
+    ///
+    /// It has to cover the *whole* of a cycle at the dimensions the node will accept, and at the
+    /// default dimensions one cycle does not fit in an hour. Emission runs in lockstep over windows
+    /// of [`SHARE_EMISSION_WINDOW`](hopr_protocol_pix::SHARE_EMISSION_WINDOW) polynomials, so with
+    /// 8192 polynomials the last useful share of the cycle lands at
+    ///
+    /// ```text
+    /// (31 full windows x 96 emitted + 1 window x 64 useful) x 256 = 778 240 packets
+    /// ```
+    ///
+    /// which is about **72 minutes** at the 1.5 Mbps per-Session cap this crate documents, before
+    /// any mixing latency or loss. A one-hour ceiling closes an honest, fully saturated Session at
+    /// the default configuration — with the cycle roughly five sixths recovered and therefore worth
+    /// nothing, since the SSA is the sum of every polynomial's constant term.
+    ///
+    /// Two hours is the value the worked profile in the module documentation already used, and it
+    /// keeps this instrument where it belongs: far enough out that
+    /// [`max_recovery_idle`](Self::max_recovery_idle) is what actually binds.
+    ///
+    /// The clock starts when the cycle reaches the front of its batch, which is up to one
+    /// predecessor's surplus tail — ~8192 packets, ~45 s at that rate — before it can make any
+    /// progress of its own. Negligible against two hours. Arming on first progress instead is
+    /// rejected because a funded cycle that is never served must still be caught.
+    ///
+    /// `HoprProtocolConfig::validate` checks this against the dimensions the node will actually
+    /// accept, so a raised `quota_range` that outgrows it is refused at load rather than discovered
+    /// one closed Session at a time.
+    ///
+    /// Default: 2 hours.
+    #[default(Duration::from_secs(7200))]
     #[serde(with = "humantime_serde")]
     pub max_recovery_time: Duration,
 

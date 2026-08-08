@@ -139,9 +139,17 @@ enum Deferral {
 ///
 /// It is *not* unreachable in general: both halves are a byte wide, so a conforming Entry may
 /// legitimately announce up to `255 + 255` and have its excess deferrals silently discarded. Both
-/// values now travel in [`PixParams`](crate::PixParams), so an Exit that cares can compare
-/// `shares_per_poly + surplus_shares` against this cap when it accepts a Session, instead of
-/// discovering the overflow one dropped acknowledgement at a time.
+/// values now travel in [`PixParams`](crate::PixParams), so an Exit that cares *can* compare
+/// `shares_per_poly + surplus_shares` against this cap when it accepts a Session.
+///
+/// Deliberately not refused on that comparison, though, and the distinction matters. Only shares
+/// arriving *before* the cycle's commitments install are deferred at all — a prefix, not the whole
+/// emission — so `shares_per_poly + surplus_shares <= MAX_DEFERRED_ACKS_PER_POLYNOMIAL` is a
+/// sufficient condition for "no acknowledgement is ever dropped for want of room", not a necessary
+/// one for the dimensions to work. Enforcing it would reject legitimate re-splits: `4096 x 128` holds
+/// the profiled product exactly and sums to 160. The shipping defaults sum to 96 and are asserted to
+/// stay under the cap in `hopr-transport`'s config tests; wider dimensions lose the guarantee and
+/// fall back on the deferral window being short.
 ///
 /// Public because it is observable behaviour, not an implementation detail: past the cap an
 /// acknowledgement is discarded, so anything measuring or exercising the deferral path has to stay
