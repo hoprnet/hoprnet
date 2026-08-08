@@ -1413,6 +1413,199 @@ mod tests {
         );
     }
 
+    /// A ticket processor with a scripted outcome, so the relay pipeline's ticket arm can be driven
+    /// independently of its PIX arm.
+    #[derive(Clone)]
+    struct ScriptedTicketProc {
+        outcome: std::sync::Arc<
+            dyn Fn() -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<ScriptedError>> + Send + Sync,
+        >,
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl ScriptedTicketProc {
+        /// Acknowledges no ticket, which is what a relay reports for a batch that resolves nothing.
+        /// The ticket arm is not what these tests are about — they only assert that it still runs.
+        fn resolving_nothing() -> Self {
+            Self {
+                outcome: std::sync::Arc::new(|| Ok(Vec::new())),
+                calls: Default::default(),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl UnacknowledgedTicketProcessor for ScriptedTicketProc {
+        type Error = ScriptedError;
+
+        fn insert_unacknowledged_ticket(
+            &self,
+            _: &OffchainPublicKey,
+            _: HalfKeyChallenge,
+            _: UnacknowledgedTicket,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn acknowledge_tickets(
+            &self,
+            _: OffchainPublicKey,
+            _: Vec<Acknowledgement>,
+        ) -> Result<Vec<ResolvedAcknowledgement>, TicketAcknowledgementError<Self::Error>> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            (self.outcome)()
+        }
+    }
+
+    /// A single-acknowledgement batch, which is the smallest one that gets past the pipeline's
+    /// empty-batch guard.
+    fn one_ack_batch() -> Vec<(OffchainPublicKey, Vec<Acknowledgement>)> {
+        vec![(
+            *OffchainKeypair::random().public(),
+            vec![VerifiedAcknowledgement::random(&OffchainKeypair::random()).leak()],
+        )]
+    }
+
+    /// Runs the relay pipeline to completion over `batch` and hands both processors back so the
+    /// test can assert on what each of them was asked to do.
+    async fn run_relay_pipeline(
+        tickets: ScriptedTicketProc,
+        exit: ScriptedExitProc,
+        ssa_evt: mpsc::Sender<HoprShareResolution>,
+        batch: Vec<(OffchainPublicKey, Vec<Acknowledgement>)>,
+    ) -> (ScriptedTicketProc, ScriptedExitProc) {
+        // Kept alive for the duration of the run: a dropped receiver would turn every ticket
+        // resolution into a send error, which is a different path than the one under test.
+        let (ticket_evt, _ticket_rx) = mpsc::channel::<TicketEvent>(4);
+        start_relay_incoming_ack_pipeline(
+            futures::stream::iter(batch),
+            ticket_evt,
+            std::sync::Arc::new(tickets.clone()),
+            std::sync::Arc::new(exit.clone()),
+            ssa_evt,
+            4,
+        )
+        .await;
+        (tickets, exit)
+    }
+
+    /// A relay that is also the Exit for the peer has to do both jobs from a single ack batch:
+    /// tickets and PIX shares are acknowledged concurrently, and the resolutions reach the SSA sink.
+    #[tokio::test]
+    async fn relay_ack_pipeline_acknowledges_tickets_and_shares_for_the_same_batch() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
+        let exit = ScriptedExitProc::new(move || Ok(vec![HoprShareResolution::AlmostRecoveredSsa(ssa_id)]));
+
+        let (tx, mut rx) = mpsc::channel::<HoprShareResolution>(4);
+        let (tickets, exit) =
+            run_relay_pipeline(ScriptedTicketProc::resolving_nothing(), exit, tx, one_ack_batch()).await;
+
+        assert_eq!(tickets.calls(), 1, "the ticket arm must run for every batch");
+        assert_eq!(exit.calls(), 1, "a peer with pending shares must reach the share arm");
+        assert_eq!(
+            rx.next().await,
+            Some(HoprShareResolution::AlmostRecoveredSsa(ssa_id)),
+            "the recovered SSA must be forwarded to the sink"
+        );
+        Ok(())
+    }
+
+    /// The `has_pending_shares` guard is what keeps PIX off the hot path of an ordinary relay: with
+    /// nothing pending, the batch must cost one thread-pool round-trip instead of two.
+    #[tokio::test]
+    async fn relay_ack_pipeline_skips_share_acknowledgement_without_pending_shares() {
+        let exit = ScriptedExitProc::new(|| Ok(vec![])).never_pending();
+
+        let (tx, mut rx) = mpsc::channel::<HoprShareResolution>(4);
+        let (tickets, exit) =
+            run_relay_pipeline(ScriptedTicketProc::resolving_nothing(), exit, tx, one_ack_batch()).await;
+
+        assert_eq!(tickets.calls(), 1, "the ticket arm runs regardless of pending shares");
+        assert_eq!(
+            exit.calls(),
+            0,
+            "a peer with no pending shares must not reach the thread pool"
+        );
+        assert_eq!(rx.next().await, None, "a skipped share arm can resolve nothing");
+    }
+
+    /// An empty batch is dropped before either arm is reached — neither processor should be paid for
+    /// a batch with nothing in it.
+    #[tokio::test]
+    async fn relay_ack_pipeline_ignores_empty_acknowledgement_batches() {
+        let (tx, _rx) = mpsc::channel::<HoprShareResolution>(4);
+        let (tickets, exit) = run_relay_pipeline(
+            ScriptedTicketProc::resolving_nothing(),
+            ScriptedExitProc::new(|| Ok(vec![])),
+            tx,
+            vec![(*OffchainKeypair::random().public(), vec![])],
+        )
+        .await;
+
+        assert_eq!(tickets.calls(), 0);
+        assert_eq!(exit.calls(), 0);
+    }
+
+    /// The two PIX error kinds differ only in log level. Neither may abort the pipeline, and neither
+    /// may cost the ticket arm its batch — ticket acknowledgement is the relay's primary job.
+    #[tokio::test]
+    async fn relay_ack_pipeline_survives_both_pix_error_kinds() {
+        for error in [ScriptedError::Expected, ScriptedError::Unexpected] {
+            let (tx, _rx) = mpsc::channel::<HoprShareResolution>(4);
+            let (tickets, exit) = run_relay_pipeline(
+                ScriptedTicketProc::resolving_nothing(),
+                ScriptedExitProc::new(move || Err(error)),
+                tx,
+                one_ack_batch(),
+            )
+            .await;
+
+            assert_eq!(exit.calls(), 1, "{error:?} must not abort the pipeline");
+            assert_eq!(tickets.calls(), 1, "{error:?} must not cost the ticket arm its batch");
+        }
+    }
+
+    /// An empty resolution batch is the ordinary case for a peer whose shares are still incomplete:
+    /// it must not be forwarded as an event.
+    #[tokio::test]
+    async fn relay_ack_pipeline_forwards_nothing_for_an_empty_resolution_batch() {
+        let (tx, mut rx) = mpsc::channel::<HoprShareResolution>(4);
+        let (_, exit) = run_relay_pipeline(
+            ScriptedTicketProc::resolving_nothing(),
+            ScriptedExitProc::new(|| Ok(vec![])),
+            tx,
+            one_ack_batch(),
+        )
+        .await;
+
+        assert_eq!(exit.calls(), 1);
+        assert_eq!(rx.next().await, None, "an empty batch must produce no event");
+    }
+
+    /// Like the exit pipeline, the relay pipeline is a long-running task with nowhere to return an
+    /// error to: a dead SSA sink is logged and the batch is still processed.
+    #[tokio::test]
+    async fn relay_ack_pipeline_survives_a_dead_pix_resolution_sink() -> anyhow::Result<()> {
+        let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
+        let (tx, rx) = mpsc::channel::<HoprShareResolution>(4);
+        drop(rx);
+
+        let (tickets, exit) = run_relay_pipeline(
+            ScriptedTicketProc::resolving_nothing(),
+            ScriptedExitProc::new(move || Ok(vec![HoprShareResolution::AlmostRecoveredSsa(ssa_id)])),
+            tx,
+            one_ack_batch(),
+        )
+        .await;
+
+        assert_eq!(exit.calls(), 1, "the batch must still have been processed");
+        assert_eq!(tickets.calls(), 1);
+        Ok(())
+    }
+
     /// Regression test for the Entry-node ack-sink bug.
     ///
     /// Before the fix, `NodeType::Entry` dropped `incoming_ack_rx` immediately at
