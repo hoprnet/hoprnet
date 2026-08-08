@@ -37,12 +37,6 @@ use crate::{
     pool::{self, Entry},
 };
 
-/// Idle heartbeat used when the pool is empty, so the engine periodically notices a
-/// dropped receiver and can shut its thread down instead of parking forever.
-const IDLE_HEARTBEAT: Duration = Duration::from_millis(200);
-/// Lower bound on any computed wake, preventing a busy-spin near a packet deadline.
-const MIN_WAKE: Duration = Duration::from_micros(100);
-
 /// Sender end of the Poisson mixing channel. Mirrors the uniform channel's sender: a lock-free,
 /// non-blocking `&self` send over an unbounded [`async_channel`] ingress.
 pub struct Sender<T> {
@@ -195,21 +189,6 @@ impl<T> Stream for Events<T> {
     }
 }
 
-/// Compute the next wake from the current occupancy and the earliest still-buffered enqueue
-/// instant (as returned by [`pool::sweep`], so no extra O(N) scan): the adaptive interval,
-/// capped by the soonest moment any packet's jitter window opens, floored at [`MIN_WAKE`].
-fn next_wake(earliest_enqueued: Option<Instant>, occupancy: usize, cfg: &MixerConfig, now: Instant) -> Duration {
-    match earliest_enqueued {
-        None => IDLE_HEARTBEAT,
-        Some(enqueued_at) => {
-            let interval = cfg.adaptive_interval(occupancy);
-            let window_opens = cfg.cap().saturating_sub(cfg.cap_jitter);
-            let deadline_wake = (enqueued_at + window_opens).saturating_duration_since(now);
-            interval.min(deadline_wake).max(MIN_WAKE)
-        }
-    }
-}
-
 /// The engine loop, run to completion by [`futures::executor::block_on`] on the dedicated
 /// thread. Sweeps the pool on every event and re-arms the adaptive timer afterwards.
 async fn run_engine<T>(
@@ -224,7 +203,7 @@ async fn run_engine<T>(
     let mut prev_sweep = Instant::now();
     let mut events = Events {
         input: Box::pin(input),
-        timer: Delay::new(IDLE_HEARTBEAT),
+        timer: Delay::new(pool::IDLE_HEARTBEAT),
         input_open: true,
     };
 
@@ -245,13 +224,7 @@ async fn run_engine<T>(
         let earliest = pool::sweep(&mut pool, &cfg, now, delta, &mut released);
         for (realized_delay, item) in released.drain(..) {
             #[cfg(all(feature = "telemetry", not(test)))]
-            {
-                let weight = 1.0f64 / cfg.metric_delay_window as f64;
-                crate::metrics::METRIC_MIXER_AVERAGE_DELAY.set(
-                    weight * realized_delay.as_millis() as f64
-                        + (1.0f64 - weight) * crate::metrics::METRIC_MIXER_AVERAGE_DELAY.get(),
-                );
-            }
+            crate::metrics::record_average_delay(realized_delay.as_millis() as f64, cfg.metric_delay_window);
             #[cfg(not(all(feature = "telemetry", not(test))))]
             let _ = realized_delay;
 
@@ -274,7 +247,7 @@ async fn run_engine<T>(
             break;
         }
 
-        let wake = next_wake(earliest, pool.len(), &cfg, Instant::now());
+        let wake = pool::next_wake(earliest, pool.len(), &cfg, now);
         events.rearm(wake);
     }
 
@@ -419,6 +392,45 @@ mod tests {
         assert!(
             reordered > 0.10,
             "output must be substantially mixed (reordered {reordered:.2})"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn burst_after_idle_should_still_be_mixed() -> anyhow::Result<()> {
+        // Regression: after an idle gap the previous-sweep instant goes stale, so the sweep's
+        // `delta` is large. A burst arriving then must still be held and mixed — not dumped with
+        // ~zero delay because the large `delta` gave every fresh packet a ~1 release probability.
+        let cfg = MixerConfig {
+            target_mean_delay: Duration::from_millis(10),
+            min_delay: Duration::ZERO,
+            delay_range: Duration::from_millis(100),
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
+
+        // Idle less than the 200 ms heartbeat, so the burst hits a stale `prev_sweep`.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        const N: usize = 2000;
+        let receiver = tokio::spawn(async move {
+            let mut delays_ms = Vec::with_capacity(N);
+            while let Some((_seq, sent_at)) = rx.next().await {
+                delays_ms.push(sent_at.elapsed().as_secs_f64() * 1000.0);
+            }
+            delays_ms
+        });
+        for seq in 0..N as u32 {
+            tx.send((seq, Instant::now()))?;
+        }
+        drop(tx);
+
+        let delays_ms = tokio::time::timeout(Duration::from_secs(10), receiver).await??;
+        assert_eq!(delays_ms.len(), N);
+        let mean = delays_ms.iter().sum::<f64>() / N as f64;
+        assert!(
+            mean > 3.0,
+            "a burst after an idle gap must still be held/mixed (observed mean {mean:.2} ms)"
         );
         Ok(())
     }

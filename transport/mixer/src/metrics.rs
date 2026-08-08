@@ -14,3 +14,12 @@ lazy_static::lazy_static! {
         )
         .unwrap();
 }
+
+/// Feed one packet delay (ms) into the `hopr_mixer_average_packet_delay` gauge as an exponential
+/// moving average with weight `1 / window`. Shared by every mixer so the smoothing lives in one
+/// place.
+#[cfg(all(feature = "telemetry", not(test)))]
+pub(crate) fn record_average_delay(delay_ms: f64, window: u64) {
+    let weight = 1.0f64 / window as f64;
+    METRIC_MIXER_AVERAGE_DELAY.set(weight * delay_ms + (1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get());
+}

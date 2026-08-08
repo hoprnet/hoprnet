@@ -10,6 +10,34 @@ use hopr_types::crypto_random;
 
 use crate::config::MixerConfig;
 
+/// Idle heartbeat used when the pool is empty, so an engine periodically notices a
+/// dropped receiver and can shut down instead of parking forever. Shared by both engines
+/// (dedicated-thread and shared-pool) as the initial timer duration and the empty-pool wake.
+pub(crate) const IDLE_HEARTBEAT: Duration = Duration::from_millis(200);
+/// Lower bound on any computed wake, preventing a busy-spin near a packet deadline.
+const MIN_WAKE: Duration = Duration::from_micros(100);
+
+/// Compute the next wake from the current occupancy and the earliest still-buffered enqueue
+/// instant (as returned by [`sweep`], so no extra O(N) scan): the adaptive interval, capped by
+/// the soonest moment any packet's jitter window opens, floored at [`MIN_WAKE`]; an idle
+/// heartbeat when the pool is empty. Engine-agnostic, so both engines share one wake policy.
+pub(crate) fn next_wake(
+    earliest_enqueued: Option<Instant>,
+    occupancy: usize,
+    cfg: &MixerConfig,
+    now: Instant,
+) -> Duration {
+    match earliest_enqueued {
+        None => IDLE_HEARTBEAT,
+        Some(enqueued_at) => {
+            let interval = cfg.adaptive_interval(occupancy);
+            let window_opens = cfg.cap().saturating_sub(cfg.cap_jitter);
+            let deadline_wake = (enqueued_at + window_opens).saturating_duration_since(now);
+            interval.min(deadline_wake).max(MIN_WAKE)
+        }
+    }
+}
+
 /// A single buffered item awaiting release.
 pub(crate) struct Entry<T> {
     /// When the item entered the mixer.
@@ -90,14 +118,26 @@ pub(crate) fn sweep<T>(
         } else if occupancy <= min_mix_occupancy {
             age >= mean // small buffer: deterministic minimum dwell
         } else {
-            crypto_random::random_float() < release_probability // memoryless coin
+            // Memoryless coin. The clock advances only over the time the packet has actually been
+            // eligible: a packet present since before the last sweep gets the full `delta` (the
+            // precomputed probability — the common case), but one that arrived mid-interval only
+            // gets `age - min_delay`, so a large `delta` (e.g. after an idle gap) can't over-release
+            // a fresh burst.
+            let eligible_for = age.saturating_sub(min_delay);
+            let p = if eligible_for >= delta {
+                release_probability
+            } else {
+                cfg.release_probability(eligible_for, mean)
+            };
+            crypto_random::random_float() < p
         };
 
         if release {
             // `swap_remove` is O(1); pool order carries no meaning (the released
             // batch is shuffled below and the kept items are re-evaluated next sweep).
-            let entry = pool.swap_remove(i);
-            out.push((now.saturating_duration_since(entry.enqueued_at), entry.item));
+            // `age` is `now - enqueued_at` of this very entry (computed above), so reuse it as the
+            // realized delay rather than recomputing the duration.
+            out.push((age, pool.swap_remove(i).item));
         } else {
             earliest = Some(earliest.map_or(enqueued_at, |e| e.min(enqueued_at)));
             i += 1;

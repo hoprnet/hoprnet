@@ -6,32 +6,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::{config::MixerConfig, poisson_shared_channel};
+use hopr_transport_mixer::poisson_shared_channel;
 
-const SAMPLE_SIZE: usize = 10;
-const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
-
-#[inline]
-fn minimal_delay_mixer_cfg() -> MixerConfig {
-    MixerConfig {
-        min_delay: std::time::Duration::from_millis(0),
-        delay_range: std::time::Duration::from_millis(1),
-        ..MixerConfig::default()
-    }
-}
-
-fn sizes() -> [usize; 3] {
-    [1_000_000, 5_000_000, 10_000_000]
-}
-
-fn size_label(bytes: usize) -> String {
-    format!("{}_MB_per_s", bytes / 1_000_000)
-}
-
-async fn drain_one<R: StreamExt + Unpin>(rx: &Rc<RefCell<R>>) -> Option<R::Item> {
-    poll_fn(|cx| rx.borrow_mut().poll_next_unpin(cx)).await
-}
+mod common;
+use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, minimal_delay_mixer_cfg, size_label, sizes};
 
 pub fn mixer_poisson_shared_throughput_reused(c: &mut Criterion) {
     let cfg = minimal_delay_mixer_cfg();

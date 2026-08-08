@@ -1,26 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use futures::{
-    SinkExt, StreamExt,
-    future::{BoxFuture, poll_fn},
-};
+use futures::{SinkExt, StreamExt, future::BoxFuture};
 use hopr_transport_mixer::{MixerSink, channel, config::MixerConfig, poisson_channel};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
-const SAMPLE_SIZE: usize = 10;
-
-/// 512 characters long string of random gibberish
-const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
-
-#[inline]
-fn minimal_delay_mixer_cfg() -> MixerConfig {
-    MixerConfig {
-        min_delay: std::time::Duration::from_millis(0),
-        delay_range: std::time::Duration::from_millis(1),
-        ..MixerConfig::default()
-    }
-}
+mod common;
+use common::{RANDOM_GIBBERISH, SAMPLE_SIZE, drain_one, minimal_delay_mixer_cfg, size_label, sizes};
 
 pub fn mixer_throughput(
     c: &mut Criterion,
@@ -151,25 +137,6 @@ fn reused_channel_group(c: &mut Criterion) -> criterion::BenchmarkGroup<'_, crit
     let mut group = c.benchmark_group("mixer_throughput_reused");
     group.sample_size(SAMPLE_SIZE);
     group
-}
-
-/// Workload volumes spanning the realistic 1–10 MB/s operating range. Each volume is one
-/// second of offered load at 1, 5 and 10 MB/s respectively, so the reported throughput shows
-/// how much headroom the engine has over the target rate.
-fn sizes() -> [usize; 3] {
-    [1_000_000, 5_000_000, 10_000_000]
-}
-
-fn size_label(bytes: usize) -> String {
-    // e.g. "1_MB_per_s" — the volume equals one second of load at this rate.
-    format!("{}_MB_per_s", bytes / 1_000_000)
-}
-
-/// Drain one item, borrowing the shared receiver only inside each poll (never across the
-/// `.await`) so the `Rc<RefCell<_>>` handle can be owned by the future without tripping
-/// `clippy::await_holding_refcell_ref`.
-async fn drain_one<R: StreamExt + Unpin>(rx: &Rc<RefCell<R>>) -> Option<R::Item> {
-    poll_fn(|cx| rx.borrow_mut().poll_next_unpin(cx)).await
 }
 
 pub fn mixer_channel_throughput_reused(c: &mut Criterion) {

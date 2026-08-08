@@ -33,9 +33,6 @@ use crate::{
     pool::{self, Entry},
 };
 
-const IDLE_HEARTBEAT: Duration = Duration::from_millis(200);
-const MIN_WAKE: Duration = Duration::from_micros(100);
-
 struct Pool<T> {
     entries: Vec<Entry<T>>,
     waker: Option<Waker>,
@@ -83,7 +80,11 @@ impl<T> Clone for Sender<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        if self.shared.sender_count.fetch_sub(1, Ordering::Relaxed) == 1 {
+        // `AcqRel` so the receiver's `Acquire` load of a zero count synchronizes-with this
+        // decrement (and thus with the push that preceded the sender's drop): without it, on a
+        // weak memory model the receiver could observe `0`, find the pool empty, and close one
+        // packet short.
+        if self.shared.sender_count.fetch_sub(1, Ordering::AcqRel) == 1 {
             // Last sender gone: wake the receiver so it can observe closure and drain.
             wake(&mut self.shared.pool.lock());
         }
@@ -124,42 +125,59 @@ impl<T: Unpin> Stream for Receiver<T> {
             }
 
             let now = Instant::now();
-            let no_senders = this.shared.sender_count.load(Ordering::Relaxed) == 0;
+            // `Acquire` pairs with the sender's `AcqRel` decrement so observing `0` guarantees
+            // every pushed entry is visible below.
+            let no_senders = this.shared.sender_count.load(Ordering::Acquire) == 0;
 
-            // Sweep under the lock; move released items into the local `ready` queue. The lock is
-            // released before parking on the timer so senders never wait on the timer poll.
-            let sleep_for = {
+            // Outcome of the sweep, decided under the lock but acted on after releasing it.
+            enum Next {
+                /// Items were released into `scratch`; move them out and pop.
+                Released,
+                /// No input can arrive and the pool is drained.
+                Closed,
+                /// Nothing ready; park the timer for this long.
+                Sleep(Duration),
+            }
+
+            // Sweep under the lock, writing released items straight into the reused `scratch`
+            // (a field disjoint from the pool guard). Draining `scratch` into `ready` and parking
+            // the timer both happen *after* the guard drops, so senders never wait on that work.
+            let next = {
                 let mut pool = this.shared.pool.lock();
                 let delta = now.saturating_duration_since(pool.prev_sweep);
                 pool.prev_sweep = now;
 
-                let mut scratch = std::mem::take(&mut this.scratch);
-                let earliest = pool::sweep(&mut pool.entries, &this.shared.cfg, now, delta, &mut scratch);
-                for (_delay, item) in scratch.drain(..) {
-                    this.ready.push_back(item);
-                }
-                this.scratch = scratch;
+                let earliest = pool::sweep(&mut pool.entries, &this.shared.cfg, now, delta, &mut this.scratch);
 
-                if !this.ready.is_empty() {
-                    continue; // got items; drop lock and pop
+                if !this.scratch.is_empty() {
+                    Next::Released
+                } else if pool.entries.is_empty() && no_senders {
+                    Next::Closed
+                } else {
+                    match pool.waker.as_mut() {
+                        Some(w) => w.clone_from(cx.waker()),
+                        None => pool.waker = Some(cx.waker().clone()),
+                    }
+                    Next::Sleep(pool::next_wake(earliest, pool.entries.len(), &this.shared.cfg, now))
                 }
-                if pool.entries.is_empty() && no_senders {
-                    drop(pool);
+            };
+
+            match next {
+                Next::Released => {
+                    this.ready.extend(this.scratch.drain(..).map(|(_delay, item)| item));
+                    continue;
+                }
+                Next::Closed => {
                     this.shared.receiver_active.store(false, Ordering::Relaxed);
                     return Poll::Ready(None);
                 }
-
-                match pool.waker.as_mut() {
-                    Some(w) => w.clone_from(cx.waker()),
-                    None => pool.waker = Some(cx.waker().clone()),
+                Next::Sleep(sleep_for) => {
+                    this.timer.reset(sleep_for);
+                    match this.timer.poll_unpin(cx) {
+                        Poll::Ready(()) => continue, // timer already elapsed; sweep again
+                        Poll::Pending => return Poll::Pending,
+                    }
                 }
-                next_wake(earliest, pool.entries.len(), &this.shared.cfg, now)
-            };
-
-            this.timer.reset(sleep_for);
-            match this.timer.poll_unpin(cx) {
-                Poll::Ready(()) => continue, // timer already elapsed; sweep again
-                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -175,20 +193,6 @@ impl<T: Unpin> Receiver<T> {
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         self.shared.receiver_active.store(false, Ordering::Relaxed);
-    }
-}
-
-/// Same wake policy as [`crate::poisson`]: adaptive interval capped by the soonest jitter window
-/// opening, floored at [`MIN_WAKE`]; idle heartbeat when empty.
-fn next_wake(earliest_enqueued: Option<Instant>, occupancy: usize, cfg: &MixerConfig, now: Instant) -> Duration {
-    match earliest_enqueued {
-        None => IDLE_HEARTBEAT,
-        Some(enqueued_at) => {
-            let interval = cfg.adaptive_interval(occupancy);
-            let window_opens = cfg.cap().saturating_sub(cfg.cap_jitter);
-            let deadline_wake = (enqueued_at + window_opens).saturating_duration_since(now);
-            interval.min(deadline_wake).max(MIN_WAKE)
-        }
     }
 }
 
@@ -208,7 +212,7 @@ pub fn poisson_shared_channel<T: Send>(cfg: MixerConfig) -> (Sender<T>, Receiver
         Sender { shared: shared.clone() },
         Receiver {
             shared,
-            timer: Delay::new(IDLE_HEARTBEAT),
+            timer: Delay::new(pool::IDLE_HEARTBEAT),
             ready: VecDeque::new(),
             scratch: Vec::new(),
         },
