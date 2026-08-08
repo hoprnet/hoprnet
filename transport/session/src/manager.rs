@@ -3317,23 +3317,60 @@ where
         }
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        let session_id = msg.session_id;
 
-        // The server can theoretically send multiple SSA commitments
-        // asking us to make the equal number of client commitments and deposits.
+        // The server can theoretically send multiple SSA commitments asking us to make the equal
+        // number of client commitments and deposits, and the batch is all-or-nothing: either every
+        // member gets a commitment and a `ReadyToDeposit`, or none does.
+        //
+        // Hence three phases rather than one loop. Interleaving them meant a batch whose *second*
+        // exit commitment failed to decode had already sent the first member's `SsaCommit` burst and
+        // emitted its `ReadyToDeposit` — an on-chain deposit instruction — before the failure was
+        // reached. The Exit, whose own request was rejected as a whole, has no cycle to spend it on.
         //
         // The server is authoritative in giving the ssa_index; the client only verifies that it is
-        // strictly monotonic. That monotonicity is enforced inside `new_ssa_commitment` below, which
-        // rejects any `ssa_index` that is `<=` the last one generated for this pseudonym with
+        // strictly monotonic. That monotonicity is enforced inside `new_ssa_commitment` in phase two,
+        // which rejects any `ssa_index` that is `<=` the last one generated for this pseudonym with
         // `PixError::InvalidInput` (see `SsaShareGenerator::new_ssa_commitment`). Because that call
-        // happens *before* the deposit address is derived and `ReadyToDeposit` is emitted, a stale,
-        // duplicate, or out-of-order `SsaRequest` cannot cause a second deposit — the whole message is
-        // rejected first. The per-pseudonym baseline lives in the generator's `polynomials` cache
-        // (30-min idle TTL, refreshed on every use), so it persists for the life of an active session.
-        // Gaps (an index strictly greater than the last, but not the immediate successor) are allowed
-        // by design, since the Exit may advance by more than one SSA at a time.
+        // happens in a phase before anything is published, a stale, duplicate, or out-of-order
+        // `SsaRequest` cannot cause a deposit — the whole message is rejected first. The
+        // per-pseudonym baseline lives in the generator's `polynomials` cache (30-min idle TTL,
+        // refreshed on every use), so it persists for the life of an active session. Gaps (an index
+        // strictly greater than the last, but not the immediate successor) are allowed by design,
+        // since the Exit may advance by more than one SSA at a time.
+
+        // Phase 1 — validate. Decoding is the only step that consumes attacker-supplied bytes:
+        // `try_into_pix_group` decompresses the point and rejects anything outside the prime-order
+        // subgroup. Doing every one of them up front is what makes a malformed later member cost
+        // nothing, and it is cheap relative to phase two.
+        let mut validated = Vec::with_capacity(msg.commitments.len());
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
+            match exit_commitment.try_into_pix_group() {
+                Ok(point) => validated.push((ssa_index, point)),
+                Err(error) => {
+                    // Terminal, like every other unacceptable-parameter case here. A peer that cannot
+                    // produce a valid group element is not going to produce one on a retry, and the
+                    // Exit would otherwise wait out `max_ssa_delivery_time` on commitments that are
+                    // never coming.
+                    let error = SessionManagerError::Unacceptable(format!(
+                        "Exit sent an undecodable SSA commitment for index {ssa_index}: {error}"
+                    ));
+                    self.refuse_ssa_request(session_id, session_slot.routing_opts.clone())
+                        .await;
+                    return Err(error.into());
+                }
+            }
+        }
 
+        // Phase 2 — stage. Generates every client commitment and derives every deposit address,
+        // publishing none of them. This is the expensive phase, and it still mutates the generator:
+        // `new_ssa_commitment` appends to the per-pseudonym polynomial queue. Failing here therefore
+        // leaves queued polynomials the Exit never learns of — wasted work rather than a leaked
+        // deposit instruction, and the generator's own monotonic index keeps them from being mistaken
+        // for a later cycle's.
+        let mut staged = Vec::with_capacity(validated.len());
+        for (ssa_index, exit_point) in validated {
             // Use the global `pix_toolbox.share_generator` to generate the client
             // commitment. The generator is shared with the packet pipeline's
             // `next_share`, so polynomials created here will be used when the
@@ -3358,19 +3395,23 @@ where
             .map_err(SessionManagerError::PixError)?;
 
             // Construct the full SSA by adding the client and exit commitments, getting the deposit address
-            let full_ssa = client_commitment.ssa_commitment
-                + exit_commitment
-                    .try_into_pix_group()
-                    .map_err(SessionManagerError::other)?;
+            let full_ssa = client_commitment.ssa_commitment + exit_point;
             let deposit_address = HoprPixSpec::group_to_deposit_address(full_ssa).ok_or(SessionManagerError::other(
                 anyhow::anyhow!("failed to convert SSA to deposit address"),
             ))?;
 
             // Split the SSA client commitment into Start protocol commitment messages
-            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(msg.session_id, client_commitment)
+            let commitment_msgs = SsaClientCommitmentMessage::new_multiple(session_id, client_commitment)
                 .map_err(SessionManagerError::other)?;
             debug!(%ssa_index, count = commitment_msgs.len(), "generated client SSA commitment messages");
 
+            staged.push((ssa_index, deposit_address, commitment_msgs));
+        }
+
+        // Phase 3 — publish. Nothing below can fail on the *content* of the request; only the
+        // transport can, and a transport that has stopped accepting messages fails the Session
+        // regardless of where in the batch it happens.
+        for (ssa_index, deposit_address, commitment_msgs) in staged {
             // Send each commitment message into the message sender
             for commitment_msg in commitment_msgs {
                 send_via_msg_sender(
@@ -6494,6 +6535,149 @@ mod tests {
         assert!(
             accepted.session_alive,
             "an accepted batch must leave the Session running"
+        );
+
+        Ok(())
+    }
+
+    /// A batch with one undecodable member must publish nothing at all.
+    ///
+    /// `handle_ssa_request` used to generate, send and emit per entry, deciding each member's fate
+    /// before looking at the next. A batch whose *second* exit commitment failed to decode had
+    /// therefore already sent the first member's `SsaCommit` burst and emitted its `ReadyToDeposit`
+    /// — an instruction to put money on chain — for a request that is then rejected as a whole. The
+    /// Exit has no cycle to spend that deposit against, and the deposit key needs its half.
+    ///
+    /// The first member is valid and the second is not, so a per-entry implementation passes the
+    /// "batch is refused" half of this test while still leaking the first deposit.
+    #[test_log::test(tokio::test)]
+    async fn a_batch_with_one_undecodable_commitment_publishes_nothing() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use futures::FutureExt;
+        use hopr_crypto_packet::prelude::HoprPixGroupElement;
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        // `SsaCommit` is the observable half of "a commitment was published"; `SessionError` is the
+        // refusal. Both are counted, because the bug shows up as the two happening together.
+        let commits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let session_errors = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let (commits_tx, errors_tx) = (commits.clone(), session_errors.clone());
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport.expect_send_message().returning(move |_, data| {
+            if crate::testing::msg_type(&data, StartProtocolDiscriminants::SsaCommit) {
+                commits_tx.fetch_add(1, Ordering::Relaxed);
+            }
+            if crate::testing::msg_type(&data, StartProtocolDiscriminants::SessionError) {
+                errors_tx.fetch_add(1, Ordering::Relaxed);
+            }
+            Box::pin(async { Ok(()) })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: small_pix_additional_data(),
+            },
+        )
+        .await?;
+
+        let valid = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+            .expect("identity element must be valid");
+        // All-ones is not a compressed point on the curve, so it fails before the subgroup check.
+        // The length is taken from the type rather than written out: the group representation is
+        // curve-dependent, and a literal silently becomes a *length* rejection under a different
+        // `HoprPixSpec` — which is a different code path from the one under test.
+        // Spelled out because the group repr is a `hybrid_array::Array` with several `AsRef` impls.
+        let repr_len = AsRef::<[u8]>::as_ref(&PixGroup::<HoprPixSpec>::default().to_bytes()).len();
+        let garbage =
+            HoprPixGroupElement::try_from(vec![0xffu8; repr_len].as_slice()).expect("length must be accepted");
+        assert!(
+            garbage.try_into_pix_group().is_err(),
+            "the test fixture must actually be undecodable"
+        );
+
+        let commitments: BTreeMap<_, _> = BTreeMap::from([
+            (SsaIndex::new(100).expect("non-zero"), valid),
+            (SsaIndex::new(101).expect("non-zero"), garbage),
+        ]);
+
+        let result = mgr
+            .handle_ssa_request(
+                alice_pseudonym,
+                SsaServerCommitmentMessage::new(
+                    alice_pseudonym,
+                    PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?,
+                    commitments,
+                ),
+            )
+            .await;
+
+        let session_alive = mgr.active_sessions().contains(&alice_pseudonym);
+
+        // Drain the mock transport before counting: `mock_packet_planning` delivers on a spawned
+        // task, so a count taken here would race the sends rather than observe them.
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::Unacceptable(_)))
+            ),
+            "an undecodable member must be refused, got {result:?}"
+        );
+        assert_eq!(
+            0,
+            commits.load(Ordering::Relaxed),
+            "no SsaCommit may be sent for a batch that is refused as a whole"
+        );
+        assert_eq!(
+            1,
+            session_errors.load(Ordering::Relaxed),
+            "the refusal must be reported to the Exit"
+        );
+        assert!(
+            !session_alive,
+            "an undecodable commitment is terminal, like every other unacceptable-parameter case"
+        );
+
+        // The point of the test: not one deposit instruction escaped for the valid first member.
+        pin_mut!(pix_events);
+        assert!(
+            pix_events.next().now_or_never().flatten().is_none(),
+            "no ReadyToDeposit may be emitted for a batch that is refused as a whole"
         );
 
         Ok(())
