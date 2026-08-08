@@ -29,8 +29,9 @@ use std::{
 use common::TestSpec;
 use hopr_protocol_pix::{
     CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
-    ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId,
-    SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixScalar, ShareResolution,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+    TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -253,7 +254,9 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
         ..Default::default()
     });
     let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
-    reconstructor.new_exit_commitment(ssa_id, polys, threshold).unwrap();
+    reconstructor
+        .new_exit_commitment(ssa_id, PixParams::try_from(generator.config()).unwrap())
+        .unwrap();
     report("after new_exit_commitment", baseline);
 
     // The whole wire order: one constant term per polynomial. The closing message publishes the

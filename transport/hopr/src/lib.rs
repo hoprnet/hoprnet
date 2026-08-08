@@ -1450,6 +1450,7 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
             tracing::trace!(
                 ssa_id = %progress.ssa_id,
                 useful_shares = progress.useful_shares,
+                shares_seen = progress.shares_seen,
                 target = progress.target_useful_shares,
                 recovered_polynomials = progress.recovered_polynomials,
                 "pix recovery progress"
@@ -1617,7 +1618,8 @@ mod pix_recovery_event_tests {
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let client = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-        let server_commitment = reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        let server_commitment =
+            reconstructor.new_exit_commitment(ssa_id, hopr_protocol_pix::PixParams::try_new(2, 2, 0)?)?;
         let expected_addr = HoprPixSpec::group_to_deposit_address(client.ssa_commitment + server_commitment)
             .ok_or_else(|| anyhow::anyhow!("deposit address"))?;
         client.process_into_reconstructor(&reconstructor)?;

@@ -17,7 +17,7 @@ use hopr_crypto_packet::{HoprPixSpec, HoprShareResolution, HoprSsaCommitmentStat
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
 use hopr_protocol_pix::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixSpec, PolynomialIndex,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixSpec, PolynomialIndex,
     ShareResolution, SsaCommitmentProof, SsaCommitmentState, SsaId, TaggedEncryptedPartialSsaShare,
 };
 use hopr_utils::{
@@ -925,12 +925,7 @@ impl ExitAcknowledgementShareProcessor<HoprPixSpec> for NopExitAcknowledgementSh
     /// `Infallible` is what forces the identity here: there is no error to return. Widening the
     /// error type so this can refuse outright is the better shape, and is worth doing if this
     /// processor ever becomes reachable with PIX negotiated.
-    fn new_exit_commitment(
-        &self,
-        _: SsaId<HoprPseudonym>,
-        _: usize,
-        _: usize,
-    ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
+    fn new_exit_commitment(&self, _: SsaId<HoprPseudonym>, _: PixParams) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
         Ok(PixGroup::<HoprPixSpec>::default())
     }
 
@@ -1229,7 +1224,7 @@ mod tests {
         let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
 
         assert_eq!(
-            noop.new_exit_commitment(ssa_id, 2, 2)?,
+            noop.new_exit_commitment(ssa_id, PixParams::try_new(2, 2, 0)?)?,
             PixGroup::<HoprPixSpec>::default()
         );
 
@@ -1310,8 +1305,7 @@ mod tests {
         fn new_exit_commitment(
             &self,
             _: SsaId<HoprPseudonym>,
-            _: usize,
-            _: usize,
+            _: PixParams,
         ) -> Result<PixGroup<HoprPixSpec>, Self::Error> {
             Ok(PixGroup::<HoprPixSpec>::default())
         }

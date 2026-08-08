@@ -47,6 +47,10 @@ struct PerSsaState {
 
     // Progress tracking.
     largest_useful_shares: u64,
+    /// Largest `shares_seen` observed for this cycle — the liveness counter, which moves for surplus
+    /// shares too. Also the staleness discriminator for snapshots, since it moves for every share
+    /// while `largest_useful_shares` does not.
+    largest_shares_seen: u64,
     target_useful_shares: u64,
     recovered_polynomials: u16,
 
@@ -93,6 +97,7 @@ impl PerSsaState {
             recovery_idle_deadline: None,
             recovery_hard_deadline: None,
             largest_useful_shares: 0,
+            largest_shares_seen: 0,
             target_useful_shares,
             recovered_polynomials: 0,
             per_ssa_invalid_total: 0,
@@ -485,13 +490,25 @@ impl SessionPixSupervisor {
         // Accumulate deposit across top-ups.
         ssa.accumulated_deposit += amount;
 
-        // Check deposit sufficiency against accumulated amount.
-        let sufficient = match ssa.expected_deposit {
-            Some(expected) => ssa.accumulated_deposit >= expected,
-            None => true,
+        // Sufficiency is judged against the *cumulative* deposit and against the larger of the two
+        // floors that can apply.
+        //
+        // `expected_deposit` is what the peer's commitment implied, and it is `None` on the only
+        // production path there is: the negotiated quota is denominated in bytes, so `handle_ssa_commit`
+        // states no amount. Treating `None` as "any deposit will do" is what made
+        // `SupervisorConfig::min_deposit` dead configuration — an operator could set a floor and a
+        // one-unit deposit would still unlock the whole quota.
+        //
+        // A zero amount never suffices, even when both floors are zero: a zero-balance confirmation
+        // says nothing was deposited, and releasing service on it would be releasing it for free.
+        // Compared rather than `max`ed, so this does not rely on `HoprBalance: Ord`.
+        let expected = ssa.expected_deposit.unwrap_or_else(HoprBalance::zero);
+        let required = if self.cfg.min_deposit > expected {
+            self.cfg.min_deposit
+        } else {
+            expected
         };
-
-        if !sufficient {
+        if ssa.accumulated_deposit == HoprBalance::zero() || ssa.accumulated_deposit < required {
             return Vec::new();
         }
 
@@ -519,7 +536,18 @@ impl SessionPixSupervisor {
             actions.extend(self.perform_recovered_transition(idx, now));
         }
 
-        if !self.release_service_emitted {
+        // Service is released by the *front* cycle being funded, not by whichever cycle funds first.
+        //
+        // `ReleaseService` is one-shot and Session-wide — the gate can never return to predeposit mode —
+        // so with `ssas_per_request > 1` an Entry could fund a later member of the batch, leave the front
+        // unfunded, and then consume unbounded service against the front until its batch-scaled deposit
+        // deadline retired it. That bypasses `max_predeposit_packets` entirely, and the share-order ratio
+        // cannot see it: serving the unfunded front is perfectly in-order.
+        //
+        // A no-op at the default `ssas_per_request = 1`, where the only live cycle is the front. When a
+        // later cycle funds first, the release simply waits for the front to fund and comes out of that
+        // call instead.
+        if !self.release_service_emitted && self.earliest_live_idx() == Some(idx) {
             self.release_service_emitted = true;
             actions.push(SessionPixAction::ReleaseService);
         }
@@ -571,35 +599,40 @@ impl SessionPixSupervisor {
 
         let ssa = &mut self.ssas[idx];
         let new_useful = progress.useful_shares;
+        let new_seen = progress.shares_seen;
 
-        // Counter regression check.
+        // Counter regression check, on the liveness counter because it is the one that moves for every
+        // share — a snapshot can be newer than the last one while carrying the same `useful_shares`.
         //
         // The relay-as-Exit pipeline processes acknowledgement batches with
         // for_each_concurrent, so absolute progress snapshots from different
         // batches can arrive out of order. Treat a stale snapshot as benign
         // noise rather than a protocol violation.
-        if new_useful < ssa.largest_useful_shares {
+        if new_seen <= ssa.largest_shares_seen {
             return Vec::new();
         }
+        ssa.largest_shares_seen = new_seen;
 
-        // Equal snapshot: no-op.
-        if new_useful == ssa.largest_useful_shares {
-            return Vec::new();
-        }
-
-        // Progress is strictly larger.
-        let delta = new_useful - ssa.largest_useful_shares;
-        ssa.largest_useful_shares = new_useful;
-        ssa.recovered_polynomials = progress.recovered_polynomials;
+        // Liveness tier. A share arrived, useful or not, so the Entry is serving this cycle — which is
+        // the question the egress gate and the recovery-idle deadline are asking. Keying either of them
+        // on `useful_shares` instead makes a conforming Entry's surplus run look like silence, and for
+        // the gate that is self-inflicted: withholding service removes the only thing that could
+        // produce the next useful share. See `SsaRecoveryProgress::shares_seen`.
         ssa.served_total_at_last_progress = served_total;
-
-        // Refresh recovery-idle only in Recovering phase.
         if ssa.phase == SsaPhase::Recovering {
             ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
         }
 
-        if let Some(reason) = self.book_share_order_progress(&progress.ssa_id, delta) {
-            return vec![SessionPixAction::Close(reason)];
+        // Payment tier. Only shares that advanced reconstruction are worth anything, so only they move
+        // the recovery counters or count towards the share-order ratio.
+        if new_useful > ssa.largest_useful_shares {
+            let delta = new_useful - ssa.largest_useful_shares;
+            ssa.largest_useful_shares = new_useful;
+            ssa.recovered_polynomials = progress.recovered_polynomials;
+
+            if let Some(reason) = self.book_share_order_progress(&progress.ssa_id, delta) {
+                return vec![SessionPixAction::Close(reason)];
+            }
         }
 
         // Signal the gate to reset its served-without-progress ceiling.
@@ -1063,15 +1096,29 @@ mod tests {
         SsaId::new(p, SsaIndex::new(idx).unwrap())
     }
 
+    /// A snapshot in which every share seen was useful — the shape of a cycle's first
+    /// `threshold` shares per polynomial, and what every test predating the liveness split means.
     fn make_progress(
         ssa_id: SsaId<HoprPseudonym>,
         useful: u64,
         target: u64,
         recovered_polys: u16,
     ) -> SsaRecoveryProgress<HoprPseudonym> {
+        make_progress_seen(ssa_id, useful, useful, target, recovered_polys)
+    }
+
+    /// A snapshot where `seen` and `useful` can differ, i.e. the Entry is serving surplus.
+    fn make_progress_seen(
+        ssa_id: SsaId<HoprPseudonym>,
+        useful: u64,
+        seen: u64,
+        target: u64,
+        recovered_polys: u16,
+    ) -> SsaRecoveryProgress<HoprPseudonym> {
         SsaRecoveryProgress {
             ssa_id,
             useful_shares: useful,
+            shares_seen: seen,
             target_useful_shares: target,
             recovered_polynomials: recovered_polys,
         }
@@ -1615,6 +1662,38 @@ mod tests {
     }
 
     #[test]
+    fn zero_deposit_does_not_release_service_when_both_floors_are_zero() {
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            now,
+            0,
+        );
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::zero(),
+            },
+            now,
+            0,
+        );
+        assert!(actions.is_empty());
+        assert_eq!(
+            sup.ssas.iter().find(|ssa| ssa.ssa_id == id).map(|ssa| ssa.phase),
+            Some(SsaPhase::AwaitingDeposit)
+        );
+    }
+
+    #[test]
     fn min_deposit_config_rejects_dust_and_accepts_full() {
         let mut cfg = default_cfg();
         cfg.min_deposit = HoprBalance::new_base(500);
@@ -1658,6 +1737,95 @@ mod tests {
         assert!(!actions.is_empty());
         let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
         assert_eq!(ssa.phase, SsaPhase::Recovering);
+    }
+
+    /// The production `handle_ssa_commit` path cannot derive a price from the byte quota and
+    /// therefore reports `expected_deposit: None`.  The configured floor must still apply in that
+    /// case; otherwise setting `SupervisorConfig::min_deposit` has no effect outside this module's
+    /// synthetic `Some(expected)` tests.
+    #[test]
+    fn configured_minimum_applies_when_no_expected_deposit_is_supplied() {
+        let mut cfg = default_cfg();
+        cfg.min_deposit = HoprBalance::new_base(500);
+        let p = pseudonym();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            now,
+            0,
+        );
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: HoprBalance::new_base(1),
+            },
+            now,
+            0,
+        );
+
+        assert!(
+            actions.is_empty(),
+            "a deposit below the configured floor must not release service"
+        );
+        assert_eq!(
+            sup.ssas.iter().find(|ssa| ssa.ssa_id == id).map(|ssa| ssa.phase),
+            Some(SsaPhase::AwaitingDeposit),
+            "the production None path must continue waiting for enough cumulative deposit"
+        );
+    }
+
+    /// Funding a queued cycle must not release service while an unfunded predecessor is live, but
+    /// that funding must take effect if the predecessor is later retired. Otherwise the one-shot
+    /// Session gate remains in predeposit mode even though the newly promoted front is funded, and
+    /// no further deposit event exists to wake it.
+    #[test]
+    fn funded_successor_releases_service_when_unfunded_front_is_retired() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let front = ssa_id(p, 1);
+        let successor = ssa_id(p, 2);
+
+        for id in [front, successor] {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: Some(sufficient_balance()),
+                },
+                now,
+                0,
+            );
+        }
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: successor,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+        assert!(
+            actions.iter().all(|a| !matches!(a, SessionPixAction::ReleaseService)),
+            "funding a cycle behind an unfunded front must not release service"
+        );
+
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(front), now, 0);
+        assert!(
+            actions.iter().any(|a| matches!(a, SessionPixAction::ReleaseService)),
+            "retiring the unfunded front must release service for its already-funded successor; got {actions:?}"
+        );
     }
 
     #[test]
@@ -2045,6 +2213,132 @@ mod tests {
             !actions
                 .iter()
                 .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle)))
+        );
+    }
+
+    /// A snapshot carrying only surplus must keep the cycle alive without paying it anything.
+    ///
+    /// This is the whole of C1 at the supervisor. A conforming Entry drains an emission window's
+    /// surplus in one contiguous run — `surplus × min(polys, 256)` packets, 8192 at the shipped
+    /// dimensions — during which `useful_shares` does not move at all. Every one of those packets is
+    /// service the Exit is consuming, so a supervisor that keyed liveness on `useful_shares` would
+    /// let the run exhaust `max_served_without_progress`, park the writer, and then close an honest
+    /// Session with `RecoveryIdle` — the re-arm branch cannot save it, because service *was*
+    /// consumed. Liveness must therefore move on `shares_seen`, and payment must not.
+    #[test]
+    fn a_surplus_only_snapshot_is_liveness_without_payment() {
+        let p = pseudonym();
+        let mut cfg = default_cfg();
+        cfg.max_recovery_idle = Duration::from_secs(10);
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+
+        // One useful share, to establish a baseline both counters agree on.
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(id, 1, 50, 0)),
+            start + Duration::from_secs(1),
+            10,
+        );
+
+        // Then a run of pure surplus: `shares_seen` climbs, `useful_shares` is pinned, and service is
+        // being consumed throughout.
+        for (i, seen) in (2..=6u64).enumerate() {
+            let actions = sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress_seen(id, 1, seen, 50, 0)),
+                start + Duration::from_secs(2 + i as u64),
+                20 + 10 * i as u64,
+            );
+            assert!(
+                actions
+                    .iter()
+                    .any(|a| matches!(a, SessionPixAction::ProgressNotification)),
+                "a surplus share must reset the gate's served-without-progress ceiling"
+            );
+            assert!(
+                !actions.iter().any(|a| matches!(a, SessionPixAction::Close(_))),
+                "a surplus share must never close the Session"
+            );
+        }
+
+        // The idle deadline was refreshed by the surplus run, so it has not expired — even though
+        // `served_total` has grown well past the watermark of the last *useful* share.
+        let actions = sup.handle_deadline(start + Duration::from_secs(12), 70);
+        assert!(
+            !actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle))),
+            "an Entry serving its negotiated surplus is not idle"
+        );
+
+        // Payment did not move: the surplus bought the Entry time, not credit.
+        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).expect("cycle must be live");
+        assert_eq!(1, ssa.largest_useful_shares, "surplus must not count as useful shares");
+        assert_eq!(6, ssa.largest_shares_seen, "every share must count as liveness");
+    }
+
+    /// Once the surplus run stops, the idle rule must still fire.
+    ///
+    /// The liveness split widens what counts as "the Entry is alive"; it must not make the anti-drip
+    /// bound unreachable. With no snapshot of any kind and service still being consumed, the Session
+    /// closes exactly as it did before.
+    #[test]
+    fn silence_after_a_surplus_run_still_closes_the_session() {
+        let p = pseudonym();
+        let mut cfg = default_cfg();
+        cfg.max_recovery_idle = Duration::from_secs(10);
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        let id = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: id,
+                expected_deposit: None,
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: id,
+                amount: sufficient_balance(),
+            },
+            start,
+            0,
+        );
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress_seen(id, 1, 4, 50, 0)),
+            start + Duration::from_secs(1),
+            10,
+        );
+
+        // Nothing further arrives, and service keeps being consumed.
+        let actions = sup.handle_deadline(start + Duration::from_secs(12), 500);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::RecoveryIdle))),
+            "a genuinely silent Entry must still be caught"
         );
     }
 

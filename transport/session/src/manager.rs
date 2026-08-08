@@ -2097,11 +2097,9 @@ where
                 let mut commitments = Vec::with_capacity(ids.len());
                 let mut guards = Vec::with_capacity(ids.len());
                 for ssa_id in ids {
-                    let (commitment, guard) = pix_toolbox.share_processor.new_guarded_exit_commitment(
-                        ssa_id,
-                        params.polys_per_ssa() as usize,
-                        params.shares_per_poly() as usize,
-                    )?;
+                    let (commitment, guard) = pix_toolbox
+                        .share_processor
+                        .new_guarded_exit_commitment(ssa_id, params)?;
                     commitments.push((ssa_id.ssa_index(), HoprPixGroupElement(commitment.to_bytes())));
                     guards.push(guard);
                 }

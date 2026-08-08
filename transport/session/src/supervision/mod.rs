@@ -281,9 +281,12 @@
 //! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
 //! `0.0..=1.0`; and non-zero `max_served_without_progress` and `min_share_order_sample`.
 //!
-//! Two more constraints cannot be checked there, because they depend on PIX dimensions negotiated
-//! per Session and on the Entry's `additional_shares`, which never goes on the wire. **Both are the
-//! same interaction, and an operator raising the PIX dimensions has to revisit them:**
+//! Two more constraints cannot be checked there, because they depend on the PIX dimensions, and those
+//! are negotiated per Session while these values are fixed at config load. All three terms — the
+//! polynomial count, the threshold and the surplus — now travel in the negotiated
+//! [`PixParams`](hopr_protocol_pix::PixParams) word, so for any one Session the Exit *knows* the run
+//! length exactly; what it cannot do is re-tune a static ceiling to match whatever it negotiates.
+//! **Both are the same interaction, and an operator raising the PIX dimensions has to revisit them:**
 //!
 //! **(1)** `max_served_without_progress` must exceed
 //! `additional_shares × min(polynomials_per_ssa, SHARE_EMISSION_WINDOW)`.
@@ -293,10 +296,12 @@
 //! surplus shares together — so every block ends with `additional_shares × window` consecutive
 //! packets carrying no *useful* share, and no `ProgressNotification` for any of them. At the shipped
 //! `additional_shares = 32` that run is **8192 packets, four times the shipped ceiling of 2048**.
-//! Crossing the ceiling parks the writer; a parked writer spends no further SURBs, so no share can
-//! arrive to wake it, while the service-gated idle timer re-arms indefinitely because no service is
-//! being consumed. The Session hangs rather than closing. Only dimensions with `polynomials_per_ssa`
-//! at or below the window escape it, which is why the small-dimension cluster tests do not show it.
+//! Crossing the ceiling parks the writer, and a parked writer spends no further SURBs, so no share
+//! can arrive to release it. The idle rule does *not* rescue it: its re-arm branch fires only when no
+//! service was consumed since the last progress, and 2048 packets were. So the Session closes with
+//! `RecoveryIdle` — an honest Entry convicted of a drip attack one emission block into a cycle, for
+//! behaviour the generator has no way to avoid. Only dimensions with `polynomials_per_ssa` at or below
+//! the window escape it, which is why the small-dimension cluster tests do not show it.
 //!
 //! **(2)** `max_recovery_idle` must exceed that same run in wall-clock terms —
 //! `additional_shares × min(polys, window) / packet rate` — because service *is* being consumed
@@ -309,30 +314,32 @@
 //! deposit. `HoprPacket::PAYLOAD_SIZE` is 1038 B, so 5 Mbps is ~602 packets/s of return traffic —
 //! one SURB and one share each.
 //!
-//! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` gives 131 072
-//! useful shares, a 129.8 MiB quota — the bottom of the default `quota_range`, so no range change is
-//! needed — and a cycle of 196 608 emitted packets, about **5.4 min** at this rate. The default
-//! `8192 × 64` would make that 21.8 min per cycle, which at 6 s settlement is a long time to leave one
-//! cycle's traffic unsettled for no benefit. Keep it a multiple of 256 so the emission window never
-//! narrows.
+//! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` with the
+//! shipped surplus of 32 gives 131 072 useful shares out of 196 608 emitted, and a cycle of 196 608
+//! packets — about **5.4 min** at this rate. The quota is priced on all of them, surplus included, so
+//! it is `2048 × 96 × 1038 B` = **194.6 MiB**, which is exactly the bottom of the default
+//! `quota_range` (a quarter of the 778.5 MiB the default dimensions imply), so no range change is
+//! needed. The default `8192 × 64` would make that 21.8 min per cycle, which at 6 s settlement is a
+//! long time to leave one cycle's traffic unsettled for no benefit. Keep it a multiple of 256 so the
+//! emission window never narrows.
 //!
 //! | Parameter | Value | Why, at this profile |
 //! |---|---|---|
-//! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 129.8 MiB quota, 5.4 min cycle; multiple of the emission window |
-//! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | Shipped threshold; the product is what fixes the quota |
-//! | `PixGlobalConfig::additional_shares` (Entry) | 32 | 1.5× surplus, and the term in both constraints above |
-//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 32 768-packet runway — **54 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 129.8 MiB` |
+//! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 194.6 MiB quota, 5.4 min cycle; multiple of the emission window |
+//! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | Shipped threshold; with the surplus below, it is what fixes the quota |
+//! | `PixGlobalConfig::additional_shares` (Entry) | 32 | 1.5× surplus. It is the term in both constraints above **and** a third of the quota — raising it buys loss tolerance and charges the Entry for it |
+//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 32 768-packet runway — **54 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 194.6 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
 //! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is exactly what is lost to an Entry that never funds — 4.2 MB. Use `0` for strict prepay and accept a ~6 s stall at session start |
-//! | `max_served_without_progress` | **16384** | 2× the 8192-packet surplus run from constraint (1). **The shipped 2048 would hang this configuration** |
+//! | `max_served_without_progress` | **16384** | 2× the 8192-packet surplus run from constraint (1). **The shipped 2048 would close this configuration with `RecoveryIdle` one emission block in** |
 //! | `max_recovery_idle` | 60 s | Covers the surplus run (13.6 s here) with margin, and satisfies `>= max_ack_await_time`. Implies a floor of ~137 packets/s (~1.1 Mbps) below which an honest Session is closed mid-block — acceptable when 5 Mbps is the operating point, and the reason to raise this if slow Sessions must be supported |
 //! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 327 s at full rate, so 2 h implies a floor of ~27 packets/s (~0.23 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
 //! | `max_off_front_share_fraction` | 0.25 | Shipped value. A conforming Entry sits near 0; two-way spreading is 0.5 |
 //! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
 //! | `max_unverifiable_shares_per_ssa` / `_per_session` | 0 / 0 | Shipped values; a failed polynomial has already doomed the cycle |
 //! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
-//! | `min_deposit` | ≥ one quota's value | 129.8 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
+//! | `min_deposit` | ≥ one quota's value | 194.6 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
 //!
 //! Related settings outside [`SupervisorConfig`] that this profile also pins:
 //!

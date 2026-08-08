@@ -784,6 +784,7 @@ pub struct SessionGlobalConfig {
 
 #[cfg(test)]
 mod tests {
+    use hopr_protocol_pix::SHARE_EMISSION_WINDOW;
     use hopr_transport_session::{MAX_SSA_BATCH_SIZE, SupervisorConfig};
 
     use super::*;
@@ -834,6 +835,58 @@ mod tests {
         HoprProtocolConfig::default()
             .validate()
             .expect("default HoprProtocolConfig must be valid");
+    }
+
+    /// At the end of each emission-window block, every polynomial emits all of its surplus shares
+    /// after it has already reached the reconstruction threshold.  None of those packets advances
+    /// `useful_shares`, so the funded service gate must admit that whole run plus the first useful
+    /// share of the next block.  Otherwise the gate parks the writer waiting for progress that only
+    /// the parked writer can create.
+    ///
+    /// **The gate no longer counts `useful_shares`.** It counts every share the cycle accepts, via
+    /// `SsaRecoveryProgress::shares_seen`, so the surplus run resets it exactly like the useful
+    /// shares around it and the inequality this test used to assert — ceiling above
+    /// `additional_shares × min(polys, window)` — constrains nothing. Sizing a static ceiling
+    /// against the run was never sound anyway: the run's length comes from the dimensions negotiated
+    /// per Session, and this value is fixed at config load.
+    ///
+    /// What is asserted instead is the property that replaced it, and the one the Session cannot
+    /// establish without: the run must be *survivable*, i.e. the deferral bucket a single polynomial
+    /// gets must hold everything the negotiated dimensions let the peer emit for it. Past
+    /// `MAX_DEFERRED_ACKS_PER_POLYNOMIAL` an acknowledgement is dropped rather than buffered, which
+    /// costs a share outright. Both halves of the sum are now a byte wide on the wire, so the sum
+    /// can reach 510 against a cap of 128 — the defaults must sit under it.
+    ///
+    /// The behavioural half of the original concern is pinned where it can actually be exercised:
+    /// `a_surplus_only_snapshot_is_liveness_without_payment` in the supervisor, which drives a
+    /// surplus-only run through the gate and the idle deadline.
+    #[test]
+    fn default_pix_gate_must_outlast_the_generator_surplus_run() {
+        let cfg = HoprProtocolConfig::default();
+
+        let emitted_per_poly = cfg.pix.ssa_part_size + cfg.pix.additional_shares;
+        assert!(
+            emitted_per_poly <= hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+            "default emission of {emitted_per_poly} shares per polynomial must fit one deferral bucket ({}), or \
+             acknowledgements are dropped and the shares they carry are lost",
+            hopr_protocol_pix::MAX_DEFERRED_ACKS_PER_POLYNOMIAL
+        );
+
+        // The ceiling still has to bound *something* — it is what stops an Entry consuming service
+        // while returning nothing at all — so a zero would disable the anti-drip rule outright.
+        assert!(
+            cfg.incoming_session_pix_config.supervision.max_served_without_progress > 0,
+            "the gate ceiling still bounds silence, and zero would disable it"
+        );
+
+        // The surplus run is quoted rather than bounded: it is what the block-structured emission
+        // produces, and the liveness counter is what absorbs it.
+        let surplus_run = cfg.pix.additional_shares as u64 * cfg.pix.num_ssa_parts.min(SHARE_EMISSION_WINDOW) as u64;
+        assert_eq!(
+            8192, surplus_run,
+            "the shipped dimensions produce an 8192-packet run of non-useful shares; if this moves, re-check that \
+             nothing has started keying liveness on useful shares again"
+        );
     }
 
     /// Each dimension range is satisfiable on its own well past anything measured, so the product

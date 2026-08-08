@@ -736,7 +736,24 @@ pub struct SsaRecoveryProgress<P> {
     pub ssa_id: SsaId<P>,
     /// Shares that advanced reconstruction — verified, distinct, and below their polynomial's
     /// threshold when they arrived. Excludes duplicates and the surplus a conforming Entry sends.
+    ///
+    /// The **payment** counter: what the Exit can eventually be paid for, and the right input to a
+    /// consumer's accounting. It is the wrong input to a liveness check — see
+    /// [`shares_seen`](Self::shares_seen).
     pub useful_shares: u64,
+    /// Shares accepted for this cycle whether or not they advanced it. Always at least
+    /// [`useful_shares`](Self::useful_shares).
+    ///
+    /// The **liveness** counter: evidence that the Entry is still serving this cycle. The two differ
+    /// by more than a rounding error, and conflating them has a specific failure mode. A conforming
+    /// Entry emits `threshold + surplus` shares per polynomial across a window advancing in lockstep,
+    /// so every window ends with `surplus × window` consecutive shares that advance nothing —
+    /// 8192 packets at the deployed dimensions. A consumer that treats "no useful share" as "the
+    /// Entry has gone quiet" will act on that run, and if the action is to withhold service it
+    /// removes the only thing that could have produced the next useful share.
+    ///
+    /// So: bound service and idleness on this, and decide payment on `useful_shares`.
+    pub shares_seen: u64,
     /// Useful shares that constitute full recovery: `polynomials × threshold`.
     ///
     /// A consumer that negotiated the dimensions can compare this against its own expectation; a

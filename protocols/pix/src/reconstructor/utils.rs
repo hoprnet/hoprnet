@@ -4,9 +4,9 @@ use vsss_rs::{
 };
 
 use crate::{
-    CONSTANT_TERM_COEFFICIENT, CoefficientIndex, CompletedShare, PartialSsaShare, PixGroup, PixGroupRepr, PixScalar,
-    PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPartCommitment, SsaPolynomialId, SsaRecoveryProgress, errors,
-    into_completed_share, types::SsaId,
+    CONSTANT_TERM_COEFFICIENT, CoefficientIndex, CompletedShare, PartialSsaShare, PixGroup, PixGroupRepr, PixParams,
+    PixScalar, PixSpec, PolynomialIndex, SsaCommitmentProof, SsaPartCommitment, SsaPolynomialId, SsaRecoveryProgress,
+    errors, into_completed_share, types::SsaId,
 };
 
 /// Relaxed ordering suffices for every progress counter in [`SsaCycle`].
@@ -47,7 +47,17 @@ pub struct SsaCycle<S: PixSpec> {
     /// Shares that advanced reconstruction: new, distinct, and below their part's threshold when
     /// they arrived. Duplicates, surplus shares and shares absorbed by a failed part are excluded,
     /// so this is the numerator of a progress ratio rather than a received-packet count.
+    ///
+    /// This is the *payment* counter. For liveness — whether the Entry is feeding this cycle at all —
+    /// see `shares_seen`, and do not substitute one for the other.
     useful_shares: std::sync::atomic::AtomicU64,
+    /// Shares that reached a part builder and were accepted as this cycle's, useful or not.
+    ///
+    /// The *liveness* counter, and always at least `useful_shares`. A conforming Entry emits
+    /// `threshold + surplus` shares per polynomial, so a whole emission window ends with
+    /// `surplus × window` consecutive shares that advance nothing — and a consumer watching
+    /// `useful_shares` alone cannot tell that from an Entry that has stopped sending.
+    shares_seen: std::sync::atomic::AtomicU64,
     /// Parts whose constant term has been reconstructed and opened its commitment.
     recovered_polynomials: std::sync::atomic::AtomicU32,
     /// Shares that failed verification, aggregated across every peer that relayed for this cycle.
@@ -107,6 +117,7 @@ impl<S: PixSpec> SsaCycle<S> {
             builder: parking_lot::Mutex::new(builder),
             parts: parts.into_iter().map(parking_lot::Mutex::new).collect(),
             useful_shares: Default::default(),
+            shares_seen: Default::default(),
             recovered_polynomials: Default::default(),
             invalid_shares: Default::default(),
             target_useful_shares: num_polys as u64 * poly_threshold,
@@ -118,9 +129,19 @@ impl<S: PixSpec> SsaCycle<S> {
         self.parts.len()
     }
 
-    /// Records a share that advanced reconstruction.
+    /// Records a share that advanced reconstruction — both a useful share and a share seen.
     pub fn record_useful_share(&self) {
         self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
+        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
+    }
+
+    /// Records a share that arrived for an already-reconstructed polynomial.
+    ///
+    /// Liveness only: the surplus a conforming Entry emits advances nothing, but it is still evidence
+    /// that the Entry is serving this cycle, which is what the Exit's egress gate and recovery-idle
+    /// deadline are asking about.
+    pub fn record_surplus_share(&self) {
+        self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
     }
 
     /// Records a polynomial part that reconstructed and opened its commitment.
@@ -144,6 +165,7 @@ impl<S: PixSpec> SsaCycle<S> {
         SsaRecoveryProgress {
             ssa_id: self.id,
             useful_shares: self.useful_shares.load(PROGRESS_ORDERING),
+            shares_seen: self.shares_seen.load(PROGRESS_ORDERING),
             target_useful_shares: self.target_useful_shares,
             // Bounded by `num_polys`, itself bounded by `MAX_POLYS_PER_SSA`, so the saturation
             // below is unreachable rather than lossy.
@@ -236,16 +258,24 @@ impl<S: PixSpec> SsaBuilder<S> {
 
 /// What a share contributed to its polynomial.
 ///
-/// The three non-contributing outcomes are kept apart from one another because they are not
+/// The four non-contributing outcomes are kept apart from one another because they are not
 /// equivalent to a caller counting progress: a `Duplicate` says the peer re-sent an evaluation
 /// point, a `Surplus` says it is still emitting for a polynomial that is already done (expected —
-/// the Entry sends `threshold + surplus` shares per polynomial), and `Absorbed` says the polynomial
-/// has already failed and nothing can change that.
+/// the Entry sends `threshold + surplus` shares per polynomial), a `SurplusOverBudget` says it has
+/// emitted more of those than it negotiated, and `Absorbed` says the polynomial has already failed
+/// and nothing can change that.
 pub enum AddShareOutcome<S: PixSpec> {
     /// Same evaluation identifier as a share already collected for this polynomial.
     Duplicate,
-    /// Arrived after the polynomial was already reconstructed.
+    /// Arrived after the polynomial was already reconstructed, within the negotiated surplus.
     Surplus,
+    /// Arrived after the polynomial was already reconstructed, past the negotiated surplus.
+    ///
+    /// Distinct from [`Surplus`](Self::Surplus) because only the latter is evidence the Entry is
+    /// conforming. Once a peer is past its own budget, further shares for the same polynomial say
+    /// nothing about whether it is still working on the cycle — see
+    /// `SsaPartBuilder::max_credited_surplus`.
+    SurplusOverBudget,
     /// Arrived after the polynomial failed to open its commitment, and was discarded.
     Absorbed,
     /// New and distinct, but the threshold is not reached yet.
@@ -281,16 +311,35 @@ pub struct SsaPartBuilder<S: PixSpec> {
     /// because [`SsaBuilder`] needs every polynomial. Both failure paths must therefore set this
     /// *and* release the share buffer, or the "exactly once" only holds for one of them.
     failed: bool,
+    /// Post-reconstruction shares credited as liveness so far, bounded by
+    /// [`Self::max_credited_surplus`].
+    surplus_seen: usize,
+    /// How many post-reconstruction shares this polynomial may contribute as liveness evidence.
+    ///
+    /// The negotiated `surplus_shares`, i.e. exactly what a conforming Entry emits per polynomial
+    /// once the threshold is met — and, since `20845807ae`, exactly what the per-SSA quota charges
+    /// for. Crediting to the negotiated figure therefore credits precisely the traffic that was paid
+    /// for, and nothing beyond it.
+    ///
+    /// A bound is needed at all because reconstruction releases the collected share set, so
+    /// duplicate detection is gone from that moment on: every later share for the polynomial is
+    /// indistinguishable from every other. Without a cap an Entry could complete one polynomial,
+    /// replay its shares forever, and keep the Exit's egress gate and idle deadline refreshed while
+    /// touching none of the remaining `polys - 1`. The cap makes the free ride finite —
+    /// `polys × surplus_shares` per cycle, which is the conforming volume.
+    max_credited_surplus: usize,
 }
 
 impl<S: PixSpec> SsaPartBuilder<S> {
-    pub fn new(commitment: SsaPartCommitment<S>, min_shares: usize) -> Self {
+    pub fn new(commitment: SsaPartCommitment<S>, min_shares: usize, max_credited_surplus: usize) -> Self {
         Self {
             commitment,
             min_shares,
             shares: Vec::new(),
             reconstructed: None,
             failed: false,
+            surplus_seen: 0,
+            max_credited_surplus,
         }
     }
 
@@ -334,9 +383,11 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         msg: PixScalar<S>,
         share: PartialSsaShare<S>,
     ) -> errors::Result<AddShareOutcome<S>, S::Pseudonym> {
-        if self.reconstructed.is_some() {
-            return Ok(AddShareOutcome::Surplus);
-        }
+        // First, and before decoding: a failed part reports its fault exactly once, and every later
+        // share for it is absorbed in silence. Validating ahead of this would turn each of those
+        // into another `InvalidShare`, and the caller charges those against
+        // `max_unverifiable_shares_per_ssa` — zero by default, so one already-doomed polynomial
+        // would close the Session once per remaining share instead of once.
         if self.failed {
             return Ok(AddShareOutcome::Absorbed);
         }
@@ -347,8 +398,24 @@ impl<S: PixSpec> SsaPartBuilder<S> {
         // zero in the Lagrange basis; a zero y is degenerate in the same way. These used to be the
         // opening lines of the per-share Feldman check, and they are the part worth keeping —
         // unlike the check itself, they cost nothing.
+        //
+        // Ahead of the `reconstructed` check below, so that a share which could never have come
+        // from the committed polynomial is rejected whether or not that polynomial is already done.
+        // The other order made a completed polynomial into a laundering channel: every malformed
+        // share addressed to it returned `Surplus`, which the Exit credits as evidence the Entry is
+        // alive.
         if (share.value().is_zero() | share.identifier().is_zero()).into() {
             return Err(vsss_rs::Error::InvalidShare.into());
+        }
+
+        if self.reconstructed.is_some() {
+            // Past the budget the share is real but no longer evidence of anything: see
+            // `max_credited_surplus`.
+            if self.surplus_seen >= self.max_credited_surplus {
+                return Ok(AddShareOutcome::SurplusOverBudget);
+            }
+            self.surplus_seen += 1;
+            return Ok(AddShareOutcome::Surplus);
         }
 
         // Reject duplicate shares — the same identifier is the same X-coordinate, which carries no
@@ -436,6 +503,13 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     /// The commitments no longer carry the degree, so this is the only source for it. It is
     /// handed to every [`SsaPartBuilder`] as its `min_shares`.
     poly_threshold: usize,
+    /// Shares the peer said it would emit per polynomial *beyond* [`Self::poly_threshold`], as
+    /// negotiated at session establishment.
+    ///
+    /// Handed to every [`SsaPartBuilder`] as its `max_credited_surplus`. Kept alongside the
+    /// threshold rather than derived from it: the two are independent halves of the negotiated
+    /// [`PixParams`](crate::PixParams) word, and the ratio between them is an operator choice.
+    poly_surplus: usize,
     num_polys: usize,
     /// Constant-term commitments received so far, **decoded**: each is decompressed and
     /// subgroup-checked exactly once, on arrival. Keeping the compressed representation instead
@@ -460,17 +534,23 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
 }
 
 impl<S: PixSpec> SsaCommitmentBuilder<S> {
+    /// Takes the whole negotiated triple rather than the two fields it used to read.
+    ///
+    /// The surplus is the third, and it was the one previously dropped on the floor at the call
+    /// site: the Session layer held a [`PixParams`] and destructured two fields out of it. Keeping
+    /// the type intact is what makes the per-polynomial surplus budget available down here — see
+    /// [`SsaPartBuilder::max_credited_surplus`].
     pub fn new(
         id: SsaId<S::Pseudonym>,
-        poly_threshold: usize,
-        num_polys: usize,
+        params: PixParams,
         exit_commitment_secret: PixScalar<S>,
         exit_commitment_public: PixGroup<S>,
     ) -> Self {
         Self {
             id,
-            poly_threshold,
-            num_polys,
+            poly_threshold: params.shares_per_poly() as usize,
+            poly_surplus: params.surplus_shares() as usize,
+            num_polys: params.polys_per_ssa() as usize,
             exit_commitment_secret,
             exit_commitment_public,
             committed_polynomials: std::collections::HashMap::new(),
@@ -620,9 +700,9 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 S::group_to_deposit_address(full_ssa_commitment).ok_or(errors::PixError::InvalidInput)?;
 
             // A zero threshold would make every part builder reconstruct from no shares at all.
-            // `new_exit_commitment` enforces `shares_per_poly >= 2`, so this is defensive — but it
-            // must be checked before the drain below, so a failure cannot strand the commitments
-            // it has already taken.
+            // `PixParams` cannot hold one — `try_new` enforces `MIN_POLY_THRESHOLD` — so this is
+            // defensive, but it must be checked before the drain below, so a failure cannot strand
+            // the commitments it has already taken.
             if self.poly_threshold == 0 {
                 return Err(errors::PixError::InvalidInput);
             }
@@ -650,6 +730,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                         constant_term,
                     ),
                     self.poly_threshold,
+                    self.poly_surplus,
                 ));
             }
 

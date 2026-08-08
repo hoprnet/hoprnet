@@ -11,10 +11,9 @@ use utils::{AddShareOutcome, SsaCommitmentBuilder, SsaCycle};
 use validator::Validate;
 
 use crate::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixGroup,
-    PixGroupRepr, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof,
-    SsaCommitmentState, SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError,
-    types::SsaId,
+    CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixParams,
+    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof, SsaCommitmentState,
+    SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
 /// Configuration for the SSA reconstructor.
@@ -235,14 +234,19 @@ pub struct SsaReconstructor<S: PixSpec> {
 /// collapse into [`NoProgress`](Self::NoProgress): none of them moves a counter, so none of them can
 /// make a snapshot differ from the last one sent.
 enum ProcessedAckResult<S: PixSpec> {
-    /// Nothing to report: the acknowledgement matched no pending share, or the share was a
-    /// duplicate, a surplus, or absorbed by an already-failed polynomial.
+    /// Nothing to report: the acknowledgement matched no pending share, or the share was a duplicate
+    /// or was absorbed by an already-failed polynomial.
+    ///
+    /// A *surplus* share is not in this set. It advances nothing, but it is evidence the Entry is
+    /// still serving, and a consumer needs to be able to tell that from silence — see
+    /// [`Progressed`](Self::Progressed).
     NoProgress,
     /// The share is valid but its polynomial's verifier is not installed yet, so it cannot be
     /// checked. Deferral, not failure: the ack is bucketed under this
     /// [`SsaPolynomialId`] and retried once the verifier arrives.
     VerifierNotReady(SsaPolynomialId<<S as PixSpec>::Pseudonym>),
-    /// The share advanced reconstruction without finishing it.
+    /// A share landed on this cycle without finishing it. The snapshot says whether it advanced
+    /// recovery: `useful_shares` moves for a useful share, only `shares_seen` for a surplus one.
     Progressed(SsaRecoveryProgress<<S as PixSpec>::Pseudonym>),
     /// The share failed verification. Carries the SSA's aggregate fault total across all peers.
     InvalidShare(SsaId<<S as PixSpec>::Pseudonym>, u64),
@@ -437,8 +441,25 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             }
             // Expected traffic, not a fault: a conforming Entry emits `threshold + surplus` shares
             // per polynomial, so every polynomial ends its life absorbing surplus.
+            //
+            // Reported rather than swallowed, even though it advances nothing. Polynomials in an
+            // emission window run in lockstep, so they reach `threshold` together and then take their
+            // surplus together — `surplus × window` consecutive shares, 8192 at the deployed
+            // dimensions, none of them useful. A consumer that only ever hears about useful shares
+            // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
+            // moves, `useful_shares` does not.
             Ok(AddShareOutcome::Surplus) => {
                 tracing::trace!(%spi, "share arrived after its polynomial was reconstructed");
+                cycle.record_surplus_share();
+                return Ok(ProcessedAckResult::Progressed(cycle.progress()));
+            }
+            // Past the negotiated surplus the peer is emitting more for this polynomial than it said
+            // it would, and reconstruction has already released the share set, so these cannot even
+            // be told apart as duplicates. Withholding the snapshot is the whole point: crediting
+            // them would let one completed polynomial refresh the Exit's gate and idle deadline
+            // indefinitely while the rest of the cycle is never touched.
+            Ok(AddShareOutcome::SurplusOverBudget) => {
+                tracing::debug!(%spi, "share arrived past the peer's negotiated surplus for this polynomial");
                 return Ok(ProcessedAckResult::NoProgress);
             }
             Ok(AddShareOutcome::Duplicate) => {
@@ -824,10 +845,9 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     pub fn new_guarded_exit_commitment(
         self: &std::sync::Arc<Self>,
         id: SsaId<S::Pseudonym>,
-        polys_per_ssa: usize,
-        shares_per_poly: usize,
+        params: PixParams,
     ) -> Result<GuardedExitCommitment<S>, PixError<S::Pseudonym>> {
-        let exit_commitment = self.new_exit_commitment(id, polys_per_ssa, shares_per_poly)?;
+        let exit_commitment = self.new_exit_commitment(id, params)?;
         Ok((
             exit_commitment,
             SsaCommitmentGuard {
@@ -897,18 +917,10 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         self.remove_cycle(ssa_id);
     }
 
-    fn new_exit_commitment(
-        &self,
-        id: SsaId<S::Pseudonym>,
-        polys_per_ssa: usize,
-        shares_per_poly: usize,
-    ) -> Result<PixGroup<S>, Self::Error> {
-        if !(1..=MAX_POLYS_PER_SSA as usize).contains(&polys_per_ssa)
-            || !(2..=MAX_POLY_THRESHOLD as usize).contains(&shares_per_poly)
-        {
-            return Err(PixError::InvalidInput);
-        }
-
+    /// No range check on the dimensions: holding a [`PixParams`] is what proves them in range, since
+    /// [`PixParams::try_new`] is the only way to make one and the two bounded fields are as wide as
+    /// their types. The check this replaced tested exactly those bounds.
+    fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>, params: PixParams) -> Result<PixGroup<S>, Self::Error> {
         let exit_commitment_secret = PixScalar::<S>::random(&mut hopr_types::crypto_random::rng());
         let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
 
@@ -919,8 +931,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
                 None => Ok(moka::ops::compute::Op::Put(std::sync::Arc::new(
                     parking_lot::Mutex::new(SsaCommitmentBuilder::new(
                         id,
-                        shares_per_poly,
-                        polys_per_ssa,
+                        params,
                         exit_commitment_secret,
                         exit_commitment_public,
                     )),
@@ -1122,8 +1133,8 @@ mod tests {
 
     use super::{utils::SsaBuilder, *};
     use crate::{
-        DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, GroupEncoding, PartialSsaShare, SsaGeneratorConfig, SsaIndex,
-        SsaShareGenerator,
+        DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, DEFAULT_SURPLUS_SHARES, GroupEncoding, PartialSsaShare,
+        SsaGeneratorConfig, SsaIndex, SsaShareGenerator,
         tests::TestSpec,
         traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
     };
@@ -1167,44 +1178,42 @@ mod tests {
             .expect("identity proof must be constructible")
     }
 
+    /// Negotiated dimensions for a test cycle.
+    ///
+    /// The surplus is [`DEFAULT_SURPLUS_SHARES`] rather than zero so that no test trips the
+    /// per-polynomial liveness credit cap by accident — the tests that mean to exercise that cap
+    /// build their own [`PixParams`] with a surplus small enough to reach it.
+    fn test_params(polys: u16, threshold: u8) -> PixParams {
+        PixParams::try_new(polys, threshold, DEFAULT_SURPLUS_SHARES).expect("test dimensions must be in range")
+    }
+
+    /// The dimension bounds live in [`PixParams::try_new`] now, so what used to be five refusals
+    /// from `new_exit_commitment` is five values that cannot be built in the first place.
+    ///
+    /// Kept rather than deleted, and pointed at the constructor: the property is unchanged — these
+    /// dimensions must never reach a commitment builder — and only its enforcement point moved. A
+    /// future signature that took the fields loose again would drop it silently.
     #[test]
-    fn reconstructor_rejects_invalid_exit_commitment_inputs() -> anyhow::Result<()> {
+    fn out_of_range_exit_commitment_dimensions_must_be_unrepresentable() -> anyhow::Result<()> {
+        for (polys, threshold) in [
+            (0, 2),                     // polys_per_ssa == 0
+            (MAX_POLYS_PER_SSA + 1, 2), // polys_per_ssa exceeds MAX
+            (2, 0),                     // shares_per_poly == 0
+            (2, 1),                     // shares_per_poly below the minimum of 2
+        ] {
+            assert!(
+                PixParams::try_new(polys, threshold, 0).is_err(),
+                "{polys} x {threshold} must not be constructible"
+            );
+        }
+
+        // The fifth case — a threshold above the maximum — has no representation at all now that
+        // the field is as wide as its bound.
+        assert_eq!(u8::MAX, crate::MAX_POLY_THRESHOLD);
+
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-
-        let make_ssa_id = || SsaId::new(SimplePseudonym::random(), 1.try_into().unwrap());
-
-        // polys_per_ssa == 0
-        assert!(matches!(
-            reconstructor.new_exit_commitment(make_ssa_id(), 0, 2),
-            Err(PixError::InvalidInput)
-        ));
-
-        // polys_per_ssa exceeds MAX
-        assert!(matches!(
-            reconstructor.new_exit_commitment(make_ssa_id(), MAX_POLYS_PER_SSA as usize + 1, 2),
-            Err(PixError::InvalidInput)
-        ));
-
-        // shares_per_poly == 0
-        assert!(matches!(
-            reconstructor.new_exit_commitment(make_ssa_id(), 2, 0),
-            Err(PixError::InvalidInput)
-        ));
-
-        // shares_per_poly == 1 (below minimum of 2)
-        assert!(matches!(
-            reconstructor.new_exit_commitment(make_ssa_id(), 2, 1),
-            Err(PixError::InvalidInput)
-        ));
-
-        // shares_per_poly exceeds MAX
-        assert!(matches!(
-            reconstructor.new_exit_commitment(make_ssa_id(), 2, MAX_POLY_THRESHOLD as usize + 1),
-            Err(PixError::InvalidInput)
-        ));
-
-        // Valid inputs still work
-        assert!(reconstructor.new_exit_commitment(make_ssa_id(), 2, 2).is_ok());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into().unwrap());
+        assert!(reconstructor.new_exit_commitment(ssa_id, test_params(2, 2)).is_ok());
 
         Ok(())
     }
@@ -1215,7 +1224,7 @@ mod tests {
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // 1. Any non-constant coefficient index is ignored rather than rejected, whether or not it is within the
         //    threshold — PIX commits to nothing but the constant term, and a peer that still sends a full Feldman
@@ -1269,7 +1278,7 @@ mod tests {
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Fill every constant term, which is the whole commitment
         let mut poly_map = HashMap::new();
@@ -1305,7 +1314,7 @@ mod tests {
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
 
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Insert the constant term of poly 0
         let mut poly_map_1 = HashMap::new();
@@ -1352,7 +1361,7 @@ mod tests {
         let peer = OffchainKeypair::random();
         let nonce = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut hopr_types::crypto_random::rng());
 
-        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD))?;
 
         reconstructor.insert_encrypted_share(
             peer.public(),
@@ -1411,7 +1420,7 @@ mod tests {
         let peer = OffchainKeypair::random();
         let nonce = crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut hopr_types::crypto_random::rng());
 
-        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD))?;
 
         reconstructor.insert_encrypted_share(
             peer.public(),
@@ -1456,7 +1465,7 @@ mod tests {
         let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, test_params(1, 2))?;
         commitment_msg.process_into_reconstructor(&reconstructor)?;
 
         // --- Step 1: Generate the first share ---
@@ -1674,7 +1683,7 @@ mod tests {
             ..Default::default()
         });
 
-        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, 4, 4)?;
+        let _server_commitment = reconstructor.new_exit_commitment(ssa_id, test_params(4, 4))?;
 
         commitment_msg.process_into_reconstructor(&reconstructor)?;
 
@@ -1736,17 +1745,34 @@ mod tests {
         surplus: u8,
         peer: &OffchainKeypair,
     ) -> anyhow::Result<(SsaReconstructor<TestSpec>, SsaId<SimplePseudonym>, Vec<Acknowledgement>)> {
+        cycle_with_declared_surplus(polys, threshold, surplus, surplus, peer)
+    }
+
+    /// As [`cycle_with_pending_acks`], but lets the Entry emit a different surplus from the one it
+    /// negotiated.
+    ///
+    /// The two are equal for a conforming peer, which is why every other caller uses the wrapper
+    /// above. Separating them is what makes an over-emitting Entry expressible: the Exit sizes its
+    /// per-polynomial liveness credit on `declared_surplus`, and nothing but that bound stops the
+    /// extra shares from counting.
+    fn cycle_with_declared_surplus(
+        polys: u16,
+        threshold: u8,
+        emitted_surplus: u8,
+        declared_surplus: u8,
+        peer: &OffchainKeypair,
+    ) -> anyhow::Result<(SsaReconstructor<TestSpec>, SsaId<SimplePseudonym>, Vec<Acknowledgement>)> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: polys,
             threshold,
-            surplus_shares: surplus,
+            surplus_shares: emitted_surplus,
         });
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::default();
-        reconstructor.new_exit_commitment(ssa_id, polys as usize, threshold as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, PixParams::try_new(polys, threshold, declared_surplus)?)?;
         commitment_msg.process_into_reconstructor(&reconstructor)?;
 
         let mut acks = Vec::new();
@@ -1826,6 +1852,154 @@ mod tests {
         Ok(())
     }
 
+    /// A surplus share must report itself as liveness without reporting itself as progress.
+    ///
+    /// This is the distinction the Exit's egress gate and recovery-idle deadline turn on. A conforming
+    /// Entry emits `threshold + surplus` shares per polynomial, and a whole emission window reaches its
+    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 8192 packets
+    /// at the deployed dimensions. A consumer told only about *useful* shares reads that run as the
+    /// Entry having gone quiet, and if it answers by withholding service it removes the only thing that
+    /// could have produced the next useful share.
+    ///
+    /// Acks are fed polynomial-major rather than in emission order, which is what puts a surplus share
+    /// in front of a still-incomplete cycle. In emission order both surplus shares of a
+    /// two-polynomial cycle arrive after full recovery has already removed it, which is why
+    /// [`progress_counts_only_the_shares_that_advance_reconstruction`] never reaches this path.
+    #[test]
+    fn a_surplus_share_reports_liveness_but_not_progress() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u8 = 2;
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(POLYS, THRESHOLD, 1, &peer)?;
+        assert_eq!(6, acks.len(), "(threshold + surplus) per polynomial");
+
+        // Emission alternates between the two polynomials, so the even positions are one polynomial's
+        // three shares and the odd positions the other's. Draining the evens first completes that
+        // polynomial and then hands its third share to a cycle that is still short.
+        let (evens, odds): (Vec<_>, Vec<_>) = acks.into_iter().enumerate().partition(|(i, _)| i % 2 == 0);
+        let ordered = evens.into_iter().chain(odds).map(|(_, ack)| ack);
+
+        let mut snapshots = Vec::new();
+        let mut recovered = false;
+        for ack in ordered {
+            for resolution in reconstructor.acknowledge_shares(*peer.public(), vec![ack])? {
+                match resolution {
+                    ShareResolution::Progress(p) => snapshots.push((p.useful_shares, p.shares_seen)),
+                    ShareResolution::RecoveredSsa(r) => {
+                        assert_eq!(ssa_id, r.ssa_id);
+                        recovered = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        assert!(recovered, "the cycle must still reconstruct from its own shares");
+        assert_eq!(
+            vec![(1, 1), (2, 2), (2, 3), (3, 4), (4, 5)],
+            snapshots,
+            "(useful, seen): the third entry is the surplus share — seen advances, useful holds. The sixth share \
+             arrives after full recovery removed the cycle, so it reports nothing."
+        );
+
+        Ok(())
+    }
+
+    /// A polynomial credits at most the negotiated surplus, however many shares arrive for it.
+    ///
+    /// Reconstruction releases the collected share set, so from that moment the builder cannot tell
+    /// one post-completion share from another — every replay of a single share looks exactly like a
+    /// fresh one. Without a bound, an Entry completes one polynomial of a large cycle, replays its
+    /// shares forever, and every replay refreshes the Exit's egress gate and recovery-idle deadline
+    /// while the remaining polynomials are never touched: unbounded service, no recovery, and so no
+    /// payment. The bound is what makes that ride finite.
+    ///
+    /// The Entry here emits four surplus shares per polynomial having negotiated one, which is the
+    /// only way to express over-emission — a conforming generator cannot exceed its own budget.
+    #[test]
+    fn a_polynomial_credits_no_more_surplus_than_was_negotiated() -> anyhow::Result<()> {
+        const POLYS: u16 = 2;
+        const THRESHOLD: u8 = 2;
+        const DECLARED_SURPLUS: u8 = 1;
+        const EMITTED_SURPLUS: u8 = 4;
+
+        let peer = OffchainKeypair::random();
+        let (reconstructor, _ssa_id, acks) =
+            cycle_with_declared_surplus(POLYS, THRESHOLD, EMITTED_SURPLUS, DECLARED_SURPLUS, &peer)?;
+        assert_eq!(12, acks.len(), "(threshold + emitted surplus) per polynomial");
+
+        // Drain one polynomial's six shares before touching the other, so the cycle stays live while
+        // that polynomial takes every surplus share the Entry has for it. In emission order the
+        // second polynomial would complete the cycle first and retire it.
+        let (evens, odds): (Vec<_>, Vec<_>) = acks.into_iter().enumerate().partition(|(i, _)| i % 2 == 0);
+
+        let mut seen = Vec::new();
+        for (_, ack) in evens {
+            for resolution in reconstructor.acknowledge_shares(*peer.public(), vec![ack])? {
+                if let ShareResolution::Progress(p) = resolution {
+                    seen.push((p.useful_shares, p.shares_seen));
+                }
+            }
+        }
+
+        assert_eq!(
+            vec![(1, 1), (2, 2), (2, 3)],
+            seen,
+            "(useful, seen): two useful shares complete the polynomial, then exactly one surplus share is credited. \
+             The remaining three are over the negotiated budget and must report nothing at all — had they been \
+             credited, `seen` would have run to 6."
+        );
+
+        // The other polynomial is untouched, so the cycle is still short of recovery — which is the
+        // state the attack wants to hold the Exit in.
+        let (_, odds_first) = odds.into_iter().next().expect("second polynomial has shares");
+        assert!(
+            reconstructor
+                .acknowledge_shares(*peer.public(), vec![odds_first])?
+                .iter()
+                .any(|r| matches!(r, ShareResolution::Progress(_))),
+            "the cycle must still be live and still accepting useful shares elsewhere"
+        );
+
+        Ok(())
+    }
+
+    /// Once a polynomial is reconstructed, the surplus path must not let malformed shares become
+    /// liveness signals. Otherwise an Entry can keep the funded-service gate open indefinitely by
+    /// naming a completed polynomial: `SsaPartBuilder::add_share` returns `Surplus` before even the
+    /// inexpensive zero-share validation that applies while the polynomial is incomplete.
+    #[test]
+    fn an_invalid_share_for_a_completed_polynomial_is_not_liveness() -> anyhow::Result<()> {
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(2, 2, 0, &peer)?;
+
+        // Emission alternates polynomials. The first and third acknowledgements complete polynomial
+        // zero while polynomial one — and therefore the cycle — remains incomplete.
+        for ack in acks.into_iter().step_by(2) {
+            reconstructor.acknowledge_shares(*peer.public(), vec![ack])?;
+        }
+
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+        let ack = HalfKey::random();
+        let challenge = ack.to_challenge()?;
+        let encrypted = PartialSsaShare::<TestSpec>::default().encrypt(&spi, &ack)?;
+        let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
+        reconstructor.insert_encrypted_share(
+            peer.public(),
+            challenge,
+            TaggedEncryptedPartialSsaShare::new(*spi.pseudonym(), &msg, encrypted)?,
+        )?;
+
+        let resolutions =
+            reconstructor.acknowledge_shares(*peer.public(), vec![VerifiedAcknowledgement::new(ack, &peer).leak()])?;
+        assert!(
+            resolutions.iter().all(|r| !matches!(r, ShareResolution::Progress(_))),
+            "a provably invalid zero share must not reset the service gate; got {resolutions:?}"
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn progress_precedes_the_terminal_event_it_belongs_to() -> anyhow::Result<()> {
         // The emission order is a contract: a consumer that acts on RecoveredSsa must already have
@@ -1878,7 +2052,7 @@ mod tests {
         let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
         let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
 
-        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2))?;
         assert_eq!(Some(&ssa_id), guard.ssa_id());
         assert!(
             reconstructor.contains_builder(&ssa_id),
@@ -1913,8 +2087,7 @@ mod tests {
         });
 
         let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
-        let (_commitment, guard) =
-            reconstructor.new_guarded_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // Take the cycle live under the guard, which is the state a correct caller would have
         // disarmed out of.
@@ -1932,7 +2105,7 @@ mod tests {
         // A tombstone was written, so this SsaId is spent: a fresh cycle at the same index is
         // published and then withdrawn at completion. That is the retirement contract, and the
         // contrast with `an_ssa_index_stays_usable_after_its_request_is_abandoned` is the point.
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         // A fresh generator: the original has already spent this pseudonym's index, and the identity
         // of the replacement commitment is irrelevant to what is being tested.
         let replacement = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -1962,7 +2135,7 @@ mod tests {
         let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
         let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
 
-        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2))?;
         assert_eq!(Some(ssa_id), guard.disarm());
         assert!(
             reconstructor.contains_builder(&ssa_id),
@@ -1989,8 +2162,7 @@ mod tests {
         let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
 
         // First attempt is abandoned before the peer is ever asked for commitments.
-        let (_commitment, guard) =
-            reconstructor.new_guarded_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         drop(guard);
 
         // Retry at the same index, which is what a failed request leaves behind.
@@ -1999,7 +2171,7 @@ mod tests {
             threshold: THRESHOLD,
             surplus_shares: 0,
         });
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let mut final_state = None;
         for (coeff_idx, coeffs) in commitment.verifiers.clone() {
@@ -2030,11 +2202,11 @@ mod tests {
         let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
         let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
 
-        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2)?;
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2))?;
 
         assert!(
             matches!(
-                reconstructor.new_guarded_exit_commitment(ssa_id, 2, 2),
+                reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2)),
                 Err(PixError::DuplicateCommitment)
             ),
             "a second registration at the same index must be rejected"
@@ -2073,7 +2245,7 @@ mod tests {
 
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Polynomial 0 twice, and polynomial 1 not at all — the shape that would otherwise leave the
         // set permanently one short while reporting two commitments received.
@@ -2118,7 +2290,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Step 1: Submit polynomial 0's constant term — must succeed, but the SSA commitment needs
         // every constant term, so no deposit address yet.
@@ -2229,7 +2401,7 @@ mod tests {
 
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
         commitment.process_into_reconstructor(&reconstructor)?;
 
         // Freshly installed: no shares collected yet.
@@ -2321,6 +2493,7 @@ mod tests {
         let mut part = SsaPartBuilder::<TestSpec>::new(
             crate::SsaPartCommitment::from_decoded_commitment(spi, PixGroup::<TestSpec>::generator()),
             1,
+            0,
         );
 
         let mut rng = hopr_types::crypto_random::rng();
@@ -2366,7 +2539,7 @@ mod tests {
 
         let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
-        reconstructor.new_exit_commitment(ssa_id, 4, 4)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(4, 4))?;
         commitment_msg.process_into_reconstructor(&reconstructor)?;
 
         // Precondition: the completed cycle holds every part builder and its accumulator.
@@ -2430,7 +2603,7 @@ mod tests {
 
         let commitment_msg = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
-        reconstructor.new_exit_commitment(ssa_id, 3, 4)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(3, 4))?;
         commitment_msg.process_into_reconstructor(&reconstructor)?;
 
         assert_eq!(
@@ -2557,7 +2730,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // One polynomial's constant term per call. Nothing is published until the last one.
         for poly in 0..POLYS as PolynomialIndex {
@@ -2612,7 +2785,7 @@ mod tests {
             early_recovery_threshold: 1.0,
             ..Default::default()
         });
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // Stand-in for what a Feldman-emitting Entry would send: a well-formed commitment under a
         // non-constant coefficient index, for every polynomial.
@@ -2696,7 +2869,7 @@ mod tests {
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -2773,7 +2946,7 @@ mod tests {
         let relayers = [OffchainKeypair::random(), OffchainKeypair::random()];
 
         let reconstructor = SsaReconstructor::<TestSpec>::default();
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -2862,7 +3035,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // Only part of the constant-term pass so far, so the SSA commitment is still unknown and no
         // part builder can be installed — a recovered part would have nowhere to go.
@@ -2959,7 +3132,7 @@ mod tests {
         let collector = OffchainKeypair::random();
 
         let reconstructor = SsaReconstructor::<TestSpec>::default();
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // Shares arrive over `carrier` before any commitment, so they defer. One is corrupted, so the
         // drain is what discovers the fault.
@@ -3047,7 +3220,7 @@ mod tests {
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -3155,7 +3328,7 @@ mod tests {
 
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
-        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(1, 2))?;
 
         // Both shares reach the Exit ahead of the commitment, so neither has a verifier yet.
         let mut pending = Vec::new();
@@ -3225,7 +3398,7 @@ mod tests {
 
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
-        reconstructor.new_exit_commitment(ssa_id, 1, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(1, 2))?;
 
         for _ in 0..2 {
             let (msg, share) = next_share_for_poly(&generator, &pseudonym, 0)?;
@@ -3369,7 +3542,7 @@ mod tests {
             unused_verifier_lifetime: VERIFIER_LIFETIME,
             ..Default::default()
         });
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // The whole commitment set lands up front, as it does in production: every part builder is
         // installed now, and the later ones then wait out most of the cycle.
@@ -3449,7 +3622,7 @@ mod tests {
             unused_verifier_lifetime: VERIFIER_LIFETIME,
             ..Default::default()
         });
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -3485,7 +3658,7 @@ mod tests {
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -3542,7 +3715,7 @@ mod tests {
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, POLYS as usize, THRESHOLD as usize)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
         generator
             .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
             .process_into_reconstructor(&reconstructor)?;
@@ -3585,7 +3758,7 @@ mod tests {
         let mut ids = Vec::with_capacity(exceed);
         for i in 0..exceed {
             let ssa_id = SsaId::new(pseudonym, (1u32 + i as u32).try_into()?);
-            reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+            reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
             ids.push(ssa_id);
         }
         reconstructor.commitment_builder.run_pending_tasks();
@@ -3654,7 +3827,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Constant term of polynomial 0 only — the SSA commitment is still unknown.
         let state = reconstructor.insert_coefficient_commitments(
@@ -3706,7 +3879,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         // Polynomial 0's constant term: nothing is published yet, the set is incomplete.
         reconstructor.insert_coefficient_commitments(
@@ -3814,7 +3987,7 @@ mod tests {
         let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
 
         let reconstructor = SsaReconstructor::<TestSpec>::new(Default::default());
-        reconstructor.new_exit_commitment(ssa_id, 2, 2)?;
+        reconstructor.new_exit_commitment(ssa_id, test_params(2, 2))?;
 
         let refused = reconstructor.insert_coefficient_commitments(
             ssa_id,
@@ -3854,15 +4027,15 @@ mod tests {
     /// with `w` yields `e`. So the assertion is now inverted.
     #[test]
     fn exit_refuses_a_client_commitment_whose_deposit_key_the_entry_knows() -> anyhow::Result<()> {
-        const POLYS: usize = 3;
-        const THRESHOLD: usize = 2;
+        const POLYS: u16 = 3;
+        const THRESHOLD: u8 = 2;
 
         let mut rng = hopr_types::crypto_random::rng();
         let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
         let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig::default());
 
         // The Exit reveals its half. This is exactly what `SsaRequest` carries to the Entry.
-        let exit_public = reconstructor.new_exit_commitment(ssa_id, POLYS, THRESHOLD)?;
+        let exit_public = reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
 
         // The attacker picks the deposit key it wants to end up holding.
         let w = PixScalar::<TestSpec>::random(&mut rng);
