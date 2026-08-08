@@ -46,6 +46,7 @@ ahash = "0.8.12"
 anyhow = "1.0.104"
 aquamarine = "0.6.0"
 async-broadcast = "0.7.2"
+async-channel = "2.5.0"
 async_channel_io = "0.3.0"
 async-trait = "0.1.91"
 asynchronous-codec = { version = "0.7.0" }
@@ -148,8 +149,8 @@ hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-featu
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = "0.5.1"
-hopr-transport = { version = "0.37.0", path = "transport/hopr" }
-hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
+hopr-transport = { version = "0.38.0", path = "transport/hopr" }
+hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.25.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }

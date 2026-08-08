@@ -4237,7 +4237,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.37.0"
+version = "0.38.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4297,9 +4297,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-mixer"
-version = "0.4.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
+ "async-channel 2.5.0",
  "bytesize",
  "criterion",
  "futures",
