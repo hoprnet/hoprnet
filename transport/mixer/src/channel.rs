@@ -15,18 +15,10 @@ use futures_timer::Delay;
 use parking_lot::Mutex;
 use tracing::trace;
 
-use crate::{config::MixerConfig, data::DelayedData};
-
+pub use crate::error::SenderError;
 #[cfg(all(feature = "telemetry", not(test)))]
-lazy_static::lazy_static! {
-    pub static ref METRIC_QUEUE_SIZE: hopr_types::telemetry::SimpleGauge =
-        hopr_types::telemetry::SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    pub static ref METRIC_MIXER_AVERAGE_DELAY: hopr_types::telemetry::SimpleGauge = hopr_types::telemetry::SimpleGauge::new(
-        "hopr_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
-}
+use crate::metrics::{METRIC_MIXER_AVERAGE_DELAY, METRIC_QUEUE_SIZE};
+use crate::{config::MixerConfig, data::DelayedData};
 
 /// Mixing and delaying channel using random delay function.
 ///
@@ -68,14 +60,6 @@ impl<T> Clone for TrackedChannel<T> {
             receiver_active: self.receiver_active.clone(),
         }
     }
-}
-
-/// Error returned by the [`Sender`].
-#[derive(Clone, Debug, thiserror::Error)]
-pub enum SenderError {
-    /// The channel is closed due to receiver being dropped.
-    #[error("Channel is closed")]
-    Closed,
 }
 
 /// Sender object interacting with the mixing channel.
