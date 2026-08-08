@@ -691,28 +691,43 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         "the whole batch must travel in a single SsaRequest"
     );
 
-    // Contiguous indices starting at 1, and the two sides agree on every cycle.
+    // The Entry publishes a batch in index order, and that *is* pinned: it is the same ordering the
+    // emission window depends on, and the Entry alone decides it.
     let entry_indices: Vec<_> = entry_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
-    let exit_indices: Vec<_> = exit_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
     assert_eq!(
         entry_indices,
         (1..=BATCH as u32).collect::<Vec<_>>(),
-        "the batch must cover contiguous SSA indices"
+        "the batch must cover contiguous SSA indices, in order"
     );
+
+    // The Exit's ordering is *not* pinned, and must not be. `SsaCommit` messages are processed under
+    // `for_each_concurrent`, so a batch arriving as one burst can finish its cycles in any order —
+    // nothing downstream cares, since every consumer keys by `ssa_id` rather than by arrival
+    // position. It looked ordered only while the Entry generated and sent one cycle at a time, which
+    // paced the burst; making the batch atomic removed that incidental pacing.
+    let mut exit_indices: Vec<_> = exit_cycles.iter().map(|q| q.ssa_id.ssa_index().get()).collect();
+    exit_indices.sort_unstable();
     assert_eq!(
         entry_indices, exit_indices,
         "Entry and Exit must agree on which SSAs the batch covered"
     );
 
-    // Distinct deposit addresses: each entry of the batch is its own cycle, hence its own deposit.
+    // So the two sides are matched by index, not by position. Distinct deposit addresses too: each
+    // entry of the batch is its own cycle, hence its own deposit.
     for (i, entry) in entry_cycles.iter().enumerate() {
+        let exit = exit_cycles
+            .iter()
+            .find(|e| e.ssa_id == entry.ssa_id)
+            .unwrap_or_else(|| panic!("the Exit must have a cycle for {}", entry.ssa_id));
         assert_eq!(
-            entry.deposit_address, exit_cycles[i].deposit_address,
-            "Entry and Exit must derive the same deposit address for cycle {i}"
+            entry.deposit_address, exit.deposit_address,
+            "Entry and Exit must derive the same deposit address for {}",
+            entry.ssa_id
         );
         assert_eq!(
-            entry.quota_per_ssa, exit_cycles[i].quota_per_ssa,
-            "Entry and Exit must agree on the quota for cycle {i}"
+            entry.quota_per_ssa, exit.quota_per_ssa,
+            "Entry and Exit must agree on the quota for {}",
+            entry.ssa_id
         );
         for (j, other) in entry_cycles.iter().enumerate().skip(i + 1) {
             assert_ne!(
