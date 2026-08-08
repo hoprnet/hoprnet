@@ -20,7 +20,7 @@ use hopr_crypto_packet::{
     prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
-use hopr_protocol_pix::{PixSpec, SsaId, SsaIndex};
+use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaIndex};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -92,23 +92,35 @@ pub type HoprStartProtocol =
 
 /// Quota per single SSA in bytes.
 ///
-/// The quota in bytes has only informative value for the user - what's the maximum amount of data that can be sent from
-/// Exit -> Entry before the SSA deposit can be recovered. So in this sense, it is a maximum volume of data transferred
-/// before SSA private key recovery at the Exit.
+/// The quota in bytes has only informative value for the user - the volume of Exit -> Entry data
+/// one SSA cycle carries, which is what a single deposit pays for.
+///
+/// Not the volume at which the Exit *recovers* the SSA private key: recovery needs
+/// `polys × threshold` useful shares, and so happens before the cycle drains. The quota covers the
+/// whole cycle, surplus included — see [`pix_params_to_quota`].
 ///
 /// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
 pub type SsaQuota = u64;
 
-/// The *priced* quota: what a single SSA deposit buys.
+/// What a single SSA deposit buys: every Exit → Entry payload byte the cycle carries.
 ///
-/// Deliberately excludes [`PixParams::surplus_shares`](hopr_protocol_pix::PixParams::surplus_shares),
-/// even though the surplus is now negotiated and known to both sides. The surplus exists to absorb
-/// lost shares, so an Exit delivers up to `polys × (threshold + surplus)` packets per cycle while
-/// charging for `polys × threshold` — the ratio is documented on `PixGlobalConfig::additional_shares`
-/// in `hopr-transport`. Pricing it would move [`DEFAULT_PIX_SSA_QUOTA`] and every default derived
-/// from it, so it is left as a separate decision.
-pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u8) -> SsaQuota {
-    polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
+/// Counts [`PixParams::emitted_shares_per_poly`], i.e. `threshold + surplus`, and not the threshold
+/// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
+/// shares (`SsaShareGenerator::next_share`), whether or not any were lost, and each share rides back
+/// on one Exit → Entry data packet — so this is exactly the traffic the Exit serves per cycle.
+/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.5× factor was a
+/// third of all Exit → Entry traffic.
+///
+/// The surplus is insurance the Entry buys against share loss, and it is billed like insurance: on
+/// purchase, not on claim. One deposit per cycle at this rate is what makes paid-for equal served.
+///
+/// The other half of that equality lives in the generator's own tests
+/// (`drain_shares_by_polynomial` in `hopr-protocol-pix`), which pin a cycle's emission at
+/// `polys × (threshold + surplus)`. Change either expression and the other has to move with it.
+pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
+    params.polys_per_ssa() as SsaQuota
+        * params.emitted_shares_per_poly() as SsaQuota
+        * HoprPacket::PAYLOAD_SIZE as SsaQuota
 }
 
 /// Default number of polynomials ("SSA parts") a single SSA is split into.
@@ -117,22 +129,23 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u8)
 /// (`PixGlobalConfig::num_ssa_parts`) and for the Exit-side acceptance policy
 /// ([`IncomingSessionPixConfig::quota_range`](crate::IncomingSessionPixConfig::quota_range)).
 /// Both must be derived from it so the two cannot drift apart: the Exit computes the
-/// offered quota as `polys × shares × PAYLOAD_SIZE` and rejects the Session if it falls
+/// offered quota as `polys × (shares + surplus) × PAYLOAD_SIZE` and rejects the Session if it falls
 /// outside its configured range, so a hard-coded range that no longer matches the
 /// dimension defaults makes every PIX Session fail to establish.
 ///
 /// ## Choosing the split
 ///
-/// For a fixed quota `Q = polys × threshold` the *product* is pinned, so the split between the two
-/// is free — but the costs scale differently, and dropping the non-constant coefficient
-/// commitments (see [`hopr_protocol_pix::SsaPartCommitment`]) changed which way they pull:
+/// For a fixed useful-share count `U = polys × threshold` the *product* is pinned, so the split
+/// between the two is free — but the costs scale differently, and dropping the non-constant
+/// coefficient commitments (see [`hopr_protocol_pix::SsaPartCommitment`]) changed which way they
+/// pull:
 ///
 /// * Commitment wire volume and Exit ingest are one commitment per polynomial — **linear in `polys`**, and formerly
 ///   `polys × threshold`. Ingest is dominated by point decompression plus the cofactor-8 subgroup check.
-/// * Reconstructor commitment memory is likewise `polys`, no longer `Q`.
-/// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `Q ×
+/// * Reconstructor commitment memory is likewise `polys`, no longer `U`.
+/// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `U ×
 ///   threshold` and is now simply `polys`.
-/// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `Q × threshold`,
+/// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `U × threshold`,
 ///   **linear in `threshold`**. This is now the only cost that grows with the threshold, and it is field arithmetic
 ///   rather than curve arithmetic.
 /// * Detection of a dishonest Entry takes `threshold` return packets, since a share set is only checked once it
@@ -141,8 +154,9 @@ pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u8)
 /// So raising `threshold` (and lowering `polys`) now buys a proportionally smaller commitment
 /// phase at the cost of more interpolation and later fault detection — the opposite of the old
 /// trade, where `threshold` was kept as small as loss tolerance allowed. The 8192 × 64 split is
-/// retained pending measurement of where the new optimum sits; the product is what fixes the
-/// quota, so the split can be re-tuned without touching session negotiation.
+/// retained pending measurement of where the new optimum sits. The quota is fixed by
+/// `polys × (threshold + surplus)`, so the split can be re-tuned without touching session
+/// negotiation as long as that product holds.
 ///
 /// ## Why this is an alias
 ///
@@ -160,11 +174,31 @@ pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = hopr_protocol_pix::DEFAULT_POLYS_PER_
 /// small relative to the polynomial count, and why it is an alias rather than a literal.
 pub const DEFAULT_PIX_SHARES_PER_POLY: u8 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
 
+/// Default number of shares emitted per SSA part beyond [`DEFAULT_PIX_SHARES_PER_POLY`].
+///
+/// An alias for the same reason as its two siblings, and with more riding on it than they have: the
+/// surplus is part of [`DEFAULT_PIX_SSA_QUOTA`], so a second, disagreeing default would not merely
+/// mis-describe a cycle — it would price one.
+pub const DEFAULT_PIX_SURPLUS_SHARES: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
+
+/// The three defaults as the single triple both nodes negotiate.
+///
+/// The `match` is a compile-time range check: defaults that fall outside what
+/// [`PixParams::try_new`] accepts fail the build rather than every Session.
+pub(crate) const DEFAULT_PIX_PARAMS: PixParams = match PixParams::try_new(
+    DEFAULT_PIX_POLYS_PER_SSA,
+    DEFAULT_PIX_SHARES_PER_POLY,
+    DEFAULT_PIX_SURPLUS_SHARES,
+) {
+    Ok(params) => params,
+    Err(_) => panic!("default PIX dimensions must be within the protocol ranges"),
+};
+
 /// Nominal per-SSA data quota implied by the default PIX dimensions.
 ///
 /// This is the amount of Exit → Entry data covered by a single SSA deposit when both
 /// nodes run the default PIX configuration.
-pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
+pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
 
 /// Divisor applied to [`DEFAULT_PIX_SSA_QUOTA`] to obtain the lower bound of the default
 /// [`quota_range`](crate::IncomingSessionPixConfig::quota_range).
@@ -621,6 +655,59 @@ mod tests {
     };
 
     use super::*;
+
+    // --- PIX quota tests ---
+
+    /// The quota must count what the generator emits, not what the Exit needs to recover.
+    ///
+    /// This is one half of "paid-for equals served". The other half is
+    /// `drain_shares_by_polynomial` in `hopr-protocol-pix`, which pins a cycle's emission at
+    /// `polys × (threshold + surplus)` — the same expression. If one moves without the other, the
+    /// Exit is either serving unpaid traffic or charging for traffic it never sends.
+    #[test]
+    fn quota_must_price_every_share_a_cycle_emits() -> anyhow::Result<()> {
+        for (polys, threshold, surplus) in [(1u16, 2u8, 0u8), (8, 2, 2), (8192, 64, 32), (16192, 255, 255)] {
+            let params = PixParams::try_new(polys, threshold, surplus)?;
+            assert_eq!(
+                polys as u64 * (threshold as u64 + surplus as u64) * HoprPacket::PAYLOAD_SIZE as u64,
+                pix_params_to_quota(&params),
+                "the quota must cover every share the cycle emits"
+            );
+        }
+        Ok(())
+    }
+
+    /// A non-zero surplus must cost something. Before it was priced, these two were equal — which
+    /// is exactly the state this guards against returning to.
+    #[test]
+    fn a_surplus_must_raise_the_quota_above_the_threshold_alone() -> anyhow::Result<()> {
+        let threshold_only = pix_params_to_quota(&PixParams::try_new(8192, 64, 0)?);
+        let with_surplus = pix_params_to_quota(&PixParams::try_new(8192, 64, 32)?);
+
+        assert!(
+            with_surplus > threshold_only,
+            "a surplus of 32 must be charged for, got {with_surplus} against {threshold_only}"
+        );
+        // The deployed factor, stated once so a change to either default is visible here.
+        assert_eq!(
+            threshold_only * 3 / 2,
+            with_surplus,
+            "the deployed surplus factor is 1.5x"
+        );
+        Ok(())
+    }
+
+    /// The defaults the Exit's `quota_range` is anchored on are the ones an Entry actually runs.
+    #[test]
+    fn default_quota_must_follow_the_default_dimensions() {
+        assert_eq!(
+            DEFAULT_PIX_POLYS_PER_SSA as u64
+                * (DEFAULT_PIX_SHARES_PER_POLY as u64 + DEFAULT_PIX_SURPLUS_SHARES as u64)
+                * HoprPacket::PAYLOAD_SIZE as u64,
+            DEFAULT_PIX_SSA_QUOTA
+        );
+        assert_eq!(DEFAULT_PIX_SURPLUS_SHARES, DEFAULT_PIX_SHARES_PER_POLY / 2);
+    }
 
     // --- ByteCapabilities tests ---
 

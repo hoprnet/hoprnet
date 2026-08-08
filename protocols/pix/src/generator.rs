@@ -9,8 +9,9 @@ use vsss_rs::{
 };
 
 use crate::{
-    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA,
-    MIN_POLY_THRESHOLD, PixGroup, PixScalar, PixSpec, PolynomialIndex, SsaPartCommitment, errors,
+    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, DEFAULT_SURPLUS_SHARES,
+    MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MIN_POLY_THRESHOLD, PixGroup, PixScalar, PixSpec, PolynomialIndex,
+    SsaPartCommitment, errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{
@@ -113,10 +114,15 @@ pub struct SsaGeneratorConfig {
     /// noticed once it has already poisoned the interpolation. See
     /// [`SsaPartCommitment`].
     ///
-    /// Default is 20. The whole range of the field is legal, so unlike the other two this one needs
-    /// no validator — it shares the lower half of the negotiated [`PixParams`](crate::PixParams)
-    /// word with `threshold`, and a byte is what fits there.
-    #[default(20)]
+    /// Emitting them is unconditional: a polynomial leaves the queue at `threshold + surplus`
+    /// shares, whether or not any were lost, so the Exit serves this many packets per polynomial in
+    /// every case. That is why the surplus is part of the per-SSA quota rather than free service —
+    /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
+    ///
+    /// Default is [`DEFAULT_SURPLUS_SHARES`]. The whole range of the field is legal, so unlike the
+    /// other two this one needs no validator — it shares the lower half of the negotiated
+    /// [`PixParams`](crate::PixParams) word with `threshold`, and a byte is what fits there.
+    #[default(DEFAULT_SURPLUS_SHARES)]
     pub surplus_shares: u8,
 }
 

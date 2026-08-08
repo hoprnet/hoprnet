@@ -35,9 +35,9 @@ pub use telemetry::{SessionAckMode, SessionLifecycleState};
 #[cfg(any(test, feature = "testing"))]
 pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
-    AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA, HoprSession,
-    HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprSessionOutPixEvent, HoprStartProtocol,
-    IncomingSession, ServiceId, SessionId, SessionTarget,
+    AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
+    DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
+    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

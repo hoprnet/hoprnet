@@ -11,8 +11,9 @@ pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorC
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
-    MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY,
+    DEFAULT_PIX_SURPLUS_SHARES, IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL,
+    MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -349,19 +350,25 @@ pub struct PixGlobalConfig {
     /// other side to reconstruct the entire SSA from all its parts. This is because if
     /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
     ///
-    /// **This is an absolute share count, not a ratio.** The default happens to be half of
+    /// **This is an absolute share count, not a ratio.** The default is half of
     /// [`DEFAULT_PIX_SHARES_PER_POLY`] — a surplus factor of 1.5× — but it is a constant computed
     /// once, so raising [`ssa_part_size`](Self::ssa_part_size) and leaving this alone lowers the
     /// surplus factor, and lowering it raises it. Re-tune the two together.
     ///
-    /// The factor is what matters, because it is what decides how much data is delivered per SSA
-    /// cycle beyond the quota that was charged for it: the surplus travels to the peer as part of
-    /// the negotiated [`PixParams`](hopr_protocol_pix::PixParams), but it is deliberately left out
-    /// of the priced quota, so an Exit sees it without charging for it.
+    /// The factor is what matters, because it is what this costs. A polynomial leaves the
+    /// generator's queue at `ssa_part_size + additional_shares` shares whether or not any were
+    /// lost, so this is service the Exit performs in every case — and since the surplus travels to
+    /// the peer as part of the negotiated [`PixParams`](hopr_protocol_pix::PixParams), the per-SSA
+    /// quota counts it and the deposit pays for it. It buys loss tolerance, and it is charged for
+    /// like any other insurance: on purchase, not on claim.
+    ///
+    /// Raising it therefore costs money rather than earning free service, which is the way round it
+    /// should be. It used to be the other way: the surplus was excluded from the quota, so the
+    /// rational Entry raised this dial to take traffic it was not billed for.
     ///
     /// Capped at 255 because it is the other byte of that word.
     #[validate(range(min = 0, max = 255))]
-    #[default((DEFAULT_PIX_SHARES_PER_POLY / 2) as usize)]
+    #[default(DEFAULT_PIX_SURPLUS_SHARES as usize)]
     pub additional_shares: usize,
 
     /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
@@ -778,18 +785,22 @@ pub struct SessionGlobalConfig {
 mod tests {
     use super::*;
 
-    /// The Exit computes the offered quota as `polys × shares × HoprPacket::PAYLOAD_SIZE` and
-    /// rejects the Session when it falls outside `quota_range`. An Entry running the default
+    /// The Exit computes the offered quota as `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`
+    /// and rejects the Session when it falls outside `quota_range`. An Entry running the default
     /// `PixGlobalConfig` must therefore always be acceptable to an Exit running the default
     /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and
     /// before both structs became `serde(default)` there was no way for an operator to fix it.
+    ///
+    /// The surplus is in that product, so this also guards the alias that gives the two crates one
+    /// default surplus: if `additional_shares` and `hopr-protocol-pix`'s own default drift apart
+    /// again, the quota computed here stops matching the one the range is anchored on.
     #[test]
     fn default_pix_dimensions_must_be_inside_default_incoming_quota_range() {
         let pix = PixGlobalConfig::default();
         let incoming = IncomingSessionPixConfig::default();
 
         let quota = pix.num_ssa_parts as u64
-            * pix.ssa_part_size as u64
+            * (pix.ssa_part_size + pix.additional_shares) as u64
             * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
 
         assert!(
