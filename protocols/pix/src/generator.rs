@@ -10,8 +10,8 @@ use vsss_rs::{
 
 use crate::{
     CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, DEFAULT_SURPLUS_SHARES,
-    MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MIN_POLY_THRESHOLD, PixGroup, PixScalar, PixSpec, PolynomialIndex,
-    SsaPartCommitment, errors,
+    MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MIN_POLY_THRESHOLD, PixGroup, PixParams, PixScalar, PixSpec,
+    PolynomialIndex, SsaPartCommitment, errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{
@@ -106,6 +106,65 @@ impl EmissionProgress {
         }
         (self.front_emitted as f64 / self.shares_per_cycle as f64).min(1.0)
     }
+}
+
+/// Fewest shares that can be emitted for a cycle before an Exit's early-recovery signal can fire.
+///
+/// An Entry uses this to tell a legitimate request for the next batch from one that arrives before
+/// the current batch has been earned. Nothing below the returned count can have produced an honest
+/// [`SsaReconstructorConfig::early_recovery_threshold`](crate::SsaReconstructorConfig::early_recovery_threshold)
+/// signal, at any dimensions, on a lossless link — and loss only pushes the real signal later.
+///
+/// ## Why it is not `early_threshold × shares_per_cycle`
+///
+/// Two independent reasons, and they pull the answer *up*, so the naive estimate is unsafe rather
+/// than merely imprecise.
+///
+/// The Exit's threshold counts **reconstructed polynomials**, not shares — `check_early_threshold`
+/// tests `received_indices.len()` against `ceil(threshold × num_polys)`. A polynomial reconstructs on
+/// its `threshold`-th useful share and its surplus is emitted afterwards, so shares and polynomials
+/// do not advance in proportion.
+///
+/// And emission is **windowed**: [`SHARE_EMISSION_WINDOW`] polynomials advance in lockstep, and a
+/// window emits its entire surplus before the next window starts. So every window before the one
+/// holding the boundary has already spent `threshold + surplus` per polynomial, not `threshold`.
+///
+/// At the deployed 8192 × 64 (+32) that is 27 whole windows — 663 552 shares — plus 63 full passes
+/// and 52 shares of the 64th in the 28th window, i.e. **86.4 % of the cycle**. Dividing the Exit's
+/// 0.85 by the 1.5× surplus factor gives 57 %, and admitting there would hand out the next deposit
+/// roughly 284 MiB of payload before it could possibly have been earned.
+///
+/// ## What it assumes
+///
+/// `early_threshold` is the *peer's* configuration and does not travel on the wire, so a caller can
+/// only supply its own as a proxy. The direction of the error matters: a peer configured **lower**
+/// asks earlier than this allows and has its request refused, so the two sides are coupled by a value
+/// neither negotiates. Negotiating it is the robust fix and is not done here.
+pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64) -> u64 {
+    let polys = params.polys_per_ssa() as u64;
+    let threshold = params.shares_per_poly() as u64;
+    let emitted_per_poly = params.emitted_shares_per_poly() as u64;
+    // Clamped because it is a peer-supplied fraction in the general case: outside `0..=1` the
+    // arithmetic below would either underflow or exceed the cycle.
+    let needed = (early_threshold.clamp(0.0, 1.0) * polys as f64).ceil() as u64;
+    if needed == 0 {
+        return 0;
+    }
+
+    let window = (SHARE_EMISSION_WINDOW as u64).min(polys);
+    // `needed - 1` so that a boundary landing exactly on a window edge is attributed to the window
+    // that completes it rather than to the next one.
+    let prior_windows = (needed - 1) / window;
+    let prior_polys = prior_windows * window;
+    // The last window may be narrower than `SHARE_EMISSION_WINDOW` when `polys` is not a multiple of
+    // it; a narrower window reaches the same pass in fewer shares.
+    let current_width = window.min(polys - prior_polys);
+    let in_window = needed - prior_polys;
+
+    // Whole windows are exhausted, surplus included. Inside the current one, the `needed`-th
+    // polynomial completes partway through the `threshold`-th pass — after `threshold - 1` full
+    // passes plus `in_window` shares of that pass. That is the earliest instant, not the average.
+    prior_polys * emitted_per_poly + (threshold - 1) * current_width + in_window
 }
 
 /// Number of polynomials the generator emits shares for concurrently.
@@ -705,6 +764,73 @@ mod tests {
             progress.is_serving_last_committed() && progress.front_fraction() >= 0.85,
             "nine tenths into the last cycle is where an Exit may legitimately ask for the next batch, got {}",
             progress.front_fraction()
+        );
+
+        Ok(())
+    }
+
+    /// The early-recovery boundary must be derived, not estimated from the surplus factor.
+    ///
+    /// Pins the deployed number, because that is what the Entry's successor gate compares against and
+    /// it is not something a reader can check by inspection. The naive
+    /// `early_threshold / surplus_factor` gives 57 %; the truth is 86.4 %, and the gap is a whole
+    /// batch's worth of deposit exposure.
+    #[test]
+    fn early_recovery_boundary_is_computed_from_the_emission_windows() -> anyhow::Result<()> {
+        let params = PixParams::try_new(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD, DEFAULT_SURPLUS_SHARES)?;
+        let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
+        assert_eq!(786_432, cycle);
+
+        // 27 whole windows (663 552 shares), then 63 full passes of the 28th plus 52 shares of its
+        // 64th — the instant the 6964th polynomial reaches its threshold.
+        let boundary = min_emission_for_early_recovery(&params, 0.85);
+        assert_eq!(663_552 + 63 * 256 + 52, boundary);
+
+        let fraction = boundary as f64 / cycle as f64;
+        assert!(
+            (0.864..0.865).contains(&fraction),
+            "the deployed boundary must be ~86.4% of emission, got {fraction}"
+        );
+        assert!(
+            fraction > 0.85 / 1.5,
+            "the naive surplus-factor estimate must be demonstrably below the real boundary"
+        );
+
+        Ok(())
+    }
+
+    /// The boundary must hold at dimensions that do not divide the emission window evenly, and at
+    /// dimensions narrower than one window — where there is no windowing to account for at all.
+    #[test]
+    fn early_recovery_boundary_handles_partial_and_narrow_windows() -> anyhow::Result<()> {
+        // Narrower than one window: a single lockstep block, so the boundary is simply the pass on
+        // which the `needed`-th polynomial completes.
+        let narrow = PixParams::try_new(10, 4, 2)?;
+        // ceil(0.85 * 10) = 9 polynomials; 3 full passes of 10, then 9 shares of the 4th.
+        assert_eq!(3 * 10 + 9, min_emission_for_early_recovery(&narrow, 0.85));
+
+        // Not a multiple of the window: the last window is narrower and reaches a pass sooner.
+        let ragged = PixParams::try_new(SHARE_EMISSION_WINDOW as u16 + 100, 4, 2)?;
+        let polys = ragged.polys_per_ssa() as u64;
+        let needed = (0.85 * polys as f64).ceil() as u64;
+        let boundary = min_emission_for_early_recovery(&ragged, 0.85);
+        assert!(
+            needed > SHARE_EMISSION_WINDOW as u64,
+            "the boundary must fall in the second, narrower window for this case to mean anything"
+        );
+        assert_eq!(
+            SHARE_EMISSION_WINDOW as u64 * 6 + 3 * 100 + (needed - SHARE_EMISSION_WINDOW as u64),
+            boundary,
+            "one whole window at threshold+surplus, then 3 passes of the 100-wide remainder"
+        );
+
+        // Degenerate thresholds are answerable rather than panicking: everything, and nothing.
+        assert_eq!(0, min_emission_for_early_recovery(&narrow, 0.0));
+        let all = min_emission_for_early_recovery(&narrow, 1.0);
+        assert_eq!(
+            3 * 10 + 10,
+            all,
+            "every polynomial completes on the last pass of the threshold"
         );
 
         Ok(())

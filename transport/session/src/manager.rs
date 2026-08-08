@@ -309,25 +309,6 @@ pub const DEFAULT_MAX_SSAS_PER_SSA_REQUEST: usize = 2;
 /// same supervisor deadlines, same Start protocol channel capacity.
 pub const DEFAULT_SSAS_PER_SSA_REQUEST: usize = 1;
 
-/// How far into its last committed cycle an Entry must be before it accepts a successor batch.
-///
-/// The Entry's half of the Exit's early-recovery trigger, and it has to be derived rather than
-/// matched, because the two count different things. The Exit asks at
-/// `SsaReconstructorConfig::early_recovery_threshold` (0.85) of the *useful* shares it needs —
-/// `polys × threshold`. The Entry can only see what it has *emitted*, which includes the surplus, so
-/// at the shipped 1.5× factor the Exit's 85 % of the useful shares is 85 / 1.5 ≈ 57 % of the cycle's
-/// emission. Loss pushes the Exit later, never earlier, so that is the floor.
-///
-/// 0.5 therefore sits below any legitimate request and enormously above the ~0 % that checking the
-/// index alone allowed. It is deliberately not tuned tighter: the peer's surplus is negotiated, but
-/// how much of it the Exit *needs* depends on the loss it actually met, so anything closer to 0.57
-/// would start refusing honest Exits on clean links.
-///
-/// Not configurable, because a value that is too high breaks the Session outright — an Exit whose
-/// request is refused has no way to ask again — while the cost of it being too low is bounded by
-/// `max_ssas_per_ssa_request`.
-const MIN_SUCCESSOR_EMISSION_FRACTION: f64 = 0.5;
-
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
@@ -1152,19 +1133,39 @@ where
         // deadline, it silently disables the rule. `validate_pix_supervision` rejects such a config, but
         // only a node built from a config file goes through it.
         //
+        // Representability is necessary and not sufficient, though: `max_recovery_idle` also has to
+        // stay under the reconstructor's `unused_verifier_lifetime`, or the supervisor waits on a
+        // cycle whose state was reclaimed hours earlier. Clamping only to the monotonic-clock cap left
+        // exactly that — `Duration::MAX` became 24 h against a 30-minute default lifetime — so the
+        // normalized config was representable and still invalid.
+        //
+        // The reconstructor is not installed until `start`, so the *default* configuration is what
+        // this can normalize against. `start` re-checks against the one actually installed, which is
+        // where a caller pairing a non-default reconstructor is caught.
+        //
         // The two batch-scaled deadlines are clamped by the scaled value, since that is what is armed;
         // dividing by the batch size (already clamped to at least 1 above) is what keeps the product
         // under the cap.
         {
+            use hopr_protocol_pix::SsaReconstructorConfig;
+
             let sup = &mut cfg.pix_config.supervision;
-            let per_cycle_cap = crate::supervision::MAX_SUPERVISOR_DURATION / sup.ssas_per_request as u32;
+            let cap = crate::supervision::MAX_SUPERVISOR_DURATION;
+            let per_cycle_cap = cap / sup.ssas_per_request as u32;
             sup.max_ssa_delivery_time = sup.max_ssa_delivery_time.min(per_cycle_cap);
             sup.max_deposit_wait = sup.max_deposit_wait.min(per_cycle_cap);
-            sup.max_recovery_idle = sup.max_recovery_idle.min(crate::supervision::MAX_SUPERVISOR_DURATION);
-            sup.max_recovery_time = sup.max_recovery_time.min(crate::supervision::MAX_SUPERVISOR_DURATION);
-            sup.tombstone_retention_window = sup
-                .tombstone_retention_window
-                .min(crate::supervision::MAX_SUPERVISOR_DURATION);
+            sup.max_recovery_time = sup.max_recovery_time.min(cap);
+            sup.tombstone_retention_window = sup.tombstone_retention_window.min(cap);
+
+            // Strictly under the lifetime, which is what `validate_pix_supervision` requires; a
+            // saturating subtraction keeps a pathologically short lifetime from wrapping. The lower
+            // bound is not clamped: raising a too-small value would be inventing a policy rather than
+            // bounding one, and it is what `validate_pix_supervision` reports.
+            let idle_cap = SsaReconstructorConfig::default()
+                .unused_verifier_lifetime
+                .saturating_sub(Duration::from_secs(1))
+                .min(cap);
+            sup.max_recovery_idle = sup.max_recovery_idle.min(idle_cap);
         }
 
         #[cfg(all(feature = "telemetry", not(test)))]
@@ -1241,6 +1242,20 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         if let Some(pix) = pix {
+            // The authoritative cross-component check, and the first moment it can be made: the
+            // supervisor's deadlines are meaningless without the reconstructor lifetimes they race
+            // against, and the reconstructor arrives here rather than at construction.
+            //
+            // `SessionManager::new` normalizes against the *default* reconstructor config, which is
+            // what makes the common programmatic case correct without an API break. A caller that
+            // pairs a supervisor config with a non-default reconstructor is caught here instead — as
+            // an error rather than a clamp, because at this point both halves were chosen
+            // deliberately and silently overriding one of them would be the wrong answer.
+            crate::supervision::validate_pix_supervision(
+                &self.cfg.pix_config.supervision,
+                pix.share_processor.config(),
+            )?;
+
             self.pix_toolbox
                 .set(pix)
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -3305,10 +3320,11 @@ where
         //
         // The whole triple is compared rather than the scalar quota it implies.  Quota equality was
         // once argued to be sufficient — the Exit does not pick the dimensions independently, so a
-        // matching product implied matching `(polys, shares)` from any Exit running unmodified code
-        // — but `pix_params_to_quota` deliberately ignores the surplus, so no quota comparison can
-        // say anything about it at all.  Comparing the params is both stricter and simpler, and
-        // costs nothing now that all three travel together.
+        // matching product implied matching `(polys, shares)` from any Exit running unmodified code.
+        // The quota now prices all three, so it is no longer blind to the surplus, but it is still a
+        // product: it cannot tell `polys x threshold` from a transposition of the two, and those are
+        // not interchangeable to the protocol.  Comparing the params is both stricter and simpler,
+        // and costs nothing now that all three travel together.
         //
         // Malformed params never reach this comparison as a mismatch: `dimensions()` fails first,
         // and that failure takes the same refusal path, so the Exit is told either way rather than
@@ -3351,8 +3367,14 @@ where
         // reached the last committed cycle — which, with the window clamped to one cycle, means every
         // earlier one is exhausted — *and* it must be far enough into that cycle. Checking only the
         // index admitted a successor batch on the last cycle's very first share, i.e. ~0 % of the way
-        // through the batch rather than the ~85 % at which a conforming Exit asks. That is nearly a
+        // through the batch rather than the ~86 % at which a conforming Exit asks. That is nearly a
         // whole cycle of unearned deposits, on a gate whose entire purpose is to prevent them.
+        //
+        // The boundary is derived rather than guessed — see `min_emission_for_early_recovery`, which
+        // accounts for the Exit counting *polynomials* and for emission running in lockstep windows
+        // that spend their whole surplus before the next window starts. A flat fraction of the cycle
+        // gets this badly wrong in the unsafe direction: 0.85/1.5 is 57 %, against a true boundary of
+        // 86.4 % at the deployed dimensions.
         //
         // Refused rather than fatal, and deliberately not via `refuse_ssa_request`, which closes the
         // Session: this message is dropped and the Session left running. A correct Exit never lands
@@ -3362,16 +3384,18 @@ where
         // First index rather than each: `commitments` is a `BTreeMap`, so the lowest index leads, and
         // checking it before the loop is also what stops a batch that fails partway from having
         // already emitted `ReadyToDeposit` for its earlier members.
+        let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
+            &our_params,
+            pix_toolbox.share_processor.config().early_recovery_threshold,
+        );
         if let Some(progress) = pix_toolbox.share_generator.emission_progress(&pseudonym)
-            && (!progress.is_serving_last_committed() || progress.front_fraction() < MIN_SUCCESSOR_EMISSION_FRACTION)
+            && (!progress.is_serving_last_committed() || progress.front_emitted < min_emitted)
         {
             let asked_first = msg.commitments.keys().next().copied();
             let error = SessionManagerError::Unacceptable(format!(
-                "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({:.0}% of that cycle) of \
-                 the batch committed up to {}",
-                progress.highest_emitted,
-                progress.front_fraction() * 100.0,
-                progress.last_committed
+                "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({} of {min_emitted} shares \
+                 needed for an early-recovery signal) of the batch committed up to {}",
+                progress.highest_emitted, progress.front_emitted, progress.last_committed
             ));
             warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
             return Err(error.into());
@@ -5570,9 +5594,21 @@ mod tests {
 
         assert_eq!(per_cycle_cap, sup.max_ssa_delivery_time);
         assert_eq!(per_cycle_cap, sup.max_deposit_wait);
-        assert_eq!(cap, sup.max_recovery_idle);
         assert_eq!(cap, sup.max_recovery_time);
         assert_eq!(cap, sup.tombstone_retention_window);
+
+        // `max_recovery_idle` is bounded by something tighter than the clock: it must stay strictly
+        // under the reconstructor's `unused_verifier_lifetime`, or the supervisor waits on a cycle
+        // whose state was reclaimed long before. Normalized against the default reconstructor, which
+        // is the one `SessionManager::new` can see; `start` re-checks against the installed one.
+        let lifetime = hopr_protocol_pix::SsaReconstructorConfig::default().unused_verifier_lifetime;
+        assert!(
+            sup.max_recovery_idle < lifetime,
+            "clamped max_recovery_idle ({:?}) must stay under the reconstructor lifetime ({lifetime:?})",
+            sup.max_recovery_idle
+        );
+        crate::supervision::validate_pix_supervision(sup, &hopr_protocol_pix::SsaReconstructorConfig::default())
+            .expect("a normalized config must satisfy every cross-component invariant, not only representability");
 
         // Which is exactly the condition that makes every deadline representable.
         let now = std::time::Instant::now();
@@ -5588,6 +5624,85 @@ mod tests {
                 "a clamped duration ({dur:?}) must still produce a deadline"
             );
         }
+    }
+
+    /// Normalizing against the default reconstructor is not enough when a caller installs a
+    /// different one.
+    ///
+    /// `SessionManager::new` cannot see the reconstructor — it arrives with the toolbox at `start` —
+    /// so its clamp can only assume the defaults. A caller pairing a shorter
+    /// `unused_verifier_lifetime` with a supervisor config that was valid against the defaults gets
+    /// a supervisor that outlives the state it is waiting on. That must be an error rather than a
+    /// silent clamp: at `start` both halves were chosen deliberately, and overriding one of them
+    /// would be answering a question the caller did not ask.
+    #[test]
+    fn start_rejects_a_supervisor_config_the_installed_reconstructor_cannot_support() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        // Valid against the defaults — 10 min sits well under the default 30 min lifetime — and
+        // therefore untouched by the constructor's clamp.
+        let cfg = SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                supervision: SupervisorConfig {
+                    max_recovery_idle: Duration::from_secs(600),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        crate::supervision::validate_pix_supervision(&cfg.pix_config.supervision, &SsaReconstructorConfig::default())
+            .expect("the fixture must be valid against the default reconstructor");
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> = SessionManager::new(cfg);
+
+        // But the reconstructor actually installed reclaims a cycle after 60 s.
+        let (pix_toolbox, _pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig::default()).into(),
+            SsaReconstructor::new(SsaReconstructorConfig {
+                unused_verifier_lifetime: Duration::from_secs(60),
+                ..Default::default()
+            })
+            .into(),
+        );
+
+        let (tx, _rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+        let started = mgr.start(tx, new_session_tx, Some(pix_toolbox));
+
+        assert!(
+            matches!(started, Err(TransportSessionError::InvalidConfig(_))),
+            "starting with a reconstructor that cannot support the supervisor config must fail, got {started:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Making every duration representable is not sufficient if normalization leaves a supervisor
+    /// waiting after its paired reconstructor has already discarded the cycle. A programmatic
+    /// caller using the default reconstructor must receive a configuration that still satisfies the
+    /// same cross-component lifetime invariants as a file-loaded configuration.
+    #[test]
+    fn programmatic_clamping_preserves_reconstructor_lifetime_invariants() {
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    supervision: SupervisorConfig {
+                        max_recovery_idle: Duration::MAX,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        crate::supervision::validate_pix_supervision(
+            &mgr.cfg.pix_config.supervision,
+            &SsaReconstructorConfig::default(),
+        )
+        .expect(
+            "normalizing a programmatic config must not leave recovery-idle beyond the reconstructor's state lifetime",
+        );
     }
 
     /// Verifies that an incoming session initiation with a PIX quota outside the acceptable range
@@ -6288,6 +6403,57 @@ mod tests {
         Ok(())
     }
 
+    /// The Entry must not admit a successor before a default Exit could possibly have produced its
+    /// early-recovery request.
+    ///
+    /// Recovery is counted in completed polynomials, while emission is windowed. Every fully drained
+    /// window before the one containing the 85% boundary has already emitted both threshold and
+    /// surplus shares. Dividing 85% by the global 1.5x surplus factor therefore underestimates the
+    /// boundary: at the deployed dimensions the first possible early signal is about 86% through
+    /// emission, not 57%.
+    ///
+    /// The gate compares against `min_emission_for_early_recovery` directly, so this test recomputes
+    /// the boundary independently — from the same first principles, but without calling the function
+    /// under test — and checks the two agree. A shared helper would agree with itself.
+    #[test]
+    fn successor_gate_waits_until_default_early_recovery_can_be_reached() {
+        let params = DEFAULT_PIX_PARAMS;
+        let polys = params.polys_per_ssa() as u64;
+        let threshold = params.shares_per_poly() as u64;
+        let surplus = params.surplus_shares() as u64;
+        let window = (hopr_protocol_pix::SHARE_EMISSION_WINDOW as u64).min(polys);
+        let early = SsaReconstructorConfig::default().early_recovery_threshold;
+        let needed = (early * polys as f64).ceil() as u64;
+
+        // `needed` lies in this window. Earlier windows are fully exhausted, including surplus;
+        // inside this one, `threshold - 1` complete passes and `in_window` shares of the threshold
+        // pass are the absolute minimum that can have been emitted before those polynomials recover.
+        let prior_windows = (needed - 1) / window;
+        let prior_polys = prior_windows * window;
+        let current_width = window.min(polys - prior_polys);
+        let in_window = needed - prior_polys;
+        let minimum_emitted = prior_polys * (threshold + surplus) + (threshold - 1) * current_width + in_window;
+        let minimum_fraction = minimum_emitted as f64 / (polys * (threshold + surplus)) as f64;
+
+        let gate = hopr_protocol_pix::min_emission_for_early_recovery(&params, early);
+        assert_eq!(
+            minimum_emitted,
+            gate,
+            "the successor gate opens at {} shares ({:.1}% of emission) against an independently derived earliest \
+             honest request of {minimum_emitted} ({:.1}%); any shortfall permits a hostile Exit to solicit a deposit \
+             before it is earned",
+            gate,
+            gate as f64 / (polys * (threshold + surplus)) as f64 * 100.0,
+            minimum_fraction * 100.0,
+        );
+
+        // And the estimate this replaced is demonstrably below it, so the test would have caught it.
+        assert!(
+            ((early / 1.5) * (polys * (threshold + surplus)) as f64) < gate as f64,
+            "the surplus-factor estimate must sit below the real boundary"
+        );
+    }
+
     /// The Entry's half of the successor gate: a batch asked for before emission has reached the last
     /// cycle of the batch already committed must be refused, committing nothing and depositing
     /// nothing — and the Session must survive it.
@@ -6430,15 +6596,21 @@ mod tests {
         };
         emit_until(&|p| p.is_serving_last_committed())?;
 
+        // The boundary the gate actually uses, recomputed from the same negotiated params.
+        let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
+            &small_pix_params(),
+            SsaReconstructorConfig::default().early_recovery_threshold,
+        );
+
         // Reaching the last cycle is *not* enough, and this is the H2 regression. The index-only gate
         // this replaced admitted a successor batch right here — on the last cycle's first share, ~0 %
         // of the way through the batch — which is nearly a whole cycle of deposits the Exit has not
         // earned, on the one gate whose purpose is to prevent exactly that.
         let progress = generator.emission_progress(&pseudonym).expect("committed");
         assert!(
-            progress.front_fraction() < MIN_SUCCESSOR_EMISSION_FRACTION,
-            "the test must stand at the start of the last cycle, got {}",
-            progress.front_fraction()
+            progress.front_emitted < min_emitted,
+            "the test must stand at the start of the last cycle, got {} of {min_emitted}",
+            progress.front_emitted
         );
         let err = mgr
             .handle_ssa_request(
@@ -6461,7 +6633,7 @@ mod tests {
         );
 
         // Far enough into that last cycle, the same batch is admitted.
-        emit_until(&|p| p.front_fraction() >= MIN_SUCCESSOR_EMISSION_FRACTION)?;
+        emit_until(&|p| p.front_emitted >= min_emitted)?;
         mgr.handle_ssa_request(
             pseudonym,
             SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
@@ -6572,11 +6744,15 @@ mod tests {
         .context("the opening batch must be accepted")?;
         assert_eq!(BATCH as usize, drain_deposits(&mut pix_events));
 
+        let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
+            &small_pix_params(),
+            SsaReconstructorConfig::default().early_recovery_threshold,
+        );
         let mut sent = 0u32;
         for _ in 0..1024 {
             if generator
                 .emission_progress(&pseudonym)
-                .is_some_and(|p| p.is_serving_last_committed() && p.front_fraction() >= MIN_SUCCESSOR_EMISSION_FRACTION)
+                .is_some_and(|p| p.is_serving_last_committed() && p.front_emitted >= min_emitted)
             {
                 break;
             }
