@@ -42,7 +42,14 @@ const FUNDING_AMOUNT: &str = "15000 wxHOPR";
 
 // PIX params: 8 polys × 2 shares × ~1440 bytes = ~23 KB per SSA cycle
 const PIX_POLYS: u16 = 8;
-const PIX_SHARES: u16 = 2;
+const PIX_SHARES: u8 = 2;
+
+/// Surplus shares the Entry is configured with.
+///
+/// Kept far below `SsaGeneratorConfig`'s own default of 20 because every surplus share is another
+/// round-trip packet — see the comment on `additional_shares` below — and because a value that
+/// differs from every default is what makes it visible whether the surplus really crossed the wire.
+const PIX_SURPLUS: u8 = 2;
 
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///
@@ -93,9 +100,9 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
             win_prob: 1.0,
             // Entry needs PIX global config matching session-negotiated (2,2)
             pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
-                num_ssa_parts: 8,
-                ssa_part_size: 2,
-                additional_shares: 2,
+                num_ssa_parts: PIX_POLYS as usize,
+                ssa_part_size: PIX_SHARES as usize,
+                additional_shares: PIX_SURPLUS as usize,
                 ..Default::default()
             }),
             ..Default::default()
@@ -336,7 +343,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
             pix_global_config: Some(hopr_lib::exports::transport::config::PixGlobalConfig {
                 num_ssa_parts: PIX_POLYS as usize,
                 ssa_part_size: PIX_SHARES as usize,
-                additional_shares: 2,
+                additional_shares: PIX_SURPLUS as usize,
                 // Must be raised in step with the Exit below: the batch size is not negotiated, and
                 // an Entry left at its default of 2 refuses a batch of 3 outright.
                 max_ssas_per_request: SSA_BATCH,

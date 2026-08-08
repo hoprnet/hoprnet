@@ -246,12 +246,14 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pix_ssa_quota: value
                 .pix_ssa_quota
                 .map(|(p, s)| {
-                    let to_u16 = |v: u32| -> Result<u16, hopr_api::types::primitive::errors::GeneralError> {
+                    fn narrow<T: TryFrom<u32, Error = std::num::TryFromIntError>>(
+                        v: u32,
+                    ) -> Result<T, hopr_api::types::primitive::errors::GeneralError> {
                         v.try_into().map_err(|e: std::num::TryFromIntError| {
                             hopr_api::types::primitive::errors::GeneralError::NonSpecificError(e.to_string())
                         })
-                    };
-                    Ok(SsaDimensions::new(to_u16(p)?, to_u16(s)?))
+                    }
+                    Ok(SsaDimensions::new(narrow(p)?, narrow(s)?))
                 })
                 .transpose()?,
             flow_control: value.flow_control,

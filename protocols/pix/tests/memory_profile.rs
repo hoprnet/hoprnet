@@ -28,9 +28,9 @@ use std::{
 
 use common::TestSpec;
 use hopr_protocol_pix::{
-    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup,
-    PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor,
-    SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
+    ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId,
+    SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
@@ -41,7 +41,7 @@ use hopr_types::{
 /// Deployed dimensions, mirroring `DEFAULT_PIX_POLYS_PER_SSA` / `DEFAULT_PIX_SHARES_PER_POLY`
 /// in `transport/session/src/types.rs`.
 const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
-const PROD_THRESHOLD: u16 = 64;
+const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 /// Mirrors `MIN_COMMITMENTS_PER_SSA_COMMIT_MSG` in `transport/session/src/manager.rs`.
 const COMMITMENTS_PER_SSA_COMMIT_MSG: usize = 28;

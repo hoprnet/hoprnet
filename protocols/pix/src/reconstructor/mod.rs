@@ -135,8 +135,14 @@ enum Deferral {
 /// Cap on deferred acknowledgements held for a single polynomial.
 ///
 /// A conforming Entry emits `threshold + surplus` shares per polynomial — 96 at the default
-/// dimensions — across all return paths combined, so this cannot be reached without the peer
-/// exceeding its own share budget. Anything above the cap is dropped rather than buffered.
+/// dimensions — across all return paths combined, so at the defaults this cannot be reached without
+/// the peer exceeding its own share budget. Anything above the cap is dropped rather than buffered.
+///
+/// It is *not* unreachable in general: both halves are a byte wide, so a conforming Entry may
+/// legitimately announce up to `255 + 255` and have its excess deferrals silently discarded. Both
+/// values now travel in [`PixParams`](crate::PixParams), so an Exit that cares can compare
+/// `shares_per_poly + surplus_shares` against this cap when it accepts a Session, instead of
+/// discovering the overflow one dropped acknowledgement at a time.
 ///
 /// Public because it is observable behaviour, not an implementation detail: past the cap an
 /// acknowledgement is discarded, so anything measuring or exercising the deferral path has to stay
@@ -1726,8 +1732,8 @@ mod tests {
     #[allow(clippy::type_complexity)]
     fn cycle_with_pending_acks(
         polys: u16,
-        threshold: u16,
-        surplus: usize,
+        threshold: u8,
+        surplus: u8,
         peer: &OffchainKeypair,
     ) -> anyhow::Result<(SsaReconstructor<TestSpec>, SsaId<SimplePseudonym>, Vec<Acknowledgement>)> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -1768,7 +1774,7 @@ mod tests {
         // only 4 can ever be useful. The gap between those two numbers is the whole point — a
         // consumer sizing a progress ratio against packets received would read 6/4.
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
         let peer = OffchainKeypair::random();
         let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(POLYS, THRESHOLD, 1, &peer)?;
         assert_eq!(
@@ -1804,7 +1810,7 @@ mod tests {
         );
         let last = snapshots.last().ok_or(anyhow::anyhow!("no progress emitted"))?;
         assert_eq!(
-            (POLYS * THRESHOLD) as u64,
+            (POLYS as u64 * THRESHOLD as u64),
             last.target_useful_shares,
             "target must be polynomials × threshold, matching the negotiated dimensions"
         );
@@ -1897,7 +1903,7 @@ mod tests {
     #[test]
     fn abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -1976,7 +1982,7 @@ mod tests {
     #[test]
     fn an_ssa_index_stays_usable_after_its_request_is_abandoned() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
         let pseudonym = SimplePseudonym::random();
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
 
@@ -2539,7 +2545,7 @@ mod tests {
     #[test]
     fn verifiers_are_installed_when_the_constant_term_set_completes() -> anyhow::Result<()> {
         const POLYS: u16 = 6;
-        const THRESHOLD: u16 = 4;
+        const THRESHOLD: u8 = 4;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -2590,7 +2596,7 @@ mod tests {
     #[test]
     fn non_constant_coefficients_are_ignored_wherever_they_arrive() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -2677,8 +2683,8 @@ mod tests {
     #[test]
     fn a_corrupted_share_is_reported_once_at_the_threshold_th_share() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 4;
-        const SURPLUS: usize = 2;
+        const THRESHOLD: u8 = 4;
+        const SURPLUS: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -2697,7 +2703,7 @@ mod tests {
 
         // Corrupt the very first share of polynomial 0, then feed its whole budget one at a time.
         let mut invalid_reports: Vec<u64> = Vec::new();
-        for i in 0..THRESHOLD as usize + SURPLUS {
+        for i in 0..THRESHOLD as usize + SURPLUS as usize {
             let (msg, mut share) = next_share_for_poly(&generator, &pseudonym, 0)?;
 
             if i == 0 {
@@ -2753,7 +2759,7 @@ mod tests {
     #[test]
     fn fault_totals_aggregate_over_the_cycle_not_the_peer() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -2775,7 +2781,7 @@ mod tests {
         // Emission is round-robin across the window, and with no surplus every share matters — so
         // the cycle's whole budget is drawn first and grouped, rather than filtered as it comes.
         let mut by_poly: std::collections::BTreeMap<PolynomialIndex, Vec<_>> = Default::default();
-        for _ in 0..POLYS * THRESHOLD {
+        for _ in 0..POLYS as usize * THRESHOLD as usize {
             let msg: [u8; 20] = hopr_types::crypto_random::random_bytes();
             let share = generator
                 .next_share(&pseudonym, &msg)?
@@ -2843,7 +2849,7 @@ mod tests {
     #[test]
     fn shares_arriving_before_their_verifier_are_redeemed_on_installation() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -2891,7 +2897,7 @@ mod tests {
             "no share can resolve before its polynomial is committed"
         );
         assert_eq!(
-            (POLYS * THRESHOLD) as usize,
+            (POLYS as usize * THRESHOLD as usize),
             reconstructor.deferred_ack_count(&ssa_id),
             "every early ack must be bucketed under its own cycle"
         );
@@ -2935,7 +2941,7 @@ mod tests {
     #[test]
     fn a_fault_redeemed_from_deferral_keeps_its_own_relayer() -> anyhow::Result<()> {
         const POLYS: u16 = 1;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         // One surplus share, kept back to give `collector` an `awaiting_acks` entry.
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -3029,7 +3035,7 @@ mod tests {
     #[test]
     fn deferring_against_an_installed_verifier_drains_immediately() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -3333,7 +3339,7 @@ mod tests {
     #[test]
     fn a_cycle_stays_live_while_a_single_polynomial_goes_untouched() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 4;
+        const THRESHOLD: u8 = 4;
         /// Bounded on **both** sides, which is why this is not simply "as large as possible":
         ///
         /// * above `SHARE_SPACING`, or the cycle idles out between two consecutive shares and the test fails for a
@@ -3373,7 +3379,7 @@ mod tests {
 
         let installed_at = std::time::Instant::now();
         let mut recovered = false;
-        for i in 0..(POLYS * THRESHOLD) as usize {
+        for i in 0..(POLYS as usize * THRESHOLD as usize) {
             std::thread::sleep(SHARE_SPACING);
 
             // Shares are emitted polynomial-major, so this is the hand-over to polynomial 1 — the
@@ -3428,7 +3434,7 @@ mod tests {
     #[test]
     fn a_cycle_with_no_shares_at_all_still_expires() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
         const VERIFIER_LIFETIME: std::time::Duration = std::time::Duration::from_millis(500);
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
@@ -3467,7 +3473,7 @@ mod tests {
     #[test]
     fn a_share_naming_a_polynomial_outside_the_cycle_is_rejected() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -3525,7 +3531,7 @@ mod tests {
     #[test]
     fn parts_of_one_cycle_lock_independently() -> anyhow::Result<()> {
         const POLYS: u16 = 4;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,

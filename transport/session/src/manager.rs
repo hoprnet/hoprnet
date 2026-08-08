@@ -23,8 +23,8 @@ use hopr_crypto_packet::{
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    GroupEncoding, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, PixSpec, RawSsaIndex, SsaId, SsaIndex, SsaReconstructor,
-    SsaShareGenerator,
+    GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec, RawSsaIndex, SsaGeneratorConfig, SsaId, SsaIndex,
+    SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
@@ -363,21 +363,20 @@ struct SessionSsaState {
     /// `HalfKeyChallenge`) and by `SsaPartBuilder` (keyed by share identifier), and a
     /// failed polynomial reports once and then goes quiet, so nothing double-counts.
     num_errors: Arc<std::sync::atomic::AtomicUsize>,
-    polys_per_ssa: u16,
-    shares_per_poly: u16,
+    /// The dimensions this Session negotiated, as they went on the wire.
+    params: PixParams,
     /// Serializes the three call sites of [`SessionManager::request_next_ssa`] so that
     /// `peek_index` / fallible work / `increment_index` is never interleaved.
     request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
 }
 
 impl SessionSsaState {
-    pub fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
+    pub fn new(params: PixParams) -> Self {
         Self {
             // SSA index starts from 1, not 0.
             current_index: std::sync::atomic::AtomicU32::new(1).into(),
             num_errors: Default::default(),
-            polys_per_ssa,
-            shares_per_poly,
+            params,
             request_lock: Arc::new(hopr_utils::runtime::prelude::Mutex::new(())),
         }
     }
@@ -414,10 +413,10 @@ impl SessionSsaState {
         SsaIndex::new(old.checked_add(n).expect("just advanced")).expect("non-zero just advanced")
     }
 
-    /// Returns the current SSA index value.
+    /// Priced quota a single SSA of this Session buys, as per [`pix_params_to_quota`].
     #[inline]
     pub const fn quota_per_ssa(&self) -> SsaQuota {
-        pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
+        pix_params_to_quota(self.params.polys_per_ssa(), self.params.shares_per_poly())
     }
 }
 
@@ -432,8 +431,9 @@ impl std::fmt::Debug for SessionSsaState {
                 "num_errors",
                 &self.num_errors.load(std::sync::atomic::Ordering::Relaxed),
             )
-            .field("polys_per_ssa", &self.polys_per_ssa)
-            .field("shares_per_poly", &self.shares_per_poly)
+            .field("polys_per_ssa", &self.params.polys_per_ssa())
+            .field("shares_per_poly", &self.params.shares_per_poly())
+            .field("surplus_shares", &self.params.surplus_shares())
             .finish()
     }
 }
@@ -945,26 +945,29 @@ impl PixToolbox {
 /// ### 1. PIX Parameter Negotiation (Session Initiation)
 ///
 /// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
-/// Address) parameters in the upper 32 bits of the `StartSession.additional_data` field:
-/// `polys_per_ssa` at bits 48–63 and `shares_per_ssa` at bits 32–47. These describe how
-/// many polynomials and shares each SSA will use, which together define the data quota per SSA.
+/// Address) parameters — a [`PixParams`] triple of `polys_per_ssa`, `shares_per_poly` and
+/// `surplus_shares` — into the upper 32 bits of the `StartSession.additional_data` field, via
+/// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares
+/// each SSA will use, which together define the data quota per SSA; the third is how many extra
+/// shares per polynomial the Entry emits to absorb losses, and is not part of the quota.
 ///
-/// Before encoding, the Entry validates that the requested dimensions match the installed
+/// Before encoding, the Entry validates that the requested [`SsaDimensions`] match the installed
 /// [`SsaShareGenerator`]'s configured [`hopr_protocol_pix::SsaGeneratorConfig::polynomials_per_ssa`] and
 /// [`hopr_protocol_pix::SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
 /// for return-path SURBs operates at the same dimensions advertised to the Exit — a
 /// mismatch would let the session proceed with incompatible share parameters. The
 /// validation runs before the initiation challenge slot is reserved, so repeated
-/// misconfigurations cannot exhaust challenge slots.
+/// misconfigurations cannot exhaust challenge slots. The surplus is then taken from that same
+/// generator rather than from the caller, since it is a property of the node, not of the request.
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
+/// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
 /// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈130
 ///   MiB–519 MiB per SSA).
-/// - The maximum allowed polynomials ([`MAX_POLYS_PER_SSA`]) and threshold ([`MAX_POLY_THRESHOLD`]).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
 /// - The Exit only checks the product of the number of polynomials and the threshold, so the Entry can set the
 ///   individual parameters so that they better fit its computing power. The computation is easily parallelizable in the
-///   number of polynomials, but not in threshold.
+///   number of polynomials, but not in threshold. The surplus is not priced into that product.
 ///
 /// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
 ///
@@ -1503,17 +1506,6 @@ where
                 .get()
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
 
-            // Validate dimensions are within protocol limits
-            if !(1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa) || !(2..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa)
-            {
-                return Err(SessionManagerError::Other(anyhow!(
-                    "invalid PIX dimensions: polys={}, shares={}",
-                    polys_per_ssa,
-                    shares_per_ssa,
-                ))
-                .into());
-            }
-
             // Validate that the requested dimensions match the installed generator's
             // configuration. The generator was initialized with fixed dimensions at startup;
             // advertising mismatched values would let the session proceed but produce
@@ -1534,8 +1526,14 @@ where
                 .into());
             }
 
-            let _ = current_ssa_state.set(SessionSsaState::new(polys_per_ssa, shares_per_ssa));
-            additional_data |= (polys_per_ssa as u64) << 48 | (shares_per_ssa as u64) << 32;
+            // The surplus is not part of what the caller asked for — it belongs to the generator —
+            // so the whole triple is taken from there, having just established that its first two
+            // fields are what was requested. This is also where the protocol ranges are enforced.
+            let params = PixParams::try_from(gen_cfg)
+                .map_err(|error| SessionManagerError::Other(anyhow!("invalid PIX dimensions: {error}")))?;
+
+            let _ = current_ssa_state.set(SessionSsaState::new(params));
+            additional_data = params.into_additional_data(additional_data as u32);
         }
 
         let (challenge, _) = insert_into_next_slot(
@@ -1969,7 +1967,10 @@ where
             );
         }
 
-        let (polys_per_ssa, shares_per_poly) = (current_ssa_state.polys_per_ssa, current_ssa_state.shares_per_poly);
+        let (polys_per_ssa, shares_per_poly) = (
+            current_ssa_state.params.polys_per_ssa(),
+            current_ssa_state.params.shares_per_poly(),
+        );
         let indices_for_commitments = ssa_indices.clone();
         // One blocking task for the whole batch rather than one per SSA: each commitment is a single
         // random scalar and one generator multiplication, so the per-task overhead would dominate.
@@ -2056,8 +2057,7 @@ where
         // Session.
         let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
             session_id,
-            current_ssa_state.polys_per_ssa,
-            current_ssa_state.shares_per_poly,
+            current_ssa_state.params,
             exit_commitments,
         ));
 
@@ -2354,34 +2354,49 @@ where
     /// Checks the PIX parameters offered by the Entry during the Session Initiation.
     ///
     /// Returns the validated parameters, or `None` if the offered parameters were rejected.
-    fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<(u16, u16)> {
+    fn check_pix_params(&self, req: &StartInitiation<SessionTarget, HoprSessionCapabilities>) -> Option<PixParams> {
         // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
         if req.capabilities.0.contains(Capability::UsePIX) {
-            // Client offered PIX, so validate the offered parameters
-            let polys_per_ssa = ((req.additional_data & 0xFFFF0000_00000000_u64) >> 48) as u16;
-            let shares_per_ssa = ((req.additional_data & 0x0000FFFF_00000000_u64) >> 32) as u16;
+            // Client offered PIX, so validate the offered parameters. Unpacking is what enforces the
+            // protocol ranges on all three of them.
+            let params = PixParams::try_from_additional_data(req.additional_data)
+                .inspect_err(|error| {
+                    debug!(
+                        challenge = req.challenge,
+                        %error,
+                        "client offered PIX parameters outside the protocol ranges"
+                    )
+                })
+                .ok()?;
 
-            let quota_per_ssa = pix_params_to_quota(polys_per_ssa, shares_per_ssa);
+            let quota_per_ssa = pix_params_to_quota(params.polys_per_ssa(), params.shares_per_poly());
             debug!(
                 challenge = req.challenge,
-                polys_per_ssa,
-                shares_per_ssa,
+                %params,
                 acceptable_range = ?self.cfg.pix_config.quota_range,
                 offered_quota_mb_per_ssa = quota_per_ssa as f64 / (1024.0 * 1024.0),
                 "client offered MB SSA quota"
             );
 
-            let in_quota_range = self.cfg.pix_config.quota_range.contains(&quota_per_ssa);
-            let valid_polys = (1..=MAX_POLYS_PER_SSA).contains(&polys_per_ssa);
-            let valid_shares = (2_u16..=MAX_POLY_THRESHOLD).contains(&shares_per_ssa);
-            (in_quota_range && valid_polys && valid_shares).then_some((polys_per_ssa, shares_per_ssa))
+            // Only the priced quota is compared: the surplus is known now, but deliberately not
+            // charged for. See `pix_params_to_quota`.
+            self.cfg
+                .pix_config
+                .quota_range
+                .contains(&quota_per_ssa)
+                .then_some(params)
         } else if self.cfg.pix_config.enforce_pix {
             // Client didn't offer PIX, but PIX is enforced
             None
         } else {
             // Client didn't offer PIX, and PIX is not enforced, so set default values
             // which are not going to be used.
-            Some((DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD))
+            PixParams::try_new(
+                DEFAULT_POLYS_PER_SSA,
+                DEFAULT_POLY_THRESHOLD,
+                SsaGeneratorConfig::default().surplus_shares,
+            )
+            .ok()
         }
     }
 
@@ -2422,7 +2437,7 @@ where
         }
 
         // Verify if the client offered the right parameters for PIX
-        let Some((client_polys_per_ssa, client_shares_per_ssa)) = self.check_pix_params(&session_req) else {
+        let Some(client_params) = self.check_pix_params(&session_req) else {
             error!(
                 challenge = session_req.challenge,
                 "client offered unacceptable PIX parameters"
@@ -2447,10 +2462,7 @@ where
             return Ok(());
         };
 
-        info!(
-            client_polys_per_ssa,
-            client_shares_per_ssa, "client offered acceptable PIX parameters"
-        );
+        info!(params = %client_params, "client offered acceptable PIX parameters");
 
         let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
@@ -2706,7 +2718,7 @@ where
         if self.pix_toolbox.get().is_some() && session_req.capabilities.0.contains(Capability::UsePIX) {
             // We use the same quota that the client offered
             slot.current_ssa_state
-                .set(SessionSsaState::new(client_polys_per_ssa, client_shares_per_ssa))
+                .set(SessionSsaState::new(client_params))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("session pix state must be uninitialized")))?;
 
             // SessionEstablished was already sent to the Entry (above). If PIX
@@ -3169,34 +3181,45 @@ where
             return Err(error.into());
         }
 
-        let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
+        let Some(our_params) = session_slot.current_ssa_state.get().map(|s| s.params) else {
             return Err(
                 SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {}", msg.session_id)).into(),
             );
         };
 
-        // The Entry enforces that the Exit's SSA parameters match exactly the quota we offered
-        // in the Session Initiation message.  Negotiation (accepting an Exit-chosen quota within
-        // our bounds) is not implemented, so any mismatch is rejected.
+        // The Entry enforces that the Exit's SSA parameters match exactly the ones we offered in the
+        // Session Initiation message.  Negotiation (accepting an Exit-chosen quota within our
+        // bounds) is not implemented, so any mismatch is rejected.
         //
-        // Comparing only the scalar quota is intentional and sufficient, even though
-        // `pix_params_to_quota` (`polys * shares * PAYLOAD_SIZE`) is not injective in
-        // `(polys, shares)`: the quota (product) is the negotiated contract, and the Exit does
-        // not pick the dimensions independently.  Its reconstructor (`new_exit_commitment`) and
-        // the `SsaRequest` params it echoes here both derive from the same `current_ssa_state`,
-        // seeded from the dimensions *we* offered (see `check_pix_params`).  The Exit therefore
-        // always sends back the exact `(polys, shares)` it will reconstruct with, so a matching
-        // quota implies matching dimensions.  A same-product-but-different-shape request could
-        // only come from an Exit running modified code, which would merely break its own recovery.
-        let server_quota = pix_params_to_quota(msg.polys_per_ssa(), msg.shares_per_poly());
-        if quota_per_ssa != server_quota {
+        // The whole triple is compared rather than the scalar quota it implies.  Quota equality was
+        // once argued to be sufficient — the Exit does not pick the dimensions independently, so a
+        // matching product implied matching `(polys, shares)` from any Exit running unmodified code
+        // — but `pix_params_to_quota` deliberately ignores the surplus, so no quota comparison can
+        // say anything about it at all.  Comparing the params is both stricter and simpler, and
+        // costs nothing now that all three travel together.
+        //
+        // Malformed params never reach this comparison as a mismatch: `dimensions()` fails first,
+        // and that failure takes the same refusal path, so the Exit is told either way rather than
+        // being left waiting on a dropped packet.
+        let server_params = match msg.dimensions() {
+            Ok(params) => params,
+            Err(error) => {
+                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                    .await;
+                return Err(
+                    SessionManagerError::Unacceptable(format!("Exit sent malformed PIX parameters: {error}")).into(),
+                );
+            }
+        };
+        if our_params != server_params {
             let error = SessionManagerError::Unacceptable(format!(
-                "Exit sent unacceptable quota {server_quota} (our is {quota_per_ssa})"
+                "Exit sent unacceptable PIX parameters {server_params} (ours are {our_params})"
             ));
             self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
                 .await;
             return Err(error.into());
         }
+        let quota_per_ssa = pix_params_to_quota(our_params.polys_per_ssa(), our_params.shares_per_poly());
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
@@ -3295,7 +3318,7 @@ mod tests {
         internal::routing::SurbMatcher,
         primitive::prelude::Address,
     };
-    use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+    use hopr_protocol_pix::{MAX_POLY_THRESHOLD, SsaGeneratorConfig, SsaReconstructorConfig};
     use hopr_protocol_start::{StartProtocol, StartProtocolDiscriminants};
     use hopr_utils::network_types::prelude::SealedHost;
     use moka::future::FutureExt;
@@ -3303,6 +3326,27 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    /// `StartInitiation::additional_data` as an Entry offering these dimensions would send it.
+    ///
+    /// Tests go through the same packing production does. They used to write the shifts out by
+    /// hand, which meant a change to the layout altered what every one of them was asserting
+    /// without altering a single line of them — plain `u64` literals type-check against anything.
+    fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u64 {
+        PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares)
+            .expect("test dimensions must be valid")
+            .into_additional_data(0)
+    }
+
+    /// The default test dimensions: the smallest legal split, with the surplus the test generators
+    /// below are configured with.
+    fn small_pix_additional_data() -> u64 {
+        pix_additional_data(2, 2, TEST_SURPLUS_SHARES)
+    }
+
+    /// Surplus used by the small test `SsaGeneratorConfig`s below. Non-zero and different from
+    /// [`SsaGeneratorConfig::default`], so a value that failed to cross the wire is visible.
+    const TEST_SURPLUS_SHARES: u8 = 1;
 
     #[test]
     fn session_config_forwards_max_buffered_segments() {
@@ -5262,8 +5306,8 @@ mod tests {
     ///
     /// ## Steps
     /// 1. Bob's manager is configured with `pix_config.quota_range: 0..=2048*1024*1024` (accepts quotas up to ~2 GiB).
-    /// 2. The test encodes `additional_data` as `(polynomials=3000, shares=3000)`, which translates to a quota of
-    ///    9,000,000 — far outside the allowed range.
+    /// 2. The test encodes `additional_data` at the maximum legal dimensions, which translates to a quota of ~4 GiB —
+    ///    outside the allowed range, while each individual dimension is in range.
     /// 3. `handle_incoming_session_initiation` is called with `Capability::UsePIX` and the out-of-range quota.
     /// 4. Bob's manager sends a `SessionError` back to the peer with reason `UnacceptablePixParams`.
     /// 5. The test receives the error on a one-shot channel and asserts `err.reason == UnacceptablePixParams` and
@@ -5307,9 +5351,10 @@ mod tests {
 
         let alice_pseudonym = HoprPseudonym::random();
 
-        // Encode (polys=3000, shares=3000) => quota = 9_000_000 which is way
-        // outside the acceptable range of 0..=2048*1024*1024
-        let additional_data = (u64::from(3000u32) << 48) | (u64::from(3000u32) << 32);
+        // The largest dimensions the protocol admits: quota = 16192 * 255 * 1038 ≈ 3.99 GiB, well
+        // outside the acceptable range of 0..=2048*1024*1024. Both dimensions are individually
+        // legal, so this exercises the quota check rather than the range check that precedes it.
+        let additional_data = pix_additional_data(MAX_POLYS_PER_SSA, MAX_POLY_THRESHOLD, 0);
 
         mgr.handle_incoming_session_initiation(
             alice_pseudonym,
@@ -5452,7 +5497,11 @@ mod tests {
             challenge: MIN_CHALLENGE,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-            additional_data: (u64::from(DEFAULT_POLYS_PER_SSA) << 48) | (u64::from(DEFAULT_POLY_THRESHOLD) << 32),
+            additional_data: pix_additional_data(
+                DEFAULT_POLYS_PER_SSA,
+                DEFAULT_POLY_THRESHOLD,
+                SsaGeneratorConfig::default().surplus_shares,
+            ),
         };
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
@@ -5536,7 +5585,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -5627,7 +5676,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -5721,7 +5770,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -5811,7 +5860,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -5921,7 +5970,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6026,7 +6075,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6088,7 +6137,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6162,7 +6211,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6269,18 +6318,18 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
 
         let session_id = alice_pseudonym;
 
-        // Server sends a quota of (10, 10) while we offered (2, 2) — should be rejected.
+        // Server sends dimensions of (10, 10) while we offered (2, 2) — should be rejected.
         let result = mgr
             .handle_ssa_request(
                 alice_pseudonym,
-                SsaServerCommitmentMessage::new(session_id, 10, 10, BTreeMap::new()),
+                SsaServerCommitmentMessage::new(session_id, PixParams::try_new(10, 10, 0)?, BTreeMap::new()),
             )
             .await;
 
@@ -6373,7 +6422,7 @@ mod tests {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                     capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                    additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                    additional_data: small_pix_additional_data(),
                 },
             )
             .await?;
@@ -6391,7 +6440,11 @@ mod tests {
             let result = mgr
                 .handle_ssa_request(
                     alice_pseudonym,
-                    SsaServerCommitmentMessage::new(session_id, 2, 2, commitments),
+                    SsaServerCommitmentMessage::new(
+                        session_id,
+                        PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?,
+                        commitments,
+                    ),
                 )
                 .await;
 
@@ -6515,7 +6568,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6634,7 +6687,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6745,7 +6798,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -6845,7 +6898,7 @@ mod tests {
             current_ssa_state: Default::default(),
         };
         slot.current_ssa_state
-            .set(SessionSsaState::new(2, 2))
+            .set(SessionSsaState::new(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?))
             .map_err(|_| anyhow!("pix state must be uninitialized"))?;
         mgr.sessions.insert(alice_pseudonym, slot.clone());
 
@@ -7056,7 +7109,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -7202,7 +7255,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;
@@ -7227,6 +7280,93 @@ mod tests {
         Ok(())
     }
 
+    /// The surplus an Entry offers must survive the round trip: stored by the Exit, then echoed
+    /// back in the `SsaRequest` it sends.
+    ///
+    /// It is the one negotiated value with no other consumer — it is not part of the priced quota,
+    /// so no quota check would notice it going missing, and the Exit does not act on it yet. Every
+    /// other dimension is pinned several times over by the checks around it.
+    #[test_log::test(tokio::test)]
+    async fn exit_stores_and_echoes_the_offered_surplus() -> anyhow::Result<()> {
+        use hopr_protocol_pix::SsaReconstructorConfig;
+        use hopr_protocol_start::StartInitiation;
+
+        // Distinct from every default, so a value read from local config instead of the wire is
+        // visibly wrong rather than accidentally right.
+        const OFFERED_SURPLUS: u8 = 37;
+
+        let (pix_toolbox, _) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: TEST_SURPLUS_SHARES,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let echoed: Arc<std::sync::Mutex<Vec<PixParams>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let echoed_clone = echoed.clone();
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport.expect_send_message().returning(move |_, data| {
+            if let Ok(HoprStartProtocol::SsaRequest(req)) = HoprStartProtocol::try_from(data.data)
+                && let Ok(params) = req.dimensions()
+            {
+                echoed_clone.lock().unwrap().push(params);
+            }
+            Box::pin(async { Ok(()) })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: pix_additional_data(2, 2, OFFERED_SURPLUS),
+            },
+        )
+        .await?;
+
+        let expected = PixParams::try_new(2, 2, OFFERED_SURPLUS)?;
+
+        let slot = mgr.sessions.get(&alice_pseudonym).context("session must exist")?;
+        let ssa_state = slot.current_ssa_state.get().context("pix state must be set")?;
+        assert_eq!(
+            expected, ssa_state.params,
+            "the Exit must keep the surplus the Entry offered, not its own"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        let echoed = echoed.lock().unwrap().clone();
+        assert_eq!(
+            vec![expected],
+            echoed,
+            "the SsaRequest must echo back exactly what was offered"
+        );
+
+        Ok(())
+    }
+
     /// Verifies that `check_pix_params` rejects out-of-bounds parameters that pass the
     /// quota-range check but exceed the protocol limits.
     ///
@@ -7242,41 +7382,51 @@ mod tests {
                 ..Default::default()
             });
 
-        // polys_per_ssa > MAX_POLYS_PER_SSA (16192) with valid quota -> should reject
-        let result = mgr.check_pix_params(&StartInitiation {
+        let offer = |additional_data: u64| StartInitiation {
             challenge: 0,
-            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
             capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (u64::from(65535u16) << 48) | (u64::from(128u16) << 32),
-        });
-        assert!(result.is_none(), "should reject polys_per_ssa > MAX_POLYS_PER_SSA");
+            additional_data,
+        };
+        // Packed by hand rather than through `pix_additional_data`, because that helper refuses to
+        // build the very values under test. The layout it mirrors is pinned in `PixParams`' own
+        // tests.
+        let packed = |polys: u16, shares: u8, surplus: u8| {
+            ((polys as u64) << 48) | ((shares as u64) << 40) | ((surplus as u64) << 32)
+        };
 
-        // shares_per_ssa < 2 with valid quota -> should reject
-        let result = mgr.check_pix_params(&StartInitiation {
-            challenge: 0,
-            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (u64::from(1u16) << 48) | (u64::from(1u16) << 32),
-        });
-        assert!(result.is_none(), "should reject shares_per_ssa < 2");
+        // polys_per_ssa > MAX_POLYS_PER_SSA (16192), and zero, with a valid quota -> should reject
+        for polys in [0, MAX_POLYS_PER_SSA + 1, u16::MAX] {
+            assert!(
+                mgr.check_pix_params(&offer(packed(polys, 128, 0))).is_none(),
+                "should reject polys_per_ssa {polys}"
+            );
+        }
 
-        // shares_per_ssa > MAX_POLY_THRESHOLD (4096) with valid quota -> should reject
-        let result = mgr.check_pix_params(&StartInitiation {
-            challenge: 0,
-            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (u64::from(1u16) << 48) | (u64::from(5000u16) << 32),
-        });
-        assert!(result.is_none(), "should reject shares_per_ssa > MAX_POLY_THRESHOLD");
+        // shares_per_poly < MIN_POLY_THRESHOLD with a valid quota -> should reject. There is no
+        // matching upper-bound case: the threshold is a byte on the wire, so `MAX_POLY_THRESHOLD`
+        // cannot be exceeded by anything a peer is able to send.
+        for shares in [0, 1] {
+            assert!(
+                mgr.check_pix_params(&offer(packed(8192, shares, 0))).is_none(),
+                "should reject shares_per_poly {shares}"
+            );
+        }
 
-        // Valid params should still be accepted
-        let result = mgr.check_pix_params(&StartInitiation {
-            challenge: 0,
-            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
-            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-            additional_data: (u64::from(8192u16) << 48) | (u64::from(128u16) << 32),
-        });
-        assert!(result.is_some(), "should accept valid params");
+        // Valid params should still be accepted, and arrive intact — including the surplus, which
+        // no other check looks at and which would therefore be free to go missing.
+        let accepted = mgr
+            .check_pix_params(&offer(packed(8192, 128, 37)))
+            .context("should accept valid params")?;
+        assert_eq!(PixParams::try_new(8192, 128, 37)?, accepted);
+
+        // Every surplus a byte can hold is legal.
+        for surplus in [0, 1, u8::MAX] {
+            assert_eq!(
+                Some(PixParams::try_new(8192, 128, surplus)?),
+                mgr.check_pix_params(&offer(packed(8192, 128, surplus)))
+            );
+        }
 
         Ok(())
     }
@@ -7329,7 +7479,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: (u64::from(2u32) << 48) | (u64::from(2u32) << 32),
+                additional_data: small_pix_additional_data(),
             },
         )
         .await?;

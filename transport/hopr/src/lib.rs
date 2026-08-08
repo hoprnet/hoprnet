@@ -856,11 +856,17 @@ where
         // node startup into a panic.
         validator::Validate::validate(&self.cfg.pix)
             .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
+        // Checked rather than `as`-cast: the validation above already bounds all three, but a
+        // truncating cast would turn a future widening of any of those ranges into a silently
+        // wrong-but-valid-looking dimension rather than a startup error.
+        fn narrow<T: TryFrom<usize>>(value: usize, field: &str) -> errors::Result<T> {
+            T::try_from(value).map_err(|_| HoprTransportError::Api(format!("PIX {field} out of range: {value}")))
+        }
         let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
             hopr_protocol_pix::SsaGeneratorConfig {
-                polynomials_per_ssa: self.cfg.pix.num_ssa_parts as u16,
-                threshold: self.cfg.pix.ssa_part_size as u16,
-                surplus_shares: self.cfg.pix.additional_shares,
+                polynomials_per_ssa: narrow(self.cfg.pix.num_ssa_parts, "num_ssa_parts")?,
+                threshold: narrow(self.cfg.pix.ssa_part_size, "ssa_part_size")?,
+                surplus_shares: narrow(self.cfg.pix.additional_shares, "additional_shares")?,
             },
         ));
 
