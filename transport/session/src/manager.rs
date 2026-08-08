@@ -365,7 +365,7 @@ struct SessionSsaState {
     /// The dimensions this Session negotiated, as they went on the wire.
     params: PixParams,
     /// Serializes the three call sites of [`SessionManager::request_next_ssa`] so that
-    /// `peek_index` / fallible work / `increment_index` is never interleaved.
+    /// `peek_index` / fallible work / `advance_index` is never interleaved.
     request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
 }
 
@@ -390,7 +390,7 @@ impl SessionSsaState {
     /// Returns the current index without consuming it.
     ///
     /// Use this to inspect the next index before fallible operations;
-    /// call [`increment_index`](Self::increment_index) to commit *after* they succeed.
+    /// call [`advance_index`](Self::advance_index) to commit *after* they succeed.
     pub fn peek_index(&self) -> SsaIndex {
         SsaIndex::new(self.current_index.load(std::sync::atomic::Ordering::Relaxed)).expect("ssa index cannot be 0")
     }
@@ -2203,7 +2203,7 @@ where
                 // Skip stale events from a previous SSA cycle (late arrivals after
                 // SsaAlmostRecovered advanced the current index).  current_index is
                 // the *next* index to allocate; `request_next_ssa` peeks it and only increments
-                // (via `increment_index`) after the SsaRequest send succeeds, so the active
+                // (via `advance_index`) after the SsaRequest send succeeds, so the active
                 // cycle's index is current_index - 1.
                 if ssa_id.ssa_index().get()
                     != state
@@ -5918,7 +5918,7 @@ mod tests {
     /// threshold and full recovery, respectively. In non-deterministic environments (Tokio task
     /// scheduling, shared thread pools), both can arrive in quick succession — sometimes racing
     /// inside [`SessionManager::dispatch_pix_event`]. The `request_lock` ensures that only one
-    /// thread passes through `peek_index → fallible work → increment_index`; the other sees a stale
+    /// thread passes through `peek_index → fallible work → advance_index`; the other sees a stale
     /// index (the cycle advanced before it acquired the lock) and becomes a no-op via the
     /// [stale-cycle guard](SessionManager::request_next_ssa).
     ///
