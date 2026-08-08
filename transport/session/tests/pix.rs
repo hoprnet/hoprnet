@@ -20,8 +20,8 @@ use hopr_protocol_pix::{
 use hopr_protocol_start::StartProtocolDiscriminants;
 use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
-    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixToolbox, SessionClientConfig, SessionManager,
-    SessionManagerConfig, SessionTarget, SsaDimensions, SupervisorConfig, SurbBalancerConfig,
+    HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
+    SessionManager, SessionManagerConfig, SessionTarget, SupervisorConfig, SurbBalancerConfig,
     testing::{mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -259,10 +259,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(SsaDimensions::new(
-                        ssa_gen_config.polynomials_per_ssa,
-                        ssa_gen_config.threshold,
-                    )),
+                    pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -645,10 +642,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(SsaDimensions::new(
-                        ssa_gen_config.polynomials_per_ssa,
-                        ssa_gen_config.threshold,
-                    )),
+                    pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -867,10 +861,7 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
                 pseudonym: alice_pseudonym.into(),
                 capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                 surb_management: None,
-                pix_ssa_quota: Some(SsaDimensions::new(
-                    ssa_gen_config.polynomials_per_ssa,
-                    ssa_gen_config.threshold,
-                )),
+                pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
                 return_path_options: RoutingOptions::Hops(1.try_into()?),
                 ..Default::default()
             },

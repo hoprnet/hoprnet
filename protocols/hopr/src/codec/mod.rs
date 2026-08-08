@@ -379,7 +379,7 @@ mod tests {
         // Need to generate multiple messages to recover the SSA
         let threshold = f.sender.ssa_gen.config().threshold as usize;
         let num_polys = f.sender.ssa_gen.config().polynomials_per_ssa as usize;
-        let surplus = f.sender.ssa_gen.config().surplus_shares;
+        let surplus = f.sender.ssa_gen.config().surplus_shares as usize;
         // Shares are emitted round-robin across the emission window, so every polynomial reaches
         // `threshold` inside the same round and the SSA completes on the last share of round
         // `threshold` — exactly the `polys × threshold` packets the agreed quota is priced on.
@@ -499,7 +499,7 @@ mod tests {
 
         let threshold = f.sender.ssa_gen.config().threshold as usize;
         let num_polys = f.sender.ssa_gen.config().polynomials_per_ssa as usize;
-        let surplus = f.sender.ssa_gen.config().surplus_shares;
+        let surplus = f.sender.ssa_gen.config().surplus_shares as usize;
         let shares_per_poly = threshold + surplus;
         let msgs_per_commitment = num_polys * shares_per_poly;
 

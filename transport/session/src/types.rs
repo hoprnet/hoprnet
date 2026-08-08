@@ -99,7 +99,15 @@ pub type HoprStartProtocol =
 /// The SessionManager always counts in packets, not in bytes, when it comes to quota management.
 pub type SsaQuota = u64;
 
-pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u16) -> SsaQuota {
+/// The *priced* quota: what a single SSA deposit buys.
+///
+/// Deliberately excludes [`PixParams::surplus_shares`](hopr_protocol_pix::PixParams::surplus_shares),
+/// even though the surplus is now negotiated and known to both sides. The surplus exists to absorb
+/// lost shares, so an Exit delivers up to `polys × (threshold + surplus)` packets per cycle while
+/// charging for `polys × threshold` — the ratio is documented on `PixGlobalConfig::additional_shares`
+/// in `hopr-transport`. Pricing it would move [`DEFAULT_PIX_SSA_QUOTA`] and every default derived
+/// from it, so it is left as a separate decision.
+pub(crate) const fn pix_params_to_quota(polys_per_ssa: u16, shares_per_poly: u8) -> SsaQuota {
     polys_per_ssa as SsaQuota * shares_per_poly as SsaQuota * HoprPacket::PAYLOAD_SIZE as SsaQuota
 }
 
@@ -150,7 +158,7 @@ pub const DEFAULT_PIX_POLYS_PER_SSA: u16 = hopr_protocol_pix::DEFAULT_POLYS_PER_
 ///
 /// See [`DEFAULT_PIX_POLYS_PER_SSA`] for why this is shared between both sides, why it is kept
 /// small relative to the polynomial count, and why it is an alias rather than a literal.
-pub const DEFAULT_PIX_SHARES_PER_POLY: u16 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
+pub const DEFAULT_PIX_SHARES_PER_POLY: u8 = hopr_protocol_pix::DEFAULT_POLY_THRESHOLD;
 
 /// Nominal per-SSA data quota implied by the default PIX dimensions.
 ///
@@ -163,48 +171,6 @@ pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(DEFAULT_PIX_POLY
 ///
 /// Preserves the 4× span the range had when its bounds were hard-coded.
 pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
-
-/// PIX dimensions a Session offers: how many polynomials an SSA is split into, and how many shares
-/// reconstruct each one.
-///
-/// Named fields rather than a `(u16, u16)` tuple, because the two are interchangeable to the type
-/// system and *not* interchangeable to the protocol — while their product, which is all the Exit
-/// compares, is identical either way. A transposition therefore announced valid-looking dimensions
-/// against a correct quota. The only thing that caught it was
-/// [`SessionManager::new_session`](crate::SessionManager::new_session) requiring both to match the
-/// locally installed generator exactly, which is a check about something else entirely and would not
-/// survive a caller that took its dimensions from elsewhere.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SsaDimensions {
-    /// Number of polynomials the SSA secret is split across.
-    pub polys_per_ssa: u16,
-    /// Shares required to reconstruct one polynomial.
-    pub shares_per_poly: u16,
-}
-
-impl SsaDimensions {
-    /// The dimensions implied by [`DEFAULT_PIX_POLYS_PER_SSA`] and [`DEFAULT_PIX_SHARES_PER_POLY`].
-    pub const DEFAULT: Self = Self::new(DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY);
-
-    pub const fn new(polys_per_ssa: u16, shares_per_poly: u16) -> Self {
-        Self {
-            polys_per_ssa,
-            shares_per_poly,
-        }
-    }
-
-    /// Per-SSA data quota these dimensions imply.
-    pub const fn quota(&self) -> SsaQuota {
-        pix_params_to_quota(self.polys_per_ssa, self.shares_per_poly)
-    }
-
-    /// Useful shares needed to recover the whole SSA.
-    ///
-    /// A share count, unlike [`quota`](Self::quota), which is the byte volume those shares pay for.
-    pub const fn target_useful_shares(&self) -> u64 {
-        self.polys_per_ssa as u64 * self.shares_per_poly as u64
-    }
-}
 
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

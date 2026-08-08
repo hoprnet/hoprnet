@@ -493,7 +493,7 @@ pub struct SupervisorConfig {
 }
 
 // ---------------------------------------------------------------------------
-// SsaDimensions
+// PixParams
 // ---------------------------------------------------------------------------
 
 /// PIX dimensions agreed upon during session negotiation.
@@ -502,7 +502,13 @@ pub struct SupervisorConfig {
 /// pair, which meant the same thing as the one a Session offers but named it differently and could
 /// not be handed across the boundary without a field-by-field copy. `target_useful_shares` moved
 /// onto the shared type with it.
-pub use crate::types::SsaDimensions;
+///
+/// That shared type is now the one the two nodes actually negotiate, down to the byte layout it is
+/// packed into — so it carries a third field, the surplus, which the supervisor does not read. The
+/// supervisor's own arithmetic is unchanged: the surplus is by definition the shares that arrive
+/// after a polynomial is already complete, so it never enters
+/// [`target_useful_shares`](PixParams::target_useful_shares).
+pub use hopr_protocol_pix::PixParams;
 
 // ---------------------------------------------------------------------------
 // SessionPixEvent
@@ -554,8 +560,7 @@ pub enum SessionPixAction {
     /// registration it made.
     RequestSsa {
         ssa_ids: Vec<SsaId<HoprPseudonym>>,
-        polys: u16,
-        threshold: u16,
+        params: PixParams,
     },
     /// Release the service gate (from predeposit to funded mode).
     ReleaseService,
@@ -923,7 +928,7 @@ mod tests {
 
         let pseudonym = HoprPseudonym::random();
         let ssa_id = SsaId::new(pseudonym, hopr_protocol_pix::SsaIndex::MIN);
-        let dims = SsaDimensions::new(10, 5);
+        let dims = PixParams::try_new(10, 5, 7)?;
         let now = std::time::Instant::now();
 
         let (mut supervisor, _) = SessionPixSupervisor::new(SupervisorConfig::default(), dims, pseudonym, now);

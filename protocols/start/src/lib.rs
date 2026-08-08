@@ -86,6 +86,12 @@ pub struct StartInitiation<T, C> {
     /// This might also contain information required for the PIX protocol.
     pub capabilities: C,
     /// Additional options (might be `capabilities` dependent), ignored if `0x0000000000000000`.
+    ///
+    /// When PIX is offered, the upper 32 bits are the
+    /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
+    /// [`PixParams::into_additional_data`](hopr_protocol_pix::PixParams::into_additional_data) —
+    /// and the lower 32 bits are the SURB balancer target. The field is then fully allocated;
+    /// there is no room left in it to negotiate anything further.
     pub additional_data: u64,
 }
 
@@ -313,9 +319,13 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
 pub struct SsaServerCommitmentMessage<I, G> {
     /// Session ID.
     pub session_id: I,
-    /// Parameters of the PIX protocol the server requires.
+    /// Parameters of the PIX protocol the server requires, packed by
+    /// [`PixParams::to_u32`](hopr_protocol_pix::PixParams::to_u32).
     ///
-    /// Upper half is the number of polynomials per SSA, lower half is the polynomial threshold (= degree + 1).
+    /// Deliberately the raw word rather than a [`PixParams`](hopr_protocol_pix::PixParams): the
+    /// codec stays total, so an out-of-range value from a peer reaches the session layer and is
+    /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
+    /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
@@ -325,25 +335,22 @@ impl<I, G> SsaServerCommitmentMessage<I, G> {
     /// Convenience constructor for creating a new `SsaServerCommitmentMessage`.
     pub fn new(
         session_id: I,
-        polys_per_ssa: u16,
-        shares_per_poly: u16,
+        params: hopr_protocol_pix::PixParams,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
     ) -> Self {
         Self {
             session_id,
-            params: ((polys_per_ssa as u32) << 16) | shares_per_poly as u32,
+            params: params.to_u32(),
             commitments: commitments.into_iter().collect(),
         }
     }
 
-    /// Number of polynomials required to reconstruct an SSA.
-    pub fn polys_per_ssa(&self) -> u16 {
-        (self.params >> 16) as u16
-    }
-
-    /// Number of shares required to reconstruct a single polynomial.
-    pub fn shares_per_poly(&self) -> u16 {
-        self.params as u16
+    /// The PIX dimensions this request was made under.
+    ///
+    /// Fails if the peer packed values outside the protocol ranges.
+    pub fn dimensions(&self) -> errors::Result<hopr_protocol_pix::PixParams> {
+        hopr_protocol_pix::PixParams::try_from_u32(self.params)
+            .map_err(|error| StartProtocolError::ParseError(format!("ssa_req.params: {error}")))
     }
 }
 
@@ -1019,6 +1026,41 @@ mod tests {
         Ok(())
     }
 
+    /// The round-trip test above deliberately uses an out-of-range sentinel to prove the codec is
+    /// total. This one goes through the constructor and the accessor, which is what production uses
+    /// and what actually pins the packed layout across `encode`/`decode`.
+    #[test]
+    fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
+        let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32)?;
+        let msg_1 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage::new(
+            0xfeedbeef_u32,
+            params,
+            [(1.try_into()?, [0u8; 33]), (2.try_into()?, [1u8; 33])],
+        ));
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::decode(tag, &msg)?;
+        assert_eq!(msg_1, msg_2);
+
+        let StartProtocol::SsaRequest(decoded) = msg_2 else {
+            anyhow::bail!("expected an SsaRequest");
+        };
+        assert_eq!(params, decoded.dimensions()?);
+        Ok(())
+    }
+
+    /// A peer can put anything in the `params` word, so reading it must fail rather than silently
+    /// yield nonsense dimensions.
+    #[test]
+    fn start_protocol_ssa_request_dimensions_should_reject_out_of_range_params() {
+        let msg: SsaServerCommitmentMessage<u32, [u8; 33]> = SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0xfeedbeef,
+            commitments: Default::default(),
+        };
+        assert!(matches!(msg.dimensions(), Err(StartProtocolError::ParseError(_))));
+    }
+
     #[test]
     fn start_protocol_session_ssa_request_message_should_fail_on_too_many_commitments() -> anyhow::Result<()> {
         let mut commitments = std::collections::BTreeMap::new();
@@ -1342,7 +1384,7 @@ mod tests {
     #[test]
     fn start_protocol_ssa_commit_messages_should_cover_every_polynomial_exactly_once() -> anyhow::Result<()> {
         const POLYS: u16 = 2048;
-        const THRESHOLD: u16 = 64;
+        const THRESHOLD: u8 = 64;
 
         let generator = SsaShareGenerator::<HoprPixSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
