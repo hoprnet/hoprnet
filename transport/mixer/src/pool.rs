@@ -69,10 +69,11 @@ impl<T> Entry<T> {
 /// When no delay is configured (`is_passthrough`) the pool is drained in enqueue order without
 /// mixing, preserving FIFO semantics.
 ///
-/// Performance: the release probability is memoryless and depends only on `delta` (shared by
-/// the whole pool this tick), so `1 - e^(-delta/mean)` is computed **once** rather than per
-/// packet; and the jitter draw is taken only for packets actually inside the `[cap-jitter, cap)`
-/// window.
+/// Performance: for the common case (a packet buffered since before the previous sweep) the
+/// release probability depends only on `delta` — shared by the whole pool this tick — so
+/// `1 - e^(-delta/mean)` is computed **once** and reused. Only a packet that arrived mid-interval
+/// (eligible for less than `delta`) needs its own `1 - e^(-eligible_for/mean)`. The jitter draw is
+/// likewise taken only for packets actually inside the `[cap-jitter, cap)` window.
 pub(crate) fn sweep<T>(
     pool: &mut Vec<Entry<T>>,
     cfg: &MixerConfig,
