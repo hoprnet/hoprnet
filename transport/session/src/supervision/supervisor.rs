@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use hopr_api::{HoprBalance, types::internal::prelude::HoprPseudonym};
 use hopr_protocol_pix::{SsaId, SsaIndex, SsaRecoveryProgress};
 
-use super::{SessionPixAction, SessionPixCloseReason, SessionPixEvent, SsaDimensions, SupervisorConfig};
+use super::{PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig};
 
 // ---------------------------------------------------------------------------
 // SsaPhase
@@ -119,7 +119,7 @@ impl PerSsaState {
 /// Deterministic core of the PIX session supervisor.
 pub struct SessionPixSupervisor {
     pub(crate) cfg: SupervisorConfig,
-    pub(crate) dims: SsaDimensions,
+    pub(crate) dims: PixParams,
     pub(crate) pseudonym: HoprPseudonym,
     pub(crate) closed: bool,
     next_ssa_index: u32,
@@ -151,7 +151,7 @@ impl SessionPixSupervisor {
     /// Create a new supervisor and emit the first `RequestSsa` action.
     pub fn new(
         cfg: SupervisorConfig,
-        dims: SsaDimensions,
+        dims: PixParams,
         pseudonym: HoprPseudonym,
         now: Instant,
     ) -> (Self, Vec<SessionPixAction>) {
@@ -962,8 +962,7 @@ impl SessionPixSupervisor {
 
         vec![SessionPixAction::RequestSsa {
             ssa_ids,
-            polys: self.dims.polys_per_ssa,
-            threshold: self.dims.shares_per_poly,
+            params: self.dims,
         }]
     }
 
@@ -1047,8 +1046,13 @@ mod tests {
         }
     }
 
-    fn dims(polys: u16, threshold: u16) -> SsaDimensions {
-        SsaDimensions::new(polys, threshold)
+    /// Test dimensions, with a deliberately non-zero surplus.
+    ///
+    /// The supervisor must ignore the surplus entirely — it counts *useful* shares, and a surplus
+    /// share is by definition one that arrives after its polynomial is already complete. A non-zero
+    /// value here is what would make a leak into `target_useful_shares` visible; zero would hide it.
+    fn dims(polys: u16, threshold: u8) -> PixParams {
+        PixParams::try_new(polys, threshold, 7).expect("test dimensions must be valid")
     }
 
     fn pseudonym() -> HoprPseudonym {
@@ -1116,13 +1120,8 @@ mod tests {
 
         assert_eq!(actions.len(), 1);
         match &actions[0] {
-            SessionPixAction::RequestSsa {
-                ssa_ids,
-                polys,
-                threshold,
-            } => {
-                assert_eq!(*polys, 10);
-                assert_eq!(*threshold, 5);
+            SessionPixAction::RequestSsa { ssa_ids, params } => {
+                assert_eq!(*params, dims(10, 5));
                 assert_eq!(ssa_ids.len(), 1, "the default batch is a single SSA");
                 assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(1).unwrap());
             }
@@ -3144,8 +3143,7 @@ mod tests {
         let actions = sup.action_result(
             &SessionPixAction::RequestSsa {
                 ssa_ids: vec![ssa_id(p, 1)],
-                polys: 10,
-                threshold: 5,
+                params: dims(10, 5),
             },
             false,
             now,

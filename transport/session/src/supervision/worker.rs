@@ -16,7 +16,7 @@ use hopr_protocol_pix::SsaRecoveryProgress;
 use hopr_utils::runtime::prelude::spawn;
 
 use super::{
-    SessionPixAction, SessionPixCloseReason, SessionPixEvent, SsaDimensions, SupervisorConfig, gate::ServiceGate,
+    PixParams, SessionPixAction, SessionPixCloseReason, SessionPixEvent, SupervisorConfig, gate::ServiceGate,
     supervisor::SessionPixSupervisor,
 };
 
@@ -127,7 +127,7 @@ pub enum WorkerCommand {
 /// Spawn a supervisor worker and return its handle and action driver receiver.
 pub fn spawn_supervisor_worker(
     cfg: SupervisorConfig,
-    dims: SsaDimensions,
+    dims: PixParams,
     pseudonym: hopr_api::types::internal::prelude::HoprPseudonym,
     now: Instant,
 ) -> (SessionPixSupervisorHandle, ActionRx) {
@@ -345,8 +345,9 @@ mod tests {
         }
     }
 
-    fn dims() -> SsaDimensions {
-        SsaDimensions::new(10, 5)
+    /// See the identically-named helper in [`super::supervisor`] for why the surplus is non-zero.
+    fn dims() -> PixParams {
+        PixParams::try_new(10, 5, 7).expect("test dimensions must be valid")
     }
 
     #[tokio::test]
@@ -493,8 +494,7 @@ mod tests {
             .send_action_result(
                 SessionPixAction::RequestSsa {
                     ssa_ids: vec![SsaId::new(p, SsaIndex::new(1).unwrap())],
-                    polys: 10,
-                    threshold: 5,
+                    params: dims(),
                 },
                 false,
             )
@@ -628,8 +628,7 @@ mod tests {
                 .send_action_result(
                     SessionPixAction::RequestSsa {
                         ssa_ids: vec![id],
-                        polys: 10,
-                        threshold: 5,
+                        params: dims(),
                     },
                     true,
                 )

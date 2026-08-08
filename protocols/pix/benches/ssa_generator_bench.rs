@@ -35,17 +35,17 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// [`DEFAULT_POLY_THRESHOLD`], so this is the negotiated value by construction. It was a
 /// literal 64 while the pix crate still said 128, which is exactly the drift the aliasing
 /// removed.
-const PROD_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
+const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 // These values all correspond to a 512 MB quota (given ca. 1 kb HOPR packet payload capacity).
 // The last entry of each is the deployed value, so the sweep is a superset of the default set.
 #[cfg(feature = "all-benchmarks")]
-const THRESHOLDS: [u16; 4] = [8, 16, 32, PROD_THRESHOLD];
+const THRESHOLDS: [u8; 4] = [8, 16, 32, PROD_THRESHOLD];
 #[cfg(feature = "all-benchmarks")]
 const POLYNOMIALS: [u16; 4] = [65535, 32768, 16384, PROD_POLYS_PER_SSA];
 
 #[cfg(not(feature = "all-benchmarks"))]
-const THRESHOLDS: [u16; 1] = [PROD_THRESHOLD];
+const THRESHOLDS: [u8; 1] = [PROD_THRESHOLD];
 #[cfg(not(feature = "all-benchmarks"))]
 const POLYNOMIALS: [u16; 1] = [PROD_POLYS_PER_SSA];
 
@@ -162,7 +162,8 @@ fn bench_next_share(c: &mut Criterion) {
                 };
                 // A commitment yields `polys * (threshold + surplus)` shares before the
                 // generator runs dry and starts returning `Ok(None)`.
-                let shares_per_commitment = NEXT_SHARE_BENCH_POLYS as usize * (threshold as usize + cfg.surplus_shares);
+                let shares_per_commitment =
+                    NEXT_SHARE_BENCH_POLYS as usize * (threshold as usize + cfg.surplus_shares as usize);
                 assert!(
                     shares_per_commitment >= NEXT_SHARE_BATCH,
                     "one commitment must cover a whole batch"

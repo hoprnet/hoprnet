@@ -9,8 +9,9 @@ use vsss_rs::{
 };
 
 use crate::{
-    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA,
-    PixGroup, PixScalar, PixSpec, PolynomialIndex, SsaPartCommitment, errors,
+    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, DEFAULT_SURPLUS_SHARES,
+    MAX_POLY_THRESHOLD, MAX_POLYS_PER_SSA, MIN_POLY_THRESHOLD, PixGroup, PixScalar, PixSpec, PolynomialIndex,
+    SsaPartCommitment, errors,
     errors::PixError,
     traits::EntryShareGenerator,
     types::{
@@ -132,10 +133,11 @@ pub struct SsaGeneratorConfig {
     pub polynomials_per_ssa: u16,
     /// Minimum number of shares required to reconstruct each SSA polynomial.
     ///
-    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be between 2 and [`MAX_POLY_THRESHOLD`].
+    /// Default is [`DEFAULT_POLY_THRESHOLD`], must be at least [`MIN_POLY_THRESHOLD`]. The upper
+    /// bound [`MAX_POLY_THRESHOLD`] is the width of the field.
     #[default(DEFAULT_POLY_THRESHOLD)]
-    #[validate(range(min = 2, max = MAX_POLY_THRESHOLD))]
-    pub threshold: u16,
+    #[validate(range(min = MIN_POLY_THRESHOLD, max = MAX_POLY_THRESHOLD))]
+    pub threshold: u8,
     /// Additional number of shares to generate beyond the threshold for redundancy.
     ///
     /// Covers *lost* shares only: the Exit reconstructs from the first `threshold` distinct shares
@@ -144,10 +146,16 @@ pub struct SsaGeneratorConfig {
     /// noticed once it has already poisoned the interpolation. See
     /// [`SsaPartCommitment`].
     ///
-    /// Default is 20, must be between 0 and 4096.
-    #[default(20)]
-    #[validate(range(min = 0, max = 4096))]
-    pub surplus_shares: usize,
+    /// Emitting them is unconditional: a polynomial leaves the queue at `threshold + surplus`
+    /// shares, whether or not any were lost, so the Exit serves this many packets per polynomial in
+    /// every case. That is why the surplus is part of the per-SSA quota rather than free service —
+    /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
+    ///
+    /// Default is [`DEFAULT_SURPLUS_SHARES`]. The whole range of the field is legal, so unlike the
+    /// other two this one needs no validator — it shares the lower half of the negotiated
+    /// [`PixParams`](crate::PixParams) word with `threshold`, and a byte is what fits there.
+    #[default(DEFAULT_SURPLUS_SHARES)]
+    pub surplus_shares: u8,
 }
 
 /// Generator for Session Stealth Address (SSA) shares distributed over Single Use Reply Blocks (SURBs).
@@ -237,7 +245,7 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
             front_run,
             ..
         } = &mut *entry;
-        let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares;
+        let max_shares_per_poly = self.cfg.threshold as usize + self.cfg.surplus_shares as usize;
 
         while !poly_queue.is_empty() {
             // The window is always the front of the queue: `new_ssa_commitment` appends, and an
@@ -465,10 +473,10 @@ mod tests {
     #[test]
     fn emission_never_crosses_a_cycle_boundary_early() -> anyhow::Result<()> {
         const POLYS: u16 = 4;
-        const THRESHOLD: u16 = 2;
-        const SURPLUS: usize = 1;
+        const THRESHOLD: u8 = 2;
+        const SURPLUS: u8 = 1;
         const BATCH: u32 = 3;
-        let per_poly = THRESHOLD as usize + SURPLUS;
+        let per_poly = THRESHOLD as usize + SURPLUS as usize;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -539,7 +547,7 @@ mod tests {
     #[test]
     fn emission_progress_lags_the_commitment_index_across_a_batch() -> anyhow::Result<()> {
         const POLYS: u16 = SHARE_EMISSION_WINDOW as u16 + 44;
-        const THRESHOLD: u16 = 2;
+        const THRESHOLD: u8 = 2;
 
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: POLYS,
@@ -725,7 +733,7 @@ mod tests {
         assert!(
             per_poly
                 .values()
-                .all(|n| *n == cfg.threshold as usize + cfg.surplus_shares)
+                .all(|n| *n == cfg.threshold as usize + cfg.surplus_shares as usize)
         );
 
         Ok(())
@@ -759,7 +767,7 @@ mod tests {
             let shares = by_poly
                 .get(&commitment.spi().poly_index())
                 .ok_or(anyhow::anyhow!("no shares for polynomial"))?;
-            assert_eq!(cfg.threshold as usize + cfg.surplus_shares, shares.len());
+            assert_eq!(cfg.threshold as usize + cfg.surplus_shares as usize, shares.len());
 
             // Only `threshold` shares are needed; the surplus stands in for any that are lost.
             let reconstructed = shares[..cfg.threshold as usize]
@@ -824,7 +832,7 @@ mod tests {
         p: &SimplePseudonym,
         cfg: &SsaGeneratorConfig,
     ) -> anyhow::Result<std::collections::BTreeMap<PolynomialIndex, Vec<crate::CompletedShare<TestSpec>>>> {
-        let expected = cfg.polynomials_per_ssa as usize * (cfg.threshold as usize + cfg.surplus_shares);
+        let expected = cfg.polynomials_per_ssa as usize * (cfg.threshold as usize + cfg.surplus_shares as usize);
         let mut by_poly: std::collections::BTreeMap<PolynomialIndex, Vec<_>> = std::collections::BTreeMap::new();
 
         for _ in 0..expected {

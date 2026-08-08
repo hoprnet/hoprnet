@@ -50,7 +50,7 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// [`DEFAULT_POLY_THRESHOLD`], so this is the negotiated value by construction. It was a
 /// literal 64 while the pix crate still said 128, which is exactly the drift the aliasing
 /// removed.
-const PROD_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
+const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 /// Coefficient commitments carried by one `SsaCommit` message.
 ///
@@ -147,7 +147,7 @@ fn bench_recon_cfg(use_batch_verification: bool) -> SsaReconstructorConfig {
     }
 }
 
-fn gen_cfg(polys: u16, threshold: u16) -> SsaGeneratorConfig {
+fn gen_cfg(polys: u16, threshold: u8) -> SsaGeneratorConfig {
     SsaGeneratorConfig {
         threshold,
         polynomials_per_ssa: polys,
@@ -195,7 +195,7 @@ fn wire_order(constant_terms: &[(PolynomialIndex, PixGroupRepr<TestSpec>)]) -> V
 ///
 /// Returns the pseudonym it was generated for, the generator (which now holds the
 /// polynomials and can produce shares), and one constant-term commitment per polynomial.
-fn generate_commitment_matrix(polys: u16, threshold: u16) -> GeneratedCycle {
+fn generate_commitment_matrix(polys: u16, threshold: u8) -> GeneratedCycle {
     let generator = SsaShareGenerator::<TestSpec>::new(gen_cfg(polys, threshold));
     let pseudonym = SimplePseudonym::random();
     let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
@@ -320,7 +320,7 @@ fn bench_new_exit_commitment(c: &mut Criterion) {
 /// A whole cycle is now only `polys` commitments, so the production width is cheap enough to
 /// always measure — it used to be `polys × threshold`, which at ~150 µs each ran for a quarter
 /// of an hour and had to be narrowed.
-fn whole_cycle_points() -> Vec<(u16, u16)> {
+fn whole_cycle_points() -> Vec<(u16, u8)> {
     let mut points = vec![(PROD_POLYS_PER_SSA, PROD_THRESHOLD)];
     if cfg!(feature = "all-benchmarks") {
         points.extend([(128u16, PROD_THRESHOLD), (512, PROD_THRESHOLD), (2048, PROD_THRESHOLD)]);
@@ -439,7 +439,8 @@ fn bench_acknowledge_batch(
     // depends on the measured cost, so the budget has to be topped up rather than assumed:
     // a fresh cycle is generated and installed *outside* the timed section, exactly as the
     // Exit does between cycles in production.
-    let shares_per_cycle = polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
+    let shares_per_cycle =
+        polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares as usize);
     let new_cycle = || {
         let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
@@ -553,7 +554,8 @@ fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
     group.sample_size(10);
 
     let polys = ACK_BENCH_POLYS;
-    let shares_per_cycle = polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
+    let shares_per_cycle =
+        polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares as usize);
 
     for concurrency in ack_concurrency() {
         group.throughput(Throughput::Bytes(
@@ -657,7 +659,7 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
         .unwrap();
 
     let shares_per_commitment =
-        PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares);
+        PROD_POLYS_PER_SSA as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares as usize);
 
     // How many acknowledgements one deferral bucket absorbs before the scenario rotates onto a fresh
     // one.
@@ -679,7 +681,8 @@ fn bench_acknowledge_shares_deferred(c: &mut Criterion) {
         "a batch must fit inside the deferral budget, or this group measures the drop path"
     );
     assert!(
-        PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares <= MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+        PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares as usize
+            <= MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
         "a conforming Entry's per-polynomial share budget must fit under the per-polynomial cap"
     );
 
@@ -811,7 +814,7 @@ fn bench_acknowledge_shares_full_ssa(c: &mut Criterion) {
 
     let peer = OffchainKeypair::random();
     let recon_cfg = bench_recon_cfg(false);
-    for (polys, threshold) in [(4u16, 10u16), (16, 10), (4, PROD_THRESHOLD)] {
+    for (polys, threshold) in [(4u16, 10u8), (16, 10), (4, PROD_THRESHOLD)] {
         let num_shares = polys as usize * threshold as usize;
         let generator_cfg = SsaGeneratorConfig {
             threshold,

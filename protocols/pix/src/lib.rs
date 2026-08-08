@@ -22,11 +22,13 @@ use vsss_rs::{
 pub mod ack_verify;
 pub mod errors;
 mod generator;
+mod params;
 mod reconstructor;
 mod traits;
 mod types;
 
 pub use generator::{SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
+pub use params::{InvalidPixParams, PixParams};
 pub use reconstructor::{
     MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard, SsaReconstructor,
     SsaReconstructorConfig,
@@ -71,12 +73,37 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
 /// interpolation (`O(threshold²)` per polynomial) and fault-detection latency (`threshold`
 /// return packets) as the only costs that grow with the threshold. The full cost model is
 /// documented on `DEFAULT_PIX_POLYS_PER_SSA` in `hopr-transport-session`.
-pub const DEFAULT_POLY_THRESHOLD: u16 = 64;
+pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
+
+/// Shares emitted per polynomial beyond [`DEFAULT_POLY_THRESHOLD`], to absorb losses.
+///
+/// The third leg of the deployed split, and like the other two a single value rather than one per
+/// crate: it used to be a literal `20` here and a separately-derived `32` in
+/// `PixGlobalConfig::additional_shares`, which meant [`SsaGeneratorConfig::default`] modelled a
+/// cycle no deployed node ever runs. That mattered little while the surplus was unpriced; it stopped
+/// being harmless once the per-SSA quota started counting it, because the quota is a `const` and had
+/// to pick one of the two.
+///
+/// Half the threshold, kept as the expression rather than as `32`, because what is being fixed is
+/// the *factor*: a cycle emits `threshold + surplus` shares per polynomial, so this is what makes
+/// the deployed surplus factor 1.5×. Re-tuning the threshold moves it in step.
+pub const DEFAULT_SURPLUS_SHARES: u8 = DEFAULT_POLY_THRESHOLD / 2;
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
+
+/// Minimum SSA polynomial threshold.
+///
+/// A threshold of 1 would make every single share reconstruct its polynomial on its own, so the
+/// secret sharing would hide nothing.
+pub const MIN_POLY_THRESHOLD: u8 = 2;
+
 /// Maximum SSA polynomial threshold supported by the [`SsaReconstructor`].
-pub const MAX_POLY_THRESHOLD: u16 = 4096;
+///
+/// A byte, because the threshold shares the lower half of the negotiated [`PixParams`] word with
+/// [`SsaGeneratorConfig::surplus_shares`] — see [`PixParams::to_u32`]. The bound is therefore
+/// structural rather than merely checked; the constant exists to name it.
+pub const MAX_POLY_THRESHOLD: u8 = u8::MAX;
 
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec: Send + Sync + 'static
