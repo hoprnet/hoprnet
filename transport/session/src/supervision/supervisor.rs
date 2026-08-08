@@ -205,7 +205,9 @@ impl SessionPixSupervisor {
             }
         };
 
+        let mut actions = actions;
         self.arm_recovery_clocks_for_earliest(now, served_total);
+        actions.extend(self.release_service_if_front_is_funded());
         self.refresh_share_order_front();
         actions
     }
@@ -219,6 +221,40 @@ impl SessionPixSupervisor {
             .filter(|(_, s)| !s.is_terminal())
             .min_by_key(|(_, s)| s.ssa_id.ssa_index())
             .map(|(i, _)| i)
+    }
+
+    /// Emits the one-shot [`SessionPixAction::ReleaseService`] once the front of the batch is funded.
+    ///
+    /// [`on_deposit_confirmed`](Self::on_deposit_confirmed) already covers the case where the front
+    /// is the cycle whose deposit just landed. This covers the other direction: a cycle that funded
+    /// while queued behind an unfunded predecessor, and reaches the front when that predecessor is
+    /// retired. There is no further deposit event for it — its deposit already happened — so without
+    /// this the Session keeps a funded front and a gate stuck in predeposit mode, and stalls for good
+    /// once `max_predeposit_packets` is spent.
+    ///
+    /// Called from the same two places as [`arm_recovery_clocks_for_earliest`](Self::arm_recovery_clocks_for_earliest),
+    /// and for the same reason: those are the two paths on which the front can move.
+    ///
+    /// `Recovering` is exactly the funded-and-unfinished phase — it is entered only once a deposit
+    /// clears both floors, and the phases after it are terminal, which `earliest_live_idx` already
+    /// excludes.
+    fn release_service_if_front_is_funded(&mut self) -> Vec<SessionPixAction> {
+        if self.closed || self.release_service_emitted {
+            return Vec::new();
+        }
+        let Some(idx) = self.earliest_live_idx() else {
+            return Vec::new();
+        };
+        if self.ssas[idx].phase != SsaPhase::Recovering {
+            return Vec::new();
+        }
+
+        self.release_service_emitted = true;
+        tracing::debug!(
+            ssa_id = %self.ssas[idx].ssa_id,
+            "releasing service — a funded cycle reached the front of the batch"
+        );
+        vec![SessionPixAction::ReleaseService]
     }
 
     /// Re-points the share-order accounting at the current front of the batch, clearing it if the front
@@ -353,8 +389,11 @@ impl SessionPixSupervisor {
             self.closed = true;
         }
 
-        // Retiring or tombstoning a cycle can promote the next one to the front of the batch.
+        // Retiring or tombstoning a cycle can promote the next one to the front of the batch — and if
+        // that one is already funded, promotion is the only moment left at which service can be
+        // released, since its deposit event is long past.
         self.arm_recovery_clocks_for_earliest(now, served_total);
+        actions.extend(self.release_service_if_front_is_funded());
 
         actions
     }
@@ -532,6 +571,12 @@ impl SessionPixSupervisor {
 
         let mut actions = Vec::new();
 
+        // Decided *before* `perform_recovered_transition` below, which can make this cycle terminal
+        // and hand the front to a successor. A cycle that funds and recovers in the same call has
+        // still paid for the service it consumed, so the gate must open on it; testing the front
+        // afterwards would find a different cycle and leave the gate shut.
+        let front_now_funded = !self.release_service_emitted && self.earliest_live_idx() == Some(idx);
+
         if recovered_pending {
             actions.extend(self.perform_recovered_transition(idx, now));
         }
@@ -545,9 +590,10 @@ impl SessionPixSupervisor {
         // cannot see it: serving the unfunded front is perfectly in-order.
         //
         // A no-op at the default `ssas_per_request = 1`, where the only live cycle is the front. When a
-        // later cycle funds first, the release simply waits for the front to fund and comes out of that
-        // call instead.
-        if !self.release_service_emitted && self.earliest_live_idx() == Some(idx) {
+        // later cycle funds first, the release waits — either for the front to fund, which comes out of
+        // this same call, or for the front to be retired, which comes out of
+        // `release_service_if_front_is_funded` as a post-step.
+        if front_now_funded {
             self.release_service_emitted = true;
             actions.push(SessionPixAction::ReleaseService);
         }
@@ -1825,6 +1871,59 @@ mod tests {
         assert!(
             actions.iter().any(|a| matches!(a, SessionPixAction::ReleaseService)),
             "retiring the unfunded front must release service for its already-funded successor; got {actions:?}"
+        );
+    }
+
+    /// A cycle that funds and goes terminal in the same call must still release service.
+    ///
+    /// `Recovered` can arrive while the cycle is still `AwaitingDeposit` — the Exit finishes
+    /// reconstructing before the chain observer reports the deposit — and is deferred until the
+    /// deposit lands. That one call then both funds the cycle and retires it, so by the time the
+    /// front is examined the cycle is terminal and the front is somebody else. Deciding on the
+    /// post-`Recovering` state and not the post-retirement one is what keeps the gate from staying
+    /// shut over a cycle that was paid for in full.
+    #[test]
+    fn a_cycle_that_funds_and_recovers_at_once_still_releases_service() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let front = ssa_id(p, 1);
+        let successor = ssa_id(p, 2);
+
+        for id in [front, successor] {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: Some(sufficient_balance()),
+                },
+                now,
+                0,
+            );
+        }
+
+        // Recovery completes before the deposit is observed, so the event is held.
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(front), now, 0);
+        assert!(
+            actions.iter().all(|a| !matches!(a, SessionPixAction::ReleaseService)),
+            "recovering an unfunded cycle must not release service"
+        );
+
+        // The deposit lands: the cycle funds and is retired in the same call. The successor behind it
+        // is still unfunded, so nothing else can open the gate.
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: front,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+        assert!(
+            actions.iter().any(|a| matches!(a, SessionPixAction::ReleaseService)),
+            "a cycle funded and retired in one call has still paid for its service; got {actions:?}"
         );
     }
 
