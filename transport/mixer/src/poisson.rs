@@ -7,7 +7,7 @@
 //! the departure process approximates Poisson, which resists timing correlation.
 //!
 //! The engine thread runs [`futures::executor::block_on`] over a single merged event
-//! stream ([`Events`]) that combines the ingress channel with an adaptive, self-rescheduling
+//! stream (`Events`) that combines the ingress channel with an adaptive, self-rescheduling
 //! [`futures_timer::Delay`]. Merging (rather than `select!`) means a newly-arrived packet
 //! interrupts the wait and triggers an immediate sweep + tick re-arm — "each new entry
 //! shortens the waker" — with no fuse/cancellation footguns.
@@ -256,7 +256,7 @@ async fn run_engine<T>(
 
 /// Instantiate a Poisson mixing channel, spawning the dedicated engine thread.
 ///
-/// Drop-in alternative to [`crate::channel`]: same `Sender`/`Receiver` shapes, but the
+/// Drop-in alternative to [`crate::channel()`]: same `Sender`/`Receiver` shapes, but the
 /// release process is exponential (memoryless) rather than uniform.
 pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
     #[cfg(all(feature = "telemetry", not(test)))]
@@ -310,14 +310,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delay_should_be_bounded_by_the_cap() -> anyhow::Result<()> {
-        let start = std::time::Instant::now();
-        let (tx, mut rx) = poisson_channel(MixerConfig::default());
-        tx.send(1)?;
-        assert_eq!(timeout(CAP + LEEWAY, rx.recv()).await?, Some(1));
-        // The hard cap force-releases at `cap`; even accounting for scheduling slack the
-        // item must not linger far beyond it.
-        assert!(start.elapsed() < CAP + LEEWAY, "item exceeded the hard cap");
+    async fn max_delay_should_be_bounded_by_the_cap() -> anyhow::Result<()> {
+        // Set the mean far above the cap: without the hard cap most packets would wait ~50 ms
+        // (the exponential mean), so asserting the *maximum realized* delay stays within the cap
+        // proves the cap actually bounds latency — a tight upper bound the old timeout-based
+        // check (500 ms leeway on a 20 ms cap) could never provide.
+        const N: usize = 3000;
+        let cap = Duration::from_millis(20);
+        let cfg = MixerConfig {
+            min_delay: Duration::ZERO,
+            delay_range: cap,
+            target_mean_delay: Duration::from_millis(50), // mean >> cap, so the cap does the bounding
+            ..MixerConfig::default()
+        };
+        let (tx, mut rx) = poisson_channel::<Instant>(cfg);
+
+        let receiver = tokio::spawn(async move {
+            let mut max_delay_ms = 0.0f64;
+            let mut count = 0usize;
+            while let Some(sent_at) = rx.next().await {
+                max_delay_ms = max_delay_ms.max(sent_at.elapsed().as_secs_f64() * 1000.0);
+                count += 1;
+            }
+            (max_delay_ms, count)
+        });
+        for _ in 0..N {
+            tx.send(Instant::now())?;
+        }
+        drop(tx);
+
+        let (observed_max, count) = tokio::time::timeout(Duration::from_secs(10), receiver).await??;
+        assert_eq!(count, N, "every packet must be delivered");
+
+        let cap_ms = cap.as_secs_f64() * 1000.0;
+        // Generous scheduling slack, but far below the ~50 ms the uncapped exponential would
+        // routinely produce, so a regression that stopped enforcing the cap fails here.
+        assert!(
+            observed_max < cap_ms + 80.0,
+            "max realized delay {observed_max:.2} ms must stay within the {cap_ms:.0} ms cap plus slack"
+        );
         Ok(())
     }
 

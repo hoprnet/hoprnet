@@ -67,7 +67,10 @@ fn run_scenario(label: &str, cfg: MixerConfig) {
 
     let sum: f64 = delays_ms.iter().sum();
     let observed_mean = sum / n as f64;
-    let over_cap = delays_ms.iter().filter(|d| **d >= cap_ms - 1e-6).count();
+    // Observed end-to-end delay at or above the cap. This is a measured delay, not a release-path
+    // label: receiver scheduling can push a probabilistic release to `>= cap` too, so it only
+    // upper-bounds the true force-release count rather than equalling it.
+    let at_or_over_cap = delays_ms.iter().filter(|d| **d >= cap_ms - 1e-6).count();
 
     println!("── {label} ─────────────────────────────────────────────");
     println!("  config:      mean(target)={mean_ms:.2} ms   cap={cap_ms:.0} ms   n={n}");
@@ -81,8 +84,8 @@ fn run_scenario(label: &str, cfg: MixerConfig) {
         percentile(&sorted, 1.0),
     );
     println!(
-        "  at cap:      {over_cap} packets ({:.2}%) force-released at ~cap",
-        100.0 * over_cap as f64 / n as f64
+        "  at cap:      {at_or_over_cap} packets ({:.2}%) with observed delay >= cap",
+        100.0 * at_or_over_cap as f64 / n as f64
     );
     println!(
         "  mixing:      {out_of_order} of {n} arrived out of send order ({:.1}%)",

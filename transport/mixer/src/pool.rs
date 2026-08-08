@@ -42,13 +42,23 @@ pub(crate) fn next_wake(
 pub(crate) struct Entry<T> {
     /// When the item entered the mixer.
     pub enqueued_at: Instant,
+    /// Per-entry uniform sample in `[0, 1)`, drawn **once** at enqueue, that places this entry's
+    /// hard-cap force-release deterministically within `[cap - cap_jitter, cap)`. Sampling once
+    /// here (rather than re-drawing each sweep) keeps the smear uniform over the window and
+    /// independent of the wake cadence — re-drawing per sweep would take the minimum over many
+    /// draws, concentrating releases near `cap - cap_jitter` and coupling them to the tick rate.
+    pub jitter_fraction: f64,
     /// The buffered payload.
     pub item: T,
 }
 
 impl<T> Entry<T> {
     pub(crate) fn new(enqueued_at: Instant, item: T) -> Self {
-        Self { enqueued_at, item }
+        Self {
+            enqueued_at,
+            jitter_fraction: crypto_random::random_float(),
+            item,
+        }
     }
 }
 
@@ -60,8 +70,8 @@ impl<T> Entry<T> {
 ///
 /// Release rules per item (first match wins):
 /// 1. `age < min_delay` — not yet eligible, keep.
-/// 2. `age >= cap`, or `age + U[0, cap_jitter] >= cap` within the jitter window — hard-cap force-release
-///    (jitter-smeared).
+/// 2. `age >= cap_deadline` — hard-cap force-release, where `cap_deadline` is this entry's deadline within `[cap -
+///    cap_jitter, cap)`, fixed once at enqueue (equals `cap` when jitter is zero).
 /// 3. `occupancy <= min_mix_occupancy` — small buffer: deterministic minimum dwell, released once `age >= mean` (no
 ///    coin), so the few packets present overlap and mix instead of escaping through the exponential's fast tail.
 /// 4. `Bernoulli(1 - e^(-delta/mean))` — the memoryless exponential clock.
@@ -72,8 +82,8 @@ impl<T> Entry<T> {
 /// Performance: for the common case (a packet buffered since before the previous sweep) the
 /// release probability depends only on `delta` — shared by the whole pool this tick — so
 /// `1 - e^(-delta/mean)` is computed **once** and reused. Only a packet that arrived mid-interval
-/// (eligible for less than `delta`) needs its own `1 - e^(-eligible_for/mean)`. The jitter draw is
-/// likewise taken only for packets actually inside the `[cap-jitter, cap)` window.
+/// (eligible for less than `delta`) needs its own `1 - e^(-eligible_for/mean)`. The hard-cap
+/// deadline is precomputed per entry at enqueue, so the sweep itself does no jitter sampling.
 pub(crate) fn sweep<T>(
     pool: &mut Vec<Entry<T>>,
     cfg: &MixerConfig,
@@ -109,12 +119,14 @@ pub(crate) fn sweep<T>(
     while i < pool.len() {
         let enqueued_at = pool[i].enqueued_at;
         let age = now.saturating_duration_since(enqueued_at);
+        // This entry's hard-cap deadline, fixed at enqueue: `[cap - jitter, cap)`, or exactly
+        // `cap` when jitter is zero. Uniform over the window and independent of the sweep cadence.
+        let cap_deadline = jitter_window_start + jitter.mul_f64(pool[i].jitter_fraction);
 
         let release = if age < min_delay {
             false
-        } else if age >= cap || (age >= jitter_window_start && reached_cap_in_window(age, cap, jitter)) {
-            // Hard-cap force-release: past the cap, or inside the jitter window and sampled to
-            // release. `||` short-circuits so the jitter draw is skipped once `age >= cap`.
+        } else if age >= cap_deadline {
+            // Hard-cap force-release at this entry's per-enqueue jitter deadline.
             true
         } else if occupancy <= min_mix_occupancy {
             age >= mean // small buffer: deterministic minimum dwell
@@ -149,17 +161,6 @@ pub(crate) fn sweep<T>(
     earliest
 }
 
-/// Whether an item already known to be inside the `[cap-jitter, cap)` window is force-released,
-/// drawing the jitter sample only here (never for packets far from the cap). Release iff
-/// `age + U[0, jitter] >= cap`.
-fn reached_cap_in_window(age: Duration, cap: Duration, jitter: Duration) -> bool {
-    if jitter.is_zero() {
-        return false;
-    }
-    let sample = Duration::from_secs_f64(crypto_random::random_float_in_range(0.0..jitter.as_secs_f64()));
-    age.saturating_add(sample) >= cap
-}
-
 /// In-place cryptographic Fisher–Yates shuffle, so the enqueue order of a released
 /// batch cannot be read off the output within a single wake.
 fn shuffle<T>(items: &mut [T]) {
@@ -185,10 +186,7 @@ mod tests {
 
     fn entry<T>(item: T, age: Duration) -> Entry<T> {
         // Construct an entry as though it had been enqueued `age` ago.
-        Entry {
-            enqueued_at: Instant::now() - age,
-            item,
-        }
+        Entry::new(Instant::now() - age, item)
     }
 
     /// One-shot `sweep` wrapper returning the released items as a `Vec`, for the direct
@@ -325,10 +323,7 @@ mod tests {
         let mut pool: Vec<Entry<u32>> = (0..n as u32)
             .map(|i| {
                 let phase = Duration::from_secs_f64(crypto_random::random_float() * step_secs);
-                Entry {
-                    enqueued_at: t0 + phase,
-                    item: i,
-                }
+                Entry::new(t0 + phase, i)
             })
             .collect();
 
@@ -344,6 +339,11 @@ mod tests {
             }
             guard += 1;
         }
+        assert!(
+            pool.is_empty(),
+            "simulate_delays_ms guard exhausted before the pool drained ({} packets left)",
+            pool.len()
+        );
         delays_ms
     }
 
@@ -389,10 +389,7 @@ mod tests {
             now_ms += step_ms;
             while next < n && arrivals[next] <= now_ms {
                 let enq = t0 + Duration::from_secs_f64(arrivals[next] / 1000.0);
-                pool.push(Entry {
-                    enqueued_at: enq,
-                    item: next as u32,
-                });
+                pool.push(Entry::new(enq, next as u32));
                 next += 1;
             }
             let now = t0 + Duration::from_secs_f64(now_ms / 1000.0);
@@ -403,6 +400,11 @@ mod tests {
             }
             guard += 1;
         }
+        assert!(
+            next == n && pool.is_empty(),
+            "simulate_rate_driven guard exhausted before all packets departed (arrived {next}/{n}, {} left in pool)",
+            pool.len()
+        );
         RateSim {
             delays_ms,
             departures_ms,
@@ -440,8 +442,10 @@ mod tests {
         };
 
         // Keep occupancy below `high_watermark` so the overload safety valve stays dormant
-        // (a burst at `capacity` would legitimately trigger relief and flush early).
-        const N: usize = 5_000;
+        // (a burst at `capacity` would legitimately trigger relief and flush early). `N` is large
+        // enough that the ~2% force-release fraction has a tight standard error: at N = 8_000,
+        // SE ≈ 0.0016, so the ±0.008 band below is ≈ ±5 sigma — negligible false-failure rate.
+        const N: usize = 8_000;
         assert!(N < cfg.high_watermark);
         let cap_ms = cfg.cap().as_secs_f64() * 1000.0;
         let delays_ms = simulate_delays_ms(&cfg, N, Duration::from_micros(250));
@@ -450,7 +454,7 @@ mod tests {
         let at_cap = delays_ms.iter().filter(|d| **d >= cap_ms).count();
         let frac = at_cap as f64 / N as f64;
         assert!(
-            (0.013..=0.027).contains(&frac),
+            (0.012..=0.028).contains(&frac),
             "expected ~2% force-released at the cap, got {:.2}%",
             frac * 100.0
         );

@@ -7,10 +7,13 @@ pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
 /// Percentile of packets that should be released before the hard cap when the
 /// mean holding delay of the exponential (Poisson) release engine is derived
-/// rather than set explicitly. `mean = cap / ln(1 / (1 - CAP_PERCENTILE))`.
+/// rather than set explicitly. `mean = delay_range / ln(1 / (1 - CAP_PERCENTILE))`.
 ///
-/// At the default cap of 20 ms this yields a mean of ~6.7 ms with ~5% of packets
-/// force-released at the cap. Override by setting [`MixerConfig::target_mean_delay`].
+/// The window is `delay_range`, not the whole cap: the memoryless clock only runs after the
+/// `min_delay` floor (see `pool::sweep`), so the percentile must be solved over the eligible
+/// window `cap - min_delay = delay_range`. At the default 20 ms range this yields a mean of
+/// ~6.7 ms with ~5% of packets force-released at the cap. Override by setting
+/// [`MixerConfig::target_mean_delay`].
 pub const HOPR_MIXER_CAP_PERCENTILE: f64 = 0.95;
 /// Default width of the jitter window smearing the hard-cap force-release.
 pub const HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS: u64 = 2;
@@ -83,9 +86,11 @@ pub struct MixerConfig {
     // --- Poisson (exponential-release) engine parameters; ignored by the uniform `channel`. ---
     /// Explicit mean holding delay of the exponential release engine.
     ///
-    /// When zero (the default), the mean is derived from the hard cap
-    /// (`min_delay + delay_range`) and [`HOPR_MIXER_CAP_PERCENTILE`] so that the
-    /// configured percentile of packets is released before the cap.
+    /// When zero (the default), the mean is derived from `delay_range` and
+    /// [`HOPR_MIXER_CAP_PERCENTILE`] so that the configured percentile of packets is released
+    /// before the cap. When set explicitly, keep it well below the cap (`min_delay +
+    /// delay_range`): a mean at or above the cap pushes almost every packet onto the hard-cap
+    /// branch, collapsing the exponential holding time this engine exists to produce.
     #[default(Duration::from_millis(0))]
     #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
     pub target_mean_delay: Duration,
@@ -159,21 +164,24 @@ impl MixerConfig {
 
     /// Mean holding delay of the exponential release engine.
     ///
-    /// Returns [`Self::target_mean_delay`] when set explicitly; otherwise derives
-    /// it from the cap so that [`HOPR_MIXER_CAP_PERCENTILE`] of packets are
-    /// released before the cap: `mean = cap / ln(1 / (1 - percentile))`.
+    /// Returns [`Self::target_mean_delay`] when set explicitly; otherwise derives it from
+    /// `delay_range` so that [`HOPR_MIXER_CAP_PERCENTILE`] of packets are released before the
+    /// cap: `mean = delay_range / ln(1 / (1 - percentile))`. The window is `delay_range` (not the
+    /// whole cap) because the memoryless clock only runs over the eligible age past `min_delay`
+    /// (see `pool::sweep`); deriving from the full cap would undershoot the target percentile
+    /// whenever `min_delay > 0`.
     pub fn mean(&self) -> Duration {
         if !self.target_mean_delay.is_zero() {
             return self.target_mean_delay;
         }
 
-        let cap = self.cap().as_secs_f64();
+        let window = self.delay_range.as_secs_f64();
         let factor = (1.0 / (1.0 - HOPR_MIXER_CAP_PERCENTILE)).ln();
-        if cap <= 0.0 || factor <= 0.0 {
+        if window <= 0.0 || factor <= 0.0 {
             return Duration::ZERO;
         }
 
-        Duration::from_secs_f64(cap / factor)
+        Duration::from_secs_f64(window / factor)
     }
 
     /// Effective mean under the overload safety valve.
@@ -185,11 +193,15 @@ impl MixerConfig {
     /// to immediate pass-through.
     pub fn mean_for(&self, occupancy: usize) -> Duration {
         let base = self.mean();
-        if occupancy <= self.high_watermark {
+        // Clamp the watermark below `capacity`: a config that sets a small `capacity` but leaves
+        // the default `high_watermark` (e.g. capacity 100, watermark 10_000) would otherwise put
+        // the trip point above any reachable occupancy, silently disabling the valve.
+        let watermark = self.high_watermark.min(self.capacity.saturating_sub(1));
+        if occupancy <= watermark {
             return base;
         }
 
-        let low = self.high_watermark.max(1);
+        let low = watermark.max(1);
         let high = self.capacity.max(low + 1);
         let fraction = (occupancy.saturating_sub(low) as f64 / (high - low) as f64).clamp(0.0, 1.0);
 
