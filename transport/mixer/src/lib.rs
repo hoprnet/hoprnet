@@ -3,6 +3,8 @@
 //! Each mixer implementation is behind its own feature so a consumer compiles only what it
 //! uses:
 //! - `poisson` (default) — the exponential (Poisson) release engine, `poisson_channel()`.
+//! - `poisson-shared` — an opt-in variant of the Poisson engine, `poisson_shared_channel()`, that keeps the pool behind
+//!   an `Arc<Mutex<_>>` and runs the sweep inline on the consumer rather than on a dedicated thread.
 //! - `uniform-channel` — the uniform-delay min-heap channel, `channel()`.
 //! - `uniform-adapter` — the uniform-delay `Sink` adapter, `MixerSink`.
 
