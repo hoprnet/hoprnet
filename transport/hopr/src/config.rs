@@ -10,7 +10,11 @@ use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
-use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
+use hopr_transport_session::{
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY,
+    DEFAULT_PIX_SURPLUS_SHARES, IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL,
+    MIN_SURB_BUFFER_DURATION,
+};
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
 
@@ -201,6 +205,14 @@ pub struct HoprProtocolConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
+    /// Global configuration for the PIX.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub pix: PixGlobalConfig,
+    /// Per-node PIX session configuration for incoming sessions.
+    #[validate(custom(function = "validate_incoming_session_pix_config"))]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub incoming_session_pix_config: IncomingSessionPixConfig,
     /// Mixer configuration.
     #[cfg_attr(feature = "serde", serde(default))]
     pub mixer: MixerConfig,
@@ -229,6 +241,157 @@ pub struct HoprProtocolConfig {
         serde(default = "default_counter_flush_interval", with = "humantime_serde")
     )]
     pub counter_flush_interval: Duration,
+}
+
+/// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything, or whose
+/// SSA batch size is outside what the protocol supports.
+///
+/// `quota_range` is operator-settable, and an empty (inverted) range silently makes
+/// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
+/// `UnacceptablePixParams` errors at Session establishment time.
+///
+/// `ssas_per_request` is checked here rather than with a `range` attribute because
+/// `IncomingSessionPixConfig` lives in `hopr-transport-session` and carries no `Validate` derive of
+/// its own. Zero would mean no `SsaRequest` is ever sent, and above [`MAX_SSA_BATCH_SIZE`] the
+/// per-cycle reconstructor state and the Start protocol channel pre-allocation both grow past what
+/// that ceiling exists to bound. `SessionManager::new` clamps rather than trusting this check, since
+/// nothing forces a programmatically built config through it.
+fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
+    if cfg.quota_range.is_empty() {
+        return Err(ValidationError::new(
+            "pix quota_range must be non-empty (start must not exceed end)",
+        ));
+    }
+    if !(1..=MAX_SSA_BATCH_SIZE).contains(&cfg.ssas_per_request) {
+        return Err(ValidationError::new(
+            "pix ssas_per_request must be between 1 and MAX_SSA_BATCH_SIZE",
+        ));
+    }
+    Ok(())
+}
+
+/// Headroom over the profiled dimension product that [`PixGlobalConfig`] will accept.
+///
+/// See [`validate_pix_dimension_product`] for why the ceiling is on the product and why this
+/// multiple does not have to move when the polynomial/threshold split is re-tuned.
+const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
+
+/// Rejects dimensions whose *product* is far outside anything that has been measured.
+///
+/// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
+/// 16192 × 255 = 4 128 960 commitments, about 8× the profiled operating point of 8192 × 64 =
+/// 524 288 (≈49 MiB of peak reconstructor state and ≈1.25 s of commitment ingest per cycle). Nothing
+/// downstream catches that: the product *is* the per-cycle quota, and the only guard on it is the
+/// peer Exit's `quota_range` rejection — which protects the Exit, and arrives after this node has
+/// already generated the cycle.
+///
+/// The ceiling is deliberately on the product rather than on either field, and that is what makes it
+/// stable: re-tuning the split holds the product constant — 4096 × 128 and 8192 × 64 are both
+/// exactly 524 288, which is why the derived `quota_range` survived that change untouched. Only a
+/// deliberate decision to raise the per-cycle quota needs to revisit this, and such a decision has to
+/// widen the Exit's `quota_range` in concert regardless.
+///
+/// It binds less hard than it once did: `ssa_part_size` was capped at 4096 before the threshold was
+/// narrowed to a byte so it could share the negotiated `PixParams` word with the surplus, which took
+/// the field-range maximum product down from 126× the profiled point to under 8×. It still binds
+/// over most of the two ranges, which is the intended effect.
+fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), ValidationError> {
+    const PROFILED: usize = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
+
+    if cfg.num_ssa_parts.saturating_mul(cfg.ssa_part_size) > MAX_PIX_DIMENSION_PRODUCT_FACTOR * PROFILED {
+        return Err(ValidationError::new(
+            "num_ssa_parts * ssa_part_size exceeds the supported per-cycle dimension product",
+        ));
+    }
+    Ok(())
+}
+
+/// Global configuration for the Protocol for Incentivization of eXits (PIX).
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default, deny_unknown_fields)
+)]
+#[validate(schema(function = "validate_pix_dimension_product", skip_on_field_errors = false))]
+pub struct PixGlobalConfig {
+    /// Number of parts an SSA is split into.
+    ///
+    /// This scales will with the CPU parallelism.
+    ///
+    /// Defaults to [`DEFAULT_PIX_POLYS_PER_SSA`], which is also what
+    /// [`IncomingSessionPixConfig::quota_range`] is derived from — changing this without
+    /// widening the peer Exit's `quota_range` accordingly will get the Session rejected.
+    ///
+    /// The range below bounds this field alone. What actually costs is the *product* with
+    /// [`ssa_part_size`](Self::ssa_part_size), which validation bounds separately at 4× the profiled
+    /// operating point — see `validate_pix_dimension_product`.
+    #[validate(range(min = 8, max = 16192))]
+    #[default(DEFAULT_PIX_POLYS_PER_SSA as usize)]
+    pub num_ssa_parts: usize,
+
+    /// Number of shares required to reconstruct an SSA part.
+    ///
+    /// This does not scale well with CPU parallelism.
+    ///
+    /// Defaults to [`DEFAULT_PIX_SHARES_PER_POLY`]. See [`num_ssa_parts`](Self::num_ssa_parts)
+    /// for the interaction with the Exit's accepted quota range, and
+    /// `validate_pix_dimension_product` for the bound on the two together.
+    /// Capped at 255 because the threshold is one byte of the negotiated
+    /// [`PixParams`](hopr_protocol_pix::PixParams) word — see
+    /// [`MAX_POLY_THRESHOLD`](hopr_protocol_pix::MAX_POLY_THRESHOLD).
+    #[validate(range(min = 2, max = 255))]
+    #[default(DEFAULT_PIX_SHARES_PER_POLY as usize)]
+    pub ssa_part_size: usize,
+
+    /// Number of shares sent in addition to `ssa_part_size` to reconstruct an SSA part.
+    ///
+    /// This is used to account for potential packet loss but makes it take longer for the
+    /// other side to reconstruct the entire SSA from all its parts. This is because if
+    /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
+    ///
+    /// **This is an absolute share count, not a ratio.** The default is half of
+    /// [`DEFAULT_PIX_SHARES_PER_POLY`] — a surplus factor of 1.5× — but it is a constant computed
+    /// once, so raising [`ssa_part_size`](Self::ssa_part_size) and leaving this alone lowers the
+    /// surplus factor, and lowering it raises it. Re-tune the two together.
+    ///
+    /// The factor is what matters, because it is what this costs. A polynomial leaves the
+    /// generator's queue at `ssa_part_size + additional_shares` shares whether or not any were
+    /// lost, so this is service the Exit performs in every case — and since the surplus travels to
+    /// the peer as part of the negotiated [`PixParams`](hopr_protocol_pix::PixParams), the per-SSA
+    /// quota counts it and the deposit pays for it. It buys loss tolerance, and it is charged for
+    /// like any other insurance: on purchase, not on claim.
+    ///
+    /// Raising it therefore costs money rather than earning free service, which is the way round it
+    /// should be. It used to be the other way: the surplus was excluded from the quota, so the
+    /// rational Entry raised this dial to take traffic it was not billed for.
+    ///
+    /// Capped at 255 because it is the other byte of that word.
+    #[validate(range(min = 0, max = 255))]
+    #[default(DEFAULT_PIX_SURPLUS_SHARES as usize)]
+    pub additional_shares: usize,
+
+    /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
+    /// `SsaRequest` from an Exit.
+    ///
+    /// This is a protection against a misbehaving Exit rather than a preference: each accepted entry
+    /// costs a full client commitment, its own burst of `SsaCommit` packets and its own on-chain
+    /// deposit, so an uncapped request would let one inbound packet amplify into minutes of CPU and
+    /// as many simultaneous deposits as the wire format admits (27). An over-cap request is rejected
+    /// in full before any of that work starts.
+    ///
+    /// **Must be at least the `ssas_per_request` of every Exit this node uses.** The batch size is not
+    /// negotiated — the Exit cannot learn this value — so an Exit batching above it has every request
+    /// rejected, and every such Session is lost. The refusal is reported to the Exit as an
+    /// `UnacceptablePixParams` `SessionError` so it fails in about a round trip rather than as a
+    /// deposit timeout minutes later, but raising the Exit side still requires raising this in step.
+    ///
+    /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
+    ///
+    /// Defaults to 2, minimum 1, maximum 20 (`MAX_SSA_BATCH_SIZE`).
+    #[validate(range(min = 1, max = 20))]
+    #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
+    pub max_ssas_per_request: usize,
 }
 
 /// Configuration of the HOPR packet pipeline.
@@ -547,7 +710,7 @@ pub struct SessionGlobalConfig {
 
     /// Maximum number of Sessions that can be managed by the Session manager.
     ///
-    /// Default is 1000, minimum is 2, maximum is 100 000.
+    /// Default is 100, minimum is 2, maximum is 100 000.
     #[validate(range(min = 2, max = 100_000))]
     #[default(default_max_managed_sessions())]
     #[cfg_attr(feature = "serde", serde(default = "default_max_managed_sessions"))]
@@ -624,6 +787,255 @@ pub struct SessionGlobalConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Exit computes the offered quota as `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`
+    /// and rejects the Session when it falls outside `quota_range`. An Entry running the default
+    /// `PixGlobalConfig` must therefore always be acceptable to an Exit running the default
+    /// `IncomingSessionPixConfig`, otherwise PIX cannot be used at all out of the box — and
+    /// before both structs became `serde(default)` there was no way for an operator to fix it.
+    ///
+    /// The surplus is in that product, so this also guards the alias that gives the two crates one
+    /// default surplus: if `additional_shares` and `hopr-protocol-pix`'s own default drift apart
+    /// again, the quota computed here stops matching the one the range is anchored on.
+    #[test]
+    fn default_pix_dimensions_must_be_inside_default_incoming_quota_range() {
+        let pix = PixGlobalConfig::default();
+        let incoming = IncomingSessionPixConfig::default();
+
+        let quota = pix.num_ssa_parts as u64
+            * (pix.ssa_part_size + pix.additional_shares) as u64
+            * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+
+        assert!(
+            incoming.quota_range.contains(&quota),
+            "default PIX quota {quota} is outside the default accepted range {:?} — every PIX session would be \
+             rejected with UnacceptablePixParams",
+            incoming.quota_range
+        );
+
+        // Both sides are derived from the same constants, so the range must be anchored exactly
+        // at the nominal quota. Asserting the relationship rather than a literal keeps this test
+        // correct if `HoprPacket::PAYLOAD_SIZE` ever changes, while still failing loudly if the
+        // range or the dimensions stop being derived from a shared source.
+        assert_eq!(
+            quota,
+            *incoming.quota_range.end(),
+            "the accepted range must be anchored at the nominal default quota"
+        );
+    }
+
+    #[test]
+    fn default_pix_configs_must_validate() {
+        PixGlobalConfig::default()
+            .validate()
+            .expect("default PixGlobalConfig must be valid");
+        validate_incoming_session_pix_config(&IncomingSessionPixConfig::default())
+            .expect("default IncomingSessionPixConfig must be valid");
+        HoprProtocolConfig::default()
+            .validate()
+            .expect("default HoprProtocolConfig must be valid");
+    }
+
+    /// Each dimension range is satisfiable on its own well past anything measured, so the product
+    /// needs its own bound.
+    ///
+    /// Both fields are operator-settable, and the product *is* the per-cycle quota: it decides how
+    /// many polynomials the Entry builds and how many commitments and part builders the Exit holds.
+    /// The peer's `quota_range` refusal is no defence — it fires after this node has generated.
+    #[test]
+    fn pix_dimensions_are_bounded_by_their_product_not_only_field_by_field() {
+        const MAX_NUM_SSA_PARTS: usize = 16192;
+        const MAX_SSA_PART_SIZE: usize = hopr_protocol_pix::MAX_POLY_THRESHOLD as usize;
+
+        // The extremes of the two field ranges, each individually valid.
+        let extreme = PixGlobalConfig {
+            num_ssa_parts: MAX_NUM_SSA_PARTS,
+            ssa_part_size: MAX_SSA_PART_SIZE,
+            ..Default::default()
+        };
+        assert!(
+            extreme.validate().is_err(),
+            "16192 x 255 is ~8x the profiled product and must be rejected"
+        );
+
+        // Re-splitting at a constant product is exactly what a re-tune does, and must stay valid —
+        // this is why the ceiling is on the product rather than on either field. The splits are
+        // fewer than they were: `ssa_part_size` is now capped at 255, so the 2048 x 256 and
+        // 1024 x 512 re-splits this used to cover are no longer expressible at all.
+        let profiled = DEFAULT_PIX_POLYS_PER_SSA as usize * DEFAULT_PIX_SHARES_PER_POLY as usize;
+        for (polys, shares) in [(4096usize, 128usize), (8192, 64)] {
+            assert_eq!(polys * shares, profiled, "test case must hold the product constant");
+            let cfg = PixGlobalConfig {
+                num_ssa_parts: polys,
+                ssa_part_size: shares,
+                ..Default::default()
+            };
+            assert!(
+                cfg.validate().is_ok(),
+                "{polys} x {shares} is the profiled product re-split and must stay valid"
+            );
+        }
+
+        // The headroom is real: the ceiling is straddled rather than hit, because hitting it exactly
+        // is no longer possible. `4 x profiled` is 2^21, and every factorisation of it with
+        // `ssa_part_size <= 255` needs `num_ssa_parts >= 16384`, past that field's own maximum. So
+        // the pair below is the largest accepted product and the next one up, one share apart.
+        let ceiling = MAX_PIX_DIMENSION_PRODUCT_FACTOR * profiled;
+        let just_under = PixGlobalConfig {
+            num_ssa_parts: MAX_NUM_SSA_PARTS,
+            ssa_part_size: ceiling / MAX_NUM_SSA_PARTS,
+            ..Default::default()
+        };
+        assert!(
+            just_under.num_ssa_parts * just_under.ssa_part_size <= ceiling,
+            "test case must sit under the ceiling"
+        );
+        assert!(
+            just_under.validate().is_ok(),
+            "the largest reachable product under the ceiling must be accepted"
+        );
+
+        let past_ceiling = PixGlobalConfig {
+            ssa_part_size: just_under.ssa_part_size + 1,
+            ..just_under
+        };
+        assert!(
+            past_ceiling.num_ssa_parts * past_ceiling.ssa_part_size > ceiling,
+            "test case must sit over the ceiling"
+        );
+        assert!(past_ceiling.validate().is_err(), "past the ceiling must be rejected");
+    }
+
+    // The reversed range is the point of the test: `quota_range` is operator-settable, so an
+    // inverted range is reachable from a config file and must be rejected by validation rather
+    // than silently matching nothing.
+    #[allow(clippy::reversed_empty_ranges)]
+    #[test]
+    fn empty_pix_quota_range_is_rejected() {
+        let cfg = IncomingSessionPixConfig {
+            quota_range: 100..=10,
+            ..Default::default()
+        };
+        assert!(validate_incoming_session_pix_config(&cfg).is_err());
+
+        let cfg = HoprProtocolConfig {
+            incoming_session_pix_config: IncomingSessionPixConfig {
+                quota_range: 100..=10,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(cfg.validate().is_err());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn pix_configs_are_reachable_from_serialized_config() {
+        // Regression guard: these two fields used to be `serde(skip)`, which pinned them to
+        // their defaults and made PIX unconfigurable.
+        let json = r#"{
+            "pix": { "num_ssa_parts": 2048 },
+            "incoming_session_pix_config": { "enforce_pix": true, "max_deposit_wait": "90s" }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
+
+        assert_eq!(2048, cfg.pix.num_ssa_parts);
+        // Container-level `serde(default)` keeps unspecified fields at their defaults.
+        assert_eq!(
+            PixGlobalConfig::default().ssa_part_size,
+            cfg.pix.ssa_part_size,
+            "unspecified PIX fields must fall back to their defaults"
+        );
+        assert!(cfg.incoming_session_pix_config.enforce_pix);
+        assert_eq!(
+            Duration::from_secs(90),
+            cfg.incoming_session_pix_config.max_deposit_wait
+        );
+        assert_eq!(
+            IncomingSessionPixConfig::default().quota_range,
+            cfg.incoming_session_pix_config.quota_range
+        );
+
+        // Both SSA batch knobs must be settable from a config file too, since raising one without the
+        // other is a silently fatal misconfiguration and an operator needs to be able to do both.
+        let json = r#"{
+            "pix": { "max_ssas_per_request": 5 },
+            "incoming_session_pix_config": { "ssas_per_request": 5 }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("SSA batch config must deserialize");
+        assert_eq!(5, cfg.pix.max_ssas_per_request);
+        assert_eq!(5, cfg.incoming_session_pix_config.ssas_per_request);
+        cfg.validate().expect("a matched pair of batch knobs must validate");
+    }
+
+    /// Both SSA batch knobs are bounded by [`MAX_SSA_BATCH_SIZE`], and the `range` attribute on
+    /// `max_ssas_per_request` has to spell that ceiling out as a literal — so assert the two agree.
+    ///
+    /// Zero is rejected on both sides for different reasons: an Exit asking for zero SSAs would never
+    /// send an `SsaRequest` at all, and an Entry accepting zero would reject every request it ever
+    /// receives. Either way PIX silently stops working.
+    #[test]
+    fn ssa_batch_knobs_are_bounded_by_the_shared_ceiling() {
+        // The literal in the `range` attribute must track the constant it stands for.
+        let at_ceiling = PixGlobalConfig {
+            max_ssas_per_request: MAX_SSA_BATCH_SIZE,
+            ..Default::default()
+        };
+        assert!(
+            at_ceiling.validate().is_ok(),
+            "MAX_SSA_BATCH_SIZE itself must be accepted — the range literal has drifted below it"
+        );
+        let past_ceiling = PixGlobalConfig {
+            max_ssas_per_request: MAX_SSA_BATCH_SIZE + 1,
+            ..Default::default()
+        };
+        assert!(
+            past_ceiling.validate().is_err(),
+            "above MAX_SSA_BATCH_SIZE must be rejected — the range literal has drifted above it"
+        );
+
+        assert!(
+            PixGlobalConfig {
+                max_ssas_per_request: 0,
+                ..Default::default()
+            }
+            .validate()
+            .is_err(),
+            "an Entry accepting zero SSAs per request would reject every request"
+        );
+
+        for ssas_per_request in [0, MAX_SSA_BATCH_SIZE + 1] {
+            let cfg = IncomingSessionPixConfig {
+                ssas_per_request,
+                ..Default::default()
+            };
+            assert!(
+                validate_incoming_session_pix_config(&cfg).is_err(),
+                "ssas_per_request of {ssas_per_request} is outside 1..={MAX_SSA_BATCH_SIZE} and must be rejected"
+            );
+
+            let cfg = HoprProtocolConfig {
+                incoming_session_pix_config: IncomingSessionPixConfig {
+                    ssas_per_request,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(
+                cfg.validate().is_err(),
+                "an out-of-range ssas_per_request must fail the whole protocol config"
+            );
+        }
+
+        assert!(
+            validate_incoming_session_pix_config(&IncomingSessionPixConfig {
+                ssas_per_request: MAX_SSA_BATCH_SIZE,
+                ..Default::default()
+            })
+            .is_ok(),
+            "the ceiling itself must be accepted"
+        );
+    }
 
     #[test]
     fn egress_backpressure_timeout_rejects_sub_minimum_values() {

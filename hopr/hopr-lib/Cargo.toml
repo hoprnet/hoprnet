@@ -15,6 +15,7 @@ include = ["README.md", "src/**/*.rs", "Cargo.toml", "LICENSE"]
 
 [lib]
 crate-type = ["rlib"]
+doctest = false
 
 [[test]]
 name = "api_general"
@@ -49,6 +50,10 @@ name = "transport_session-size3"
 required-features = ["testing"]
 
 [[test]]
+name = "transport_session_pix"
+required-features = ["testing"]
+
+[[test]]
 name = "transport_tickets"
 required-features = ["testing"]
 
@@ -67,7 +72,12 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = ["transport-announce-quic"]
+default = ["bjj", "transport-announce-quic"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `bjj`.
+# Consumers settling PIX deposits on-chain must build with `default-features = false`
+# and not re-enable this, or every deposit address will be a Baby JubJub public key that
+# no plain transfer can reach.
+bjj = ["hopr-transport/bjj"]
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-network-graph?/telemetry",
@@ -202,6 +212,7 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
+hopr-ct-full-network = { workspace = true }
 hopr-utils = { workspace = true, features = ["runtime-tokio"] }
 
 

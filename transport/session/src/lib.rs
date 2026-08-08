@@ -21,14 +21,23 @@ pub use balancer::{AtomicSurbFlowEstimator, BalancerStateValues, MIN_BALANCER_SA
 use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
-#[cfg(feature = "benchmark")]
-pub use manager::SESSION_FORWARD_CAPACITY;
-pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+pub use manager::{
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, IncomingSessionPixConfig,
+    MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig,
+};
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
+pub use hopr_api::types::internal::routing::DestinationRouting;
+pub use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
+pub use hopr_protocol_pix::{InvalidPixParams, PixParams};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
+#[cfg(any(test, feature = "testing"))]
+pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
-    ByteCapabilities, HoprSession, HoprSessionConfig, HoprStartProtocol, IncomingSession, SESSION_APPLICATION_TAG,
-    ServiceId, SessionId, SessionTarget,
+    AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
+    DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
+    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
@@ -66,7 +75,13 @@ flagset::flags! {
         /// Disable SURB-based egress rate control.
         ///
         /// This applies only to the recipient of the Session (Exit).
+        ///
+        /// If not set, the lower half of additional data may contain information about the desired SURB buffer size.
         NoRateControl = 0b0001_0000,
+        /// Indicates to the Session recipient (Exit) that this Session should use the PIX protocol.
+        ///
+        /// The upper half of additional data may be used to configure the PIX protocol parameters.
+        UsePIX = 0b0010_0000,
     }
 }
 
@@ -105,6 +120,24 @@ pub struct SessionClientConfig {
     /// Default is `false`.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// PIX parameters for SSAs.
+    ///
+    /// When not set, the Session will not advertise any PIX capability and may
+    /// get refused by the Exit (if it requires PIX).
+    ///
+    /// The Exit may also refuse to accept the Session if the given values
+    /// evaluate to a PIX quota that is not within Exit's acceptable PIX quota range.
+    ///
+    /// These are not free parameters: the shares this node puts on the wire come from the installed
+    /// [`SsaShareGenerator`](hopr_protocol_pix::SsaShareGenerator), so
+    /// [`SessionManager::new_session`] refuses any value that disagrees with it rather than
+    /// advertising dimensions it cannot honour. Setting this is therefore an assertion about the
+    /// node's own PIX configuration — build it with
+    /// [`PixParams::try_from`](hopr_protocol_pix::PixParams) over that generator's config if you do
+    /// not want to restate it.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session.
     ///
     /// `None` (the default) leaves the session unpaced — today's behaviour. `Some(..)` enables the
@@ -122,7 +155,8 @@ mod tests {
     use hopr_protocol_app::v1::ApplicationData;
     use hopr_protocol_session::session_socket_mtu;
     use hopr_protocol_start::{
-        KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+        ErrorIdentifier, KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished,
+        StartInitiation,
     };
 
     use super::*;
@@ -163,7 +197,7 @@ mod tests {
         );
 
         let msg = HoprStartProtocol::SessionError(StartErrorType {
-            challenge: StartChallenge::MAX,
+            identifier: ErrorIdentifier::Challenge(StartChallenge::MAX),
             reason: StartErrorReason::NoSlotsAvailable,
         });
 

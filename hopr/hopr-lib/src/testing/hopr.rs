@@ -14,7 +14,7 @@ use crate::{
         },
     },
     config::{HoprLibConfig, SessionGlobalConfig, TransitLatencyConfig},
-    testing::{TestingConnector, TestingHopr},
+    testing::TestingHopr,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -27,6 +27,9 @@ pub fn create_hopr_instance_config(
     host_port: u16,
     safe: NodeSafeConfig,
     winn_prob: f64,
+    pix_config: Option<crate::exports::transport::session::IncomingSessionPixConfig>,
+    idle_timeout_ms: u64,
+    pix_global_config: Option<crate::exports::transport::config::PixGlobalConfig>,
     transit_latency: Option<TransitLatencyConfig>,
 ) -> HoprLibConfig {
     HoprLibConfig {
@@ -44,7 +47,7 @@ pub fn create_hopr_instance_config(
                 announce_local_addresses: true,
             },
             session: SessionGlobalConfig {
-                idle_timeout: Duration::from_millis(2500),
+                idle_timeout: Duration::from_millis(idle_timeout_ms),
                 // Disable EXIT→ENTRY SURB level notifications in test clusters.
                 // With the default notify period (2 s) less than idle_timeout (2.5 s),
                 // each notification resets the moka TTI and prevents session expiration tests
@@ -70,21 +73,30 @@ pub fn create_hopr_instance_config(
             stream: Default::default(),
             path_planner: Default::default(),
             counter_flush_interval: Default::default(),
+            pix: pix_global_config.unwrap_or_default(),
+            incoming_session_pix_config: pix_config.unwrap_or_default(),
         },
         publish: true,
         ..Default::default()
     }
 }
 
-pub struct TestedHopr {
+pub struct TestedHopr<TMgr: 'static = crate::testing::wiring::SharedTicketManager> {
     // Tokio runtime in which all long-running tasks of the HOPR node are spawned.
     runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
-    pub instance: Arc<TestingHopr>,
-    pub connector: TestingConnector,
+    pub instance: Arc<
+        crate::Hopr<
+            crate::testing::TestingConnector,
+            crate::testing::TestingGraph,
+            hopr_transport_p2p::HoprNetwork,
+            TMgr,
+        >,
+    >,
+    pub connector: crate::testing::TestingConnector,
 }
 
-impl std::fmt::Debug for TestedHopr {
+impl<TMgr: 'static> std::fmt::Debug for TestedHopr<TMgr> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TestedHopr")
             .field("instance", &self.instance.identity().node_address)
@@ -92,8 +104,19 @@ impl std::fmt::Debug for TestedHopr {
     }
 }
 
-impl TestedHopr {
-    pub fn new(runtime: tokio::runtime::Runtime, instance: Arc<TestingHopr>, connector: TestingConnector) -> Self {
+impl<TMgr: 'static + Send + Sync> TestedHopr<TMgr> {
+    pub fn new(
+        runtime: tokio::runtime::Runtime,
+        instance: Arc<
+            crate::Hopr<
+                crate::testing::TestingConnector,
+                crate::testing::TestingGraph,
+                hopr_transport_p2p::HoprNetwork,
+                TMgr,
+            >,
+        >,
+        connector: crate::testing::TestingConnector,
+    ) -> Self {
         assert_eq!(
             HoprState::Running,
             HoprNodeOperations::status(&*instance),
@@ -107,7 +130,7 @@ impl TestedHopr {
     }
 }
 
-impl Drop for TestedHopr {
+impl<TMgr: 'static> Drop for TestedHopr<TMgr> {
     fn drop(&mut self) {
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
@@ -116,8 +139,15 @@ impl Drop for TestedHopr {
     }
 }
 
-impl TestedHopr {
-    pub fn inner(&self) -> &TestingHopr {
+impl<TMgr: 'static + Send + Sync> TestedHopr<TMgr> {
+    pub fn inner(
+        &self,
+    ) -> &crate::Hopr<
+        crate::testing::TestingConnector,
+        crate::testing::TestingGraph,
+        hopr_transport_p2p::HoprNetwork,
+        TMgr,
+    > {
         &self.instance
     }
 
@@ -129,7 +159,7 @@ impl TestedHopr {
         (*self.instance.graph().me()).into()
     }
 
-    pub fn connector(&self) -> &TestingConnector {
+    pub fn connector(&self) -> &crate::testing::TestingConnector {
         &self.connector
     }
 
@@ -247,7 +277,7 @@ impl ChannelGuard {
                     }
                     Ok::<_, crate::errors::HoprLibError>(false)
                 },
-                Duration::from_secs(30),
+                Duration::from_secs(5),
             )
             .await
             .context("channel did not reach Closed state")?;
@@ -284,7 +314,7 @@ impl Drop for ChannelGuard {
                                 }
                                 Ok::<_, crate::errors::HoprLibError>(false)
                             },
-                            Duration::from_secs(30),
+                            Duration::from_secs(5),
                         )
                         .await;
                     }
