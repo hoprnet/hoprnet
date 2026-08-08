@@ -50,8 +50,7 @@ use crate::{
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
         ClosureReason, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprSessionCapabilities, HoprSessionConfig,
-        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaDimensions, SsaQuota,
-        pix_params_to_quota,
+        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -951,14 +950,15 @@ impl PixToolbox {
 /// each SSA will use, which together define the data quota per SSA; the third is how many extra
 /// shares per polynomial the Entry emits to absorb losses, and is not part of the quota.
 ///
-/// Before encoding, the Entry validates that the requested [`SsaDimensions`] match the installed
-/// [`SsaShareGenerator`]'s configured [`hopr_protocol_pix::SsaGeneratorConfig::polynomials_per_ssa`] and
-/// [`hopr_protocol_pix::SsaGeneratorConfig::threshold`]. This ensures the generator that produces PIX shares
-/// for return-path SURBs operates at the same dimensions advertised to the Exit — a
-/// mismatch would let the session proceed with incompatible share parameters. The
-/// validation runs before the initiation challenge slot is reserved, so repeated
-/// misconfigurations cannot exhaust challenge slots. The surplus is then taken from that same
-/// generator rather than from the caller, since it is a property of the node, not of the request.
+/// What is announced is built from the installed [`SsaShareGenerator`]'s
+/// [`SsaGeneratorConfig`](hopr_protocol_pix::SsaGeneratorConfig), never from the caller: the
+/// generator is what produces the shares that go on the wire, so advertising anything else would
+/// let the Session proceed while emitting shares the Exit cannot reconstruct. The caller's
+/// `pix_ssa_quota` is an assertion about this node's own PIX configuration, and a disagreement is
+/// refused so a caller whose belief is stale fails loudly rather than silently getting a different
+/// per-SSA quota — and so differently sized deposits — than it sized for. That check runs before
+/// the initiation challenge slot is reserved, so repeated misconfigurations cannot exhaust
+/// challenge slots.
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
@@ -1493,10 +1493,7 @@ where
                 .into());
             }
 
-            let SsaDimensions {
-                polys_per_ssa,
-                shares_per_poly: shares_per_ssa,
-            } = cfg
+            let requested = cfg
                 .pix_ssa_quota
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested without PIX SSA quota")))?;
 
@@ -1506,31 +1503,22 @@ where
                 .get()
                 .ok_or_else(|| SessionManagerError::Other(anyhow!("UsePIX requested but no PIX toolbox installed")))?;
 
-            // Validate that the requested dimensions match the installed generator's
-            // configuration. The generator was initialized with fixed dimensions at startup;
-            // advertising mismatched values would let the session proceed but produce
-            // incompatible PIX shares on the wire.
+            // The installed generator is what actually produces the shares that go on the wire, so
+            // it — not the caller — is the source of the announced parameters. The requested value
+            // is an assertion about this node's own PIX configuration, checked so that a caller
+            // whose belief is stale fails loudly instead of silently getting different dimensions
+            // (and so a different per-SSA quota, and so differently sized deposits) than it sized
+            // for. Advertising the caller's value instead would let the Session proceed while
+            // producing shares the Exit cannot reconstruct.
             let gen_cfg = pix_toolbox.share_generator.config();
-            if polys_per_ssa != gen_cfg.polynomials_per_ssa {
-                return Err(SessionManagerError::Unacceptable(format!(
-                    "requested polys_per_ssa {} does not match installed generator ({})",
-                    polys_per_ssa, gen_cfg.polynomials_per_ssa,
-                ))
-                .into());
-            }
-            if shares_per_ssa != gen_cfg.threshold {
-                return Err(SessionManagerError::Unacceptable(format!(
-                    "requested shares_per_ssa {} does not match installed generator ({})",
-                    shares_per_ssa, gen_cfg.threshold,
-                ))
-                .into());
-            }
-
-            // The surplus is not part of what the caller asked for — it belongs to the generator —
-            // so the whole triple is taken from there, having just established that its first two
-            // fields are what was requested. This is also where the protocol ranges are enforced.
             let params = PixParams::try_from(gen_cfg)
                 .map_err(|error| SessionManagerError::Other(anyhow!("invalid PIX dimensions: {error}")))?;
+            if requested != params {
+                return Err(SessionManagerError::Unacceptable(format!(
+                    "requested PIX parameters {requested} do not match installed generator ({params})"
+                ))
+                .into());
+            }
 
             let _ = current_ssa_state.set(SessionSsaState::new(params));
             additional_data = params.into_additional_data(additional_data as u32);
@@ -5196,7 +5184,7 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some(SsaDimensions::new(2, 2)),
+                    pix_ssa_quota: Some(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(0.try_into()?),
                     ..Default::default()
@@ -5225,15 +5213,14 @@ mod tests {
     }
 
     /// Verifies that `new_session` rejects UsePIX when the requested
-    /// `polys_per_ssa`/`shares_per_ssa` don't match the installed
-    /// `SsaShareGenerator`'s configured dimensions.
+    /// `pix_ssa_quota` doesn't match the installed `SsaShareGenerator`'s configured dimensions.
     ///
     /// ## Steps
-    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3)`.
+    /// 1. Create a `PixToolbox` with a generator configured for `(polys=5, shares=3, surplus=5)`.
     /// 2. Start the manager with that toolbox installed.
-    /// 3. Call `new_session` requesting `pix_ssa_quota: Some(SsaDimensions::new(10, 10))` — both values are within
-    ///    protocol bounds but mismatch the generator.
-    /// 4. Assert the error identifies which dimension doesn't match.
+    /// 3. Call `new_session` requesting `pix_ssa_quota: Some(PixParams::try_new(10, 10, 5))` — every value is within
+    ///    protocol bounds but mismatches the generator.
+    /// 4. Assert the error identifies the mismatch.
     /// 5. Assert no challenge slot was consumed (validation runs before slot reservation).
     #[test_log::test(tokio::test)]
     async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
@@ -5268,8 +5255,8 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    // Both values pass protocol bounds but polys=10 != generator's 5
-                    pix_ssa_quota: Some(SsaDimensions::new(10, 10)),
+                    // All three pass protocol bounds but polys=10 != generator's 5
+                    pix_ssa_quota: Some(PixParams::try_new(10, 10, 5)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
                     ..Default::default()
@@ -5280,8 +5267,34 @@ mod tests {
         let err = result.unwrap_err();
         let msg = format!("{err:?}");
         assert!(
-            msg.contains("does not match installed generator"),
+            msg.contains("do not match installed generator"),
             "expected generator mismatch error, got: {msg}"
+        );
+
+        // A surplus-only mismatch must be rejected too. It is the value with no other consumer —
+        // nothing downstream would notice it being wrong — so if the comparison ever narrows back
+        // to the two priced dimensions, this is what catches it.
+        let result = mgr
+            .new_session(
+                Address::from(&ChainKeypair::random()),
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capability::UsePIX.into(),
+                    surb_management: None,
+                    pix_ssa_quota: Some(PixParams::try_new(
+                        ssa_gen_config.polynomials_per_ssa,
+                        ssa_gen_config.threshold,
+                        ssa_gen_config.surplus_shares + 1,
+                    )?),
+                    forward_path_options: RoutingOptions::Hops(1.try_into()?),
+                    return_path_options: RoutingOptions::Hops(2.try_into()?),
+                    ..Default::default()
+                },
+            )
+            .await;
+        assert!(
+            format!("{:?}", result.unwrap_err()).contains("do not match installed generator"),
+            "a surplus-only mismatch must be rejected"
         );
 
         assert_eq!(mgr.num_active_sessions(), 0);

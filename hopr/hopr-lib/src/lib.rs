@@ -74,8 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    FlowControlConfig, HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget,
-    SsaDimensions, SurbBalancerConfig,
+    FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, PixParams, SessionCapabilities,
+    SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -156,8 +156,13 @@ pub struct HoprSessionClientConfig {
     pub always_max_out_surbs: bool,
     /// If set, sets the PIX dimensions for the Session.
     ///
+    /// These must match this node's own PIX configuration exactly — see
+    /// [`SessionClientConfig::pix_ssa_quota`](hopr_transport::SessionClientConfig) — so the usual
+    /// way to build one is [`PixParams::try_from`] over the installed generator's config rather
+    /// than by restating the three values.
+    ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<SsaDimensions>,
+    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
@@ -185,10 +190,10 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     pub always_max_out_surbs: bool,
-    /// If set, sets the PIX quota `(polys_per_ssa, shares_per_ssa)` for the Session.
+    /// If set, sets the PIX dimensions for the Session.
     ///
     /// Defaults to `None`.
-    pub pix_ssa_quota: Option<(u32, u32)>,
+    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
 }
@@ -243,19 +248,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
-            pix_ssa_quota: value
-                .pix_ssa_quota
-                .map(|(p, s)| {
-                    fn narrow<T: TryFrom<u32, Error = std::num::TryFromIntError>>(
-                        v: u32,
-                    ) -> Result<T, hopr_api::types::primitive::errors::GeneralError> {
-                        v.try_into().map_err(|e: std::num::TryFromIntError| {
-                            hopr_api::types::primitive::errors::GeneralError::NonSpecificError(e.to_string())
-                        })
-                    }
-                    Ok(SsaDimensions::new(narrow(p)?, narrow(s)?))
-                })
-                .transpose()?,
+            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
         })
     }

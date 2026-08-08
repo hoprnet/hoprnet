@@ -51,6 +51,15 @@ const PIX_SHARES: u8 = 2;
 /// differs from every default is what makes it visible whether the surplus really crossed the wire.
 const PIX_SURPLUS: u8 = 2;
 
+/// The three above as the Session asks for them.
+///
+/// `const` rather than built at the call site so the range check runs at compile time — the values
+/// are constants, so a typo here should not need a cluster to boot before it is noticed.
+const PIX_PARAMS: hopr_lib::PixParams = match hopr_lib::PixParams::try_new(PIX_POLYS, PIX_SHARES, PIX_SURPLUS) {
+    Ok(params) => params,
+    Err(_) => panic!("test PIX parameters must be within the protocol ranges"),
+};
+
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///
 /// Deliberately above the Entry's default cap of 2, so the test also proves that
@@ -185,7 +194,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         pseudonym: None,
                         surb_management: None,
                         always_max_out_surbs: false,
-                        pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
+                        pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
                     },
                 )
@@ -413,7 +422,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                         pseudonym: None,
                         surb_management: None,
                         always_max_out_surbs: false,
-                        pix_ssa_quota: Some(hopr_lib::SsaDimensions::new(PIX_POLYS, PIX_SHARES)),
+                        pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
                     },
                 )
