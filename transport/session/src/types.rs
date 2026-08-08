@@ -29,10 +29,7 @@ use hopr_protocol_session::{
     flow_control::{DeliveryClock, DeliveryMeter, DeliveryTap, FlowControlConfig},
 };
 use hopr_protocol_start::StartProtocol;
-use hopr_utils::network_types::{
-    prelude::SealedHost,
-    utils::{AsyncWriteSink, DuplexIO},
-};
+use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
 use tracing::{debug, instrument};
 
 use crate::{
@@ -260,11 +257,14 @@ impl HoprSessionInPixEvent {
 /// Previously tags were dynamically allocated per session.
 pub const SESSION_APPLICATION_TAG: Tag = Tag::Reserved(ReservedTag::Session as u64);
 
-/// Unique ID of a specific Session.
+/// [`SessionId`], [`ServiceId`], and [`SessionTarget`] are provided by `hopr-types` and
+/// re-exported here via `hopr-utils`, so they match the published `hopr-api` session types.
 ///
-/// Now a simple type alias for HoprPseudonym since we use a constant
-/// application tag for all sessions instead of dynamically allocating tags.
-pub type SessionId = HoprPseudonym;
+/// - `SessionId` is a type alias for `HoprPseudonym` (a constant application tag is used for all sessions instead
+///   of dynamically allocating tags).
+/// - `ServiceId` identifies a service local to the Exit node (e.g. Cover Traffic).
+/// - `SessionTarget` describes where data received over the session is forwarded.
+pub use hopr_utils::network_types::types::{ServiceId, SessionId, SessionTarget};
 
 pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
@@ -293,34 +293,12 @@ pub enum ClosureReason {
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send + Unpin {}
 impl<T: futures::AsyncWrite + futures::AsyncRead + Send + Unpin> AsyncReadWrite for T {}
 
-/// Describes a node service target.
-/// These are specialized [`SessionTargets`](SessionTarget::ExitNode)
-/// that are local to the Exit node and have different purposes, such as Cover Traffic.
+/// Wrapper for an incoming [`HoprSession`] carrying the [`SessionId`] and [`SessionTarget`]
+/// extracted from the Start protocol during session establishment.
 ///
-/// These targets cannot be [sealed](SealedHost) from the Entry node.
-pub type ServiceId = u32;
-
-/// Defines what should happen with the data at the recipient where the
-/// data from the established session are supposed to be forwarded to some `target`.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum SessionTarget {
-    /// Target is running over UDP with the given IP address and port.
-    UdpStream(SealedHost),
-    /// Target is running over TCP with the given address and port.
-    TcpStream(SealedHost),
-    /// Target is a service directly at the exit node with the given service ID.
-    ExitNode(ServiceId),
-}
-
-/// Wrapper for incoming [`HoprSession`] along with other information
-/// extracted from the Start protocol during the session establishment.
-#[derive(Debug)]
-pub struct IncomingSession {
-    /// Actual incoming session.
-    pub session: HoprSession,
-    /// Desired [target](SessionTarget) of the data received over the session.
-    pub target: SessionTarget,
-}
+/// This is the published generic [`hopr_api::node::IncomingSession`] specialized to the
+/// concrete [`HoprSession`] byte-stream.
+pub type IncomingSession = hopr_api::node::IncomingSession<HoprSession>;
 
 /// Configures the Session protocol socket over HOPR.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, serde::Serialize)]
@@ -649,10 +627,13 @@ impl tokio::io::AsyncWrite for HoprSession {
 mod tests {
     use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_api::{
-        Address,
-        types::{crypto::prelude::*, crypto_random::Randomizable, internal::routing::RoutingOptions},
+    use hopr_api::types::{
+        crypto::prelude::*,
+        crypto_random::Randomizable,
+        internal::{prelude::HoprPseudonym, routing::RoutingOptions},
+        primitive::prelude::*,
     };
+    use hopr_utils::network_types::prelude::SealedHost;
 
     use super::*;
 
