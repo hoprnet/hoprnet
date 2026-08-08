@@ -1110,6 +1110,27 @@ where
         cfg.pix_config.supervision.ssas_per_request =
             cfg.pix_config.supervision.ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE);
 
+        // Every supervisor duration, for the same reason and with more riding on it. A duration the
+        // monotonic clock cannot represent makes `Instant::checked_add` return `None`, and every phase
+        // reads an absent deadline as *no deadline* — so an over-large value does not produce a distant
+        // deadline, it silently disables the rule. `validate_pix_supervision` rejects such a config, but
+        // only a node built from a config file goes through it.
+        //
+        // The two batch-scaled deadlines are clamped by the scaled value, since that is what is armed;
+        // dividing by the batch size (already clamped to at least 1 above) is what keeps the product
+        // under the cap.
+        {
+            let sup = &mut cfg.pix_config.supervision;
+            let per_cycle_cap = crate::supervision::MAX_SUPERVISOR_DURATION / sup.ssas_per_request as u32;
+            sup.max_ssa_delivery_time = sup.max_ssa_delivery_time.min(per_cycle_cap);
+            sup.max_deposit_wait = sup.max_deposit_wait.min(per_cycle_cap);
+            sup.max_recovery_idle = sup.max_recovery_idle.min(crate::supervision::MAX_SUPERVISOR_DURATION);
+            sup.max_recovery_time = sup.max_recovery_time.min(crate::supervision::MAX_SUPERVISOR_DURATION);
+            sup.tombstone_retention_window = sup
+                .tombstone_retention_window
+                .min(crate::supervision::MAX_SUPERVISOR_DURATION);
+        }
+
         #[cfg(all(feature = "telemetry", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -5410,6 +5431,62 @@ mod tests {
     // ---------------------------------------------------------------------------
     // PIX protocol tests
     // ---------------------------------------------------------------------------
+
+    /// Supervisor durations a programmatic caller supplies must be clamped, not trusted.
+    ///
+    /// `validate_pix_supervision` rejects these, but nothing in this crate calls `validate` — a
+    /// `SessionManagerConfig` assembled in code reaches the supervisor exactly as written. And the
+    /// failure is silent in the worst direction: `Instant::checked_add` returns `None` for a duration
+    /// the monotonic clock cannot represent, and every phase reads an absent deadline as *no
+    /// deadline*, so the over-large value disables the rule rather than relaxing it.
+    ///
+    /// The two batch-scaled deadlines are clamped by what is actually armed, so a batch of `n` leaves
+    /// each of them at a cap `n` times smaller.
+    #[test]
+    fn programmatic_supervisor_durations_are_clamped_to_a_representable_deadline() {
+        const BATCH: usize = 4;
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    supervision: SupervisorConfig {
+                        ssas_per_request: BATCH,
+                        max_ssa_delivery_time: Duration::MAX,
+                        max_deposit_wait: Duration::MAX,
+                        max_recovery_idle: Duration::MAX,
+                        max_recovery_time: Duration::MAX,
+                        tombstone_retention_window: Duration::MAX,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let sup = &mgr.cfg.pix_config.supervision;
+        let cap = crate::supervision::MAX_SUPERVISOR_DURATION;
+        let per_cycle_cap = cap / BATCH as u32;
+
+        assert_eq!(per_cycle_cap, sup.max_ssa_delivery_time);
+        assert_eq!(per_cycle_cap, sup.max_deposit_wait);
+        assert_eq!(cap, sup.max_recovery_idle);
+        assert_eq!(cap, sup.max_recovery_time);
+        assert_eq!(cap, sup.tombstone_retention_window);
+
+        // Which is exactly the condition that makes every deadline representable.
+        let now = std::time::Instant::now();
+        for dur in [
+            crate::supervision::scaled_deadline(sup.max_ssa_delivery_time, sup.ssas_per_request),
+            crate::supervision::scaled_deadline(sup.max_deposit_wait, sup.ssas_per_request),
+            sup.max_recovery_idle,
+            sup.max_recovery_time,
+            sup.tombstone_retention_window,
+        ] {
+            assert!(
+                now.checked_add(dur).is_some(),
+                "a clamped duration ({dur:?}) must still produce a deadline"
+            );
+        }
+    }
 
     /// Verifies that an incoming session initiation with a PIX quota outside the acceptable range
     /// is rejected with `StartErrorReason::UnacceptablePixParams`.

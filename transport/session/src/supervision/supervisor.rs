@@ -147,9 +147,18 @@ pub struct SessionPixSupervisor {
     /// Tracks the first failure reason when multiple SSAs fail, so the
     /// earliest cause is used for the final `Close` action rather than the last.
     first_failure_reason: Option<SessionPixCloseReason>,
-    /// SSA indices that have been retired (closed and removed).
-    /// Prevents stale SsaRequestSent events from resurrecting closed SSAs.
-    retired_ssa_indices: Vec<SsaIndex>,
+    /// Greatest SSA index that has been retired (closed and removed).
+    ///
+    /// Prevents a stale `SsaRequestSent` from resurrecting a closed SSA. A high-watermark rather
+    /// than the set of every retired index: the set grew for the whole life of the Session and was
+    /// scanned linearly on every request, one entry per cycle, without bound.
+    ///
+    /// A watermark alone would be wrong if it were consulted first — retirement is not monotone,
+    /// since a later batch member can lose its deposit while an earlier one is still recovering, and
+    /// "at or below the greatest retired index" would then condemn that live earlier cycle. The
+    /// guard is therefore placed *after* the live-record lookup, so a cycle that still exists always
+    /// wins and the watermark only ever answers for indices that have none.
+    highest_retired_ssa_index: Option<SsaIndex>,
 }
 
 impl SessionPixSupervisor {
@@ -173,7 +182,7 @@ impl SessionPixSupervisor {
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
-            retired_ssa_indices: Vec::new(),
+            highest_retired_ssa_index: None,
         };
 
         let actions = s.emit_request_next_ssa(now);
@@ -210,6 +219,18 @@ impl SessionPixSupervisor {
         actions.extend(self.release_service_if_front_is_funded());
         self.refresh_share_order_front();
         actions
+    }
+
+    /// Raises the retired-index watermark.
+    ///
+    /// Takes the maximum rather than assuming the caller retires in order, because it does not: a
+    /// later batch member losing its deposit is retired before an earlier one that is still
+    /// recovering.
+    fn note_retired_index(&mut self, index: SsaIndex) {
+        self.highest_retired_ssa_index = Some(match self.highest_retired_ssa_index {
+            Some(highest) if highest >= index => highest,
+            _ => index,
+        });
     }
 
     /// Index of the earliest cycle that has not finished recovering — the one the Entry should be
@@ -370,7 +391,7 @@ impl SessionPixSupervisor {
         self.ssas
             .retain(|ssa| !matches!(ssa.phase, SsaPhase::Recovered { tombstone_until } if now >= tombstone_until));
         for id in retired_ids {
-            self.retired_ssa_indices.push(id.ssa_index());
+            self.note_retired_index(id.ssa_index());
             actions.push(SessionPixAction::RetireSsa(id));
         }
 
@@ -459,13 +480,20 @@ impl SessionPixSupervisor {
             return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
         }
 
-        // Guard: reject if this SSA index was already retired.
-        if self.retired_ssa_indices.contains(&ssa_id.ssa_index()) {
-            return Vec::new();
-        }
-
+        // The live-record lookup comes first, and the staleness guard only answers for indices that
+        // have no record. Retirement is not monotone — a later batch member can lose its deposit while
+        // an earlier one is still recovering — so a watermark consulted first would silently ignore a
+        // legitimate request for a cycle that is very much alive. Asking the records first removes the
+        // assumption instead of relying on it.
         let Some(idx) = self.find_ssa_idx(ssa_id) else {
-            // A confirmation for an SSA we never asked for.
+            // No live record. Either this index was retired and the event is a straggler, which is
+            // benign and ignored, or we were never asked for it at all, which is a protocol fault.
+            if self
+                .highest_retired_ssa_index
+                .is_some_and(|highest| ssa_id.ssa_index() <= highest)
+            {
+                return Vec::new();
+            }
             return vec![SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)];
         };
 
@@ -955,7 +983,7 @@ impl SessionPixSupervisor {
         // Record the retired index to prevent stale SsaRequestSent events
         // from resurrecting it.
         let retired = self.ssas[idx].ssa_id;
-        self.retired_ssa_indices.push(retired.ssa_index());
+        self.note_retired_index(retired.ssa_index());
         let carried_successor_gate = self.ssas[idx].is_batch_last && !self.ssas[idx].next_requested;
         self.ssas.remove(idx);
 
@@ -1924,6 +1952,97 @@ mod tests {
         assert!(
             actions.iter().any(|a| matches!(a, SessionPixAction::ReleaseService)),
             "a cycle funded and retired in one call has still paid for its service; got {actions:?}"
+        );
+    }
+
+    /// A live cycle below the retired watermark must still accept its own request event.
+    ///
+    /// Retirement is not monotone: a later batch member can lose its deposit — timeout, observer
+    /// closure — while an earlier one is still recovering, which puts the watermark *above* a live
+    /// index. A staleness guard consulted before the record lookup would then silently drop the
+    /// earlier cycle's `SsaRequestSent`, leaving its commitment deadline unarmed and the Entry free
+    /// to never answer. Looking the record up first is what removes the assumption.
+    #[test]
+    fn a_live_cycle_below_the_retired_watermark_still_arms_its_deadline() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let earlier = ssa_id(p, 1);
+        let later = ssa_id(p, 2);
+
+        // The later member is retired first, which puts the watermark above the earlier one.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(later), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: later,
+                expected_deposit: Some(sufficient_balance()),
+            },
+            now,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::DepositObserverClosed(later), now, 0);
+        assert_eq!(
+            Some(later.ssa_index()),
+            sup.highest_retired_ssa_index,
+            "the later member must have set the watermark"
+        );
+
+        // The earlier member is still live, and its request event must still arm the clock.
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(earlier), now, 0);
+        let armed = sup
+            .ssas
+            .iter()
+            .find(|s| s.ssa_id == earlier)
+            .expect("the earlier cycle must still be live")
+            .commitment_deadline;
+        assert!(
+            armed.is_some(),
+            "a live cycle below the watermark must still have its commitment deadline armed"
+        );
+    }
+
+    /// And a straggler for an index that really is gone stays benign rather than closing the Session.
+    ///
+    /// A batch of two, so retiring one member leaves the Session alive — retiring the last live cycle
+    /// closes it outright, and a closed supervisor ignores everything, which would make the second
+    /// half of this test vacuous.
+    #[test]
+    fn a_request_event_for_a_retired_index_is_ignored() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let retired = ssa_id(p, 1);
+
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(retired), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::CommitmentVerified {
+                ssa_id: retired,
+                expected_deposit: Some(sufficient_balance()),
+            },
+            now,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::DepositObserverClosed(retired), now, 0);
+        assert!(!sup.closed, "the second batch member must keep the Session alive");
+
+        let actions = sup.handle_event(&SessionPixEvent::SsaRequestSent(retired), now, 0);
+        assert!(
+            actions.iter().all(|a| !matches!(a, SessionPixAction::Close(_))),
+            "a straggling request for a retired index must be ignored, not fatal; got {actions:?}"
+        );
+
+        // An index we were never asked for is a different matter — above the watermark and with no
+        // record, it can only be an SSA this supervisor never registered.
+        let actions = sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 9)), now, 0);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::InvalidTransition))),
+            "an index above the watermark with no record is a protocol fault; got {actions:?}"
         );
     }
 

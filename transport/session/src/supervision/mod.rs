@@ -862,15 +862,12 @@ pub fn validate_pix_supervision(
         ));
     }
     // Reject durations that would overflow the monotonic clock when used as
-    // deadlines. 24 h is a safe upper bound — no supervisor duration should
-    // ever be this large, and the cap prevents silent deadline loss via
-    // Instant::checked_add returning None.
+    // deadlines. See `MAX_SUPERVISOR_DURATION`.
     //
     // The first two are checked *as armed*, i.e. multiplied by the batch size, because that product
     // is the duration a deadline is actually set to. Checking the unscaled value would let a config
     // pass here and then be silently clamped at arming time, which is the failure mode this cap
     // exists to make loud.
-    const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
     for (name, dur) in [
         (
             "max_ssa_delivery_time",
@@ -893,6 +890,20 @@ pub fn validate_pix_supervision(
     }
     Ok(())
 }
+
+/// Upper bound on any supervisor duration, as it is actually armed.
+///
+/// 24 h is far above anything a supervisor deadline should be, and the point is not the number but
+/// the failure it forecloses: every phase reads an absent deadline as *no deadline*, and
+/// `Instant::checked_add` returns `None` for a duration the monotonic clock cannot represent. So a
+/// large enough configured value does not produce a long deadline, it produces none at all — the
+/// supervisor silently stops enforcing that phase.
+///
+/// Enforced twice, and deliberately so. [`validate_pix_supervision`] *rejects* a config above it,
+/// which is what an operator should see. `SessionManager::new` *clamps* to it, because nothing in
+/// this crate calls `validate` and a programmatically assembled config would otherwise reach the
+/// supervisor unchecked.
+pub(crate) const MAX_SUPERVISOR_DURATION: Duration = Duration::from_secs(86400);
 
 /// A per-cycle deadline duration as it is actually armed for a batch of `ssas_per_request`.
 ///
