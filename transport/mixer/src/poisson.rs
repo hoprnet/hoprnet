@@ -256,7 +256,7 @@ async fn run_engine<T>(
 
 /// Instantiate a Poisson mixing channel, spawning the dedicated engine thread.
 ///
-/// Drop-in alternative to [`crate::channel()`]: same `Sender`/`Receiver` shapes, but the
+/// Drop-in alternative to the uniform `channel()`: same `Sender`/`Receiver` shapes, but the
 /// release process is exponential (memoryless) rather than uniform.
 pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
     #[cfg(all(feature = "telemetry", not(test)))]

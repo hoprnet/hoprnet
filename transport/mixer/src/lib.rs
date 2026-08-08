@@ -2,9 +2,9 @@
 //!
 //! Each mixer implementation is behind its own feature so a consumer compiles only what it
 //! uses:
-//! - `poisson` (default) — the exponential (Poisson) release engine, [`poisson_channel`].
-//! - `uniform-channel` — the uniform-delay min-heap channel, [`channel()`].
-//! - `uniform-adapter` — the uniform-delay `Sink` adapter, [`MixerSink`].
+//! - `poisson` (default) — the exponential (Poisson) release engine, `poisson_channel()`.
+//! - `uniform-channel` — the uniform-delay min-heap channel, `channel()`.
+//! - `uniform-adapter` — the uniform-delay `Sink` adapter, `MixerSink`.
 
 pub mod config;
 pub mod error;
