@@ -28,6 +28,9 @@ default = ["poisson"]
 all-benchmarks = []
 # Exponential (Poisson) release engine — `poisson_channel`.
 poisson = ["dep:async-channel", "futures/executor"]
+# EXPERIMENTAL shared-pool Poisson engine (no dedicated thread / relay channels) — for the
+# throughput comparison against `poisson_channel`; not wired into production.
+poisson-shared = ["poisson", "dep:parking_lot"]
 # Uniform-delay min-heap channel — `channel`.
 uniform-channel = ["dep:parking_lot", "dep:tracing"]
 # Uniform-delay `Sink` adapter — `MixerSink`.
@@ -70,3 +73,8 @@ name = "mixer_throughput_bench"
 harness = false
 # Compares all three implementations, so it needs every mixer feature enabled.
 required-features = ["poisson", "uniform-channel", "uniform-adapter"]
+
+[[bench]]
+name = "poisson_shared_bench"
+harness = false
+required-features = ["poisson-shared"]

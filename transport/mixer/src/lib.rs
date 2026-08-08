@@ -24,11 +24,16 @@ pub mod poisson;
 #[cfg(feature = "poisson")]
 mod pool;
 
+#[cfg(feature = "poisson-shared")]
+pub mod poisson_shared;
+
 #[cfg(feature = "uniform-channel")]
 pub use channel::channel;
 pub use config::MixerConfig;
 pub use error::SenderError;
 #[cfg(feature = "poisson")]
 pub use poisson::poisson_channel;
+#[cfg(feature = "poisson-shared")]
+pub use poisson_shared::poisson_shared_channel;
 #[cfg(feature = "uniform-adapter")]
 pub use sink::MixerSink;
