@@ -22,9 +22,8 @@ use hopr_crypto_packet::{
 };
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
-    DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator, ExitAcknowledgementShareProcessor,
-    GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec, SsaCommitmentGuard, SsaGeneratorConfig, SsaId,
-    SsaReconstructor, SsaShareGenerator,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec,
+    SsaCommitmentGuard, SsaId, SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
@@ -53,8 +52,9 @@ use crate::{
         SupervisorConfig, spawn_supervisor_worker,
     },
     types::{
-        ClosureReason, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprSessionCapabilities, HoprSessionConfig,
-        HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+        ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA,
+        HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG,
+        SsaQuota, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -224,9 +224,9 @@ const MAX_CONCURRENT_START_EXCHANGES: usize = 10_000;
 ///
 /// The per-cycle burst is bounded by two independent limits, and the capacity takes the smaller:
 ///
-/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × threshold`, a `threshold`-fold over-estimate, since a cycle carries
-///   one constant term per polynomial and nothing else. The quota alone does not reveal how the product splits, so the
-///   over-estimate cannot be undone from it.
+/// * `quota_range.end() / PAYLOAD_SIZE` is `polys × (threshold + surplus)`, an over-estimate by that whole second
+///   factor, since a cycle carries one constant term per polynomial and nothing else. The quota alone does not reveal
+///   how the product splits, so the over-estimate cannot be undone from it.
 /// * [`MAX_POLYS_PER_SSA`] is the number of polynomials [`SessionManager::check_pix_params`] will accept, whatever the
 ///   quota says. It therefore bounds the commitments a cycle can ever deliver.
 ///
@@ -372,11 +372,11 @@ impl SessionSsaState {
 
     /// Data quota one SSA cycle of these dimensions covers.
     ///
-    /// The *priced* quota, as per [`pix_params_to_quota`] — the negotiated surplus is deliberately
-    /// not charged for.
+    /// The whole cycle, surplus included, as per [`pix_params_to_quota`]: every share a cycle emits
+    /// rides one Exit → Entry packet, so all of them are priced.
     #[inline]
     pub const fn quota_per_ssa(&self) -> SsaQuota {
-        pix_params_to_quota(self.params.polys_per_ssa(), self.params.shares_per_poly())
+        pix_params_to_quota(&self.params)
     }
 }
 
@@ -492,15 +492,21 @@ pub struct IncomingSessionPixConfig {
     /// the incoming Session will be rejected.
     ///
     /// The default is derived from the default PIX dimensions
-    /// ([`crate::DEFAULT_PIX_POLYS_PER_SSA`] × [`crate::DEFAULT_PIX_SHARES_PER_POLY`]) rather than hard-coded,
-    /// so that an Entry running the default configuration is always accepted. The upper bound is
-    /// exactly [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing
-    /// to serve unincentivized per SSA cycle, and accepting more than our own nominal dimensions
-    /// would raise both that exposure and the reconstructor memory held per Session. An Exit that
-    /// wants to serve Entries configured with larger dimensions must widen this range explicitly.
+    /// ([`crate::DEFAULT_PIX_POLYS_PER_SSA`] × ([`crate::DEFAULT_PIX_SHARES_PER_POLY`] +
+    /// [`crate::DEFAULT_PIX_SURPLUS_SHARES`])) rather than hard-coded, so that an Entry running the
+    /// default configuration is always accepted. The upper bound is exactly
+    /// [`DEFAULT_PIX_SSA_QUOTA`]: the range expresses how much data this Exit is willing to serve
+    /// per SSA cycle, and accepting more than our own nominal dimensions would raise both that
+    /// exposure and the reconstructor memory held per Session. An Exit that wants to serve Entries
+    /// configured with larger dimensions must widen this range explicitly.
+    ///
+    /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
+    /// PAYLOAD_SIZE` — so this bounds the traffic actually served rather than the fraction of it the
+    /// threshold accounts for. It used to bound only the latter, which understated the exposure by
+    /// the surplus factor: 1.5× at the deployed dimensions.
     ///
     /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
-    /// (≈ 130 MiB to ≈ 519 MiB, inclusive).
+    /// (≈ 195 MiB to ≈ 778 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Deadlines, fault limits and service budget the Exit-side PIX supervisor enforces on a
@@ -886,12 +892,13 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈130
-///   MiB–519 MiB per SSA).
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈195
+///   MiB–778 MiB per SSA).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
-/// - The Exit only checks the product of the number of polynomials and the threshold, so the Entry can set the
-///   individual parameters so that they better fit its computing power. The computation is easily parallelizable in the
-///   number of polynomials, but not in threshold. The surplus is not priced into that product.
+/// - The Exit only checks the *product* `polys × (threshold + surplus)`, not the individual values, so the Entry can
+///   split it to suit its computing power. The computation is easily parallelizable in the number of polynomials, but
+///   not in threshold. The surplus is inside that product, so redundancy is bought rather than taken: a cycle emits
+///   `threshold + surplus` shares per polynomial come what may, and the deposit covers all of them.
 ///
 /// If parameters are rejected, a [`StartErrorReason::UnacceptablePixParams`] error is returned.
 ///
@@ -2416,7 +2423,7 @@ where
                 })
                 .ok()?;
 
-            let quota_per_ssa = pix_params_to_quota(params.polys_per_ssa(), params.shares_per_poly());
+            let quota_per_ssa = pix_params_to_quota(&params);
             debug!(
                 challenge = req.challenge,
                 %params,
@@ -2425,8 +2432,8 @@ where
                 "client offered MB SSA quota"
             );
 
-            // Only the priced quota is compared: the surplus is known now, but deliberately not
-            // charged for. See `pix_params_to_quota`.
+            // The compared quota covers the whole cycle, surplus included, so the range bounds what
+            // this Exit will actually serve rather than a fraction of it. See `pix_params_to_quota`.
             self.cfg
                 .pix_config
                 .quota_range
@@ -2438,12 +2445,7 @@ where
         } else {
             // Client didn't offer PIX, and PIX is not enforced, so set default values
             // which are not going to be used.
-            PixParams::try_new(
-                DEFAULT_POLYS_PER_SSA,
-                DEFAULT_POLY_THRESHOLD,
-                SsaGeneratorConfig::default().surplus_shares,
-            )
-            .ok()
+            Some(DEFAULT_PIX_PARAMS)
         }
     }
 
@@ -3267,7 +3269,7 @@ where
                 .await;
             return Err(error.into());
         }
-        let quota_per_ssa = pix_params_to_quota(our_params.polys_per_ssa(), our_params.shares_per_poly());
+        let quota_per_ssa = pix_params_to_quota(&our_params);
 
         // Successor gate, the Entry's half of the one in `SessionPixSupervisor`. A correct Exit asks
         // for the next batch when the *last* cycle of the current one is nearly recovered, by which
@@ -5607,11 +5609,7 @@ mod tests {
             challenge: MIN_CHALLENGE,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
             capabilities: HoprSessionCapabilities(Capability::Segmentation | Capability::UsePIX),
-            additional_data: pix_additional_data(
-                DEFAULT_POLYS_PER_SSA,
-                DEFAULT_POLY_THRESHOLD,
-                SsaGeneratorConfig::default().surplus_shares,
-            ),
+            additional_data: DEFAULT_PIX_PARAMS.into_additional_data(0),
         };
 
         // What makes the missing toolbox the sole remaining cause of the refusal below.
@@ -6697,7 +6695,7 @@ mod tests {
         let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
             unreachable!();
         };
-        assert_eq!(quota.quota_per_ssa, pix_params_to_quota(2, 2));
+        assert_eq!(quota.quota_per_ssa, pix_params_to_quota(&small_pix_params()));
 
         bob_sender.close_channel();
         bob_handle.await??;

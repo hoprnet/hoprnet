@@ -396,9 +396,11 @@ pub struct SupervisorConfig {
     /// growing window, so widening `delay_range` cannot move it, and the denominator grows with the
     /// numerator so nothing accumulates. It is also independent of packet **rate** (both terms scale
     /// together, so unlike a wall-clock bound it implies no throughput floor), of **loss** (which hits
-    /// every cycle alike), and of **`surplus_shares`** — which matters, because the surplus is
-    /// Entry-chosen and never goes on the wire, so the Exit cannot compute any expected
-    /// shares-per-packet ratio. Comparing the batch's cycles against each other cancels it.
+    /// every cycle alike), and of **`surplus_shares`** — which matters even now that the surplus is
+    /// negotiated rather than Entry-private. The Exit knows the budget, not the spend: how many of a
+    /// cycle's emitted shares turn out to be useful depends on the loss the Entry actually met, so no
+    /// expected shares-per-packet ratio follows from the parameter. Comparing the batch's cycles
+    /// against each other cancels it.
     ///
     /// ## The value
     ///
@@ -774,6 +776,8 @@ mod tests {
             max_unverifiable_shares_per_session: 0,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
+            max_off_front_share_fraction: 0.25,
+            min_share_order_sample: 16384,
             tombstone_retention_window: Duration::from_secs(30),
             min_deposit: HoprBalance::new_base(0),
         }
@@ -921,7 +925,7 @@ mod tests {
     /// else exercises it, and getting it wrong would silently restore tolerance for a failure that
     /// has already doomed the cycle.
     #[test]
-    fn the_default_configuration_closes_on_the_first_unverifiable_share() {
+    fn the_default_configuration_closes_on_the_first_unverifiable_share() -> anyhow::Result<()> {
         use hopr_api::types::crypto_random::Randomizable;
 
         use crate::supervision::supervisor::SessionPixSupervisor;
@@ -950,5 +954,7 @@ mod tests {
             )),
             "one unverifiable share must close the session under the default config, got {actions:?}"
         );
+
+        Ok(())
     }
 }
