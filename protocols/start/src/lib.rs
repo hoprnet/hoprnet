@@ -1289,6 +1289,322 @@ mod tests {
         Ok(())
     }
 
+    /// Session ID used by the hand-framed malformed-message tests below. Its concrete type is
+    /// `u32`, matching the `I` parameter those tests decode with.
+    const MALFORMED_SESSION_ID: u32 = 0xfeedbeef;
+
+    /// Type the hand-framed bodies are decoded as: 33-byte commitments and a 65-byte proof, the
+    /// same shape the production instantiation uses.
+    type Decoder = StartProtocol<u32, String, u8, [u8; 33], [u8; 65]>;
+
+    /// Wraps a raw body in the Start protocol envelope (version, discriminant, 16-bit body length)
+    /// exactly as `encode` does. Malformed-input tests need bodies the encoder would refuse to
+    /// produce, so they frame them by hand.
+    fn frame(disc: StartProtocolDiscriminants, body: &[u8]) -> Vec<u8> {
+        let mut out = vec![Decoder::START_PROTOCOL_VERSION, disc as u8];
+        out.extend_from_slice(&(body.len() as u16).to_be_bytes());
+        out.extend_from_slice(body);
+        out
+    }
+
+    /// Builds an `SsaCommit` body: fixed prefix, optional proof, entries, trailing CBOR session id.
+    /// `declared_polys` is written to the wire as-is, so it can disagree with `entries` — which is
+    /// the whole point of the tests that use it.
+    fn ssa_commit_body(
+        coefficient_index: u16,
+        declared_polys: u16,
+        proof: Option<&[u8]>,
+        entries: &[(u16, [u8; 33])],
+    ) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(&1u32.to_be_bytes());
+        body.extend_from_slice(&coefficient_index.to_be_bytes());
+        body.extend_from_slice(&declared_polys.to_be_bytes());
+        if let Some(proof) = proof {
+            body.extend_from_slice(proof);
+        }
+        for (index, commitment) in entries {
+            body.extend_from_slice(&index.to_be_bytes());
+            body.extend_from_slice(commitment);
+        }
+        body.extend(serde_cbor_2::to_vec(&MALFORMED_SESSION_ID).expect("session id must serialize"));
+        body
+    }
+
+    /// The `SsaRequest` counterpart of [`ssa_commit_body`], whose entries are keyed by SSA index.
+    fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(&0u32.to_be_bytes());
+        body.extend_from_slice(&declared_commitments.to_be_bytes());
+        for (ssa_index, commitment) in entries {
+            body.extend_from_slice(&ssa_index.to_be_bytes());
+            body.extend_from_slice(commitment);
+        }
+        body.extend(serde_cbor_2::to_vec(&MALFORMED_SESSION_ID).expect("session id must serialize"));
+        body
+    }
+
+    fn decode_framed(disc: StartProtocolDiscriminants, body: &[u8]) -> errors::Result<Decoder> {
+        Decoder::decode(Decoder::START_PROTOCOL_MESSAGE_TAG, &frame(disc, body))
+    }
+
+    /// A commitment or proof whose byte length is free to disagree with `size_of`, which is what
+    /// the encoder's size guards compare against. A fixed-size array can never be the wrong length,
+    /// so those guards are unreachable without a type like this.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct VarLenBytes(Vec<u8>);
+
+    impl AsRef<[u8]> for VarLenBytes {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+
+    fn is_parse_error(error: &StartProtocolError, what: &str) -> bool {
+        matches!(error, StartProtocolError::ParseError(context) if context == what)
+    }
+
+    /// The proof rides on constant-term messages only, and its presence is implied by the
+    /// coefficient index rather than by a flag. An encoder that let the two disagree would
+    /// desynchronise the decoder, so all three disagreements must be refused.
+    #[test]
+    fn start_protocol_encode_should_refuse_a_proof_that_disagrees_with_the_coefficient_index() {
+        let missing = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
+            session_id: MALFORMED_SESSION_ID,
+            ssa_index: SsaIndex::MIN,
+            coefficient_index: 0,
+            commitment_proof: None,
+            coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
+        });
+        assert!(
+            matches!(missing.encode(), Err(ref e) if is_parse_error(e, "missing commitment_proof")),
+            "a constant-term message without a proof must be refused"
+        );
+
+        let unexpected = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
+            session_id: MALFORMED_SESSION_ID,
+            ssa_index: SsaIndex::MIN,
+            coefficient_index: 1,
+            commitment_proof: Some([0u8; 65]),
+            coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
+        });
+        assert!(
+            matches!(unexpected.encode(), Err(ref e) if is_parse_error(e, "commitment_proof on a non-constant term")),
+            "a proof on a non-constant term must be refused"
+        );
+
+        let wrong_size =
+            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaCommit(SsaClientCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 0,
+                commitment_proof: Some(VarLenBytes(vec![0u8; 7])),
+                coefficient_commitments: [(
+                    0u16,
+                    VarLenBytes(vec![
+                        0u8;
+                        StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::PIX_COEFF_COMMITMENT_REPR_SIZE
+                    ]),
+                )]
+                .into_iter()
+                .collect(),
+            });
+        assert!(
+            matches!(wrong_size.encode(), Err(ref e) if is_parse_error(e, "commitment_proof_size")),
+            "a proof of the wrong length must be refused"
+        );
+    }
+
+    /// Entries are read back at a fixed stride, so a commitment of the wrong length would shift
+    /// every field after it. Both message kinds carry entries and both must reject it.
+    #[test]
+    fn start_protocol_encode_should_refuse_wrongly_sized_commitments() -> anyhow::Result<()> {
+        let commit =
+            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaCommit(SsaClientCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 1,
+                commitment_proof: None,
+                coefficient_commitments: [(0u16, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
+            });
+        assert!(
+            matches!(commit.encode(), Err(ref e) if is_parse_error(e, "commitment_repr_size")),
+            "SsaCommit must refuse a commitment of the wrong length"
+        );
+
+        let request =
+            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaRequest(SsaServerCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                params: 0,
+                commitments: [(SsaIndex::MIN, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
+            });
+        assert!(
+            matches!(request.encode(), Err(ref e) if is_parse_error(e, "commitment_repr_size")),
+            "SsaRequest must refuse a commitment of the wrong length"
+        );
+
+        Ok(())
+    }
+
+    /// A commitment message with nothing to commit to is a wasted packet, and the decoder rejects
+    /// `num_polys == 0` in any case — so the encoder must not emit one.
+    #[test]
+    fn start_protocol_encode_should_refuse_an_ssa_commit_without_commitments() {
+        let msg = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
+            session_id: MALFORMED_SESSION_ID,
+            ssa_index: SsaIndex::MIN,
+            coefficient_index: 1,
+            commitment_proof: None,
+            coefficient_commitments: Default::default(),
+        });
+
+        assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
+    }
+
+    /// Everything below decodes bodies a peer could send but the encoder would never produce. The
+    /// codec has to stay total: each one is answered with an error, never a panic or a silent
+    /// misparse of the fields that follow.
+    #[test]
+    fn start_protocol_decode_should_reject_truncated_session_errors() {
+        // A `Challenge` identifier without room for the trailing reason byte.
+        let mut body = vec![ErrorIdentifierDiscriminants::Challenge as u8];
+        body.extend_from_slice(&[0u8; size_of::<StartChallenge>()]);
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SessionError, &body),
+            Err(StartProtocolError::InvalidLength)
+        ));
+
+        // A `SessionId` identifier with nothing at all after the tag byte.
+        assert!(matches!(
+            decode_framed(
+                StartProtocolDiscriminants::SessionError,
+                &[ErrorIdentifierDiscriminants::SessionId as u8]
+            ),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_an_ssa_commit_shorter_than_its_fixed_prefix() {
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaCommit, &[0u8; 10]),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    /// `num_polys` is attacker-controlled and sizes an allocation, so it is bounded before it is
+    /// used — both at zero and at `MAX_POLYS_PER_SSA`.
+    #[test]
+    fn start_protocol_decode_should_reject_an_out_of_range_polynomial_count() {
+        for declared in [0, MAX_POLYS_PER_SSA + 1] {
+            let body = ssa_commit_body(1, declared, None, &[(0, [0u8; 33])]);
+            assert!(
+                matches!(
+                    decode_framed(StartProtocolDiscriminants::SsaCommit, &body),
+                    Err(StartProtocolError::NumberOfCommitments)
+                ),
+                "num_polys={declared} must be rejected"
+            );
+        }
+    }
+
+    /// A count that survives the `MAX_POLYS_PER_SSA` bound can still be more than the packet can
+    /// physically hold; the wire limit is what catches it before the allocation.
+    #[test]
+    fn start_protocol_decode_should_reject_more_polynomials_than_the_body_can_hold() {
+        let body = ssa_commit_body(1, 100, None, &[(0, [0u8; 33]), (1, [1u8; 33])]);
+
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaCommit, &body),
+            Err(StartProtocolError::NumberOfCommitments)
+        ));
+    }
+
+    /// A constant-term message declares its proof by its coefficient index alone, so a body with no
+    /// room for one after the fixed prefix is malformed rather than proof-less.
+    #[test]
+    fn start_protocol_decode_should_reject_a_constant_term_without_room_for_its_proof() {
+        // Fixed prefix plus exactly the proof: nothing left for entries or the session id.
+        let body = ssa_commit_body(0, 1, Some(&[0u8; 65]), &[]);
+
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaCommit, &body[..8 + 65]),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    /// Repeating a polynomial index would silently overwrite the earlier commitment, so the decoder
+    /// refuses the message instead of picking a winner.
+    #[test]
+    fn start_protocol_decode_should_reject_duplicate_polynomial_commitments() {
+        let body = ssa_commit_body(1, 2, None, &[(7, [0u8; 33]), (7, [1u8; 33])]);
+
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaCommit, &body),
+            Err(StartProtocolError::DuplicateCommitment)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_an_ssa_request_shorter_than_its_fixed_prefix() {
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &[0u8; 6]),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_an_out_of_range_commitment_count() {
+        for declared in [0, Decoder::MAX_SSAS_PER_REQUEST + 1] {
+            let body = ssa_request_body(declared, &[(1, [0u8; 33])]);
+            assert!(
+                matches!(
+                    decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
+                    Err(StartProtocolError::NumberOfCommitments)
+                ),
+                "num_commitments={declared} must be rejected"
+            );
+        }
+    }
+
+    /// `SsaRequest` has no payload-derived bound on its count, so a body that promises more entries
+    /// than it carries must be caught while walking them.
+    #[test]
+    fn start_protocol_decode_should_reject_an_ssa_request_that_promises_more_than_it_carries() {
+        let body = ssa_request_body(3, &[(1, [0u8; 33])]);
+
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
+            Err(StartProtocolError::InvalidLength)
+        ));
+    }
+
+    #[test]
+    fn start_protocol_decode_should_reject_duplicate_ssa_commitments() {
+        let body = ssa_request_body(2, &[(1, [0u8; 33]), (1, [1u8; 33])]);
+
+        assert!(matches!(
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
+            Err(StartProtocolError::DuplicateCommitment)
+        ));
+    }
+
+    /// An SSA index of zero has no representation in `SsaIndex`, and it reaches the decoder as a
+    /// plain `u32` — so both message kinds must turn it into an error rather than unwrap it.
+    #[test]
+    fn start_protocol_decode_should_reject_a_zero_ssa_index() {
+        let mut body = ssa_commit_body(1, 1, None, &[(0, [0u8; 33])]);
+        body[..4].copy_from_slice(&0u32.to_be_bytes());
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaCommit, &body), Err(ref e) if is_parse_error(e, "ssa_index is 0")),
+        );
+
+        let body = ssa_request_body(1, &[(0, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(ref e) if is_parse_error(e, "ssa_index is 0")),
+        );
+    }
+
     #[test]
     fn start_protocol_new_multiple_messages_should_encode_and_decode() -> anyhow::Result<()> {
         // Generate a real SSA commitment using the same setup as the PIX
