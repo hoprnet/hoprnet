@@ -1,14 +1,16 @@
-//! EXPERIMENTAL shared-pool Poisson mixer (perf experiment "§1").
+//! Shared-pool Poisson mixer — an opt-in alternative to [`crate::poisson`], behind the
+//! `poisson-shared` feature.
 //!
-//! Unlike [`crate::poisson`] — which owns the pool on a dedicated OS thread and relays packets
-//! in and out over two `async-channel` queues — this variant keeps the pool behind an
-//! `Arc<Mutex<_>>` (like the uniform [`crate::channel`]). Senders lock and push; the sweep and
-//! the adaptive timer run on the **consumer's** `poll_next`. This removes both cross-thread
-//! hand-offs, at the cost of (a) holding the mutex across each O(N) sweep and (b) losing the
-//! dedicated-thread runtime isolation.
+//! Where [`crate::poisson`] owns the pool on a dedicated OS thread and relays packets in and out
+//! over two `async-channel` queues, this variant keeps the pool behind an `Arc<Mutex<_>>` (like
+//! the uniform [`crate::channel`]). Senders lock and push; the sweep and the adaptive timer run
+//! on the **consumer's** `poll_next`. Removing both cross-thread hand-offs makes it markedly
+//! faster (see `benches/poisson_shared_bench.rs`), with two tradeoffs: the mutex is held across
+//! each O(N) sweep, and the mixing runs on the consumer's task rather than an isolated thread
+//! (benign, given the cadence-independent release clock).
 //!
-//! Built to measure the throughput difference against `poisson_channel`; not wired into
-//! production.
+//! The release logic is shared with [`crate::poisson`] via [`crate::pool::sweep`], so the mixing
+//! behaviour (and its stochastic guarantees) is identical.
 
 use std::{
     collections::VecDeque,
