@@ -309,6 +309,25 @@ pub const DEFAULT_MAX_SSAS_PER_SSA_REQUEST: usize = 2;
 /// same supervisor deadlines, same Start protocol channel capacity.
 pub const DEFAULT_SSAS_PER_SSA_REQUEST: usize = 1;
 
+/// How far into its last committed cycle an Entry must be before it accepts a successor batch.
+///
+/// The Entry's half of the Exit's early-recovery trigger, and it has to be derived rather than
+/// matched, because the two count different things. The Exit asks at
+/// `SsaReconstructorConfig::early_recovery_threshold` (0.85) of the *useful* shares it needs —
+/// `polys × threshold`. The Entry can only see what it has *emitted*, which includes the surplus, so
+/// at the shipped 1.5× factor the Exit's 85 % of the useful shares is 85 / 1.5 ≈ 57 % of the cycle's
+/// emission. Loss pushes the Exit later, never earlier, so that is the floor.
+///
+/// 0.5 therefore sits below any legitimate request and enormously above the ~0 % that checking the
+/// index alone allowed. It is deliberately not tuned tighter: the peer's surplus is negotiated, but
+/// how much of it the Exit *needs* depends on the loss it actually met, so anything closer to 0.57
+/// would start refusing honest Exits on clean links.
+///
+/// Not configurable, because a value that is too high breaks the Session outright — an Exit whose
+/// request is refused has no way to ask again — while the cost of it being too low is bounded by
+/// `max_ssas_per_ssa_request`.
+const MIN_SUCCESSOR_EMISSION_FRACTION: f64 = 0.5;
+
 /// Timeout when sending Start protocol messages to the sink
 const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
 
@@ -1015,6 +1034,22 @@ pub struct SessionManager<S> {
     /// SessionEstablished) await the slot once instead of busy-looping with sleeps.
     /// Keyed by SessionId so that only waiters for the relevant session are woken.
     slot_allocated: Arc<Mutex<HashMap<SessionId, Vec<oneshot::Sender<()>>>>>,
+    /// Serialises `handle_ssa_request` per pseudonym.
+    ///
+    /// Start messages are processed under `for_each_concurrent`, so without this several
+    /// `SsaRequest`s for one pseudonym run at once — and each reads the successor gate's admission
+    /// state before any of them has advanced it. Every racer passes, and the Entry commits to (and
+    /// funds) as many batches as the Exit cared to send, which is exactly what the gate exists to
+    /// stop. The generator's own monotonic index is the backstop that keeps this from being a
+    /// correctness hole, but it only rejects *equal or lower* indices: an Exit numbering its batches
+    /// upwards races past it.
+    ///
+    /// An async lock rather than a blocking one because the guarded region awaits — commitment
+    /// generation goes to a blocking pool, and publication awaits the transport.
+    ///
+    /// A `moka` cache rather than a map, for its idle eviction: a `HashMap` keyed by pseudonym would
+    /// otherwise retain one entry per Session for the life of the process.
+    ssa_request_locks: moka::future::Cache<HoprPseudonym, Arc<futures::lock::Mutex<()>>>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -1029,6 +1064,7 @@ impl<S> Clone for SessionManager<S> {
             msg_sender: self.msg_sender.clone(),
             pix_toolbox: self.pix_toolbox.clone(),
             slot_allocated: Arc::clone(&self.slot_allocated),
+            ssa_request_locks: self.ssa_request_locks.clone(),
         }
     }
 }
@@ -1172,6 +1208,13 @@ where
             active_sessions,
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
+            // Idle rather than live TTL, and generous: the entry must outlive the gap between two
+            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~72 min at the
+            // deployed dimensions and the documented rate cap. Matches the generator's own
+            // per-pseudonym cache, which is what the guarded region reads.
+            ssa_request_locks: moka::future::Cache::builder()
+                .time_to_idle(Duration::from_secs(1800))
+                .build(),
         }
     }
 
@@ -3290,11 +3333,26 @@ where
         }
         let quota_per_ssa = pix_params_to_quota(&our_params);
 
+        // Everything from here to the end of the batch is serialised per pseudonym. Start messages run
+        // under `for_each_concurrent`, so the successor gate below would otherwise be read by several
+        // requests before any of them advanced it, and every one would pass. See `ssa_request_locks`.
+        let request_lock = self
+            .ssa_request_locks
+            .get_with(pseudonym, async { Arc::new(futures::lock::Mutex::new(())) })
+            .await;
+        let _request_guard = request_lock.lock().await;
+
         // Successor gate, the Entry's half of the one in `SessionPixSupervisor`. A correct Exit asks
         // for the next batch when the *last* cycle of the current one is nearly recovered, by which
-        // point we have long been emitting that cycle's shares. An Exit that asks while we are still
-        // serving an earlier cycle is asking for deposits it cannot have earned, so nothing here
-        // commits and nothing is deposited.
+        // point we have long been emitting that cycle's shares. An Exit that asks earlier is asking
+        // for deposits it cannot have earned, so nothing here commits and nothing is deposited.
+        //
+        // Two conditions, and the second is what the first alone cannot give. Emission must have
+        // reached the last committed cycle — which, with the window clamped to one cycle, means every
+        // earlier one is exhausted — *and* it must be far enough into that cycle. Checking only the
+        // index admitted a successor batch on the last cycle's very first share, i.e. ~0 % of the way
+        // through the batch rather than the ~85 % at which a conforming Exit asks. That is nearly a
+        // whole cycle of unearned deposits, on a gate whose entire purpose is to prevent them.
         //
         // Refused rather than fatal, and deliberately not via `refuse_ssa_request`, which closes the
         // Session: this message is dropped and the Session left running. A correct Exit never lands
@@ -3304,13 +3362,16 @@ where
         // First index rather than each: `commitments` is a `BTreeMap`, so the lowest index leads, and
         // checking it before the loop is also what stops a batch that fails partway from having
         // already emitted `ReadyToDeposit` for its earlier members.
-        if let Some((emitted_for, last_committed)) = pix_toolbox.share_generator.emission_progress(&pseudonym)
-            && emitted_for.is_none_or(|emitted| emitted < last_committed)
+        if let Some(progress) = pix_toolbox.share_generator.emission_progress(&pseudonym)
+            && (!progress.is_serving_last_committed() || progress.front_fraction() < MIN_SUCCESSOR_EMISSION_FRACTION)
         {
             let asked_first = msg.commitments.keys().next().copied();
             let error = SessionManagerError::Unacceptable(format!(
-                "Exit asked for SSAs from {asked_first:?} while emission has only reached {emitted_for:?} of the \
-                 batch committed up to {last_committed}"
+                "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({:.0}% of that cycle) of \
+                 the batch committed up to {}",
+                progress.highest_emitted,
+                progress.front_fraction() * 100.0,
+                progress.last_committed
             ));
             warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
             return Err(error.into());
@@ -6239,8 +6300,13 @@ mod tests {
     /// Ordering across a batch is pinned where it lives, on the generator, by
     /// `emission_never_crosses_a_cycle_boundary_early` and
     /// `emission_progress_lags_the_commitment_index_across_a_batch`. What this test drives is the
-    /// wiring and the two ends of the gate — nothing emitted yet, and emission having reached the last
-    /// committed index.
+    /// wiring and all three points of the gate: nothing emitted at all, emission having merely
+    /// *reached* the last committed cycle, and emission far enough into it.
+    ///
+    /// The middle point is the regression. Admission used to be "emission has reached the last
+    /// committed index", which becomes true on that cycle's very first share — so a successor batch
+    /// was admitted ~0 % into the batch rather than the ~85 % at which a conforming Exit asks. See
+    /// [`MIN_SUCCESSOR_EMISSION_FRACTION`].
     #[test_log::test(tokio::test)]
     async fn entry_refuses_a_batch_asked_for_before_emission_reaches_the_current_one() -> anyhow::Result<()> {
         use std::collections::BTreeMap;
@@ -6350,28 +6416,207 @@ mod tests {
             "refusing a request must not close the Session"
         );
 
-        // Once emission has reached the last committed cycle, the same batch is admitted.
-        for msg in 0..64u32 {
-            generator.next_share(&pseudonym, &msg.to_be_bytes())?;
-            if generator
-                .emission_progress(&pseudonym)
-                .is_some_and(|(emitted, last)| emitted == Some(last))
-            {
-                break;
+        // Emit until the last cycle of the batch has taken the front — but no further.
+        let mut sent = 0u32;
+        let mut emit_until = |pred: &dyn Fn(&hopr_protocol_pix::EmissionProgress) -> bool| -> anyhow::Result<()> {
+            for _ in 0..1024 {
+                if generator.emission_progress(&pseudonym).as_ref().is_some_and(pred) {
+                    return Ok(());
+                }
+                sent += 1;
+                generator.next_share(&pseudonym, &sent.to_be_bytes())?;
             }
-        }
+            anyhow::bail!("emission did not reach the expected point")
+        };
+        emit_until(&|p| p.is_serving_last_committed())?;
+
+        // Reaching the last cycle is *not* enough, and this is the H2 regression. The index-only gate
+        // this replaced admitted a successor batch right here — on the last cycle's first share, ~0 %
+        // of the way through the batch — which is nearly a whole cycle of deposits the Exit has not
+        // earned, on the one gate whose purpose is to prevent exactly that.
+        let progress = generator.emission_progress(&pseudonym).expect("committed");
+        assert!(
+            progress.front_fraction() < MIN_SUCCESSOR_EMISSION_FRACTION,
+            "the test must stand at the start of the last cycle, got {}",
+            progress.front_fraction()
+        );
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
+            )
+            .await
+            .expect_err("reaching the last cycle must not by itself admit the next batch");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
         assert_eq!(
-            generator.emission_progress(&pseudonym),
-            Some((SsaIndex::new(BATCH), SsaIndex::new(BATCH).expect("non-zero"))),
-            "emission must have reached the last cycle of the committed batch"
+            drain_deposits(&mut pix_events),
+            0,
+            "a batch refused for being early must not emit a single ReadyToDeposit"
         );
 
+        // Far enough into that last cycle, the same batch is admitted.
+        emit_until(&|p| p.front_fraction() >= MIN_SUCCESSOR_EMISSION_FRACTION)?;
         mgr.handle_ssa_request(
             pseudonym,
             SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
         )
         .await
         .context("a batch asked for on time must be accepted")?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Concurrent `SsaRequest`s for one pseudonym must admit exactly one batch.
+    ///
+    /// Start messages are processed under `for_each_concurrent`, so several requests for the same
+    /// Session run at once, and each reads the successor gate before any of them has advanced it.
+    /// Requests are issued at distinct, ascending index ranges because that is the shape the
+    /// generator's monotonic index cannot refuse — it rejects equal or lower indices, and an Exit
+    /// numbering its batches upwards never offers one.
+    ///
+    /// **What this pins is the invariant, not the mechanism.** At this fixture's dimensions — two
+    /// polynomials at threshold two — `new_ssa_commitment` returns in microseconds, so the window
+    /// between reading the gate and advancing it is too narrow to hit: removing
+    /// [`ssa_request_locks`](SessionManager::ssa_request_locks) leaves the outcome unchanged here.
+    /// The window is a function of that call's cost, which at the deployed 8192 x 64 is around a
+    /// second, and a fixture that large is not something to build into a unit test. So this test
+    /// guards the property and the serialisation is justified by the shape of the code rather than
+    /// by this failing without it.
+    ///
+    /// It does earn its place: it is what would catch the gate being made per-entry, the guard being
+    /// taken after the gate instead of before it, or the handler gaining an await between the two.
+    #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 4))]
+    async fn concurrent_ssa_requests_for_one_pseudonym_admit_one_batch() -> anyhow::Result<()> {
+        use std::collections::BTreeMap;
+
+        use hopr_protocol_pix::{PixGroup, SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        const BATCH: u32 = 2;
+        const RACERS: u32 = 4;
+
+        let generator = Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 1,
+        }));
+        let (pix_toolbox, mut pix_events) = PixToolbox::new(
+            generator.clone(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            max_ssas_per_ssa_request: BATCH as usize,
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: small_pix_additional_data(),
+            },
+        )
+        .await?;
+
+        let identity = HoprPixGroupElement::try_from(PixGroup::<HoprPixSpec>::default().to_bytes().as_ref())
+            .expect("identity element must be valid");
+        let batch = |from: u32| {
+            (from..from + BATCH)
+                .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
+                .collect::<BTreeMap<_, _>>()
+        };
+        let drain_deposits = |events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)| {
+            let mut seen = 0;
+            while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
+                seen += 1;
+            }
+            seen
+        };
+
+        // The opening batch, then emission far enough into its last cycle that exactly one successor
+        // batch is legitimately admissible.
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(BATCH as usize, drain_deposits(&mut pix_events));
+
+        let mut sent = 0u32;
+        for _ in 0..1024 {
+            if generator
+                .emission_progress(&pseudonym)
+                .is_some_and(|p| p.is_serving_last_committed() && p.front_fraction() >= MIN_SUCCESSOR_EMISSION_FRACTION)
+            {
+                break;
+            }
+            sent += 1;
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        // Real tasks on a multi-threaded runtime, not `join_all`: `join_all` polls in order, so the
+        // first future runs its gate check and its whole commitment phase before the second is polled
+        // at all, and the requests never actually overlap. That shape passes with or without the
+        // serialisation and so proves nothing about it.
+        let barrier = Arc::new(tokio::sync::Barrier::new(RACERS as usize));
+        let outcomes = futures::future::join_all((0..RACERS).map(|r| {
+            let mgr = mgr.clone();
+            let barrier = barrier.clone();
+            let commitments = batch(BATCH + 1 + r * BATCH);
+            tokio::spawn(async move {
+                barrier.wait().await;
+                mgr.handle_ssa_request(
+                    pseudonym,
+                    SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), commitments),
+                )
+                .await
+            })
+        }))
+        .await
+        .into_iter()
+        .map(|joined| joined.expect("racer task must not panic"))
+        .collect::<Vec<_>>();
+
+        let admitted = outcomes.iter().filter(|o| o.is_ok()).count();
+        assert_eq!(
+            1, admitted,
+            "exactly one of {RACERS} concurrent requests may be admitted, got {admitted}: {outcomes:?}"
+        );
+        assert_eq!(
+            BATCH as usize,
+            drain_deposits(&mut pix_events),
+            "only the admitted batch may produce deposit instructions"
+        );
 
         bob_sender.close_channel();
         bob_handle.await??;

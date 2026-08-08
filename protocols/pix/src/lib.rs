@@ -27,7 +27,7 @@ mod reconstructor;
 mod traits;
 mod types;
 
-pub use generator::{SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
+pub use generator::{EmissionProgress, SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
 pub use params::{InvalidPixParams, PixParams};
 pub use reconstructor::{
     MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard, SsaReconstructor,
