@@ -134,12 +134,14 @@ impl EmissionProgress {
 /// 0.85 by the 1.5× surplus factor gives 57 %, and admitting there would hand out the next deposit
 /// roughly 284 MiB of payload before it could possibly have been earned.
 ///
-/// ## What it assumes
+/// ## Which threshold to pass
 ///
-/// `early_threshold` is the *peer's* configuration and does not travel on the wire, so a caller can
-/// only supply its own as a proxy. The direction of the error matters: a peer configured **lower**
-/// asks earlier than this allows and has its request refused, so the two sides are coupled by a value
-/// neither negotiates. Negotiating it is the robust fix and is not done here.
+/// [`MIN_EARLY_RECOVERY_THRESHOLD`](crate::MIN_EARLY_RECOVERY_THRESHOLD), not the caller's own
+/// `early_recovery_threshold`. The value that decides when the request actually goes out belongs to
+/// the *peer* and does not travel on the wire, and the direction of a mismatch is unforgiving: a peer
+/// configured lower asks earlier than a gate built on the local value admits, and its one-shot
+/// request is dropped with no retry path. Computing the gate at the protocol floor admits every
+/// conforming peer, and the floor is what makes "conforming" checkable locally.
 pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64) -> u64 {
     let polys = params.polys_per_ssa() as u64;
     let threshold = params.shares_per_poly() as u64;
@@ -291,6 +293,21 @@ impl<S: PixSpec> SsaShareGenerator<S> {
     #[inline]
     pub fn config(&self) -> &SsaGeneratorConfig {
         &self.cfg
+    }
+
+    /// Discards all polynomial state held for `pseudonym`.
+    ///
+    /// The same observable state the cache's own idle retention produces, reached deliberately: no
+    /// further share can be emitted for any cycle of this pseudonym, and
+    /// [`emission_progress`](Self::emission_progress) goes back to `None`.
+    ///
+    /// The distinction that state has been *lost* rather than never created is not recoverable from
+    /// here — an evicted entry leaves nothing behind — so a caller that needs it has to hold the fact
+    /// itself, for as long as it needs it to mean something. `hopr-transport-session` keeps it per
+    /// Session, because a successor `SsaRequest` arriving against lost state is indistinguishable from
+    /// the opening one otherwise, and the two must not be answered alike.
+    pub fn forget(&self, pseudonym: &S::Pseudonym) {
+        self.polynomials.invalidate(pseudonym);
     }
 
     /// How far share emission has got for `pseudonym`.

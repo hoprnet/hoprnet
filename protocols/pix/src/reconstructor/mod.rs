@@ -72,6 +72,13 @@ pub struct SsaReconstructorConfig {
     /// notification, triggering pipelined SSA request preparation.
     ///
     /// Range: 0.0..1.0. Default: 0.85.
+    ///
+    /// A reconstructor driving a real Session is additionally held to
+    /// [`MIN_EARLY_RECOVERY_THRESHOLD`](crate::MIN_EARLY_RECOVERY_THRESHOLD), the floor an Entry
+    /// assumes when it decides whether a successor `SsaRequest` has been earned. Anything below it is
+    /// unusable rather than merely aggressive — the request goes out early and the Entry refuses it.
+    /// The bound is not in this validator because it belongs to the pairing rather than to the
+    /// reconstructor: `hopr-transport-session` checks it where both halves are known.
     #[default(0.85)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub early_recovery_threshold: f64,

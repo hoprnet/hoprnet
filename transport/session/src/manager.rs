@@ -23,7 +23,7 @@ use hopr_crypto_packet::{
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_pix::{
     EntryShareGenerator, ExitAcknowledgementShareProcessor, GroupEncoding, MAX_POLYS_PER_SSA, PixParams, PixSpec,
-    SsaCommitmentGuard, SsaId, SsaReconstructor, SsaShareGenerator,
+    SsaCommitmentGuard, SsaId, SsaIndex, SsaReconstructor, SsaShareGenerator,
 };
 use hopr_protocol_start::{
     ErrorIdentifier, KeepAliveFlag, KeepAliveMessage, SsaClientCommitmentMessage, SsaServerCommitmentMessage,
@@ -359,15 +359,46 @@ impl std::fmt::Display for SessionHandles {
 /// Once carried the SSA index and a fault counter as well. Both moved to the supervisor: it decides
 /// *when* a cycle is requested, so it is also what allocates the index, and it is what enforces the
 /// fault limit. Leaving a second copy of either here would have meant two authorities for one fact.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 struct SessionSsaState {
     /// The dimensions this Session negotiated, as they went on the wire.
     params: PixParams,
+    /// Highest SSA index this Session has had the generator commit to, `0` before the first batch.
+    ///
+    /// A deliberate second copy of a fact the generator already holds, and the only one of the three
+    /// that came back. The generator's own watermark lives in a cache with an idle retention, so
+    /// "absent" there conflates *never committed* with *state discarded* — and those must not be
+    /// treated alike, because the first is the opening batch every Session begins with and the second
+    /// is a Session whose Entry can no longer serve the cycles it already committed to. This copy
+    /// lives exactly as long as the Session does, so it can tell them apart. See the successor gate in
+    /// [`SessionManager::handle_ssa_request`].
+    ///
+    /// Entry-side only; an Exit never commits and leaves it at zero. [`SsaIndex`] is a `NonZero<u32>`,
+    /// which is what makes `0` an unambiguous "none" rather than a sentinel that has to be defended.
+    committed_ssa_watermark: std::sync::atomic::AtomicU32,
 }
 
 impl SessionSsaState {
     pub fn new(params: PixParams) -> Self {
-        Self { params }
+        Self {
+            params,
+            committed_ssa_watermark: std::sync::atomic::AtomicU32::new(0),
+        }
+    }
+
+    /// Highest SSA index committed for this Session, `None` before the first batch.
+    #[inline]
+    pub fn committed_watermark(&self) -> Option<SsaIndex> {
+        SsaIndex::new(self.committed_ssa_watermark.load(Ordering::Relaxed))
+    }
+
+    /// Raises the committed-index watermark to `index` if it is higher.
+    ///
+    /// `fetch_max` rather than a store: the gate serialises requests per pseudonym, but a Session's
+    /// slot is shared and monotonicity here must not depend on that lock staying where it is.
+    #[inline]
+    pub fn note_committed(&self, index: SsaIndex) {
+        self.committed_ssa_watermark.fetch_max(index.get(), Ordering::Relaxed);
     }
 
     /// Data quota one SSA cycle of these dimensions covers.
@@ -1237,11 +1268,14 @@ where
         T: futures::Sink<IncomingSession> + Send + 'static,
         T::Error: std::error::Error + Send + Sync + 'static,
     {
-        self.msg_sender
-            .set(msg_sender)
-            .map_err(|_| SessionManagerError::AlreadyStarted)?;
-
-        if let Some(pix) = pix {
+        // Every fallible check runs before the first `OnceLock::set` below.
+        //
+        // `start` publishes the manager's started state through those locks, and a `OnceLock` cannot
+        // be un-set. Validating after `msg_sender` had been filled left a manager that reports
+        // `is_started() == false` — no workers, no notifier — and yet refuses every retry with
+        // `AlreadyStarted`: neither running nor recoverable, out of what is an ordinary configuration
+        // error the caller could have corrected and retried on the same instance.
+        if let Some(pix) = pix.as_ref() {
             // The authoritative cross-component check, and the first moment it can be made: the
             // supervisor's deadlines are meaningless without the reconstructor lifetimes they race
             // against, and the reconstructor arrives here rather than at construction.
@@ -1255,7 +1289,13 @@ where
                 &self.cfg.pix_config.supervision,
                 pix.share_processor.config(),
             )?;
+        }
 
+        self.msg_sender
+            .set(msg_sender)
+            .map_err(|_| SessionManagerError::AlreadyStarted)?;
+
+        if let Some(pix) = pix {
             self.pix_toolbox
                 .set(pix)
                 .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -3376,29 +3416,73 @@ where
         // gets this badly wrong in the unsafe direction: 0.85/1.5 is 57 %, against a true boundary of
         // 86.4 % at the deployed dimensions.
         //
-        // Refused rather than fatal, and deliberately not via `refuse_ssa_request`, which closes the
-        // Session: this message is dropped and the Session left running. A correct Exit never lands
-        // here; one that does has its own deadline for the cycles it already allocated, and it can
-        // reach them without us having paid for anything.
+        // Being early is refused rather than fatal, and deliberately not via `refuse_ssa_request`,
+        // which closes the Session: that message is dropped and the Session left running. A correct
+        // Exit never lands there; one that does has its own deadline for the cycles it already
+        // allocated, and it can reach them without us having paid for anything. Lost generator state
+        // is the one arm that *is* fatal, for the reason given at it.
         //
         // First index rather than each: `commitments` is a `BTreeMap`, so the lowest index leads, and
         // checking it before the loop is also what stops a batch that fails partway from having
         // already emitted `ReadyToDeposit` for its earlier members.
+        //
+        // Computed at the protocol floor rather than at our own reconstructor's threshold. The value
+        // that decides when a correct Exit asks is *its* setting, which does not travel on the wire;
+        // gating on ours refused a peer configured lower, silently, with no retry path — two valid
+        // configurations that could not talk. See `MIN_EARLY_RECOVERY_THRESHOLD`, which every Exit is
+        // held to by `validate_pix_supervision` and which is therefore the earliest any conforming
+        // peer can ask.
         let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
             &our_params,
-            pix_toolbox.share_processor.config().early_recovery_threshold,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
         );
-        if let Some(progress) = pix_toolbox.share_generator.emission_progress(&pseudonym)
-            && (!progress.is_serving_last_committed() || progress.front_emitted < min_emitted)
-        {
-            let asked_first = msg.commitments.keys().next().copied();
-            let error = SessionManagerError::Unacceptable(format!(
-                "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({} of {min_emitted} shares \
-                 needed for an early-recovery signal) of the batch committed up to {}",
-                progress.highest_emitted, progress.front_emitted, progress.last_committed
-            ));
-            warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
-            return Err(error.into());
+        match pix_toolbox.share_generator.emission_progress(&pseudonym) {
+            Some(progress) if !progress.is_serving_last_committed() || progress.front_emitted < min_emitted => {
+                let asked_first = msg.commitments.keys().next().copied();
+                let error = SessionManagerError::Unacceptable(format!(
+                    "Exit asked for SSAs from {asked_first:?} while emission has reached {:?} ({} of {min_emitted} \
+                     shares needed for an early-recovery signal) of the batch committed up to {}",
+                    progress.highest_emitted, progress.front_emitted, progress.last_committed
+                ));
+                warn!(session_id = %msg.session_id, %error, "refused an early SSA request");
+                return Err(error.into());
+            }
+            // No generator state, but this Session has committed before: the entry was discarded
+            // under us and the gate above has nothing left to measure.
+            //
+            // Absent state is otherwise the ordinary opening batch, which is why the gate treats it as
+            // admissible — and that is the whole of the hole this closes. The generator keeps its
+            // per-pseudonym entry in a cache with an idle retention, refreshed by share *emission*; a
+            // Session kept alive on KeepAlives alone while the Entry sends nothing outlives it. An Exit
+            // that arranges exactly that gets the successor gate deleted rather than merely relaxed —
+            // no emission boundary, and no monotonic index either, since the discarded entry took the
+            // high-watermark with it — and can then farm a fresh deposit per retention period.
+            //
+            // Terminal rather than a dropped message. The polynomials for the committed cycles went
+            // with the entry, so `next_share` yields nothing and no share of them will ever be emitted:
+            // whatever the Exit deposited against them is already unrecoverable and this half of the
+            // Session can make no further PIX progress. Refusing quietly would leave the Exit to
+            // discover that by timing out on commitments we have decided never to send.
+            None if session_slot
+                .current_ssa_state
+                .get()
+                .and_then(SessionSsaState::committed_watermark)
+                .is_some() =>
+            {
+                let error = SessionManagerError::Unacceptable(format!(
+                    "generator state for {pseudonym} was discarded while the Session was live; the cycles committed \
+                     up to {:?} can no longer be served",
+                    session_slot
+                        .current_ssa_state
+                        .get()
+                        .and_then(SessionSsaState::committed_watermark)
+                ));
+                warn!(session_id = %msg.session_id, %error, "refused an SSA request against lost generator state");
+                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                    .await;
+                return Err(error.into());
+            }
+            _ => {}
         }
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
@@ -3478,6 +3562,14 @@ where
             .await
             .map_err(SessionManagerError::other)?
             .map_err(SessionManagerError::PixError)?;
+
+            // The generator has been advanced for this index, so the Session records it now rather
+            // than after the publish phase. Recording it early is the safe direction: the watermark
+            // only ever makes the successor gate stricter, and a batch abandoned between here and
+            // publication has still moved the generator.
+            if let Some(state) = session_slot.current_ssa_state.get() {
+                state.note_committed(ssa_index);
+            }
 
             // Construct the full SSA by adding the client and exit commitments, getting the deposit address
             let full_ssa = client_commitment.ssa_commitment + exit_point;
@@ -5678,6 +5770,61 @@ mod tests {
         Ok(())
     }
 
+    /// A rejected PIX configuration must not consume the manager's one-shot start state.
+    ///
+    /// Validation is fallible and happens before any worker is spawned, so callers must be able to
+    /// correct the toolbox (or start without PIX) and retry the same manager. Otherwise `start`
+    /// reports an ordinary configuration error while leaving `is_started() == false`, but the
+    /// already-filled message-sender lock makes every retry fail with `AlreadyStarted`.
+    ///
+    /// On a runtime because the retry now gets far enough to spawn the manager's workers, which is
+    /// the whole point — before the fix it returned `AlreadyStarted` before reaching them.
+    #[test_log::test(tokio::test)]
+    async fn rejected_pix_start_does_not_poison_a_retry() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    supervision: SupervisorConfig {
+                        max_recovery_idle: Duration::from_secs(600),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let (invalid_pix, _pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig::default()).into(),
+            SsaReconstructor::new(SsaReconstructorConfig {
+                unused_verifier_lifetime: Duration::from_secs(60),
+                ..Default::default()
+            })
+            .into(),
+        );
+        let (first_tx, _first_rx) = futures::channel::mpsc::unbounded();
+        let (first_notifier, _first_notifications) = futures::channel::mpsc::channel(1);
+        assert!(matches!(
+            mgr.start(first_tx, first_notifier, Some(invalid_pix)),
+            Err(TransportSessionError::InvalidConfig(_))
+        ));
+        assert!(
+            !mgr.is_started(),
+            "a rejected start must not report the manager as running"
+        );
+
+        let (retry_tx, _retry_rx) = futures::channel::mpsc::unbounded();
+        let (retry_notifier, _retry_notifications) = futures::channel::mpsc::channel(1);
+        let retry = mgr.start(retry_tx, retry_notifier, None);
+        assert!(
+            retry.is_ok(),
+            "a configuration error must leave the manager retryable, got {retry:?}"
+        );
+
+        Ok(())
+    }
+
     /// Making every duration representable is not sufficient if normalization leaves a supervisor
     /// waiting after its paired reconstructor has already discarded the cycle. A programmatic
     /// caller using the default reconstructor must receive a configuration that still satisfies the
@@ -6422,7 +6569,14 @@ mod tests {
         let threshold = params.shares_per_poly() as u64;
         let surplus = params.surplus_shares() as u64;
         let window = (hopr_protocol_pix::SHARE_EMISSION_WINDOW as u64).min(polys);
-        let early = SsaReconstructorConfig::default().early_recovery_threshold;
+        // The floor, because that is what the gate is computed at — see
+        // `MIN_EARLY_RECOVERY_THRESHOLD`. The default must not sit below it, or a stock Exit would
+        // ask before a stock Entry admits.
+        let early = hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD;
+        assert!(
+            SsaReconstructorConfig::default().early_recovery_threshold >= early,
+            "the shipped default must be admissible under the protocol floor it is gated against"
+        );
         let needed = (early * polys as f64).ceil() as u64;
 
         // `needed` lies in this window. Earlier windows are fully exhausted, including surplus;
@@ -6452,6 +6606,249 @@ mod tests {
             ((early / 1.5) * (polys * (threshold + surplus)) as f64) < gate as f64,
             "the surplus-factor estimate must sit below the real boundary"
         );
+    }
+
+    /// Dimensions wide enough that the protocol floor and a stricter local threshold disagree.
+    ///
+    /// At `small_pix_params`' two polynomials, `ceil(0.85 x 2)` and `ceil(1.0 x 2)` are both 2, so
+    /// every threshold in range produces the same boundary and a test built on them cannot tell which
+    /// one the gate used. Eight separates them: 7 polynomials against 8.
+    fn wide_pix_params() -> PixParams {
+        PixParams::try_new(8, 2, TEST_SURPLUS_SHARES).expect("test dimensions must be valid")
+    }
+
+    /// Builds an Entry-side manager serving `params`, with the reconstructor at `early_threshold`.
+    ///
+    /// Returns the manager, its generator, and the PIX event stream, with one PIX Session already
+    /// established for the returned pseudonym.
+    #[allow(clippy::type_complexity)]
+    async fn entry_with_pix_session(
+        params: PixParams,
+        early_threshold: f64,
+    ) -> anyhow::Result<(
+        SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>,
+        Arc<SsaShareGenerator<HoprPixSpec>>,
+        HoprPseudonym,
+        impl futures::Stream<Item = HoprSessionOutPixEvent> + Unpin,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        tokio::task::JoinHandle<anyhow::Result<()>>,
+    )> {
+        use hopr_protocol_start::StartInitiation;
+
+        let generator = Arc::new(SsaShareGenerator::new(SsaGeneratorConfig {
+            polynomials_per_ssa: params.polys_per_ssa(),
+            threshold: params.shares_per_poly(),
+            surplus_shares: params.surplus_shares(),
+        }));
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            generator.clone(),
+            SsaReconstructor::new(SsaReconstructorConfig {
+                early_recovery_threshold: early_threshold,
+                ..Default::default()
+            })
+            .into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: params.into_additional_data(0),
+            },
+        )
+        .await?;
+
+        Ok((mgr, generator, pseudonym, pix_events, bob_sender, bob_handle))
+    }
+
+    /// One SSA commitment at `index`, from the identity element the Exit-side point is not checked
+    /// against here.
+    fn ssa_request_for(index: u32) -> std::collections::BTreeMap<SsaIndex, HoprPixGroupElement> {
+        let identity = HoprPixGroupElement::try_from(
+            hopr_protocol_pix::PixGroup::<HoprPixSpec>::default()
+                .to_bytes()
+                .as_ref(),
+        )
+        .expect("identity element must be valid");
+        std::collections::BTreeMap::from([(SsaIndex::new(index).expect("non-zero"), identity)])
+    }
+
+    fn drain_pix_events(events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)) -> usize {
+        let mut seen = 0;
+        while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
+            seen += 1;
+        }
+        seen
+    }
+
+    /// The successor gate must open at the protocol floor, not at the local reconstructor's threshold.
+    ///
+    /// The value that decides when a correct Exit asks for its next batch is the *peer's*
+    /// `early_recovery_threshold`, and it does not travel on the wire. Deriving the boundary from the
+    /// Entry's own copy meant two individually valid configurations could not communicate: an Exit
+    /// configured lower sent its one-shot request before the gate opened, the Entry dropped it
+    /// silently, and the Session died on `max_ssa_delivery_time` waiting for a commitment that had
+    /// been deliberately refused — a failure visible on neither node as a configuration error.
+    ///
+    /// So the gate is computed at [`hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD`], which
+    /// `validate_pix_supervision` holds every Exit to. This fixture puts the local reconstructor at
+    /// `1.0` — the strictest end of the range — and asks at exactly the floor's boundary. A gate built
+    /// on the local value wants one more share and refuses.
+    #[test_log::test(tokio::test)]
+    async fn successor_gate_opens_at_the_protocol_floor_not_the_local_threshold() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, 1.0).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        let at_floor = hopr_protocol_pix::min_emission_for_early_recovery(
+            &params,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
+        );
+        let at_local = hopr_protocol_pix::min_emission_for_early_recovery(&params, 1.0);
+        assert!(
+            at_floor < at_local,
+            "the fixture must separate the two boundaries, got {at_floor} and {at_local}"
+        );
+
+        // One share short of the floor's boundary, the request is early under either reading.
+        for sent in 1..at_floor as u32 {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            )
+            .await
+            .expect_err("a request one share below the boundary must be refused");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events));
+
+        // On the boundary itself it is admitted — and would not be if the gate read the local 1.0.
+        generator.next_share(&pseudonym, &at_floor.to_be_bytes())?;
+        assert_eq!(
+            at_floor,
+            generator
+                .emission_progress(&pseudonym)
+                .expect("committed")
+                .front_emitted,
+            "the fixture must stand exactly on the floor's boundary"
+        );
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+        )
+        .await
+        .context("a request at the protocol floor must be accepted whatever the local threshold is")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A successor request arriving after the generator's state was discarded must be refused.
+    ///
+    /// The gate only applies where there is emission progress to measure, and absent progress is
+    /// otherwise the ordinary opening batch. But the generator keeps its per-pseudonym state in a
+    /// cache with an idle retention refreshed by share *emission*, so a Session kept alive while the
+    /// Entry emits nothing outlives it — and the successor gate is then not relaxed but deleted, along
+    /// with the monotonic index the discarded entry carried. An Exit that arranges that farms one
+    /// unearned deposit per retention period, which is the exposure the gate exists to close.
+    ///
+    /// `forget` reaches the same state the retention would, deliberately: an evicted entry and an
+    /// explicitly dropped one are indistinguishable from the outside, which is precisely why the fact
+    /// that a batch *was* committed has to be held somewhere that lives as long as the Session.
+    ///
+    /// The opening request in this test is the other half of the property — absent state with nothing
+    /// committed is still admitted, or no PIX Session could ever start.
+    #[test_log::test(tokio::test)]
+    async fn an_ssa_request_against_discarded_generator_state_is_refused_and_closes_the_session() -> anyhow::Result<()>
+    {
+        let params = small_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(vec![pseudonym], mgr.active_sessions());
+
+        generator.forget(&pseudonym);
+        assert!(
+            generator.emission_progress(&pseudonym).is_none(),
+            "the fixture must reproduce the state an idle eviction leaves behind"
+        );
+
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            )
+            .await
+            .expect_err("a successor request against discarded generator state must be refused");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events),
+            "a refused request must not emit a single ReadyToDeposit"
+        );
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "the Entry can no longer emit shares for the cycles it committed to, so leaving the Session open only \
+             makes the Exit wait out its commitment deadline"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
     }
 
     /// The Entry's half of the successor gate: a batch asked for before emission has reached the last

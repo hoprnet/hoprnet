@@ -107,6 +107,31 @@ pub const MIN_POLY_THRESHOLD: u8 = 2;
 /// structural rather than merely checked; the constant exists to name it.
 pub const MAX_POLY_THRESHOLD: u8 = u8::MAX;
 
+/// Protocol-wide floor on [`SsaReconstructorConfig::early_recovery_threshold`].
+///
+/// The Entry refuses a successor `SsaRequest` that arrives before the current batch can plausibly
+/// have been recovered — see [`min_emission_for_early_recovery`]. That boundary is a function of the
+/// *Exit's* `early_recovery_threshold`, and the two sides negotiate [`PixParams`] but not this: it is
+/// a local reconstructor setting on the Exit, and the Entry computing the gate has no way to read it.
+///
+/// So the Entry computes the gate at this floor instead of at its own value, and every Exit is
+/// required to sit at or above it. That turns an unshared value into a shared one without a wire
+/// change, and it is sound in the only direction that matters — an Exit at or above the floor asks at
+/// or after the point the Entry admits, so no conforming pair can fail to communicate. Deriving the
+/// gate from the Entry's own setting instead left two individually valid configurations that could
+/// not talk: an Exit configured lower sent its one-shot request early, the Entry silently dropped it,
+/// and the Session died waiting for a commitment that was deliberately refused.
+///
+/// Equal to the shipped default today, but a separate constant on purpose. The default is a policy
+/// choice an operator may raise; this is a compatibility bound, and *lowering* it is a protocol
+/// break — every Entry still running the old value would refuse the earlier request. Raising it is
+/// equally breaking in the other direction, since Exits at the old floor become unservable.
+///
+/// Enforced where the two halves meet rather than in [`SsaReconstructorConfig`]'s own validator: a
+/// reconstructor exercised on its own has no peer to be incompatible with, and pinning the
+/// early-recovery logic in a unit test needs thresholds well below anything deployable.
+pub const MIN_EARLY_RECOVERY_THRESHOLD: f64 = 0.85;
+
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec: Send + Sync + 'static
 where

@@ -353,7 +353,7 @@
 //! | `SessionManagerConfig::maximum_surb_buffer_size` | 10 000 | Ceiling the balancer may be steered to |
 //! | `SsaReconstructorConfig::max_ack_await_time` | 30 s | Bounds how long an unacknowledged share is held; both `max_recovery_idle` and `tombstone_retention_window` must clear it |
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
-//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the 54 s pipelining runway quoted above; lowering it buys runway at the cost of committing to the next cycle earlier |
+//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the 54 s pipelining runway quoted above. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
 //! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
 
 use std::time::Duration;
@@ -850,6 +850,21 @@ pub fn validate_pix_supervision(
             "max_recovery_idle must be >= max_ack_await_time".into(),
         ));
     }
+    // An Exit below the floor asks for its next batch before any conforming Entry will admit the
+    // request. The Entry's gate is computed at the floor precisely because this value does not travel
+    // on the wire (see `MIN_EARLY_RECOVERY_THRESHOLD`), so the mismatch cannot be detected on the
+    // link: the one-shot request is dropped, nothing acknowledges the refusal, and the Session dies
+    // on `max_ssa_delivery_time` waiting for a commitment that was deliberately withheld. Rejecting
+    // it here turns a silent remote failure into a local startup error, which is the only place the
+    // operator who set the value can see it.
+    if reconstructor_cfg.early_recovery_threshold < hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "early_recovery_threshold ({}) must be >= MIN_EARLY_RECOVERY_THRESHOLD ({}); a lower value asks for the \
+             next SSA batch before a conforming Entry admits the request",
+            reconstructor_cfg.early_recovery_threshold,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD
+        )));
+    }
     // Documented invariant: tombstone must outlive the ack window.
     if cfg.tombstone_retention_window < reconstructor_cfg.max_ack_await_time {
         return Err(TransportSessionError::InvalidConfig(
@@ -1077,6 +1092,45 @@ mod tests {
                 "a duration of Duration::MAX must be rejected, not saturated"
             );
         }
+    }
+
+    /// An Exit below the protocol floor cannot have its successor requests admitted by any conforming
+    /// Entry, so the mismatch has to be caught locally.
+    ///
+    /// The Entry's gate is computed at [`hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD`] because
+    /// this value never goes on the wire — see the constant. That makes a lower local setting a
+    /// silent, remote failure: the one-shot request goes out early, the Entry drops it, nothing
+    /// acknowledges the refusal, and the Session dies on its commitment deadline. This is the only
+    /// place an operator can be told, so both individually valid halves have to be compared here.
+    #[test]
+    fn validation_rejects_an_early_recovery_threshold_below_the_protocol_floor() {
+        let cfg = valid_cfg();
+        let floor = hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD;
+
+        let below = SsaReconstructorConfig {
+            early_recovery_threshold: floor - 0.05,
+            ..valid_rcn_cfg()
+        };
+        assert!(
+            validate_pix_supervision(&cfg, &below).is_err(),
+            "an Exit asking earlier than any Entry admits must not start"
+        );
+
+        for accepted in [floor, 1.0] {
+            let rcn = SsaReconstructorConfig {
+                early_recovery_threshold: accepted,
+                ..valid_rcn_cfg()
+            };
+            assert!(
+                validate_pix_supervision(&cfg, &rcn).is_ok(),
+                "{accepted} is at or above the floor and must be accepted"
+            );
+        }
+
+        assert!(
+            SsaReconstructorConfig::default().early_recovery_threshold >= floor,
+            "the shipped default must itself be admissible"
+        );
     }
 
     /// `max_recovery_idle` is bounded from both directions, so its cap check must be reachable
