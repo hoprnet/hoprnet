@@ -249,7 +249,7 @@ impl ClusterGuard {
                     capabilities: Default::default(),
                     pseudonym: None,
                     surb_management: Some(SurbBalancerConfig::default()),
-                    always_max_out_surbs: false,
+                    max_surbs_per_data_packet: 1,
                     flow_control: None,
                 },
             )

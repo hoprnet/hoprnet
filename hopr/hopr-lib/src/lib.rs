@@ -185,8 +185,8 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub pseudonym: Option<hopr_api::types::internal::protocol::HoprPseudonym>,
     /// Enable automatic SURB management for the session.
     pub surb_management: Option<SurbBalancerConfig>,
-    /// If set, the maximum number of possible SURBs will always be sent with session data packets.
-    pub always_max_out_surbs: bool,
+    /// Sets the maximum number of possible SURBs which will always be sent with Session data packets (if they fit).
+    pub max_surbs_per_data_packet: usize,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
 }
@@ -201,7 +201,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             capabilities: SessionCapability::Segmentation.into(),
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
-            always_max_out_surbs: false,
+            max_surbs_per_data_packet: 1,
             flow_control: None,
         }
     }
@@ -238,7 +238,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             capabilities: value.capabilities,
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
-            always_max_out_surbs: value.always_max_out_surbs,
+            max_surbs_per_data_packet: value.max_surbs_per_data_packet,
             flow_control: value.flow_control,
         })
     }
@@ -901,7 +901,7 @@ mod tests {
             capabilities: SessionCapability::Segmentation.into(),
             pseudonym: None,
             surb_management: None,
-            always_max_out_surbs: false,
+            max_surbs_per_data_packet: 1,
             flow_control: None,
         })
         .context("explicit path config conversion must succeed")?;
