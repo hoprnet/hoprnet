@@ -1,16 +1,12 @@
-//! Shared-pool Poisson mixer — an opt-in alternative to [`crate::poisson`], behind the
+//! Shared-pool Poisson mixer — opt-in alternative to [`crate::poisson`] behind the
 //! `poisson-shared` feature.
 //!
-//! Where [`crate::poisson`] owns the pool on a dedicated OS thread and relays packets in and out
-//! over two `async-channel` queues, this variant keeps the pool behind an `Arc<Mutex<_>>` (like
-//! the uniform `channel()`). Senders lock and push; the sweep and the adaptive timer run
-//! on the **consumer's** `poll_next`. Removing both cross-thread hand-offs makes it markedly
-//! faster (see `benches/poisson_shared_bench.rs`), with two tradeoffs: the mutex is held across
-//! each O(N) sweep, and the mixing runs on the consumer's task rather than an isolated thread
-//! (benign, given the cadence-independent release clock).
-//!
-//! The release logic is shared with [`crate::poisson`] via `pool::sweep`, so the mixing
-//! behaviour (and its stochastic guarantees) is identical.
+//! Instead of a dedicated thread and two channels, the pool lives behind an `Arc<Mutex<_>>` and
+//! the sweep + adaptive timer run on the consumer's `poll_next`. Dropping both cross-thread
+//! hand-offs is markedly faster (see `benches/poisson_shared_bench.rs`); the tradeoff is holding
+//! the mutex across each O(N) sweep and mixing on the consumer task rather than an isolated thread
+//! (benign, given the cadence-independent release clock). Release logic is shared via `pool::sweep`,
+//! so mixing behaviour is identical to [`crate::poisson`].
 
 use std::{
     collections::VecDeque,
@@ -112,8 +108,7 @@ impl<T> futures::sink::Sink<T> for Sender<T> {
     type Error = SenderError;
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // The pool is unbounded, so a send never needs to wait: always ready while the receiver
-        // lives, matching the dedicated-thread engine's sender.
+        // Unbounded pool: always ready while the receiver lives.
         if self.shared.receiver_active.load(Ordering::Relaxed) {
             Poll::Ready(Ok(()))
         } else {
@@ -163,13 +158,10 @@ impl<T: Unpin> Stream for Receiver<T> {
             // every pushed entry is visible below.
             let no_senders = this.shared.sender_count.load(Ordering::Acquire) == 0;
 
-            // Outcome of the sweep, decided under the lock but acted on after releasing it.
+            // Sweep outcome, decided under the lock and acted on after it drops.
             enum Next {
-                /// Items were released into `scratch`; move them out and pop.
                 Released,
-                /// No input can arrive and the pool is drained.
                 Closed,
-                /// Nothing ready; park the timer for this long.
                 Sleep(Duration),
             }
 

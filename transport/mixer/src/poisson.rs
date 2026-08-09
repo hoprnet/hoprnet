@@ -1,21 +1,14 @@
 //! Exponential (Poisson) release mixer — an additive alternative to the uniform `channel`.
 //!
-//! Instead of assigning each packet a uniform delay on a shared min-heap, this engine
-//! holds packets in a pool owned by a dedicated OS thread and, on every wake, releases
-//! each eligible packet with the memoryless probability `1 - e^(-delta/mean)`
-//! (`1 - e^(-delta/mean)`). The resulting holding time is exponential and
-//! the departure process approximates Poisson, which resists timing correlation.
+//! A dedicated OS thread holds packets in a pool and, on every wake, releases each eligible
+//! packet with the memoryless probability `1 - e^(-delta/mean)`, giving exponential holding
+//! times and a Poisson-like departure process that resists timing correlation.
 //!
-//! The engine thread runs [`futures::executor::block_on`] over a single merged event
-//! stream (`Events`) that combines the ingress channel with an adaptive, self-rescheduling
-//! [`futures_timer::Delay`]. Merging (rather than `select!`) means a newly-arrived packet
-//! interrupts the wait and triggers an immediate sweep + tick re-arm — "each new entry
-//! shortens the waker" — with no fuse/cancellation footguns.
-//!
-//! Ingress and egress are unbounded [`async_channel`] channels — lock-free `&self` sends that
-//! never block, chosen for lower overhead than `futures::channel::mpsc` in this MPSC hot path.
-//! The [`Receiver`] exposes egress as a `Stream`. The engine thread terminates when the last
-//! sender drops and the pool drains, or when the receiver is dropped.
+//! The thread `block_on`s one merged event stream (`Events`) combining the ingress channel with
+//! a self-rescheduling [`futures_timer::Delay`]; merging (not `select!`) lets a new packet
+//! interrupt the wait and re-arm the tick with no fuse/cancellation footguns. Ingress and egress
+//! are unbounded [`async_channel`]s — lock-free non-blocking `&self` sends, deliberately chosen
+//! over `futures::channel::mpsc` for lower overhead on this MPSC hot path.
 
 use std::{
     pin::Pin,
@@ -37,8 +30,7 @@ use crate::{
     pool::{self, Entry, PoissonParams},
 };
 
-/// Sender end of the Poisson mixing channel. Mirrors the uniform channel's sender: a lock-free,
-/// non-blocking `&self` send over an unbounded [`async_channel`] ingress.
+/// Sender end of the Poisson mixing channel.
 pub struct Sender<T> {
     input: ChanTx<(Instant, T)>,
     receiver_active: Arc<AtomicBool>,
@@ -229,7 +221,6 @@ async fn run_engine<T>(
             let _ = realized_delay;
 
             if output.try_send(item).is_err() {
-                // Receiver gone: nothing left to deliver to.
                 receiver_active.store(false, Ordering::Relaxed);
                 return;
             }
@@ -293,6 +284,7 @@ pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Recei
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
+    use rstest::rstest;
     use tokio::time::timeout;
 
     use super::*;
@@ -314,6 +306,22 @@ mod tests {
             }),
             ..MixerConfig::default()
         }
+    }
+
+    /// Drain `rx` in a spawned task, mapping each item at the instant it is received (so realized
+    /// delays are measured at delivery), returning the mapped values in delivery order.
+    fn spawn_drain<T, R>(mut rx: Receiver<T>, f: impl Fn(T) -> R + Send + 'static) -> tokio::task::JoinHandle<Vec<R>>
+    where
+        T: Send + 'static,
+        R: Send + 'static,
+    {
+        tokio::spawn(async move {
+            let mut out = Vec::new();
+            while let Some(item) = rx.next().await {
+                out.push(f(item));
+            }
+            out
+        })
     }
 
     #[tokio::test]
@@ -468,7 +476,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn passthrough_should_preserve_order() -> anyhow::Result<()> {
+    async fn poisson_channel_passthrough_should_preserve_order() -> anyhow::Result<()> {
         const ITERATIONS: usize = 40;
         let (tx, rx) = poisson_channel(MixerConfig {
             min_delay: Duration::ZERO,
@@ -542,30 +550,26 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
+    #[case::exactly_once(4_000)]
+    #[case::unbounded_flood(20_000)]
     #[tokio::test]
-    async fn all_packets_should_be_delivered_exactly_once() -> anyhow::Result<()> {
-        // Basic channel invariant: no loss, no duplication, no fabrication.
-        const N: u32 = 4000;
-        let (tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
+    async fn all_sent_ids_should_be_delivered_exactly_once(#[case] n: u32) -> anyhow::Result<()> {
+        // No loss, no duplication, no fabrication — including a flood the unbounded ingress must
+        // accept without blocking.
+        let (tx, rx) = poisson_channel::<u32>(MixerConfig::default());
+        let drained = spawn_drain(rx, |x| x);
 
-        let receiver = tokio::spawn(async move {
-            let mut got = Vec::with_capacity(N as usize);
-            while let Some(item) = rx.next().await {
-                got.push(item);
-            }
-            got
-        });
-
-        for i in 0..N {
-            tx.send(i)?;
+        for i in 0..n {
+            tx.send(i).expect("unbounded ingress must always accept");
         }
         drop(tx);
 
-        let mut got = tokio::time::timeout(Duration::from_secs(10), receiver).await??;
+        let mut got = tokio::time::timeout(Duration::from_secs(10), drained).await??;
         got.sort_unstable();
         assert_eq!(
             got,
-            (0..N).collect::<Vec<_>>(),
+            (0..n).collect::<Vec<_>>(),
             "every sent id must be delivered exactly once"
         );
         Ok(())
@@ -611,16 +615,8 @@ mod tests {
         // exactly once. Exercises concurrent lock-free ingress.
         const CLONES: u32 = 8;
         const PER: u32 = 500;
-        let total = (CLONES * PER) as usize;
-        let (tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
-
-        let receiver = tokio::spawn(async move {
-            let mut got = Vec::with_capacity(total);
-            while let Some(item) = rx.next().await {
-                got.push(item);
-            }
-            got
-        });
+        let (tx, rx) = poisson_channel::<u32>(MixerConfig::default());
+        let receiver = spawn_drain(rx, |x| x);
 
         let mut tasks = Vec::new();
         for c in 0..CLONES {
@@ -696,35 +692,6 @@ mod tests {
         assert!(
             max_mean / min_mean < 4.0,
             "per-clone mean delays should be similar (min {min_mean:.2} ms, max {max_mean:.2} ms, means {means:?})"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn unbounded_ingress_should_accept_a_flood() -> anyhow::Result<()> {
-        // The unbounded ingress accepts a large synchronous flood without blocking or loss.
-        const N: u32 = 20_000;
-        let (tx, mut rx) = poisson_channel::<u32>(MixerConfig::default());
-
-        let receiver = tokio::spawn(async move {
-            let mut got = Vec::with_capacity(N as usize);
-            while let Some(item) = rx.next().await {
-                got.push(item);
-            }
-            got
-        });
-
-        for i in 0..N {
-            tx.send(i).expect("unbounded ingress must always accept");
-        }
-        drop(tx);
-
-        let mut got = tokio::time::timeout(Duration::from_secs(10), receiver).await??;
-        got.sort_unstable();
-        assert_eq!(
-            got,
-            (0..N).collect::<Vec<_>>(),
-            "unbounded ingress must accept and deliver all"
         );
         Ok(())
     }

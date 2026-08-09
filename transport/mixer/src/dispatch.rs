@@ -16,6 +16,21 @@ use crate::{
     error::SenderError,
 };
 
+/// Match an `Any*` value and run `$call` against the inner engine handle, with the feature-gated
+/// arms declared once. The variant name never appears in the body, so all arms share `$call`.
+macro_rules! forward {
+    ($ty:ident, $val:expr, $inner:ident => $call:expr) => {
+        match $val {
+            #[cfg(feature = "uniform-channel")]
+            $ty::Uniform($inner) => $call,
+            #[cfg(feature = "poisson")]
+            $ty::Poisson($inner) => $call,
+            #[cfg(feature = "poisson-shared")]
+            $ty::PoissonShared($inner) => $call,
+        }
+    };
+}
+
 /// Sender over whichever engine [`create`] selected.
 pub enum AnySender<T> {
     #[cfg(feature = "uniform-channel")]
@@ -43,47 +58,19 @@ impl<T> Sink<T> for AnySender<T> {
     type Error = SenderError;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.get_mut() {
-            #[cfg(feature = "uniform-channel")]
-            AnySender::Uniform(s) => Pin::new(s).poll_ready(cx),
-            #[cfg(feature = "poisson")]
-            AnySender::Poisson(s) => Pin::new(s).poll_ready(cx),
-            #[cfg(feature = "poisson-shared")]
-            AnySender::PoissonShared(s) => Pin::new(s).poll_ready(cx),
-        }
+        forward!(AnySender, self.get_mut(), s => Pin::new(s).poll_ready(cx))
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        match self.get_mut() {
-            #[cfg(feature = "uniform-channel")]
-            AnySender::Uniform(s) => Pin::new(s).start_send(item),
-            #[cfg(feature = "poisson")]
-            AnySender::Poisson(s) => Pin::new(s).start_send(item),
-            #[cfg(feature = "poisson-shared")]
-            AnySender::PoissonShared(s) => Pin::new(s).start_send(item),
-        }
+        forward!(AnySender, self.get_mut(), s => Pin::new(s).start_send(item))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.get_mut() {
-            #[cfg(feature = "uniform-channel")]
-            AnySender::Uniform(s) => Pin::new(s).poll_flush(cx),
-            #[cfg(feature = "poisson")]
-            AnySender::Poisson(s) => Pin::new(s).poll_flush(cx),
-            #[cfg(feature = "poisson-shared")]
-            AnySender::PoissonShared(s) => Pin::new(s).poll_flush(cx),
-        }
+        forward!(AnySender, self.get_mut(), s => Pin::new(s).poll_flush(cx))
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.get_mut() {
-            #[cfg(feature = "uniform-channel")]
-            AnySender::Uniform(s) => Pin::new(s).poll_close(cx),
-            #[cfg(feature = "poisson")]
-            AnySender::Poisson(s) => Pin::new(s).poll_close(cx),
-            #[cfg(feature = "poisson-shared")]
-            AnySender::PoissonShared(s) => Pin::new(s).poll_close(cx),
-        }
+        forward!(AnySender, self.get_mut(), s => Pin::new(s).poll_close(cx))
     }
 }
 
@@ -101,14 +88,7 @@ impl<T: Unpin> Stream for AnyReceiver<T> {
     type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.get_mut() {
-            #[cfg(feature = "uniform-channel")]
-            AnyReceiver::Uniform(r) => Pin::new(r).poll_next(cx),
-            #[cfg(feature = "poisson")]
-            AnyReceiver::Poisson(r) => Pin::new(r).poll_next(cx),
-            #[cfg(feature = "poisson-shared")]
-            AnyReceiver::PoissonShared(r) => Pin::new(r).poll_next(cx),
-        }
+        forward!(AnyReceiver, self.get_mut(), r => Pin::new(r).poll_next(cx))
     }
 }
 

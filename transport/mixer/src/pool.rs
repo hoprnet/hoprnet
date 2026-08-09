@@ -57,8 +57,13 @@ impl PoissonParams {
             crate::config::MixerType::Poisson(poisson) => poisson,
             #[cfg(feature = "poisson-shared")]
             crate::config::MixerType::PoissonShared(poisson) => poisson,
+            // `create` only routes Poisson variants here, so this is unreachable in practice;
+            // assert in debug so a direct caller passing a non-Poisson config fails loudly.
             #[allow(unreachable_patterns)]
-            _ => PoissonConfig::default(),
+            _ => {
+                debug_assert!(false, "PoissonParams::from_mixer called with a non-Poisson mixer_type");
+                PoissonConfig::default()
+            }
         };
         Self::new(cfg, &poisson)
     }
@@ -148,7 +153,6 @@ pub(crate) struct Entry<T> {
     /// independent of the wake cadence — re-drawing per sweep would take the minimum over many
     /// draws, concentrating releases near `cap - cap_jitter` and coupling them to the tick rate.
     pub jitter_fraction: f64,
-    /// The buffered payload.
     pub item: T,
 }
 
@@ -226,8 +230,7 @@ pub(crate) fn sweep<T>(
         let release = if age < min_delay {
             false
         } else if age >= cap_deadline {
-            // Hard-cap force-release at this entry's per-enqueue jitter deadline.
-            true
+            true // hard-cap force-release
         } else if occupancy <= min_mix_occupancy {
             age >= mean // small buffer: deterministic minimum dwell
         } else {
@@ -756,15 +759,30 @@ mod tests {
     }
 
     #[rstest]
-    #[case(Duration::ZERO, 0.0)]
-    #[case(Duration::from_millis(10), 0.6321)] // 1 - e^-1 after one mean has elapsed
-    fn release_probability_should_follow_the_exponential_clock(#[case] delta: Duration, #[case] expected: f64) {
-        assert!((release_probability(delta, Duration::from_millis(10)) - expected).abs() < 1e-3);
+    #[case(Duration::ZERO, Duration::from_millis(10), 0.0)]
+    #[case(Duration::from_millis(10), Duration::from_millis(10), 0.6321)] // 1 - e^-1 after one mean
+    #[case(Duration::from_millis(5), Duration::ZERO, 1.0)] // degenerate mean releases unconditionally
+    fn release_probability_should_follow_the_exponential_clock(
+        #[case] delta: Duration,
+        #[case] mean: Duration,
+        #[case] expected: f64,
+    ) {
+        assert!((release_probability(delta, mean) - expected).abs() < 1e-3);
     }
 
     #[test]
-    fn release_probability_should_be_one_for_a_degenerate_mean() {
-        assert_eq!(release_probability(Duration::from_millis(5), Duration::ZERO), 1.0);
+    fn next_wake_should_be_the_idle_heartbeat_when_the_pool_is_empty() {
+        assert_eq!(next_wake(None, 0, &default_params(), Instant::now()), IDLE_HEARTBEAT);
+    }
+
+    #[test]
+    fn next_wake_should_be_floored_at_min_wake_for_an_overdue_packet() {
+        // A packet already past its jitter-window opening drives `deadline_wake` to zero, so the
+        // result is the `MIN_WAKE` floor rather than a busy-spin at zero.
+        let params = default_params();
+        let now = Instant::now();
+        let overdue = now - params.cap - Duration::from_secs(1);
+        assert_eq!(next_wake(Some(overdue), 1000, &params, now), MIN_WAKE);
     }
 
     #[test]
