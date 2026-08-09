@@ -2,12 +2,14 @@
 source: hopr/hopr-lib/src/config.rs
 expression: cfg.protocol.mixer
 ---
+capacity: 1000
 min_delay: 5ms
 delay_range: 50ms
-capacity: 1000
-target_mean_delay: 0s
-cap_jitter: 2ms
-min_mix_occupancy: 5
-high_watermark: 10000
-tick_floor: 1ms
-saturation_min_mean: 1ms
+mixer_type:
+  PoissonShared:
+    target_mean_delay: 0s
+    cap_jitter: 2ms
+    min_mix_occupancy: 5
+    high_watermark: 10000
+    tick_floor: 1ms
+    saturation_min_mean: 1ms

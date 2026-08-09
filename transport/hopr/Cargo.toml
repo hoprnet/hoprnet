@@ -48,9 +48,6 @@ telemetry = [
   "hopr-transport-mixer/telemetry",
 ]
 p2p-announce-quic = []
-# Opt-in: use the shared-pool exponential (Poisson) release mixer engine instead of the default
-# uniform-delay mixer. Swaps the constructor at the mixer wiring site.
-poisson-mixer = ["hopr-transport-mixer/poisson-shared"]
 runtime-tokio = [
   "hopr-utils/runtime-tokio",
   "hopr-utils/network-types-runtime-tokio",
@@ -117,7 +114,14 @@ hopr-utils = { workspace = true, features = [
 hopr-crypto-packet = { workspace = true, features = ["ed25519"] }
 hopr-protocol-app = { workspace = true }
 hopr-protocol-hopr = { workspace = true, features = ["rayon"] }
-hopr-transport-mixer = { workspace = true, features = ["uniform-channel"] }
+# All engines are compiled so the mixer implementation can be selected at runtime via
+# `MixerConfig::mixer_type`.
+hopr-transport-mixer = { workspace = true, features = [
+  "uniform-channel",
+  "uniform-adapter",
+  "poisson",
+  "poisson-shared",
+] }
 hopr-transport-probe = { workspace = true }
 hopr-transport-session = { workspace = true }
 hopr-transport-tag-allocator = { workspace = true }

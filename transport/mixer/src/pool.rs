@@ -8,30 +8,130 @@ use std::time::{Duration, Instant};
 
 use hopr_types::crypto_random;
 
-use crate::config::MixerConfig;
+use crate::config::{HOPR_MIXER_CAP_PERCENTILE, MixerConfig, PoissonConfig};
 
-/// Idle heartbeat used when the pool is empty, so an engine periodically notices a
-/// dropped receiver and can shut down instead of parking forever. Shared by both engines
-/// (dedicated-thread and shared-pool) as the initial timer duration and the empty-pool wake.
+/// Idle heartbeat when the pool is empty, so an engine periodically notices a dropped receiver
+/// and can shut down instead of parking forever. Both engines use it as the initial timer.
 pub(crate) const IDLE_HEARTBEAT: Duration = Duration::from_millis(200);
-/// Lower bound on any computed wake, preventing a busy-spin near a packet deadline.
 const MIN_WAKE: Duration = Duration::from_micros(100);
 
-/// Compute the next wake from the current occupancy and the earliest still-buffered enqueue
-/// instant (as returned by [`sweep`], so no extra O(N) scan): the adaptive interval, capped by
-/// the soonest moment any packet's jitter window opens, floored at [`MIN_WAKE`]; an idle
-/// heartbeat when the pool is empty. Engine-agnostic, so both engines share one wake policy.
+/// Poisson tuning resolved from a [`MixerConfig`], holding everything the sweep and wake policy
+/// need without re-reading the public config or recomputing the derived mean each tick.
+#[derive(Clone, Copy)]
+pub(crate) struct PoissonParams {
+    min_delay: Duration,
+    cap: Duration,
+    cap_jitter: Duration,
+    min_mix_occupancy: usize,
+    high_watermark: usize,
+    capacity: usize,
+    mean: Duration,
+    saturation_min_mean: Duration,
+    tick_floor: Duration,
+    // Read only by the engines' telemetry path, so it is dead in non-telemetry / test builds.
+    #[allow(dead_code)]
+    pub(crate) metric_delay_window: u64,
+}
+
+impl PoissonParams {
+    pub(crate) fn new(cfg: &MixerConfig, poisson: &PoissonConfig) -> Self {
+        Self {
+            min_delay: cfg.min_delay,
+            cap: cfg.cap(),
+            cap_jitter: poisson.cap_jitter,
+            min_mix_occupancy: poisson.min_mix_occupancy,
+            high_watermark: poisson.high_watermark,
+            capacity: cfg.capacity,
+            mean: derive_mean(cfg.delay_range, poisson.target_mean_delay),
+            saturation_min_mean: poisson.saturation_min_mean,
+            tick_floor: poisson.tick_floor,
+            metric_delay_window: cfg.metric_delay_window,
+        }
+    }
+
+    /// Resolve the params from a config, taking the [`PoissonConfig`] from its `mixer_type` (or
+    /// defaults when a non-Poisson variant is passed to a Poisson engine directly).
+    pub(crate) fn from_mixer(cfg: &MixerConfig) -> Self {
+        let poisson = match cfg.mixer_type {
+            #[cfg(feature = "poisson")]
+            crate::config::MixerType::Poisson(poisson) => poisson,
+            #[cfg(feature = "poisson-shared")]
+            crate::config::MixerType::PoissonShared(poisson) => poisson,
+            #[allow(unreachable_patterns)]
+            _ => PoissonConfig::default(),
+        };
+        Self::new(cfg, &poisson)
+    }
+
+    pub(crate) fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    fn is_passthrough(&self) -> bool {
+        self.cap.is_zero()
+    }
+
+    /// Effective mean under the overload valve: the base mean up to `high_watermark`, shrinking
+    /// toward `saturation_min_mean` as occupancy nears `capacity`. The watermark is clamped below
+    /// `capacity` so a small configured capacity can't push the trip point out of reach.
+    fn mean_for(&self, occupancy: usize) -> Duration {
+        let base = self.mean;
+        let watermark = self.high_watermark.min(self.capacity.saturating_sub(1));
+        if occupancy <= watermark {
+            return base;
+        }
+        let low = watermark.max(1);
+        let high = self.capacity.max(low + 1);
+        let fraction = (occupancy.saturating_sub(low) as f64 / (high - low) as f64).clamp(0.0, 1.0);
+        let scaled = Duration::from_secs_f64(base.as_secs_f64() * (1.0 - fraction));
+        scaled.max(self.saturation_min_mean.min(base))
+    }
+
+    /// Adaptive wake interval `mean / occupancy`, clamped to `[tick_floor, mean]`.
+    fn adaptive_interval(&self, occupancy: usize) -> Duration {
+        let ceil = self.mean.max(self.tick_floor);
+        Duration::from_secs_f64(self.mean.as_secs_f64() / occupancy.max(1) as f64).clamp(self.tick_floor, ceil)
+    }
+}
+
+/// Memoryless release probability `1 - e^(-delta/mean)`, independent of the wake cadence.
+fn release_probability(delta: Duration, mean: Duration) -> f64 {
+    let mean = mean.as_secs_f64();
+    if mean <= 0.0 {
+        return 1.0;
+    }
+    1.0 - (-delta.as_secs_f64() / mean).exp()
+}
+
+/// Explicit `target` when set, else derived from `delay_range` so [`HOPR_MIXER_CAP_PERCENTILE`]
+/// of packets release before the cap. The window is `delay_range` because the clock only runs
+/// past `min_delay`.
+fn derive_mean(delay_range: Duration, target: Duration) -> Duration {
+    if !target.is_zero() {
+        return target;
+    }
+    let window = delay_range.as_secs_f64();
+    let factor = (1.0 / (1.0 - HOPR_MIXER_CAP_PERCENTILE)).ln();
+    if window <= 0.0 || factor <= 0.0 {
+        return Duration::ZERO;
+    }
+    Duration::from_secs_f64(window / factor)
+}
+
+/// Next wake from the current occupancy and the earliest still-buffered enqueue instant (from
+/// [`sweep`], so no extra scan): the adaptive interval, capped by the soonest jitter-window
+/// opening, floored at `MIN_WAKE`; an idle heartbeat when the pool is empty.
 pub(crate) fn next_wake(
     earliest_enqueued: Option<Instant>,
     occupancy: usize,
-    cfg: &MixerConfig,
+    params: &PoissonParams,
     now: Instant,
 ) -> Duration {
     match earliest_enqueued {
         None => IDLE_HEARTBEAT,
         Some(enqueued_at) => {
-            let interval = cfg.adaptive_interval(occupancy);
-            let window_opens = cfg.cap().saturating_sub(cfg.cap_jitter);
+            let interval = params.adaptive_interval(occupancy);
+            let window_opens = params.cap.saturating_sub(params.cap_jitter);
             let deadline_wake = (enqueued_at + window_opens).saturating_duration_since(now);
             interval.min(deadline_wake).max(MIN_WAKE)
         }
@@ -86,7 +186,7 @@ impl<T> Entry<T> {
 /// deadline is precomputed per entry at enqueue, so the sweep itself does no jitter sampling.
 pub(crate) fn sweep<T>(
     pool: &mut Vec<Entry<T>>,
-    cfg: &MixerConfig,
+    params: &PoissonParams,
     now: Instant,
     delta: Duration,
     out: &mut Vec<(Duration, T)>,
@@ -96,7 +196,7 @@ pub(crate) fn sweep<T>(
         return None;
     }
 
-    if cfg.is_passthrough() {
+    if params.is_passthrough() {
         for e in pool.drain(..) {
             out.push((now.saturating_duration_since(e.enqueued_at), e.item));
         }
@@ -104,14 +204,14 @@ pub(crate) fn sweep<T>(
     }
 
     let occupancy = pool.len();
-    let cap = cfg.cap();
-    let jitter = cfg.cap_jitter;
-    let min_delay = cfg.min_delay;
-    let min_mix_occupancy = cfg.min_mix_occupancy;
-    let mean = cfg.mean_for(occupancy);
+    let cap = params.cap;
+    let jitter = params.cap_jitter;
+    let min_delay = params.min_delay;
+    let min_mix_occupancy = params.min_mix_occupancy;
+    let mean = params.mean_for(occupancy);
 
     // Computed once per sweep (memoryless, shared `delta`) rather than per packet.
-    let release_probability = cfg.release_probability(delta, mean);
+    let full_delta_probability = release_probability(delta, mean);
     let jitter_window_start = cap.saturating_sub(jitter);
 
     let mut earliest: Option<Instant> = None;
@@ -138,9 +238,9 @@ pub(crate) fn sweep<T>(
             // a fresh burst.
             let eligible_for = age.saturating_sub(min_delay);
             let p = if eligible_for >= delta {
-                release_probability
+                full_delta_probability
             } else {
-                cfg.release_probability(eligible_for, mean)
+                release_probability(eligible_for, mean)
             };
             crypto_random::random_float() < p
         };
@@ -189,24 +289,54 @@ mod tests {
         Entry::new(Instant::now() - age, item)
     }
 
-    /// One-shot `sweep` wrapper returning the released items as a `Vec`, for the direct
-    /// (non-simulation) unit tests. `delta` is irrelevant to the branches these tests exercise.
-    fn sweep_once<T>(pool: &mut Vec<Entry<T>>, cfg: &MixerConfig, now: Instant) -> Vec<(Duration, T)> {
+    /// Engine params from explicit common fields plus a [`PoissonConfig`].
+    fn params(min_delay: Duration, delay_range: Duration, poisson: PoissonConfig) -> PoissonParams {
+        let cfg = MixerConfig {
+            min_delay,
+            delay_range,
+            ..MixerConfig::default()
+        };
+        PoissonParams::new(&cfg, &poisson)
+    }
+
+    /// Default engine params (derived mean, default cap and watermarks).
+    fn default_params() -> PoissonParams {
+        PoissonParams::from_mixer(&MixerConfig::default())
+    }
+
+    /// Params with a cap ≈ 30 means, so truncation (`e^-30`) is negligible and shape assertions
+    /// see the true exponential.
+    fn untruncated_params(mean: Duration) -> PoissonParams {
+        params(
+            Duration::ZERO,
+            mean * 30,
+            PoissonConfig {
+                target_mean_delay: mean,
+                ..PoissonConfig::default()
+            },
+        )
+    }
+
+    /// One-shot `sweep` returning the released items, for the direct (non-simulation) tests.
+    /// `delta` is irrelevant to the branches these exercise.
+    fn sweep_once<T>(pool: &mut Vec<Entry<T>>, params: &PoissonParams) -> Vec<(Duration, T)> {
         let mut out = Vec::new();
-        sweep(pool, cfg, now, cfg.mean().max(Duration::from_millis(1)), &mut out);
+        sweep(
+            pool,
+            params,
+            Instant::now(),
+            params.mean.max(Duration::from_millis(1)),
+            &mut out,
+        );
         out
     }
 
     #[test]
     fn passthrough_should_preserve_order() -> anyhow::Result<()> {
-        let cfg = MixerConfig {
-            min_delay: Duration::ZERO,
-            delay_range: Duration::ZERO,
-            ..MixerConfig::default()
-        };
+        let params = params(Duration::ZERO, Duration::ZERO, PoissonConfig::default());
         let mut pool: Vec<Entry<u32>> = (0..8).map(|i| entry(i, Duration::ZERO)).collect();
 
-        let released: Vec<u32> = sweep_once(&mut pool, &cfg, Instant::now())
+        let released: Vec<u32> = sweep_once(&mut pool, &params)
             .into_iter()
             .map(|(_, item)| item)
             .collect();
@@ -222,11 +352,11 @@ mod tests {
 
     #[test]
     fn deadline_should_force_release_regardless_of_rng() -> anyhow::Result<()> {
-        let cfg = MixerConfig::default();
+        let params = default_params();
         // Ages well beyond the cap — must always be released.
-        let mut pool: Vec<Entry<u32>> = (0..16).map(|i| entry(i, cfg.cap() + Duration::from_secs(1))).collect();
+        let mut pool: Vec<Entry<u32>> = (0..16).map(|i| entry(i, params.cap + Duration::from_secs(1))).collect();
 
-        let released = sweep_once(&mut pool, &cfg, Instant::now());
+        let released = sweep_once(&mut pool, &params);
 
         assert!(pool.is_empty(), "all past-deadline items must be released");
         assert_eq!(released.len(), 16);
@@ -235,28 +365,25 @@ mod tests {
 
     #[test]
     fn small_buffer_should_enforce_minimum_dwell() -> anyhow::Result<()> {
-        let cfg = MixerConfig::default();
-        let mean = cfg.mean();
-        assert!(cfg.min_mix_occupancy >= 1);
+        let params = default_params();
+        let mean = params.mean;
+        let occupancy = params.min_mix_occupancy as u32;
+        assert!(occupancy >= 1);
 
-        // Occupancy at the threshold, all fresh (age well below one mean): the deterministic
-        // minimum-dwell branch must KEEP them — no coin, no early release.
-        let young_age = mean / 4;
-        let mut pool: Vec<Entry<u32>> = (0..cfg.min_mix_occupancy as u32).map(|i| entry(i, young_age)).collect();
-        let released = sweep_once(&mut pool, &cfg, Instant::now());
+        // At the threshold and all fresh (age below one mean): the minimum-dwell branch KEEPS
+        // them — no coin, no early release.
+        let mut pool: Vec<Entry<u32>> = (0..occupancy).map(|i| entry(i, mean / 4)).collect();
         assert!(
-            released.is_empty(),
+            sweep_once(&mut pool, &params).is_empty(),
             "small buffer must hold packets younger than one mean"
         );
-        assert_eq!(pool.len(), cfg.min_mix_occupancy);
+        assert_eq!(pool.len(), params.min_mix_occupancy);
 
         // Once they have dwelt at least one mean, the same small buffer releases them.
-        let old_age = mean + mean / 4;
-        let mut pool: Vec<Entry<u32>> = (0..cfg.min_mix_occupancy as u32).map(|i| entry(i, old_age)).collect();
-        let released = sweep_once(&mut pool, &cfg, Instant::now());
+        let mut pool: Vec<Entry<u32>> = (0..occupancy).map(|i| entry(i, mean + mean / 4)).collect();
         assert_eq!(
-            released.len(),
-            cfg.min_mix_occupancy,
+            sweep_once(&mut pool, &params).len(),
+            params.min_mix_occupancy,
             "packets older than one mean are released"
         );
         Ok(())
@@ -266,11 +393,11 @@ mod tests {
     fn delays_should_follow_exponential_distribution(#[values(1.0, 5.0, 10.0)] mb_per_s: f64) -> anyhow::Result<()> {
         // Across the realistic 1–10 MB/s load range, a relaxed cap makes truncation negligible
         // and the realized delays should exhibit the three exponential signatures.
-        let cfg = untruncated_cfg(Duration::from_millis(10));
-        let mean_ms = cfg.mean().as_secs_f64() * 1000.0;
+        let params = untruncated_params(Duration::from_millis(10));
+        let mean_ms = params.mean.as_secs_f64() * 1000.0;
 
         const N: usize = 6000;
-        let sim = simulate_rate_driven(&cfg, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(25));
+        let sim = simulate_rate_driven(&params, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(25));
         let delays = steady_slice(&sim.delays_ms);
 
         let observed_mean = mean_of(delays);
@@ -317,7 +444,7 @@ mod tests {
     /// phase relative to the sweep grid — as they would in reality, arriving at continuous
     /// wall-clock times. Without this, every delay lands on an exact multiple of `step`, whose
     /// alignment to distribution bin edges is a pure artifact of the discretization.
-    fn simulate_delays_ms(cfg: &MixerConfig, n: usize, step: Duration) -> Vec<f64> {
+    fn simulate_delays_ms(params: &PoissonParams, n: usize, step: Duration) -> Vec<f64> {
         let t0 = Instant::now();
         let step_secs = step.as_secs_f64();
         let mut pool: Vec<Entry<u32>> = (0..n as u32)
@@ -333,7 +460,7 @@ mod tests {
         let mut guard = 0;
         while !pool.is_empty() && guard < 1_000_000 {
             now += step;
-            sweep(&mut pool, cfg, now, step, &mut out);
+            sweep(&mut pool, params, now, step, &mut out);
             for (d, _) in out.drain(..) {
                 delays_ms.push(d.as_secs_f64() * 1000.0);
             }
@@ -367,7 +494,7 @@ mod tests {
     /// through the pool in virtual time, stepping by `step`. Arrival instants are continuous,
     /// so realized delays carry no grid-alignment artifact. This models a steady load rather
     /// than an instantaneous burst.
-    fn simulate_rate_driven(cfg: &MixerConfig, n: usize, inter_arrival_ms: f64, step: Duration) -> RateSim {
+    fn simulate_rate_driven(params: &PoissonParams, n: usize, inter_arrival_ms: f64, step: Duration) -> RateSim {
         let mut arrivals = Vec::with_capacity(n);
         let mut t = 0.0;
         for _ in 0..n {
@@ -393,7 +520,7 @@ mod tests {
                 next += 1;
             }
             let now = t0 + Duration::from_secs_f64(now_ms / 1000.0);
-            sweep(&mut pool, cfg, now, step, &mut out);
+            sweep(&mut pool, params, now, step, &mut out);
             for (d, item) in out.drain(..) {
                 delays_ms[item as usize] = d.as_secs_f64() * 1000.0;
                 departures_ms.push(now_ms);
@@ -433,22 +560,24 @@ mod tests {
         // mean = cap / ln(1/(1-0.98)) = 20 / ln(50) ≈ 5.11 ms should leave ~2% of packets to
         // be force-released at the 20 ms cap (i.e. 98% leave naturally within the cap).
         // Jitter off so the truncated mass lands exactly at the cap and is countable.
-        let cfg = MixerConfig {
-            target_mean_delay: Duration::from_micros(5113),
-            min_delay: Duration::ZERO,
-            delay_range: Duration::from_millis(20),
-            cap_jitter: Duration::ZERO,
-            ..MixerConfig::default()
-        };
+        let params = params(
+            Duration::ZERO,
+            Duration::from_millis(20),
+            PoissonConfig {
+                target_mean_delay: Duration::from_micros(5113),
+                cap_jitter: Duration::ZERO,
+                ..PoissonConfig::default()
+            },
+        );
 
         // Keep occupancy below `high_watermark` so the overload safety valve stays dormant
         // (a burst at `capacity` would legitimately trigger relief and flush early). `N` is large
         // enough that the ~2% force-release fraction has a tight standard error: at N = 8_000,
         // SE ≈ 0.0016, so the ±0.008 band below is ≈ ±5 sigma — negligible false-failure rate.
         const N: usize = 8_000;
-        assert!(N < cfg.high_watermark);
-        let cap_ms = cfg.cap().as_secs_f64() * 1000.0;
-        let delays_ms = simulate_delays_ms(&cfg, N, Duration::from_micros(250));
+        assert!(N < params.high_watermark);
+        let cap_ms = params.cap.as_secs_f64() * 1000.0;
+        let delays_ms = simulate_delays_ms(&params, N, Duration::from_micros(250));
         assert_eq!(delays_ms.len(), N);
 
         let at_cap = delays_ms.iter().filter(|d| **d >= cap_ms).count();
@@ -472,11 +601,11 @@ mod tests {
         // A burst at full capacity trips the overload valve. With the saturation floor the
         // effective mean bottoms out at `saturation_min_mean` rather than zero, so packets
         // still incur a non-trivial mixing delay instead of passing straight through.
-        let cfg = MixerConfig::default();
-        let n = cfg.capacity;
-        let floor_ms = cfg.saturation_min_mean.as_secs_f64() * 1000.0;
+        let params = default_params();
+        let n = params.capacity;
+        let floor_ms = params.saturation_min_mean.as_secs_f64() * 1000.0;
 
-        let delays_ms = simulate_delays_ms(&cfg, n, Duration::from_micros(250));
+        let delays_ms = simulate_delays_ms(&params, n, Duration::from_micros(250));
         assert_eq!(delays_ms.len(), n, "every packet must eventually be released");
 
         let observed_mean = delays_ms.iter().sum::<f64>() / n as f64;
@@ -489,26 +618,15 @@ mod tests {
         Ok(())
     }
 
-    /// Config with a relaxed cap so the exponential tail is essentially untruncated,
-    /// letting distribution-shape assertions see the true exponential.
-    fn untruncated_cfg(mean: Duration) -> MixerConfig {
-        MixerConfig {
-            target_mean_delay: mean,
-            min_delay: Duration::ZERO,
-            delay_range: mean * 30, // cap ≈ 30 means → truncation e^-30 ≈ 0
-            ..MixerConfig::default()
-        }
-    }
-
     #[rstest]
     fn holding_time_should_be_memoryless(#[values(1.0, 5.0, 10.0)] mb_per_s: f64) -> anyhow::Result<()> {
         // Memorylessness ⇒ the survival function decays at a constant rate:
         // P(X > 2m) / P(X > m) = P(X > m) = e^-1 ≈ 0.368, independent of the offset.
-        let cfg = untruncated_cfg(Duration::from_millis(10));
-        let mean_ms = cfg.mean().as_secs_f64() * 1000.0;
+        let params = untruncated_params(Duration::from_millis(10));
+        let mean_ms = params.mean.as_secs_f64() * 1000.0;
 
         const N: usize = 8_000;
-        let sim = simulate_rate_driven(&cfg, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(50));
+        let sim = simulate_rate_driven(&params, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(50));
         let delays = steady_slice(&sim.delays_ms);
 
         let past_1m = delays.iter().filter(|d| **d > mean_ms).count() as f64;
@@ -528,12 +646,12 @@ mod tests {
     ) -> anyhow::Result<()> {
         // The continuous exponential clock `1 - e^(-δ/mean)` makes the distribution independent
         // of the sweep cadence: a fine and a coarse step must yield the same mean at any load.
-        let cfg = untruncated_cfg(Duration::from_millis(10));
+        let params = untruncated_params(Duration::from_millis(10));
         const N: usize = 8_000;
         let inter = inter_arrival_ms_for(mb_per_s);
 
-        let fine = simulate_rate_driven(&cfg, N, inter, Duration::from_micros(50));
-        let coarse = simulate_rate_driven(&cfg, N, inter, Duration::from_micros(500));
+        let fine = simulate_rate_driven(&params, N, inter, Duration::from_micros(50));
+        let coarse = simulate_rate_driven(&params, N, inter, Duration::from_micros(500));
 
         let mean_fine = mean_of(steady_slice(&fine.delays_ms));
         let mean_coarse = mean_of(steady_slice(&coarse.delays_ms));
@@ -555,12 +673,12 @@ mod tests {
         // run a Pearson chi-squared test. df = K-1 = 9; the threshold 40 corresponds to
         // p ≈ 1e-5, so a true exponential (expected χ² ≈ 9) passes with wide margin while a
         // wrong distribution (uniform, deterministic, …) produces χ² in the hundreds.
-        let cfg = untruncated_cfg(Duration::from_millis(10));
-        let mean_ms = cfg.mean().as_secs_f64() * 1000.0;
+        let params = untruncated_params(Duration::from_millis(10));
+        let mean_ms = params.mean.as_secs_f64() * 1000.0;
 
         const N: usize = 8_000;
         const K: usize = 10;
-        let sim = simulate_rate_driven(&cfg, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(25));
+        let sim = simulate_rate_driven(&params, N, inter_arrival_ms_for(mb_per_s), Duration::from_micros(25));
         let delays = steady_slice(&sim.delays_ms);
 
         let mut counts = [0usize; K];
@@ -593,11 +711,11 @@ mod tests {
         // Displacement theorem: Poisson arrivals + i.i.d. exponential delays ⇒ the departure
         // process is Poisson at the same rate. Check the departures for (a) rate conservation
         // and (b) the Poisson signature CV ≈ 1 on inter-departure gaps, across the load range.
-        let cfg = untruncated_cfg(Duration::from_millis(10));
+        let params = untruncated_params(Duration::from_millis(10));
         let inter_arrival_ms = inter_arrival_ms_for(mb_per_s);
 
         const N: usize = 6_000;
-        let sim = simulate_rate_driven(&cfg, N, inter_arrival_ms, Duration::from_micros(25));
+        let sim = simulate_rate_driven(&params, N, inter_arrival_ms, Duration::from_micros(25));
         assert_eq!(sim.departures_ms.len(), N, "every packet must depart");
 
         let steady = steady_slice(&sim.departures_ms);
@@ -622,18 +740,72 @@ mod tests {
 
     #[test]
     fn min_delay_floor_should_keep_ineligible_items() -> anyhow::Result<()> {
-        let cfg = MixerConfig {
-            min_delay: Duration::from_millis(50),
-            delay_range: Duration::from_millis(20),
-            ..MixerConfig::default()
-        };
+        let params = params(
+            Duration::from_millis(50),
+            Duration::from_millis(20),
+            PoissonConfig::default(),
+        );
         // Age below the floor: must be kept even though the pool is tiny.
         let mut pool: Vec<Entry<u32>> = vec![entry(1u32, Duration::from_millis(5))];
 
-        let released = sweep_once(&mut pool, &cfg, Instant::now());
+        let released = sweep_once(&mut pool, &params);
 
         assert_eq!(pool.len(), 1, "item under the min-delay floor must be kept");
         assert!(released.is_empty());
         Ok(())
+    }
+
+    #[rstest]
+    #[case(Duration::ZERO, 0.0)]
+    #[case(Duration::from_millis(10), 0.6321)] // 1 - e^-1 after one mean has elapsed
+    fn release_probability_should_follow_the_exponential_clock(#[case] delta: Duration, #[case] expected: f64) {
+        assert!((release_probability(delta, Duration::from_millis(10)) - expected).abs() < 1e-3);
+    }
+
+    #[test]
+    fn release_probability_should_be_one_for_a_degenerate_mean() {
+        assert_eq!(release_probability(Duration::from_millis(5), Duration::ZERO), 1.0);
+    }
+
+    #[test]
+    fn adaptive_interval_should_shorten_with_occupancy() {
+        let params = default_params();
+        // One item: the ceiling (one mean); many items: the floor.
+        assert!((params.adaptive_interval(1).as_secs_f64() - params.mean.as_secs_f64()).abs() < 1e-6);
+        assert_eq!(params.adaptive_interval(100_000), params.tick_floor);
+        assert!(params.adaptive_interval(10) >= params.adaptive_interval(100));
+    }
+
+    #[test]
+    fn mean_for_should_shrink_from_the_base_toward_the_floor_above_the_watermark() {
+        let params = default_params();
+        assert_eq!(params.mean_for(params.high_watermark), params.mean);
+        assert!(params.mean_for(params.high_watermark + 1) < params.mean);
+        assert_eq!(params.mean_for(params.capacity), params.saturation_min_mean);
+    }
+
+    #[test]
+    fn derived_mean_should_use_the_delay_range_not_the_cap() {
+        // min_delay = 10 ms, delay_range = 20 ms ⇒ mean = 20 / ln(20) ≈ 6.68 ms (the eligible
+        // window is the range, not the 30 ms cap).
+        let params = params(
+            Duration::from_millis(10),
+            Duration::from_millis(20),
+            PoissonConfig::default(),
+        );
+        assert!((params.mean.as_secs_f64() * 1000.0 - 6.68).abs() < 0.1);
+    }
+
+    #[test]
+    fn explicit_target_mean_should_override_derivation() {
+        let params = params(
+            Duration::ZERO,
+            Duration::from_millis(20),
+            PoissonConfig {
+                target_mean_delay: Duration::from_millis(10),
+                ..PoissonConfig::default()
+            },
+        );
+        assert_eq!(params.mean, Duration::from_millis(10));
     }
 }

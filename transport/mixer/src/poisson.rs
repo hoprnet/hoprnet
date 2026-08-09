@@ -3,7 +3,7 @@
 //! Instead of assigning each packet a uniform delay on a shared min-heap, this engine
 //! holds packets in a pool owned by a dedicated OS thread and, on every wake, releases
 //! each eligible packet with the memoryless probability `1 - e^(-delta/mean)`
-//! ([`MixerConfig::release_probability`]). The resulting holding time is exponential and
+//! (`1 - e^(-delta/mean)`). The resulting holding time is exponential and
 //! the departure process approximates Poisson, which resists timing correlation.
 //!
 //! The engine thread runs [`futures::executor::block_on`] over a single merged event
@@ -34,7 +34,7 @@ use futures_timer::Delay;
 pub use crate::error::SenderError;
 use crate::{
     config::MixerConfig,
-    pool::{self, Entry},
+    pool::{self, Entry, PoissonParams},
 };
 
 /// Sender end of the Poisson mixing channel. Mirrors the uniform channel's sender: a lock-free,
@@ -192,12 +192,12 @@ impl<T> Stream for Events<T> {
 /// The engine loop, run to completion by [`futures::executor::block_on`] on the dedicated
 /// thread. Sweeps the pool on every event and re-arms the adaptive timer afterwards.
 async fn run_engine<T>(
-    cfg: MixerConfig,
+    params: PoissonParams,
     input: ChanRx<(Instant, T)>,
     output: ChanTx<T>,
     receiver_active: Arc<AtomicBool>,
 ) {
-    let mut pool: Vec<Entry<T>> = Vec::with_capacity(cfg.capacity);
+    let mut pool: Vec<Entry<T>> = Vec::with_capacity(params.capacity());
     // Reused across sweeps to avoid a per-sweep allocation.
     let mut released: Vec<(Duration, T)> = Vec::new();
     let mut prev_sweep = Instant::now();
@@ -221,10 +221,10 @@ async fn run_engine<T>(
         let now = Instant::now();
         let delta = now.saturating_duration_since(prev_sweep);
         prev_sweep = now;
-        let earliest = pool::sweep(&mut pool, &cfg, now, delta, &mut released);
+        let earliest = pool::sweep(&mut pool, &params, now, delta, &mut released);
         for (realized_delay, item) in released.drain(..) {
             #[cfg(all(feature = "telemetry", not(test)))]
-            crate::metrics::record_average_delay(realized_delay.as_millis() as f64, cfg.metric_delay_window);
+            crate::metrics::record_average_delay(realized_delay.as_millis() as f64, params.metric_delay_window);
             #[cfg(not(all(feature = "telemetry", not(test))))]
             let _ = realized_delay;
 
@@ -247,7 +247,7 @@ async fn run_engine<T>(
             break;
         }
 
-        let wake = pool::next_wake(earliest, pool.len(), &cfg, now);
+        let wake = pool::next_wake(earliest, pool.len(), &params, now);
         events.rearm(wake);
     }
 
@@ -265,6 +265,7 @@ pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Recei
         lazy_static::initialize(&crate::metrics::METRIC_MIXER_AVERAGE_DELAY);
     }
 
+    let params = PoissonParams::from_mixer(&cfg);
     let (input_tx, input_rx) = async_channel::unbounded::<(Instant, T)>();
     let (output_tx, output_rx) = async_channel::unbounded::<T>();
     let receiver_active = Arc::new(AtomicBool::new(true));
@@ -273,7 +274,7 @@ pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Recei
     std::thread::Builder::new()
         .name("hopr-mixer-poisson".into())
         .spawn(move || {
-            futures::executor::block_on(run_engine(cfg, input_rx, output_tx, engine_flag));
+            futures::executor::block_on(run_engine(params, input_rx, output_tx, engine_flag));
         })
         .expect("failed to spawn the mixer engine thread");
 
@@ -295,11 +296,25 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
+    use crate::config::{MixerType, PoissonConfig};
 
     const CAP: Duration = Duration::from_millis(
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
     const LEEWAY: Duration = Duration::from_millis(500);
+
+    /// Config selecting the dedicated-thread engine with an explicit mean and cap bounds.
+    fn poisson_cfg(min_delay: Duration, delay_range: Duration, target_mean_delay: Duration) -> MixerConfig {
+        MixerConfig {
+            min_delay,
+            delay_range,
+            mixer_type: MixerType::Poisson(PoissonConfig {
+                target_mean_delay,
+                ..PoissonConfig::default()
+            }),
+            ..MixerConfig::default()
+        }
+    }
 
     #[tokio::test]
     async fn mixer_should_pass_an_element() -> anyhow::Result<()> {
@@ -317,12 +332,8 @@ mod tests {
         // check (500 ms leeway on a 20 ms cap) could never provide.
         const N: usize = 3000;
         let cap = Duration::from_millis(20);
-        let cfg = MixerConfig {
-            min_delay: Duration::ZERO,
-            delay_range: cap,
-            target_mean_delay: Duration::from_millis(50), // mean >> cap, so the cap does the bounding
-            ..MixerConfig::default()
-        };
+        // mean >> cap, so the hard cap (not the coin) must do the bounding.
+        let cfg = poisson_cfg(Duration::ZERO, cap, Duration::from_millis(50));
         let (tx, mut rx) = poisson_channel::<Instant>(cfg);
 
         let receiver = tokio::spawn(async move {
@@ -381,12 +392,7 @@ mod tests {
         // delay) and reordered — the property the engine exists for, and a regression guard
         // against the "release everything instantly" failure mode.
         const N: usize = 3000;
-        let cfg = MixerConfig {
-            target_mean_delay: Duration::from_millis(10),
-            min_delay: Duration::ZERO,
-            delay_range: Duration::from_millis(100), // relaxed cap → little truncation
-            ..MixerConfig::default()
-        };
+        let cfg = poisson_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         let receiver = tokio::spawn(async move {
@@ -432,12 +438,7 @@ mod tests {
         // Regression: after an idle gap the previous-sweep instant goes stale, so the sweep's
         // `delta` is large. A burst arriving then must still be held and mixed — not dumped with
         // ~zero delay because the large `delta` gave every fresh packet a ~1 release probability.
-        let cfg = MixerConfig {
-            target_mean_delay: Duration::from_millis(10),
-            min_delay: Duration::ZERO,
-            delay_range: Duration::from_millis(100),
-            ..MixerConfig::default()
-        };
+        let cfg = poisson_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         // Idle less than the 200 ms heartbeat, so the burst hits a stale `prev_sweep`.
@@ -653,12 +654,7 @@ mod tests {
         // them, so no clone should be starved or systematically delayed more than another.
         const CLONES: usize = 6;
         const PER: usize = 800;
-        let cfg = MixerConfig {
-            target_mean_delay: Duration::from_millis(10),
-            min_delay: Duration::ZERO,
-            delay_range: Duration::from_millis(100), // relaxed cap → little truncation
-            ..MixerConfig::default()
-        };
+        let cfg = poisson_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_channel::<(usize, Instant)>(cfg);
 
         let receiver = tokio::spawn(async move {

@@ -30,7 +30,7 @@ use parking_lot::Mutex;
 pub use crate::error::SenderError;
 use crate::{
     config::MixerConfig,
-    pool::{self, Entry},
+    pool::{self, Entry, PoissonParams},
 };
 
 struct Pool<T> {
@@ -44,7 +44,7 @@ struct Shared<T> {
     pool: Arc<Mutex<Pool<T>>>,
     sender_count: Arc<AtomicUsize>,
     receiver_active: Arc<AtomicBool>,
-    cfg: MixerConfig,
+    params: PoissonParams,
 }
 
 impl<T> Clone for Shared<T> {
@@ -53,7 +53,7 @@ impl<T> Clone for Shared<T> {
             pool: self.pool.clone(),
             sender_count: self.sender_count.clone(),
             receiver_active: self.receiver_active.clone(),
-            cfg: self.cfg,
+            params: self.params,
         }
     }
 }
@@ -181,7 +181,7 @@ impl<T: Unpin> Stream for Receiver<T> {
                 let delta = now.saturating_duration_since(pool.prev_sweep);
                 pool.prev_sweep = now;
 
-                let earliest = pool::sweep(&mut pool.entries, &this.shared.cfg, now, delta, &mut this.scratch);
+                let earliest = pool::sweep(&mut pool.entries, &this.shared.params, now, delta, &mut this.scratch);
 
                 #[cfg(all(feature = "telemetry", not(test)))]
                 crate::metrics::METRIC_QUEUE_SIZE.set(pool.entries.len() as f64);
@@ -195,7 +195,7 @@ impl<T: Unpin> Stream for Receiver<T> {
                         Some(w) => w.clone_from(cx.waker()),
                         None => pool.waker = Some(cx.waker().clone()),
                     }
-                    Next::Sleep(pool::next_wake(earliest, pool.entries.len(), &this.shared.cfg, now))
+                    Next::Sleep(pool::next_wake(earliest, pool.entries.len(), &this.shared.params, now))
                 }
             };
 
@@ -207,7 +207,7 @@ impl<T: Unpin> Stream for Receiver<T> {
                         #[cfg(all(feature = "telemetry", not(test)))]
                         crate::metrics::record_average_delay(
                             _delay.as_millis() as f64,
-                            this.shared.cfg.metric_delay_window,
+                            this.shared.params.metric_delay_window,
                         );
                         this.ready.push_back(item);
                     }
@@ -248,15 +248,16 @@ impl<T> Drop for Receiver<T> {
 
 /// Instantiate a shared-pool Poisson mixing channel. No engine thread is spawned.
 pub fn poisson_shared_channel<T: Send>(cfg: MixerConfig) -> (Sender<T>, Receiver<T>) {
+    let params = PoissonParams::from_mixer(&cfg);
     let shared = Shared {
         pool: Arc::new(Mutex::new(Pool {
-            entries: Vec::with_capacity(cfg.capacity),
+            entries: Vec::with_capacity(params.capacity()),
             waker: None,
             prev_sweep: Instant::now(),
         })),
         sender_count: Arc::new(AtomicUsize::new(1)),
         receiver_active: Arc::new(AtomicBool::new(true)),
-        cfg,
+        params,
     };
     (
         Sender { shared: shared.clone() },
@@ -275,11 +276,25 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
+    use crate::config::{MixerType, PoissonConfig};
 
     const CAP: Duration = Duration::from_millis(
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
     const LEEWAY: Duration = Duration::from_millis(500);
+
+    /// Config selecting the shared-pool engine with an explicit mean and cap bounds.
+    fn shared_cfg(min_delay: Duration, delay_range: Duration, target_mean_delay: Duration) -> MixerConfig {
+        MixerConfig {
+            min_delay,
+            delay_range,
+            mixer_type: MixerType::PoissonShared(PoissonConfig {
+                target_mean_delay,
+                ..PoissonConfig::default()
+            }),
+            ..MixerConfig::default()
+        }
+    }
 
     #[tokio::test]
     async fn shared_should_pass_an_element() -> anyhow::Result<()> {
@@ -314,12 +329,7 @@ mod tests {
     #[tokio::test]
     async fn shared_should_mix_under_load() -> anyhow::Result<()> {
         const N: usize = 3000;
-        let cfg = MixerConfig {
-            target_mean_delay: Duration::from_millis(10),
-            min_delay: Duration::ZERO,
-            delay_range: Duration::from_millis(100),
-            ..MixerConfig::default()
-        };
+        let cfg = shared_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_shared_channel::<(u32, Instant)>(cfg);
 
         let recv = tokio::spawn(async move {

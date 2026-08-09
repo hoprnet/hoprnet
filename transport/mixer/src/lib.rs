@@ -9,6 +9,8 @@
 //! - `uniform-adapter` — the uniform-delay `Sink` adapter, `MixerSink`.
 
 pub mod config;
+#[cfg(any(feature = "uniform-channel", feature = "poisson", feature = "poisson-shared"))]
+mod dispatch;
 pub mod error;
 pub mod metrics;
 
@@ -31,7 +33,9 @@ pub mod poisson_shared;
 
 #[cfg(feature = "uniform-channel")]
 pub use channel::channel;
-pub use config::MixerConfig;
+pub use config::{MixerConfig, MixerType, PoissonConfig};
+#[cfg(any(feature = "uniform-channel", feature = "poisson", feature = "poisson-shared"))]
+pub use dispatch::{AnyReceiver, AnySender, create};
 pub use error::SenderError;
 #[cfg(feature = "poisson")]
 pub use poisson::poisson_channel;
