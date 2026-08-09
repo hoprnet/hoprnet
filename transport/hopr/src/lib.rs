@@ -853,12 +853,11 @@ where
         // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
         // a subset of what the global generator covers, so one generator suffices.
         //
-        // `SsaShareGenerator::new` validates its config and *panics* on failure, so the ranges are
-        // checked here and the error propagated instead. This used to be a SAFETY comment asserting
-        // that `PixGlobalConfig` had already been validated "before this code runs" via
+        // Validated here rather than left to the constructor: `PixGlobalConfig` carries more than
+        // the three fields `SsaGeneratorConfig` covers, and this used to be a SAFETY comment
+        // asserting that it had already been validated "before this code runs" via
         // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
-        // rested entirely on every caller remembering to, and a programmatically built config turned
-        // node startup into a panic.
+        // rested entirely on every caller remembering to.
         validator::Validate::validate(&self.cfg.pix)
             .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
         // Checked rather than `as`-cast: the validation above already bounds all three, but a
@@ -867,13 +866,16 @@ where
         fn narrow<T: TryFrom<usize>>(value: usize, field: &str) -> errors::Result<T> {
             T::try_from(value).map_err(|_| HoprTransportError::Api(format!("PIX {field} out of range: {value}")))
         }
-        let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
-            hopr_protocol_pix::SsaGeneratorConfig {
+        // `try_new`, not `new`: the dimensions come from operator configuration, so a range
+        // violation is a startup error to report rather than a panic to take down the node.
+        let ssa_generator = Arc::new(
+            hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: narrow(self.cfg.pix.num_ssa_parts, "num_ssa_parts")?,
                 threshold: narrow(self.cfg.pix.ssa_part_size, "ssa_part_size")?,
                 surplus_shares: narrow(self.cfg.pix.additional_shares, "additional_shares")?,
-            },
-        ));
+            })
+            .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
+        );
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))

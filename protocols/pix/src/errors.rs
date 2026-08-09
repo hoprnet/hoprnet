@@ -5,6 +5,8 @@ use crate::SsaIndex;
 pub enum PixError<P: std::fmt::Display> {
     #[error("invalid input to the function")]
     InvalidInput,
+    #[error("invalid configuration: {0}")]
+    InvalidConfiguration(#[from] validator::ValidationErrors),
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
     /// No longer produced by the reconstructor: a share failing verification is expected adversarial

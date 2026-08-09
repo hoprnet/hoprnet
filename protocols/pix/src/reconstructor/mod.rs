@@ -300,11 +300,12 @@ impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Creates a new SSA reconstructor from the given configuration.
     ///
-    /// # Panics
-    /// Panics if the configuration fails validation.
-    pub fn new(cfg: SsaReconstructorConfig) -> Self {
-        cfg.validate().expect("invalid SsaReconstructorConfig");
-        Self {
+    /// Fails if the configuration does not validate. Prefer this over [`Self::new`] anywhere the
+    /// configuration is assembled at runtime — a config built programmatically or read from a file
+    /// is input, not a constant, and turning it into a panic makes it un-handleable by the caller.
+    pub fn try_new(cfg: SsaReconstructorConfig) -> Result<Self, PixError<S::Pseudonym>> {
+        cfg.validate()?;
+        Ok(Self {
             commitment_builder: moka::sync::Cache::builder()
                 .time_to_idle(cfg.incomplete_commitment_lifetime)
                 .build(),
@@ -350,7 +351,16 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             cfg,
-        }
+        })
+    }
+
+    /// Creates a new SSA reconstructor from the given configuration.
+    ///
+    /// # Panics
+    /// Panics if the configuration fails validation. Use [`Self::try_new`] to handle that case
+    /// instead.
+    pub fn new(cfg: SsaReconstructorConfig) -> Self {
+        Self::try_new(cfg).expect("invalid SsaReconstructorConfig")
     }
 
     /// Returns the configuration of the reconstructor.
@@ -1127,6 +1137,29 @@ mod tests {
         tests::TestSpec,
         traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
     };
+
+    #[test]
+    fn ssa_reconstructor_try_new_should_reject_an_invalid_config_without_panicking() {
+        let cfg = SsaReconstructorConfig {
+            // Outside the validated 0.0..=1.0 range.
+            early_recovery_threshold: 1.5,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            SsaReconstructor::<TestSpec>::try_new(cfg),
+            Err(PixError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SsaReconstructorConfig")]
+    fn ssa_reconstructor_new_should_still_panic_on_an_invalid_config() {
+        let _ = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            early_recovery_threshold: 1.5,
+            ..Default::default()
+        });
+    }
 
     /// Pulls from the generator until it yields a share for `poly_index`, discarding the rest.
     ///

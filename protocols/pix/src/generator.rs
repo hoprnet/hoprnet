@@ -136,17 +136,27 @@ pub struct SsaShareGenerator<S: PixSpec> {
 impl<S: PixSpec> SsaShareGenerator<S> {
     /// Creates a new share generator with the provided configuration.
     ///
-    /// # Panics
-    /// Panics if the configuration fails validation.
-    pub fn new(cfg: SsaGeneratorConfig) -> Self {
-        cfg.validate().expect("invalid SsaGeneratorConfig");
-        Self {
+    /// Fails if the configuration does not validate. Prefer this over [`Self::new`] anywhere the
+    /// configuration is assembled at runtime — a config built programmatically or read from a file
+    /// is input, not a constant, and turning it into a panic makes it un-handleable by the caller.
+    pub fn try_new(cfg: SsaGeneratorConfig) -> errors::Result<Self, S::Pseudonym> {
+        cfg.validate()?;
+        Ok(Self {
             polynomials: moka::sync::CacheBuilder::default()
                 .initial_capacity(100_000)
                 .time_to_idle(std::time::Duration::from_secs(1800))
                 .build_with_hasher(ahash::RandomState::new()),
             cfg,
-        }
+        })
+    }
+
+    /// Creates a new share generator with the provided configuration.
+    ///
+    /// # Panics
+    /// Panics if the configuration fails validation. Use [`Self::try_new`] to handle that case
+    /// instead.
+    pub fn new(cfg: SsaGeneratorConfig) -> Self {
+        Self::try_new(cfg).expect("invalid SsaGeneratorConfig")
     }
 
     /// Returns the configuration used to generate this [`SsaShareGenerator`].
@@ -347,7 +357,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 }
             })?;
 
-        let ssa_id = *commitments[0].spi.as_ref();
+        // Built from the parameters rather than read back off `commitments[0]`: every element above
+        // was constructed with exactly this `SsaId`, and indexing would have made the whole function
+        // depend on `polynomials_per_ssa >= 1` holding — which is a validation invariant enforced
+        // three call layers away, not something visible here.
+        let ssa_id = SsaId::new(*pseudonym, ssa_index);
         let ssa_commitment = PixGroup::<S>::generator() * our_commitment_secret;
         Ok(SsaCommitment {
             ssa_id,
@@ -390,6 +404,35 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    #[test]
+    fn ssa_generator_try_new_should_reject_an_invalid_config_without_panicking() {
+        // Zero polynomials is the case the rest of the generator quietly relies on being impossible
+        // — `new_ssa_commitment` builds its `SsaId` from the parameters precisely so that it does
+        // not have to index into an empty commitment vector.
+        let cfg = SsaGeneratorConfig {
+            polynomials_per_ssa: 0,
+            threshold: 10,
+            surplus_shares: 2,
+        };
+
+        assert!(matches!(
+            SsaShareGenerator::<TestSpec>::try_new(cfg),
+            Err(PixError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SsaGeneratorConfig")]
+    fn ssa_generator_new_should_still_panic_on_an_invalid_config() {
+        // `new` stays panicking on purpose: it is what the benches and tests use, where a bad
+        // constant should abort rather than be threaded through a `Result`.
+        let _ = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 0,
+            threshold: 10,
+            surplus_shares: 2,
+        });
+    }
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {
