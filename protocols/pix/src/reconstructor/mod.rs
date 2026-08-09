@@ -16,6 +16,26 @@ use crate::{
     SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
 };
 
+/// Rejects an early-recovery fraction that is not a finite value in `0.0..=1.0`.
+///
+/// A `range` validator does not cover this. Every IEEE comparison against `NaN` is false, so `NaN`
+/// satisfies `min = 0.0, max = 1.0` untouched — and it does not stay inert downstream:
+/// [`SsaCommitmentBuilder::check_early_threshold`] computes `(threshold * num_polys).ceil() as usize`,
+/// and casting a `NaN` float to an integer saturates to zero in Rust. The early-recovery signal then
+/// fires on the very first reconstructed polynomial rather than at 85 % of them, which is the
+/// earliest instant the Exit can possibly ask for its next batch — and the Entry's successor gate,
+/// which exists to refuse exactly that, drops the request and leaves the Session to die on its
+/// commitment deadline.
+fn validate_early_recovery_threshold(threshold: f64) -> Result<(), validator::ValidationError> {
+    if threshold.is_finite() && (0.0..=1.0).contains(&threshold) {
+        Ok(())
+    } else {
+        Err(validator::ValidationError::new(
+            "early_recovery_threshold must be a finite fraction between 0.0 and 1.0",
+        ))
+    }
+}
+
 /// Configuration for the SSA reconstructor.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 pub struct SsaReconstructorConfig {
@@ -80,7 +100,7 @@ pub struct SsaReconstructorConfig {
     /// The bound is not in this validator because it belongs to the pairing rather than to the
     /// reconstructor: `hopr-transport-session` checks it where both halves are known.
     #[default(0.85)]
-    #[validate(range(min = 0.0, max = 1.0))]
+    #[validate(custom(function = "validate_early_recovery_threshold"))]
     pub early_recovery_threshold: f64,
 }
 
@@ -1616,6 +1636,38 @@ mod tests {
     // -----------------------------------------------------------------------
     // early_recovery_threshold tests
     // -----------------------------------------------------------------------
+
+    /// A non-finite early-recovery threshold must not survive configuration validation.
+    ///
+    /// The `range(min = 0.0, max = 1.0)` this replaced could not reject `NaN`: IEEE comparison against
+    /// it is false in both directions, so it satisfied both bounds. And it did not stay harmless —
+    /// `check_early_threshold` multiplies by `num_polys`, calls `ceil`, and casts to `usize`, and a
+    /// `NaN` survives all three to saturate at zero. The Exit would then announce early recovery on
+    /// its first reconstructed polynomial, which is the earliest instant it can ask for the next batch
+    /// and precisely what the Entry's successor gate refuses.
+    ///
+    /// Asserted through `validate` rather than through `SsaReconstructor::new`, whose `expect` would
+    /// make the failure a panic and the passing cases the only observable ones.
+    #[test]
+    fn a_non_finite_early_recovery_threshold_is_not_a_valid_configuration() {
+        use validator::Validate;
+
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1.5, -0.1] {
+            let cfg = SsaReconstructorConfig {
+                early_recovery_threshold: bad,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_err(), "{bad} is not a fraction and must be rejected");
+        }
+
+        for good in [0.0, 0.85, 1.0] {
+            let cfg = SsaReconstructorConfig {
+                early_recovery_threshold: good,
+                ..Default::default()
+            };
+            assert!(cfg.validate().is_ok(), "{good} is a valid fraction");
+        }
+    }
 
     /// Helper: create an SsaBuilder that accepts zero-valued sub-secrets.
     fn make_builder(num_polys: usize) -> SsaBuilder<TestSpec> {

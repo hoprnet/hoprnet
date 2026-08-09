@@ -857,10 +857,20 @@ pub fn validate_pix_supervision(
     // on `max_ssa_delivery_time` waiting for a commitment that was deliberately withheld. Rejecting
     // it here turns a silent remote failure into a local startup error, which is the only place the
     // operator who set the value can see it.
-    if reconstructor_cfg.early_recovery_threshold < hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD {
+    //
+    // Written as a range rather than `< floor`, and with the finiteness test in front, for the same
+    // reason `max_off_front_share_fraction` above is: every IEEE comparison against `NaN` is false, so
+    // `NaN < floor` admits it, and a `NaN` threshold is not inert — `ceil` leaves it `NaN` and casting
+    // that to an integer saturates to zero, so the Exit signals early recovery on its first
+    // reconstructed polynomial. That is the *earliest* possible request against a gate whose entire
+    // job is to refuse early ones.
+    if !reconstructor_cfg.early_recovery_threshold.is_finite()
+        || !(hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD..=1.0)
+            .contains(&reconstructor_cfg.early_recovery_threshold)
+    {
         return Err(TransportSessionError::InvalidConfig(format!(
-            "early_recovery_threshold ({}) must be >= MIN_EARLY_RECOVERY_THRESHOLD ({}); a lower value asks for the \
-             next SSA batch before a conforming Entry admits the request",
+            "early_recovery_threshold ({}) must be a finite fraction between MIN_EARLY_RECOVERY_THRESHOLD ({}) and \
+             1.0; a lower value asks for the next SSA batch before a conforming Entry admits the request",
             reconstructor_cfg.early_recovery_threshold,
             hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD
         )));
@@ -1130,6 +1140,24 @@ mod tests {
         assert!(
             SsaReconstructorConfig::default().early_recovery_threshold >= floor,
             "the shipped default must itself be admissible"
+        );
+    }
+
+    /// `NaN` is unordered, so a bare `< floor` check does not reject it. The reconstructor's
+    /// derived range validator has the same problem: both `NaN < 0.0` and `NaN > 1.0` are false.
+    /// Once admitted, casting `ceil(NaN)` to `usize` produces zero and the early notification fires
+    /// on the first recovered polynomial, well before the Entry's successor gate opens.
+    #[test]
+    fn validation_rejects_a_non_finite_early_recovery_threshold() {
+        let cfg = valid_cfg();
+        let rcn = SsaReconstructorConfig {
+            early_recovery_threshold: f64::NAN,
+            ..valid_rcn_cfg()
+        };
+
+        assert!(
+            validate_pix_supervision(&cfg, &rcn).is_err(),
+            "a non-finite threshold must not bypass the protocol floor"
         );
     }
 

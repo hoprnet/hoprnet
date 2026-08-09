@@ -217,6 +217,13 @@ impl<S: PixSpec> SsaBuilder<S> {
     /// Returns `true` once, when the number of received polynomial parts reaches
     /// `ceil(threshold * num_polys)` for the first time. Subsequent calls return
     /// `false` (idempotent guard — fires at most once per SSA lifecycle).
+    ///
+    /// `threshold` is assumed finite, which
+    /// [`validate_early_recovery_threshold`](super::validate_early_recovery_threshold) is what makes
+    /// true — `SsaReconstructorConfig` is the only source of it, and its constructor validates. The
+    /// cast below is why that matters rather than being a formality: `NaN` survives the multiply and
+    /// the `ceil`, then saturates to `0`, so an unvalidated threshold fires this on the first part
+    /// instead of the configured fraction of them.
     pub fn check_early_threshold(&mut self, threshold: f64) -> bool {
         if self.early_notified {
             return false;

@@ -146,9 +146,18 @@ pub fn min_emission_for_early_recovery(params: &PixParams, early_threshold: f64)
     let polys = params.polys_per_ssa() as u64;
     let threshold = params.shares_per_poly() as u64;
     let emitted_per_poly = params.emitted_shares_per_poly() as u64;
-    // Clamped because it is a peer-supplied fraction in the general case: outside `0..=1` the
-    // arithmetic below would either underflow or exceed the cycle.
-    let needed = (early_threshold.clamp(0.0, 1.0) * polys as f64).ceil() as u64;
+    // Clamped because a fraction outside `0..=1` would make the arithmetic below either underflow or
+    // exceed the cycle — and a non-finite one fails *closed*, to the whole cycle, rather than being
+    // clamped. `f64::clamp` propagates `NaN`, `NaN.ceil()` is `NaN`, and casting that to an integer
+    // saturates to zero, so the one input that should be refused outright would instead return a
+    // boundary of zero shares and open the gate completely. This function is only ever called to
+    // decide whether a deposit has been earned; when its input is meaningless the answer is "no".
+    let early_threshold = if early_threshold.is_finite() {
+        early_threshold.clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    let needed = (early_threshold * polys as f64).ceil() as u64;
     if needed == 0 {
         return 0;
     }
@@ -849,6 +858,33 @@ mod tests {
             all,
             "every polynomial completes on the last pass of the threshold"
         );
+
+        Ok(())
+    }
+
+    /// A non-finite threshold must close the gate, not open it.
+    ///
+    /// The clamp this replaced propagated `NaN`, and every step after it quietly agreed: `NaN * polys`
+    /// is `NaN`, `NaN.ceil()` is `NaN`, and casting that to an integer saturates to *zero*. The
+    /// early-exit for `needed == 0` then returned a boundary of zero shares — so the one input with no
+    /// meaning at all produced the single most permissive answer this function can give, on the
+    /// calculation the Entry uses to decide whether a deposit has been earned.
+    ///
+    /// `SsaReconstructorConfig` now refuses a non-finite threshold outright, so this is defence in
+    /// depth rather than the only guard. It is worth having because the function is public, takes a
+    /// bare `f64`, and every one of the steps above is silent.
+    #[test]
+    fn a_non_finite_early_recovery_threshold_closes_the_emission_gate() -> anyhow::Result<()> {
+        let params = PixParams::try_new(DEFAULT_POLYS_PER_SSA, DEFAULT_POLY_THRESHOLD, DEFAULT_SURPLUS_SHARES)?;
+        let whole_cycle = min_emission_for_early_recovery(&params, 1.0);
+
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                whole_cycle,
+                min_emission_for_early_recovery(&params, bad),
+                "{bad} must demand the whole cycle, not zero shares"
+            );
+        }
 
         Ok(())
     }
