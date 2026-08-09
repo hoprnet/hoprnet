@@ -892,24 +892,14 @@ where
         // reconstructor) to handle SsaRequest, but do not use the
         // reconstructor for SSA recovery.
         let pix_toolbox = match (role, exit_ack_share) {
-            // Keep in step with the `(Relay, Some)` arm below, which is the same wiring.
             (protocol::NodeType::Exit, Some(ref ssa_events)) => {
-                let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    ssa_reconstructor_config(),
-                ));
-                let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
-                let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
-                processes.insert(
-                    HoprTransportProcess::PixEvents,
-                    hopr_utils::spawn_as_abortable!(
-                        pix_event_stream(session_pix_events, ssa_share_resolution_events_rx, self.smgr.clone())
-                            .map(Ok)
-                            .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
-                    ),
+                let (pix_tools, pipeline_builder) = wire_exit_pix(
+                    pipeline_builder,
+                    ssa_generator.clone(),
+                    ssa_events,
+                    self.smgr.clone(),
+                    &mut processes,
                 );
-
-                let pipeline_builder =
-                    pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
 
                 let pipeline_processes = pipeline_builder.build_for_exit();
                 processes.extend_from(pipeline_processes);
@@ -925,29 +915,16 @@ where
             }
             (protocol::NodeType::Relay, Some(ref ssa_events)) => {
                 // A relay that also acts as an Exit (has exit_ack_share) needs
-                // a full PixToolbox to handle the PIX handshake.
-                //
-                // Identical to the `(Exit, Some)` arm above apart from the terminal `build_for_*` and
-                // the `with_ticket_events` step — including the `bounded_sink_channel` capacity
-                // literal, which is what will drift if only one arm is ever edited. Left duplicated
-                // rather than extracted because threading a real `SsaReconstructorConfig` through the
-                // three `::default()` sites reworks both arms anyway; extract then.
-                let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    ssa_reconstructor_config(),
-                ));
-                let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), ssa_reconstructor.clone());
-                let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
-                processes.insert(
-                    HoprTransportProcess::PixEvents,
-                    hopr_utils::spawn_as_abortable!(
-                        pix_event_stream(session_pix_events, ssa_share_resolution_events_rx, self.smgr.clone())
-                            .map(Ok)
-                            .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
-                    ),
+                // a full PixToolbox to handle the PIX handshake — the same wiring as the
+                // `(Exit, Some)` arm above, differing only in the terminal below.
+                let (pix_tools, pipeline_builder) = wire_exit_pix(
+                    pipeline_builder,
+                    ssa_generator.clone(),
+                    ssa_events,
+                    self.smgr.clone(),
+                    &mut processes,
                 );
 
-                let pipeline_builder =
-                    pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx);
                 let pipeline_processes = pipeline_builder.with_ticket_events(ticket_events).build_for_relay();
                 processes.extend_from(pipeline_processes);
                 Some(pix_tools)
@@ -1464,6 +1441,70 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
             None
         }
     }
+}
+
+/// Wires the Exit-side PIX machinery: reconstructor, [`PixToolbox`], the recovered-share channel
+/// and the [`HoprTransportProcess::PixEvents`] task, returning the toolbox and the pipeline builder
+/// with share processing attached.
+///
+/// Shared by the `(Exit, Some)` and `(Relay, Some)` arms of `run_inner`, which differ only in the
+/// terminal `build_for_*` call and the relay's extra `with_ticket_events` step. Both need the exact
+/// same wiring, and keeping it in one place is not cosmetic: the previous two copies had already
+/// drifted, with the comment on the reconstructor config fixed in the Exit copy only.
+///
+/// The caller keeps the terminal, so this returns the builder rather than the built processes.
+/// Only the `exit_ack_proc` and `ssa_events` type parameters change; the rest pass through
+/// untouched, which is why none of them carry bounds here.
+#[allow(clippy::type_complexity)]
+fn wire_exit_pix<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, PixEvt>(
+    pipeline_builder: HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt>,
+    ssa_generator: Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+    ssa_events: &PixEvt,
+    smgr: Arc<HoprSessionManager>,
+    processes: &mut AbortableList<HoprTransportProcess>,
+) -> (
+    PixToolbox,
+    HoprPacketPipelineBuilder<
+        WIn,
+        WOut,
+        Chain,
+        S,
+        TFact,
+        G,
+        AppOut,
+        AppIn,
+        TEvt,
+        Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
+        CrossfireSink<HoprShareResolution>,
+    >,
+)
+where
+    PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
+    PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
+{
+    // `ssa_reconstructor_config()` rather than `SsaReconstructorConfig::default()`: the supervisor's
+    // deadlines are validated against that function's return value in
+    // `validate_incoming_session_pix_config`, and the check is only worth anything if the config it
+    // inspects is provably the one the reconstructors are built with. Constructing a second default
+    // here would put the two a refactor apart from disagreeing silently.
+    let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
+        ssa_reconstructor_config(),
+    ));
+    let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator, ssa_reconstructor.clone());
+    let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
+    processes.insert(
+        HoprTransportProcess::PixEvents,
+        hopr_utils::spawn_as_abortable!(
+            pix_event_stream(session_pix_events, ssa_share_resolution_events_rx, smgr)
+                .map(Ok)
+                .forward(ssa_events.clone().sink_map_err(HoprTransportError::other))
+        ),
+    );
+
+    (
+        pix_tools,
+        pipeline_builder.with_exit_ack_share_processing(ssa_reconstructor, ssa_share_resolution_events_tx),
+    )
 }
 
 /// Builds the merged PIX event stream feeding the upper layer.

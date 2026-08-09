@@ -1,7 +1,7 @@
 [package]
 name = "hopr-lib"
 description = "HOPR library implementing the HOPR protocol"
-version = "4.0.2-rc.9"
+version = "4.0.2-rc.10"
 edition.workspace = true
 license.workspace = true
 readme = "README.md"
@@ -72,7 +72,7 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = ["bjj"]
+default = ["bjj", "transport-announce-quic"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `bjj`.
 # Consumers settling PIX deposits on-chain must build with `default-features = false`
 # and not re-enable this, or every deposit address will be a Baby JubJub public key that

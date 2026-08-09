@@ -908,8 +908,10 @@ impl PixToolbox {
 /// Address) parameters — a [`PixParams`] triple of `polys_per_ssa`, `shares_per_poly` and
 /// `surplus_shares` — into the upper 32 bits of the `StartSession.additional_data` field, via
 /// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares
-/// each SSA will use, which together define the data quota per SSA; the third is how many extra
-/// shares per polynomial the Entry emits to absorb losses, and is not part of the quota.
+/// each SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb
+/// losses. All three define the data quota per SSA, which is
+/// `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free, since
+/// a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
 ///
 /// What is announced is built from the installed [`SsaShareGenerator`]'s
 /// [`SsaGeneratorConfig`](hopr_protocol_pix::SsaGeneratorConfig), never from the caller: the
@@ -2876,6 +2878,7 @@ where
 
         // Extract useful information about the session from the Start protocol message
         let incoming_session = IncomingSession {
+            id: session_id,
             session,
             target: session_req.target,
         };

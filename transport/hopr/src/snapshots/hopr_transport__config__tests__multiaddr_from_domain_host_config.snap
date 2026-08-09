@@ -1,5 +1,5 @@
 ---
-source: transport/api/src/config.rs
+source: transport/hopr/src/config.rs
 expression: addr.to_string()
 ---
-/dns4/example.com/tcp/443
+/dns4/example.com/udp/443/quic-v1
