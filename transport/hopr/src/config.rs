@@ -403,7 +403,59 @@ pub struct PixGlobalConfig {
     pub reconstructor: PixReconstructorConfig,
 }
 
-/// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject.
+/// Modelled per-Session return-path rate, in bytes per second — 1.5 Mbit/s.
+///
+/// Mirrors `RETURN_RATE_BYTES_PER_SEC` in `protocols/pix/tests/memory_profile.rs`, which is where
+/// this operating point is defined and measured against. The two are separate literals because the
+/// profile is an integration test of `hopr-protocol-pix` and cannot see this crate; moving the
+/// operating point means moving both.
+const MODELLED_RETURN_RATE_BYTES_PER_SEC: usize = 1_500_000 / 8;
+
+/// Concurrent Sessions per Exit the acknowledgement buffer is sized for.
+///
+/// Mirrors `SESSIONS_PER_EXIT` in the same profile.
+const MODELLED_SESSIONS_PER_EXIT: usize = 100;
+
+/// Ceiling on the rate at which an Exit can put shares into the awaiting-ack buffer, in shares per
+/// second.
+///
+/// A share occupies one buffer entry from the moment the Exit *sends* it until its acknowledgement
+/// returns or [`PixReconstructorConfig::max_ack_await_time`] elapses, so the buffer cannot hold more
+/// than this rate times that window. Everything the budget below rejects, it rejects on the strength
+/// of this number.
+///
+/// Derived rather than chosen: the modelled Exit above, at one packet payload per share.
+/// `div_ceil`, because a ceiling that rounds down is not one.
+const ACK_INGEST_CEILING_PER_SEC: usize = MODELLED_RETURN_RATE_BYTES_PER_SEC
+    .div_ceil(hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE)
+    * MODELLED_SESSIONS_PER_EXIT;
+
+/// Live heap one entry in the reconstructor's awaiting-ack buffer costs, in bytes.
+///
+/// **Measured, not derived.** `size_of` accounts for only 145 B of it — a 33 B `HalfKeyChallenge`
+/// key and a 112 B `TaggedEncryptedPartialSsaShare` value, both inline arrays — and moka's
+/// per-entry bookkeeping is the other 244 B. Run `awaiting_ack_entry_cost` in
+/// `protocols/pix/tests/memory_profile.rs` to re-derive it; at the time of writing it reports
+/// 383 B/entry at 20 000 entries and 389 B/entry at 100 000. Rounded up, because understating the
+/// per-entry cost would admit configurations that exceed the budget.
+const AWAITING_ACK_ENTRY_BYTES: usize = 400;
+
+/// Memory budget for the whole awaiting-ack buffer.
+///
+/// Sized so that the modelled Exit's default configuration sits at about a fifth of it (543 000
+/// reachable entries, ~207 MiB) while an acknowledgement window stretched to an hour does not fit
+/// (65 160 000 entries, ~24 GiB). The admissible ceiling on
+/// [`max_ack_await_time`](PixReconstructorConfig::max_ack_await_time) that this works out to is
+/// 148 s — about 5× the 30 s default, and generous for a timeout whose useful range is a return-path
+/// round trip.
+///
+/// A constant rather than an eighth field on purpose: a settable budget is a check the operator
+/// raises rather than a bound they respect. Move it here, with the reasoning, if a real deployment
+/// needs a longer window.
+const MAX_ACK_BUFFER_BYTES: usize = 1024 * 1024 * 1024;
+
+/// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject, then
+/// applies the deployment-side budget the protocol type has no opinion about.
 ///
 /// The mirror below deliberately carries no `range` attributes of its own. Every bound on those
 /// seven fields is a property of the reconstructor, not of this crate, so the protocol type stays
@@ -418,7 +470,46 @@ fn validate_pix_reconstructor_config(cfg: &PixReconstructorConfig) -> Result<(),
         let mut error = ValidationError::new("pix reconstructor configuration is out of range");
         error.message = Some(errors.to_string().into());
         error
-    })
+    })?;
+
+    validate_ack_buffer_budget(cfg)
+}
+
+/// Rejects a reconstructor configuration whose awaiting-ack buffer could grow past
+/// [`MAX_ACK_BUFFER_BYTES`].
+///
+/// # Why the bound is not the product of the two caps
+///
+/// `max_tracked_peers × max_awaiting_acks` is 2 000 × 1 000 000 by default, and costing that at
+/// [`AWAITING_ACK_ENTRY_BYTES`] gives ~800 GB. That figure is arithmetically correct and
+/// operationally meaningless. Reaching it would require the Exit to *send* two billion
+/// share-bearing packets inside the acknowledgement window — 66 M packets per second at the default
+/// 30 s — because an entry only exists for a share this node has already put on the wire.
+///
+/// The two caps are also independent backstops against **mutually exclusive** concentrations.
+/// `max_awaiting_acks` sizes one cache per peer and has to cover every Session on the node returning
+/// through a single first-relayer (~543 000 entries at the modelled operating point, which is what
+/// makes a cap of 1 000 000 the right order rather than an oversight). `max_tracked_peers` covers
+/// the opposite case, traffic spread thinly across many relayers. Bounding their product tightly
+/// enough to matter would force one of them below what its own case needs, and a `max_awaiting_acks`
+/// set too low does not save memory — it size-evicts shares before their acknowledgements arrive,
+/// silently losing them.
+///
+/// So the bound is on what is reachable: the ingest rate times the window, floored by the product
+/// for the operator who has genuinely configured a smaller buffer. That `min` is what keeps a
+/// small node — `max_tracked_peers: 10`, `max_awaiting_acks: 10_000`, 40 MB whatever the window —
+/// from being refused a long window it cannot possibly abuse. At production dimensions the product
+/// term never binds, by the paragraph above.
+fn validate_ack_buffer_budget(cfg: &PixReconstructorConfig) -> Result<(), ValidationError> {
+    let configured = cfg.max_tracked_peers.saturating_mul(cfg.max_awaiting_acks);
+    let rate_bound = ACK_INGEST_CEILING_PER_SEC.saturating_mul(cfg.max_ack_await_time.as_secs() as usize);
+
+    if configured.min(rate_bound).saturating_mul(AWAITING_ACK_ENTRY_BYTES) > MAX_ACK_BUFFER_BYTES {
+        return Err(ValidationError::new(
+            "pix reconstructor max_ack_await_time admits more awaiting-ack state than the buffer budget allows",
+        ));
+    }
+    Ok(())
 }
 
 /// Operator-facing mirror of [`SsaReconstructorConfig`], the Exit-side share reconstructor.
@@ -982,6 +1073,105 @@ mod tests {
             SsaReconstructorConfig::default(),
             SsaReconstructorConfig::from(PixReconstructorConfig::default()),
             "the operator-facing mirror and the reconstructor it configures have drifted apart"
+        );
+    }
+
+    /// The awaiting-ack buffer is bounded by what the Exit can reach, not by the product of its two
+    /// caps — see [`validate_ack_buffer_budget`] for why those are not the same thing.
+    ///
+    /// All three cases matter. The default must pass or the node will not start. An hour-long
+    /// acknowledgement window must fail, because that is the one dial an operator can turn to
+    /// multiply the buffer and nothing else guards it. And a small node must be allowed that same
+    /// hour, because its caps make the buffer unreachable — that last case is the only thing
+    /// separating this check from a plain `range(max = …)` on the window, and without it the `min`
+    /// term would be decoration.
+    #[test]
+    fn ack_buffer_budget_bounds_the_reachable_state_not_the_product_of_the_caps() {
+        PixReconstructorConfig::default()
+            .validate()
+            .expect("the default acknowledgement window must fit the buffer budget");
+
+        let stretched = PixReconstructorConfig {
+            max_ack_await_time: Duration::from_secs(3600),
+            ..Default::default()
+        };
+        assert!(
+            stretched.validate().is_err(),
+            "an hour-long acknowledgement window at production caps must be rejected"
+        );
+
+        // Same window, caps small enough that the product bounds the buffer below the budget on its
+        // own. 10 x 10_000 x 400 B = 40 MB, whatever the window.
+        let small_node = PixReconstructorConfig {
+            max_ack_await_time: Duration::from_secs(3600),
+            max_tracked_peers: 10,
+            max_awaiting_acks: 10_000,
+            ..Default::default()
+        };
+        small_node
+            .validate()
+            .expect("a node whose caps make the buffer unreachable must keep its long window");
+
+        // The product term must not bind at production dimensions: 2000 x 1_000_000 entries is
+        // ~800 GB on paper and the default still validates above, which is the whole point.
+        assert!(
+            PixReconstructorConfig::default()
+                .max_tracked_peers
+                .saturating_mul(PixReconstructorConfig::default().max_awaiting_acks)
+                .saturating_mul(AWAITING_ACK_ENTRY_BYTES)
+                > MAX_ACK_BUFFER_BYTES,
+            "if the default product now fits the budget, this test no longer distinguishes the two bounds"
+        );
+    }
+
+    /// The operator-visible consequence of the three budget constants, stated as a literal.
+    ///
+    /// Changing [`AWAITING_ACK_ENTRY_BYTES`], [`MAX_ACK_BUFFER_BYTES`] or the modelled operating
+    /// point moves the longest acknowledgement window an operator may configure. That is a
+    /// user-facing range, so a change to it should have to be restated here rather than discovered
+    /// in the field.
+    #[test]
+    fn ack_buffer_budget_admits_a_window_of_148_seconds() {
+        const CEILING: u64 = 148;
+
+        let at_ceiling = PixReconstructorConfig {
+            max_ack_await_time: Duration::from_secs(CEILING),
+            ..Default::default()
+        };
+        at_ceiling
+            .validate()
+            .expect("the stated ceiling itself must be accepted");
+
+        let past_ceiling = PixReconstructorConfig {
+            max_ack_await_time: Duration::from_secs(CEILING + 1),
+            ..Default::default()
+        };
+        assert!(
+            past_ceiling.validate().is_err(),
+            "one second past the stated ceiling must be rejected"
+        );
+    }
+
+    /// The ingest ceiling is derived from the operating point `memory_profile.rs` models, and the
+    /// two are separate literals because that profile cannot see this crate.
+    ///
+    /// This restates the profile's arithmetic so the derivation is checked rather than asserted in
+    /// prose. `HoprPacket::PAYLOAD_SIZE` is read live on both sides, so only the modelled rate and
+    /// Session count are pinned.
+    #[test]
+    fn ack_ingest_ceiling_matches_the_modelled_operating_point() {
+        let shares_per_session_per_sec =
+            MODELLED_RETURN_RATE_BYTES_PER_SEC.div_ceil(hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE);
+
+        assert_eq!(187_500, MODELLED_RETURN_RATE_BYTES_PER_SEC, "1.5 Mbit/s per Session");
+        assert_eq!(
+            shares_per_session_per_sec * MODELLED_SESSIONS_PER_EXIT,
+            ACK_INGEST_CEILING_PER_SEC
+        );
+        assert_eq!(
+            543_000,
+            ACK_INGEST_CEILING_PER_SEC * SsaReconstructorConfig::DEFAULT_MAX_ACK_AWAIT_TIME.as_secs() as usize,
+            "the reachable entry count at the default window, which the budget must accommodate"
         );
     }
 

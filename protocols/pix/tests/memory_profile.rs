@@ -33,7 +33,7 @@ use hopr_protocol_pix::{
     SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
-    crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
+    crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
     crypto_random::Randomizable,
     internal::prelude::{Acknowledgement, VerifiedAcknowledgement},
 };
@@ -155,6 +155,102 @@ fn stage_shares(
         acks.push(VerifiedAcknowledgement::new(ack, peer).leak());
     }
     acks
+}
+
+/// Measures what one entry in the `awaiting_acks` buffer costs in live heap.
+///
+/// This is the number `hopr-transport`'s `PixReconstructorConfig` budget is denominated in, and it
+/// cannot be read off `size_of` alone: the payload is ~80 B of inline arrays, and moka's per-entry
+/// bookkeeping — hash map entry, LRU node, TTL timer-wheel node, the `Arc` around the value —
+/// dominates it. Rather than guess a multiple, measure, and let the validation constant cite this.
+///
+/// The occupancy is reported at two points rather than one because moka grows its internal
+/// structures in chunks; a single reading at an unlucky occupancy would report the chunk rather
+/// than the entry. One share is built before the baseline and copied in —
+/// `TaggedEncryptedPartialSsaShare` is `Copy`, so nothing the loop does allocates and the delta is
+/// the cache and nothing else.
+///
+/// Ignored by default: it holds ~100 000 live cache entries.
+#[test]
+#[ignore]
+fn awaiting_ack_entry_cost() {
+    /// Occupancy points to report. The last is the figure to quote.
+    const POINTS: [usize; 2] = [20_000, 100_000];
+
+    let entries = POINTS[POINTS.len() - 1];
+
+    println!("\n=== Type sizes ===");
+    println!(
+        "  HalfKeyChallenge (key)           {:>4} B",
+        size_of::<HalfKeyChallenge>()
+    );
+    println!(
+        "  TaggedEncryptedPartialSsaShare   {:>4} B",
+        size_of::<TaggedEncryptedPartialSsaShare<TestSpec>>()
+    );
+    let payload = size_of::<HalfKeyChallenge>() + size_of::<TaggedEncryptedPartialSsaShare<TestSpec>>();
+    println!("  payload per entry                {payload:>4} B");
+
+    // One polynomial of two shares is enough: the entries are distinguished by their keys, and the
+    // value is the same shape whichever share it holds.
+    let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        threshold: 2,
+        polynomials_per_ssa: 1,
+        surplus_shares: 0,
+    });
+    let pseudonym = SimplePseudonym::random();
+    let peer = OffchainKeypair::random();
+    let _ = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+    let share = generator.next_share(&pseudonym, b"nonce").unwrap().unwrap();
+    let template = {
+        let ack = HalfKey::random();
+        let enc_share = share.share.encrypt(&share.id, &ack).unwrap();
+        TaggedEncryptedPartialSsaShare::new(pseudonym, b"nonce", enc_share).unwrap()
+    };
+
+    // Keys built up front: `HalfKey::to_challenge` is a scalar multiplication, and doing 100 000 of
+    // them inside the measured region would put the transient curve state in the reading.
+    let challenges = (0..entries)
+        .map(|_| HalfKey::random().to_challenge().unwrap())
+        .collect::<Vec<_>>();
+
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        // Above the largest occupancy point, so nothing is size-evicted, and long enough that
+        // nothing expires mid-measurement. Both would make the average report a smaller cache.
+        max_awaiting_acks: entries * 2,
+        max_ack_await_time: std::time::Duration::from_secs(7200),
+        ..Default::default()
+    });
+
+    let baseline = live_bytes();
+    println!("\n=== Awaiting-ack buffer, one peer ===");
+    let mut inserted = 0;
+    for point in POINTS {
+        while inserted < point {
+            reconstructor
+                .insert_encrypted_share(peer.public(), challenges[inserted], template)
+                .unwrap();
+            inserted += 1;
+        }
+        // moka applies writes from an internal queue during maintenance. Queued or applied, the
+        // bytes are live either way, so the total is right regardless — this only makes the split
+        // between the two stable enough that the two points are comparable.
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let held = live_bytes().saturating_sub(baseline);
+        println!(
+            "  {point:>7} entries                  {:>9.1} MiB live   {:>4} B/entry  ({:>4} B overhead)",
+            mib(held),
+            held / point,
+            (held / point).saturating_sub(payload)
+        );
+    }
+
+    println!(
+        "\n  Quote the last row as AWAITING_ACK_ENTRY_BYTES in `hopr-transport`'s\n  `validate_ack_buffer_budget`. \
+         Round up: the budget is a ceiling, so under-stating the\n  per-entry cost admits configurations that exceed \
+         it.\n"
+    );
 }
 
 /// Walks one production-width SSA cycle and reports live heap at each phase.
