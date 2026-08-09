@@ -587,7 +587,7 @@ mod tests {
     /// hypothetical one.
     ///
     /// On secp256k1 the cofactor is 1, no such point exists, and the case is vacuous.
-    #[cfg(feature = "bjj")]
+    #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
     #[test]
     fn pix_group_element_rejects_a_small_order_point() {
         use hopr_protocol_pix::Group;

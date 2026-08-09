@@ -95,7 +95,7 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; /
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HoprPixSpec;
 
-#[cfg(not(feature = "bjj"))]
+#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = ChainKeypair;
     type Cipher = ChaCha20;
@@ -115,7 +115,7 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     }
 }
 
-#[cfg(feature = "bjj")]
+#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
 impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type AddressPrivateKey = BjjKeypair;
     type Cipher = ChaCha20;
@@ -139,15 +139,15 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
 pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
 
 /// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
-#[cfg(not(feature = "bjj"))]
+#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
 pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
-#[cfg(feature = "bjj")]
+#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
 pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, BjjKeypair>;
 
 /// HOPR-specific [`hopr_protocol_pix::SsaCommitmentState`].
-#[cfg(not(feature = "bjj"))]
+#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
 pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, Address>;
-#[cfg(feature = "bjj")]
+#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
 pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, BjjPublicKey>;
 
 /// HOPR-specific PIX scalar type.
@@ -159,9 +159,9 @@ pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePs
 ///
 /// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
 /// itself as another generic argument.
-#[cfg(not(feature = "bjj"))]
+#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
 pub type HoprPixScalar = crypto_traits::elliptic_curve::Scalar<Secp256k1>;
-#[cfg(feature = "bjj")]
+#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
 pub type HoprPixScalar = BabyJubJubScalar;
 
 /// HOPR-specific PIX group element representation type.
@@ -174,9 +174,9 @@ pub type HoprPixScalar = BabyJubJubScalar;
 /// error (E0119): implementing `From`/`TryFrom` for a new-type wrapping the projection conflicts
 /// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
 /// projection is distinct from the wrapper type.
-#[cfg(not(feature = "bjj"))]
+#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
 pub type HoprPixGroupRepr = crypto_traits::elliptic_curve::array::Array<u8, crypto_traits::elliptic_curve::consts::U33>;
-#[cfg(feature = "bjj")]
+#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
 pub type HoprPixGroupRepr = BabyJubJubCompressedPoint;
 
 #[cfg(test)]

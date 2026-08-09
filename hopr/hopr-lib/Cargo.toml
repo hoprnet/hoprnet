@@ -72,12 +72,17 @@ required-features = ["testing"]
 
 [features]
 capture = ["hopr-transport/capture"]
-default = ["bjj", "transport-announce-quic"]
-# Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `bjj`.
-# Consumers settling PIX deposits on-chain must build with `default-features = false`
-# and not re-enable this, or every deposit address will be a Baby JubJub public key that
-# no plain transfer can reach.
-bjj = ["hopr-transport/bjj"]
+default = ["pix-bjj", "transport-announce-quic"]
+# Selects the Baby JubJub instantiation of `HoprPixSpec`; see `hopr-transport`'s `pix-bjj`.
+pix-bjj = ["hopr-transport/pix-bjj"]
+# Overrides `pix-bjj`, giving Ethereum deposit addresses that a plain transfer can reach.
+#
+# **This is what a consumer settling PIX deposits on-chain should enable.** Turning `pix-bjj` off
+# with `default-features = false` is not sufficient and never was: features are additive, so
+# the moment any crate in the graph pulls `hopr-lib` with defaults — a transitive dependency,
+# or this workspace's own declaration — `pix-bjj` comes back on for everyone and the opt-out is
+# silently undone. `pix-secp256k1` wins on addition instead, so it cannot be undone that way.
+pix-secp256k1 = ["hopr-transport/pix-secp256k1"]
 telemetry = [
   "hopr-transport/telemetry",
   "hopr-network-graph?/telemetry",

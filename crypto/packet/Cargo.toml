@@ -24,14 +24,29 @@ crate-type = ["rlib"]
 doctest = false
 
 [features]
-default = ["rayon", "ed25519", "bjj"]
+default = ["rayon", "ed25519", "pix-bjj"]
 all-benchmarks = []
 
 rayon = ["hopr-utils/parallelize-rayon"]
 ed25519 = []
 x25519 = []
 secp256k1 = []
-bjj = []
+# Selects the BabyJubJub instantiation of `HoprPixSpec`, and with it BabyJubJub deposit
+# addresses. Default, because it is what production settles.
+pix-bjj = []
+# Overrides `pix-bjj` back to the secp256k1 instantiation, giving Ethereum deposit addresses that
+# a plain `HoprToken.transfer` can reach. Not default, and deliberately an *override* rather
+# than a peer of `pix-bjj`: Cargo features are additive, so `default-features = false` is only
+# effective while every crate in the graph agrees to it, and one dependency that forgets
+# silently re-enables `pix-bjj` for everyone. That is not hypothetical — it is how hoprnet
+# 27b4b255f9 turned every hoprd deposit address into a curve point no transfer could reach,
+# with no build error and no runtime error beyond a strategy that quietly never deposited.
+# A feature that wins *on addition* cannot be defeated that way.
+#
+# Note this is `pix-secp256k1`, not `secp256k1`: that name is taken above and selects the
+# Sphinx header curve, which is an unrelated axis. Sharing it would make enabling one silently
+# switch the other — the same defect one layer along.
+pix-secp256k1 = []
 serde = [
   "dep:serde",
   "dep:serde_bytes",

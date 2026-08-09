@@ -64,8 +64,13 @@ pub use hopr_crypto_packet::HoprPixSpec;
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_hopr::MemorySurbStore;
+/// Re-exported so a consumer can name `<HoprPixSpec as PixSpec>::DepositAddress` and assert at
+/// compile time that it is the variant it can actually settle. Which instantiation is in play is
+/// a feature-graph outcome rather than a local decision, and getting it wrong is otherwise silent
+/// until deposits stop happening at runtime.
+pub use hopr_protocol_pix::PixSpec;
 pub use hopr_protocol_pix::RecoveredSsa;
-use hopr_protocol_pix::{PixSpec, ShareResolution};
+use hopr_protocol_pix::ShareResolution;
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
