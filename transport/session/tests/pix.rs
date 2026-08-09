@@ -72,13 +72,12 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     // One commitment per polynomial — the constant term — chunked into packet-sized messages.
     // Every message carries the proof of knowledge, so the per-message budget loses its size.
-    let expected_ssa_commits = {
-        let max_commitments_per_message = (ApplicationData::PAYLOAD_SIZE
-            - HoprStartProtocol::START_HEADER_SIZE
-            - HoprStartProtocol::PIX_COMMITMENT_PROOF_SIZE)
-            / (size_of::<SsaIndex>() + size_of::<hopr_crypto_packet::prelude::HoprPixGroupElement>());
-        (ssa_gen_config.polynomials_per_ssa as usize).div_ceil(max_commitments_per_message)
-    };
+    //
+    // Asked of the encoder rather than restated here: `SessionId` is an alias of `HoprPseudonym`
+    // (fixed size, so its CBOR length does not depend on which pseudonym), which makes
+    // `alice_pseudonym` a faithful stand-in for the session id the encoder will see.
+    let expected_ssa_commits = (ssa_gen_config.polynomials_per_ssa as usize)
+        .div_ceil(HoprStartProtocol::ssa_commit_chunking(&alice_pseudonym)?.max_constant_terms_per_message);
 
     let mut sequence = mockall::Sequence::new();
     let mut alice_transport = MockMsgSender::new();

@@ -223,29 +223,14 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
         let ssa_index = commitment.ssa_id.ssa_index();
         let commitment_proof = K::from(commitment.commitment_proof);
 
-        // A single message can only carry a limited number of coefficient commitments
-        // so that the resulting encoded message still fits within a HOPR packet payload.
-        // The commitments of a single coefficient (across all polynomials) might therefore
-        // need to be split across multiple messages.
-        //
-        // The bound is derived from the actual SsaCommit encode layout:
-        //   header:     version(1) + disc(1) + data_len(2) = 4
-        //   fixed:      ssa_index(4) + coefficient_index(2) + poly_count(2) = 8
-        //   proof:      PIX_COMMITMENT_PROOF_SIZE, constant-term messages only
-        //   per-entry:  PolynomialIndex(2) + commitment_repr(PIX_COEFF_COMMITMENT_REPR_SIZE)
-        //   trailer:    CBOR-encoded session_id
-        let header_and_fixed: usize = 4 + 4 + 2 + 2; // header + ssa_index + coeff_index + num_polys
-        let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
-            + StartProtocol::<I, (), (), G, K>::PIX_COEFF_COMMITMENT_REPR_SIZE;
-        // Compute the exact CBOR size of the session_id for this instantiation.
-        let cbor_session_id_size = serde_cbor_2::to_vec(&session_id)?.len();
-        let budget = ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size);
-        let max_commitments_per_message = (budget / per_entry).max(1);
-        // Constant-term messages additionally carry the proof, so they fit fewer entries. Phase 2
-        // keeps the full budget, which is what the block size below is aligned to; only phase 1
-        // pays for the proof, costing a handful of extra messages per cycle.
-        let max_constant_terms_per_message =
-            (budget.saturating_sub(StartProtocol::<I, (), (), G, K>::PIX_COMMITMENT_PROOF_SIZE) / per_entry).max(1);
+        // A single message can only carry a limited number of coefficient commitments so that the
+        // resulting encoded message still fits within a HOPR packet payload. The commitments of a
+        // single coefficient (across all polynomials) might therefore need to be split across
+        // multiple messages. The encode layout this is derived from is documented on the helper.
+        let SsaCommitChunking {
+            max_commitments_per_message,
+            max_constant_terms_per_message,
+        } = StartProtocol::<I, (), (), G, K>::ssa_commit_chunking(&session_id)?;
 
         // Group the transposed verifiers by coefficient index, each group sorted by polynomial
         // index. A `BTreeMap` keeps the coefficient order deterministic; the inner sort is what
@@ -430,6 +415,61 @@ impl<I, T, C, G, K> StartProtocol<I, T, C, G, K> {
     pub const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     /// Current version of the Start protocol.
     pub const START_PROTOCOL_VERSION: u8 = 0x03;
+
+    /// How many commitment entries one [`SsaCommit`](StartProtocol::SsaCommit) message can carry,
+    /// for each of the two delivery phases.
+    ///
+    /// This is the bound
+    /// [`SsaClientCommitmentMessage::new_multiple`] chunks by, exposed so that a caller predicting
+    /// the message count for a commitment does not have to restate the encode layout. Restating it
+    /// is error-prone in a way that hides: the copy this replaced used `SsaIndex` (4 B) where an
+    /// `SsaCommit` entry prefix is a `PolynomialIndex` (2 B), against a different fixed overhead,
+    /// and agreed with the encoder only because the two mistakes floored to the same divisor at the
+    /// dimensions it ran at.
+    ///
+    /// Takes the `session_id` itself rather than a precomputed length: its CBOR encoding is part of
+    /// the layout, so leaving the caller to measure it is the same footgun one level up.
+    pub fn ssa_commit_chunking(session_id: &I) -> Result<SsaCommitChunking, StartProtocolError>
+    where
+        I: serde::Serialize,
+    {
+        // A single message can only carry a limited number of coefficient commitments
+        // so that the resulting encoded message still fits within a HOPR packet payload.
+        // The commitments of a single coefficient (across all polynomials) might therefore
+        // need to be split across multiple messages.
+        //
+        // The bound is derived from the actual SsaCommit encode layout:
+        //   header:     version(1) + disc(1) + data_len(2) = 4
+        //   fixed:      ssa_index(4) + coefficient_index(2) + poly_count(2) = 8
+        //   proof:      PIX_COMMITMENT_PROOF_SIZE, constant-term messages only
+        //   per-entry:  PolynomialIndex(2) + commitment_repr(PIX_COEFF_COMMITMENT_REPR_SIZE)
+        //   trailer:    CBOR-encoded session_id
+        let header_and_fixed: usize = 4 + 4 + 2 + 2; // header + ssa_index + coeff_index + num_polys
+        let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE;
+        // Compute the exact CBOR size of the session_id for this instantiation.
+        let cbor_session_id_size = serde_cbor_2::to_vec(session_id)?.len();
+        let budget = ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size);
+
+        Ok(SsaCommitChunking {
+            max_commitments_per_message: (budget / per_entry).max(1),
+            // Constant-term messages additionally carry the proof, so they fit fewer entries. Phase
+            // 2 keeps the full budget, which is what the block size in `new_multiple` is aligned to;
+            // only phase 1 pays for the proof, costing a handful of extra messages per cycle.
+            max_constant_terms_per_message: (budget.saturating_sub(Self::PIX_COMMITMENT_PROOF_SIZE) / per_entry).max(1),
+        })
+    }
+}
+
+/// How many commitment entries one `SsaCommit` message can carry, per delivery phase.
+///
+/// Returned by [`StartProtocol::ssa_commit_chunking`]. The two are easy to confuse and differ only
+/// by the proof of knowledge, so they are named rather than returned as a pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SsaCommitChunking {
+    /// Phase 2 — higher-coefficient messages, which get the full entry budget.
+    pub max_commitments_per_message: usize,
+    /// Phase 1 — constant-term messages, which also carry the proof of knowledge and so fit fewer.
+    pub max_constant_terms_per_message: usize,
 }
 
 impl<I, T, C, G, K> StartProtocol<I, T, C, G, K>
@@ -1079,6 +1119,40 @@ mod tests {
         });
 
         assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
+        Ok(())
+    }
+
+    /// Pins [`StartProtocol::ssa_commit_chunking`] against a fully determined instantiation.
+    ///
+    /// The bound's only other consumers ask *it* how many messages to expect, so nothing else can
+    /// catch a change in the arithmetic. Here every input is fixed, so the outputs can be stated
+    /// outright: a change to the layout has to come through this test.
+    #[test]
+    fn ssa_commit_chunking_should_match_the_encode_layout() -> anyhow::Result<()> {
+        type Spec = StartProtocol<i32, String, u8, [u8; 33], [u8; 65]>;
+
+        // header(4) + ssa_index(4) + coeff_index(2) + num_polys(2) = 12, plus the CBOR session id:
+        // 0xfeedeef exceeds u16, so CBOR spends a 1-byte prefix and 4 bytes of payload on it.
+        let budget = ApplicationData::PAYLOAD_SIZE - 12 - 5;
+        // `PolynomialIndex` is a `u16` — an `SsaIndex` prefix belongs to `SsaRequest`, not here.
+        let per_entry = size_of::<PolynomialIndex>() + Spec::PIX_COEFF_COMMITMENT_REPR_SIZE;
+
+        let chunking = Spec::ssa_commit_chunking(&0xfeedeef)?;
+
+        assert_eq!(budget / per_entry, chunking.max_commitments_per_message);
+        assert_eq!(
+            (budget - Spec::PIX_COMMITMENT_PROOF_SIZE) / per_entry,
+            chunking.max_constant_terms_per_message
+        );
+        // Stated as literals too, so that a change reaching *both* the encoder and the derivation
+        // above still has to be acknowledged here.
+        assert_eq!(28, chunking.max_commitments_per_message);
+        assert_eq!(27, chunking.max_constant_terms_per_message);
+
+        // The proof is carried by constant-term messages only, so phase 1 must never fit more
+        // entries than phase 2 — the invariant `new_multiple`'s two loops rely on.
+        assert!(chunking.max_constant_terms_per_message < chunking.max_commitments_per_message);
+
         Ok(())
     }
 
