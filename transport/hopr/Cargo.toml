@@ -48,9 +48,9 @@ telemetry = [
   "hopr-transport-mixer/telemetry",
 ]
 p2p-announce-quic = []
-# Opt-in: use the exponential (Poisson) release mixer engine instead of the default
+# Opt-in: use the shared-pool exponential (Poisson) release mixer engine instead of the default
 # uniform-delay mixer. Swaps the constructor at the mixer wiring site.
-poisson-mixer = ["hopr-transport-mixer/poisson"]
+poisson-mixer = ["hopr-transport-mixer/poisson-shared"]
 runtime-tokio = [
   "hopr-utils/runtime-tokio",
   "hopr-utils/network-types-runtime-tokio",

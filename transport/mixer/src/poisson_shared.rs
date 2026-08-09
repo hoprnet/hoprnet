@@ -108,6 +108,32 @@ impl<T> Sender<T> {
     }
 }
 
+impl<T> futures::sink::Sink<T> for Sender<T> {
+    type Error = SenderError;
+
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // The pool is unbounded, so a send never needs to wait: always ready while the receiver
+        // lives, matching the dedicated-thread engine's sender.
+        if self.shared.receiver_active.load(Ordering::Relaxed) {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Ready(Err(SenderError::Closed))
+        }
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.get_mut().send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
 /// Receiver end of the shared-pool mixer. Runs the sweep + adaptive timer inline.
 pub struct Receiver<T> {
     shared: Shared<T>,
@@ -378,6 +404,17 @@ mod tests {
 
         let output = timeout(2 * CAP + LEEWAY, rx.take(ITERATIONS).collect::<Vec<_>>()).await?;
         assert_eq!(input, output, "pass-through must preserve FIFO order");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn shared_sender_should_deliver_through_the_sink_api() -> anyhow::Result<()> {
+        // The transport wires the sender as a `Sink`, so exercise that path (not just the
+        // inherent `send`): `SinkExt::send` drives poll_ready -> start_send -> poll_flush.
+        use futures::SinkExt;
+        let (mut tx, mut rx) = poisson_shared_channel::<u32>(MixerConfig::default());
+        SinkExt::send(&mut tx, 7).await?;
+        assert_eq!(timeout(CAP + LEEWAY, rx.recv()).await?, Some(7));
         Ok(())
     }
 }

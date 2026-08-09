@@ -23,8 +23,8 @@ include = [
 crate-type = ["rlib"]
 
 [features]
-# The Poisson engine is the default mixer implementation.
-default = ["poisson"]
+# The shared-pool Poisson engine is the default mixer implementation.
+default = ["poisson-shared"]
 all-benchmarks = []
 # Exponential (Poisson) release engine — `poisson_channel`.
 poisson = ["dep:async-channel", "futures/executor"]

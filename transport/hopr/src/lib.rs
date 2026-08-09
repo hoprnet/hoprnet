@@ -531,13 +531,13 @@ where
         mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
             .unwrap_or(u64::MAX)
             .max(1);
-        // The uniform-delay engine (default) and the opt-in exponential (Poisson) engine
-        // expose the same `Sink`/`Stream` surface, so the downstream pipeline and forwarder
-        // are agnostic to which one is wired here.
+        // The uniform-delay engine (default) and the opt-in shared-pool exponential (Poisson)
+        // engine expose the same `Sink`/`Stream` surface, so the downstream pipeline and
+        // forwarder are agnostic to which one is wired here.
         #[cfg(not(feature = "poisson-mixer"))]
         let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::channel(mixer_cfg);
         #[cfg(feature = "poisson-mixer")]
-        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::poisson_channel(mixer_cfg);
+        let (mixing_channel_tx, mix_rx) = hopr_transport_mixer::poisson_shared_channel(mixer_cfg);
         let transit_latency_cfg = self.cfg.transit_latency;
         processes.insert(
             HoprTransportProcess::MixerForwarder,
