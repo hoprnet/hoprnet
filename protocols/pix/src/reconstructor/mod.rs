@@ -23,7 +23,7 @@ pub struct SsaReconstructorConfig {
     /// Time until the complete commitment to an SSA must be received.
     ///
     /// Default is 2 minutes.
-    #[default(std::time::Duration::from_secs(120))]
+    #[default(Self::DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME)]
     pub incomplete_commitment_lifetime: std::time::Duration,
     /// Maximum time an SSA cycle can go without progress before it is discarded.
     ///
@@ -32,26 +32,41 @@ pub struct SsaReconstructorConfig {
     /// therefore never expires, whatever the line rate.
     ///
     /// Default is 30 minutes.
-    #[default(std::time::Duration::from_secs(1800))]
+    #[default(Self::DEFAULT_UNUSED_VERIFIER_LIFETIME)]
     pub unused_verifier_lifetime: std::time::Duration,
     /// Maximum number of peers that can be tracked simultaneously with unacknowledged shares.
     ///
     /// Default is 2000, minimum is 10.
+    ///
+    /// This is a per-*peer* fan-out bound, and it guards the opposite concentration to
+    /// [`max_awaiting_acks`](Self::max_awaiting_acks): traffic spread thinly across many
+    /// first-relayers. The two cannot both be saturated at once, which is why their product is not
+    /// the reconstructor's memory bound — see `PixReconstructorConfig` in `hopr-transport` for the
+    /// bound that is.
     #[validate(range(min = 10))]
-    #[default(2000)]
+    #[default(Self::DEFAULT_MAX_TRACKED_PEERS)]
     pub max_tracked_peers: usize,
     /// Maximum number of awaited acknowledgements to extract a single share.
     ///
     /// This corresponds to the maximum number of unacknowledged HOPR packets awaiting acknowledgement.
     ///
     /// Default is 1 000 000, must be at least 10 000.
-    #[default(1_000_000)]
+    ///
+    /// Sizes one inner cache **per peer**, so it must cover the concentrated case: every Session on
+    /// the node returning through a single first-relayer. At the operating point
+    /// `tests/memory_profile.rs` models that is ~542 000 entries, which is what makes a cap of this
+    /// order the right one rather than an oversight.
+    #[default(Self::DEFAULT_MAX_AWAITING_ACKS)]
     #[validate(range(min = 10000))]
     pub max_awaiting_acks: usize,
     /// Maximum time an acknowledgement can be awaited before it is discarded.
     ///
     /// Default is 30 seconds.
-    #[default(std::time::Duration::from_secs(30))]
+    ///
+    /// Multiplies the whole awaiting-ack buffer: the reachable state is the Exit's share-emission
+    /// rate times this window, so it — not either cap above — is the dial that actually sizes the
+    /// buffer.
+    #[default(Self::DEFAULT_MAX_ACK_AWAIT_TIME)]
     pub max_ack_await_time: std::time::Duration,
     /// Indicates whether to use batch verification algorithm for acknowledgements.
     ///
@@ -67,15 +82,38 @@ pub struct SsaReconstructorConfig {
     /// Left configurable rather than removed: the figures above come from the sequential
     /// `sustained_quota_rate` group, and the Exit runs acknowledgements through a concurrent
     /// pipeline, where amortising the batch setup across more callers may yet pay.
-    #[default(false)]
+    #[default(Self::DEFAULT_USE_BATCH_VERIFICATION)]
     pub use_batch_verification: bool,
     /// Fraction of reconstructed polynomials at which to emit an early recovery
     /// notification, triggering pipelined SSA request preparation.
     ///
     /// Range: 0.0..1.0. Default: 0.85.
-    #[default(0.85)]
+    #[default(Self::DEFAULT_EARLY_RECOVERY_THRESHOLD)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub early_recovery_threshold: f64,
+}
+
+/// The defaults, named so that a mirror can share them instead of restating them.
+///
+/// `hopr-transport`'s `PixReconstructorConfig` is the operator-facing shape of this struct, and a
+/// second copy of these literals over there would be a second thing to keep true. Referencing them
+/// from both `#[default(…)]` sites means the two cannot disagree by construction, which is a
+/// stronger guarantee than any test comparing them after the fact.
+impl SsaReconstructorConfig {
+    /// Default [`early_recovery_threshold`](Self::early_recovery_threshold).
+    pub const DEFAULT_EARLY_RECOVERY_THRESHOLD: f64 = 0.85;
+    /// Default [`incomplete_commitment_lifetime`](Self::incomplete_commitment_lifetime).
+    pub const DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME: std::time::Duration = std::time::Duration::from_secs(120);
+    /// Default [`max_ack_await_time`](Self::max_ack_await_time).
+    pub const DEFAULT_MAX_ACK_AWAIT_TIME: std::time::Duration = std::time::Duration::from_secs(30);
+    /// Default [`max_awaiting_acks`](Self::max_awaiting_acks).
+    pub const DEFAULT_MAX_AWAITING_ACKS: usize = 1_000_000;
+    /// Default [`max_tracked_peers`](Self::max_tracked_peers).
+    pub const DEFAULT_MAX_TRACKED_PEERS: usize = 2000;
+    /// Default [`unused_verifier_lifetime`](Self::unused_verifier_lifetime).
+    pub const DEFAULT_UNUSED_VERIFIER_LIFETIME: std::time::Duration = std::time::Duration::from_secs(1800);
+    /// Default [`use_batch_verification`](Self::use_batch_verification).
+    pub const DEFAULT_USE_BATCH_VERIFICATION: bool = false;
 }
 
 type EncryptedShareCache<S> =

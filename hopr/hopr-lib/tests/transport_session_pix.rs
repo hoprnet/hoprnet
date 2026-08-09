@@ -356,6 +356,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                 // Must be raised in step with the Exit below: the batch size is not negotiated, and
                 // an Entry left at its default of 2 refuses a batch of 3 outright.
                 max_ssas_per_request: SSA_BATCH,
+                ..Default::default()
             }),
             ..Default::default()
         },

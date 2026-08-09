@@ -8,6 +8,7 @@ use std::{
 
 use hopr_api::Multiaddr;
 pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
+use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
@@ -392,6 +393,136 @@ pub struct PixGlobalConfig {
     #[validate(range(min = 1, max = 20))]
     #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
     pub max_ssas_per_request: usize,
+
+    /// Exit-side SSA reconstructor configuration.
+    ///
+    /// Nested rather than flattened so the whole PIX surface stays under one key, and so that
+    /// Exit-side capacity does not intermix with the Entry-side dimensions above.
+    #[validate(nested)]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reconstructor: PixReconstructorConfig,
+}
+
+/// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject.
+///
+/// The mirror below deliberately carries no `range` attributes of its own. Every bound on those
+/// seven fields is a property of the reconstructor, not of this crate, so the protocol type stays
+/// the single source of truth for them and this delegates rather than restating. A restated range
+/// is simply a second place to forget when the first one moves.
+///
+/// `validator` schema functions return one [`ValidationError`], so the inner [`ValidationErrors`]
+/// is folded into its message — [`validate_incoming_session_pix_config`] above is the existing
+/// precedent in this file for a hand-written check that reaches into another crate.
+fn validate_pix_reconstructor_config(cfg: &PixReconstructorConfig) -> Result<(), ValidationError> {
+    SsaReconstructorConfig::from(*cfg).validate().map_err(|errors| {
+        let mut error = ValidationError::new("pix reconstructor configuration is out of range");
+        error.message = Some(errors.to_string().into());
+        error
+    })
+}
+
+/// Operator-facing mirror of [`SsaReconstructorConfig`], the Exit-side share reconstructor.
+///
+/// Stands in the same relationship to the protocol type that the fields of [`PixGlobalConfig`]
+/// stand in to `SsaGeneratorConfig`: `hopr-protocol-pix` owns the type the reconstructor is built
+/// from, and this crate owns the shape an operator writes. It exists because none of these seven
+/// values was reachable from a config file at all — both production constructors took
+/// `SsaReconstructorConfig::default()`, so the Exit side of PIX was unconfigurable while the Entry
+/// side was not.
+///
+/// Duplicating seven fields is the price of the mirror, and two guards pay it. The [`From`] impl
+/// below is written exhaustively, so a field added to [`SsaReconstructorConfig`] fails to compile
+/// until it is mirrored here; and `pix_reconstructor_mirror_matches_the_protocol_defaults` asserts
+/// the two default sets still agree. Validation is not duplicated at all — see
+/// [`validate_pix_reconstructor_config`].
+///
+/// Each field's rationale lives on the protocol type and is linked rather than copied, since a
+/// third copy of the same prose is a third thing to keep true.
+#[derive(Clone, Copy, Debug, PartialEq, Validate, smart_default::SmartDefault)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(default, deny_unknown_fields)
+)]
+#[validate(schema(function = "validate_pix_reconstructor_config", skip_on_field_errors = false))]
+pub struct PixReconstructorConfig {
+    /// Time until the complete commitment to an SSA must be received.
+    ///
+    /// Defaults to 2 minutes. See
+    /// [`SsaReconstructorConfig::incomplete_commitment_lifetime`].
+    #[default(SsaReconstructorConfig::DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME)]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    pub incomplete_commitment_lifetime: Duration,
+
+    /// Maximum time an SSA cycle can go without progress before it is discarded.
+    ///
+    /// Defaults to 30 minutes. See [`SsaReconstructorConfig::unused_verifier_lifetime`].
+    #[default(SsaReconstructorConfig::DEFAULT_UNUSED_VERIFIER_LIFETIME)]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    pub unused_verifier_lifetime: Duration,
+
+    /// Maximum number of peers tracked simultaneously with unacknowledged shares.
+    ///
+    /// Defaults to 2000, minimum 10. See [`SsaReconstructorConfig::max_tracked_peers`].
+    #[default(SsaReconstructorConfig::DEFAULT_MAX_TRACKED_PEERS)]
+    pub max_tracked_peers: usize,
+
+    /// Maximum number of awaited acknowledgements held **per peer**.
+    ///
+    /// Defaults to 1 000 000, minimum 10 000. See [`SsaReconstructorConfig::max_awaiting_acks`].
+    #[default(SsaReconstructorConfig::DEFAULT_MAX_AWAITING_ACKS)]
+    pub max_awaiting_acks: usize,
+
+    /// Maximum time an acknowledgement is awaited before its share is discarded.
+    ///
+    /// Defaults to 30 seconds. See [`SsaReconstructorConfig::max_ack_await_time`].
+    #[default(SsaReconstructorConfig::DEFAULT_MAX_ACK_AWAIT_TIME)]
+    #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
+    pub max_ack_await_time: Duration,
+
+    /// Whether to use the batch verification algorithm for acknowledgements.
+    ///
+    /// Defaults to `false`. See [`SsaReconstructorConfig::use_batch_verification`], which records
+    /// the measurements behind that default and why the knob was kept rather than removed.
+    #[default(SsaReconstructorConfig::DEFAULT_USE_BATCH_VERIFICATION)]
+    pub use_batch_verification: bool,
+
+    /// Fraction of reconstructed polynomials at which an early recovery notification is emitted.
+    ///
+    /// Defaults to 0.85, range 0.0..=1.0. See
+    /// [`SsaReconstructorConfig::early_recovery_threshold`].
+    #[default(SsaReconstructorConfig::DEFAULT_EARLY_RECOVERY_THRESHOLD)]
+    pub early_recovery_threshold: f64,
+}
+
+impl From<PixReconstructorConfig> for SsaReconstructorConfig {
+    /// Both sides are written out exhaustively, with no `..Default::default()` on either.
+    ///
+    /// That is the guard the mirror rests on: a field added to [`SsaReconstructorConfig`] leaves
+    /// this initialiser incomplete and a field added to [`PixReconstructorConfig`] leaves the
+    /// pattern incomplete, so either one fails to compile until it is mirrored. Struct update
+    /// syntax would compile in both directions and silently pin the new knob to its default.
+    fn from(cfg: PixReconstructorConfig) -> Self {
+        let PixReconstructorConfig {
+            incomplete_commitment_lifetime,
+            unused_verifier_lifetime,
+            max_tracked_peers,
+            max_awaiting_acks,
+            max_ack_await_time,
+            use_batch_verification,
+            early_recovery_threshold,
+        } = cfg;
+
+        Self {
+            incomplete_commitment_lifetime,
+            unused_verifier_lifetime,
+            max_tracked_peers,
+            max_awaiting_acks,
+            max_ack_await_time,
+            use_batch_verification,
+            early_recovery_threshold,
+        }
+    }
 }
 
 /// Configuration of the HOPR packet pipeline.
@@ -836,6 +967,24 @@ mod tests {
             .expect("default HoprProtocolConfig must be valid");
     }
 
+    /// The operator-facing mirror must round-trip to the protocol type it stands for.
+    ///
+    /// Both sides now read the same `SsaReconstructorConfig::DEFAULT_*` constants, so this is
+    /// structurally true rather than merely observed — which is the point of asserting it. What the
+    /// test actually guards is a future edit that replaces one of those references with a literal:
+    /// the mirror would still compile, still validate, and quietly install a different Exit.
+    ///
+    /// The field *set* is guarded by the compiler instead — `From` is written exhaustively in both
+    /// directions, so neither struct can grow a field the other lacks.
+    #[test]
+    fn pix_reconstructor_mirror_matches_the_protocol_defaults() {
+        assert_eq!(
+            SsaReconstructorConfig::default(),
+            SsaReconstructorConfig::from(PixReconstructorConfig::default()),
+            "the operator-facing mirror and the reconstructor it configures have drifted apart"
+        );
+    }
+
     /// Each dimension range is satisfiable on its own well past anything measured, so the product
     /// needs its own bound.
     ///
@@ -966,6 +1115,29 @@ mod tests {
         assert_eq!(5, cfg.pix.max_ssas_per_request);
         assert_eq!(5, cfg.incoming_session_pix_config.ssas_per_request);
         cfg.validate().expect("a matched pair of batch knobs must validate");
+
+        // Same defect one struct down: every Exit-side reconstructor dial used to be unreachable
+        // because both production constructors took `SsaReconstructorConfig::default()`. The
+        // durations must come through `humantime_serde` rather than as a struct of secs/nanos.
+        let json = r#"{
+            "pix": { "reconstructor": { "max_ack_await_time": "45s", "max_tracked_peers": 500 } }
+        }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("reconstructor config must deserialize");
+        assert_eq!(Duration::from_secs(45), cfg.pix.reconstructor.max_ack_await_time);
+        assert_eq!(500, cfg.pix.reconstructor.max_tracked_peers);
+        assert_eq!(
+            PixReconstructorConfig::default().unused_verifier_lifetime,
+            cfg.pix.reconstructor.unused_verifier_lifetime,
+            "unspecified reconstructor fields must fall back to their defaults"
+        );
+        cfg.validate().expect("a narrowed reconstructor must validate");
+
+        // And it must reach the reconstructor, not merely parse: the conversion is what the two
+        // production constructors consume.
+        assert_eq!(
+            Duration::from_secs(45),
+            SsaReconstructorConfig::from(cfg.pix.reconstructor).max_ack_await_time
+        );
     }
 
     /// Both SSA batch knobs are bounded by [`MAX_SSA_BATCH_SIZE`], and the `range` attribute on
