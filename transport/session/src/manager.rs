@@ -2939,11 +2939,12 @@ where
             ))
         })??;
 
-        let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
-
         if ssa_client_commitment_state.deposit_address_first_encountered
             && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
         {
+            // Inside the guard on purpose: every other `SsaCommit` of a cycle takes the other branch,
+            // so allocating this before the `if` built and dropped a channel per message.
+            let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
             let slot_clone = session_slot.clone();
             // Scaled by the batch size for the same reason the kill switch is, and it has to be: this
             // awaiter is the *only* thing that aborts `PixKillSwitch(ssa_index)`. If it gave up after
