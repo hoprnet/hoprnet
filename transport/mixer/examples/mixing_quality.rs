@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use futures::StreamExt;
 use futures_timer::Delay;
-use hopr_transport_mixer::{MixerConfig, MixerType, PoissonConfig, poisson_channel};
+use hopr_transport_mixer::{MixerConfig, MixerType, PoissonConfig, PoissonDelay, poisson_channel};
 
 const COUNT: usize = 20_000;
 /// ~10k msg/s ingress — the top of the target regime.
@@ -28,12 +28,12 @@ fn percentile(sorted_ms: &[f64], p: f64) -> f64 {
     sorted_ms[idx]
 }
 
-/// A dedicated-thread Poisson config with an explicit mean, hard cap, and jitter.
-fn poisson_cfg(target_mean_delay: Duration, max_cap: Duration, cap_jitter: Duration) -> MixerConfig {
+/// A dedicated-thread Poisson config with the given delay anchor, percentile, and jitter.
+fn poisson_cfg(delay: PoissonDelay, cap_percentile: f64, cap_jitter: Duration) -> MixerConfig {
     MixerConfig {
         mixer_type: MixerType::Poisson(PoissonConfig {
-            max_cap,
-            target_mean_delay,
+            delay,
+            cap_percentile,
             cap_jitter,
             ..PoissonConfig::default()
         }),
@@ -43,10 +43,10 @@ fn poisson_cfg(target_mean_delay: Duration, max_cap: Duration, cap_jitter: Durat
 
 fn run_scenario(label: &str, cfg: MixerConfig) {
     let (cap_ms, mean_ms) = match cfg.mixer_type {
-        MixerType::Poisson(pc) => (
-            pc.max_cap.as_secs_f64() * 1000.0,
-            pc.target_mean_delay.as_secs_f64() * 1000.0,
-        ),
+        MixerType::Poisson(pc) => {
+            let (cap, mean) = pc.delay.resolve(pc.cap_percentile);
+            (cap.as_secs_f64() * 1000.0, mean.as_secs_f64() * 1000.0)
+        }
         #[allow(unreachable_patterns)]
         _ => (0.0, 0.0),
     };
@@ -119,24 +119,26 @@ fn main() {
         1.0 / SEND_SPACING.as_secs_f64() / 1000.0
     );
 
-    // Mean fixed at 10 ms via explicit override; vary only the hard cap.
+    // Anchor the mean at 10 ms and vary the cap via the percentile.
     let mean = Duration::from_millis(10);
     let default_jitter = Duration::from_millis(2);
 
+    // mean 10 ms, cap 20 ms ⇒ 1 - e^(-20/10) ≈ 86.5th percentile.
     run_scenario(
-        "mean 10 ms, cap 20 ms (default delay_range)",
-        poisson_cfg(mean, Duration::from_millis(20), default_jitter),
+        "mean 10 ms, cap ~20 ms",
+        poisson_cfg(PoissonDelay::Mean(mean), 0.865, default_jitter),
     );
 
+    // mean 10 ms, cap 100 ms ⇒ ~99.995th percentile (relaxed cap, negligible truncation).
     run_scenario(
-        "mean 10 ms, cap 100 ms (relaxed)",
-        poisson_cfg(mean, Duration::from_millis(100), default_jitter),
+        "mean 10 ms, cap ~100 ms (relaxed)",
+        poisson_cfg(PoissonDelay::Mean(mean), 0.99995, default_jitter),
     );
 
-    // 98% within a 20 ms cap ⇒ mean = 20 / ln(50) ≈ 5.11 ms. Jitter off so the ~2% truncated
-    // mass lands exactly at the cap and is countable.
+    // Cap 20 ms at the 98th percentile ⇒ mean ≈ 5.11 ms, ~2% force-released. Jitter off so the
+    // truncated mass lands exactly at the cap and is countable.
     run_scenario(
-        "98% within 20 ms: mean 5.11 ms, cap 20 ms, no jitter",
-        poisson_cfg(Duration::from_micros(5113), Duration::from_millis(20), Duration::ZERO),
+        "cap 20 ms @ 98%: mean ~5.11 ms, no jitter",
+        poisson_cfg(PoissonDelay::Cap(Duration::from_millis(20)), 0.98, Duration::ZERO),
     );
 }

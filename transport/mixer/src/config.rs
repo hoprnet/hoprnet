@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
 pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
@@ -8,9 +8,8 @@ pub const HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
-/// Percentile of packets released before the Poisson hard cap (`max_cap`) when the mean is
-/// derived rather than set explicitly: `mean = max_cap / ln(1 / (1 - CAP_PERCENTILE))`. At the
-/// default 20 ms cap this gives a ~4.3 ms mean, i.e. ~99% release before the cap.
+/// Default fraction of packets released before the Poisson hard cap. Fixes the cap:mean ratio
+/// (`mean = cap / ln(1 / (1 - p))`), so at the default 20 ms cap the mean is ~4.3 ms.
 pub const HOPR_MIXER_CAP_PERCENTILE: f64 = 0.99;
 pub const HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS: u64 = 2;
 pub const HOPR_MIXER_DEFAULT_MIN_MIX_OCCUPANCY: usize = 5;
@@ -22,8 +21,19 @@ fn default_metric_delay_window() -> u64 {
     HOPR_MIXER_DELAY_METRIC_WINDOW
 }
 #[cfg(feature = "serde")]
-fn default_max_cap() -> Duration {
-    Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS)
+fn default_cap_percentile() -> f64 {
+    HOPR_MIXER_CAP_PERCENTILE
+}
+/// Reject a release percentile outside the open interval `(0, 1)`; the endpoints make the
+/// cap:mean ratio zero or infinite.
+fn validate_cap_percentile(percentile: f64) -> Result<(), ValidationError> {
+    if percentile > 0.0 && percentile < 1.0 {
+        Ok(())
+    } else {
+        Err(ValidationError::new(
+            "cap_percentile must be in the open interval (0, 1)",
+        ))
+    }
 }
 #[cfg(feature = "serde")]
 fn default_cap_jitter() -> Duration {
@@ -50,7 +60,7 @@ fn default_saturation_min_mean() -> Duration {
 ///
 /// Fields here apply to all engines; per-engine tuning lives in [`MixerType`], whose active
 /// variant also selects which engine [`crate::create`] instantiates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MixerConfig {
     /// Preallocated buffer capacity; more items may still be inserted, triggering reallocation.
@@ -90,9 +100,9 @@ impl MixerConfig {
             #[cfg(feature = "uniform-channel")]
             MixerType::Uniform(uniform) => uniform.min_delay.saturating_add(uniform.delay_range),
             #[cfg(feature = "poisson")]
-            MixerType::Poisson(poisson) => poisson.max_cap,
+            MixerType::Poisson(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
             #[cfg(feature = "poisson-shared")]
-            MixerType::PoissonShared(poisson) => poisson.max_cap,
+            MixerType::PoissonShared(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
             #[allow(unreachable_patterns)]
             _ => Duration::ZERO,
         }
@@ -112,7 +122,7 @@ impl MixerConfig {
 /// Engine-specific mixer configuration; the active variant selects the engine.
 ///
 /// Each variant is gated on the feature of the implementation it configures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MixerType {
     /// Uniform-delay min-heap channel.
@@ -178,25 +188,55 @@ pub struct UniformConfig {
     pub delay_range: Duration,
 }
 
+/// Which of the two bound quantities (hard cap / mean) the operator fixes; the other is derived
+/// from it and [`PoissonConfig::cap_percentile`] via `mean = cap / ln(1 / (1 - percentile))`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PoissonDelay {
+    /// Hard latency cap; the mean is derived so `cap_percentile` of packets release before it.
+    Cap(#[cfg_attr(feature = "serde", serde(with = "humantime_serde"))] Duration),
+    /// Mean holding delay; the hard cap is derived so `cap_percentile` of packets release before it.
+    Mean(#[cfg_attr(feature = "serde", serde(with = "humantime_serde"))] Duration),
+}
+
+impl Default for PoissonDelay {
+    fn default() -> Self {
+        PoissonDelay::Cap(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS))
+    }
+}
+
+impl PoissonDelay {
+    /// Resolve to `(hard_cap, mean)`, deriving the unspecified quantity at `percentile`.
+    /// A non-`(0, 1)` percentile (rejected by validation) degrades gracefully to zeros.
+    pub fn resolve(&self, percentile: f64) -> (Duration, Duration) {
+        let factor = (1.0 / (1.0 - percentile)).ln();
+        if !factor.is_finite() || factor <= 0.0 {
+            return match *self {
+                PoissonDelay::Cap(cap) => (cap, Duration::ZERO),
+                PoissonDelay::Mean(mean) => (Duration::ZERO, mean),
+            };
+        }
+        match *self {
+            PoissonDelay::Cap(cap) => (cap, Duration::from_secs_f64(cap.as_secs_f64() / factor)),
+            PoissonDelay::Mean(mean) => (Duration::from_secs_f64(mean.as_secs_f64() * factor), mean),
+        }
+    }
+}
+
 /// Tuning parameters for the exponential (Poisson) release engines.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
+#[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PoissonConfig {
-    /// Hard latency cap: no packet waits longer than this, and the derived mean places
-    /// [`HOPR_MIXER_CAP_PERCENTILE`] (~99%) of releases within it.
-    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS))]
-    #[cfg_attr(feature = "serde", serde(default = "default_max_cap", with = "humantime_serde"))]
-    pub max_cap: Duration,
-    /// Explicit mean holding delay.
-    ///
-    /// The default `0` is a sentinel meaning "derive": the mean is computed from `max_cap` and
-    /// [`HOPR_MIXER_CAP_PERCENTILE`] as `max_cap / ln(1 / (1 - percentile))` (~4.3 ms at the
-    /// 20 ms default cap), so operators get a sensible mean without hand-tuning. Set a non-zero
-    /// value to override it — but keep it well below the cap, since a mean at or above the cap
-    /// collapses the exponential holding time onto the deterministic hard-cap release.
-    #[default(Duration::from_millis(0))]
-    #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
-    pub target_mean_delay: Duration,
+    /// Fixes either the hard cap or the mean; the other is derived (see [`PoissonDelay`]).
+    #[default(_code = "PoissonDelay::default()")]
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub delay: PoissonDelay,
+    /// Fraction of packets released before the hard cap, fixing the cap:mean ratio. Must be in
+    /// `(0, 1)`.
+    #[default(HOPR_MIXER_CAP_PERCENTILE)]
+    #[cfg_attr(feature = "serde", serde(default = "default_cap_percentile"))]
+    #[validate(custom(function = "validate_cap_percentile"))]
+    pub cap_percentile: f64,
     /// Width of the window over which hard-cap force-releases are smeared, removing the
     /// deterministic release instant at exactly the cap.
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_CAP_JITTER_IN_MS))]

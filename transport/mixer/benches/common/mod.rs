@@ -6,7 +6,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig};
+use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig, PoissonDelay};
 
 pub const SAMPLE_SIZE: usize = 10;
 
@@ -21,7 +21,7 @@ pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPc
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
     MixerConfig {
         mixer_type: MixerType::Poisson(PoissonConfig {
-            max_cap: std::time::Duration::from_millis(1),
+            delay: PoissonDelay::Cap(std::time::Duration::from_millis(1)),
             ..PoissonConfig::default()
         }),
         ..MixerConfig::default()

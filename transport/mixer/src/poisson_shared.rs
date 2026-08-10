@@ -268,17 +268,17 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::config::{MixerType, PoissonConfig};
+    use crate::config::{MixerType, PoissonConfig, PoissonDelay};
 
     const CAP: Duration = Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS);
     const LEEWAY: Duration = Duration::from_millis(500);
 
-    /// Config selecting the shared-pool engine with an explicit hard cap and mean.
-    fn shared_cfg(max_cap: Duration, target_mean_delay: Duration) -> MixerConfig {
+    /// Config selecting the shared-pool engine with the given delay anchor and percentile.
+    fn shared_cfg(delay: PoissonDelay, cap_percentile: f64) -> MixerConfig {
         MixerConfig {
             mixer_type: MixerType::PoissonShared(PoissonConfig {
-                max_cap,
-                target_mean_delay,
+                delay,
+                cap_percentile,
                 ..PoissonConfig::default()
             }),
             ..MixerConfig::default()
@@ -318,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn poisson_shared_should_mix_under_load() -> anyhow::Result<()> {
         const N: usize = 3000;
-        let cfg = shared_cfg(Duration::from_millis(100), Duration::from_millis(10));
+        let cfg = shared_cfg(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
         let (tx, mut rx) = poisson_shared_channel::<(u32, Instant)>(cfg);
 
         let recv = tokio::spawn(async move {
@@ -389,7 +389,7 @@ mod tests {
     #[tokio::test]
     async fn shared_passthrough_should_preserve_order() -> anyhow::Result<()> {
         const ITERATIONS: usize = 32;
-        let (tx, rx) = poisson_shared_channel(shared_cfg(Duration::ZERO, Duration::ZERO));
+        let (tx, rx) = poisson_shared_channel(shared_cfg(PoissonDelay::Cap(Duration::ZERO), 0.99));
 
         let input = (0..ITERATIONS as u32).collect::<Vec<_>>();
         for i in input.iter() {

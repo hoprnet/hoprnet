@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use hopr_types::crypto_random;
 
-use crate::config::{HOPR_MIXER_CAP_PERCENTILE, MixerConfig, PoissonConfig};
+use crate::config::{MixerConfig, PoissonConfig};
 
 /// Idle heartbeat when the pool is empty, so an engine periodically notices a dropped receiver
 /// and can shut down instead of parking forever. Both engines use it as the initial timer.
@@ -34,16 +34,17 @@ pub(crate) struct PoissonParams {
 
 impl PoissonParams {
     pub(crate) fn new(cfg: &MixerConfig, poisson: &PoissonConfig) -> Self {
+        // The cap and mean are bound by the percentile; the config fixes one and derives the other.
+        let (cap, mean) = poisson.delay.resolve(poisson.cap_percentile);
         Self {
-            // The Poisson hard cap is its own `max_cap`; there is no min-delay floor.
-            cap: poisson.max_cap,
+            cap,
             // Clamp to the cap: `sweep` has no separate `age >= cap` check, so a `cap_jitter`
             // larger than the cap would push `cap_deadline` past the hard latency bound.
-            cap_jitter: poisson.cap_jitter.min(poisson.max_cap),
+            cap_jitter: poisson.cap_jitter.min(cap),
             min_mix_occupancy: poisson.min_mix_occupancy,
             high_watermark: poisson.high_watermark,
             capacity: cfg.capacity,
-            mean: derive_mean(poisson.max_cap, poisson.target_mean_delay),
+            mean,
             saturation_min_mean: poisson.saturation_min_mean,
             tick_floor: poisson.tick_floor,
             metric_delay_window: cfg.metric_delay_window,
@@ -107,20 +108,6 @@ fn release_probability(delta: Duration, mean: Duration) -> f64 {
         return 1.0;
     }
     1.0 - (-delta.as_secs_f64() / mean).exp()
-}
-
-/// Explicit `target` when set, else derived from `max_cap` so [`HOPR_MIXER_CAP_PERCENTILE`] of
-/// packets release before the cap: `mean = max_cap / ln(1 / (1 - percentile))`.
-fn derive_mean(max_cap: Duration, target: Duration) -> Duration {
-    if !target.is_zero() {
-        return target;
-    }
-    let cap = max_cap.as_secs_f64();
-    let factor = (1.0 / (1.0 - HOPR_MIXER_CAP_PERCENTILE)).ln();
-    if cap <= 0.0 || factor <= 0.0 {
-        return Duration::ZERO;
-    }
-    Duration::from_secs_f64(cap / factor)
 }
 
 /// Next wake from the current occupancy and the earliest still-buffered enqueue instant (from
@@ -277,6 +264,7 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
+    use crate::config::PoissonDelay;
 
     // The stochastic property tests are parameterized over the realistic 1–10 MB/s operating
     // range via `#[values(1.0, 5.0, 10.0)]`.
@@ -299,9 +287,11 @@ mod tests {
     /// Params with a cap ≈ 30 means, so truncation (`e^-30`) is negligible and shape assertions
     /// see the true exponential.
     fn untruncated_params(mean: Duration) -> PoissonParams {
+        // Anchor the mean and push the cap far out (99.99th percentile ⇒ cap ≈ 9.2·mean), so
+        // truncation is ~0.01% and shape assertions see the true exponential.
         params(PoissonConfig {
-            max_cap: mean * 30,
-            target_mean_delay: mean,
+            delay: PoissonDelay::Mean(mean),
+            cap_percentile: 0.9999,
             ..PoissonConfig::default()
         })
     }
@@ -323,7 +313,7 @@ mod tests {
     #[test]
     fn passthrough_should_preserve_order() -> anyhow::Result<()> {
         let params = params(PoissonConfig {
-            max_cap: Duration::ZERO,
+            delay: PoissonDelay::Cap(Duration::ZERO),
             ..PoissonConfig::default()
         });
         let mut pool: Vec<Entry<u32>> = (0..8).map(|i| entry(i, Duration::ZERO)).collect();
@@ -548,13 +538,13 @@ mod tests {
     }
 
     #[test]
-    fn derived_mean_should_leave_two_percent_at_cap() -> anyhow::Result<()> {
-        // mean = cap / ln(1/(1-0.98)) = 20 / ln(50) ≈ 5.11 ms should leave ~2% of packets to
-        // be force-released at the 20 ms cap (i.e. 98% leave naturally within the cap).
+    fn cap_percentile_should_fix_the_force_release_fraction() -> anyhow::Result<()> {
+        // By construction, exactly `1 - cap_percentile` of packets are force-released at the cap.
+        // Cap 20 ms at the 98th percentile ⇒ mean = 20 / ln(50) ≈ 5.11 ms and ~2% at the cap.
         // Jitter off so the truncated mass lands exactly at the cap and is countable.
         let params = params(PoissonConfig {
-            max_cap: Duration::from_millis(20),
-            target_mean_delay: Duration::from_micros(5113),
+            delay: PoissonDelay::Cap(Duration::from_millis(20)),
+            cap_percentile: 0.98,
             cap_jitter: Duration::ZERO,
             ..PoissonConfig::default()
         });
@@ -772,34 +762,34 @@ mod tests {
     }
 
     #[test]
-    fn derived_mean_should_be_the_cap_over_the_percentile_factor() {
-        // target_mean_delay = 0 ⇒ derive: max_cap 20 ms, 99th percentile ⇒ 20 / ln(100) ≈ 4.34 ms.
+    fn cap_anchor_should_derive_the_mean_at_the_percentile() {
+        // Cap 20 ms at the 99th percentile ⇒ mean = 20 / ln(100) ≈ 4.34 ms.
         let params = params(PoissonConfig {
-            max_cap: Duration::from_millis(20),
-            target_mean_delay: Duration::ZERO,
+            delay: PoissonDelay::Cap(Duration::from_millis(20)),
             ..PoissonConfig::default()
         });
         assert!((params.mean.as_secs_f64() * 1000.0 - 4.34).abs() < 0.1);
     }
 
     #[test]
+    fn mean_anchor_should_derive_the_cap_at_the_percentile() {
+        // Mean 10 ms at the 99th percentile ⇒ cap = 10 * ln(100) ≈ 46 ms.
+        let params = params(PoissonConfig {
+            delay: PoissonDelay::Mean(Duration::from_millis(10)),
+            ..PoissonConfig::default()
+        });
+        assert_eq!(params.mean, Duration::from_millis(10));
+        assert!((params.cap.as_secs_f64() * 1000.0 - 46.05).abs() < 0.2);
+    }
+
+    #[test]
     fn cap_jitter_should_be_clamped_to_the_cap() {
         // A cap_jitter larger than the cap must not push the hard-cap deadline past the cap.
         let params = params(PoissonConfig {
-            max_cap: Duration::from_millis(20),
+            delay: PoissonDelay::Cap(Duration::from_millis(20)),
             cap_jitter: Duration::from_secs(1),
             ..PoissonConfig::default()
         });
         assert!(params.cap_jitter <= params.cap);
-    }
-
-    #[test]
-    fn explicit_target_mean_should_override_derivation() {
-        let params = params(PoissonConfig {
-            max_cap: Duration::from_millis(20),
-            target_mean_delay: Duration::from_millis(10),
-            ..PoissonConfig::default()
-        });
-        assert_eq!(params.mean, Duration::from_millis(10));
     }
 }

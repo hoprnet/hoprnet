@@ -33,7 +33,7 @@ pub mod poisson_shared;
 
 #[cfg(feature = "uniform-channel")]
 pub use channel::channel;
-pub use config::{MixerConfig, MixerType, PoissonConfig};
+pub use config::{MixerConfig, MixerType, PoissonConfig, PoissonDelay};
 #[cfg(any(feature = "uniform-channel", feature = "poisson", feature = "poisson-shared"))]
 pub use dispatch::{AnyReceiver, AnySender, create};
 pub use error::SenderError;
