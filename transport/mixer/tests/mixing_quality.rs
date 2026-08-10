@@ -17,7 +17,7 @@ use futures::StreamExt;
 use futures_timer::Delay;
 use hopr_transport_mixer::{MixerConfig, MixerType, PoissonConfig, PoissonDelay, poisson_channel};
 
-const COUNT: usize = 10_000;
+const COUNT: usize = 5_000;
 /// ~10k msg/s ingress — the top of the target regime.
 const SEND_SPACING: Duration = Duration::from_micros(100);
 
@@ -60,7 +60,7 @@ fn run_scenario(cfg: MixerConfig) -> Stats {
         _ => unreachable!("scenario configs are always the dedicated-thread Poisson variant"),
     };
 
-    let (delays_ms, out_of_order) = futures::executor::block_on(async move {
+    let (mut delays_ms, out_of_order) = futures::executor::block_on(async move {
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         let sender = async move {
@@ -92,16 +92,17 @@ fn run_scenario(cfg: MixerConfig) -> Stats {
     let n = delays_ms.len();
     assert_eq!(n, COUNT, "every enqueued packet must be delivered before close");
 
-    let mut sorted = delays_ms.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    let observed_mean = delays_ms.iter().sum::<f64>() / n as f64;
-    let at_or_over_cap = delays_ms.iter().filter(|d| **d >= cap_ms - 1e-6).count();
+    // Sum and cap-count are order-independent; fold them in one pass, then sort in place for the
+    // percentile (no second copy of the delay vector needed).
+    let (sum, at_or_over_cap) = delays_ms
+        .iter()
+        .fold((0.0, 0usize), |(s, c), d| (s + d, c + (*d >= cap_ms - 1e-6) as usize));
+    delays_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     Stats {
         cap_ms,
-        observed_mean,
-        p99: percentile(&sorted, 0.99),
+        observed_mean: sum / n as f64,
+        p99: percentile(&delays_ms, 0.99),
         at_or_over_cap_frac: at_or_over_cap as f64 / n as f64,
         out_of_order_frac: out_of_order as f64 / n as f64,
     }

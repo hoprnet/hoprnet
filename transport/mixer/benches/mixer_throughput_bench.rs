@@ -41,11 +41,12 @@ fn send_continuous_stream_load(item: &str, iterations: usize, _cfg: MixerConfig)
     Box::pin(async move {
         let (tx, rx) = futures::channel::mpsc::unbounded();
 
-        // Baseline: a raw `then_concurrent` stream applying the same minimal (1 ms) hold as
-        // `minimal_delay_mixer_cfg`, isolating the per-item overhead from the mixer machinery.
+        // Baseline floor: a raw `then_concurrent` stream with no artificial hold, so it measures
+        // the plumbing overhead alone — the counterpart of `minimal_delay_mixer_cfg`, whose
+        // near-passthrough config the real mixer variants run against.
         let mut rx = rx.then_concurrent(
             |v| async move {
-                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                tokio::time::sleep(std::time::Duration::ZERO).await;
 
                 v
             },

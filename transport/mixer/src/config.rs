@@ -93,11 +93,7 @@ impl MixerConfig {
     #[cfg(feature = "poisson")]
     pub fn new_poisson(delay: PoissonDelay, cap_percentile: f64) -> Self {
         Self {
-            mixer_type: MixerType::Poisson(PoissonConfig {
-                delay,
-                cap_percentile,
-                ..PoissonConfig::default()
-            }),
+            mixer_type: MixerType::Poisson(Self::poisson_config(delay, cap_percentile)),
             ..Self::default()
         }
     }
@@ -106,12 +102,19 @@ impl MixerConfig {
     #[cfg(feature = "poisson-shared")]
     pub fn new_poisson_shared(delay: PoissonDelay, cap_percentile: f64) -> Self {
         Self {
-            mixer_type: MixerType::PoissonShared(PoissonConfig {
-                delay,
-                cap_percentile,
-                ..PoissonConfig::default()
-            }),
+            mixer_type: MixerType::PoissonShared(Self::poisson_config(delay, cap_percentile)),
             ..Self::default()
+        }
+    }
+
+    /// The shared [`PoissonConfig`] body for both Poisson engine constructors (defaults except the
+    /// given anchor and percentile), so the two variants cannot drift apart.
+    #[cfg(feature = "poisson")]
+    fn poisson_config(delay: PoissonDelay, cap_percentile: f64) -> PoissonConfig {
+        PoissonConfig {
+            delay,
+            cap_percentile,
+            ..PoissonConfig::default()
         }
     }
 
