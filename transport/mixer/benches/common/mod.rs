@@ -13,10 +13,10 @@ pub const SAMPLE_SIZE: usize = 10;
 /// 512 characters long string of random gibberish.
 pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
-/// A near-passthrough config (1 ms cap) so the benchmark measures the channel's per-message
-/// overhead rather than the mixing delay. The `Poisson` variant is read by both Poisson engines
-/// (via `PoissonParams::from_mixer`); the uniform channel sees no `Uniform` config and so applies
-/// zero delay — equally minimal for a throughput measurement.
+/// A near-passthrough Poisson config (1 ms cap) so the Poisson-engine benchmarks measure the
+/// per-message overhead rather than the mixing delay. Read by both Poisson engines via
+/// `PoissonParams::from_mixer`. The uniform-engine benchmarks use their own zero-delay
+/// `MixerConfig::new_uniform` config instead of relying on this one.
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
     MixerConfig {

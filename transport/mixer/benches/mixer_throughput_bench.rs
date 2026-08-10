@@ -85,7 +85,8 @@ fn send_continuous_sink_load(item: &'static str, iterations: usize, cfg: MixerCo
 pub fn mixer_sink_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
-        minimal_delay_mixer_cfg(),
+        // Zero-delay uniform config so the sink measures per-message overhead, not the delay.
+        MixerConfig::new_uniform(std::time::Duration::ZERO, std::time::Duration::ZERO),
         "mixer_sink",
         &[
             10 * 1024 * 2 * RANDOM_GIBBERISH.len(),
@@ -116,7 +117,8 @@ fn reused_channel_group(c: &mut Criterion) -> criterion::BenchmarkGroup<'_, crit
 }
 
 pub fn mixer_channel_throughput_reused(c: &mut Criterion) {
-    let cfg = minimal_delay_mixer_cfg();
+    // Zero-delay uniform config so the channel measures per-message overhead, not the delay.
+    let cfg = MixerConfig::new_uniform(std::time::Duration::ZERO, std::time::Duration::ZERO);
     // Built once, before any benchmarking: runtime + channel, shared across every size/sample.
     let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
     let (tx, rx) = channel::<&'static str>(cfg);

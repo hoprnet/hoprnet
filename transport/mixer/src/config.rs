@@ -112,8 +112,8 @@ impl MixerConfig {
     }
 
     /// Packet window over which the `hopr_mixer_average_packet_delay` EMA is smoothed. Sized to
-    /// [`HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR`]× the active engine's [`Self::nominal_max_delay`]
-    /// in ms (floored at 1), so the smoothing tracks the configured delay instead of a constant.
+    /// [`HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR`]× the active engine's nominal max delay in ms
+    /// (floored at 1), so the smoothing tracks the configured delay instead of a constant.
     pub fn metric_delay_window(&self) -> u64 {
         (HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR * self.nominal_max_delay().as_millis() as u64).max(1)
     }
@@ -135,18 +135,15 @@ impl MixerConfig {
 
     /// The uniform engine's config, so the uniform channel and sink can obtain their
     /// `random_delay` bounds. When the active engine is not `Uniform` (a config built for a
-    /// Poisson engine but fed to a uniform primitive), this yields zero delay rather than the
-    /// uniform default range — preserving the historical "no Uniform config ⇒ no delay" contract.
+    /// Poisson engine but fed to a uniform primitive), it falls back to the uniform defaults so
+    /// the uniform channel still applies its usual mixing delay rather than degenerating to zero.
     #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     pub(crate) fn uniform_config(&self) -> UniformConfig {
         match self.mixer_type {
             #[cfg(feature = "uniform-channel")]
             MixerType::Uniform(uniform) => uniform,
             #[allow(unreachable_patterns)]
-            _ => UniformConfig {
-                min_delay: Duration::ZERO,
-                delay_range: Duration::ZERO,
-            },
+            _ => UniformConfig::default(),
         }
     }
 }
