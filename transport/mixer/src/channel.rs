@@ -17,7 +17,7 @@ use tracing::trace;
 
 pub use crate::error::SenderError;
 #[cfg(all(feature = "telemetry", not(test)))]
-use crate::metrics::{METRIC_MIXER_AVERAGE_DELAY, METRIC_QUEUE_SIZE};
+use crate::metrics::METRIC_QUEUE_SIZE;
 use crate::{config::MixerConfig, data::DelayedData};
 
 /// Mixing and delaying channel using random delay function.
@@ -115,11 +115,7 @@ impl<T> Sender<T> {
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_QUEUE_SIZE.increment(1.0f64);
-
-            let weight = 1.0f64 / channel.cfg.metric_delay_window as f64;
-            METRIC_MIXER_AVERAGE_DELAY.set(
-                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-            );
+            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, channel.cfg.metric_delay_window);
         }
 
         Ok(())
@@ -273,7 +269,8 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_QUEUE_SIZE);
-        lazy_static::initialize(&METRIC_MIXER_AVERAGE_DELAY);
+        lazy_static::initialize(&crate::metrics::METRIC_MIXER_AVERAGE_DELAY);
+        lazy_static::initialize(&crate::metrics::METRIC_MIXER_PACKET_DELAY);
     }
 
     let mut buffer = BinaryHeap::new();

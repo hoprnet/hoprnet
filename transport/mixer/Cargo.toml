@@ -32,9 +32,9 @@ poisson = ["dep:async-channel", "futures/executor"]
 # dedicated thread or relay channels). Faster than `poisson`, but without thread isolation.
 poisson-shared = ["poisson", "dep:parking_lot"]
 # Uniform-delay min-heap channel — `channel`.
-uniform-channel = ["dep:parking_lot", "dep:tracing"]
+uniform-channel = ["dep:parking_lot"]
 # Uniform-delay `Sink` adapter — `MixerSink`.
-uniform-adapter = ["dep:tracing"]
+uniform-adapter = []
 telemetry = ["hopr-types/telemetry", "dep:lazy_static"]
 serde = ["dep:serde", "dep:humantime-serde"]
 
@@ -48,7 +48,7 @@ parking_lot = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true, optional = true }
+tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-types = { workspace = true, features = ["random"] }

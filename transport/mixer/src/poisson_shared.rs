@@ -193,14 +193,17 @@ impl<T: Unpin> Stream for Receiver<T> {
 
             match next {
                 Next::Released => {
-                    for (_delay, item) in this.scratch.drain(..) {
-                        // Feed realized delay into the same EMA gauge the dedicated engine uses,
-                        // so switching to the shared engine doesn't flatline the dashboards.
+                    for (delay, item) in this.scratch.drain(..) {
+                        tracing::trace!(delay_ms = delay.as_millis() as u64, "mixer released packet");
+                        // Same delay metrics as the dedicated engine, so switching engines doesn't
+                        // flatline the dashboards.
                         #[cfg(all(feature = "telemetry", not(test)))]
-                        crate::metrics::record_average_delay(
-                            _delay.as_millis() as f64,
+                        crate::metrics::record_packet_delay(
+                            delay.as_millis() as f64,
                             this.shared.params.metric_delay_window,
                         );
+                        #[cfg(not(all(feature = "telemetry", not(test))))]
+                        let _ = delay;
                         this.ready.push_back(item);
                     }
                     continue;

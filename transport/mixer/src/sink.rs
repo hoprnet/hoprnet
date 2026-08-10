@@ -11,7 +11,7 @@ use futures_timer::Delay;
 use tracing::trace;
 
 #[cfg(all(feature = "telemetry", not(test)))]
-use crate::metrics::{METRIC_MIXER_AVERAGE_DELAY, METRIC_QUEUE_SIZE};
+use crate::metrics::METRIC_QUEUE_SIZE;
 use crate::{config::MixerConfig, data::DelayedData};
 
 /// A [`Sink`] adapter that applies random delays to items before forwarding them to an inner sink.
@@ -72,11 +72,7 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_QUEUE_SIZE.increment(1.0f64);
-
-            let weight = 1.0f64 / this.cfg.metric_delay_window as f64;
-            METRIC_MIXER_AVERAGE_DELAY.set(
-                (weight * random_delay.as_millis() as f64) + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-            );
+            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, this.cfg.metric_delay_window);
         }
 
         Ok(())

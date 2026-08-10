@@ -215,8 +215,9 @@ async fn run_engine<T>(
         prev_sweep = now;
         let earliest = pool::sweep(&mut pool, &params, now, delta, &mut released);
         for (realized_delay, item) in released.drain(..) {
+            tracing::trace!(delay_ms = realized_delay.as_millis() as u64, "mixer released packet");
             #[cfg(all(feature = "telemetry", not(test)))]
-            crate::metrics::record_average_delay(realized_delay.as_millis() as f64, params.metric_delay_window);
+            crate::metrics::record_packet_delay(realized_delay.as_millis() as f64, params.metric_delay_window);
             #[cfg(not(all(feature = "telemetry", not(test))))]
             let _ = realized_delay;
 
@@ -254,6 +255,7 @@ pub fn poisson_channel<T: Send + 'static>(cfg: MixerConfig) -> (Sender<T>, Recei
     {
         lazy_static::initialize(&crate::metrics::METRIC_QUEUE_SIZE);
         lazy_static::initialize(&crate::metrics::METRIC_MIXER_AVERAGE_DELAY);
+        lazy_static::initialize(&crate::metrics::METRIC_MIXER_PACKET_DELAY);
     }
 
     let params = PoissonParams::from_mixer(&cfg);
