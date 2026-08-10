@@ -91,7 +91,45 @@ pub struct SsaReconstructorConfig {
     #[default(Self::DEFAULT_EARLY_RECOVERY_THRESHOLD)]
     #[validate(range(min = 0.0, max = 1.0))]
     pub early_recovery_threshold: f64,
+    /// Ceiling on the total live state held in the awaiting-acknowledgement buffer, across every
+    /// peer, in bytes.
+    ///
+    /// This is the *global* bound; [`max_tracked_peers`](Self::max_tracked_peers) and
+    /// [`max_awaiting_acks`](Self::max_awaiting_acks) are per-dimension backstops and their product
+    /// is not one. See [`SsaReconstructor::insert_encrypted_share`] for why the product overstates
+    /// by roughly three thousandfold and why bounding it instead would lose shares.
+    ///
+    /// Enforced at insertion time rather than by validating a workload model. A model has to assume
+    /// a Session count and a packet rate; the node enforces neither — `maximum_managed_sessions`
+    /// validates to 100 000 and `SessionCapability::NoRateControl` removes the rate limiter
+    /// entirely — so a configuration can be perfectly valid and still exceed any modelled budget.
+    /// Counting what is actually held is indifferent to all of that.
+    ///
+    /// Default is 1 GiB, which at [`AWAITING_ACK_ENTRY_BYTES`] is ~2.68 M shares in flight.
+    ///
+    /// The minimum is 25 600 B — 64 entries. That is a sanity floor, not a sizing recommendation:
+    /// its only job is to stop the budget rounding down to a handful of shares. Whether a given
+    /// value is *adequate* depends on the node's traffic, which is exactly the thing this design
+    /// stopped trying to predict, so the floor deliberately does not pretend to encode it. A node
+    /// configured near it will drop shares and say so.
+    #[default(Self::DEFAULT_MAX_ACK_BUFFER_BYTES)]
+    #[validate(range(min = 25_600))]
+    pub max_ack_buffer_bytes: usize,
 }
+
+/// Live heap one entry in the awaiting-acknowledgement buffer costs, in bytes.
+///
+/// **Measured, not derived.** `size_of` accounts for only 145 B of it — a 33 B `HalfKeyChallenge`
+/// key and a 112 B [`TaggedEncryptedPartialSsaShare`] value, both inline arrays — and moka's
+/// per-entry bookkeeping (hash map entry, LRU node, TTL timer-wheel node, the `Arc` around the
+/// value) is the other 244 B. Run `awaiting_ack_entry_cost` in `tests/memory_profile.rs` to
+/// re-derive it; at the time of writing it reports 383 B/entry at 20 000 entries and 389 B/entry at
+/// 100 000. Rounded up, because understating it would let
+/// [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes) be exceeded.
+///
+/// Every entry is this size — the payload is fixed-width inline arrays with no indirection — which
+/// is what lets the runtime bound count entries rather than weigh each one.
+pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 
 /// The defaults, named so that a mirror can share them instead of restating them.
 ///
@@ -106,6 +144,8 @@ impl SsaReconstructorConfig {
     pub const DEFAULT_INCOMPLETE_COMMITMENT_LIFETIME: std::time::Duration = std::time::Duration::from_secs(120);
     /// Default [`max_ack_await_time`](Self::max_ack_await_time).
     pub const DEFAULT_MAX_ACK_AWAIT_TIME: std::time::Duration = std::time::Duration::from_secs(30);
+    /// Default [`max_ack_buffer_bytes`](Self::max_ack_buffer_bytes).
+    pub const DEFAULT_MAX_ACK_BUFFER_BYTES: usize = 1024 * 1024 * 1024;
     /// Default [`max_awaiting_acks`](Self::max_awaiting_acks).
     pub const DEFAULT_MAX_AWAITING_ACKS: usize = 1_000_000;
     /// Default [`max_tracked_peers`](Self::max_tracked_peers).
@@ -262,6 +302,24 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// Tombstone set: SsaIds that have been retired. The commitment completion path checks this
     /// after publishing the cycle, preventing resurrection when `retire_ssa` runs concurrently.
     retired_ssas: moka::sync::Cache<SsaId<S::Pseudonym>, ()>,
+    /// Running estimate of the entries live in [`awaiting_acks`](Self::awaiting_acks), summed over
+    /// every peer, so the global budget costs one relaxed load per insertion.
+    ///
+    /// An *estimate*, and knowingly so — see [`Self::resync_ack_buffer`] for the one drift source
+    /// that cannot be listened for and what keeps it from accumulating.
+    ///
+    /// Behind an `Arc` because each peer's inner cache decrements it from an eviction listener, and
+    /// moka requires those to be `'static` — they cannot borrow the reconstructor that owns them.
+    ack_buffer_entries: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes) in entries, divided
+    /// once here rather than on every insertion.
+    max_ack_buffer_entries: usize,
+    /// When [`resync_ack_buffer`](Self::resync_ack_buffer) last ran, and the lock that keeps two
+    /// from running at once.
+    ///
+    /// `None` until the first run, so a buffer that saturates immediately is not made to wait out
+    /// an interval before its first ground-truth reading.
+    ack_buffer_resync: parking_lot::Mutex<Option<std::time::Instant>>,
     cfg: SsaReconstructorConfig,
 }
 
@@ -360,6 +418,16 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .build(),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
+                // Dropping a peer entry drops its whole inner cache, and dropping a moka handle
+                // does not run that cache's eviction listener — so without this, every entry the
+                // peer still held would stay counted against the global budget forever. Invalidating
+                // routes them through the inner listener instead.
+                //
+                // `run_pending_tasks()` is deliberately not called here: it is unbounded work on
+                // whichever thread happened to trigger maintenance. That leaves the invalidation
+                // best-effort, which is precisely why `resync_ack_buffer` exists — this narrows the
+                // drift, it does not close it.
+                .eviction_listener(|_, shares: EncryptedShareCache<S>, _| shares.invalidate_all())
                 .build(),
             // One bucket per cycle, expiring on the same clock as the shares it belongs to: an ack
             // whose share has left `awaiting_acks` can never be used again, so there is nothing to
@@ -388,6 +456,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             retired_ssas: moka::sync::Cache::builder()
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
+            ack_buffer_entries: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            // At least one, so a budget rounded below one entry refuses everything rather than
+            // dividing to zero and admitting everything.
+            max_ack_buffer_entries: (cfg.max_ack_buffer_bytes / AWAITING_ACK_ENTRY_BYTES).max(1),
+            ack_buffer_resync: parking_lot::Mutex::new(None),
             cfg,
         })
     }
@@ -743,6 +816,87 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         std::mem::take(&mut *ready)
     }
 
+    /// Minimum wall time between two [`resync_ack_buffer`](Self::resync_ack_buffer) passes.
+    ///
+    /// A saturated buffer would otherwise turn every rejected insertion into an
+    /// `O(max_tracked_peers)` scan — the overload path amplifying its own cost, which is the shape
+    /// of bug this budget exists to prevent.
+    ///
+    /// Derived from [`max_ack_await_time`](SsaReconstructorConfig::max_ack_await_time) rather than
+    /// fixed, because what a resync reclaims is entries that have aged out of *that* window. A
+    /// constant would be wrong at both ends: too slow for a short window, so a drained buffer keeps
+    /// refusing shares long after it emptied, and needlessly eager for a long one.
+    ///
+    /// The resulting staleness — up to ~1.9 s at the 30 s default — only bites when the counter has
+    /// drifted high *and* nothing is touching the caches, since redemption and any cache access
+    /// drive moka's expiry maintenance and fire the listener directly. That is the traffic-stopped
+    /// case, where refusing a share costs nothing.
+    fn ack_buffer_resync_interval(&self) -> std::time::Duration {
+        (self.cfg.max_ack_await_time / 16).max(std::time::Duration::from_millis(1))
+    }
+
+    /// Recomputes [`ack_buffer_entries`](Self::ack_buffer_entries) from what the caches actually
+    /// hold.
+    ///
+    /// # Why a counter needs a backstop at all
+    ///
+    /// Entries leave the buffer four ways: redeemed by their acknowledgement, expired, size-evicted
+    /// from their peer's cache, or dropped wholesale when the peer's entry leaves `awaiting_acks`.
+    /// The inner eviction listener catches the first three exactly. The fourth cannot be caught:
+    /// dropping a moka handle does not run its eviction listener, so the outer listener falls back
+    /// to `invalidate_all`, which is best-effort and races an insertion landing on the very cache
+    /// being discarded.
+    ///
+    /// Left alone, that residue only ever accumulates *upward*, and an over-count is far worse than
+    /// an under-count: it would eventually refuse every share while the buffer sat empty, turning a
+    /// memory ceiling into a permanent outage of the acknowledgement path. (The sibling
+    /// `HoprUnacknowledgedTicketProcessor` in `hopr-protocol-hopr` has the same nesting and the same
+    /// residue; there it only skews metrics.)
+    ///
+    /// So the counter is treated as a hint that is allowed to be wrong, and ground truth is
+    /// consulted at the one moment being wrong would cost something — when it says the buffer is
+    /// full. `try_lock` rather than `lock`: a caller that finds a resync already running should
+    /// proceed on the current estimate, not queue up behind it.
+    fn resync_ack_buffer(&self) {
+        let Some(mut last_run) = self.ack_buffer_resync.try_lock() else {
+            return;
+        };
+        if last_run.is_some_and(|at| at.elapsed() < self.ack_buffer_resync_interval()) {
+            return;
+        }
+
+        let held = self.count_ack_buffer_entries();
+        let previous = self.ack_buffer_entries.swap(held, std::sync::atomic::Ordering::Relaxed);
+        *last_run = Some(std::time::Instant::now());
+
+        if previous != held {
+            tracing::debug!(
+                previous,
+                held,
+                "resynchronised the awaiting-acknowledgement buffer count"
+            );
+        }
+    }
+
+    /// Ground truth: the entries actually held across every peer.
+    ///
+    /// Never reads [`ack_buffer_entries`](Self::ack_buffer_entries), so a test asserting the two
+    /// agree is testing the counter rather than agreeing with it — the same reason
+    /// `deferred_ack_count` recomputes from `by_poly` instead of reading `DeferredAcks::total`.
+    ///
+    /// `O(max_tracked_peers)`, and each `run_pending_tasks` is bounded by that cache's pending write
+    /// queue rather than its size. Both callers keep it off the steady-state path.
+    fn count_ack_buffer_entries(&self) -> usize {
+        self.awaiting_acks.run_pending_tasks();
+        self.awaiting_acks
+            .iter()
+            .map(|(_, shares)| {
+                shares.run_pending_tasks();
+                shares.entry_count() as usize
+            })
+            .sum()
+    }
+
     /// The published cycle, if it is still live.
     #[cfg(test)]
     fn cycle(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<std::sync::Arc<SsaCycle<S>>> {
@@ -1048,6 +1202,37 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         Ok(res)
     }
 
+    /// Buffers an encrypted share until its acknowledgement arrives, subject to the global byte
+    /// budget.
+    ///
+    /// # The bound is global, and it is not the product of the two caps
+    ///
+    /// [`max_tracked_peers`](SsaReconstructorConfig::max_tracked_peers) and
+    /// [`max_awaiting_acks`](SsaReconstructorConfig::max_awaiting_acks) bound one dimension each,
+    /// and their product — 2 000 × 1 000 000 by default, some 800 GB — is neither reachable nor the
+    /// right thing to bound. Not reachable, because an entry exists only for a share this node has
+    /// already *sent*, so filling it would take 66 M packets/s of egress inside the default 30 s
+    /// window. Not right, because the two guard **mutually exclusive** concentrations:
+    /// `max_awaiting_acks` sizes one cache per peer and has to cover every Session returning through
+    /// a single first-relayer, while `max_tracked_peers` covers traffic spread thin. Squeezing the
+    /// product would push one of them below what its own case needs, and a `max_awaiting_acks` set
+    /// too low does not save memory — it size-evicts shares before their acknowledgements arrive.
+    ///
+    /// So the real bound is [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes),
+    /// counted here across all peers at once. Validating a workload model instead would not do:
+    /// a model has to assume a Session count and a packet rate, and this node enforces neither.
+    ///
+    /// # Behaviour at the ceiling
+    ///
+    /// The newest share is refused, rather than the oldest evicted: there is no cheap global
+    /// "oldest" across per-peer caches, and the oldest is nearest its TTL anyway. Either way a full
+    /// buffer means share loss — the packet is already on the wire and its acknowledgement will find
+    /// nothing — which is the honest cost of a hard ceiling. [`PixError::AckBufferFull`] is
+    /// deliberately not an expected error so the caller logs it.
+    ///
+    /// The check and the insertion are not atomic. Concurrent inserters can overshoot the ceiling by
+    /// their own number, which is the right trade: a lock on this path would cost more than the few
+    /// hundred kilobytes of overshoot it would prevent.
     fn insert_encrypted_share(
         &self,
         peer: &OffchainPublicKey,
@@ -1058,12 +1243,37 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
             return Err(PixError::ShareIsEmpty);
         }
 
+        // One relaxed load in the steady state. Only a buffer that has actually reached its ceiling
+        // pays for the ground-truth pass, and even then at most one caller at a time does.
+        if self.ack_buffer_entries.load(std::sync::atomic::Ordering::Relaxed) >= self.max_ack_buffer_entries {
+            self.resync_ack_buffer();
+            if self.ack_buffer_entries.load(std::sync::atomic::Ordering::Relaxed) >= self.max_ack_buffer_entries {
+                tracing::error!(
+                    %peer,
+                    budget_bytes = self.cfg.max_ack_buffer_bytes,
+                    "awaiting-acknowledgement buffer is full — dropping share"
+                );
+                return Err(PixError::AckBufferFull);
+            }
+        }
+
+        // Incremented unconditionally, including when this replaces an entry under the same
+        // challenge. The inner listener fires for `Replaced` too, so the pair nets to zero.
+        self.ack_buffer_entries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.awaiting_acks
             .get_with_by_ref(peer, || {
                 // Inner cache keyed by HalfKeyChallenge — each entry gets its own TTL
                 // so a late-arriving share gets the full max_ack_await_time window.
+                let released = self.ack_buffer_entries.clone();
                 moka::sync::CacheBuilder::new(self.cfg.max_awaiting_acks as u64)
                     .time_to_live(self.cfg.max_ack_await_time)
+                    // Every way an entry can leave this cache — redeemed by its acknowledgement,
+                    // expired, or size-evicted — arrives here, which is what keeps the global count
+                    // falling without the removal sites having to know about it.
+                    .eviction_listener(move |_, _, _| {
+                        released.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                    })
                     .build()
             })
             .insert(challenge, tagged_enc_share);
@@ -1197,6 +1407,276 @@ mod tests {
             early_recovery_threshold: 1.5,
             ..Default::default()
         });
+    }
+
+    /// A distinct, insertable share and the acknowledgement that redeems it.
+    ///
+    /// The contents do not matter to the budget — only that each entry has its own key — so this
+    /// skips the generator entirely and builds a `PartialSsaShare::default()` under a fresh
+    /// acknowledgement key.
+    fn budget_share(
+        spi: &SsaPolynomialId<SimplePseudonym>,
+    ) -> anyhow::Result<(HalfKey, HalfKeyChallenge, TaggedEncryptedPartialSsaShare<TestSpec>)> {
+        let ack_key = HalfKey::random();
+        let challenge = ack_key.to_challenge()?;
+        Ok((
+            ack_key,
+            challenge,
+            TaggedEncryptedPartialSsaShare {
+                pseudonym: *spi.pseudonym(),
+                nonce: crypto_traits::elliptic_curve::Scalar::<Secp256k1>::random(&mut hopr_types::crypto_random::rng()),
+                partial_share: PartialSsaShare::default().encrypt(spi, &ack_key)?,
+            },
+        ))
+    }
+
+    /// A reconstructor whose acknowledgement buffer holds exactly `entries`.
+    fn reconstructor_with_ack_budget(entries: usize) -> SsaReconstructor<TestSpec> {
+        SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            max_ack_buffer_bytes: entries * AWAITING_ACK_ENTRY_BYTES,
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn ack_buffer_refuses_shares_past_its_byte_budget() -> anyhow::Result<()> {
+        // The validated minimum, so the budget is the smallest one a real config can ask for.
+        const BUDGET: usize = 64;
+
+        let reconstructor = reconstructor_with_ack_budget(BUDGET);
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
+        let peer = OffchainKeypair::random();
+
+        for i in 0..BUDGET {
+            let (_, challenge, share) = budget_share(&spi)?;
+            reconstructor
+                .insert_encrypted_share(peer.public(), challenge, share)
+                .map_err(|error| anyhow::anyhow!("insertion {i} must fit the budget: {error}"))?;
+        }
+
+        let (_, challenge, share) = budget_share(&spi)?;
+        assert!(
+            matches!(
+                reconstructor.insert_encrypted_share(peer.public(), challenge, share),
+                Err(PixError::AckBufferFull)
+            ),
+            "the share past the budget must be refused rather than buffered"
+        );
+        assert_eq!(
+            BUDGET,
+            reconstructor.count_ack_buffer_entries(),
+            "the buffer must hold exactly its budget — no more, and the refusal must not have dropped any"
+        );
+
+        Ok(())
+    }
+
+    /// Redeeming an acknowledgement must give its budget back.
+    ///
+    /// This is the release path the inner eviction listener exists for: `process_verified_ack`
+    /// calls `remove`, which moka reports as an `Explicit` removal. A listener that only handled
+    /// expiry and size eviction would leak here, and the buffer would fill permanently on a node
+    /// that was working perfectly.
+    #[test]
+    fn redeeming_an_acknowledgement_returns_its_budget() -> anyhow::Result<()> {
+        const BUDGET: usize = 64;
+
+        let reconstructor = reconstructor_with_ack_budget(BUDGET);
+        let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
+        let spi = SsaPolynomialId::new(ssa_id, 0);
+        let peer = OffchainKeypair::random();
+        reconstructor.new_exit_commitment(ssa_id, DEFAULT_POLYS_PER_SSA as usize, DEFAULT_POLY_THRESHOLD as usize)?;
+
+        let mut redeemable = None;
+        for _ in 0..BUDGET {
+            let (ack_key, challenge, share) = budget_share(&spi)?;
+            reconstructor.insert_encrypted_share(peer.public(), challenge, share)?;
+            redeemable = Some((ack_key, challenge));
+        }
+
+        let (ack_key, challenge) = redeemable.expect("the loop ran at least once");
+        let (_, refused, share) = budget_share(&spi)?;
+        assert!(
+            matches!(
+                reconstructor.insert_encrypted_share(peer.public(), refused, share),
+                Err(PixError::AckBufferFull)
+            ),
+            "precondition: the buffer is full"
+        );
+
+        // The cycle is not published, so this defers rather than redeeming — and deliberately
+        // leaves the share in place. Budget must therefore *not* be returned yet.
+        let peer_cache = reconstructor
+            .awaiting_acks
+            .get(peer.public())
+            .expect("the peer holds shares");
+        assert!(matches!(
+            reconstructor.process_verified_ack(ack_key, challenge, &peer_cache),
+            Ok(ProcessedAckResult::VerifierNotReady(_))
+        ));
+        assert_eq!(
+            BUDGET,
+            reconstructor.count_ack_buffer_entries(),
+            "a deferral retains the share, so it must still be charged for"
+        );
+
+        // An outright removal is the redemption path's effect on the buffer.
+        peer_cache.remove(&challenge);
+        assert_eq!(
+            BUDGET - 1,
+            reconstructor.count_ack_buffer_entries(),
+            "redeeming must free the entry"
+        );
+        reconstructor
+            .insert_encrypted_share(peer.public(), refused, share)
+            .map_err(|error| anyhow::anyhow!("the freed slot must be reusable: {error}"))?;
+
+        Ok(())
+    }
+
+    /// Expiry must give budget back too — the release path that runs constantly in production.
+    ///
+    /// Most shares are never acknowledged in the window that matters; they age out. If the TTL did
+    /// not release budget, a busy Exit would fill its buffer once and never accept another share.
+    #[test]
+    fn expiring_shares_return_their_budget() -> anyhow::Result<()> {
+        const BUDGET: usize = 64;
+        const WINDOW: std::time::Duration = std::time::Duration::from_millis(100);
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            max_ack_buffer_bytes: BUDGET * AWAITING_ACK_ENTRY_BYTES,
+            max_ack_await_time: WINDOW,
+            ..Default::default()
+        });
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
+        let peer = OffchainKeypair::random();
+
+        for _ in 0..BUDGET {
+            let (_, challenge, share) = budget_share(&spi)?;
+            reconstructor.insert_encrypted_share(peer.public(), challenge, share)?;
+        }
+        let (_, challenge, share) = budget_share(&spi)?;
+        assert!(
+            matches!(
+                reconstructor.insert_encrypted_share(peer.public(), challenge, share),
+                Err(PixError::AckBufferFull)
+            ),
+            "precondition: the buffer is full"
+        );
+
+        std::thread::sleep(WINDOW * 2);
+
+        // moka expires lazily, so the entries are still charged for until maintenance runs. The
+        // insertion path reaches that through `resync_ack_buffer`, which is what this asserts: a
+        // buffer full of expired shares must let the next one in without any caller intervening.
+        let (_, challenge, share) = budget_share(&spi)?;
+        reconstructor
+            .insert_encrypted_share(peer.public(), challenge, share)
+            .map_err(|error| anyhow::anyhow!("expired entries must free their budget: {error}"))?;
+
+        assert_eq!(
+            1,
+            reconstructor.count_ack_buffer_entries(),
+            "only the share inserted after the window should remain"
+        );
+
+        Ok(())
+    }
+
+    /// The counter is a hint; this asserts it does not become a lying one.
+    ///
+    /// The churn below deliberately includes the drift source no listener can catch — evicting a
+    /// peer's whole entry from `awaiting_acks`, which drops its inner cache rather than draining
+    /// it. Over-counting is the dangerous direction: it would eventually refuse every share while
+    /// the buffer sat empty. `count_ack_buffer_entries` recomputes from the caches instead of
+    /// reading the counter, so this compares the counter against the truth rather than against
+    /// itself.
+    #[test]
+    fn the_ack_buffer_counter_does_not_inflate_as_peers_churn() -> anyhow::Result<()> {
+        const PEERS: usize = 40;
+        const TRACKED: usize = 10;
+        const PER_PEER: usize = 5;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            // Well above anything inserted here: the point is peer churn, not the ceiling.
+            max_ack_buffer_bytes: 4096 * AWAITING_ACK_ENTRY_BYTES,
+            // Forces the outer cache to evict peers — and with them, whole inner caches — four
+            // times over.
+            max_tracked_peers: TRACKED,
+            ..Default::default()
+        });
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
+
+        for _ in 0..PEERS {
+            let peer = OffchainKeypair::random();
+            for _ in 0..PER_PEER {
+                let (_, challenge, share) = budget_share(&spi)?;
+                reconstructor.insert_encrypted_share(peer.public(), challenge, share)?;
+            }
+        }
+
+        let held = reconstructor.count_ack_buffer_entries();
+        assert!(
+            held <= TRACKED * PER_PEER,
+            "the outer cache bounds what can be held: {held} entries across at most {TRACKED} peers"
+        );
+
+        // A resync is what makes the counter authoritative again; without the backstop the residue
+        // from dropped inner caches would sit on it permanently.
+        reconstructor.resync_ack_buffer();
+        assert_eq!(
+            held,
+            reconstructor
+                .ack_buffer_entries
+                .load(std::sync::atomic::Ordering::Relaxed),
+            "the counter must agree with what the caches actually hold after churn"
+        );
+
+        Ok(())
+    }
+
+    /// The bound no longer depends on a workload model — which is the whole of M2.
+    ///
+    /// Both caps are set so their product is orders of magnitude past the budget, exactly the
+    /// configuration the old modelled validation would have waved through. What is held is decided
+    /// by the byte budget and nothing else: no Session count, no assumed packet rate, no
+    /// acknowledgement window.
+    #[test]
+    fn the_ack_buffer_budget_binds_regardless_of_the_configured_caps() -> anyhow::Result<()> {
+        const BUDGET: usize = 64;
+        /// Enough peers that neither cap is anywhere near binding, few enough that the test is not
+        /// dominated by keypair generation.
+        const PEERS: usize = 16;
+
+        let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+            max_ack_buffer_bytes: BUDGET * AWAITING_ACK_ENTRY_BYTES,
+            max_tracked_peers: 2000,
+            max_awaiting_acks: 1_000_000,
+            // An hour, against a 30 s default: the dial the modelled check keyed on, turned to a
+            // value it would have rejected outright.
+            max_ack_await_time: std::time::Duration::from_secs(3600),
+            ..Default::default()
+        });
+        let spi = SsaPolynomialId::new(SsaId::new(SimplePseudonym::random(), 1.try_into()?), 0);
+
+        // Spread across peers so neither per-peer nor per-dimension cap is anywhere near binding.
+        let peers = (0..PEERS).map(|_| OffchainKeypair::random()).collect::<Vec<_>>();
+        let mut accepted = 0;
+        for i in 0..(BUDGET * 4) {
+            let (_, challenge, share) = budget_share(&spi)?;
+            if reconstructor
+                .insert_encrypted_share(peers[i % PEERS].public(), challenge, share)
+                .is_ok()
+            {
+                accepted += 1;
+            }
+        }
+
+        assert_eq!(
+            BUDGET, accepted,
+            "the byte budget must be what binds, not the caps whose product is 2e9 entries"
+        );
+        Ok(())
     }
 
     /// Pulls from the generator until it yields a share for `poly_index`, discarding the rest.

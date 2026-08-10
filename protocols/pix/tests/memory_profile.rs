@@ -28,9 +28,10 @@ use std::{
 
 use common::TestSpec;
 use hopr_protocol_pix::{
-    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
-    ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId,
-    SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+    TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
@@ -219,6 +220,10 @@ fn awaiting_ack_entry_cost() {
         // nothing expires mid-measurement. Both would make the average report a smaller cache.
         max_awaiting_acks: entries * 2,
         max_ack_await_time: std::time::Duration::from_secs(7200),
+        // Exactly the occupancy being measured, so the run doubles as a check on the global budget:
+        // fill it to the ceiling and the live heap must land inside the byte figure that ceiling
+        // was denominated in.
+        max_ack_buffer_bytes: entries * AWAITING_ACK_ENTRY_BYTES,
         ..Default::default()
     });
 
@@ -246,10 +251,33 @@ fn awaiting_ack_entry_cost() {
         );
     }
 
+    // The reconstructor is now exactly at its configured budget, so the next share must be refused.
+    // That is the whole claim `AWAITING_ACK_ENTRY_BYTES` exists to support: a ceiling counted in
+    // entries is a ceiling in bytes.
+    let budget = entries * AWAITING_ACK_ENTRY_BYTES;
+    let held = live_bytes().saturating_sub(baseline);
+    let overrun =
+        reconstructor.insert_encrypted_share(peer.public(), HalfKey::random().to_challenge().unwrap(), template);
+    assert!(
+        overrun.is_err(),
+        "a buffer filled to max_ack_buffer_bytes must refuse the next share"
+    );
+    assert!(
+        held <= budget,
+        "live heap {held} B exceeds the {budget} B the same occupancy was budgeted at — AWAITING_ACK_ENTRY_BYTES \
+         ({AWAITING_ACK_ENTRY_BYTES} B) is understated at {} B/entry",
+        held / entries
+    );
     println!(
-        "\n  Quote the last row as AWAITING_ACK_ENTRY_BYTES in `hopr-transport`'s\n  `validate_ack_buffer_budget`. \
-         Round up: the budget is a ceiling, so under-stating the\n  per-entry cost admits configurations that exceed \
-         it.\n"
+        "  at the configured ceiling         {:>9.1} MiB live against a {:.1} MiB budget ({:.0}% of it)",
+        mib(held),
+        mib(budget),
+        100.0 * held as f64 / budget as f64
+    );
+
+    println!(
+        "\n  Quote the last row as AWAITING_ACK_ENTRY_BYTES in `hopr-protocol-pix`. Round up: the\n  budget is a \
+         ceiling, so under-stating the per-entry cost lets it be exceeded.\n"
     );
 }
 
