@@ -496,8 +496,10 @@ pub struct PixReconstructorConfig {
 
     /// Ceiling on the total awaiting-acknowledgement state held across every peer, in bytes.
     ///
-    /// Defaults to 1 GiB, minimum 16 MiB. See
-    /// [`SsaReconstructorConfig::max_ack_buffer_bytes`].
+    /// Defaults to 1 GiB, minimum 25 600 B — 64 entries at the measured per-entry cost. That floor
+    /// is a sanity check rather than a sizing recommendation; see
+    /// [`SsaReconstructorConfig::max_ack_buffer_bytes`], which is where it is enforced and why it is
+    /// deliberately low.
     ///
     /// This — not the product of [`max_tracked_peers`](Self::max_tracked_peers) and
     /// [`max_awaiting_acks`](Self::max_awaiting_acks) — is what bounds the reconstructor's
@@ -998,6 +1000,35 @@ mod tests {
             SsaReconstructorConfig::default(),
             SsaReconstructorConfig::from(PixReconstructorConfig::default()),
             "the operator-facing mirror and the reconstructor it configures have drifted apart"
+        );
+    }
+
+    /// The acknowledgement-budget floor named in this crate's operator documentation must be the
+    /// one the protocol crate actually enforces.
+    ///
+    /// The doc comment above once said 16 MiB against a validated 25 600 B, from a floor lowered on
+    /// one side only. A number written in prose cannot be checked by the compiler, so it gets
+    /// checked here instead — the same lesson L20 recorded about a `SAFETY` comment quoting a
+    /// constant it did not reference.
+    #[test]
+    fn the_documented_ack_budget_floor_is_the_enforced_one() {
+        const DOCUMENTED_FLOOR: usize = 25_600;
+
+        PixReconstructorConfig {
+            max_ack_buffer_bytes: DOCUMENTED_FLOOR,
+            ..Default::default()
+        }
+        .validate()
+        .expect("the documented floor itself must be accepted");
+
+        assert!(
+            PixReconstructorConfig {
+                max_ack_buffer_bytes: DOCUMENTED_FLOOR - 1,
+                ..Default::default()
+            }
+            .validate()
+            .is_err(),
+            "one byte below the documented floor must be rejected — the prose and the validator have drifted"
         );
     }
 

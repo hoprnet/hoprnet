@@ -518,6 +518,10 @@ mod tests {
     }
 
     fn random_pix_group_element() -> HoprPixGroupElement {
+        // Needed only on Baby JubJub, where `mul_by_generator` comes from the trait. secp256k1's
+        // `ProjectivePoint` has it inherently, so importing it there is an unused import — the same
+        // arms the curve selection itself uses, so this tracks it rather than restating it.
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
         use hopr_protocol_pix::Group;
 
         let scalar = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
@@ -575,8 +579,9 @@ mod tests {
     }
 
     /// **M13.** A well-formed encoding of a point outside the prime-order subgroup must not parse
-    /// into a PIX group element. Baby JubJub is the production curve — `bjj` is a default feature —
-    /// and its cofactor is 8, so such points exist.
+    /// into a PIX group element. Baby JubJub is the production curve — `pix-bjj` is a default
+    /// feature and `pix-secp256k1` is not overriding it — and its cofactor is 8, so such points
+    /// exist.
     ///
     /// This pins the *property*, not the mechanism, and deliberately so. The subgroup check in
     /// [`HoprPixGroupElement::try_into_pix_group`] is not the step that rejects here: the backend's
@@ -620,7 +625,11 @@ mod tests {
 
     #[test]
     fn pix_commitment_proof_wire_wrapper_round_trips() -> anyhow::Result<()> {
-        use hopr_protocol_pix::{Group, SsaId};
+        // See `random_pix_group_element` above: trait-provided on Baby JubJub, inherent on
+        // secp256k1.
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
+        use hopr_protocol_pix::Group;
+        use hopr_protocol_pix::SsaId;
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
         let secret = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
