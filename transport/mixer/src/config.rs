@@ -5,8 +5,10 @@ use validator::{Validate, ValidationError};
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
 pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS: u64 = 20;
-pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
+/// The average-delay metric window is sized to this many times the active engine's nominal max
+/// delay (in ms), so a larger configured delay smooths the EMA over proportionally more packets.
+pub const HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR: u64 = 5;
 
 /// Default fraction of packets released before the Poisson hard cap. Fixes the cap:mean ratio
 /// (`mean = cap / ln(1 / (1 - p))`), so at the default 20 ms cap the mean is ~4.3 ms.
@@ -16,10 +18,6 @@ pub const HOPR_MIXER_DEFAULT_MIN_MIX_OCCUPANCY: usize = 5;
 pub const HOPR_MIXER_DEFAULT_TICK_FLOOR_IN_MS: u64 = 1;
 pub const HOPR_MIXER_DEFAULT_SATURATION_MIN_MEAN_IN_MS: u64 = 1;
 
-#[cfg(feature = "serde")]
-fn default_metric_delay_window() -> u64 {
-    HOPR_MIXER_DELAY_METRIC_WINDOW
-}
 #[cfg(feature = "serde")]
 fn default_cap_percentile() -> f64 {
     HOPR_MIXER_CAP_PERCENTILE
@@ -67,11 +65,6 @@ pub struct MixerConfig {
     #[default(HOPR_MIXER_CAPACITY)]
     #[validate(range(min = 1))]
     pub capacity: usize,
-    /// Packet window over which the average-delay metric is smoothed.
-    #[default(HOPR_MIXER_DELAY_METRIC_WINDOW)]
-    #[cfg_attr(feature = "serde", serde(skip_serializing, default = "default_metric_delay_window"))]
-    #[validate(range(min = 1))]
-    pub metric_delay_window: u64,
     /// Engine selection plus its implementation-specific tuning.
     #[default(_code = "MixerType::default()")]
     #[cfg_attr(feature = "serde", serde(default))]
@@ -115,6 +108,28 @@ impl MixerConfig {
             delay,
             cap_percentile,
             ..PoissonConfig::default()
+        }
+    }
+
+    /// Packet window over which the `hopr_mixer_average_packet_delay` EMA is smoothed. Sized to
+    /// [`HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR`]× the active engine's [`Self::nominal_max_delay`]
+    /// in ms (floored at 1), so the smoothing tracks the configured delay instead of a constant.
+    pub fn metric_delay_window(&self) -> u64 {
+        (HOPR_MIXER_DELAY_METRIC_WINDOW_FACTOR * self.nominal_max_delay().as_millis() as u64).max(1)
+    }
+
+    /// The active engine's nominal maximum delay: the Poisson hard cap, or the uniform
+    /// `min_delay + delay_range`.
+    fn nominal_max_delay(&self) -> Duration {
+        match self.mixer_type {
+            #[cfg(feature = "uniform-channel")]
+            MixerType::Uniform(uniform) => uniform.min_delay.saturating_add(uniform.delay_range),
+            #[cfg(feature = "poisson")]
+            MixerType::Poisson(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
+            #[cfg(feature = "poisson-shared")]
+            MixerType::PoissonShared(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
+            #[allow(unreachable_patterns)]
+            _ => Duration::ZERO,
         }
     }
 

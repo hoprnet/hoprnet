@@ -47,7 +47,7 @@ impl PoissonParams {
             mean,
             saturation_min_mean: poisson.saturation_min_mean,
             tick_floor: poisson.tick_floor,
-            metric_delay_window: cfg.metric_delay_window,
+            metric_delay_window: cfg.metric_delay_window(),
         }
     }
 

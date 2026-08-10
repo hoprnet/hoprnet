@@ -72,7 +72,7 @@ where
         #[cfg(all(feature = "telemetry", not(test)))]
         {
             METRIC_QUEUE_SIZE.increment(1.0f64);
-            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, this.cfg.metric_delay_window);
+            crate::metrics::record_packet_delay(random_delay.as_millis() as f64, this.cfg.metric_delay_window());
         }
 
         Ok(())
