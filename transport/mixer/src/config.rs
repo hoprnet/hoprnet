@@ -115,15 +115,20 @@ impl MixerConfig {
         }
     }
 
-    /// The uniform engine's config (defaulting when the active engine is not `Uniform`), so the
-    /// uniform channel and sink can obtain their `random_delay` bounds.
+    /// The uniform engine's config, so the uniform channel and sink can obtain their
+    /// `random_delay` bounds. When the active engine is not `Uniform` (a config built for a
+    /// Poisson engine but fed to a uniform primitive), this yields zero delay rather than the
+    /// uniform default range — preserving the historical "no Uniform config ⇒ no delay" contract.
     #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
     pub(crate) fn uniform_config(&self) -> UniformConfig {
         match self.mixer_type {
             #[cfg(feature = "uniform-channel")]
             MixerType::Uniform(uniform) => uniform,
             #[allow(unreachable_patterns)]
-            _ => UniformConfig::default(),
+            _ => UniformConfig {
+                min_delay: Duration::ZERO,
+                delay_range: Duration::ZERO,
+            },
         }
     }
 }
