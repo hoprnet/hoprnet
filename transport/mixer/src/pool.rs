@@ -19,7 +19,6 @@ const MIN_WAKE: Duration = Duration::from_micros(100);
 /// need without re-reading the public config or recomputing the derived mean each tick.
 #[derive(Clone, Copy)]
 pub(crate) struct PoissonParams {
-    min_delay: Duration,
     cap: Duration,
     cap_jitter: Duration,
     min_mix_occupancy: usize,
@@ -36,15 +35,15 @@ pub(crate) struct PoissonParams {
 impl PoissonParams {
     pub(crate) fn new(cfg: &MixerConfig, poisson: &PoissonConfig) -> Self {
         Self {
-            min_delay: cfg.min_delay,
-            cap: cfg.cap(),
+            // The Poisson hard cap is its own `max_cap`; there is no min-delay floor.
+            cap: poisson.max_cap,
             // Clamp to the cap: `sweep` has no separate `age >= cap` check, so a `cap_jitter`
             // larger than the cap would push `cap_deadline` past the hard latency bound.
-            cap_jitter: poisson.cap_jitter.min(cfg.cap()),
+            cap_jitter: poisson.cap_jitter.min(poisson.max_cap),
             min_mix_occupancy: poisson.min_mix_occupancy,
             high_watermark: poisson.high_watermark,
             capacity: cfg.capacity,
-            mean: derive_mean(cfg.delay_range, poisson.target_mean_delay),
+            mean: derive_mean(poisson.max_cap, poisson.target_mean_delay),
             saturation_min_mean: poisson.saturation_min_mean,
             tick_floor: poisson.tick_floor,
             metric_delay_window: cfg.metric_delay_window,
@@ -110,19 +109,18 @@ fn release_probability(delta: Duration, mean: Duration) -> f64 {
     1.0 - (-delta.as_secs_f64() / mean).exp()
 }
 
-/// Explicit `target` when set, else derived from `delay_range` so [`HOPR_MIXER_CAP_PERCENTILE`]
-/// of packets release before the cap. The window is `delay_range` because the clock only runs
-/// past `min_delay`.
-fn derive_mean(delay_range: Duration, target: Duration) -> Duration {
+/// Explicit `target` when set, else derived from `max_cap` so [`HOPR_MIXER_CAP_PERCENTILE`] of
+/// packets release before the cap: `mean = max_cap / ln(1 / (1 - percentile))`.
+fn derive_mean(max_cap: Duration, target: Duration) -> Duration {
     if !target.is_zero() {
         return target;
     }
-    let window = delay_range.as_secs_f64();
+    let cap = max_cap.as_secs_f64();
     let factor = (1.0 / (1.0 - HOPR_MIXER_CAP_PERCENTILE)).ln();
-    if window <= 0.0 || factor <= 0.0 {
+    if cap <= 0.0 || factor <= 0.0 {
         return Duration::ZERO;
     }
-    Duration::from_secs_f64(window / factor)
+    Duration::from_secs_f64(cap / factor)
 }
 
 /// Next wake from the current occupancy and the earliest still-buffered enqueue instant (from
@@ -175,21 +173,20 @@ impl<T> Entry<T> {
 /// when the pool is empty afterwards.
 ///
 /// Release rules per item (first match wins):
-/// 1. `age < min_delay` — not yet eligible, keep.
-/// 2. `age >= cap_deadline` — hard-cap force-release, where `cap_deadline` is this entry's deadline within `[cap -
+/// 1. `age >= cap_deadline` — hard-cap force-release, where `cap_deadline` is this entry's deadline within `[cap -
 ///    cap_jitter, cap)`, fixed once at enqueue (equals `cap` when jitter is zero).
-/// 3. `occupancy <= min_mix_occupancy` — small buffer: deterministic minimum dwell, released once `age >= mean` (no
+/// 2. `occupancy <= min_mix_occupancy` — small buffer: deterministic minimum dwell, released once `age >= mean` (no
 ///    coin), so the few packets present overlap and mix instead of escaping through the exponential's fast tail.
-/// 4. `Bernoulli(1 - e^(-delta/mean))` — the memoryless exponential clock.
+/// 3. `Bernoulli(1 - e^(-delta/mean))` — the memoryless exponential clock.
 ///
-/// When no delay is configured (`is_passthrough`) the pool is drained in enqueue order without
-/// mixing, preserving FIFO semantics.
+/// When the cap is zero (`is_passthrough`) the pool is drained in enqueue order without mixing,
+/// preserving FIFO semantics.
 ///
 /// Performance: for the common case (a packet buffered since before the previous sweep) the
 /// release probability depends only on `delta` — shared by the whole pool this tick — so
 /// `1 - e^(-delta/mean)` is computed **once** and reused. Only a packet that arrived mid-interval
-/// (eligible for less than `delta`) needs its own `1 - e^(-eligible_for/mean)`. The hard-cap
-/// deadline is precomputed per entry at enqueue, so the sweep itself does no jitter sampling.
+/// needs its own `1 - e^(-age/mean)`. The hard-cap deadline is precomputed per entry at enqueue,
+/// so the sweep itself does no jitter sampling.
 pub(crate) fn sweep<T>(
     pool: &mut Vec<Entry<T>>,
     params: &PoissonParams,
@@ -212,7 +209,6 @@ pub(crate) fn sweep<T>(
     let occupancy = pool.len();
     let cap = params.cap;
     let jitter = params.cap_jitter;
-    let min_delay = params.min_delay;
     let min_mix_occupancy = params.min_mix_occupancy;
     let mean = params.mean_for(occupancy);
 
@@ -229,23 +225,19 @@ pub(crate) fn sweep<T>(
         // `cap` when jitter is zero. Uniform over the window and independent of the sweep cadence.
         let cap_deadline = jitter_window_start + jitter.mul_f64(pool[i].jitter_fraction);
 
-        let release = if age < min_delay {
-            false
-        } else if age >= cap_deadline {
+        let release = if age >= cap_deadline {
             true // hard-cap force-release
         } else if occupancy <= min_mix_occupancy {
             age >= mean // small buffer: deterministic minimum dwell
         } else {
-            // Memoryless coin. The clock advances only over the time the packet has actually been
-            // eligible: a packet present since before the last sweep gets the full `delta` (the
-            // precomputed probability — the common case), but one that arrived mid-interval only
-            // gets `age - min_delay`, so a large `delta` (e.g. after an idle gap) can't over-release
-            // a fresh burst.
-            let eligible_for = age.saturating_sub(min_delay);
-            let p = if eligible_for >= delta {
+            // Memoryless coin. A packet present since before the last sweep gets the full `delta`
+            // (the precomputed probability — the common case); one that arrived mid-interval gets
+            // only its `age`, so a large `delta` (e.g. after an idle gap) can't over-release a
+            // fresh burst.
+            let p = if age >= delta {
                 full_delta_probability
             } else {
-                release_probability(eligible_for, mean)
+                release_probability(age, mean)
             };
             crypto_random::random_float() < p
         };
@@ -294,14 +286,9 @@ mod tests {
         Entry::new(Instant::now() - age, item)
     }
 
-    /// Engine params from explicit common fields plus a [`PoissonConfig`].
-    fn params(min_delay: Duration, delay_range: Duration, poisson: PoissonConfig) -> PoissonParams {
-        let cfg = MixerConfig {
-            min_delay,
-            delay_range,
-            ..MixerConfig::default()
-        };
-        PoissonParams::new(&cfg, &poisson)
+    /// Engine params from a [`PoissonConfig`].
+    fn params(poisson: PoissonConfig) -> PoissonParams {
+        PoissonParams::new(&MixerConfig::default(), &poisson)
     }
 
     /// Default engine params (derived mean, default cap and watermarks).
@@ -312,14 +299,11 @@ mod tests {
     /// Params with a cap ≈ 30 means, so truncation (`e^-30`) is negligible and shape assertions
     /// see the true exponential.
     fn untruncated_params(mean: Duration) -> PoissonParams {
-        params(
-            Duration::ZERO,
-            mean * 30,
-            PoissonConfig {
-                target_mean_delay: mean,
-                ..PoissonConfig::default()
-            },
-        )
+        params(PoissonConfig {
+            max_cap: mean * 30,
+            target_mean_delay: mean,
+            ..PoissonConfig::default()
+        })
     }
 
     /// One-shot `sweep` returning the released items, for the direct (non-simulation) tests.
@@ -338,7 +322,10 @@ mod tests {
 
     #[test]
     fn passthrough_should_preserve_order() -> anyhow::Result<()> {
-        let params = params(Duration::ZERO, Duration::ZERO, PoissonConfig::default());
+        let params = params(PoissonConfig {
+            max_cap: Duration::ZERO,
+            ..PoissonConfig::default()
+        });
         let mut pool: Vec<Entry<u32>> = (0..8).map(|i| entry(i, Duration::ZERO)).collect();
 
         let released: Vec<u32> = sweep_once(&mut pool, &params)
@@ -565,15 +552,12 @@ mod tests {
         // mean = cap / ln(1/(1-0.98)) = 20 / ln(50) ≈ 5.11 ms should leave ~2% of packets to
         // be force-released at the 20 ms cap (i.e. 98% leave naturally within the cap).
         // Jitter off so the truncated mass lands exactly at the cap and is countable.
-        let params = params(
-            Duration::ZERO,
-            Duration::from_millis(20),
-            PoissonConfig {
-                target_mean_delay: Duration::from_micros(5113),
-                cap_jitter: Duration::ZERO,
-                ..PoissonConfig::default()
-            },
-        );
+        let params = params(PoissonConfig {
+            max_cap: Duration::from_millis(20),
+            target_mean_delay: Duration::from_micros(5113),
+            cap_jitter: Duration::ZERO,
+            ..PoissonConfig::default()
+        });
 
         // Keep occupancy below `high_watermark` so the overload safety valve stays dormant
         // (a burst at `capacity` would legitimately trigger relief and flush early). `N` is large
@@ -743,23 +727,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn min_delay_floor_should_keep_ineligible_items() -> anyhow::Result<()> {
-        let params = params(
-            Duration::from_millis(50),
-            Duration::from_millis(20),
-            PoissonConfig::default(),
-        );
-        // Age below the floor: must be kept even though the pool is tiny.
-        let mut pool: Vec<Entry<u32>> = vec![entry(1u32, Duration::from_millis(5))];
-
-        let released = sweep_once(&mut pool, &params);
-
-        assert_eq!(pool.len(), 1, "item under the min-delay floor must be kept");
-        assert!(released.is_empty());
-        Ok(())
-    }
-
     #[rstest]
     #[case(Duration::ZERO, Duration::from_millis(10), 0.0)]
     #[case(Duration::from_millis(10), Duration::from_millis(10), 0.6321)] // 1 - e^-1 after one mean
@@ -805,41 +772,33 @@ mod tests {
     }
 
     #[test]
-    fn derived_mean_should_use_the_delay_range_not_the_cap() {
-        // min_delay = 10 ms, delay_range = 20 ms ⇒ mean = 20 / ln(20) ≈ 6.68 ms (the eligible
-        // window is the range, not the 30 ms cap).
-        let params = params(
-            Duration::from_millis(10),
-            Duration::from_millis(20),
-            PoissonConfig::default(),
-        );
-        assert!((params.mean.as_secs_f64() * 1000.0 - 6.68).abs() < 0.1);
+    fn derived_mean_should_be_the_cap_over_the_percentile_factor() {
+        // max_cap = 20 ms, 99th percentile ⇒ mean = 20 / ln(100) ≈ 4.34 ms.
+        let params = params(PoissonConfig {
+            max_cap: Duration::from_millis(20),
+            ..PoissonConfig::default()
+        });
+        assert!((params.mean.as_secs_f64() * 1000.0 - 4.34).abs() < 0.1);
     }
 
     #[test]
     fn cap_jitter_should_be_clamped_to_the_cap() {
         // A cap_jitter larger than the cap must not push the hard-cap deadline past the cap.
-        let params = params(
-            Duration::ZERO,
-            Duration::from_millis(20),
-            PoissonConfig {
-                cap_jitter: Duration::from_secs(1),
-                ..PoissonConfig::default()
-            },
-        );
+        let params = params(PoissonConfig {
+            max_cap: Duration::from_millis(20),
+            cap_jitter: Duration::from_secs(1),
+            ..PoissonConfig::default()
+        });
         assert!(params.cap_jitter <= params.cap);
     }
 
     #[test]
     fn explicit_target_mean_should_override_derivation() {
-        let params = params(
-            Duration::ZERO,
-            Duration::from_millis(20),
-            PoissonConfig {
-                target_mean_delay: Duration::from_millis(10),
-                ..PoissonConfig::default()
-            },
-        );
+        let params = params(PoissonConfig {
+            max_cap: Duration::from_millis(20),
+            target_mean_delay: Duration::from_millis(10),
+            ..PoissonConfig::default()
+        });
         assert_eq!(params.mean, Duration::from_millis(10));
     }
 }

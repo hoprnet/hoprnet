@@ -97,7 +97,7 @@ impl<T: Unpin> Stream for AnyReceiver<T> {
 pub fn create<T: Send + Unpin + 'static>(cfg: MixerConfig) -> (AnySender<T>, AnyReceiver<T>) {
     match cfg.mixer_type {
         #[cfg(feature = "uniform-channel")]
-        MixerType::Uniform => {
+        MixerType::Uniform(_) => {
             let (tx, rx) = crate::channel::channel(cfg);
             (AnySender::Uniform(tx), AnyReceiver::Uniform(rx))
         }

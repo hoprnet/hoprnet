@@ -528,7 +528,7 @@ where
         // getting its own independent delay queue. The single forwarder task owns the receiver
         // (and therefore the heap timer) — no per-clone waker coordination is needed.
         let mut mixer_cfg = self.cfg.mixer;
-        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.delay_range.as_millis())
+        mixer_cfg.metric_delay_window = u64::try_from(5 * mixer_cfg.nominal_max_delay().as_millis())
             .unwrap_or(u64::MAX)
             .max(1);
         // The mixer implementation is selected at runtime from `mixer_cfg.mixer_type`; every

@@ -270,17 +270,14 @@ mod tests {
     use super::*;
     use crate::config::{MixerType, PoissonConfig};
 
-    const CAP: Duration = Duration::from_millis(
-        crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
-    );
+    const CAP: Duration = Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS);
     const LEEWAY: Duration = Duration::from_millis(500);
 
-    /// Config selecting the shared-pool engine with an explicit mean and cap bounds.
-    fn shared_cfg(min_delay: Duration, delay_range: Duration, target_mean_delay: Duration) -> MixerConfig {
+    /// Config selecting the shared-pool engine with an explicit hard cap and mean.
+    fn shared_cfg(max_cap: Duration, target_mean_delay: Duration) -> MixerConfig {
         MixerConfig {
-            min_delay,
-            delay_range,
             mixer_type: MixerType::PoissonShared(PoissonConfig {
+                max_cap,
                 target_mean_delay,
                 ..PoissonConfig::default()
             }),
@@ -321,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn poisson_shared_should_mix_under_load() -> anyhow::Result<()> {
         const N: usize = 3000;
-        let cfg = shared_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
+        let cfg = shared_cfg(Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_shared_channel::<(u32, Instant)>(cfg);
 
         let recv = tokio::spawn(async move {
@@ -392,11 +389,7 @@ mod tests {
     #[tokio::test]
     async fn shared_passthrough_should_preserve_order() -> anyhow::Result<()> {
         const ITERATIONS: usize = 32;
-        let (tx, rx) = poisson_shared_channel(MixerConfig {
-            min_delay: Duration::ZERO,
-            delay_range: Duration::ZERO,
-            ..MixerConfig::default()
-        });
+        let (tx, rx) = poisson_shared_channel(shared_cfg(Duration::ZERO, Duration::ZERO));
 
         let input = (0..ITERATIONS as u32).collect::<Vec<_>>();
         for i in input.iter() {

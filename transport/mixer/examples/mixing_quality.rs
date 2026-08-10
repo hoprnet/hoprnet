@@ -28,12 +28,11 @@ fn percentile(sorted_ms: &[f64], p: f64) -> f64 {
     sorted_ms[idx]
 }
 
-/// A dedicated-thread Poisson config with an explicit mean and cap tuning.
-fn poisson_cfg(target_mean_delay: Duration, delay_range: Duration, cap_jitter: Duration) -> MixerConfig {
+/// A dedicated-thread Poisson config with an explicit mean, hard cap, and jitter.
+fn poisson_cfg(target_mean_delay: Duration, max_cap: Duration, cap_jitter: Duration) -> MixerConfig {
     MixerConfig {
-        min_delay: Duration::ZERO,
-        delay_range,
         mixer_type: MixerType::Poisson(PoissonConfig {
+            max_cap,
             target_mean_delay,
             cap_jitter,
             ..PoissonConfig::default()
@@ -43,11 +42,13 @@ fn poisson_cfg(target_mean_delay: Duration, delay_range: Duration, cap_jitter: D
 }
 
 fn run_scenario(label: &str, cfg: MixerConfig) {
-    let cap_ms = cfg.cap().as_secs_f64() * 1000.0;
-    let mean_ms = match cfg.mixer_type {
-        MixerType::Poisson(pc) => pc.target_mean_delay.as_secs_f64() * 1000.0,
+    let (cap_ms, mean_ms) = match cfg.mixer_type {
+        MixerType::Poisson(pc) => (
+            pc.max_cap.as_secs_f64() * 1000.0,
+            pc.target_mean_delay.as_secs_f64() * 1000.0,
+        ),
         #[allow(unreachable_patterns)]
-        _ => 0.0,
+        _ => (0.0, 0.0),
     };
 
     let (delays_ms, out_of_order) = futures::executor::block_on(async move {

@@ -305,15 +305,32 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
+    use crate::config::{MixerType, UniformConfig};
 
     const PROCESSING_LEEWAY: Duration = Duration::from_millis(250);
     const MAXIMUM_SINGLE_DELAY_DURATION: Duration = Duration::from_millis(
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
 
+    /// A uniform-engine config with the given delay bounds.
+    fn uniform_cfg(min_delay: Duration, delay_range: Duration) -> MixerConfig {
+        MixerConfig {
+            mixer_type: MixerType::Uniform(UniformConfig { min_delay, delay_range }),
+            ..MixerConfig::default()
+        }
+    }
+
+    /// Uniform config with the crate's default delay span (0–20 ms).
+    fn uniform_default() -> MixerConfig {
+        uniform_cfg(
+            Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+            Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+        )
+    }
+
     #[tokio::test]
     async fn mixer_channel_should_pass_an_element() -> anyhow::Result<()> {
-        let (tx, mut rx) = channel(MixerConfig::default());
+        let (tx, mut rx) = channel(uniform_default());
         tx.send(1)?;
         assert_eq!(rx.recv().await, Some(1));
 
@@ -324,7 +341,7 @@ mod tests {
     async fn mixer_channel_should_introduce_random_delay() -> anyhow::Result<()> {
         let start = std::time::SystemTime::now();
 
-        let (tx, mut rx) = channel(MixerConfig::default());
+        let (tx, mut rx) = channel(uniform_default());
         tx.send(1)?;
         assert_eq!(rx.recv().await, Some(1));
 
@@ -340,7 +357,7 @@ mod tests {
     async fn mixer_channel_should_batch_on_sending_emulating_concurrency() -> anyhow::Result<()> {
         const ITERATIONS: usize = 10;
 
-        let (tx, mut rx) = channel(MixerConfig::default());
+        let (tx, mut rx) = channel(uniform_default());
 
         let start = std::time::SystemTime::now();
 
@@ -364,7 +381,7 @@ mod tests {
     async fn mixer_channel_should_work_concurrently_and_properly_closed_channels() -> anyhow::Result<()> {
         const ITERATIONS: usize = 1000;
 
-        let (tx, mut rx) = channel(MixerConfig::default());
+        let (tx, mut rx) = channel(uniform_default());
 
         let recv_task = tokio::task::spawn(async move {
             while let Some(_item) = timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION, rx.next())
@@ -391,7 +408,7 @@ mod tests {
     async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_sync_send() -> anyhow::Result<()> {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
 
-        let (tx, rx) = channel(MixerConfig::default());
+        let (tx, rx) = channel(uniform_default());
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
 
@@ -416,7 +433,7 @@ mod tests {
     {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
 
-        let (mut tx, rx) = channel(MixerConfig::default());
+        let (mut tx, rx) = channel(uniform_default());
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
 
@@ -441,7 +458,7 @@ mod tests {
     {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
 
-        let (mut tx, rx) = channel(MixerConfig::default());
+        let (mut tx, rx) = channel(uniform_default());
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
 
@@ -466,11 +483,7 @@ mod tests {
     async fn mixer_channel_should_not_mix_the_order_if_the_min_delay_and_delay_range_is_0() -> anyhow::Result<()> {
         const ITERATIONS: usize = 40; // highly unlikely that this produces the same order on the input given the size
 
-        let (tx, rx) = channel(MixerConfig {
-            min_delay: Duration::from_millis(0),
-            delay_range: Duration::from_millis(0),
-            ..MixerConfig::default()
-        });
+        let (tx, rx) = channel(uniform_cfg(Duration::ZERO, Duration::ZERO));
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
 
@@ -493,7 +506,7 @@ mod tests {
 
     #[tokio::test]
     async fn sender_should_return_closed_when_receiver_inactive() -> anyhow::Result<()> {
-        let (tx, _rx) = channel::<i32>(MixerConfig::default());
+        let (tx, _rx) = channel::<i32>(uniform_default());
 
         // Simulate the receiver marking itself inactive (normally happens
         // in poll_next when sender_count drops to 0).
@@ -514,11 +527,7 @@ mod tests {
     async fn sender_can_push_while_receiver_is_parked_on_timer() -> anyhow::Result<()> {
         // Mixer with a long minimum delay — the receiver's first poll will park on the
         // timer for at least this duration.
-        let cfg = MixerConfig {
-            min_delay: Duration::from_millis(500),
-            delay_range: Duration::from_millis(1),
-            ..MixerConfig::default()
-        };
+        let cfg = uniform_cfg(Duration::from_millis(500), Duration::from_millis(1));
         let (tx, mut rx) = channel::<u32>(cfg);
 
         // Prime: push one item so the receiver's timer branch activates.
@@ -563,11 +572,7 @@ mod tests {
     /// `sender_count == 0`, silently discarding anything still in the buffer.
     #[tokio::test]
     async fn receiver_drains_buffered_items_after_last_sender_drops() -> anyhow::Result<()> {
-        let cfg = MixerConfig {
-            min_delay: Duration::from_millis(0),
-            delay_range: Duration::from_millis(1),
-            ..MixerConfig::default()
-        };
+        let cfg = uniform_cfg(Duration::ZERO, Duration::from_millis(1));
         let (tx, mut rx) = channel::<u32>(cfg);
 
         const ITERATIONS: usize = 16;
@@ -603,11 +608,7 @@ mod tests {
     /// sees every item regardless of which clone pushed it.
     #[tokio::test]
     async fn sender_clones_share_heap() -> anyhow::Result<()> {
-        let cfg = MixerConfig {
-            min_delay: Duration::from_millis(50),
-            delay_range: Duration::from_millis(1),
-            ..MixerConfig::default()
-        };
+        let cfg = uniform_cfg(Duration::from_millis(50), Duration::from_millis(1));
         let (tx_a, mut rx) = channel::<u32>(cfg);
         let tx_b = tx_a.clone();
 

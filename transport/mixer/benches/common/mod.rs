@@ -6,7 +6,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{StreamExt, future::poll_fn};
-use hopr_transport_mixer::config::MixerConfig;
+use hopr_transport_mixer::config::{MixerConfig, MixerType, PoissonConfig};
 
 pub const SAMPLE_SIZE: usize = 10;
 
@@ -14,12 +14,16 @@ pub const SAMPLE_SIZE: usize = 10;
 pub const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1boJ48Jm7xBBNIvxsrbK3bNCevOMXYMqrhsVBXfmKy23K7ItgbuObTmqk0ndfceAhugLZveAhp4Xx1vHCAROY69sOTJiia3EBC2aXSBpUfb3WHSJDxHRMHwzCwd0BPj4WFi4Ig884Ph6altlFWzpL3ILsHmLxy9KoPCAtolb3YEegMCI4y9BsoWyCtcZdBHBrqXaSzuJivw5J1DBudj3Z6oORrEfRuFIQLi0l89Emc35WhSyzOdguC1x9PS8AiIAu7UoXlp3VIaqVUu4XGUZ21ABxI9DyMzxGbOOlsrRGFFN9G8di9hqIX1UOZpRgMNmtDwZoyoU2nGLoWGM58buwuvbNkLjGu2X9HamiiDsRIR4vxi5i61wIP6VueVOb68wvbz8csR88OhFsExjGBD9XXtJvUjy1nwdkikBOblNm2FUbyq8aHwHocoMqZk8elbYMHgbjme9d1CxZQKRwOR";
 
 /// A near-passthrough config (1 ms cap) so the benchmark measures the channel's per-message
-/// overhead rather than the mixing delay.
+/// overhead rather than the mixing delay. The `Poisson` variant is read by both Poisson engines
+/// (via `PoissonParams::from_mixer`); the uniform channel sees no `Uniform` config and so applies
+/// zero delay — equally minimal for a throughput measurement.
 #[inline]
 pub fn minimal_delay_mixer_cfg() -> MixerConfig {
     MixerConfig {
-        min_delay: std::time::Duration::from_millis(0),
-        delay_range: std::time::Duration::from_millis(1),
+        mixer_type: MixerType::Poisson(PoissonConfig {
+            max_cap: std::time::Duration::from_millis(1),
+            ..PoissonConfig::default()
+        }),
         ..MixerConfig::default()
     }
 }

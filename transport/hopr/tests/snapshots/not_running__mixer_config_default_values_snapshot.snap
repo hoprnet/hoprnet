@@ -3,10 +3,9 @@ source: transport/hopr/tests/not_running.rs
 expression: cfg
 ---
 capacity: 20000
-min_delay: 0s
-delay_range: 20ms
 mixer_type:
   PoissonShared:
+    max_cap: 20ms
     target_mean_delay: 0s
     cap_jitter: 2ms
     min_mix_occupancy: 5
