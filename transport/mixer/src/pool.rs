@@ -773,9 +773,10 @@ mod tests {
 
     #[test]
     fn derived_mean_should_be_the_cap_over_the_percentile_factor() {
-        // max_cap = 20 ms, 99th percentile ⇒ mean = 20 / ln(100) ≈ 4.34 ms.
+        // target_mean_delay = 0 ⇒ derive: max_cap 20 ms, 99th percentile ⇒ 20 / ln(100) ≈ 4.34 ms.
         let params = params(PoissonConfig {
             max_cap: Duration::from_millis(20),
+            target_mean_delay: Duration::ZERO,
             ..PoissonConfig::default()
         });
         assert!((params.mean.as_secs_f64() * 1000.0 - 4.34).abs() < 0.1);

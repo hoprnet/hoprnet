@@ -5,6 +5,9 @@ use validator::Validate;
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
 pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS: u64 = 20;
+/// Default Poisson mean holding delay. Concrete (rather than the derive-from-cap sentinel `0`)
+/// so the default config reads sensibly; ~96% of traffic releases before the 20 ms cap.
+pub const HOPR_MIXER_DEFAULT_TARGET_MEAN_DELAY_IN_MS: u64 = 6;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
 pub const HOPR_MIXER_CAPACITY: usize = 20_000;
 
@@ -24,6 +27,10 @@ fn default_metric_delay_window() -> u64 {
 #[cfg(feature = "serde")]
 fn default_max_cap() -> Duration {
     Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS)
+}
+#[cfg(feature = "serde")]
+fn default_target_mean_delay() -> Duration {
+    Duration::from_millis(HOPR_MIXER_DEFAULT_TARGET_MEAN_DELAY_IN_MS)
 }
 #[cfg(feature = "serde")]
 fn default_cap_jitter() -> Duration {
@@ -187,11 +194,14 @@ pub struct PoissonConfig {
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS))]
     #[cfg_attr(feature = "serde", serde(default = "default_max_cap", with = "humantime_serde"))]
     pub max_cap: Duration,
-    /// Explicit mean holding delay; when zero the mean is derived from `max_cap` and
-    /// [`HOPR_MIXER_CAP_PERCENTILE`]. Keep well below the cap: a mean at or above it collapses
-    /// the exponential holding time onto the hard-cap release.
-    #[default(Duration::from_millis(0))]
-    #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
+    /// Mean holding delay. Defaults to `HOPR_MIXER_DEFAULT_TARGET_MEAN_DELAY_IN_MS`; set to zero
+    /// to derive it from `max_cap` and [`HOPR_MIXER_CAP_PERCENTILE`] instead. Keep well below the
+    /// cap: a mean at or above it collapses the exponential holding time onto the hard-cap release.
+    #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_TARGET_MEAN_DELAY_IN_MS))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_target_mean_delay", with = "humantime_serde")
+    )]
     pub target_mean_delay: Duration,
     /// Width of the window over which hard-cap force-releases are smeared, removing the
     /// deterministic release instant at exactly the cap.
