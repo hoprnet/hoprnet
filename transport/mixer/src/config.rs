@@ -80,41 +80,50 @@ pub struct MixerConfig {
 }
 
 impl MixerConfig {
-    /// Uniform random delay in `[min_delay, min_delay + delay_range]`, used by the uniform
-    /// engines. The bounds come from the `Uniform` variant (zero for any other engine).
-    pub fn random_delay(&self) -> Duration {
-        let (min_delay, delay_range) = self.uniform_delay_bounds();
-        let max_delay = min_delay.saturating_add(delay_range);
-        let random_delay = if max_delay.as_millis() == 0 {
-            0
-        } else {
-            hopr_types::crypto_random::random_integer(min_delay.as_millis() as u64, Some(max_delay.as_millis() as u64))
-        };
-        Duration::from_millis(random_delay)
-    }
-
-    /// The active engine's nominal maximum delay: the Poisson `max_cap`, or the uniform
-    /// `min_delay + delay_range`. Useful for sizing delay-dependent parameters.
-    pub fn nominal_max_delay(&self) -> Duration {
-        match self.mixer_type {
-            #[cfg(feature = "uniform-channel")]
-            MixerType::Uniform(uniform) => uniform.min_delay.saturating_add(uniform.delay_range),
-            #[cfg(feature = "poisson")]
-            MixerType::Poisson(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
-            #[cfg(feature = "poisson-shared")]
-            MixerType::PoissonShared(poisson) => poisson.delay.resolve(poisson.cap_percentile).0,
-            #[allow(unreachable_patterns)]
-            _ => Duration::ZERO,
+    /// Config selecting the uniform-delay engine with the given delay bounds.
+    #[cfg(feature = "uniform-channel")]
+    pub fn new_uniform(min_delay: Duration, delay_range: Duration) -> Self {
+        Self {
+            mixer_type: MixerType::Uniform(UniformConfig { min_delay, delay_range }),
+            ..Self::default()
         }
     }
 
-    /// The uniform engine's `(min_delay, delay_range)`, or zeros when the active engine is not `Uniform`.
-    fn uniform_delay_bounds(&self) -> (Duration, Duration) {
+    /// Config selecting the dedicated-thread Poisson engine with the given delay anchor.
+    #[cfg(feature = "poisson")]
+    pub fn new_poisson(delay: PoissonDelay, cap_percentile: f64) -> Self {
+        Self {
+            mixer_type: MixerType::Poisson(PoissonConfig {
+                delay,
+                cap_percentile,
+                ..PoissonConfig::default()
+            }),
+            ..Self::default()
+        }
+    }
+
+    /// Config selecting the shared-pool Poisson engine with the given delay anchor.
+    #[cfg(feature = "poisson-shared")]
+    pub fn new_poisson_shared(delay: PoissonDelay, cap_percentile: f64) -> Self {
+        Self {
+            mixer_type: MixerType::PoissonShared(PoissonConfig {
+                delay,
+                cap_percentile,
+                ..PoissonConfig::default()
+            }),
+            ..Self::default()
+        }
+    }
+
+    /// The uniform engine's config (defaulting when the active engine is not `Uniform`), so the
+    /// uniform channel and sink can obtain their `random_delay` bounds.
+    #[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
+    pub(crate) fn uniform_config(&self) -> UniformConfig {
         match self.mixer_type {
             #[cfg(feature = "uniform-channel")]
-            MixerType::Uniform(uniform) => (uniform.min_delay, uniform.delay_range),
+            MixerType::Uniform(uniform) => uniform,
             #[allow(unreachable_patterns)]
-            _ => (Duration::ZERO, Duration::ZERO),
+            _ => UniformConfig::default(),
         }
     }
 }
@@ -174,7 +183,7 @@ impl validator::Validate for MixerType {
 ///
 /// The delay is drawn uniformly from `[min_delay, min_delay + delay_range]`; a deterministic
 /// `min_delay` floor is a uniform-only concept (it does not aid a memoryless Poisson mixer).
-#[cfg(feature = "uniform-channel")]
+#[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UniformConfig {
@@ -186,6 +195,23 @@ pub struct UniformConfig {
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS))]
     #[cfg_attr(feature = "serde", serde(with = "humantime_serde"))]
     pub delay_range: Duration,
+}
+
+#[cfg(any(feature = "uniform-channel", feature = "uniform-adapter"))]
+impl UniformConfig {
+    /// A uniform random delay drawn from `[min_delay, min_delay + delay_range]`.
+    pub fn random_delay(&self) -> Duration {
+        let max_delay = self.min_delay.saturating_add(self.delay_range);
+        let random_delay = if max_delay.as_millis() == 0 {
+            0
+        } else {
+            hopr_types::crypto_random::random_integer(
+                self.min_delay.as_millis() as u64,
+                Some(max_delay.as_millis() as u64),
+            )
+        };
+        Duration::from_millis(random_delay)
+    }
 }
 
 /// Which of the two bound quantities (hard cap / mean) the operator fixes; the other is derived

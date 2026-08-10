@@ -25,7 +25,6 @@ crate-type = ["rlib"]
 [features]
 # The shared-pool Poisson engine is the default mixer implementation.
 default = ["poisson-shared"]
-all-benchmarks = []
 # Exponential (Poisson) release engine — `poisson_channel`.
 poisson = ["dep:async-channel", "futures/executor"]
 # Opt-in shared-pool Poisson engine: pool behind Arc<Mutex>, sweep runs on the consumer (no
@@ -64,10 +63,6 @@ rust-stream-ext-concurrent = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
-
-[[example]]
-name = "mixing_quality"
-required-features = ["poisson"]
 
 [[bench]]
 name = "mixer_throughput_bench"

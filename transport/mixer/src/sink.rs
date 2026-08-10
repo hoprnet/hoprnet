@@ -62,7 +62,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let this = Pin::into_inner(self);
-        let random_delay = this.cfg.random_delay();
+        let random_delay = this.cfg.uniform_config().random_delay();
 
         trace!(delay_ms = random_delay.as_millis(), "mixer: delaying item");
 
@@ -142,23 +142,12 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::config::{MixerType, UniformConfig};
-
     const LEEWAY: Duration = Duration::from_millis(200);
-
-    /// A uniform-engine config (small capacity) with the given delay bounds.
-    fn uniform_cfg(min_delay: Duration, delay_range: Duration) -> MixerConfig {
-        MixerConfig {
-            capacity: 16,
-            mixer_type: MixerType::Uniform(UniformConfig { min_delay, delay_range }),
-            ..MixerConfig::default()
-        }
-    }
 
     #[tokio::test]
     async fn items_are_forwarded_after_delay() {
         let (tx, mut rx) = mpsc::channel::<u32>(100);
-        let cfg = uniform_cfg(Duration::from_millis(50), Duration::from_millis(10));
+        let cfg = MixerConfig::new_uniform(Duration::from_millis(50), Duration::from_millis(10));
 
         let mut sink = MixerSink::new(tx, cfg);
 
@@ -175,7 +164,7 @@ mod tests {
     #[tokio::test]
     async fn all_items_are_forwarded_with_zero_delay() {
         let (tx, mut rx) = mpsc::channel::<u32>(100);
-        let cfg = uniform_cfg(Duration::ZERO, Duration::ZERO);
+        let cfg = MixerConfig::new_uniform(Duration::ZERO, Duration::ZERO);
 
         let mut sink = MixerSink::new(tx, cfg);
 
@@ -195,7 +184,7 @@ mod tests {
     #[tokio::test]
     async fn clone_starts_with_empty_heap() {
         let (tx, mut rx) = mpsc::channel::<u32>(100);
-        let cfg = uniform_cfg(Duration::from_millis(50), Duration::from_millis(10));
+        let cfg = MixerConfig::new_uniform(Duration::from_millis(50), Duration::from_millis(10));
 
         let mut sink = MixerSink::new(tx, cfg);
         sink.start_send_unpin(1u32).unwrap();
@@ -250,7 +239,7 @@ mod tests {
             }
         }
 
-        let cfg = uniform_cfg(Duration::ZERO, Duration::ZERO);
+        let cfg = MixerConfig::new_uniform(Duration::ZERO, Duration::ZERO);
         let mut sink = MixerSink::new(AlwaysFullNoOpFlushSink, cfg);
         sink.start_send_unpin(42u32).unwrap();
 

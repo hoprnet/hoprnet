@@ -290,22 +290,10 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::config::{MixerType, PoissonConfig, PoissonDelay};
+    use crate::config::PoissonDelay;
 
     const CAP: Duration = Duration::from_millis(crate::config::HOPR_MIXER_DEFAULT_MAX_CAP_IN_MS);
     const LEEWAY: Duration = Duration::from_millis(500);
-
-    /// Config selecting the dedicated-thread engine with the given delay anchor and percentile.
-    fn poisson_cfg(delay: PoissonDelay, cap_percentile: f64) -> MixerConfig {
-        MixerConfig {
-            mixer_type: MixerType::Poisson(PoissonConfig {
-                delay,
-                cap_percentile,
-                ..PoissonConfig::default()
-            }),
-            ..MixerConfig::default()
-        }
-    }
 
     /// Drain `rx` in a spawned task, mapping each item at the instant it is received (so realized
     /// delays are measured at delivery), returning the mapped values in delivery order.
@@ -340,7 +328,7 @@ mod tests {
         const N: usize = 3000;
         let cap = Duration::from_millis(20);
         // mean >> cap, so the hard cap (not the coin) must do the bounding.
-        let cfg = poisson_cfg(PoissonDelay::Cap(cap), 0.33);
+        let cfg = MixerConfig::new_poisson(PoissonDelay::Cap(cap), 0.33);
         let (tx, mut rx) = poisson_channel::<Instant>(cfg);
 
         let receiver = tokio::spawn(async move {
@@ -376,7 +364,10 @@ mod tests {
         // per-wake shuffle, so the output order should differ from the input. A mean well below
         // the cap keeps the whole burst dwelling together long enough to mix.
         const ITERATIONS: usize = 40;
-        let (tx, rx) = poisson_channel(poisson_cfg(PoissonDelay::Mean(Duration::from_millis(20)), 0.99));
+        let (tx, rx) = poisson_channel(MixerConfig::new_poisson(
+            PoissonDelay::Mean(Duration::from_millis(20)),
+            0.99,
+        ));
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
         for i in input.iter() {
@@ -395,7 +386,7 @@ mod tests {
         // delay) and reordered — the property the engine exists for, and a regression guard
         // against the "release everything instantly" failure mode.
         const N: usize = 3000;
-        let cfg = poisson_cfg(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
+        let cfg = MixerConfig::new_poisson(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         let receiver = tokio::spawn(async move {
@@ -441,7 +432,7 @@ mod tests {
         // Regression: after an idle gap the previous-sweep instant goes stale, so the sweep's
         // `delta` is large. A burst arriving then must still be held and mixed — not dumped with
         // ~zero delay because the large `delta` gave every fresh packet a ~1 release probability.
-        let cfg = poisson_cfg(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
+        let cfg = MixerConfig::new_poisson(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
         let (tx, mut rx) = poisson_channel::<(u32, Instant)>(cfg);
 
         // Idle less than the 200 ms heartbeat, so the burst hits a stale `prev_sweep`.
@@ -473,7 +464,7 @@ mod tests {
     #[tokio::test]
     async fn poisson_channel_passthrough_should_preserve_order() -> anyhow::Result<()> {
         const ITERATIONS: usize = 40;
-        let (tx, rx) = poisson_channel(poisson_cfg(PoissonDelay::Cap(Duration::ZERO), 0.99));
+        let (tx, rx) = poisson_channel(MixerConfig::new_poisson(PoissonDelay::Cap(Duration::ZERO), 0.99));
 
         let input = (0..ITERATIONS).collect::<Vec<_>>();
         for i in input.iter() {
@@ -607,7 +598,7 @@ mod tests {
         // them, so no clone should be starved or systematically delayed more than another.
         const CLONES: usize = 6;
         const PER: usize = 800;
-        let cfg = poisson_cfg(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
+        let cfg = MixerConfig::new_poisson(PoissonDelay::Mean(Duration::from_millis(10)), 0.999);
         let (tx, mut rx) = poisson_channel::<(usize, Instant)>(cfg);
 
         let receiver = tokio::spawn(async move {

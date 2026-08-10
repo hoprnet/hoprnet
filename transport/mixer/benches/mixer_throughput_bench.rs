@@ -37,15 +37,15 @@ pub fn mixer_throughput(
     group.finish();
 }
 
-fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) -> BoxFuture<'_, ()> {
+fn send_continuous_stream_load(item: &str, iterations: usize, _cfg: MixerConfig) -> BoxFuture<'_, ()> {
     Box::pin(async move {
         let (tx, rx) = futures::channel::mpsc::unbounded();
 
+        // Baseline: a raw `then_concurrent` stream applying the same minimal (1 ms) hold as
+        // `minimal_delay_mixer_cfg`, isolating the per-item overhead from the mixer machinery.
         let mut rx = rx.then_concurrent(
             |v| async move {
-                let random_delay = cfg.random_delay();
-
-                tokio::time::sleep(random_delay).await;
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
                 v
             },
