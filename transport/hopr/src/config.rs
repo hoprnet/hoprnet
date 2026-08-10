@@ -202,6 +202,7 @@ pub struct HoprProtocolConfig {
     #[cfg_attr(feature = "serde", serde(default))]
     pub session: SessionGlobalConfig,
     /// Mixer configuration.
+    #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub mixer: MixerConfig,
     /// Simulated transit latency shim between the mixer output and the wire.

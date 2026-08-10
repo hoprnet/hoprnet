@@ -49,6 +49,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true, optional = true }
+validator = { workspace = true }
 
 hopr-types = { workspace = true, features = ["random"] }
 

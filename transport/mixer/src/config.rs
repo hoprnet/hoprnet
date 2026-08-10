@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use validator::Validate;
+
 pub const HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS: u64 = 0;
 pub const HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS: u64 = 20;
 pub const HOPR_MIXER_DELAY_METRIC_WINDOW: u64 = 100;
@@ -46,15 +48,17 @@ fn default_saturation_min_mean() -> Duration {
 ///
 /// Fields here apply to all engines; per-engine tuning lives in [`MixerType`], whose active
 /// variant also selects which engine [`crate::create`] instantiates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MixerConfig {
     /// Preallocated buffer capacity; more items may still be inserted, triggering reallocation.
     #[default(HOPR_MIXER_CAPACITY)]
+    #[validate(range(min = 1))]
     pub capacity: usize,
     /// Packet window over which the average-delay metric is smoothed.
     #[default(HOPR_MIXER_DELAY_METRIC_WINDOW)]
     #[cfg_attr(feature = "serde", serde(skip_serializing, default = "default_metric_delay_window"))]
+    #[validate(range(min = 1))]
     pub metric_delay_window: u64,
     /// Minimum delay before any packet is eligible for release.
     #[default(Duration::from_millis(HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS))]
@@ -67,6 +71,7 @@ pub struct MixerConfig {
     /// Engine selection plus its implementation-specific tuning.
     #[default(_code = "MixerType::default()")]
     #[cfg_attr(feature = "serde", serde(default))]
+    #[validate(nested)]
     pub mixer_type: MixerType,
 }
 
@@ -130,8 +135,23 @@ impl Default for MixerType {
     }
 }
 
+// Hand-written because `validator::Validate` does not derive on enums; delegates to the nested
+// `PoissonConfig` for the Poisson variants.
+impl validator::Validate for MixerType {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        match self {
+            #[cfg(feature = "poisson")]
+            MixerType::Poisson(poisson) => poisson.validate(),
+            #[cfg(feature = "poisson-shared")]
+            MixerType::PoissonShared(poisson) => poisson.validate(),
+            #[allow(unreachable_patterns)]
+            _ => Ok(()),
+        }
+    }
+}
+
 /// Tuning parameters for the exponential (Poisson) release engines.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PoissonConfig {
     /// Explicit mean holding delay; when zero the mean is derived from `delay_range` and
@@ -154,6 +174,7 @@ pub struct PoissonConfig {
     /// `saturation_min_mean` as the buffer nears `capacity`.
     #[default(HOPR_MIXER_CAPACITY / 2)]
     #[cfg_attr(feature = "serde", serde(default = "default_high_watermark"))]
+    #[validate(range(min = 1))]
     pub high_watermark: usize,
     /// Lower bound on the adaptive wake interval, keeping the tick frequency low under load.
     #[default(Duration::from_millis(HOPR_MIXER_DEFAULT_TICK_FLOOR_IN_MS))]
@@ -174,9 +195,25 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "poisson-shared")]
+    #[cfg(feature = "poisson-shared")]
     #[test]
     fn default_mixer_type_should_be_poisson_shared() {
         assert!(matches!(MixerType::default(), MixerType::PoissonShared(_)));
+    }
+
+    #[test]
+    fn default_config_should_pass_validation() -> anyhow::Result<()> {
+        MixerConfig::default().validate()?;
+        Ok(())
+    }
+
+    #[test]
+    fn zero_capacity_should_fail_validation() {
+        let cfg = MixerConfig {
+            capacity: 0,
+            ..MixerConfig::default()
+        };
+        assert!(cfg.validate().is_err());
     }
 
     #[test]
