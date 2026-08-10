@@ -38,7 +38,9 @@ impl PoissonParams {
         Self {
             min_delay: cfg.min_delay,
             cap: cfg.cap(),
-            cap_jitter: poisson.cap_jitter,
+            // Clamp to the cap: `sweep` has no separate `age >= cap` check, so a `cap_jitter`
+            // larger than the cap would push `cap_deadline` past the hard latency bound.
+            cap_jitter: poisson.cap_jitter.min(cfg.cap()),
             min_mix_occupancy: poisson.min_mix_occupancy,
             high_watermark: poisson.high_watermark,
             capacity: cfg.capacity,
@@ -285,7 +287,7 @@ mod tests {
     use super::*;
 
     // The stochastic property tests are parameterized over the realistic 1–10 MB/s operating
-    // range via `#[values(1.0, 5.0, 10.0)]`. At 512-byte packets these are ≈2k/10k/20k msg/s.
+    // range via `#[values(1.0, 5.0, 10.0)]`.
 
     fn entry<T>(item: T, age: Duration) -> Entry<T> {
         // Construct an entry as though it had been enqueued `age` ago.
@@ -812,6 +814,20 @@ mod tests {
             PoissonConfig::default(),
         );
         assert!((params.mean.as_secs_f64() * 1000.0 - 6.68).abs() < 0.1);
+    }
+
+    #[test]
+    fn cap_jitter_should_be_clamped_to_the_cap() {
+        // A cap_jitter larger than the cap must not push the hard-cap deadline past the cap.
+        let params = params(
+            Duration::ZERO,
+            Duration::from_millis(20),
+            PoissonConfig {
+                cap_jitter: Duration::from_secs(1),
+                ..PoissonConfig::default()
+            },
+        );
+        assert!(params.cap_jitter <= params.cap);
     }
 
     #[test]

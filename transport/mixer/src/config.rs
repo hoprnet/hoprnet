@@ -173,6 +173,7 @@ pub struct PoissonConfig {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "poisson-shared")]
     #[test]
     fn default_mixer_type_should_be_poisson_shared() {
         assert!(matches!(MixerType::default(), MixerType::PoissonShared(_)));

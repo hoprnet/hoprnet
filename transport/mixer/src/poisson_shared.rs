@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shared_should_mix_under_load() -> anyhow::Result<()> {
+    async fn poisson_shared_should_mix_under_load() -> anyhow::Result<()> {
         const N: usize = 3000;
         let cfg = shared_cfg(Duration::ZERO, Duration::from_millis(100), Duration::from_millis(10));
         let (tx, mut rx) = poisson_shared_channel::<(u32, Instant)>(cfg);
