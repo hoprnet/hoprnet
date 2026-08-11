@@ -4,7 +4,7 @@ use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
-    graph::{EdgeCapacityUpdate, MeasurableEdge, NetworkGraphUpdate},
+    graph::{EdgeBalanceUpdate, MeasurableEdge, NetworkGraphUpdate},
     types::{
         chain::chain_events::ChainEvent,
         internal::prelude::ChannelStatus,
@@ -131,28 +131,22 @@ pub(super) async fn process_chain_events<C, G, S>(
 
                 match keys {
                     Ok(Some((from, to))) => {
-                        let capacity =
-                            match channel.status {
-                                ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
-                                _ => ticket_price.read().div_f64(win_probability.read().as_f64()).ok().map(
-                                    |ticket_value| {
-                                        channel
-                                            .balance
-                                            .amount()
-                                            .checked_div(ticket_value.amount())
-                                            .map(|v| v.low_u128())
-                                            .unwrap_or(u128::MAX)
-                                    },
-                                ),
-                            };
+                        // Emit the raw balance, not a ticket count. Dividing by the ticket face
+                        // value here would bake a live ticket price and winning probability into
+                        // every edge, so each price change would stale the whole graph at once.
+                        // Consumers apply the face value when they evaluate a path instead.
+                        let balance = match channel.status {
+                            ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
+                            _ => Some(channel.balance.amount()),
+                        };
 
                         tracing::debug!(
-                            %channel, ?capacity,
-                            "recording graph edge for channel capacity"
+                            %channel, ?balance,
+                            "recording graph edge for channel balance"
                         );
-                        graph_updater.record_edge(MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(
-                            Box::new(EdgeCapacityUpdate {
-                                capacity,
+                        graph_updater.record_edge(MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Balance(
+                            Box::new(EdgeBalanceUpdate {
+                                balance,
                                 src: from,
                                 dest: to,
                             }),
@@ -195,13 +189,37 @@ pub(super) async fn process_chain_events<C, G, S>(
             ChainEvent::WinningProbabilityIncreased(prob) | ChainEvent::WinningProbabilityDecreased(prob) => {
                 tracing::debug!(%prob, "recording winning probability change");
                 *win_probability.write() = prob;
+                push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
             ChainEvent::TicketPriceChanged(price) => {
                 tracing::debug!(%price, "recording ticket price change");
                 *ticket_price.write() = price;
+                push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
             _ => {}
         }
+    }
+}
+
+/// Recomputes the single-hop ticket face value and pushes it into the graph.
+///
+/// `price / win_probability` is the amount that makes the expected payout per packet equal the
+/// ticket price, i.e. one ticket's face value. Edges store only a balance, so this is the one place
+/// pricing enters path selection — and a change costs a single write rather than an edge sweep.
+fn push_ticket_face_value<G>(
+    graph: &G,
+    ticket_price: &Arc<RwLock<HoprBalance>>,
+    win_probability: &Arc<RwLock<WinningProbability>>,
+) where
+    G: NetworkGraphUpdate,
+{
+    match ticket_price.read().div_f64(win_probability.read().as_f64()) {
+        Ok(face_value) => {
+            let face_value = face_value.amount();
+            tracing::debug!(%face_value, "recording ticket face value change");
+            graph.set_ticket_face_value(face_value);
+        }
+        Err(error) => tracing::error!(%error, "failed to derive the ticket face value; leaving the previous one"),
     }
 }
 
@@ -217,7 +235,7 @@ mod tests {
     use hopr_api::{
         HoprBalance, OffchainPublicKey,
         chain::{ChainKeyOperations, HoprKeyIdent, KeyIdMapping, WinningProbability},
-        graph::{EdgeCapacityUpdate, MeasurableEdge, MeasurablePath, MeasurablePeer, NetworkGraphUpdate},
+        graph::{EdgeBalanceUpdate, MeasurableEdge, MeasurablePath, MeasurablePeer, NetworkGraphUpdate},
         types::{
             chain::chain_events::ChainEvent,
             crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
@@ -292,7 +310,8 @@ mod tests {
     #[derive(Debug, Clone)]
     enum GraphCall {
         Node(OffchainPublicKey),
-        Edge(Box<EdgeCapacityUpdate>),
+        Edge(Box<EdgeBalanceUpdate>),
+        FaceValue(hopr_api::graph::traits::ChannelBalance),
     }
 
     #[derive(Debug, Clone, Default)]
@@ -305,10 +324,17 @@ mod tests {
             self.calls.lock().unwrap().clone()
         }
 
-        fn edges(&self) -> Vec<EdgeCapacityUpdate> {
+        fn edges(&self) -> Vec<EdgeBalanceUpdate> {
             self.recorded()
                 .into_iter()
                 .filter_map(|c| if let GraphCall::Edge(e) = c { Some(*e) } else { None })
+                .collect()
+        }
+
+        fn face_values(&self) -> Vec<hopr_api::graph::traits::ChannelBalance> {
+            self.recorded()
+                .into_iter()
+                .filter_map(|c| if let GraphCall::FaceValue(v) = c { Some(v) } else { None })
                 .collect()
         }
 
@@ -321,13 +347,17 @@ mod tests {
     }
 
     impl NetworkGraphUpdate for RecordingGraph {
+        fn set_ticket_face_value(&self, ticket_face_value: hopr_api::graph::traits::ChannelBalance) {
+            self.calls.lock().unwrap().push(GraphCall::FaceValue(ticket_face_value));
+        }
+
         fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
         where
             N: MeasurablePeer + Clone + Send + Sync + 'static,
             P: MeasurablePath + Clone + Send + Sync + 'static,
         {
-            if let MeasurableEdge::Capacity(cap) = update {
-                self.calls.lock().unwrap().push(GraphCall::Edge(cap));
+            if let MeasurableEdge::Balance(balance) = update {
+                self.calls.lock().unwrap().push(GraphCall::Edge(balance));
             }
         }
 
@@ -514,7 +544,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // price=10, win_prob=1.0, balance=100 → capacity = 100/(10/1.0) = 10
+        // The balance is emitted as-is; pricing no longer enters the per-edge value.
         run(
             vec![ChainEvent::ChannelOpened(channel(
                 src_addr,
@@ -533,7 +563,10 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(10));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::ChannelBalance::from(100u64))
+        );
         assert_eq!(edges[0].src, *src_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
     }
@@ -548,7 +581,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // price=10, win_prob=1.0, balance=50 after decrease → capacity = 50/10 = 5
+        // The decreased balance is emitted as-is.
         run(
             vec![ChainEvent::ChannelBalanceDecreased(
                 channel(src_addr, dst_addr, 50, ChannelStatus::Open),
@@ -565,7 +598,10 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(5));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::ChannelBalance::from(50u64))
+        );
     }
 
     #[tokio::test]
@@ -596,7 +632,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, None);
+        assert_eq!(edges[0].balance, None);
     }
 
     /// Regression test: before the fix, ChannelClosureInitiated was a no-op and the
@@ -631,13 +667,13 @@ mod tests {
         let edges = graph.edges();
         assert_eq!(edges.len(), 1, "closure-initiated must emit a graph update");
         assert_eq!(
-            edges[0].capacity, None,
-            "closure-initiated must zero out the capacity so routing stops using this edge"
+            edges[0].balance, None,
+            "closure-initiated must clear the balance so routing stops using this edge"
         );
     }
 
     #[tokio::test]
-    async fn ticket_price_change_affects_subsequent_capacity() {
+    async fn ticket_price_change_pushes_a_new_face_value() {
         let (src_offchain, src_chain) = make_keypairs();
         let (dst_offchain, dst_chain) = make_keypairs();
         let src_addr = src_chain.public().to_address();
@@ -646,7 +682,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // initial price=10; after price change to 20, balance=200 → 200/(20/1.0) = 10
+        // A price change recomputes the face value: 20 / 1.0 = 20. The balance is untouched.
         run(
             vec![
                 ChainEvent::TicketPriceChanged(HoprBalance::from(20u64)),
@@ -661,13 +697,23 @@ mod tests {
         )
         .await;
 
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::ChannelBalance::from(20u64)],
+            "a price change must push exactly one recomputed face value"
+        );
+
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(10));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::ChannelBalance::from(200u64)),
+            "the emitted balance must not depend on the price"
+        );
     }
 
     #[tokio::test]
-    async fn win_probability_change_affects_subsequent_capacity() -> anyhow::Result<()> {
+    async fn win_probability_change_pushes_a_new_face_value() -> anyhow::Result<()> {
         let (src_offchain, src_chain) = make_keypairs();
         let (dst_offchain, dst_chain) = make_keypairs();
         let src_addr = src_chain.public().to_address();
@@ -676,7 +722,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // initial win_prob=1.0; after decrease to 0.5, balance=100, price=10 → 100/(10/0.5) = 5
+        // A winning-probability change recomputes the face value: 10 / 0.5 = 20.
         let new_prob = WinningProbability::try_from_f64(0.5).context("0.5 is a valid winning probability")?;
         run(
             vec![
@@ -692,9 +738,19 @@ mod tests {
         )
         .await;
 
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::ChannelBalance::from(20u64)],
+            "a winning-probability change must push exactly one recomputed face value"
+        );
+
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(5));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::ChannelBalance::from(100u64)),
+            "the emitted balance must not depend on the winning probability"
+        );
         Ok(())
     }
 

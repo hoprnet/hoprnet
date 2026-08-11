@@ -1237,7 +1237,8 @@ where
             .filter_map(|peer| {
                 let observation = self.graph.edge(me, &peer);
                 if let Some(info) = observation {
-                    if info.score() >= minimum_score {
+                    // An unobserved edge has no score and cannot clear any threshold.
+                    if info.score().is_some_and(|score| score >= minimum_score) {
                         Some((peer, info))
                     } else {
                         None

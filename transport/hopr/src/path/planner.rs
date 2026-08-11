@@ -186,7 +186,7 @@ fn capacity_factor(c: u128, reference: u128) -> f64 {
 /// derived from the per-path aggregates.  Factors are neutral (1.0) when the
 /// corresponding aggregate is unavailable to avoid penalising unprobed paths.
 /// For 0-hop routes (`hops == 0`) the capacity factor is always 1.0 — direct
-/// `me -> dest` packets use no payment channel, so `capacity_floor = None` is expected.
+/// `me -> dest` packets use no payment channel, so `fundable_tickets_floor = None` is expected.
 fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams) -> f64 {
     let lat = pwc
         .total_latency_ms
@@ -195,7 +195,7 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     let cap = if hops == 0 {
         1.0
     } else {
-        pwc.capacity_floor
+        pwc.fundable_tickets_floor
             .map(|c| capacity_factor(c, params.capacity_reference))
             .unwrap_or(1.0)
     };
@@ -310,7 +310,7 @@ where
             total_latency_ms = ?pwm.total_latency_ms,
             min_probe_success_rate = ?pwm.min_probe_success_rate,
             min_ack_rate = ?pwm.min_ack_rate,
-            capacity_floor = ?pwm.capacity_floor,
+            fundable_tickets_floor = ?pwm.fundable_tickets_floor,
             "weighted candidate path",
         );
     }
@@ -1128,7 +1128,7 @@ mod tests {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(std::time::Duration::from_millis(50))));
             obs.record(EdgeWeightType::Intermediate(Ok(std::time::Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Capacity(Some(1000)));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(1000u64))));
         });
     }
 
@@ -1916,14 +1916,14 @@ mod tests {
         }
     }
 
-    fn make_pwm(cost: f64, latency_ms: Option<u32>, capacity_floor: Option<u128>) -> PathWithMetrics {
+    fn make_pwm(cost: f64, latency_ms: Option<u32>, fundable_tickets_floor: Option<u128>) -> PathWithMetrics {
         PathWithMetrics {
             path: vec![],
             cost,
             total_latency_ms: latency_ms,
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor,
+            fundable_tickets_floor,
         }
     }
 
