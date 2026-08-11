@@ -174,13 +174,61 @@ pub fn prune_for_consistency(candidates: Vec<PathWithMetrics>, floor: usize, hop
     // latency-measured candidates are never discarded when unprobed paths alone
     // would satisfy the floor.
     let target_populated = populated.len().min(floor);
-    populated.truncate(target_populated);
+    let populated = take_relayer_diverse(populated, target_populated);
     let remaining = floor - target_populated;
 
     let mut result = populated;
     result.extend(unpopulated.into_iter().take(remaining));
 
     result
+}
+
+/// Takes `n` candidates from `sorted`, preferring not-yet-represented first relayers.
+///
+/// A plain truncation keeps the `n` lowest-latency paths, which in a well-connected network are
+/// frequently the *same* few relayers reached by different routes.  The candidate set that
+/// survives then offers far less relayer diversity than the graph actually has, and every
+/// downstream draw — including the return-path spreading — inherits that concentration.
+///
+/// Relative order is preserved, so the result is still latency-ordered within each pass.
+fn take_relayer_diverse(sorted: Vec<PathWithMetrics>, n: usize) -> Vec<PathWithMetrics> {
+    if sorted.len() <= n {
+        return sorted;
+    }
+
+    let mut seen: Vec<OffchainPublicKey> = Vec::with_capacity(n);
+    let mut taken = vec![false; sorted.len()];
+    let mut count = 0;
+
+    // First pass: one path per distinct first relayer, best (lowest-latency) first.
+    for (i, p) in sorted.iter().enumerate() {
+        if count == n {
+            break;
+        }
+        let Some(first) = p.path.first() else { continue };
+        if !seen.contains(first) {
+            seen.push(*first);
+            taken[i] = true;
+            count += 1;
+        }
+    }
+
+    // Second pass: fill any remaining slots with the best of the rest.
+    for slot in taken.iter_mut() {
+        if count == n {
+            break;
+        }
+        if !*slot {
+            *slot = true;
+            count += 1;
+        }
+    }
+
+    sorted
+        .into_iter()
+        .zip(taken)
+        .filter_map(|(p, keep)| keep.then_some(p))
+        .collect()
 }
 
 /// Compute candidate paths from `src` to `dest` through `graph`.
@@ -945,6 +993,72 @@ mod tests {
             min_ack_rate: None,
             capacity_floor,
         }
+    }
+
+    /// A candidate whose first hop is relayer `relayer_idx`, with the given latency.
+    fn make_path_via(relayer_idx: u8, latency_ms: u32) -> PathWithMetrics {
+        let mut secret = [1u8; 32];
+        secret[0] = relayer_idx.max(1);
+        let relayer = *OffchainKeypair::from_secret(&secret).expect("valid secret").public();
+        PathWithMetrics {
+            path: vec![relayer],
+            cost: 1.0,
+            total_latency_ms: Some(latency_ms),
+            min_probe_success_rate: None,
+            min_ack_rate: None,
+            capacity_floor: Some(1000),
+        }
+    }
+
+    #[test]
+    fn prune_should_prefer_distinct_first_relayers_over_pure_latency_order() {
+        // The four lowest-latency paths all leave via relayer 1; relayers 2..4 are slower. A pure
+        // latency truncation to 3 would keep only relayer 1, collapsing all downstream diversity.
+        let candidates = vec![
+            make_path_via(1, 10),
+            make_path_via(1, 11),
+            make_path_via(1, 12),
+            make_path_via(1, 13),
+            make_path_via(2, 50),
+            make_path_via(3, 60),
+            make_path_via(4, 70),
+        ];
+
+        let result = prune_for_consistency(candidates, 3, 1);
+        assert_eq!(3, result.len());
+
+        let relayers: Vec<String> = result
+            .iter()
+            .map(|p| hopr_api::types::primitive::traits::ToHex::to_hex(p.path.first().expect("non-empty")))
+            .collect();
+        let mut distinct = relayers.clone();
+        distinct.sort();
+        distinct.dedup();
+        assert_eq!(3, distinct.len(), "the floor must be filled with distinct relayers");
+
+        // The best path per relayer is the one kept, so latency still drives the choice within
+        // each relayer.
+        assert_eq!(Some(10), result[0].total_latency_ms, "still latency-ordered");
+    }
+
+    #[test]
+    fn prune_should_fall_back_to_latency_order_once_relayers_are_exhausted() {
+        // Only two relayers available but a floor of 4: the remaining slots go to the next-best
+        // paths regardless of relayer.
+        let candidates = vec![
+            make_path_via(1, 10),
+            make_path_via(2, 20),
+            make_path_via(1, 30),
+            make_path_via(2, 40),
+            make_path_via(1, 50),
+        ];
+
+        let result = prune_for_consistency(candidates, 4, 1);
+        assert_eq!(4, result.len());
+        assert_eq!(
+            vec![Some(10), Some(20), Some(30), Some(40)],
+            result.iter().map(|p| p.total_latency_ms).collect::<Vec<_>>()
+        );
     }
 
     #[test]

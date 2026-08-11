@@ -76,6 +76,21 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
+    /// Minimum number of *distinct first relayers* to spread a batch of return paths over.
+    ///
+    /// Return paths are otherwise drawn independently by weight, which concentrates a session's
+    /// SURBs on the few highest-weighted relays — losing one then costs a share of the return
+    /// traffic far above the reliable-mode loss tolerance. Spreading over `K` relays and
+    /// interleaving the draws caps a single relay's share at roughly `1/K`, which makes a single
+    /// return-relay failure survivable without having to detect it first.
+    ///
+    /// Capped by how many distinct relayers the candidate set actually offers, so a small or
+    /// sparsely-connected network simply gets as much diversity as exists. `0` or `1` disables
+    /// the spreading and restores per-path independent weighted draws.
+    ///
+    /// Default is 6.
+    #[default = 6]
+    pub min_return_path_diversity: usize,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -139,6 +154,110 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     pwc.cost * lat * cap
 }
 
+/// Picks an index into `weights` with probability proportional to the weight.
+///
+/// Returns `None` if every weight is non-positive. Mirrors `WeightedCollection::pick_index`, which
+/// cannot be reused here because the selection below operates over subsets of one collection.
+fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
+    let total: f64 = weights.iter().map(|w| w.max(0.0)).sum();
+    if total <= 0.0 {
+        return None;
+    }
+
+    // Path selection is privacy-relevant, so draw from the CSPRNG rather than a thread RNG.
+    let r = hopr_api::types::crypto_random::random_float_in_range(0.0..total);
+    let mut cumulative = 0.0;
+    for (i, w) in weights.iter().enumerate() {
+        cumulative += w.max(0.0);
+        if r < cumulative {
+            return Some(i);
+        }
+    }
+
+    // Floating-point edge case: fall back to the last positive-weight entry.
+    weights.iter().rposition(|w| *w > 0.0)
+}
+
+/// Groups candidate indices by the path's first relayer, one bucket per distinct relayer.
+///
+/// The first relayer is the only hop the *replying* side pays for and the one whose failure takes
+/// the whole return path with it, so it is the right axis to diversify over. Insertion order is
+/// preserved, which keeps the grouping deterministic for a given candidate list.
+fn group_by_first_relayer(candidates: &[&(ValidatedPath, f64)]) -> Vec<Vec<usize>> {
+    let mut relayers: Vec<OffchainPublicKey> = Vec::new();
+    let mut buckets: Vec<Vec<usize>> = Vec::new();
+
+    for (i, (path, _)) in candidates.iter().enumerate() {
+        let Some(first) = path.first() else {
+            continue;
+        };
+        match relayers.iter().position(|k| k == first) {
+            Some(b) => buckets[b].push(i),
+            None => {
+                relayers.push(*first);
+                buckets.push(vec![i]);
+            }
+        }
+    }
+
+    buckets
+}
+
+/// Picks up to `k` distinct buckets, weighted by each bucket's total weight, without replacement.
+///
+/// Returns fewer than `k` when fewer distinct relayers exist — a sparse network gets as much
+/// diversity as it has, rather than an error.
+fn pick_distinct_buckets(buckets: &[Vec<usize>], weights: &[f64], k: usize) -> Vec<usize> {
+    let mut remaining: Vec<f64> = buckets
+        .iter()
+        .map(|b| b.iter().map(|&i| weights[i].max(0.0)).sum())
+        .collect();
+
+    let target = k.min(buckets.len());
+    let mut chosen = Vec::with_capacity(target);
+    while chosen.len() < target {
+        let Some(b) = pick_weighted_index(&remaining) else {
+            break;
+        };
+        chosen.push(b);
+        remaining[b] = 0.0;
+    }
+
+    chosen
+}
+
+/// Draws `count` paths by cycling through `chosen` buckets, picking by weight within each.
+///
+/// The round-robin is what makes a dead relayer cost about `1/chosen.len()` of *any prefix* of the
+/// batch, not just of the batch as a whole — which is what matters, because the replying side
+/// drains its SURB buffer from one end rather than sampling it uniformly.
+fn round_robin_across_buckets(
+    items: &[&(ValidatedPath, f64)],
+    buckets: &[Vec<usize>],
+    chosen: &[usize],
+    weights: &[f64],
+    count: usize,
+) -> Vec<ValidatedPath> {
+    if chosen.is_empty() {
+        return Vec::new();
+    }
+
+    // Per-relayer weight vectors, so the within-bucket draw is a plain lookup.
+    let bucket_weights: Vec<Vec<f64>> = chosen
+        .iter()
+        .map(|&b| buckets[b].iter().map(|&i| weights[i]).collect())
+        .collect();
+
+    (0..count)
+        .map(|i| {
+            let slot = i % chosen.len();
+            let bucket = &buckets[chosen[slot]];
+            let within = pick_weighted_index(&bucket_weights[slot]).unwrap_or(0);
+            items[bucket[within]].0.clone()
+        })
+        .collect()
+}
+
 /// Cache key for the path planner: `(source, destination, hops)`.
 ///
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
@@ -168,6 +287,7 @@ pub struct PathPlanner<Surb, R, S> {
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
     weighting: WeightingParams,
+    min_return_path_diversity: usize,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -196,6 +316,7 @@ where
                 latency_halflife: config.latency_halflife,
                 capacity_reference: config.capacity_reference,
             },
+            min_return_path_diversity: config.min_return_path_diversity,
         }
     }
 
@@ -252,68 +373,10 @@ where
 
             RoutingOptions::Hops(hops) => {
                 let hops_usize: usize = hops.into();
-                trace!(hops = hops_usize, "resolving path via planner cache");
-
                 let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
                 let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
 
-                let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
-
-                let resolver = self.resolver.clone();
-                let selector = self.selector.clone();
-                let weighting = self.weighting;
-
-                let paths = self
-                    .cache
-                    .try_get_with(cache_key, async move {
-                        trace!(hops = hops_usize, "path cache miss, querying selector");
-                        let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
-
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-                        for mut pwc in candidates {
-                            let path_nodes = std::mem::take(&mut pwc.path);
-                            let node_ids: Vec<NodeId> =
-                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
-                                    path_metrics.push(pwc);
-                                }
-                                Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
-                            }
-                        }
-
-                        if valid_paths.is_empty() {
-                            return Err(PathPlannerError::Path(PathError::PathNotFound(
-                                hops_usize,
-                                src_key.to_hex(),
-                                dest_key.to_hex(),
-                            )));
-                        }
-
-                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-                        let total_wt = weighted.total_weight();
-                        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-                            tracing::debug!(
-                                %destination,
-                                hops = hops_usize,
-                                path = %vp,
-                                cost = pwm.cost,
-                                composite_weight = w,
-                                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-                                total_latency_ms = ?pwm.total_latency_ms,
-                                min_probe_success_rate = ?pwm.min_probe_success_rate,
-                                min_ack_rate = ?pwm.min_ack_rate,
-                                capacity_floor = ?pwm.capacity_floor,
-                                "weighted candidate path",
-                            );
-                        }
-                        Ok(Arc::new(weighted))
-                    })
-                    .await
-                    .map_err(PathPlannerError::CacheError)?;
+                let paths = self.cached_paths(source, destination, hops).await?;
 
                 paths.pick_one().ok_or_else(|| {
                     PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
@@ -328,6 +391,141 @@ where
 
         trace!(%path, "validated resolved path");
         Ok(path)
+    }
+
+    /// Returns the cached, weighted collection of validated `hops`-hop paths from `source` to
+    /// `destination`, computing and caching it on a miss.
+    ///
+    /// Callers that need a single path draw one with `pick_one`; callers that need a whole batch
+    /// (see [`PathPlanner::resolve_diverse_return_paths`]) work over the collection directly, so
+    /// they pay for one cache lookup instead of one per path.
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn cached_paths(
+        &self,
+        source: NodeId,
+        destination: NodeId,
+        hops: hopr_api::types::primitive::bounded::BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
+    ) -> Result<PlannerCacheValue> {
+        let hops_usize: usize = hops.into();
+        trace!(hops = hops_usize, "resolving path via planner cache");
+
+        let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
+        let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
+
+        let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
+
+        let resolver = self.resolver.clone();
+        let selector = self.selector.clone();
+        let weighting = self.weighting;
+
+        self.cache
+            .try_get_with(cache_key, async move {
+                trace!(hops = hops_usize, "path cache miss, querying selector");
+                let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
+
+                let chain_resolver = ChainPathResolver::from(&*resolver);
+                let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+                for mut pwc in candidates {
+                    let path_nodes = std::mem::take(&mut pwc.path);
+                    let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                    match ValidatedPath::new(source, node_ids, &chain_resolver).await {
+                        Ok(vp) => {
+                            valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
+                            path_metrics.push(pwc);
+                        }
+                        Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
+                    }
+                }
+
+                if valid_paths.is_empty() {
+                    return Err(PathPlannerError::Path(PathError::PathNotFound(
+                        hops_usize,
+                        src_key.to_hex(),
+                        dest_key.to_hex(),
+                    )));
+                }
+
+                let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                let total_wt = weighted.total_weight();
+                for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                    tracing::debug!(
+                        %destination,
+                        hops = hops_usize,
+                        path = %vp,
+                        cost = pwm.cost,
+                        composite_weight = w,
+                        sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                        total_latency_ms = ?pwm.total_latency_ms,
+                        min_probe_success_rate = ?pwm.min_probe_success_rate,
+                        min_ack_rate = ?pwm.min_ack_rate,
+                        capacity_floor = ?pwm.capacity_floor,
+                        "weighted candidate path",
+                    );
+                }
+                Ok(Arc::new(weighted))
+            })
+            .await
+            .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Resolves `count` return paths from `destination` back to this node, spread across at least
+    /// [`PathPlannerConfig::min_return_path_diversity`] distinct first relayers and interleaved
+    /// round-robin between them.
+    ///
+    /// Drawing each return path independently by weight concentrates a session's SURBs on the few
+    /// highest-weighted relays, so losing one costs a share of the return traffic well above the
+    /// reliable-mode tolerance. Spreading over `K` relayers caps a single relay's share at about
+    /// `1/K`, and interleaving keeps that true of any *prefix* of the batch too — which matters
+    /// because the replying side drains its SURB buffer from one end.
+    ///
+    /// Only `Hops` routing has alternatives to spread over; an explicit path resolves to itself,
+    /// so those fall back to plain repeated resolution.
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn resolve_diverse_return_paths(
+        &self,
+        destination: NodeId,
+        options: RoutingOptions,
+        count: usize,
+    ) -> Result<Vec<ValidatedPath>> {
+        let me = NodeId::Offchain(self.me);
+
+        let hops = match options {
+            RoutingOptions::Hops(hops) if u32::from(hops) > 0 && self.min_return_path_diversity > 1 => hops,
+            // Nothing to spread over: a fixed path, a direct return, or diversity disabled.
+            other => {
+                return (0..count)
+                    .map(|_| self.resolve_path(destination, me, other.clone()))
+                    .collect::<FuturesUnordered<_>>()
+                    .try_collect::<Vec<_>>()
+                    .await;
+            }
+        };
+
+        let candidates = self.cached_paths(destination, me, hops).await?;
+        let items: Vec<&(ValidatedPath, f64)> = candidates.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+
+        let buckets = group_by_first_relayer(&items);
+        let chosen = pick_distinct_buckets(&buckets, &weights, self.min_return_path_diversity);
+        if chosen.is_empty() {
+            return Err(PathPlannerError::Path(PathError::PathNotFound(
+                hops.into(),
+                destination.to_string(),
+                me.to_string(),
+            )));
+        }
+
+        tracing::debug!(
+            %destination,
+            count,
+            distinct_relayers = chosen.len(),
+            available_relayers = buckets.len(),
+            requested = self.min_return_path_diversity,
+            "spreading return paths across distinct first relayers"
+        );
+
+        Ok(round_robin_across_buckets(&items, &buckets, &chosen, &weights, count))
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -364,10 +562,7 @@ where
                         "resolving packet return paths"
                     );
 
-                    (0..num_possible_surbs)
-                        .map(|_| self.resolve_path(*destination, NodeId::Offchain(self.me), return_options.clone()))
-                        .collect::<FuturesUnordered<_>>()
-                        .try_collect::<Vec<ValidatedPath>>()
+                    self.resolve_diverse_return_paths(*destination, return_options, num_possible_surbs)
                         .await?
                         .into_iter()
                         .enumerate()
@@ -661,6 +856,105 @@ mod tests {
         ) -> std::result::Result<BoxStream<'a, ChannelEntry>, TestError> {
             Ok(Box::pin(stream::iter(self.channels.clone())))
         }
+    }
+
+    // ── return-path diversity helpers ─────────────────────────────────────────
+
+    /// A one-element path whose only (and therefore first) hop is `key`.
+    fn path_via(key: OffchainPublicKey, addr: Address) -> ValidatedPath {
+        ValidatedPath::direct(key, addr)
+    }
+
+    fn diversity_fixture() -> Vec<(ValidatedPath, f64)> {
+        // Three candidates via relayer A, two via ME, one via DEST — deliberately lopsided, which
+        // is exactly the shape that makes independent weighted draws concentrate.
+        let (a, m, d) = (pubkey(&SECRET_A), pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
+        vec![
+            (path_via(a, a_addr()), 10.0),
+            (path_via(a, a_addr()), 9.0),
+            (path_via(a, a_addr()), 8.0),
+            (path_via(m, me_addr()), 2.0),
+            (path_via(m, me_addr()), 1.0),
+            (path_via(d, dest_addr()), 1.0),
+        ]
+    }
+
+    #[test]
+    fn group_by_first_relayer_should_bucket_candidates_by_their_first_hop() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+
+        let buckets = group_by_first_relayer(&items);
+
+        assert_eq!(3, buckets.len(), "one bucket per distinct first relayer");
+        assert_eq!(vec![vec![0, 1, 2], vec![3, 4], vec![5]], buckets);
+    }
+
+    #[test]
+    fn pick_distinct_buckets_should_return_distinct_buckets_up_to_the_requested_count() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+        let buckets = group_by_first_relayer(&items);
+
+        let chosen = pick_distinct_buckets(&buckets, &weights, 2);
+        assert_eq!(2, chosen.len());
+        assert_ne!(chosen[0], chosen[1], "buckets are picked without replacement");
+
+        // Asking for more diversity than exists yields everything available, not an error.
+        let all = pick_distinct_buckets(&buckets, &weights, 99);
+        assert_eq!(3, all.len());
+        let mut sorted = all.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(3, sorted.len(), "every chosen bucket is distinct");
+    }
+
+    #[test]
+    fn round_robin_across_buckets_should_interleave_relayers_evenly() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+        let buckets = group_by_first_relayer(&items);
+        let chosen = pick_distinct_buckets(&buckets, &weights, 3);
+
+        let paths = round_robin_across_buckets(&items, &buckets, &chosen, &weights, 9);
+        assert_eq!(9, paths.len());
+
+        // `OffchainPublicKey` is not `Ord`, so compare relayers by their hex form.
+        let relayers: Vec<String> = paths.iter().map(|p| p.first().expect("non-empty").to_hex()).collect();
+
+        // Every window of 3 consecutive picks covers all 3 relayers: no relayer owns a contiguous
+        // block, so a dead one costs ~1/3 of any prefix rather than a third of the batch at once.
+        for window in relayers.windows(3) {
+            let mut distinct = window.to_vec();
+            distinct.sort();
+            distinct.dedup();
+            assert_eq!(3, distinct.len(), "each window of 3 must cover all 3 relayers");
+        }
+
+        // Even overall share, despite the 10:9:8 vs 2:1 vs 1 weight skew across buckets.
+        for relayer in [pubkey(&SECRET_A), pubkey(&SECRET_ME), pubkey(&SECRET_DEST)] {
+            let hex = relayer.to_hex();
+            assert_eq!(3, relayers.iter().filter(|r| **r == hex).count());
+        }
+    }
+
+    #[test]
+    fn round_robin_across_buckets_should_yield_nothing_without_a_bucket() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+        let buckets = group_by_first_relayer(&items);
+
+        assert!(round_robin_across_buckets(&items, &buckets, &[], &weights, 5).is_empty());
+    }
+
+    #[test]
+    fn pick_weighted_index_should_reject_a_non_positive_total() {
+        assert_eq!(None, pick_weighted_index(&[]));
+        assert_eq!(None, pick_weighted_index(&[0.0, 0.0]));
+        assert_eq!(Some(1), pick_weighted_index(&[0.0, 1.0]));
     }
 
     // ── address fixtures ──────────────────────────────────────────────────────
