@@ -39,10 +39,23 @@ const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 // These values all correspond to a 512 MB quota (given ca. 1 kb HOPR packet payload capacity).
 // The last entry of each is the deployed value, so the sweep is a superset of the default set.
+//
+// The polynomial counts are capped by [`MAX_POLYS_PER_SSA`] (16 192), which is what makes this
+// sweep so much narrower than it looks. It used to read `[65535, 32768, 16384, 8192]` against
+// thresholds `[8, 16, 32, 64]`, and **three of those four points panicked**: `polynomials_per_ssa`
+// is `#[validate(range(min = 1, max = MAX_POLYS_PER_SSA))]`, so only the deployed point was ever
+// constructible and `--features all-benchmarks` aborted on the first sweep entry.
+//
+// That ceiling also bounds the re-tune this sweep exists to inform. Holding the quota at
+// `8192 × 64 = 524 288` and keeping `polys <= 16 192` puts the floor on the threshold at **33** —
+// so the whole reachable design space is one halving of the threshold against one doubling of the
+// polynomial count. Going below that means raising `MAX_POLYS_PER_SSA` first, which is a separate
+// decision: it is also the ceiling on `PixGlobalConfig::num_ssa_parts` and feeds the dimension
+// product validation.
 #[cfg(feature = "all-benchmarks")]
-const THRESHOLDS: [u8; 4] = [8, 16, 32, PROD_THRESHOLD];
+const THRESHOLDS: [u8; 4] = [33, 40, 48, PROD_THRESHOLD];
 #[cfg(feature = "all-benchmarks")]
-const POLYNOMIALS: [u16; 4] = [65535, 32768, 16384, PROD_POLYS_PER_SSA];
+const POLYNOMIALS: [u16; 4] = [15887, 13107, 10922, PROD_POLYS_PER_SSA];
 
 #[cfg(not(feature = "all-benchmarks"))]
 const THRESHOLDS: [u8; 1] = [PROD_THRESHOLD];

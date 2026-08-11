@@ -557,13 +557,22 @@ fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
     let shares_per_cycle =
         polys as usize * (PROD_THRESHOLD as usize + SsaGeneratorConfig::default().surplus_shares as usize);
 
-    for concurrency in ack_concurrency() {
+    // Both verification modes, because this group is what decides `use_batch_verification`'s
+    // default and the sequential group above cannot. Batching was flipped off on the strength of
+    // that group, but it amortises within one `acknowledge_shares` call and parallelises through
+    // rayon — so under `for_each_concurrent` the question is whether that inner parallelism helps
+    // when callers are already occupying every core, or oversubscribes them. Flattened into the
+    // concurrency loop rather than nested, so the body below is unchanged.
+    for (concurrency, (mode, use_batch_verification)) in ack_concurrency()
+        .into_iter()
+        .flat_map(|c| [("per_ack", false), ("batch", true)].map(|m| (c, m)))
+    {
         group.throughput(Throughput::Bytes(
             (concurrency * SUSTAINED_BATCH) as u64 * QUOTA_BYTES_PER_SHARE,
         ));
 
         let peer = OffchainKeypair::random();
-        let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
+        let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(use_batch_verification));
         let new_cycle = || {
             let (generator, pseudonym, constant_terms, proof) = generate_commitment_matrix(polys, PROD_THRESHOLD);
             let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
@@ -574,7 +583,7 @@ fn bench_acknowledge_shares_concurrent(c: &mut Criterion) {
             (generator, pseudonym)
         };
 
-        group.bench_function(BenchmarkId::from_parameter(format!("c{concurrency}")), |b| {
+        group.bench_function(BenchmarkId::from_parameter(format!("c{concurrency}/{mode}")), |b| {
             let (mut generator, mut pseudonym) = new_cycle();
             let mut remaining = shares_per_cycle;
             let mut counter: u64 = 0;

@@ -79,9 +79,25 @@ pub struct SsaReconstructorConfig {
     /// the same benchmark then measures 50.2 MiB/s batched against 92.8 MiB/s unbatched, so
     /// batching costs 46 % of the sustained rate.
     ///
-    /// Left configurable rather than removed: the figures above come from the sequential
-    /// `sustained_quota_rate` group, and the Exit runs acknowledgements through a concurrent
-    /// pipeline, where amortising the batch setup across more callers may yet pay.
+    /// **Settled against the concurrent pipeline shape**, which is what the Exit actually runs and
+    /// what the sequential figures above could not speak to. `concurrent_quota_rate` on 48 cores,
+    /// aggregate MiB/s of Session quota:
+    ///
+    /// | callers | unbatched | batched  |                              |
+    /// | ------- | --------- | -------- | ---------------------------- |
+    /// | 1       | **90.8**  | 47.7     | unbatched 1.90×              |
+    /// | 10      | 137.5     | 133.4    | tie — confidence intervals overlap |
+    /// | 48      | 150.4     | **162.6**| batched 1.08×                |
+    ///
+    /// So batching does eventually pay, but only *above* the concurrency the pipeline is
+    /// configured for: `DEFAULT_ACK_INPUT_CONCURRENCY` is 10, which is precisely the row where the
+    /// two are indistinguishable. `false` stays the default because it is far better at low
+    /// concurrency and no worse at the configured one, making it the safer choice across the range
+    /// an operator can set — not because batching is slower everywhere.
+    ///
+    /// Kept configurable for the operator who raises `ack_input_concurrency` well past its default,
+    /// where the last row says the choice flips. Note that none of this binds capacity: 137 MiB/s
+    /// at the production shape is 7.3× the 18.75 MiB/s that 100 concurrent Sessions demand.
     #[default(Self::DEFAULT_USE_BATCH_VERIFICATION)]
     pub use_batch_verification: bool,
     /// Fraction of reconstructed polynomials at which to emit an early recovery
