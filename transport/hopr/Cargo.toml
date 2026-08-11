@@ -30,18 +30,20 @@ crate-type = ["rlib"]
 doctest = false
 
 [features]
-default = ["bjj", "p2p-announce-quic"]
+default = ["pix-bjj", "p2p-announce-quic"]
 # Selects the Baby JubJub instantiation of `HoprPixSpec`, making PIX stealth addresses
-# Baby JubJub public keys instead of Ethereum addresses.
+# Baby JubJub public keys instead of Ethereum addresses. Default, because it is what
+# production settles.
 #
-# Forwarded from here rather than pinned on the workspace dependency so a consumer can
-# opt out: Cargo features are additive, so a hard-enabled `hopr-crypto-packet/bjj` could
-# never be turned off downstream. Anything that settles PIX deposits with plain on-chain
-# transfers needs the secp256k1 variant instead, because a Baby JubJub public key is not
-# an account that can receive one. No such consumer is in-tree today — the strategies
-# that were the motivating case have since been removed — so this is kept for downstream
-# consumers and for the option to reintroduce one, not for a current caller.
-bjj = ["hopr-crypto-packet/bjj"]
+# Forwarded from here rather than pinned on the workspace dependency, so that the choice
+# stays expressible at all: Cargo features are additive, and a hard-enabled
+# `hopr-crypto-packet/pix-bjj` could never be turned off downstream.
+pix-bjj = ["hopr-crypto-packet/pix-bjj"]
+# Overrides `pix-bjj`; see `hopr-crypto-packet`'s `pix-secp256k1` for why it is an override rather
+# than a peer. This is the supported way for a consumer to get Ethereum deposit addresses —
+# `default-features = false` is not, because it only holds while every crate in the graph
+# agrees to it.
+pix-secp256k1 = ["hopr-crypto-packet/pix-secp256k1"]
 all-benchmarks = []
 capture = ["dep:pcap-file"]
 # Test utilities: emulated peer wiring, stub chain API, shared keypair/payload fixtures.
