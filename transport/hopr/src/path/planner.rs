@@ -14,6 +14,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
+use hopr_transport_session::flow_control::{ReturnPathFeedback, ReturnPathFeedbackFactory};
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
@@ -91,6 +92,17 @@ pub struct PathPlannerConfig {
     /// Default is 6.
     #[default = 6]
     pub min_return_path_diversity: usize,
+    /// How long a return relayer retired by [`PathPlanner::degrade_return_path`] stays out of the
+    /// selection pool.
+    ///
+    /// Sustained return-direction loss identifies the *batch* of relayers in use, not which one
+    /// died, so the whole batch is retired and the innocent members come back when this expires.
+    /// Long enough that the next few batches genuinely avoid the dead relayer, short enough that
+    /// the usable pool is not durably shrunk.
+    ///
+    /// Default is 60 seconds.
+    #[default(Duration::from_secs(60))]
+    pub return_relayer_cooldown: Duration,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -205,13 +217,31 @@ fn group_by_first_relayer(candidates: &[&(ValidatedPath, f64)]) -> Vec<Vec<usize
 
 /// Picks up to `k` distinct buckets, weighted by each bucket's total weight, without replacement.
 ///
+/// Buckets whose index appears in `avoid` are skipped, unless doing so would leave nothing to pick
+/// at all — a cooled-down relayer is better than no return path.
+///
 /// Returns fewer than `k` when fewer distinct relayers exist — a sparse network gets as much
 /// diversity as it has, rather than an error.
-fn pick_distinct_buckets(buckets: &[Vec<usize>], weights: &[f64], k: usize) -> Vec<usize> {
+fn pick_distinct_buckets(buckets: &[Vec<usize>], weights: &[f64], k: usize, avoid: &[usize]) -> Vec<usize> {
     let mut remaining: Vec<f64> = buckets
         .iter()
-        .map(|b| b.iter().map(|&i| weights[i].max(0.0)).sum())
+        .enumerate()
+        .map(|(b, entries)| {
+            if avoid.contains(&b) {
+                0.0
+            } else {
+                entries.iter().map(|&i| weights[i].max(0.0)).sum()
+            }
+        })
         .collect();
+
+    // Everything is cooled down: fall back to the full set rather than failing to reply at all.
+    if remaining.iter().all(|w| *w <= 0.0) {
+        remaining = buckets
+            .iter()
+            .map(|b| b.iter().map(|&i| weights[i].max(0.0)).sum())
+            .collect();
+    }
 
     let target = k.min(buckets.len());
     let mut chosen = Vec::with_capacity(target);
@@ -288,6 +318,16 @@ pub struct PathPlanner<Surb, R, S> {
     refresh_period: Duration,
     weighting: WeightingParams,
     min_return_path_diversity: usize,
+    /// First relayers handed out for the most recent return-path batch per destination, so that a
+    /// degradation report can retire exactly the set that was in use when the loss was observed.
+    return_relayers_in_use: moka::sync::Cache<NodeId, Arc<Vec<OffchainPublicKey>>>,
+    /// Relayers retired by a degradation report, excluded from selection until the entry expires.
+    ///
+    /// Sustained return loss says *a* relayer in the batch is dead but not *which* — with the
+    /// traffic spread over K of them there is nothing to attribute it to. Retiring the whole batch
+    /// is what makes the next draw certain to avoid the dead one; the TTL puts the innocent ones
+    /// back in the pool shortly after.
+    cooled_down_relayers: moka::sync::Cache<OffchainPublicKey, ()>,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -317,6 +357,14 @@ where
                 capacity_reference: config.capacity_reference,
             },
             min_return_path_diversity: config.min_return_path_diversity,
+            return_relayers_in_use: moka::sync::Cache::builder()
+                .max_capacity(config.max_cache_capacity)
+                .time_to_idle(config.cache_ttl)
+                .build(),
+            cooled_down_relayers: moka::sync::Cache::builder()
+                .max_capacity(config.max_cache_capacity)
+                .time_to_live(config.return_relayer_cooldown)
+                .build(),
         }
     }
 
@@ -507,7 +555,21 @@ where
         let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
 
         let buckets = group_by_first_relayer(&items);
-        let chosen = pick_distinct_buckets(&buckets, &weights, self.min_return_path_diversity);
+
+        // Relayers retired by a recent degradation report are skipped, unless every candidate is
+        // cooled down — in which case a stale relayer beats no return path at all.
+        let avoid: Vec<usize> = buckets
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| {
+                b.first()
+                    .and_then(|&i| items[i].0.first())
+                    .is_some_and(|k| self.cooled_down_relayers.contains_key(k))
+            })
+            .map(|(b, _)| b)
+            .collect();
+
+        let chosen = pick_distinct_buckets(&buckets, &weights, self.min_return_path_diversity, &avoid);
         if chosen.is_empty() {
             return Err(PathPlannerError::Path(PathError::PathNotFound(
                 hops.into(),
@@ -521,11 +583,62 @@ where
             count,
             distinct_relayers = chosen.len(),
             available_relayers = buckets.len(),
+            cooled_down_relayers = avoid.len(),
             requested = self.min_return_path_diversity,
             "spreading return paths across distinct first relayers"
         );
 
+        // Remember the batch so a later degradation report knows exactly what was in use.
+        let in_use: Vec<OffchainPublicKey> = chosen
+            .iter()
+            .filter_map(|&b| buckets[b].first().and_then(|&i| items[i].0.first()).copied())
+            .collect();
+        self.return_relayers_in_use.insert(destination, Arc::new(in_use));
+
         Ok(round_robin_across_buckets(&items, &buckets, &chosen, &weights, count))
+    }
+
+    /// Reports that the return path from `destination` is degraded, so the next batch picks
+    /// different relayers.
+    ///
+    /// Retires every relayer of the most recent batch for
+    /// [`PathPlannerConfig::return_relayer_cooldown`] and drops the cached candidate list, so the
+    /// next resolution recomputes from the current graph. Both are needed: the cooldown steers the
+    /// draw away from the dead relayer, the cache drop lets fresh probe data in.
+    ///
+    /// Driven by the reliable-mode loss clock, which sees sustained loss within a few RTTs, rather
+    /// than by probing, which is EMA-smoothed behind a 60 s path cache.
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub fn degrade_return_path(&self, destination: NodeId) {
+        let Some(in_use) = self.return_relayers_in_use.get(&destination) else {
+            tracing::debug!(%destination, "no return-path batch on record; nothing to retire");
+            return;
+        };
+
+        for relayer in in_use.iter() {
+            self.cooled_down_relayers.insert(*relayer, ());
+        }
+        self.return_relayers_in_use.invalidate(&destination);
+
+        // Drop every cached return-path candidate list for this destination, whatever its hop
+        // count, so the next resolution is recomputed rather than replayed.
+        //
+        // `moka::future::Cache::invalidate` is async but this seam is called from a poll context,
+        // so the invalidation is spawned. The cooldown above is what actually steers the next draw;
+        // this only decides how fresh the candidates it draws from are.
+        let me = NodeId::Offchain(self.me);
+        let cache = self.cache.clone();
+        hopr_utils::runtime::prelude::spawn(async move {
+            for hops in 0..=RoutingOptions::MAX_INTERMEDIATE_HOPS as u32 {
+                cache.invalidate(&(destination, me, hops)).await;
+            }
+        });
+
+        tracing::info!(
+            %destination,
+            retired_relayers = in_use.len(),
+            "return path degraded; retired the relayers in use and dropped the cached candidates"
+        );
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -599,6 +712,48 @@ where
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
+    }
+}
+
+/// Adapts a [`PathPlanner`] to the session layer's return-path feedback seam.
+///
+/// The session layer detects that a return path has gone bad but has no way to fix one; the
+/// planner can re-plan but has no view of delivery. This bridges the two without either depending
+/// on the other.
+#[derive(Clone)]
+pub struct PlannerReturnPathFeedback<Surb, R, S>(pub PathPlanner<Surb, R, S>);
+
+impl<Surb, R, S> ReturnPathFeedbackFactory for PlannerReturnPathFeedback<Surb, R, S>
+where
+    Surb: SurbStore + Clone + Send + Sync + 'static,
+    R: Clone,
+    S: Clone,
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
+    S: PathSelector + Send + Sync + 'static,
+{
+    fn for_destination(&self, destination: NodeId) -> Arc<dyn ReturnPathFeedback> {
+        Arc::new(DestinationBoundFeedback {
+            planner: self.0.clone(),
+            destination,
+        })
+    }
+}
+
+/// A [`ReturnPathFeedback`] handle pinned to one session's destination.
+struct DestinationBoundFeedback<Surb, R, S> {
+    planner: PathPlanner<Surb, R, S>,
+    destination: NodeId,
+}
+
+impl<Surb, R, S> ReturnPathFeedback for DestinationBoundFeedback<Surb, R, S>
+where
+    Surb: SurbStore + Send + Sync + 'static,
+    Surb: Send + Sync,
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
+    S: PathSelector + Send + Sync + 'static,
+{
+    fn return_path_degraded(&self) {
+        self.planner.degrade_return_path(self.destination);
     }
 }
 
@@ -897,12 +1052,12 @@ mod tests {
         let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
         let buckets = group_by_first_relayer(&items);
 
-        let chosen = pick_distinct_buckets(&buckets, &weights, 2);
+        let chosen = pick_distinct_buckets(&buckets, &weights, 2, &[]);
         assert_eq!(2, chosen.len());
         assert_ne!(chosen[0], chosen[1], "buckets are picked without replacement");
 
         // Asking for more diversity than exists yields everything available, not an error.
-        let all = pick_distinct_buckets(&buckets, &weights, 99);
+        let all = pick_distinct_buckets(&buckets, &weights, 99, &[]);
         assert_eq!(3, all.len());
         let mut sorted = all.clone();
         sorted.sort();
@@ -916,7 +1071,7 @@ mod tests {
         let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
         let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
         let buckets = group_by_first_relayer(&items);
-        let chosen = pick_distinct_buckets(&buckets, &weights, 3);
+        let chosen = pick_distinct_buckets(&buckets, &weights, 3, &[]);
 
         let paths = round_robin_across_buckets(&items, &buckets, &chosen, &weights, 9);
         assert_eq!(9, paths.len());
@@ -938,6 +1093,33 @@ mod tests {
             let hex = relayer.to_hex();
             assert_eq!(3, relayers.iter().filter(|r| **r == hex).count());
         }
+    }
+
+    #[test]
+    fn pick_distinct_buckets_should_skip_cooled_down_relayers() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+        let buckets = group_by_first_relayer(&items);
+
+        // Retire bucket 0 (the heavily-weighted relayer A); it must never be drawn while others exist.
+        for _ in 0..20 {
+            let chosen = pick_distinct_buckets(&buckets, &weights, 2, &[0]);
+            assert_eq!(2, chosen.len());
+            assert!(!chosen.contains(&0), "a cooled-down relayer must not be selected");
+        }
+    }
+
+    #[test]
+    fn pick_distinct_buckets_should_fall_back_when_every_relayer_is_cooled_down() {
+        let fixture = diversity_fixture();
+        let items: Vec<&(ValidatedPath, f64)> = fixture.iter().collect();
+        let weights: Vec<f64> = items.iter().map(|(_, w)| *w).collect();
+        let buckets = group_by_first_relayer(&items);
+
+        // A stale relayer still beats having no return path at all.
+        let chosen = pick_distinct_buckets(&buckets, &weights, 2, &[0, 1, 2]);
+        assert_eq!(2, chosen.len());
     }
 
     #[test]
