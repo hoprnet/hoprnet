@@ -80,14 +80,14 @@ pub struct SsaReconstructorConfig {
     /// batching costs 46 % of the sustained rate.
     ///
     /// **Settled against the concurrent pipeline shape**, which is what the Exit actually runs and
-    /// what the sequential figures above could not speak to. `concurrent_quota_rate` on 48 cores,
-    /// aggregate MiB/s of Session quota:
+    /// what the sequential figures above could not speak to. `concurrent_quota_rate` on 48 cores at
+    /// production width, aggregate MiB/s of Session quota:
     ///
     /// | callers | unbatched | batched  |                              |
     /// | ------- | --------- | -------- | ---------------------------- |
-    /// | 1       | **90.8**  | 47.7     | unbatched 1.90×              |
-    /// | 10      | 137.5     | 133.4    | tie — confidence intervals overlap |
-    /// | 48      | 150.4     | **162.6**| batched 1.08×                |
+    /// | 1       | **90.9**  | 46.4     | unbatched 1.96×              |
+    /// | 10      | 130.2     | 126.2    | tie — confidence intervals overlap |
+    /// | 48      | 139.8     | **152.6**| batched 1.09×                |
     ///
     /// So batching does eventually pay, but only *above* the concurrency the pipeline is
     /// configured for: `DEFAULT_ACK_INPUT_CONCURRENCY` is 10, which is precisely the row where the
@@ -96,8 +96,14 @@ pub struct SsaReconstructorConfig {
     /// an operator can set — not because batching is slower everywhere.
     ///
     /// Kept configurable for the operator who raises `ack_input_concurrency` well past its default,
-    /// where the last row says the choice flips. Note that none of this binds capacity: 137 MiB/s
-    /// at the production shape is 7.3× the 18.75 MiB/s that 100 concurrent Sessions demand.
+    /// where the last row says the choice flips.
+    ///
+    /// **Headroom is narrower than it looks.** A deployed Exit serves 10–30 clients at 16–20 Mbps,
+    /// so it absorbs 19–72 MiB/s; against the 130 MiB/s above that is **1.8× at the top of the
+    /// range**, not the 7.3× an earlier reading of these figures claimed. That claim came from
+    /// comparing against the benchmark suite's own model of production — 100 Sessions at 1.5 Mbps,
+    /// 18.75 MiB/s — which understates real per-Session rate by 13×. The rates here are also
+    /// measured at 4096 polynomials rather than the 512 used previously, which costs about 5 %.
     #[default(Self::DEFAULT_USE_BATCH_VERIFICATION)]
     pub use_batch_verification: bool,
     /// Fraction of reconstructed polynomials at which to emit an early recovery
