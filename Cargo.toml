@@ -138,8 +138,8 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = "1.19.0"
-hopr-types = { version = "2.2.0", features = ["use-bindings"] }
+hopr-api = "1.20.0"
+hopr-types = { version = "2.2.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.6.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
