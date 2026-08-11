@@ -239,6 +239,9 @@ impl HoprSession {
                 capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 max_buffered_segments: cfg.max_buffered_segments,
+                // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
+                // also where the honest clock that observes the resulting loss lives.
+                max_frame_age: flow_control.and_then(|c| c.max_frame_age),
                 ..Default::default()
             };
 
@@ -267,6 +270,9 @@ impl HoprSession {
                     // `.max(1)`: never drop the retry budget to 0 — an abandoned frame under
                     // reliable-mode flow control leaves a gap and corrupts the stream.
                     max_outgoing_frame_retries: fc.map(|c| c.frame_retries.max(1) as usize).unwrap_or(2),
+                    // Retire an outgoing frame that is already too stale to be worth delivering,
+                    // rather than spending the remaining retry budget on it.
+                    max_frame_age: fc.and_then(|c| c.max_frame_age),
                     ..Default::default()
                 };
 

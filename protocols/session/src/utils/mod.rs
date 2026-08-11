@@ -68,6 +68,9 @@ pub(crate) struct RetriedFrameId {
     pub frame_id: FrameId,
     pub retry_count: usize,
     max_retries: usize,
+    /// When the frame first entered the retry pipeline; carried across retries, so [`Self::age`]
+    /// measures total time in flight rather than time since the last resend.
+    first_sent: std::time::Instant,
 }
 
 impl RetriedFrameId {
@@ -76,6 +79,7 @@ impl RetriedFrameId {
             frame_id,
             retry_count: 1,
             max_retries: 1,
+            first_sent: std::time::Instant::now(),
         }
     }
 
@@ -84,6 +88,7 @@ impl RetriedFrameId {
             frame_id,
             retry_count: 1,
             max_retries,
+            first_sent: std::time::Instant::now(),
         }
     }
 
@@ -93,10 +98,16 @@ impl RetriedFrameId {
                 frame_id: self.frame_id,
                 retry_count: self.retry_count + 1,
                 max_retries: self.max_retries,
+                first_sent: self.first_sent,
             })
         } else {
             None
         }
+    }
+
+    /// How long ago this frame first entered the retry pipeline.
+    pub fn age(&self) -> std::time::Duration {
+        self.first_sent.elapsed()
     }
 }
 
