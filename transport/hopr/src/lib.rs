@@ -61,7 +61,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::MemorySurbStore;
+pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_probe::{
     Probe,
@@ -1056,6 +1056,14 @@ where
     /// Returns a reference to the network graph.
     pub fn graph(&self) -> &Graph {
         &self.graph
+    }
+
+    /// Returns a reference to the SURB store.
+    ///
+    /// Exposed so that chain-level channel events can invalidate stored SURBs whose return path
+    /// starts with a relayer this node can no longer pay.
+    pub fn surb_store(&self) -> &MemorySurbStore {
+        &self.path_planner.surb_store
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

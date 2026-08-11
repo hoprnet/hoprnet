@@ -44,6 +44,21 @@ pub trait SurbStore {
     ///
     /// The operation should happen reasonably fast, as it is called from the packet processing code.
     fn find_reply_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener>;
+
+    /// Marks the edge from this node to `relayer` as unusable, so stored SURBs whose return path
+    /// starts there are no longer handed out.
+    ///
+    /// Used by the replying side once the payment channel towards `relayer` is closing or closed:
+    /// replying over it would only burn the SURB. SURBs with a direct return path are unaffected —
+    /// their first relayer is the final recipient and needs no channel.
+    ///
+    /// Defaults to a no-op, for stores that do not track edge validity.
+    fn invalidate_relayer(&self, _relayer: &HoprKeyIdent) {}
+
+    /// Reverts [`SurbStore::invalidate_relayer`] once the channel towards `relayer` re-opens.
+    ///
+    /// Defaults to a no-op, for stores that do not track edge validity.
+    fn revalidate_relayer(&self, _relayer: &HoprKeyIdent) {}
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).
