@@ -403,36 +403,56 @@ pub fn convergence_budget() -> Duration {
     TEST_GLOBAL_TIMEOUT / CONVERGENCE_BUDGET_FRACTION
 }
 
+/// Outcome of one convergence probe.
+pub enum Probe<T> {
+    /// Converged; stop polling and yield this.
+    Ready(T),
+    /// Not yet converged, described for the failure message. Keep polling.
+    Pending(String),
+}
+
 /// Polls `probe` until it reports convergence or [`convergence_budget`] expires.
 ///
-/// `probe` returns `Ok(value)` once converged, or `Err(state)` describing what it observed. On
-/// expiry the error carries `what`, the elapsed time and that last observed state — a bare boolean
-/// cannot distinguish "converged slowly" from "never converged", which is precisely what a CI log
-/// needs in order to be diagnosable without a re-run.
-pub async fn wait_for_convergence<T, E, F, Fut>(what: &str, mut probe: F) -> anyhow::Result<T>
+/// `probe` returns `Ok(Probe::Ready)` once converged and `Ok(Probe::Pending(state))` while it is
+/// still settling; on expiry the error carries `what`, the elapsed time and that last observed
+/// state, since a bare boolean cannot distinguish "converged slowly" from "never converged" — which
+/// is exactly what a CI log needs to be diagnosable without a re-run.
+///
+/// An `Err` from `probe` is a *hard* failure (a broken API call, say) and propagates immediately:
+/// retrying it until the budget expires would only turn a clear error into a timeout.
+pub async fn wait_for_convergence<T, F, Fut>(what: &str, mut probe: F) -> anyhow::Result<T>
 where
     F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = std::result::Result<T, E>>,
-    E: std::fmt::Display,
+    Fut: std::future::Future<Output = anyhow::Result<Probe<T>>>,
 {
     let budget = convergence_budget();
     let started = tokio::time::Instant::now();
-    loop {
-        let observed = match probe().await {
-            Ok(converged) => return Ok(converged),
-            Err(state) => state,
-        };
+    let deadline = started + budget;
+    let mut observed = "<never probed>".to_string();
 
-        if started.elapsed() >= budget {
-            anyhow::bail!(
-                "{what} did not converge within {budget:?} (elapsed {:?}); last observed: {observed}",
-                started.elapsed(),
-            );
+    while let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) {
+        // Bound the probe itself: an unbounded `probe().await` that blocks would sail past the
+        // budget and only stop at the outer test timeout, which is what this helper exists to avoid.
+        match tokio::time::timeout_at(deadline, probe()).await {
+            Ok(result) => match result? {
+                Probe::Ready(converged) => return Ok(converged),
+                Probe::Pending(state) => observed = state,
+            },
+            Err(_) => {
+                observed = format!("{observed} (probe still running at the deadline)");
+                break;
+            }
         }
 
         tracing::trace!(what, ?budget, elapsed = ?started.elapsed(), "waiting for convergence");
-        sleep(CONVERGENCE_POLL_INTERVAL).await;
+        // Never sleep past the deadline, or the next probe would start after the budget expired.
+        sleep(CONVERGENCE_POLL_INTERVAL.min(remaining)).await;
     }
+
+    anyhow::bail!(
+        "{what} did not converge within {budget:?} (elapsed {:?}); last observed: {observed}",
+        started.elapsed(),
+    )
 }
 
 lazy_static::lazy_static! {

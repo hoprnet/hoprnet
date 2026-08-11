@@ -9,7 +9,9 @@ use hopr_lib::{
         node::{HasNetworkView, HasTransportApi, IncentiveChannelOperations},
         types::primitive::prelude::Address,
     },
-    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster, wait_for_convergence},
+    testing::fixtures::{
+        ClusterGuard, Probe, TEST_GLOBAL_TIMEOUT, size_3_cluster_fixture as cluster, wait_for_convergence,
+    },
 };
 use rstest::*;
 use serial_test::serial;
@@ -144,11 +146,11 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
             })
             .collect();
 
-        if rates.iter().all(|(_, rate)| rate.is_some_and(|r| r > 0.0)) {
-            Ok(())
+        Ok(if rates.iter().all(|(_, rate)| rate.is_some_and(|r| r > 0.0)) {
+            Probe::Ready(())
         } else {
-            Err(format!("probe rates per peer: {rates:?}"))
-        }
+            Probe::Pending(format!("probe rates per peer: {rates:?}"))
+        })
     })
     .await?;
 
@@ -179,19 +181,23 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
     // Wait for probe quality to propagate — `all_network_peers(0.0)` filters
     // peers with score > 0 which requires at least one successful probe round.
     let all_peers = wait_for_convergence("peer scores", || async {
+        // A failing API call is a hard error, not slow convergence: propagate it rather than
+        // retrying until the budget expires.
         let peers = node
             .inner()
             .transport()
             .all_network_peers(0.0)
             .await
-            .map_err(|error| format!("failed to get all network peers: {error}"))?;
+            .context("failed to get all network peers")?;
 
-        if peers.len() >= expected_count && peers.iter().all(|(_, obs)| obs.score() > 0.0) {
-            Ok(peers)
-        } else {
-            let scores: Vec<(String, f64)> = peers.iter().map(|(id, obs)| (id.to_string(), obs.score())).collect();
-            Err(format!("{}/{expected_count} scored peers: {scores:?}", peers.len()))
-        }
+        Ok(
+            if peers.len() == expected_count && peers.iter().all(|(_, obs)| obs.score() > 0.0) {
+                Probe::Ready(peers)
+            } else {
+                let scores: Vec<(String, f64)> = peers.iter().map(|(id, obs)| (id.to_string(), obs.score())).collect();
+                Probe::Pending(format!("{}/{expected_count} scored peers: {scores:?}", peers.len()))
+            },
+        )
     })
     .await?;
 
