@@ -31,6 +31,29 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Rejects a temper exponent outside `(0, 1]`.
+///
+/// `w^γ` is only a flattening of the weights for `γ ∈ (0, 1]`.
+///
+/// `γ > 1` would sharpen instead — concentrating harder than raw path value, the opposite of the
+/// knob's purpose — and `γ <= 0` inverts or annihilates the ordering, sending traffic *preferentially*
+/// to the worst relays. Both are almost certainly typos, so refuse them rather than silently
+/// degrade every return path the node builds.
+fn validate_weight_temper(temper: f64) -> std::result::Result<(), ValidationError> {
+    if temper > 0.0 && temper <= 1.0 {
+        return Ok(());
+    }
+    let mut err = ValidationError::new("weight_temper_out_of_range");
+    err.message = Some(
+        format!(
+            "return_path_weight_temper ({temper}) must be in (0, 1]: 1.0 samples by raw path value, smaller values \
+             flatten towards uniform"
+        )
+        .into(),
+    );
+    Err(err)
+}
+
 /// Configuration for [`PathPlanner`]'s internal path cache.
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate)]
 pub struct PathPlannerConfig {
@@ -76,6 +99,26 @@ pub struct PathPlannerConfig {
     /// Defaults to 10_000_000 (~10 MiB in wxHOPR tokens).
     #[default = 10_000_000]
     pub capacity_reference: u128,
+    /// Exponent applied to return-path weights before sampling, flattening the distribution.
+    ///
+    /// Return paths are drawn weighted-random by path value, which concentrates a session's SURBs
+    /// on the few highest-valued relays — losing one then costs far more than the reliable-mode
+    /// loss tolerance. Raising each weight to `γ ∈ (0, 1]` compresses the spread between good and
+    /// bad candidates without changing their order: `w' = w^γ`.
+    ///
+    /// `1.0` samples by raw path value (most traffic on the best relays, largest blast radius when
+    /// one dies). Values approaching `0.0` tend to a uniform draw (smallest blast radius, most
+    /// traffic on poor relays). With weights `(0.4, 0.3, 0.2, 0.1)`, `γ = 0.5` moves the busiest
+    /// relay's share from 40% to 33% and the ratio between busiest and least-busy from 4.0 to 2.0.
+    ///
+    /// This replaces an earlier attempt to spread a *batch* over K distinct relayers. That could
+    /// not work: a batch is the SURBs that fit in one packet, and `HoprPacket::PAYLOAD_SIZE /
+    /// HoprSurb::SIZE` is 2, so K never exceeded 2 regardless of configuration, and each packet
+    /// re-drew independently anyway. Tempering has no such ceiling — it applies to every draw at
+    /// any candidate count. Defaults to 0.5.
+    #[validate(custom(function = "validate_weight_temper"))]
+    #[default = 0.5]
+    pub return_path_weight_temper: f64,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -139,6 +182,41 @@ fn composite_weight(pwc: &PathWithMetrics, hops: usize, params: WeightingParams)
     pwc.cost * lat * cap
 }
 
+/// Picks an index into `weights` with probability proportional to the weight; `None` if all are
+/// non-positive.
+///
+/// Mirrors `WeightedCollection::pick_index`, which cannot be reused because the callers below
+/// select over *subsets* of a single collection.
+fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
+    let total: f64 = weights.iter().map(|w| w.max(0.0)).sum();
+    if total <= 0.0 {
+        return None;
+    }
+
+    // Path selection is privacy-relevant, so draw from the CSPRNG rather than a thread RNG.
+    let r = hopr_api::types::crypto_random::random_float_in_range(0.0..total);
+    let mut cumulative = 0.0;
+    for (i, w) in weights.iter().enumerate() {
+        cumulative += w.max(0.0);
+        if r < cumulative {
+            return Some(i);
+        }
+    }
+
+    // Floating-point edge case: fall back to the last positive-weight entry.
+    weights.iter().rposition(|w| *w > 0.0)
+}
+
+/// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
+/// candidates without reordering them.
+///
+/// `x^γ` is monotone for `γ > 0`, so the best candidate stays the best — only the *ratio* between
+/// them shrinks, which is what bounds how much of a session rides on any single relayer. Weights
+/// are clamped at zero first: a negative weight would make `powf` return NaN and poison the draw.
+fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
+    weights.iter().map(|w| w.max(0.0).powf(temper)).collect()
+}
+
 /// Cache key for the path planner: `(source, destination, hops)`.
 ///
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
@@ -168,6 +246,7 @@ pub struct PathPlanner<Surb, R, S> {
     cache: moka::future::Cache<PlannerCacheKey, PlannerCacheValue>,
     refresh_period: Duration,
     weighting: WeightingParams,
+    return_path_weight_temper: f64,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -196,6 +275,7 @@ where
                 latency_halflife: config.latency_halflife,
                 capacity_reference: config.capacity_reference,
             },
+            return_path_weight_temper: config.return_path_weight_temper,
         }
     }
 
@@ -252,71 +332,16 @@ where
 
             RoutingOptions::Hops(hops) => {
                 let hops_usize: usize = hops.into();
-                trace!(hops = hops_usize, "resolving path via planner cache");
+                let paths = self.cached_paths(source, destination, hops).await?;
 
-                let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
-                let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
-
-                let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
-
-                let resolver = self.resolver.clone();
-                let selector = self.selector.clone();
-                let weighting = self.weighting;
-
-                let paths = self
-                    .cache
-                    .try_get_with(cache_key, async move {
-                        trace!(hops = hops_usize, "path cache miss, querying selector");
-                        let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
-
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-                        for mut pwc in candidates {
-                            let path_nodes = std::mem::take(&mut pwc.path);
-                            let node_ids: Vec<NodeId> =
-                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
-                                    path_metrics.push(pwc);
-                                }
-                                Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
-                            }
-                        }
-
-                        if valid_paths.is_empty() {
-                            return Err(PathPlannerError::Path(PathError::PathNotFound(
-                                hops_usize,
-                                src_key.to_hex(),
-                                dest_key.to_hex(),
-                            )));
-                        }
-
-                        let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-                        let total_wt = weighted.total_weight();
-                        for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-                            tracing::debug!(
-                                %destination,
-                                hops = hops_usize,
-                                path = %vp,
-                                cost = pwm.cost,
-                                composite_weight = w,
-                                sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-                                total_latency_ms = ?pwm.total_latency_ms,
-                                min_probe_success_rate = ?pwm.min_probe_success_rate,
-                                min_ack_rate = ?pwm.min_ack_rate,
-                                capacity_floor = ?pwm.capacity_floor,
-                                "weighted candidate path",
-                            );
-                        }
-                        Ok(Arc::new(weighted))
-                    })
-                    .await
-                    .map_err(PathPlannerError::CacheError)?;
-
+                // Format from the `NodeId`s rather than re-resolving them: `cached_paths` has
+                // already done that, and for `NodeId::Chain` each resolution is a resolver lookup.
                 paths.pick_one().ok_or_else(|| {
-                    PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                    PathPlannerError::Path(PathError::PathNotFound(
+                        hops_usize,
+                        source.to_string(),
+                        destination.to_string(),
+                    ))
                 })?
             }
         };
@@ -328,6 +353,152 @@ where
 
         trace!(%path, "validated resolved path");
         Ok(path)
+    }
+
+    /// Cached weighted collection of validated `hops`-hop paths from `source` to `destination`,
+    /// computed on a miss.
+    ///
+    /// Single-path callers draw with `pick_one`; batch callers (see
+    /// [`PathPlanner::resolve_diverse_return_paths`]) work over the collection directly, paying one
+    /// cache lookup instead of one per path.
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn cached_paths(
+        &self,
+        source: NodeId,
+        destination: NodeId,
+        hops: hopr_api::types::primitive::bounded::BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>,
+    ) -> Result<PlannerCacheValue> {
+        let hops_usize: usize = hops.into();
+        trace!(hops = hops_usize, "resolving path via planner cache");
+
+        let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
+        let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
+
+        let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
+
+        let resolver = self.resolver.clone();
+        let selector = self.selector.clone();
+        let weighting = self.weighting;
+
+        self.cache
+            .try_get_with(cache_key, async move {
+                trace!(hops = hops_usize, "path cache miss, querying selector");
+                let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
+
+                let chain_resolver = ChainPathResolver::from(&*resolver);
+                let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+                let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+                for mut pwc in candidates {
+                    let path_nodes = std::mem::take(&mut pwc.path);
+                    let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+                    match ValidatedPath::new(source, node_ids, &chain_resolver).await {
+                        Ok(vp) => {
+                            valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
+                            path_metrics.push(pwc);
+                        }
+                        Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
+                    }
+                }
+
+                if valid_paths.is_empty() {
+                    return Err(PathPlannerError::Path(PathError::PathNotFound(
+                        hops_usize,
+                        src_key.to_hex(),
+                        dest_key.to_hex(),
+                    )));
+                }
+
+                let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+                let total_wt = weighted.total_weight();
+                for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+                    tracing::debug!(
+                        %destination,
+                        hops = hops_usize,
+                        path = %vp,
+                        cost = pwm.cost,
+                        composite_weight = w,
+                        sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+                        total_latency_ms = ?pwm.total_latency_ms,
+                        min_probe_success_rate = ?pwm.min_probe_success_rate,
+                        min_ack_rate = ?pwm.min_ack_rate,
+                        capacity_floor = ?pwm.capacity_floor,
+                        "weighted candidate path",
+                    );
+                }
+                Ok(Arc::new(weighted))
+            })
+            .await
+            .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
+    /// over [`PathPlannerConfig::return_path_weight_temper`]-flattened path values.
+    ///
+    /// Tempering is what bounds the blast radius of losing one relay: raw path values concentrate a
+    /// session's SURBs on the few best candidates, so the flatter the effective distribution, the
+    /// smaller any single relay's share of the return stream.
+    ///
+    /// Draws are independent — deliberately. Spreading a *batch* over K distinct relayers was tried
+    /// and cannot work: a batch is the SURBs that fit in one packet, and `HoprPacket::PAYLOAD_SIZE /
+    /// HoprSurb::SIZE` is 2, so K was capped at 2 whatever the configuration said, while each packet
+    /// re-drew independently regardless. Tempering has no such ceiling.
+    ///
+    /// Only `Hops` routing has alternatives to draw over — an explicit path resolves to itself, so
+    /// those fall back to plain repeated resolution.
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn resolve_diverse_return_paths(
+        &self,
+        destination: NodeId,
+        options: RoutingOptions,
+        count: usize,
+    ) -> Result<Vec<ValidatedPath>> {
+        // No return paths requested (e.g. the message fills the payload, leaving no room for
+        // SURBs). Resolve nothing — querying the planner here would turn "none wanted" into a
+        // `PathNotFound` error.
+        if count == 0 {
+            return Ok(Vec::new());
+        }
+
+        let me = NodeId::Offchain(self.me);
+
+        let hops = match options {
+            RoutingOptions::Hops(hops) if u32::from(hops) > 0 => hops,
+            // A fixed path or a direct return has no alternatives to weight over.
+            other => {
+                return (0..count)
+                    .map(|_| self.resolve_path(destination, me, other.clone()))
+                    .collect::<FuturesUnordered<_>>()
+                    .try_collect::<Vec<_>>()
+                    .await;
+            }
+        };
+
+        let candidates = self.cached_paths(destination, me, hops).await?;
+        let items: Vec<&(ValidatedPath, f64)> = candidates.iter().collect();
+        let weights = temper_weights(
+            &items.iter().map(|(_, w)| *w).collect::<Vec<_>>(),
+            self.return_path_weight_temper,
+        );
+
+        if weights.iter().all(|w| *w <= 0.0) {
+            return Err(PathPlannerError::Path(PathError::PathNotFound(
+                hops.into(),
+                destination.to_string(),
+                me.to_string(),
+            )));
+        }
+
+        tracing::debug!(
+            %destination,
+            count,
+            candidates = items.len(),
+            temper = self.return_path_weight_temper,
+            "drawing return paths from tempered weights"
+        );
+
+        Ok((0..count)
+            .filter_map(|_| pick_weighted_index(&weights).map(|i| items[i].0.clone()))
+            .collect())
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -364,10 +535,7 @@ where
                         "resolving packet return paths"
                     );
 
-                    (0..num_possible_surbs)
-                        .map(|_| self.resolve_path(*destination, NodeId::Offchain(self.me), return_options.clone()))
-                        .collect::<FuturesUnordered<_>>()
-                        .try_collect::<Vec<ValidatedPath>>()
+                    self.resolve_diverse_return_paths(*destination, return_options, num_possible_surbs)
                         .await?
                         .into_iter()
                         .enumerate()
@@ -663,6 +831,100 @@ mod tests {
         }
     }
 
+    // ── return-path diversity helpers ─────────────────────────────────────────
+
+    /// A one-element path whose only (and therefore first) hop is `key`.
+    fn path_via(key: OffchainPublicKey, addr: Address) -> ValidatedPath {
+        ValidatedPath::direct(key, addr)
+    }
+
+    fn diversity_fixture() -> Vec<(ValidatedPath, f64)> {
+        // Three candidates via relayer A, two via ME, one via DEST — deliberately lopsided, which
+        // is exactly the shape that makes independent weighted draws concentrate.
+        let (a, m, d) = (pubkey(&SECRET_A), pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
+        vec![
+            (path_via(a, a_addr()), 10.0),
+            (path_via(a, a_addr()), 9.0),
+            (path_via(a, a_addr()), 8.0),
+            (path_via(m, me_addr()), 2.0),
+            (path_via(m, me_addr()), 1.0),
+            (path_via(d, dest_addr()), 1.0),
+        ]
+    }
+
+    #[test]
+    fn config_should_reject_a_weight_temper_outside_the_unit_range() {
+        assert!(PathPlannerConfig::default().validate().is_ok());
+
+        // 1.0 is the raw path value — the sharpest permitted, and the pre-tempering behaviour.
+        assert!(
+            PathPlannerConfig {
+                return_path_weight_temper: 1.0,
+                ..PathPlannerConfig::default()
+            }
+            .validate()
+            .is_ok()
+        );
+
+        // Above 1.0 sharpens instead of flattening, concentrating harder than raw path value.
+        let sharpening = PathPlannerConfig {
+            return_path_weight_temper: 1.5,
+            ..PathPlannerConfig::default()
+        };
+        // Assert on the rendered message, which is what an operator actually sees.
+        let err = sharpening
+            .validate()
+            .expect_err("a sharpening exponent must be rejected");
+        assert!(err.to_string().contains("must be in (0, 1]"), "{err}");
+
+        // Zero annihilates the ordering: every candidate would weigh exactly 1.
+        assert!(
+            PathPlannerConfig {
+                return_path_weight_temper: 0.0,
+                ..PathPlannerConfig::default()
+            }
+            .validate()
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn temper_should_compress_the_weight_spread_without_reordering() {
+        let raw = [0.4, 0.3, 0.2, 0.1];
+
+        let untouched = temper_weights(&raw, 1.0);
+        assert_eq!(raw.to_vec(), untouched, "temper 1.0 must be the identity");
+
+        let flattened = temper_weights(&raw, 0.5);
+        // Order preserved…
+        assert!(flattened.windows(2).all(|w| w[0] > w[1]), "{flattened:?}");
+        // …but the best-to-worst ratio shrinks from 4.0 towards 1.0, which is what bounds how much
+        // of a session rides on the single best relayer.
+        let raw_ratio = raw[0] / raw[3];
+        let tempered_ratio = flattened[0] / flattened[3];
+        assert!(
+            tempered_ratio < raw_ratio,
+            "{tempered_ratio} should be below {raw_ratio}"
+        );
+        assert!((tempered_ratio - 2.0).abs() < 1e-9, "{tempered_ratio}");
+    }
+
+    #[test]
+    fn temper_should_clamp_negative_weights_instead_of_producing_nan() {
+        // `powf` on a negative base with a fractional exponent is NaN, which would poison the
+        // cumulative sum in `pick_weighted_index` and make selection return nothing.
+        let out = temper_weights(&[-1.0, 0.0, 4.0], 0.5);
+        assert!(out.iter().all(|w| w.is_finite()), "{out:?}");
+        assert_eq!(vec![0.0, 0.0, 2.0], out);
+    }
+
+    #[test]
+    fn pick_weighted_index_should_reject_a_non_positive_total() {
+        assert_eq!(None, pick_weighted_index(&[]));
+        assert_eq!(None, pick_weighted_index(&[0.0, 0.0]));
+        assert_eq!(Some(1), pick_weighted_index(&[0.0, 1.0]));
+    }
+
     // ── address fixtures ──────────────────────────────────────────────────────
     fn me_addr() -> Address {
         Address::from_str("0x1000d5786d9e6799b3297da1ad55605b91e2c882").expect("valid addr")
@@ -874,6 +1136,127 @@ mod tests {
     }
 
     // ── test: cache integration ───────────────────────────────────────────────
+
+    /// Builds a planner over `me -> a -> dest` with both channels open.
+    fn diversity_planner(
+        cfg: PathPlannerConfig,
+    ) -> PathPlanner<hopr_protocol_hopr::MemorySurbStore, TestChainApi, HoprGraphPathSelector<ChannelGraph>> {
+        let (me, a, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_A), pubkey(&SECRET_DEST));
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(dest);
+        graph.add_edge(&me, &a).unwrap();
+        graph.add_edge(&a, &dest).unwrap();
+        graph.add_edge(&dest, &a).unwrap();
+        graph.add_edge(&a, &me).unwrap();
+        for (from, to) in [(me, a), (a, dest), (dest, a), (a, me)] {
+            mark_edge_full(&graph, &from, &to);
+        }
+
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
+            .with_open_channel(me_addr(), a_addr())
+            .with_open_channel(a_addr(), dest_addr())
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr());
+
+        PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        )
+    }
+
+    #[tokio::test]
+    async fn resolve_diverse_return_paths_should_return_empty_without_querying_when_none_requested() {
+        let planner = diversity_planner(small_config());
+        let dest = NodeId::Offchain(pubkey(&SECRET_DEST));
+        let hops = RoutingOptions::Hops(1.try_into().expect("valid 1"));
+
+        // `max_surbs_with_message` returns 0 when the message fills the payload. That must yield an
+        // empty result, not a `PathNotFound` — and must not populate the cache.
+        let paths = planner
+            .resolve_diverse_return_paths(dest, hops, 0)
+            .await
+            .expect("zero return paths is not an error");
+        assert!(paths.is_empty());
+
+        let cache_key: PlannerCacheKey = (dest, NodeId::Offchain(pubkey(&SECRET_ME)), 1);
+        assert!(
+            planner.cache.get(&cache_key).await.is_none(),
+            "nothing requested must not query the planner"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_diverse_return_paths_should_return_count_paths_at_any_temper() {
+        // Tempering changes *which* candidates are favoured, never how many paths come back — the
+        // caller has already sized the batch to the SURBs that fit in its packet.
+        for temper in [1.0, 0.5, 0.05] {
+            let planner = diversity_planner(PathPlannerConfig {
+                return_path_weight_temper: temper,
+                ..small_config()
+            });
+            let dest = NodeId::Offchain(pubkey(&SECRET_DEST));
+            let hops = RoutingOptions::Hops(1.try_into().expect("valid 1"));
+
+            let paths = planner
+                .resolve_diverse_return_paths(dest, hops, 3)
+                .await
+                .expect("weighted resolution should succeed");
+            assert_eq!(3, paths.len(), "temper={temper} must still return `count` paths");
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_diverse_return_paths_should_fall_back_for_routing_without_alternatives() {
+        let planner = diversity_planner(small_config());
+        let dest = NodeId::Offchain(pubkey(&SECRET_DEST));
+
+        // A direct return has no relayer to spread over.
+        let direct = planner
+            .resolve_diverse_return_paths(dest, RoutingOptions::Hops(0.try_into().expect("valid 0")), 2)
+            .await
+            .expect("zero-hop return should resolve");
+        assert_eq!(2, direct.len());
+
+        // An explicit path resolves to itself.
+        let explicit = planner
+            .resolve_diverse_return_paths(
+                dest,
+                RoutingOptions::IntermediatePath(vec![NodeId::Offchain(pubkey(&SECRET_A))].try_into().expect("valid")),
+                2,
+            )
+            .await
+            .expect("explicit return path should resolve");
+        assert_eq!(2, explicit.len());
+    }
+
+    #[tokio::test]
+    async fn resolve_diverse_return_paths_should_return_the_requested_count() {
+        let planner = diversity_planner(small_config());
+        let dest = NodeId::Offchain(pubkey(&SECRET_DEST));
+        let hops = RoutingOptions::Hops(1.try_into().expect("valid 1"));
+
+        // Fewer paths than the configured diversity: capped to `count`, still exactly `count` paths.
+        for count in [1usize, 2, 5] {
+            let paths = planner
+                .resolve_diverse_return_paths(dest, hops.clone(), count)
+                .await
+                .expect("should resolve");
+            assert_eq!(count, paths.len(), "count={count}");
+        }
+    }
 
     #[tokio::test]
     async fn planner_cache_miss_should_populate_cache() {
