@@ -182,6 +182,9 @@ pub struct SurbStoreConfig {
 pub struct MemorySurbStore {
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
     surbs_per_pseudonym: moka::sync::Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
+    /// Relayers this node can no longer pay. Holds at most a handful of entries (our own closing
+    /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
+    invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
     cfg: Arc<SurbStoreConfig>,
 }
 
@@ -210,7 +213,29 @@ impl MemorySurbStore {
                 })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
+            invalidated_relayers: Default::default(),
             cfg: cfg.into(),
+        }
+    }
+
+    /// Whether `relayer` is currently unusable as a return path's first hop.
+    pub fn is_relayer_invalidated(&self, relayer: &HoprKeyIdent) -> bool {
+        self.invalidated_relayers.read().contains(relayer)
+    }
+
+    /// Whether a stored SURB can still be used to reply: its first relayer must still be payable.
+    ///
+    /// A direct return path is exempt — its "first relayer" is the final recipient, which needs no
+    /// channel (RFC-0003 §3.2, RFC-0006 §6.1). Without that exemption, closing an unrelated channel
+    /// to a session's originator would discard perfectly good SURBs.
+    fn is_surb_usable(&self, surb: &HoprSurb) -> bool {
+        match surb.additional_data_receiver.proof_of_relay_values().chain_length() {
+            // Direct return path: the "first relayer" is the final recipient, which needs no channel.
+            1 => true,
+            // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. Refuse it rather
+            // than let a malformed value pass as "direct" and bypass the check below.
+            0 => false,
+            _ => !self.invalidated_relayers.read().contains(&surb.first_relayer),
         }
     }
 }
@@ -229,11 +254,15 @@ impl SurbStore for MemorySurbStore {
         let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym)?;
 
         match matcher {
-            SurbMatcher::Pseudonym(_) => surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
-                sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                surb: popped_surb.surb,
-                remaining: popped_surb.remaining,
-            }),
+            // SURBs whose return path no longer has a usable first edge are dropped on the way,
+            // rather than handed out only to have the reply fail to be paid for.
+            SurbMatcher::Pseudonym(_) => surbs_for_pseudonym
+                .pop_next_valid(|_, surb| self.is_surb_usable(surb))
+                .map(|popped_surb| FoundSurb {
+                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                    surb: popped_surb.surb,
+                    remaining: popped_surb.remaining,
+                }),
             // The following code intentionally only checks the SURB at the popping end of the
             // ring buffer and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
@@ -281,6 +310,23 @@ impl SurbStore for MemorySurbStore {
                     .build()
             })
             .insert(sender_id.surb_id(), opener);
+    }
+
+    #[tracing::instrument(skip_all, level = "trace")]
+    fn invalidate_relayer(&self, relayer: &HoprKeyIdent) {
+        if self.invalidated_relayers.write().insert(*relayer) {
+            tracing::info!(
+                %relayer,
+                "invalidating stored SURBs whose return path starts with this relayer"
+            );
+        }
+    }
+
+    #[tracing::instrument(skip_all, level = "trace")]
+    fn revalidate_relayer(&self, relayer: &HoprKeyIdent) {
+        if self.invalidated_relayers.write().remove(relayer) {
+            tracing::info!(%relayer, "relayer is usable again for SURB return paths");
+        }
     }
 
     #[tracing::instrument(skip_all, level = "trace", fields(?sender_id), ret)]
@@ -343,11 +389,6 @@ impl<S> SurbRingBuffer<S> {
         rb.len()
     }
 
-    /// Pops the next SURB and its ID, in the buffer's [`SurbPopOrder`].
-    pub fn pop_one(&self) -> Option<PoppedSurb<S>> {
-        self.pop_next_valid(|_, _| true)
-    }
-
     /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
     ///
     /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
@@ -404,9 +445,147 @@ impl<S> SurbRingBuffer<S> {
 
 #[cfg(test)]
 mod tests {
+    use hopr_api::types::crypto::crypto_traits::Randomizable;
+    use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
     use rstest::rstest;
 
     use super::*;
+
+    impl<S> SurbRingBuffer<S> {
+        /// Pops the next SURB regardless of validity — the buffer-ordering tests below are about
+        /// which end is consumed, not about which SURBs are usable.
+        fn pop_any(&self) -> Option<PoppedSurb<S>> {
+            self.pop_next_valid(|_, _| true)
+        }
+    }
+
+    /// Builds a SURB with the given first relayer and PoR chain length (= return path length).
+    ///
+    /// Only those two fields are read by the store, so the SURB is assembled straight from its
+    /// wire layout — `first_relayer | alpha | header | sender_key | additional_data_receiver` —
+    /// whose parser performs no cryptographic validation. That avoids a full Sphinx key exchange
+    /// per fixture and keeps the chain length exactly controllable.
+    fn surb_via(first_relayer: HoprKeyIdent, chain_length: u8) -> anyhow::Result<HoprSurb> {
+        let mut bytes = vec![0u8; HoprSurb::SIZE];
+
+        let key_id_size = HoprSphinxHeaderSpec::KEY_ID_SIZE.get();
+        bytes[..key_id_size].copy_from_slice(first_relayer.as_ref());
+
+        // The chain length is the leading byte of the receiver's proof-of-relay values, which
+        // in turn lead the trailing `additional_data_receiver` block.
+        bytes[HoprSurb::SIZE - HoprSphinxHeaderSpec::SURB_RECEIVER_DATA_SIZE] = chain_length;
+
+        let surb = HoprSurb::try_from(bytes.as_slice())?;
+
+        // Guard the hand-rolled layout: a wrong offset would silently yield chain length 0 and
+        // make the assertions below pass for the wrong reason.
+        assert_eq!(first_relayer, surb.first_relayer, "fixture: wrong first relayer");
+        assert_eq!(
+            chain_length,
+            surb.additional_data_receiver.proof_of_relay_values().chain_length(),
+            "fixture: wrong chain length"
+        );
+
+        Ok(surb)
+    }
+
+    /// A return path with one intermediate relayer: `me -> relayer -> recipient`.
+    const TWO_HOP: u8 = 2;
+    /// A return path straight to the recipient, which needs no payment channel.
+    const DIRECT: u8 = 1;
+
+    #[test]
+    fn memory_surb_store_should_skip_surbs_whose_first_relayer_was_invalidated() -> anyhow::Result<()> {
+        let (dead, alive) = (HoprKeyIdent::from(1u32), HoprKeyIdent::from(2u32));
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        // Two SURBs return via the dead relay, one via a healthy one; all are two-hop.
+        store.insert_surbs(
+            pseudonym,
+            vec![
+                ([1u8; 8], surb_via(dead, TWO_HOP)?),
+                ([2u8; 8], surb_via(dead, TWO_HOP)?),
+                ([3u8; 8], surb_via(alive, TWO_HOP)?),
+            ],
+        );
+
+        store.invalidate_relayer(&dead);
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
+        assert_eq!([3u8; 8], found.sender_id.surb_id(), "must skip past the dead relayer");
+        assert_eq!(
+            0, found.remaining,
+            "the invalidated SURBs must be discarded, not left behind"
+        );
+
+        assert!(
+            store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none(),
+            "no usable SURB should remain"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_not_invalidate_surbs_with_a_direct_return_path() -> anyhow::Result<()> {
+        // A single-element path means the "first relayer" is the final recipient, which needs no
+        // payment channel — closing a channel to it must not discard the SURB.
+        let recipient = HoprKeyIdent::from(1u32);
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.insert_surbs(pseudonym, vec![([7u8; 8], surb_via(recipient, DIRECT)?)]);
+        store.invalidate_relayer(&recipient);
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("a direct-return-path SURB must stay usable"))?;
+        assert_eq!([7u8; 8], found.sender_id.surb_id());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_reject_a_surb_with_a_malformed_chain_length() -> anyhow::Result<()> {
+        // A chain length is hops + 1, so 0 is malformed. It must not pass as "direct" and thereby
+        // skip the invalidation check.
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.insert_surbs(pseudonym, vec![([5u8; 8], surb_via(relayer, 0)?)]);
+        store.invalidate_relayer(&relayer);
+
+        assert!(store.find_surb(SurbMatcher::Pseudonym(pseudonym)).is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn memory_surb_store_should_make_a_relayer_usable_again_after_revalidation() -> anyhow::Result<()> {
+        let relayer = HoprKeyIdent::from(1u32);
+
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        store.insert_surbs(pseudonym, vec![([9u8; 8], surb_via(relayer, TWO_HOP)?)]);
+
+        store.invalidate_relayer(&relayer);
+        store.revalidate_relayer(&relayer);
+
+        let found = store
+            .find_surb(SurbMatcher::Pseudonym(pseudonym))
+            .ok_or(anyhow::anyhow!("expected the revalidated SURB"))?;
+        assert_eq!([9u8; 8], found.sender_id.surb_id());
+
+        Ok(())
+    }
 
     #[test]
     fn surb_store_config_should_default_to_fifo() {
@@ -430,12 +609,12 @@ mod tests {
         rb.push([([4u8; 8], 0)]);
 
         for (i, expected_id) in expected.into_iter().enumerate() {
-            let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+            let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
             assert_eq!(expected_id, popped.id, "unexpected id at index {i}");
             assert_eq!(expected.len() - 1 - i, popped.remaining, "unexpected remaining");
         }
 
-        assert!(rb.pop_one().is_none(), "buffer should be drained");
+        assert!(rb.pop_any().is_none(), "buffer should be drained");
 
         Ok(())
     }
@@ -450,19 +629,19 @@ mod tests {
         let len = rb.push([([2u8; 8], 0)]);
         assert_eq!(2, len);
 
-        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!([1u8; 8], popped.id);
         assert_eq!(1, popped.remaining);
 
-        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!([2u8; 8], popped.id);
         assert_eq!(0, popped.remaining);
 
         let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
         assert_eq!(2, len);
 
-        assert_eq!([1u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
-        assert_eq!([2u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
 
         Ok(())
     }
@@ -477,19 +656,19 @@ mod tests {
         let len = rb.push([([2u8; 8], 0)]);
         assert_eq!(2, len);
 
-        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!([2u8; 8], popped.id);
         assert_eq!(1, popped.remaining);
 
-        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
         assert_eq!([1u8; 8], popped.id);
         assert_eq!(0, popped.remaining);
 
         let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
         assert_eq!(2, len);
 
-        assert_eq!([2u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
-        assert_eq!([1u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
 
         Ok(())
     }
@@ -521,7 +700,7 @@ mod tests {
 
         assert!(rb.pop_next_valid(|_, _| false).is_none());
         // The buffer is fully drained by the exhaustive search.
-        assert!(rb.pop_one().is_none());
+        assert!(rb.pop_any().is_none());
 
         Ok(())
     }
@@ -536,7 +715,7 @@ mod tests {
         for i in 0..1_000u32 {
             rb.push([(((i as u64).to_be_bytes()), 0)]);
             if i % 3 == 0 {
-                rb.pop_one();
+                rb.pop_any();
             }
             assert!(rb.surbs.lock().len() <= 8, "length exceeded capacity");
         }
