@@ -233,6 +233,6 @@ ignored = [
 # plain crates.io versions once hopr-api 1.21.0, hopr-utilities 0.7.0 and hopr-network-graph 0.4.0
 # are published.
 [patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "92537d52db6f9b9dfd4f3518a2063a4758309026" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "4a53ed13634a5080a63760b9ca84bd9fe7710114" }
 hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", rev = "e17451a8db2fd72cecde273ac8ef87de96c8bac0" }
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", rev = "1825d41a852204d935733d027f71a83bd7674abc" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", rev = "d9dc437108b59776b8b9673664c88d9b177d7769" }

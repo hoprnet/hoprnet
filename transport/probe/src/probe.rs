@@ -611,6 +611,11 @@ mod tests {
         fn edge(&self, _src: &OffchainPublicKey, _dest: &OffchainPublicKey) -> Option<TestEdgeObservations> {
             Some(TestEdgeObservations)
         }
+
+        /// Probing never identifies a path by slot, so nothing here depends on this mapping.
+        fn path_slot(&self, _key: &OffchainPublicKey) -> Option<u64> {
+            None
+        }
     }
 
     type TestClassifier = ProbeClassifierState<PeerStore>;
