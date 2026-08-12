@@ -873,7 +873,7 @@ where
             hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: narrow(self.cfg.pix.num_ssa_parts, "num_ssa_parts")?,
                 threshold: narrow(self.cfg.pix.ssa_part_size, "ssa_part_size")?,
-                surplus_shares: narrow(self.cfg.pix.additional_shares, "additional_shares")?,
+                surplus_shares: narrow(self.cfg.pix.surplus_shares(), "additional_shares")?,
             })
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );

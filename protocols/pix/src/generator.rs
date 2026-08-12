@@ -89,9 +89,32 @@ fn new_polynomial_with_commitment<S: PixSpec>(
     Ok((polynomial, PixGroup::<S>::mul_by_generator(&secret)))
 }
 
+/// Rejects a surplus larger than the threshold it insures.
+///
+/// The bound is deliberately loose — twice the emitted shares a polynomial needs — because the
+/// surplus is legitimately a deployment choice about return-path loss, and over-insuring a bad path
+/// is a reasonable thing to want. What it forbids is the case where the insurance costs more than
+/// the thing insured: since H5 the surplus travels in the negotiated
+/// [`PixParams`](crate::PixParams) and is billed on purchase rather than on claim, so a surplus
+/// above the threshold means an Entry paying for more redundancy than payload in every deposit.
+///
+/// This is a *configuration* bound, not a wire one. `PixParams` packs the surplus as a byte and
+/// accepts the whole range, and a peer offering an extravagant surplus is already caught where it
+/// should be — by the Exit's `quota_range`, since the surplus inflates the quota.
+fn surplus_must_not_exceed_threshold(cfg: &SsaGeneratorConfig) -> Result<(), validator::ValidationError> {
+    if cfg.surplus_shares > cfg.threshold {
+        return Err(validator::ValidationError::new(
+            "surplus_shares must not exceed threshold — the surplus is billed, so this pays for more redundancy than \
+             payload",
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for the [`SsaShareGenerator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[validate(schema(function = "surplus_must_not_exceed_threshold", skip_on_field_errors = false))]
 pub struct SsaGeneratorConfig {
     /// The number of polynomials to generate per SSA commitment.
     ///
@@ -119,9 +142,15 @@ pub struct SsaGeneratorConfig {
     /// every case. That is why the surplus is part of the per-SSA quota rather than free service —
     /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
     ///
-    /// Default is [`DEFAULT_SURPLUS_SHARES`]. The whole range of the field is legal, so unlike the
-    /// other two this one needs no validator — it shares the lower half of the negotiated
-    /// [`PixParams`](crate::PixParams) word with `threshold`, and a byte is what fits there.
+    /// Default is [`DEFAULT_SURPLUS_SHARES`] — but prefer [`default_surplus_for`] wherever the
+    /// threshold is known, because this is a *ratio* of it and the constant can only be the ratio
+    /// evaluated at the default threshold.
+    ///
+    /// Bounded by `threshold` rather than by the byte the wire gives it: see
+    /// [`surplus_must_not_exceed_threshold`]. It shares the lower half of the negotiated
+    /// [`PixParams`](crate::PixParams) word with `threshold`, so a byte is all that fits there — but
+    /// what is *representable* and what is sane to configure are different questions, and this field
+    /// used to be documented as needing no validator on the strength of the first.
     #[default(DEFAULT_SURPLUS_SHARES)]
     pub surplus_shares: u8,
 }
@@ -404,6 +433,67 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// The surplus is a ratio of the threshold, and the ratio is a loss-rate tolerance.
+    ///
+    /// Pinned as the tolerance rather than as four literals, because the tolerance is the property
+    /// with a physical meaning — `surplus/(threshold + surplus)` is the fraction of a polynomial's
+    /// shares that may be lost before it cannot reconstruct. A change to
+    /// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to restate what it did to that number.
+    #[test]
+    fn the_default_surplus_covers_a_fifth_of_a_polynomial_being_lost() {
+        for threshold in [16u8, 32, 48, 64] {
+            let surplus = crate::default_surplus_for(threshold);
+            let emitted = threshold as f64 + surplus as f64;
+            let tolerated = surplus as f64 / emitted;
+            assert!(
+                (0.19..=0.21).contains(&tolerated),
+                "threshold {threshold} + surplus {surplus} tolerates {tolerated:.3} loss, expected ~0.20"
+            );
+        }
+
+        assert_eq!(
+            DEFAULT_SURPLUS_SHARES,
+            crate::default_surplus_for(DEFAULT_POLY_THRESHOLD),
+            "the constant must stay the ratio evaluated at the default threshold, not drift from it"
+        );
+    }
+
+    /// A surplus above the threshold pays for more redundancy than payload, and is billed for it.
+    ///
+    /// The boundary rather than an arbitrary over-large value: the rule is exactly "not more than
+    /// the thing it insures", so the interesting cases are on either side of it. A flat surplus of
+    /// 20 — what deployments used before this became a ratio — is what fails at threshold 16.
+    #[test]
+    fn a_surplus_larger_than_the_threshold_is_rejected() {
+        let at_bound = SsaGeneratorConfig {
+            polynomials_per_ssa: 16,
+            threshold: 16,
+            surplus_shares: 16,
+        };
+        assert!(
+            SsaShareGenerator::<TestSpec>::try_new(at_bound).is_ok(),
+            "a surplus equal to the threshold must be allowed — over-insuring a lossy path is a real choice"
+        );
+
+        let past_bound = SsaGeneratorConfig {
+            surplus_shares: 17,
+            ..at_bound
+        };
+        assert!(matches!(
+            SsaShareGenerator::<TestSpec>::try_new(past_bound),
+            Err(PixError::InvalidConfiguration(_))
+        ));
+
+        let flat_twenty_at_low_threshold = SsaGeneratorConfig {
+            surplus_shares: 20,
+            ..at_bound
+        };
+        assert!(
+            SsaShareGenerator::<TestSpec>::try_new(flat_twenty_at_low_threshold).is_err(),
+            "the configuration this rule exists to catch: 20 shares of insurance against 16 of payload"
+        );
+    }
 
     #[test]
     fn ssa_generator_try_new_should_reject_an_invalid_config_without_panicking() {

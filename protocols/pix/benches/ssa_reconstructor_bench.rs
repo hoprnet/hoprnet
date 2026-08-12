@@ -6,7 +6,7 @@
 //! | --------------------- | ---------- |
 //! | polynomials per SSA   | 4 096 – 8 192 |
 //! | threshold             | 16 – 64 |
-//! | surplus shares        | 20 (flat, not `threshold/2`) |
+//! | surplus shares        | `threshold/4`, covering 20 % share loss |
 //! | SSAs in flight        | 2 – 3 per Session |
 //! | per-Session rate      | 16 – 20 Mbps |
 //! | clients per Exit      | 10 – 30 |
@@ -65,13 +65,13 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// removed.
 const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
-/// Surplus shares emitted per polynomial beyond the threshold, as deployments configure it.
+/// Surplus shares emitted per polynomial beyond the deployed threshold.
 ///
-/// A flat 20, **not** `SsaGeneratorConfig::default().surplus_shares`, which is `threshold / 2`.
-/// Every group that sizes a cycle used the default, so each was modelling 32 surplus shares against
-/// a deployed 20 — a cycle 9 % longer than the real one, and a different quantity again at any
-/// threshold other than 64.
-const PROD_SURPLUS: u8 = 20;
+/// Derived, not flat: the surplus is a ratio of the threshold sized to absorb 20 % share loss, so a
+/// sweep that varies the threshold has to vary this with it. A flat value would model a different
+/// loss tolerance at every point — and above threshold 16 a flat 20 no longer even validates, since
+/// the insurance would exceed the payload it insures.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
 
 /// Coefficient commitments carried by one `SsaCommit` message.
 ///
@@ -840,6 +840,103 @@ fn bench_drain_deferred_acks(c: &mut Criterion) {
     group.finish();
 }
 
+/// Polynomials per cycle for the interpolation sweep.
+///
+/// Enough that per-cycle setup is amortised over a useful number of polynomial completions, small
+/// enough that the whole fixture is rebuilt per iteration at every threshold in the sweep. The
+/// measured quantity is per *share*, which is independent of how many polynomials are in flight, so
+/// this only trades wall clock against sample stability.
+const INTERPOLATION_POLYS: u16 = 128;
+
+/// What the threshold costs the Exit, which is the term the polys/threshold split turns on.
+///
+/// The Entry side is known to be threshold-free — a 4× threshold change moves `new_ssa_commitment`
+/// by 7 % — so if the Exit is too, the threshold is nearly free on both sides and only the surplus
+/// and fault-detection latency argue for a particular value.
+///
+/// # What is being measured
+///
+/// Two costs in `SsaPartBuilder::add_share`, both quadratic in the threshold per polynomial, and
+/// deliberately measured together because nothing separates them from outside the builder:
+///
+/// - `shares.combine()` — the Lagrange interpolation, run once when a polynomial reaches its threshold,
+///   `O(threshold²)`;
+/// - the duplicate-identifier scan, a linear walk of the shares collected so far on *every* share, so `O(threshold)`
+///   each and `O(threshold²)` per polynomial — the same order as the interpolation it precedes.
+///
+/// Reported per share, which is what makes the sweep readable: both terms are `O(threshold)` per
+/// share, so **a flat line across the sweep means neither is material** and a rising one means the
+/// re-tune has something to win. Elements are shares so the number is directly comparable with the
+/// sustained- and concurrent-rate groups.
+///
+/// `surplus_shares: 0` so exactly `polys × threshold` shares complete every polynomial: no share is
+/// surplus, no polynomial is left short, and the timed region is purely the completion path.
+fn bench_acknowledge_shares_interpolation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("SsaReconstructor::acknowledge_shares/interpolation");
+    group.measurement_time(Duration::from_secs(10));
+    group.sample_size(10);
+
+    let peer = OffchainKeypair::random();
+    let recon_cfg = bench_recon_cfg(false);
+    let polys = INTERPOLATION_POLYS;
+
+    for threshold in [16u8, 32, 48, PROD_THRESHOLD] {
+        let num_shares = polys as usize * threshold as usize;
+        let generator_cfg = SsaGeneratorConfig {
+            threshold,
+            polynomials_per_ssa: polys,
+            surplus_shares: 0,
+        };
+
+        group.throughput(Throughput::Elements(num_shares as u64));
+        group.bench_function(BenchmarkId::from_parameter(format!("t{threshold}")), |b| {
+            let mut completed_at_least_once = false;
+            b.iter_custom(|iters| {
+                let mut total = Duration::ZERO;
+                for _ in 0..iters {
+                    // Completing every polynomial consumes the cycle, so the fixture is rebuilt per
+                    // iteration — the same constraint `full_ssa` works under.
+                    let reconstructor = SsaReconstructor::<TestSpec>::new(recon_cfg);
+                    let generator = SsaShareGenerator::<TestSpec>::new(generator_cfg);
+                    let pseudonym = SimplePseudonym::random();
+                    let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+                    reconstructor
+                        .new_exit_commitment(ssa_id, polys as usize, threshold as usize)
+                        .unwrap();
+                    let commitment = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+                    let proof = commitment.commitment_proof;
+                    for (coeff_index, poly_commitments) in commitment.verifiers {
+                        reconstructor
+                            .insert_coefficient_commitments(
+                                ssa_id,
+                                coeff_index,
+                                (coeff_index == 0).then_some(proof),
+                                poly_commitments.into_iter(),
+                            )
+                            .unwrap();
+                    }
+
+                    let mut counter: u64 = 0;
+                    let acks = stage_shares(&reconstructor, &generator, &peer, pseudonym, &mut counter, num_shares);
+
+                    let start = Instant::now();
+                    let resolutions = reconstructor.acknowledge_shares(*peer.public(), acks).unwrap();
+                    total += start.elapsed();
+
+                    completed_at_least_once |= !resolutions.is_empty();
+                }
+                total
+            });
+            assert!(
+                completed_at_least_once,
+                "the interpolation sweep must actually complete polynomials — an empty resolution set means the timed \
+                 region measured a path that did no reconstruction"
+            );
+        });
+    }
+    group.finish();
+}
+
 fn bench_acknowledge_shares_full_ssa(c: &mut Criterion) {
     // Recovers an *entire* SSA, so this is the only group that exercises the final
     // reconstruction path (`ShareResolution::RecoveredSsa`, `scalar_to_private_key`, and
@@ -929,6 +1026,7 @@ criterion_group!(
     bench_acknowledge_shares_concurrent,
     bench_acknowledge_shares_deferred,
     bench_drain_deferred_acks,
+    bench_acknowledge_shares_interpolation,
     bench_acknowledge_shares_full_ssa
 );
 criterion_main!(benches);

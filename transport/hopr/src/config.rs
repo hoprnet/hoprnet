@@ -12,9 +12,8 @@ use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY,
-    DEFAULT_PIX_SURPLUS_SHARES, IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL,
-    MIN_SURB_BUFFER_DURATION,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
+    MAX_SSA_BATCH_SIZE, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -304,6 +303,18 @@ fn validate_pix_dimension_product(cfg: &PixGlobalConfig) -> Result<(), Validatio
             "num_ssa_parts * ssa_part_size exceeds the supported per-cycle dimension product",
         ));
     }
+
+    // An explicit surplus above the threshold buys more redundancy than payload, and — since H5 put
+    // the surplus in the negotiated `PixParams` and hence in the billed quota — pays for it on every
+    // deposit. `hopr-protocol-pix` enforces the same rule on `SsaGeneratorConfig`; checking it here
+    // too turns it into a config-load error naming the operator's own field, rather than one about a
+    // struct they never wrote.
+    if cfg.surplus_shares() > cfg.ssa_part_size {
+        return Err(ValidationError::new(
+            "additional_shares must not exceed ssa_part_size — the surplus is billed, so this pays for more \
+             redundancy than payload",
+        ));
+    }
     Ok(())
 }
 
@@ -351,13 +362,20 @@ pub struct PixGlobalConfig {
     /// other side to reconstruct the entire SSA from all its parts. This is because if
     /// no packet loss is present, the other side can reconstruct the SSA from fewer shares.
     ///
-    /// **This is an absolute share count, not a ratio.** The default is half of
-    /// [`DEFAULT_PIX_SHARES_PER_POLY`] — a surplus factor of 1.5× — but it is a constant computed
-    /// once, so raising [`ssa_part_size`](Self::ssa_part_size) and leaving this alone lowers the
-    /// surplus factor, and lowering it raises it. Re-tune the two together.
+    /// **Leave unset unless you have measured your return-path loss.** `None` derives the surplus
+    /// from [`ssa_part_size`](Self::ssa_part_size) via
+    /// [`default_surplus_for`](hopr_protocol_pix::default_surplus_for), which sizes it to absorb
+    /// 20 % of a polynomial's shares going missing. Read
+    /// [`surplus_shares`](Self::surplus_shares) for the resolved value.
+    ///
+    /// It is a ratio because the physics is a ratio: a polynomial reconstructs from the first
+    /// `ssa_part_size` distinct shares to arrive out of `ssa_part_size + surplus` emitted, so
+    /// surviving loss rate `p` needs `surplus >= ssa_part_size · p/(1−p)`. Setting an absolute count
+    /// therefore means a different loss tolerance at every threshold — a flat 20 covers 24 % at
+    /// `ssa_part_size` 64 but 56 % at 16, where it exceeds the shares it insures and is rejected.
     ///
     /// The factor is what matters, because it is what this costs. A polynomial leaves the
-    /// generator's queue at `ssa_part_size + additional_shares` shares whether or not any were
+    /// generator's queue at `ssa_part_size + surplus` shares whether or not any were
     /// lost, so this is service the Exit performs in every case — and since the surplus travels to
     /// the peer as part of the negotiated [`PixParams`](hopr_protocol_pix::PixParams), the per-SSA
     /// quota counts it and the deposit pays for it. It buys loss tolerance, and it is charged for
@@ -367,10 +385,10 @@ pub struct PixGlobalConfig {
     /// should be. It used to be the other way: the surplus was excluded from the quota, so the
     /// rational Entry raised this dial to take traffic it was not billed for.
     ///
-    /// Capped at 255 because it is the other byte of that word.
+    /// Capped at 255 because it is the other byte of that word, and at `ssa_part_size` because
+    /// insurance costing more than the payload is a misconfiguration rather than a preference.
     #[validate(range(min = 0, max = 255))]
-    #[default(DEFAULT_PIX_SURPLUS_SHARES as usize)]
-    pub additional_shares: usize,
+    pub additional_shares: Option<usize>,
 
     /// Maximum number of SSA commitments this node, acting as an Entry, accepts in a single
     /// `SsaRequest` from an Exit.
@@ -401,6 +419,21 @@ pub struct PixGlobalConfig {
     #[validate(nested)]
     #[cfg_attr(feature = "serde", serde(default))]
     pub reconstructor: PixReconstructorConfig,
+}
+
+impl PixGlobalConfig {
+    /// Surplus shares per polynomial: the operator's value if set, otherwise derived from
+    /// [`ssa_part_size`](Self::ssa_part_size).
+    ///
+    /// Every reader must go through this rather than the field. The field is `Option` precisely
+    /// because serde cannot express "default to a function of a sibling", so the field alone is not
+    /// the configuration — reading it directly is how the unset case would silently become zero
+    /// surplus, i.e. no loss tolerance at all.
+    pub fn surplus_shares(&self) -> usize {
+        self.additional_shares.unwrap_or_else(|| {
+            hopr_protocol_pix::default_surplus_for(self.ssa_part_size.min(u8::MAX as usize) as u8) as usize
+        })
+    }
 }
 
 /// Rejects a reconstructor configuration that [`SsaReconstructorConfig`] itself would reject.
@@ -952,7 +985,7 @@ mod tests {
         let incoming = IncomingSessionPixConfig::default();
 
         let quota = pix.num_ssa_parts as u64
-            * (pix.ssa_part_size + pix.additional_shares) as u64
+            * (pix.ssa_part_size + pix.surplus_shares()) as u64
             * hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
 
         assert!(
@@ -1185,6 +1218,51 @@ mod tests {
             Duration::from_secs(45),
             SsaReconstructorConfig::from(cfg.pix.reconstructor).max_ack_await_time
         );
+
+        // An unset surplus must derive from the configured threshold, not fall to zero. This is the
+        // one field whose `serde(default)` cannot express its own default, so "absent" and "zero"
+        // are the two readings that must not be confused — zero surplus is legal and means no loss
+        // tolerance at all.
+        let json = r#"{ "pix": { "ssa_part_size": 32 } }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX dimensions must deserialize");
+        assert_eq!(None, cfg.pix.additional_shares, "the field itself stays unset");
+        assert_eq!(8, cfg.pix.surplus_shares(), "and resolves to ssa_part_size / 4");
+
+        let json = r#"{ "pix": { "ssa_part_size": 32, "additional_shares": 30 } }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("an explicit surplus must deserialize");
+        assert_eq!(30, cfg.pix.surplus_shares(), "an explicit surplus is passed through");
+
+        let json = r#"{ "pix": { "ssa_part_size": 16, "additional_shares": 20 } }"#;
+        let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("it parses; validation is what rejects it");
+        assert!(
+            cfg.validate().is_err(),
+            "a surplus above the threshold must be rejected — 20 shares of insurance against 16 of payload"
+        );
+    }
+
+    /// The derived surplus tracks the configured threshold, which is the whole point of deriving it.
+    ///
+    /// Stated as the loss rate it covers rather than as four literals: `surplus/(threshold+surplus)`
+    /// is the fraction of a polynomial's shares that may go missing before it cannot reconstruct,
+    /// and that — not the raw count — is what an operator would compare against measured loss.
+    #[test]
+    fn the_derived_surplus_covers_a_fifth_of_a_polynomial_at_every_threshold() {
+        for ssa_part_size in [16usize, 32, 48, 64] {
+            let cfg = PixGlobalConfig {
+                ssa_part_size,
+                ..Default::default()
+            };
+            let surplus = cfg.surplus_shares();
+            let tolerated = surplus as f64 / (ssa_part_size + surplus) as f64;
+            assert!(
+                (0.19..=0.21).contains(&tolerated),
+                "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating {tolerated:.3} loss"
+            );
+            assert!(
+                cfg.validate().is_ok(),
+                "a derived surplus must never fail the bound it is derived under"
+            );
+        }
     }
 
     /// Both SSA batch knobs are bounded by [`MAX_SSA_BATCH_SIZE`], and the `range` attribute on

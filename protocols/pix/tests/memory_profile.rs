@@ -50,12 +50,13 @@ const COMMITMENTS_PER_SSA_COMMIT_MSG: usize = 28;
 /// Mirrors `HoprPacket::PAYLOAD_SIZE`.
 const QUOTA_BYTES_PER_SHARE: u64 = 1038;
 
-/// Surplus shares emitted per polynomial beyond the threshold, as deployments configure it.
+/// Surplus shares emitted per polynomial beyond the threshold.
 ///
-/// A flat 20 rather than `DEFAULT_SURPLUS_SHARES` (`threshold / 2`, so 32 here). The cycle is
-/// `polys × (threshold + surplus)` shares long, so this decides how much of the profile's wall
-/// clock is spent walking one.
-const PROD_SURPLUS: u8 = 20;
+/// Derived from the threshold — a ratio sized to absorb 20 % share loss — rather than a flat count.
+/// The cycle is `polys × (threshold + surplus)` shares long, so this decides how much of the
+/// profile's wall clock is spent walking one, and a flat value would mean a different cycle length
+/// relative to the threshold at every dimension.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
 
 /// Operating point being modelled: per-Session return-path rate, in bytes per second.
 ///

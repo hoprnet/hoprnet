@@ -75,6 +75,32 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
 /// documented on `DEFAULT_PIX_POLYS_PER_SSA` in `hopr-transport-session`.
 pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
 
+/// Share loss a polynomial's surplus is sized to absorb, as a reciprocal: `1/5` is 20 %.
+///
+/// The surplus is insurance against *lost* shares, and this is the loss rate it covers. A
+/// polynomial reconstructs from the first `threshold` distinct shares to arrive out of
+/// `threshold + surplus` emitted, so surviving a per-packet loss rate of `p` needs
+/// `surplus >= threshold · p/(1−p)` — which makes the surplus inherently a **ratio** of the
+/// threshold, and `surplus/(threshold + surplus)` the loss rate it tolerates.
+///
+/// At `threshold/4` that is 20 %.
+const SURPLUS_LOSS_TOLERANCE_DIVISOR: u8 = 4;
+
+/// Shares to emit per polynomial beyond `threshold`, to absorb losses.
+///
+/// **A ratio, evaluated at the threshold actually configured** — see
+/// [`SURPLUS_LOSS_TOLERANCE_DIVISOR`] for why a ratio is the physically meaningful shape.
+///
+/// This used to be a bare constant, `DEFAULT_POLY_THRESHOLD / 2`, evaluated once at the *default*
+/// threshold and then applied whatever the configured one was. Deployments run thresholds from 16
+/// to 64, so a single absolute surplus means wildly different insurance across that range: a flat
+/// 20 covers 24 % loss at threshold 64 but 56 % at threshold 16, where it exceeds the shares it
+/// insures. Since H5 the surplus is billed on purchase rather than on claim, so that over-insurance
+/// is quota an Entry pays for in every deposit.
+pub const fn default_surplus_for(threshold: u8) -> u8 {
+    threshold / SURPLUS_LOSS_TOLERANCE_DIVISOR
+}
+
 /// Shares emitted per polynomial beyond [`DEFAULT_POLY_THRESHOLD`], to absorb losses.
 ///
 /// The third leg of the deployed split, and like the other two a single value rather than one per
@@ -84,10 +110,9 @@ pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
 /// being harmless once the per-SSA quota started counting it, because the quota is a `const` and had
 /// to pick one of the two.
 ///
-/// Half the threshold, kept as the expression rather than as `32`, because what is being fixed is
-/// the *factor*: a cycle emits `threshold + surplus` shares per polynomial, so this is what makes
-/// the deployed surplus factor 1.5×. Re-tuning the threshold moves it in step.
-pub const DEFAULT_SURPLUS_SHARES: u8 = DEFAULT_POLY_THRESHOLD / 2;
+/// Only the value of [`default_surplus_for`] at the default threshold. Anything that knows its own
+/// threshold should call that instead — this constant cannot, which is exactly the defect above.
+pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLY_THRESHOLD);
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;

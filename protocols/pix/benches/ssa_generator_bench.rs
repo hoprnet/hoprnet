@@ -8,7 +8,7 @@
 //! | --------------------- | ---------- |
 //! | polynomials per SSA   | 4 096 – 8 192 |
 //! | threshold             | 16 – 64 |
-//! | surplus shares        | 20 (flat, not `threshold/2`) |
+//! | surplus shares        | `threshold/4`, covering 20 % share loss |
 //! | SSAs in flight        | 2 – 3 per Session |
 //! | per-Session rate      | 16 – 20 Mbps |
 //! | clients per Exit      | 10 – 30 |
@@ -52,18 +52,15 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// removed.
 const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
-/// Surplus shares emitted per polynomial beyond the threshold, as deployments configure it.
+/// Surplus shares emitted per polynomial, derived from the threshold being swept.
 ///
-/// A flat 20, **not** `DEFAULT_SURPLUS_SHARES`, which is `threshold / 2` and so would be a
-/// different quantity at every point of the sweep below — 8 at threshold 16, 32 at 64. Benchmarking
-/// against the default would therefore silently vary the emitted-share count with the threshold and
-/// confound the very comparison the sweep exists to make.
-///
-/// Worth knowing while reading any result here: at a flat 20 the surplus *factor* swings from 1.31×
-/// at threshold 64 to **2.25× at threshold 16**, where the insurance exceeds the shares it insures.
-/// The surplus is billed on purchase rather than on claim (see H5), so that is quota an Entry pays
-/// for at every deposit.
-const PROD_SURPLUS: u8 = 20;
+/// A function rather than a constant, because the surplus *is* a ratio of the threshold — sized to
+/// absorb 20 % share loss — and a sweep that varies the threshold while holding the surplus fixed
+/// would silently vary the loss tolerance instead, from 20 % at one end to something else at the
+/// other. See `default_surplus_for` in `hopr-protocol-pix`.
+fn prod_surplus(threshold: u8) -> u8 {
+    hopr_protocol_pix::default_surplus_for(threshold)
+}
 
 // The production operating box, per the module documentation. The last entry of each is the
 // deployed value, so the sweep stays a superset of the default set.
@@ -143,7 +140,7 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                             let cfg = SsaGeneratorConfig {
                                 threshold,
                                 polynomials_per_ssa,
-                                surplus_shares: PROD_SURPLUS,
+                                surplus_shares: prod_surplus(threshold),
                             };
                             (SsaShareGenerator::<TestSpec>::new(cfg), SimplePseudonym::random())
                         },
@@ -176,7 +173,7 @@ fn bench_verify_reconstructed(c: &mut Criterion) {
         let cfg = SsaGeneratorConfig {
             threshold,
             polynomials_per_ssa: 1,
-            surplus_shares: PROD_SURPLUS,
+            surplus_shares: prod_surplus(threshold),
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
         let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
@@ -216,7 +213,7 @@ fn bench_next_share(c: &mut Criterion) {
                 let cfg = SsaGeneratorConfig {
                     threshold,
                     polynomials_per_ssa: NEXT_SHARE_BENCH_POLYS,
-                    surplus_shares: PROD_SURPLUS,
+                    surplus_shares: prod_surplus(threshold),
                 };
                 // A commitment yields `polys * (threshold + surplus)` shares before the
                 // generator runs dry and starts returning `Ok(None)`.
