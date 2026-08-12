@@ -311,7 +311,7 @@ mod tests {
     enum GraphCall {
         Node(OffchainPublicKey),
         Edge(Box<EdgeBalanceUpdate>),
-        FaceValue(hopr_api::graph::traits::ChannelBalance),
+        FaceValue(hopr_api::graph::traits::Balance),
     }
 
     #[derive(Debug, Clone, Default)]
@@ -331,7 +331,7 @@ mod tests {
                 .collect()
         }
 
-        fn face_values(&self) -> Vec<hopr_api::graph::traits::ChannelBalance> {
+        fn face_values(&self) -> Vec<hopr_api::graph::traits::Balance> {
             self.recorded()
                 .into_iter()
                 .filter_map(|c| if let GraphCall::FaceValue(v) = c { Some(v) } else { None })
@@ -347,7 +347,7 @@ mod tests {
     }
 
     impl NetworkGraphUpdate for RecordingGraph {
-        fn set_ticket_face_value(&self, ticket_face_value: hopr_api::graph::traits::ChannelBalance) {
+        fn set_ticket_face_value(&self, ticket_face_value: hopr_api::graph::traits::Balance) {
             self.calls.lock().unwrap().push(GraphCall::FaceValue(ticket_face_value));
         }
 
@@ -563,10 +563,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(
-            edges[0].balance,
-            Some(hopr_api::graph::traits::ChannelBalance::from(100u64))
-        );
+        assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(100u64)));
         assert_eq!(edges[0].src, *src_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
     }
@@ -598,10 +595,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(
-            edges[0].balance,
-            Some(hopr_api::graph::traits::ChannelBalance::from(50u64))
-        );
+        assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(50u64)));
     }
 
     #[tokio::test]
@@ -699,7 +693,7 @@ mod tests {
 
         assert_eq!(
             graph.face_values(),
-            vec![hopr_api::graph::traits::ChannelBalance::from(20u64)],
+            vec![hopr_api::graph::traits::Balance::from(20u64)],
             "a price change must push exactly one recomputed face value"
         );
 
@@ -707,7 +701,7 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert_eq!(
             edges[0].balance,
-            Some(hopr_api::graph::traits::ChannelBalance::from(200u64)),
+            Some(hopr_api::graph::traits::Balance::from(200u64)),
             "the emitted balance must not depend on the price"
         );
     }
@@ -740,7 +734,7 @@ mod tests {
 
         assert_eq!(
             graph.face_values(),
-            vec![hopr_api::graph::traits::ChannelBalance::from(20u64)],
+            vec![hopr_api::graph::traits::Balance::from(20u64)],
             "a winning-probability change must push exactly one recomputed face value"
         );
 
@@ -748,7 +742,7 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert_eq!(
             edges[0].balance,
-            Some(hopr_api::graph::traits::ChannelBalance::from(100u64)),
+            Some(hopr_api::graph::traits::Balance::from(100u64)),
             "the emitted balance must not depend on the winning probability"
         );
         Ok(())

@@ -76,7 +76,7 @@ struct MetricsValueFn<W: EdgeObservableRead> {
     /// Read once per query rather than stored on any edge: deriving a count at query time is
     /// safe, whereas deriving it at edge-update time is what made a price change stale the
     /// whole graph.
-    ticket_face_value: Option<hopr_api::graph::traits::ChannelBalance>,
+    ticket_face_value: Option<hopr_api::graph::traits::Balance>,
 }
 
 impl<W> ValueFn for MetricsValueFn<W>
@@ -138,13 +138,13 @@ where
             // log ratio, and a base-unit balance would compress every realistic channel into a
             // sliver of its output range.
             let edge_tickets = observed.intermediate_qos().and_then(|m| m.balance()).map(|balance| {
-                let face_value = ticket_face_value.unwrap_or_else(hopr_api::graph::traits::ChannelBalance::one);
+                let face_value = ticket_face_value.unwrap_or_else(hopr_api::graph::traits::Balance::one);
                 let tickets = if face_value.is_zero() {
-                    hopr_api::graph::traits::ChannelBalance::zero()
+                    hopr_api::graph::traits::Balance::zero()
                 } else {
                     balance / face_value
                 };
-                if tickets > hopr_api::graph::traits::ChannelBalance::from(u128::MAX) {
+                if tickets > hopr_api::graph::traits::Balance::from(u128::MAX) {
                     u128::MAX
                 } else {
                     tickets.low_u128()
@@ -574,9 +574,9 @@ mod tests {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(50))));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Balance(Some(
-                hopr_api::graph::traits::ChannelBalance::from(1000u64),
-            )));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                1000u64,
+            ))));
         });
     }
 
@@ -1249,9 +1249,9 @@ mod tests {
             graph.upsert_edge(src, dst, |obs| {
                 obs.record(EdgeWeightType::Connected(true));
                 obs.record(EdgeWeightType::Immediate(Ok(Duration::from_millis(lat_ms))));
-                obs.record(EdgeWeightType::Balance(Some(
-                    hopr_api::graph::traits::ChannelBalance::from(1000u64),
-                )));
+                obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                    1000u64,
+                ))));
             });
         };
 
@@ -1291,16 +1291,16 @@ mod tests {
         graph.upsert_edge(&me, &hop, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Balance(Some(
-                hopr_api::graph::traits::ChannelBalance::from(500u64),
-            )));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                500u64,
+            ))));
         });
         graph.upsert_edge(&hop, &dest, |obs| {
             obs.record(EdgeWeightType::Connected(true));
             obs.record(EdgeWeightType::Intermediate(Ok(Duration::from_millis(50))));
-            obs.record(EdgeWeightType::Balance(Some(
-                hopr_api::graph::traits::ChannelBalance::from(200u64),
-            )));
+            obs.record(EdgeWeightType::Balance(Some(hopr_api::graph::traits::Balance::from(
+                200u64,
+            ))));
         });
         graph.add_edge(&me, &hop).unwrap();
         graph.add_edge(&hop, &dest).unwrap();
