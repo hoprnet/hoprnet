@@ -16,6 +16,6 @@ pub mod selector;
 pub mod traits;
 
 pub use errors::{PathPlannerError, Result};
-pub use planner::{PathPlanner, PathPlannerConfig};
+pub use planner::{PathPlanner, PathPlannerConfig, PlannerReturnPathFeedback};
 pub use selector::HoprGraphPathSelector;
 pub use traits::{BackgroundPathCacheRefreshable, PathSelector, PathWithMetrics};
