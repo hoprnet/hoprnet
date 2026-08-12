@@ -157,6 +157,8 @@ pub enum HoprTransportProcess {
     OutgoingIndexSync,
     #[strum(to_string = "periodic protocol counter flush")]
     CounterFlush,
+    /// Periodically reports SURB round-trip counts into the network graph.
+    SurbFlush,
     #[strum(to_string = "mixer→wire forwarder")]
     MixerForwarder,
     #[cfg(feature = "capture")]
@@ -793,6 +795,8 @@ where
             .map_err(HoprTransportError::chain)?
             .channel;
 
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
             .transport((mixing_channel_tx, wire_msg_rx))
@@ -802,6 +806,10 @@ where
             .ticket_factory(ticket_factory)
             .channels_dst(channels_dst)
             .with_counters(self.counters.clone())
+            .with_surb_telemetry(
+                surb_round_trips.clone(),
+                protocol::surb_telemetry::path_slots_of(self.graph.clone()),
+            )
             .with_config(self.cfg.packet);
 
         let pipeline_processes = match role {
@@ -834,6 +842,27 @@ where
                                 obs.record(EdgeWeightType::ImmediateProtocolConformance { num_packets, num_acks });
                             });
                         }
+                        futures::future::ready(())
+                    })
+                    .await;
+            }),
+        );
+
+        // -- periodic SURB round-trip flush
+        let surb_flush_graph = self.graph.clone();
+        let surb_flush_interval = self.cfg.surb_flush_interval;
+        processes.insert(
+            HoprTransportProcess::SurbFlush,
+            hopr_utils::spawn_as_abortable!(async move {
+                futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval))
+                    .for_each(|_| {
+                        protocol::surb_telemetry::flush_into(
+                            &surb_round_trips,
+                            &surb_flush_graph,
+                            hopr_utils::platform::time::native::current_time()
+                                .as_unix_timestamp()
+                                .as_millis(),
+                        );
                         futures::future::ready(())
                     })
                     .await;

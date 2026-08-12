@@ -108,15 +108,35 @@ impl SurbRoundTripRegistry {
     }
 }
 
+/// Resolves a node to the slot it occupies in a [`PathId`].
+///
+/// Taken as a function rather than as a graph so the codec decorator stays free of the graph's type
+/// parameters -- the packet pipeline builder is already deeply generic and has no graph handle of
+/// its own to thread through.
+pub type PathSlotResolver = Arc<dyn Fn(&OffchainPublicKey) -> Option<u64> + Send + Sync>;
+
+/// A resolver that places no node, so nothing is ever attributed.
+///
+/// Lets the decorator be installed unconditionally: with no graph to resolve against, every leg
+/// fails to build an id and is skipped before it reaches the pending map.
+pub fn no_path_slots() -> PathSlotResolver {
+    Arc::new(|_| None)
+}
+
+/// Reads path slots out of a network graph.
+pub fn path_slots_of<G>(graph: G) -> PathSlotResolver
+where
+    G: NetworkGraphView<NodeId = OffchainPublicKey> + Send + Sync + 'static,
+{
+    Arc::new(move |key| graph.path_slot(key))
+}
+
 /// Builds the [`PathId`] of a leg from the nodes it visits.
 ///
 /// Returns `None` if any node is unknown to the graph or the leg is longer than a [`PathId`] can
 /// hold -- in both cases the id would name edges the round-trip did not use, which is worse than
 /// reporting nothing.
-fn path_id<G>(graph: &G, nodes: impl IntoIterator<Item = OffchainPublicKey>) -> Option<PathId>
-where
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
-{
+fn path_id(slots: &PathSlotResolver, nodes: impl IntoIterator<Item = OffchainPublicKey>) -> Option<PathId> {
     let mut id = [0u64; PATH_ID_SLOTS];
     let mut len = 0;
 
@@ -124,7 +144,7 @@ where
         if len == PATH_ID_SLOTS {
             return None;
         }
-        id[len] = graph.path_slot(&node)?;
+        id[len] = slots(&node)?;
         len += 1;
     }
 
@@ -136,20 +156,17 @@ where
 /// The forward leg starts at us and ends at the destination; the reply leg starts at that same
 /// destination and ends back at us. Joining them at the destination is what lets the graph credit
 /// the whole loop, and it is why the forward path's last hop seeds the reply leg.
-fn round_trip_paths<G>(
-    graph: &G,
+fn round_trip_paths(
+    slots: &PathSlotResolver,
+    me: &OffchainPublicKey,
     forward: &[OffchainPublicKey],
     reply: &[OffchainPublicKey],
-) -> Option<ForwardAndReturnPath>
-where
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
-{
-    let me = *graph.identity();
+) -> Option<ForwardAndReturnPath> {
     let destination = *forward.last()?;
 
     Some(ForwardAndReturnPath {
-        forward: path_id(graph, std::iter::once(me).chain(forward.iter().copied()))?,
-        reply: path_id(graph, std::iter::once(destination).chain(reply.iter().copied()))?,
+        forward: path_id(slots, std::iter::once(*me).chain(forward.iter().copied()))?,
+        reply: path_id(slots, std::iter::once(destination).chain(reply.iter().copied()))?,
     })
 }
 
@@ -210,10 +227,11 @@ where
 ///
 /// Encoding and decoding are otherwise passed straight through; a failure to attribute a round-trip
 /// never fails a packet.
-#[derive(Debug, Clone)]
-pub struct SurbTelemetryCodec<C, G> {
+#[derive(Clone)]
+pub struct SurbTelemetryCodec<C> {
     inner: C,
-    graph: G,
+    me: OffchainPublicKey,
+    slots: PathSlotResolver,
     registry: SurbRoundTripRegistry,
     /// Legs each outstanding SURB was minted over.
     ///
@@ -222,15 +240,29 @@ pub struct SurbTelemetryCodec<C, G> {
     pending: moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>,
 }
 
-impl<C, G> SurbTelemetryCodec<C, G>
-where
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
-{
-    /// Wraps `inner`, resolving paths against `graph` and accumulating into `registry`.
-    pub fn new(inner: C, graph: G, registry: SurbRoundTripRegistry, max_pending: u64) -> Self {
+impl<C: std::fmt::Debug> std::fmt::Debug for SurbTelemetryCodec<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The slot resolver is a closure and has nothing meaningful to show.
+        f.debug_struct("SurbTelemetryCodec")
+            .field("inner", &self.inner)
+            .field("me", &self.me)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<C> SurbTelemetryCodec<C> {
+    /// Wraps `inner`, resolving path slots with `slots` and accumulating into `registry`.
+    pub fn new(
+        inner: C,
+        me: OffchainPublicKey,
+        slots: PathSlotResolver,
+        registry: SurbRoundTripRegistry,
+        max_pending: u64,
+    ) -> Self {
         Self {
             inner,
-            graph,
+            me,
+            slots,
             registry,
             pending: moka::sync::Cache::builder()
                 .max_capacity(max_pending)
@@ -257,7 +289,7 @@ where
 
         for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
             let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
-            let Some(paths) = round_trip_paths(&self.graph, &forward, &reply) else {
+            let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
                 continue;
             };
 
@@ -275,10 +307,9 @@ where
     }
 }
 
-impl<C, G> PacketEncoder for SurbTelemetryCodec<C, G>
+impl<C> PacketEncoder for SurbTelemetryCodec<C>
 where
     C: PacketEncoder,
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
 {
     type Error = C::Error;
 
@@ -302,10 +333,9 @@ where
     }
 }
 
-impl<C, G> PacketDecoder for SurbTelemetryCodec<C, G>
+impl<C> PacketDecoder for SurbTelemetryCodec<C>
 where
     C: PacketDecoder,
-    G: NetworkGraphView<NodeId = OffchainPublicKey>,
 {
     type Error = C::Error;
 
@@ -344,8 +374,9 @@ mod tests {
     use super::*;
 
     /// The trait impls are pass-throughs, so the tests drive the attribution logic directly.
-    fn recorder(graph: ChannelGraph) -> SurbTelemetryCodec<(), ChannelGraph> {
-        SurbTelemetryCodec::new((), graph, SurbRoundTripRegistry::default(), 128)
+    fn recorder(graph: ChannelGraph) -> SurbTelemetryCodec<()> {
+        let me = *graph.identity();
+        SurbTelemetryCodec::new((), me, path_slots_of(graph), SurbRoundTripRegistry::default(), 128)
     }
 
     fn surb_id(seed: u8) -> HoprSurbId {
@@ -398,7 +429,8 @@ mod tests {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
 
-        let paths = round_trip_paths(&graph, &[destination], &[me]).context("both nodes are in the graph")?;
+        let paths = round_trip_paths(&path_slots_of(graph.clone()), &me, &[destination], &[me])
+            .context("both nodes are in the graph")?;
 
         let me_slot = graph.path_slot(&me).context("self is in the graph")?;
         let dest_slot = graph.path_slot(&destination).context("destination is in the graph")?;
@@ -417,7 +449,7 @@ mod tests {
 
         // Reporting an id built from a node the graph cannot place would credit whichever edges the
         // wrong slots happened to name.
-        assert!(round_trip_paths(&graph, &[stranger], &[me]).is_none());
+        assert!(round_trip_paths(&path_slots_of(graph), &me, &[stranger], &[me]).is_none());
     }
 
     #[test]
@@ -426,7 +458,7 @@ mod tests {
         let forward: Vec<_> = peers.clone();
 
         // A `PathId` holds five slots; a longer leg cannot be named without dropping hops.
-        assert!(round_trip_paths(&graph, &forward, &[me]).is_none());
+        assert!(round_trip_paths(&path_slots_of(graph), &me, &forward, &[me]).is_none());
     }
 
     #[test]
@@ -493,6 +525,28 @@ mod tests {
 
         let (_, expected, observed) = recorder.registry.drain()[0];
         assert_eq!((1, 1), (expected, observed));
+        Ok(())
+    }
+
+    #[test]
+    fn flushing_should_leave_nothing_behind_to_report_twice() -> anyhow::Result<()> {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let recorder = recorder(graph.clone());
+
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path: ValidatedPath::direct(destination, address()),
+            return_paths: vec![ValidatedPath::direct(me, address())],
+        };
+        recorder.on_minted(&routing, &[surb_id(1)]);
+        recorder.on_replied(&surb_id(1));
+
+        flush_into(&recorder.registry, &graph, 0);
+
+        // Counts belong to the interval that produced them; carrying them into the next flush would
+        // keep reporting a round-trip that happened once as though it kept happening.
+        assert!(recorder.registry.drain().is_empty());
         Ok(())
     }
 
