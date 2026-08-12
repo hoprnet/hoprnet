@@ -14,6 +14,7 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
+use hopr_transport_session::flow_control::{ReturnPathFeedback, ReturnPathFeedbackFactory};
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
@@ -568,6 +569,70 @@ where
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
+    }
+
+    /// Drops the cached return-path candidates for `destination`, so the next draw re-runs
+    /// selection against current edge scores instead of a list built before the failure.
+    ///
+    /// Invalidation is the whole action. It deliberately does *not* retire the relayers that were
+    /// in use: an earlier version did, because a batch was believed to span K distinct relayers and
+    /// there was no way to tell which had failed. Neither premise holds —
+    /// `HoprPacket::PAYLOAD_SIZE / HoprSurb::SIZE` is 2, so a batch never spanned more than two,
+    /// and per-edge SURB round-trip telemetry now says which ones are actually delivering.
+    ///
+    /// Return-path cache keys are `(destination, me, hops)` — reversed relative to forward paths,
+    /// because a return path runs *from* the destination back to us.
+    pub fn degrade_return_path(&self, destination: NodeId) {
+        let me = NodeId::Offchain(self.me);
+        let cache = self.cache.clone();
+
+        // `moka::future::Cache::invalidate` is async and this is called from a poll context (the
+        // session's delivery clock), so it cannot be awaited here.
+        hopr_utils::runtime::prelude::spawn(async move {
+            for hops in 0..=RoutingOptions::MAX_INTERMEDIATE_HOPS as u32 {
+                cache.invalidate(&(destination, me, hops)).await;
+            }
+            tracing::debug!(%destination, "dropped cached return-path candidates after sustained loss");
+        });
+    }
+}
+
+/// Adapts a [`PathPlanner`] into the session layer's [`ReturnPathFeedbackFactory`].
+///
+/// The seam exists so the layer that *detects* return-path failure (the session's delivery clock)
+/// does not depend on the layer that *fixes* it (the path planner), nor the reverse.
+#[derive(Clone)]
+pub struct PlannerReturnPathFeedback<Surb, R, S>(pub PathPlanner<Surb, R, S>);
+
+impl<Surb, R, S> ReturnPathFeedbackFactory for PlannerReturnPathFeedback<Surb, R, S>
+where
+    Surb: SurbStore + Clone + Send + Sync + 'static,
+    R: Clone + ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
+    S: Clone + PathSelector + Send + Sync + 'static,
+{
+    fn for_destination(&self, destination: NodeId) -> Arc<dyn ReturnPathFeedback> {
+        Arc::new(DestinationBoundFeedback {
+            planner: self.0.clone(),
+            destination,
+        })
+    }
+}
+
+/// A [`ReturnPathFeedback`] bound to one destination, since the session knows its counterparty but
+/// the trait method carries no arguments.
+struct DestinationBoundFeedback<Surb, R, S> {
+    planner: PathPlanner<Surb, R, S>,
+    destination: NodeId,
+}
+
+impl<Surb, R, S> ReturnPathFeedback for DestinationBoundFeedback<Surb, R, S>
+where
+    Surb: SurbStore + Send + Sync + 'static,
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
+    S: PathSelector + Send + Sync + 'static,
+{
+    fn return_path_degraded(&self) {
+        self.planner.degrade_return_path(self.destination);
     }
 }
 

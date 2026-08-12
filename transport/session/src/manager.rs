@@ -39,6 +39,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
+    flow_control::ReturnPathFeedbackFactory,
     types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol, SESSION_APPLICATION_TAG},
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -532,6 +533,9 @@ pub struct SessionManager<S> {
     active_sessions: Arc<std::sync::atomic::AtomicUsize>,
     sessions: moka::sync::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
+    /// Optional seam to the transport's path planner, used to re-plan a session's return path when
+    /// the loss clock says it has gone bad. `None` leaves return-path correction to probing.
+    return_path_feedback: Option<Arc<dyn ReturnPathFeedbackFactory>>,
     cfg: SessionManagerConfig,
 }
 
@@ -545,6 +549,7 @@ impl<S> Clone for SessionManager<S> {
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
+            return_path_feedback: self.return_path_feedback.clone(),
         }
     }
 }
@@ -651,8 +656,19 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
+            return_path_feedback: None,
             cfg,
         }
+    }
+
+    /// Wires the seam that lets a session re-plan its return path on sustained loss.
+    ///
+    /// Without it — and without
+    /// [`FlowControlConfig::return_path_replan`](hopr_protocol_session::flow_control::FlowControlConfig::return_path_replan)
+    /// being set — a degraded return path is corrected only once probing notices, which takes tens of seconds.
+    pub fn with_return_path_feedback(mut self, factory: Arc<dyn ReturnPathFeedbackFactory>) -> Self {
+        self.return_path_feedback = Some(factory);
+        self
     }
 
     /// Starts the instance with the given `msg_sender` `Sink`
@@ -1122,6 +1138,12 @@ where
                         // anti-grief down-only ceiling, and the client's opt-in flow-control config.
                         Some(surb_mgmt.clone()),
                         cfg.flow_control,
+                        // Only the entry side plans return paths, so only it can re-plan one.
+                        self.return_path_feedback
+                            .as_ref()
+                            // Same conversion the forward routing uses, so the planner's
+                            // per-destination record is keyed identically.
+                            .map(|factory| factory.for_destination(destination.into())),
                     )?;
 
                     #[cfg(feature = "telemetry")]
