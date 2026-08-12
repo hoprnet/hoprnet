@@ -134,9 +134,9 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = "1.21.0"
-hopr-types = { version = "2.3.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.7.0", default-features = false }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "7c26c0bee697d33529dc9412c271ce6c8d726fc1" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", rev = "2a3bb391f1f98475d033b105c69090d050aaff0c", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", git = "https://github.com/hoprnet/hopr-utilities", rev = "a43495abdda0d2ee7f5516ccd451021eb0c3f31e", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -147,19 +147,18 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = "0.5.1"
+hopr-ticket-manager = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
 hopr-transport = { version = "0.37.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.25.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = "0.23.0"
-
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.1.0", default-features = false }
-hopr-transport-p2p = { version = "0.9.4", features = ["transport-quic"] }
-hopr-ct-full-network = { version = "0.3.0", default-features = false }
-hopr-network-graph = { version = "0.3.1", default-features = false }
+hopr-session-server-forwarder = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199", default-features = false }
+hopr-transport-p2p = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199", features = ["transport-quic"] }
+hopr-ct-full-network = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199", default-features = false }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -229,18 +228,21 @@ ignored = [
   "hopr-utils-session",
 ]
 
-# TODO: revert to crates.io versions once contracts publishes hopr-bindings 4.12.2, hopr-types
-# publishes 2.3.0, hopr-api publishes 1.21.0, hopr-utilities publishes 0.7.0 and
-# hopr-chain-connector publishes 0.23.0. Mirrors the TODO in hopr-types/Cargo.toml.
+# Safety net for the service-registry wave. The direct dependencies above already name the
+# `feat/service-registry` revs, but a direct dep only rewrites the edges declared here: a
+# transitive dependant asking crates.io for `hopr-api` would still resolve 1.20.0 and the graph
+# would carry two incompatible copies. `[patch.crates-io]` replaces the source globally, so every
+# consumer converges on one.
+#
+# TODO: delete this block, and revert the entries above to crates.io versions, once the wave is
+# published.
 [patch.crates-io]
-blokli-client = { path = "../blokli-client/client" }
-hopr-api = { path = "../hopr-api" }
-hopr-bindings = { path = "../contracts/ethereum/bindings" }
-hopr-chain-connector = { path = "../hopr-impls/connector" }
-hopr-types = { path = "../hopr-types" }
-hopr-utilities = { path = "../hopr-utilities" }
-
-# hopr-types pins hopr-bindings to a contracts git rev, so patching crates.io alone leaves two
-# copies of the crate in the graph and their alloy types stop unifying.
-[patch."https://github.com/hoprnet/contracts"]
-hopr-bindings = { path = "../contracts/ethereum/bindings" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "7c26c0bee697d33529dc9412c271ce6c8d726fc1" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", rev = "2a3bb391f1f98475d033b105c69090d050aaff0c" }
+hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", rev = "a43495abdda0d2ee7f5516ccd451021eb0c3f31e" }
+blokli-client = { git = "https://github.com/hoprnet/blokli-client", rev = "2b2d41a387f46d2d7adf4e0e66dd4dff520c0b92" }
+hopr-chain-connector = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
+hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
+hopr-ct-full-network = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
+hopr-ticket-manager = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
+hopr-transport-p2p = { git = "https://github.com/hoprnet/hopr-impls", rev = "f5c44b245f7a52679185acbf244152c5fd5c2199" }
