@@ -1240,6 +1240,54 @@ mod tests {
         );
     }
 
+    /// The surplus has two upper bounds, and the tighter one is `ssa_part_size`.
+    ///
+    /// `range(max = 255)` is the byte the negotiated `PixParams` word gives the field; the schema
+    /// check is "insurance must not exceed the payload it insures". Since `ssa_part_size` is itself
+    /// capped at 255, the second subsumes the first — the range attribute survives because it fails
+    /// *keyed on the field*, naming the limit, where the schema check can only report against the
+    /// struct.
+    ///
+    /// Both are asserted because a `range` attribute on an `Option` is not obviously live: the
+    /// crate has no other instance of one, and an attribute that silently validated nothing would
+    /// look exactly like this one. It does fire — validator 0.21 unwraps the `Option` — and this is
+    /// what would notice if that changed.
+    #[test]
+    fn the_surplus_is_bounded_by_the_threshold_it_insures() {
+        let at_bound = PixGlobalConfig {
+            ssa_part_size: 64,
+            additional_shares: Some(64),
+            ..Default::default()
+        };
+        at_bound
+            .validate()
+            .expect("a surplus equal to the threshold is allowed — over-insuring a lossy path is a real choice");
+
+        let past_bound = PixGlobalConfig {
+            additional_shares: Some(65),
+            ..at_bound
+        };
+        let errors = past_bound
+            .validate()
+            .expect_err("one share past the threshold must be rejected");
+        assert!(
+            errors.field_errors().contains_key("__all__"),
+            "the schema check is what enforces the tighter bound"
+        );
+
+        let past_the_wire_byte = PixGlobalConfig {
+            additional_shares: Some(300),
+            ..at_bound
+        };
+        let errors = past_the_wire_byte
+            .validate()
+            .expect_err("a surplus that cannot fit the PixParams byte must be rejected");
+        assert!(
+            errors.field_errors().contains_key("additional_shares"),
+            "the field range must still fire through the Option, not only the schema check"
+        );
+    }
+
     /// The derived surplus tracks the configured threshold, which is the whole point of deriving it.
     ///
     /// Stated as the loss rate it covers rather than as four literals: `surplus/(threshold+surplus)`
