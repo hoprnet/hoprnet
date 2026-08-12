@@ -3928,7 +3928,7 @@ dependencies = [
 [[package]]
 name = "hopr-api"
 version = "1.21.0"
-source = "git+https://github.com/hoprnet/hopr-api?rev=92537d52db6f9b9dfd4f3518a2063a4758309026#92537d52db6f9b9dfd4f3518a2063a4758309026"
+source = "git+https://github.com/hoprnet/hopr-api?rev=4a53ed13634a5080a63760b9ca84bd9fe7710114#4a53ed13634a5080a63760b9ca84bd9fe7710114"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4086,7 +4086,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.3.3"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=1825d41a852204d935733d027f71a83bd7674abc#1825d41a852204d935733d027f71a83bd7674abc"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=d9dc437108b59776b8b9673664c88d9b177d7769#d9dc437108b59776b8b9673664c88d9b177d7769"
 dependencies = [
  "anyhow",
  "bimap",
