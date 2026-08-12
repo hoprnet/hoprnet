@@ -134,9 +134,9 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = "1.19.0"
-hopr-types = { version = "2.2.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.6.0", default-features = false }
+hopr-api = "1.21.0"
+hopr-types = { version = "2.3.0", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.7.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -153,7 +153,7 @@ hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.25.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = "0.22.1"
+hopr-chain-connector = "0.23.0"
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.1.0", default-features = false }
@@ -228,3 +228,19 @@ ignored = [
   "hopr-session-server-forwarder",
   "hopr-utils-session",
 ]
+
+# TODO: revert to crates.io versions once contracts publishes hopr-bindings 4.12.2, hopr-types
+# publishes 2.3.0, hopr-api publishes 1.21.0, hopr-utilities publishes 0.7.0 and
+# hopr-chain-connector publishes 0.23.0. Mirrors the TODO in hopr-types/Cargo.toml.
+[patch.crates-io]
+blokli-client = { path = "../blokli-client/client" }
+hopr-api = { path = "../hopr-api" }
+hopr-bindings = { path = "../contracts/ethereum/bindings" }
+hopr-chain-connector = { path = "../hopr-impls/connector" }
+hopr-types = { path = "../hopr-types" }
+hopr-utilities = { path = "../hopr-utilities" }
+
+# hopr-types pins hopr-bindings to a contracts git rev, so patching crates.io alone leaves two
+# copies of the crate in the graph and their alloy types stop unifying.
+[patch."https://github.com/hoprnet/contracts"]
+hopr-bindings = { path = "../contracts/ethereum/bindings" }

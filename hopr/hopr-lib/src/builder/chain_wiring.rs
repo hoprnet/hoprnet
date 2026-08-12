@@ -171,7 +171,25 @@ pub(super) async fn process_chain_events<C, G>(
                 tracing::debug!(%price, "recording ticket price change");
                 *ticket_price.write() = price;
             }
-            _ => {}
+            // Redemption moves balance inside a channel that is already in the graph, and the
+            // `ChannelBalance*` events that accompany it carry the capacity change. This arm was
+            // previously covered by a catch-all, which is why it reads as new: making the match
+            // exhaustive surfaced it rather than changed it.
+            ChainEvent::TicketRedeemed(..) => {}
+            // The service registry describes what a node offers, not how packets reach it, so
+            // none of these affect the routing graph or the capacity inputs. They are listed
+            // rather than swept up by a catch-all so that the next `ChainEvent` variant is a
+            // compile-time decision here instead of a silent no-op.
+            ChainEvent::ServiceRegistered(_)
+            | ChainEvent::ServiceUpdated(_)
+            | ChainEvent::ServiceDeregistered(..)
+            | ChainEvent::ServiceTypeRegistered(..)
+            | ChainEvent::ServiceTypeOwnerChanged(..)
+            | ChainEvent::ServiceTypeRequirementChanged(..)
+            | ChainEvent::ServiceTypeRegistrationBurnChanged(..)
+            | ChainEvent::ServiceTypeUpdateBurnChanged(..)
+            | ChainEvent::ServiceTypeRegistrationFeeChanged(_)
+            | ChainEvent::ServiceRegistryPointerChanged(_) => {}
         }
     }
 }
@@ -330,6 +348,35 @@ mod tests {
             safe_address: None,
             key_id: KeyIdent::default(),
         }
+    }
+
+    /// One event of every `ChainEvent::Service*` variant, in declaration order.
+    fn service_events(node: Address, owner: Address) -> anyhow::Result<Vec<ChainEvent>> {
+        use hopr_api::types::internal::prelude::{ServiceEntry, ServiceMetadata, ServiceType};
+
+        let now = SystemTime::now();
+        let entry = ServiceEntry::new(
+            ServiceType::GVPN_EXIT,
+            node,
+            owner,
+            ServiceMetadata::try_from(b"exit-node".to_vec())?,
+            now,
+            now,
+        )?;
+        let burn = HoprBalance::from(7u64);
+
+        Ok(vec![
+            ChainEvent::ServiceRegistered(entry.clone()),
+            ChainEvent::ServiceUpdated(entry),
+            ChainEvent::ServiceDeregistered(ServiceType::GVPN_EXIT, node),
+            ChainEvent::ServiceTypeRegistered(ServiceType::GVPN_EXIT, owner),
+            ChainEvent::ServiceTypeOwnerChanged(ServiceType::GVPN_EXIT, Some(owner)),
+            ChainEvent::ServiceTypeRequirementChanged(ServiceType::GVPN_EXIT, Some(owner)),
+            ChainEvent::ServiceTypeRegistrationBurnChanged(ServiceType::GVPN_EXIT, burn),
+            ChainEvent::ServiceTypeUpdateBurnChanged(ServiceType::GVPN_EXIT, burn),
+            ChainEvent::ServiceTypeRegistrationFeeChanged(burn),
+            ChainEvent::ServiceRegistryPointerChanged(owner),
+        ])
     }
 
     async fn run(
@@ -720,5 +767,91 @@ mod tests {
             Some(tx),
         )
         .await;
+    }
+
+    /// The service registry describes what a node offers, not how packets reach it, so no
+    /// `ChainEvent::Service*` variant may touch the routing graph or the capacity inputs.
+    ///
+    /// The trailing channel event is the regression guard: a mis-wired arm that panicked or
+    /// short-circuited the loop would swallow every event behind it, which no assertion on the
+    /// service events alone would notice.
+    #[tokio::test]
+    async fn service_events_are_ignored_without_stopping_processing() -> anyhow::Result<()> {
+        let (src_offchain, src_chain) = make_keypairs();
+        let (dst_offchain, dst_chain) = make_keypairs();
+        let src_addr = src_chain.public().to_address();
+        let dst_addr = dst_chain.public().to_address();
+        let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
+
+        let events = service_events(dst_addr, src_addr)?;
+        assert_eq!(events.len(), 10, "every service variant must be exercised");
+
+        // Held here rather than inside `run`, so the values after the run can be inspected.
+        let ticket_price = Arc::new(RwLock::new(HoprBalance::from(10u64)));
+        let win_probability = Arc::new(RwLock::new(WinningProbability::ALWAYS));
+        let graph = RecordingGraph::default();
+
+        process_chain_events(
+            stub.clone(),
+            graph.clone(),
+            futures::stream::iter(events),
+            src_addr,
+            *src_offchain.public(),
+            ticket_price.clone(),
+            win_probability.clone(),
+            None,
+        )
+        .await;
+
+        assert!(
+            graph.recorded().is_empty(),
+            "service events must not touch the routing graph, got {:?}",
+            graph.recorded()
+        );
+        assert_eq!(
+            *ticket_price.read(),
+            HoprBalance::from(10u64),
+            "service events must not change the ticket price"
+        );
+        assert_eq!(
+            win_probability.read().as_f64(),
+            WinningProbability::ALWAYS.as_f64(),
+            "service events must not change the winning probability"
+        );
+
+        // Same events again, this time followed by a routed one.
+        let mut events = service_events(dst_addr, src_addr)?;
+        events.push(ChainEvent::ChannelOpened(channel(
+            src_addr,
+            dst_addr,
+            100,
+            ChannelStatus::Open,
+        )));
+        let graph = RecordingGraph::default();
+
+        // price=10, win_prob=1.0, balance=100 → capacity = 100/(10/1.0) = 10
+        run(
+            events,
+            stub,
+            graph.clone(),
+            src_addr,
+            *src_offchain.public(),
+            HoprBalance::from(10u64),
+            WinningProbability::ALWAYS,
+        )
+        .await;
+
+        let edges = graph.edges();
+        assert_eq!(edges.len(), 1, "the event following the service ones must still be routed");
+        assert_eq!(
+            edges[0].capacity,
+            Some(10),
+            "the capacity inputs must have survived the service events"
+        );
+        assert_eq!(edges[0].src, *src_offchain.public());
+        assert_eq!(edges[0].dest, *dst_offchain.public());
+        assert!(graph.nodes().is_empty(), "no service event may record a graph node");
+
+        Ok(())
     }
 }
