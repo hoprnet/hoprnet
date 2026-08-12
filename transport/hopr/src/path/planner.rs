@@ -116,6 +116,21 @@ pub struct PathPlannerConfig {
     #[validate(custom(function = "validate_weight_temper"))]
     #[default = 0.5]
     pub return_path_weight_temper: f64,
+    /// Fraction of return-path draws made uniformly at random instead of by weight.
+    ///
+    /// Weights come from observations, and observations only exist for paths that get selected — a
+    /// closed loop in which a path that falls out of favour stops being measured, so its score can
+    /// never recover and it is never chosen again. Spending a small share of draws uniformly keeps
+    /// every candidate under observation, which is what lets a recovered one climb back.
+    ///
+    /// Costs throughput in proportion: this share of return paths deliberately ignores which
+    /// candidate looks best. Candidates have already passed the selector's gates (open channels,
+    /// `min_ack_rate`, and so on) before reaching here, so an exploratory draw is random only with
+    /// respect to *quality*, never a route the cost function rejected. `0.0` disables it.
+    /// Defaults to 0.1.
+    #[validate(custom(function = "validate_unit_interval"))]
+    #[default = 0.1]
+    pub return_path_exploration: f64,
     /// Upper bound on a loopback probe's round-trip time considered plausible.
     /// Measurements above this cap (clock skew, stale telemetry) are discarded
     /// instead of poisoning the latency EMA with an absurd value.
@@ -204,6 +219,21 @@ fn pick_weighted_index(weights: &[f64]) -> Option<usize> {
     weights.iter().rposition(|w| *w > 0.0)
 }
 
+/// Whether this draw should explore — ignore the weights and pick uniformly.
+///
+/// Weights are derived from observations, and observations only exist for paths that were selected.
+/// Left alone that is a closed loop: a path that falls out of favour stops being measured, so its
+/// score can never recover and it is never chosen again. Spending a small share of draws uniformly
+/// keeps every candidate under observation, which is what lets one that has recovered climb back.
+fn should_explore(exploration: f64) -> bool {
+    exploration > 0.0 && hopr_api::types::crypto_random::random_float_in_range(0.0..1.0) < exploration
+}
+
+/// Picks a uniformly random index over `len` entries.
+fn pick_uniform_index(len: usize) -> Option<usize> {
+    (len > 0).then(|| (hopr_api::types::crypto_random::random_float_in_range(0.0..len as f64) as usize).min(len - 1))
+}
+
 /// Flattens `weights` by raising each to `temper`, compressing the spread between good and bad
 /// candidates without reordering them.
 ///
@@ -244,6 +274,7 @@ pub struct PathPlanner<Surb, R, S> {
     refresh_period: Duration,
     weighting: WeightingParams,
     return_path_weight_temper: f64,
+    return_path_exploration: f64,
 }
 
 impl<Surb, R, S> PathPlanner<Surb, R, S>
@@ -273,6 +304,7 @@ where
                 capacity_reference: config.capacity_reference,
             },
             return_path_weight_temper: config.return_path_weight_temper,
+            return_path_exploration: config.return_path_exploration,
         }
     }
 
@@ -494,7 +526,14 @@ where
         );
 
         Ok((0..count)
-            .filter_map(|_| pick_weighted_index(&weights).map(|i| items[i].0.clone()))
+            .filter_map(|_| {
+                if should_explore(self.return_path_exploration) {
+                    pick_uniform_index(items.len())
+                } else {
+                    pick_weighted_index(&weights)
+                }
+                .map(|i| items[i].0.clone())
+            })
             .collect())
     }
 
@@ -890,6 +929,54 @@ mod tests {
         ) -> std::result::Result<BoxStream<'a, ChannelEntry>, TestError> {
             Ok(Box::pin(stream::iter(self.channels.clone())))
         }
+    }
+
+    #[test]
+    fn exploration_should_be_off_at_zero_and_certain_at_one() {
+        // The two endpoints are what callers actually configure, and a mistake at either end is
+        // silent: 0.0 that still explores wastes throughput, 1.0 that never does starves the
+        // observations the weights are built from.
+        assert!((0..200).all(|_| !should_explore(0.0)));
+        assert!((0..200).all(|_| should_explore(1.0)));
+    }
+
+    #[test]
+    fn exploration_rate_should_be_near_the_configured_fraction() {
+        let explored = (0..10_000).filter(|_| should_explore(0.1)).count();
+        // Loose bounds: this is a CSPRNG draw, so the test is guarding the wiring, not the
+        // generator's uniformity.
+        assert!(
+            (700..1_300).contains(&explored),
+            "expected roughly 1000 of 10000 draws to explore, got {explored}"
+        );
+    }
+
+    #[test]
+    fn uniform_index_should_stay_in_range_and_reach_every_candidate() {
+        assert_eq!(None, pick_uniform_index(0), "nothing to pick from");
+
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..1_000 {
+            let i = pick_uniform_index(4).expect("non-empty");
+            assert!(i < 4, "index {i} out of range");
+            seen.insert(i);
+        }
+        assert_eq!(4, seen.len(), "every candidate must be reachable");
+    }
+
+    #[test]
+    fn exploration_should_reach_a_candidate_that_weighting_would_never_pick() {
+        // The point of the knob: a path whose weight has collapsed still gets traffic occasionally,
+        // which is the only way it can ever be re-measured and recover.
+        let weights = [1.0, 0.0];
+        assert!(
+            (0..200).all(|_| pick_weighted_index(&weights) == Some(0)),
+            "a zero weight is never drawn by weight"
+        );
+        assert!(
+            (0..1_000).any(|_| pick_uniform_index(weights.len()) == Some(1)),
+            "an exploratory draw must be able to reach it"
+        );
     }
 
     #[test]
