@@ -866,19 +866,17 @@ where
                     .for_each(|_| {
                         // Detection before the drain: `degraded_destinations` reads the counts the
                         // flush is about to reset.
-                        // DIAGNOSTIC kill-switch. Re-planning became destructive the moment its
-                        // invalidation started matching real cache entries, and it is not yet
-                        // established whether the damage comes from the invalidation itself or from
-                        // something else in the same change. Toggling this lets one binary produce
-                        // both arms of that comparison, so the two runs differ in nothing else.
+                        // DIAGNOSTIC kill-switch, now gating only the path invalidation.
+                        //
+                        // Measured: with both consumers suppressed a healthy baseline returns
+                        // 100%, and with them live it collapses to 0.14% -- so the invalidation is
+                        // the destructive element, not the key resolution that made it reach the
+                        // cache. What that comparison could not separate is the balancer mark,
+                        // which was suppressed alongside it. Keeping the mark while dropping the
+                        // invalidation isolates the supply fix from the path churn.
                         let replanning_disabled = std::env::var_os("HOPR_DISABLE_RETURN_PATH_REPLAN").is_some();
 
                         for destination in surb_round_trips.degraded_destinations() {
-                            if replanning_disabled {
-                                tracing::info!(%destination, "return path silent; re-planning DISABLED");
-                                continue;
-                            }
-
                             let node = hopr_api::types::internal::prelude::NodeId::Offchain(destination);
 
                             // Sessions name their destination by its chain address, this telemetry
@@ -900,8 +898,16 @@ where
                                 .map(|n| surb_flush_smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
                                 .unwrap_or(0);
 
-                            tracing::info!(%destination, sessions = marked, "return path silent; re-planning");
-                            surb_flush_planner.degrade_return_path(node);
+                            tracing::info!(
+                                %destination,
+                                sessions = marked,
+                                replanning = !replanning_disabled,
+                                "return path silent"
+                            );
+
+                            if !replanning_disabled {
+                                surb_flush_planner.degrade_return_path(node);
+                            }
                         }
 
                         protocol::surb_telemetry::flush_into(
