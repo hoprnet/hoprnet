@@ -136,6 +136,28 @@ impl SurbBalancerController for PidBalancerController {
 mod tests {
     use super::*;
 
+    /// A starved buffer must command production. This is the controller's entire purpose, and a
+    /// cluster run showed it returning 0 for an error of -9803 -- maximally starved.
+    #[test]
+    fn pid_should_command_production_when_the_buffer_is_empty() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(7_000, 5_000));
+
+        let out = c.next_control_output(0);
+        assert!(out > 0, "empty buffer against a 7000 target must produce, got {out}");
+    }
+
+    /// The output limit is what every PID term is clamped to. A zero limit silently turns the
+    /// controller into a no-op that reports a huge error and commands nothing -- which is
+    /// indistinguishable, from the outside, from a controller that thinks the buffer is full.
+    #[test]
+    fn pid_with_a_zero_output_limit_commands_nothing_however_starved() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(7_000, 0));
+
+        assert_eq!(0, c.next_control_output(0), "a zero limit clamps every term to zero");
+    }
+
     // --- PidControllerGains tests ---
 
     #[test]

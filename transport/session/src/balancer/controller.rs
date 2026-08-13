@@ -414,7 +414,14 @@ where
         );
 
         let output = self.controller.next_control_output(current);
-        tracing::debug!(output, current, error, "next balancer control output for session");
+        tracing::debug!(
+            output,
+            current,
+            error,
+            target = self.controller.bounds().target(),
+            output_limit = self.controller.bounds().output_limit(),
+            "next balancer control output for session"
+        );
 
         self.flow_control.adjust_surb_flow(output as usize);
 
