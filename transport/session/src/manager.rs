@@ -951,13 +951,18 @@ impl PixToolbox {
 /// ### 1. PIX Parameter Negotiation (Session Initiation)
 ///
 /// During [`SessionManager::new_session`], the Entry encodes its PIX SSA (Session Stealth
-/// Address) parameters — a [`PixParams`] triple of `polys_per_ssa`, `shares_per_poly` and
-/// `surplus_shares` — into the upper 32 bits of the `StartSession.additional_data` field, via
-/// [`PixParams::into_additional_data`]. The first two describe how many polynomials and shares
-/// each SSA will use; the third is how many extra shares per polynomial the Entry emits to absorb
-/// losses. All three define the data quota per SSA, which is
-/// `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free, since
-/// a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
+/// Address) parameters — a [`PixParams`] quadruple of `polys_per_ssa`, `shares_per_poly`,
+/// `surplus_shares` and the curve `suite` — into the upper 32 bits of the
+/// `StartSession.additional_data` field, via [`PixParams::into_additional_data`]. The first two
+/// describe how many polynomials and shares each SSA will use; the third is how many extra shares
+/// per polynomial the Entry emits to absorb losses. Those three define the data quota per SSA, which
+/// is `polys × (threshold + surplus) × PAYLOAD_SIZE` — the surplus is priced in rather than free,
+/// since a cycle emits it whether or not any share is lost (see `pix_params_to_quota`).
+///
+/// The fourth is not a dimension and does not enter the quota: it names the elliptic curve the
+/// Entry's build instantiates PIX over, which fixes the width of every curve-sized field later in
+/// the handshake. It is fixed at build time on both sides and is therefore not negotiated — the Exit
+/// refuses anything but its own, below.
 ///
 /// What is announced is built from the installed [`SsaShareGenerator`]'s
 /// [`SsaGeneratorConfig`](hopr_protocol_pix::SsaGeneratorConfig), never from the caller: the
@@ -2359,7 +2364,8 @@ where
         // TODO: the Exit may decide to use different quota based on the `target` in the StartInitiation message
         if req.capabilities.0.contains(Capability::UsePIX) {
             // Client offered PIX, so validate the offered parameters. Unpacking is what enforces the
-            // protocol ranges on all three of them.
+            // protocol ranges on the three dimensions, and what rejects a suite identifier no curve
+            // claims — leaving only "a known curve, but not ours" for the check below.
             let params = PixParams::try_from_additional_data(req.additional_data)
                 .inspect_err(|error| {
                     debug!(
@@ -3206,12 +3212,16 @@ where
         // Session Initiation message.  Negotiation (accepting an Exit-chosen quota within our
         // bounds) is not implemented, so any mismatch is rejected.
         //
-        // The whole triple is compared rather than the scalar quota it implies.  Quota equality was
-        // once argued to be sufficient — the Exit does not pick the dimensions independently, so a
-        // matching product implied matching `(polys, shares)` from any Exit running unmodified code
-        // — but `pix_params_to_quota` deliberately ignores the surplus, so no quota comparison can
-        // say anything about it at all.  Comparing the params is both stricter and simpler, and
-        // costs nothing now that all three travel together.
+        // The whole quadruple is compared rather than the scalar quota it implies.  Quota equality
+        // was once argued to be sufficient — the Exit does not pick the dimensions independently, so
+        // a matching product implied matching `(polys, shares)` from any Exit running unmodified
+        // code — but `pix_params_to_quota` deliberately ignores the surplus, so no quota comparison
+        // can say anything about it at all.  Comparing the params is both stricter and simpler, and
+        // costs nothing now that all four travel together.
+        //
+        // The fourth, the curve suite, is why the Entry needs no separate curve check of its own:
+        // the Exit refused a foreign suite before it sent this message, and an Exit that echoed a
+        // different one back than the Entry offered fails right here.
         //
         // Malformed params never reach this comparison as a mismatch: `dimensions()` fails first,
         // and that failure takes the same refusal path, so the Exit is told either way rather than
@@ -5290,7 +5300,7 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    // All three pass protocol bounds but polys=10 != generator's 5
+                    // Every dimension passes protocol bounds but polys=10 != generator's 5
                     pix_ssa_quota: Some(PixParams::try_new(10, 10, 5, LOCAL_PIX_SUITE)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),

@@ -77,17 +77,19 @@ const _: () = assert!(
     "MAX_POLYS_PER_SSA no longer fits below the PixParams suite bits"
 );
 
-/// The PIX dimensions two nodes agree on for a Session, and the only encoding of them.
+/// Everything about PIX two nodes must agree on for a Session, and the only encoding of it: three
+/// dimensions and the curve suite they are dimensions of.
 ///
-/// The same triple is packed into two different wire fields — the `SsaRequest` `params` word and the
-/// upper half of `StartInitiation::additional_data` — and both go through this type. Every earlier
-/// version of this had the shifts written out by hand at each site, in two mutually inconsistent
-/// shapes, which is why the packing lives behind a constructor rather than in the callers.
+/// The same quadruple is packed into two different wire fields — the `SsaRequest` `params` word and
+/// the upper half of `StartInitiation::additional_data` — and both go through this type. Every
+/// earlier version of this had the shifts written out by hand at each site, in two mutually
+/// inconsistent shapes, which is why the packing lives behind a constructor rather than in the
+/// callers.
 ///
-/// Named fields rather than a `(u16, u8, u8)` tuple: `polys_per_ssa` and `shares_per_poly` are
-/// interchangeable to the type system and *not* interchangeable to the protocol, while their product
-/// — which is all the Exit compares — is identical either way. A transposition therefore announced
-/// valid-looking dimensions against a correct quota, and the only thing that caught it was
+/// Named fields rather than a `(u16, u8, u8, PixSuite)` tuple: `polys_per_ssa` and `shares_per_poly`
+/// are interchangeable to the type system and *not* interchangeable to the protocol, while their
+/// product — which is all the Exit compares — is identical either way. A transposition therefore
+/// announced valid-looking dimensions against a correct quota, and the only thing that caught it was
 /// `SessionManager::new_session` requiring both to match the locally installed generator exactly,
 /// which is a check about something else entirely.
 ///
@@ -96,7 +98,9 @@ const _: () = assert!(
 ///
 /// The [`suite`](Self::suite) is here for the same reason the dimensions are: it is something both
 /// nodes must agree on, and equality of this type is what the Entry already checks against the
-/// Exit's echo, so carrying it here gets that direction for free.
+/// Exit's echo, so carrying it here gets that direction for free. Note that it is not a dimension —
+/// it does not enter the quota — so code that speaks about what the deposit buys is right to name
+/// only the other three.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PixParams {
     polys_per_ssa: u16,

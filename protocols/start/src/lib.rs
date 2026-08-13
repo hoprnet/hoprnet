@@ -330,9 +330,11 @@ impl<I, G> SsaServerCommitmentMessage<I, G> {
         }
     }
 
-    /// The PIX dimensions this request was made under.
+    /// The PIX dimensions this request was made under, and the curve suite they are dimensions of.
     ///
-    /// Fails if the peer packed values outside the protocol ranges.
+    /// Fails if the peer packed values outside the protocol ranges, or named a curve suite that does
+    /// not exist. The name predates the suite and is kept because the callers read it for the
+    /// dimensions; the suite rides along because both sides must agree on it too.
     pub fn dimensions(&self) -> errors::Result<hopr_protocol_pix::PixParams> {
         hopr_protocol_pix::PixParams::try_from_u32(self.params)
             .map_err(|error| StartProtocolError::ParseError(format!("ssa_req.params: {error}")))
