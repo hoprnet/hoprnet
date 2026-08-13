@@ -1224,7 +1224,7 @@ mod tests {
         let ssa_id = SsaId::new(HoprPseudonym::random(), 1.try_into()?);
 
         assert_eq!(
-            noop.new_exit_commitment(ssa_id, PixParams::try_new(2, 2, 0)?)?,
+            noop.new_exit_commitment(ssa_id, PixParams::try_new_for::<HoprPixSpec>(2, 2, 0)?)?,
             PixGroup::<HoprPixSpec>::default()
         );
 

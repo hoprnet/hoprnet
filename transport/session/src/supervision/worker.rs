@@ -347,7 +347,7 @@ mod tests {
 
     /// See the identically-named helper in [`super::supervisor`] for why the surplus is non-zero.
     fn dims() -> PixParams {
-        PixParams::try_new(10, 5, 7).expect("test dimensions must be valid")
+        PixParams::try_new(10, 5, 7, crate::types::LOCAL_PIX_SUITE).expect("test dimensions must be valid")
     }
 
     #[tokio::test]

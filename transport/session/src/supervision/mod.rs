@@ -318,31 +318,31 @@
 //! one SURB and one share each.
 //!
 //! **Dimensions first**, because every supervisor value derives from them. `2048 × 64` with the
-//! shipped surplus of 32 gives 131 072 useful shares out of 196 608 emitted, and a cycle of 196 608
-//! packets — about **5.4 min** at this rate. The quota is priced on all of them, surplus included, so
-//! it is `2048 × 96 × 1038 B` = **194.6 MiB**, which is exactly the bottom of the default
-//! `quota_range` (a quarter of the 778.5 MiB the default dimensions imply), so no range change is
-//! needed. The default `8192 × 64` would make that 21.8 min per cycle, which at 6 s settlement is a
+//! derived surplus of 16 gives 131 072 useful shares out of 163 840 emitted, and a cycle of 163 840
+//! packets — about **4.5 min** at this rate. The quota is priced on all of them, surplus included, so
+//! it is `2048 × 80 × 1038 B` = **162.2 MiB**, which is exactly the bottom of the default
+//! `quota_range` (a quarter of the 648.8 MiB the default dimensions imply), so no range change is
+//! needed. The default `8192 × 64` would make that 18.1 min per cycle, which at 6 s settlement is a
 //! long time to leave one cycle's traffic unsettled for no benefit. Keep it a multiple of 256 so the
 //! emission window never narrows.
 //!
 //! | Parameter | Value | Why, at this profile |
 //! |---|---|---|
-//! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 194.6 MiB quota, 5.4 min cycle; multiple of the emission window |
+//! | `PixGlobalConfig::num_ssa_parts` (Entry) | 2048 | 162.2 MiB quota, 4.5 min cycle; multiple of the emission window |
 //! | `PixGlobalConfig::ssa_part_size` (Entry) | 64 | Shipped threshold; with the surplus below, it is what fixes the quota |
-//! | `PixGlobalConfig::additional_shares` (Entry) | 32 | 1.5× surplus, and a third of the quota — raising it buys loss tolerance and charges the Entry for it. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
-//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 32 768-packet runway — **54 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 194.6 MiB` |
+//! | `PixGlobalConfig::additional_shares` (Entry) | unset | Derives to 16 — a quarter of the threshold, i.e. a 1.25× surplus factor and a fifth of the quota. Setting it explicitly buys loss tolerance and charges the Entry for it. Keep `ssa_part_size + additional_shares` inside one deferral bucket (128) |
+//! | `ssas_per_request` | **1** | The 85 % early signal leaves a 24 627-packet runway — **41 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 162.2 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
 //! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is exactly what is lost to an Entry that never funds — 4.2 MB. Use `0` for strict prepay and accept a ~6 s stall at session start |
 //! | `max_served_without_progress` | 2048 | Shipped value, and no longer dimension-dependent: the surplus run resets it like any other share, so this bounds genuine silence only |
 //! | `max_recovery_idle` | 60 s | Shipped value. Satisfies `>= max_ack_await_time` and `< unused_verifier_lifetime`. It no longer has to cover the surplus run — that resets it — so what it now implies is only that a Session returning *nothing at all* for a minute is closed |
-//! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 327 s at full rate, so 2 h implies a floor of ~27 packets/s (~0.23 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
+//! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 272 s at full rate, so 2 h implies a floor of ~23 packets/s (~0.19 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
 //! | `max_off_front_share_fraction` | 0.25 | Shipped value. A conforming Entry sits near 0; two-way spreading is 0.5 |
 //! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
 //! | `max_unverifiable_shares_per_ssa` / `_per_session` | 0 / 0 | Shipped values; a failed polynomial has already doomed the cycle |
 //! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
-//! | `min_deposit` | ≥ one quota's value | 194.6 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
+//! | `min_deposit` | ≥ one quota's value | 162.2 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
 //!
 //! Related settings outside [`SupervisorConfig`] that this profile also pins:
 //!
@@ -1189,7 +1189,7 @@ mod tests {
 
         let pseudonym = HoprPseudonym::random();
         let ssa_id = SsaId::new(pseudonym, hopr_protocol_pix::SsaIndex::MIN);
-        let dims = PixParams::try_new(10, 5, 7)?;
+        let dims = PixParams::try_new(10, 5, 7, crate::types::LOCAL_PIX_SUITE)?;
         let now = std::time::Instant::now();
 
         let (mut supervisor, _) = SessionPixSupervisor::new(SupervisorConfig::default(), dims, pseudonym, now);

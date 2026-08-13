@@ -1159,7 +1159,7 @@ mod tests {
     /// share is by definition one that arrives after its polynomial is already complete. A non-zero
     /// value here is what would make a leak into `target_useful_shares` visible; zero would hide it.
     fn dims(polys: u16, threshold: u8) -> PixParams {
-        PixParams::try_new(polys, threshold, 7).expect("test dimensions must be valid")
+        PixParams::try_new(polys, threshold, 7, crate::types::LOCAL_PIX_SUITE).expect("test dimensions must be valid")
     }
 
     fn pseudonym() -> HoprPseudonym {

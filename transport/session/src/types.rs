@@ -105,8 +105,8 @@ pub type SsaQuota = u64;
 /// alone. A polynomial leaves the generator's queue only once it has emitted `threshold + surplus`
 /// shares (`SsaShareGenerator::next_share`), whether or not any were lost, and each share rides back
 /// on one Exit → Entry data packet — so this is exactly the traffic the Exit serves per cycle.
-/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.5× factor was a
-/// third of all Exit → Entry traffic.
+/// Charging the threshold alone left the surplus unpaid, which at the deployed 1.25× factor is a
+/// fifth of all Exit → Entry traffic.
 ///
 /// The surplus is insurance the Entry buys against share loss, and it is billed like insurance: on
 /// purchase, not on claim. One deposit per cycle at this rate is what makes paid-for equal served.
@@ -143,17 +143,26 @@ pub(crate) const fn pix_params_to_quota(params: &PixParams) -> SsaQuota {
 /// * Share verification is one scalar multiplication per *polynomial*, not `O(threshold)` per share. It used to be `U ×
 ///   threshold` and is now simply `polys`.
 /// * Interpolating a polynomial is `O(threshold²)` field operations, and there are `polys` of them — `U × threshold`,
-///   **linear in `threshold`**. This is now the only cost that grows with the threshold, and it is field arithmetic
-///   rather than curve arithmetic.
+///   **linear in `threshold`**, and it is field arithmetic rather than curve arithmetic.
 /// * Detection of a dishonest Entry takes `threshold` return packets, since a share set is only checked once it
 ///   interpolates.
+/// * On the **Entry**, `SsaShareGenerator::next_share` evaluates a `threshold`-wide polynomial by Horner for every
+///   share it emits — `U × threshold` again. This is much the smaller of the two per-share terms, but it is not zero,
+///   and describing the Entry as threshold-free (as this list once did) is wrong.
 ///
-/// So raising `threshold` (and lowering `polys`) now buys a proportionally smaller commitment
-/// phase at the cost of more interpolation and later fault detection — the opposite of the old
-/// trade, where `threshold` was kept as small as loss tolerance allowed. The 8192 × 64 split is
-/// retained pending measurement of where the new optimum sits. The quota is fixed by
-/// `polys × (threshold + surplus)`, so the split can be re-tuned without touching session
-/// negotiation as long as that product holds.
+/// So raising `threshold` (and lowering `polys`) buys a proportionally smaller commitment phase at
+/// the cost of more interpolation, later fault detection and more Entry evaluation.
+///
+/// Both sides have since been measured, and `8192 × 64` stands — see
+/// [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the tables. The objective is **Exit
+/// reconstruction capacity**, because the Exit serves 10–30 clients while an Entry serves only
+/// itself: on that measure the deployed threshold is within 0.4 % of the optimum, and the fixed
+/// per-polynomial cost the Exit amortises over `threshold` shares means a *lower* threshold is
+/// worse, not better. Summing Entry and Exit per-share cost instead would favour 48 by about 3 %;
+/// that reading is recorded there and deliberately not acted on.
+///
+/// The quota is fixed by `polys × (threshold + surplus)`, so the split can be re-tuned without
+/// touching session negotiation as long as that product holds.
 ///
 /// ## Why this is an alias
 ///
@@ -178,7 +187,16 @@ pub const DEFAULT_PIX_SHARES_PER_POLY: u8 = hopr_protocol_pix::DEFAULT_POLY_THRE
 /// mis-describe a cycle — it would price one.
 pub const DEFAULT_PIX_SURPLUS_SHARES: u8 = hopr_protocol_pix::DEFAULT_SURPLUS_SHARES;
 
-/// The three defaults as the single triple both nodes negotiate.
+/// The elliptic curve suite this build instantiates PIX over, as announced to peers.
+///
+/// A property of how the node was compiled — `pix-bjj` or `pix-secp256k1` on `hopr-crypto-packet`
+/// — not of its configuration, so it is read off the spec rather than named again here. Peers that
+/// disagree about it cannot exchange PIX commitments at all, because every curve-sized field on the
+/// wire changes width with it; announcing it is what turns that into a refused Session instead of
+/// undecodable traffic.
+pub const LOCAL_PIX_SUITE: hopr_protocol_pix::PixSuite = <HoprPixSpec as PixSpec>::PIX_SUITE;
+
+/// The three defaults and the local curve suite, as the single set both nodes must agree on.
 ///
 /// The `match` is a compile-time range check: defaults that fall outside what
 /// [`PixParams::try_new`] accepts fail the build rather than every Session.
@@ -186,6 +204,7 @@ pub(crate) const DEFAULT_PIX_PARAMS: PixParams = match PixParams::try_new(
     DEFAULT_PIX_POLYS_PER_SSA,
     DEFAULT_PIX_SHARES_PER_POLY,
     DEFAULT_PIX_SURPLUS_SHARES,
+    LOCAL_PIX_SUITE,
 ) {
     Ok(params) => params,
     Err(_) => panic!("default PIX dimensions must be within the protocol ranges"),
@@ -670,7 +689,7 @@ mod tests {
     #[test]
     fn quota_must_price_every_share_a_cycle_emits() -> anyhow::Result<()> {
         for (polys, threshold, surplus) in [(1u16, 2u8, 0u8), (8, 2, 2), (8192, 64, 32), (16192, 255, 255)] {
-            let params = PixParams::try_new(polys, threshold, surplus)?;
+            let params = PixParams::try_new(polys, threshold, surplus, LOCAL_PIX_SUITE)?;
             assert_eq!(
                 polys as u64 * (threshold as u64 + surplus as u64) * HoprPacket::PAYLOAD_SIZE as u64,
                 pix_params_to_quota(&params),
@@ -684,19 +703,23 @@ mod tests {
     /// is exactly the state this guards against returning to.
     #[test]
     fn a_surplus_must_raise_the_quota_above_the_threshold_alone() -> anyhow::Result<()> {
-        let threshold_only = pix_params_to_quota(&PixParams::try_new(8192, 64, 0)?);
-        let with_surplus = pix_params_to_quota(&PixParams::try_new(8192, 64, 32)?);
+        let threshold_only = pix_params_to_quota(&PixParams::try_new(8192, 64, 0, LOCAL_PIX_SUITE)?);
+        let with_surplus = pix_params_to_quota(&PixParams::try_new(8192, 64, 32, LOCAL_PIX_SUITE)?);
 
         assert!(
             with_surplus > threshold_only,
             "a surplus of 32 must be charged for, got {with_surplus} against {threshold_only}"
         );
-        // The deployed factor, stated once so a change to either default is visible here.
         assert_eq!(
             threshold_only * 3 / 2,
             with_surplus,
-            "the deployed surplus factor is 1.5x"
+            "a surplus of half the threshold must cost half the threshold's quota again"
         );
+
+        // And the same, at the surplus this node actually defaults to: `threshold / 4`, i.e. a
+        // deployed factor of 1.25x rather than the 1.5x this test used to describe as "deployed".
+        let deployed = pix_params_to_quota(&DEFAULT_PIX_PARAMS);
+        assert_eq!(threshold_only * 5 / 4, deployed, "the deployed surplus factor is 1.25x");
         Ok(())
     }
 
@@ -709,7 +732,13 @@ mod tests {
                 * HoprPacket::PAYLOAD_SIZE as u64,
             DEFAULT_PIX_SSA_QUOTA
         );
-        assert_eq!(DEFAULT_PIX_SURPLUS_SHARES, DEFAULT_PIX_SHARES_PER_POLY / 2);
+        // Anchored on the ratio function rather than on a restatement of it. This line used to read
+        // `DEFAULT_PIX_SHARES_PER_POLY / 2`, which was the ratio before it became `threshold / 4`;
+        // restating it is precisely how it came to disagree with the constant it checks.
+        assert_eq!(
+            DEFAULT_PIX_SURPLUS_SHARES,
+            hopr_protocol_pix::default_surplus_for(DEFAULT_PIX_SHARES_PER_POLY)
+        );
     }
 
     // --- ByteCapabilities tests ---
