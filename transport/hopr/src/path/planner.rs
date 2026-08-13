@@ -62,10 +62,19 @@ pub struct PathPlannerConfig {
     pub max_cache_capacity: u64,
     /// Time-to-live for a cached path list.  When an entry expires the next
     /// [`PathPlanner::resolve_routing`] call transparently recomputes it (lazy refresh).
-    #[default(Duration::from_secs(60))]
+    ///
+    /// Candidate weights are computed once, when the entry is filled, and frozen in the
+    /// [`hopr_utils::statistics::WeightedCollection`] -- so this bounds how stale the *weights* a
+    /// live session draws from can be, not merely how stale the candidate set is. At the previous
+    /// 60 s a relay that stopped delivering kept its full share of return-path draws for a minute
+    /// after the graph had already scored it down.
+    #[default(Duration::from_secs(10))]
     pub cache_ttl: Duration,
     /// Period between proactive background cache-refresh sweeps.
-    #[default(Duration::from_secs(30))]
+    ///
+    /// Held at half the TTL so a steady-state session is normally served from an entry that was
+    /// re-weighted rather than one that expired under it.
+    #[default(Duration::from_secs(5))]
     pub refresh_period: Duration,
     /// Maximum number of candidate paths the selector may return per query.
     /// All returned candidates are validated and cached.
@@ -904,6 +913,28 @@ mod tests {
         assert!(
             (0..1_000).any(|_| pick_uniform_index(weights.len()) == Some(1)),
             "an exploratory draw must be able to reach it"
+        );
+    }
+
+    /// Cached candidate weights are frozen at fill time, so the TTL bounds how stale the numbers a
+    /// live session draws from can be -- not just how stale the candidate set is.
+    #[test]
+    fn the_path_cache_should_expire_faster_than_a_session_can_be_lost() {
+        let cfg = PathPlannerConfig::default();
+
+        // The SURB round-trip window slices at 5s. A TTL far above that lets a relay keep its full
+        // share of return-path draws long after the graph has scored it down -- measured as a
+        // session that stayed degraded for minutes after the evidence was in.
+        assert!(
+            cfg.cache_ttl <= Duration::from_secs(15),
+            "path cache TTL {:?} outlives the evidence that should displace it",
+            cfg.cache_ttl
+        );
+        assert!(
+            cfg.refresh_period < cfg.cache_ttl,
+            "the background sweep ({:?}) must re-weight entries before they expire ({:?})",
+            cfg.refresh_period,
+            cfg.cache_ttl
         );
     }
 
