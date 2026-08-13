@@ -25,7 +25,7 @@ use crate::{
     Capabilities, Capability,
     balancer::BalancerStateValues,
     errors::TransportSessionError,
-    flow_control::{PacedWriter, ReturnPathFeedback, SurbSupply},
+    flow_control::{PacedWriter, SurbSupply},
 };
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
@@ -178,7 +178,7 @@ impl HoprSession {
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Unpin + 'static,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None, None)
+        Self::new_with_surb_state(id, routing, cfg, hopr, on_close, None, None)
     }
 
     /// Like [`new`](Self::new) but threads the SURB balancer state and the opt-in client-side
@@ -195,7 +195,6 @@ impl HoprSession {
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
         surb_mgmt: Option<Arc<BalancerStateValues>>,
         flow_control: Option<FlowControlConfig>,
-        return_path_feedback: Option<Arc<dyn ReturnPathFeedback>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Unpin + 'static,
@@ -316,11 +315,7 @@ impl HoprSession {
                             .unwrap_or_else(|| Arc::new(BalancerStateValues::default()));
                         let supply = SurbSupply::new(surb_state, cfg.frame_mtu);
                         debug!(?fc_cfg, "wrapping session socket with paced flow-control writer");
-                        let paced = PacedWriter::new(socket, fc_cfg, clock, supply);
-                        Box::new(match return_path_feedback {
-                            Some(feedback) => paced.with_return_path_feedback(fc_cfg, feedback),
-                            None => paced,
-                        })
+                        Box::new(PacedWriter::new(socket, fc_cfg, clock, supply))
                     }
                     None => Box::new(socket),
                 }

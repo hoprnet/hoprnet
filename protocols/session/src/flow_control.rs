@@ -119,158 +119,6 @@ pub struct FlowControlConfig {
     /// bounds how stale a *present* frame may be. `None` (default) keeps the previous behaviour.
     #[default(None)]
     pub max_frame_age: Option<Duration>,
-
-    /// **Reactive return-path re-planning (opt-in).** When set, sustained loss in the return
-    /// direction triggers a re-plan of the return path instead of waiting for probing to notice.
-    ///
-    /// `None` (the default) leaves the return path to be corrected by probing alone, which is
-    /// EMA-smoothed behind a path cache and therefore takes tens of seconds.
-    #[default(None)]
-    pub return_path_replan: Option<ReturnPathReplanConfig>,
-}
-
-/// Governs when sustained return-direction loss is taken as "this return path is dead".
-///
-/// The signal is the honest delivery clock's `lost_bytes`: a frame retires as lost when its
-/// acknowledgement never came back, which — for a session whose forward path is healthy — means
-/// the *return* path dropped the ack. That is visible within an RTT, whereas probing needs tens of
-/// seconds to move an EMA behind a 60 s path cache.
-#[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
-pub struct ReturnPathReplanConfig {
-    /// Loss ratio (`lost / (acked + lost)`) above which an observation window counts as bad.
-    ///
-    /// Default 0.2, matching the reliable-mode tolerance: below it retransmission already recovers
-    /// the stream, and re-planning would only add churn.
-    #[default(0.2)]
-    pub loss_threshold: f64,
-
-    /// Length of one observation window. Default 1 s — long enough to span a few RTTs, so a single
-    /// unlucky frame cannot make a window look bad.
-    #[default(Duration::from_secs(1))]
-    pub window: Duration,
-
-    /// Consecutive bad windows required before re-planning. Default 3, so a blip has to persist for
-    /// ~3 s to count as sustained.
-    #[default(3)]
-    pub sustained_windows: u32,
-
-    /// Minimum interval between re-plans. Default 5 s, so a return path that stays lossy cannot
-    /// drive continuous re-planning churn.
-    #[default(Duration::from_secs(5))]
-    pub cooldown: Duration,
-}
-
-impl ReturnPathReplanConfig {
-    /// Clamps the parameters so a misconfiguration cannot make the detector fire on every sample.
-    fn normalized(self) -> Self {
-        Self {
-            loss_threshold: if self.loss_threshold.is_finite() {
-                self.loss_threshold.clamp(0.0, 1.0)
-            } else {
-                0.2
-            },
-            window: self.window.max(Duration::from_millis(1)),
-            sustained_windows: self.sustained_windows.max(1),
-            cooldown: self.cooldown,
-        }
-    }
-}
-
-/// Notified when the return direction has been losing for long enough that the current return path
-/// should be abandoned and re-planned.
-///
-/// Implemented on the transport side, where the path planner lives; kept as a one-method trait so
-/// a test can satisfy it without standing up a planner.
-#[cfg_attr(test, mockall::automock)]
-pub trait ReturnPathFeedback: Send + Sync {
-    /// The return path currently in use is degraded; select a different one.
-    fn return_path_degraded(&self);
-}
-
-/// Watches the honest delivery clock for *sustained* return-direction loss.
-///
-/// Deliberately not a simple threshold on a single observation: reliable mode tolerates ~20 % loss
-/// because retransmission recovers it, so only loss that persists across several windows means the
-/// return path itself is gone rather than merely congested.
-pub struct ReturnPathMonitor {
-    feedback: std::sync::Arc<dyn ReturnPathFeedback>,
-    cfg: ReturnPathReplanConfig,
-    window_started: std::time::Instant,
-    acked: u64,
-    lost: u64,
-    /// Consecutive windows whose loss ratio exceeded the threshold.
-    bad_windows: u32,
-    last_replan: Option<std::time::Instant>,
-}
-
-impl ReturnPathMonitor {
-    /// Creates a monitor reporting to `feedback`.
-    pub fn new(feedback: std::sync::Arc<dyn ReturnPathFeedback>, cfg: ReturnPathReplanConfig) -> Self {
-        Self {
-            feedback,
-            cfg: cfg.normalized(),
-            window_started: std::time::Instant::now(),
-            acked: 0,
-            lost: 0,
-            bad_windows: 0,
-            last_replan: None,
-        }
-    }
-
-    /// Folds one delivery observation in, closing the current window if it has elapsed.
-    pub fn observe(&mut self, delivered: Delivered) {
-        self.acked = self.acked.saturating_add(delivered.acked_bytes as u64);
-        self.lost = self.lost.saturating_add(delivered.lost_bytes as u64);
-
-        if self.window_started.elapsed() < self.cfg.window {
-            return;
-        }
-        self.close_window();
-    }
-
-    /// Scores the elapsed window and re-plans if loss has been sustained for long enough.
-    fn close_window(&mut self) {
-        let total = self.acked.saturating_add(self.lost);
-        // An idle window carries no evidence either way, so it neither accuses nor exonerates.
-        if total > 0 {
-            let loss_ratio = self.lost as f64 / total as f64;
-            if loss_ratio > self.cfg.loss_threshold {
-                self.bad_windows = self.bad_windows.saturating_add(1);
-                tracing::debug!(
-                    loss_ratio,
-                    bad_windows = self.bad_windows,
-                    "return-direction loss above threshold"
-                );
-            } else {
-                self.bad_windows = 0;
-            }
-        }
-
-        self.acked = 0;
-        self.lost = 0;
-        self.window_started = std::time::Instant::now();
-
-        if self.bad_windows < self.cfg.sustained_windows {
-            return;
-        }
-
-        let now = std::time::Instant::now();
-        if self
-            .last_replan
-            .is_some_and(|last| now.duration_since(last) < self.cfg.cooldown)
-        {
-            // Still cooling down from the previous re-plan; keep observing rather than churn.
-            return;
-        }
-
-        tracing::info!(
-            bad_windows = self.bad_windows,
-            "sustained return-direction loss; re-planning the return path"
-        );
-        self.feedback.return_path_degraded();
-        self.last_replan = Some(now);
-        self.bad_windows = 0;
-    }
 }
 
 impl FlowControlConfig {
@@ -294,7 +142,6 @@ impl FlowControlConfig {
             // At least one retry: under reliable-mode flow control an abandoned frame leaves a gap
             // (stream corruption), so `frame_retries` must never clamp the retry budget to 0.
             frame_retries: self.frame_retries.max(1),
-            return_path_replan: self.return_path_replan.map(ReturnPathReplanConfig::normalized),
             // A zero bound would drop every frame on sight; treat it as "not set".
             max_frame_age: self.max_frame_age.filter(|age| !age.is_zero()),
         }
@@ -312,10 +159,6 @@ impl FlowControlConfig {
             persist_stall_parks: 8,
             frame_retries: 8,
             max_frame_age: Some(Duration::from_secs(2)),
-            // Detection belongs with the rest of the tail-tolerance bundle. Left unset, the return
-            // path is corrected by probing alone -- EMA-smoothed behind a path cache, so tens of
-            // seconds -- which is the gap this profile exists to close.
-            return_path_replan: Some(ReturnPathReplanConfig::default()),
             ..Self::default()
         }
     }
@@ -634,113 +477,11 @@ impl DeliverySignal for DeliveryClock {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    /// Builds a monitor with a very short window so the tests do not sleep for seconds.
-    fn monitor(feedback: Arc<dyn ReturnPathFeedback>, sustained_windows: u32, cooldown: Duration) -> ReturnPathMonitor {
-        ReturnPathMonitor::new(
-            feedback,
-            ReturnPathReplanConfig {
-                loss_threshold: 0.2,
-                window: Duration::from_millis(10),
-                sustained_windows,
-                cooldown,
-            },
-        )
-    }
-
-    fn delivered(acked: usize, lost: usize) -> Delivered {
-        Delivered {
-            acked_bytes: acked,
-            lost_bytes: lost,
-        }
-    }
-
-    /// Feeds one observation and lets the window elapse, so the next observation closes it.
-    fn close_window(m: &mut ReturnPathMonitor, d: Delivered) {
-        m.observe(d);
-        std::thread::sleep(Duration::from_millis(12));
-        m.observe(delivered(0, 0));
-    }
-
-    #[test]
-    fn return_path_monitor_should_replan_after_sustained_loss() {
-        let mut feedback = MockReturnPathFeedback::new();
-        feedback.expect_return_path_degraded().once().return_const(());
-
-        let mut m = monitor(Arc::new(feedback), 3, Duration::from_secs(60));
-
-        // Three consecutive windows at 50 % loss — well above the 20 % tolerance.
-        for _ in 0..3 {
-            close_window(&mut m, delivered(1_000, 1_000));
-        }
-    }
-
-    #[test]
-    fn return_path_monitor_should_ignore_loss_within_tolerance() {
-        let mut feedback = MockReturnPathFeedback::new();
-        feedback.expect_return_path_degraded().never();
-
-        let mut m = monitor(Arc::new(feedback), 3, Duration::from_secs(60));
-
-        // 10 % loss: retransmission recovers this, so it must not cause churn.
-        for _ in 0..6 {
-            close_window(&mut m, delivered(9_000, 1_000));
-        }
-    }
-
-    #[test]
-    fn return_path_monitor_should_require_loss_to_be_sustained() {
-        let mut feedback = MockReturnPathFeedback::new();
-        feedback.expect_return_path_degraded().never();
-
-        let mut m = monitor(Arc::new(feedback), 3, Duration::from_secs(60));
-
-        // A bad window followed by a good one resets the streak, so it never reaches 3.
-        for _ in 0..4 {
-            close_window(&mut m, delivered(1_000, 1_000));
-            close_window(&mut m, delivered(10_000, 0));
-        }
-    }
-
-    #[test]
-    fn return_path_monitor_should_rate_limit_replans() {
-        let mut feedback = MockReturnPathFeedback::new();
-        // Six bad windows at `sustained_windows = 1` would be six re-plans without the cooldown.
-        feedback.expect_return_path_degraded().once().return_const(());
-
-        let mut m = monitor(Arc::new(feedback), 1, Duration::from_secs(60));
-
-        for _ in 0..6 {
-            close_window(&mut m, delivered(0, 1_000));
-        }
-    }
-
-    #[test]
-    fn return_path_monitor_should_ignore_idle_windows() {
-        let mut feedback = MockReturnPathFeedback::new();
-        feedback.expect_return_path_degraded().never();
-
-        let mut m = monitor(Arc::new(feedback), 1, Duration::from_secs(60));
-
-        // No traffic at all carries no evidence: it must neither accuse nor exonerate.
-        for _ in 0..5 {
-            close_window(&mut m, delivered(0, 0));
-        }
-    }
-
     use super::*;
 
     #[test]
     fn robust_profile_should_bound_frame_age() {
         assert_eq!(FlowControlConfig::robust().max_frame_age, Some(Duration::from_secs(2)));
-        // Detection has to be on for the profile to do what it claims: left unset it was never
-        // enabled by anything -- not by a profile, not by hoprd, not by the edge client -- so the
-        // loss clock never ran and no return path was ever re-planned.
-        assert!(
-            FlowControlConfig::robust().return_path_replan.is_some(),
-            "the robust profile must enable return-path re-planning"
-        );
         assert_eq!(FlowControlConfig::default().max_frame_age, None);
     }
 

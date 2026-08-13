@@ -14,7 +14,6 @@ use hopr_api::{
 };
 use hopr_crypto_packet::prelude::*;
 use hopr_protocol_hopr::{FoundSurb, SurbStore};
-use hopr_transport_session::flow_control::{ReturnPathFeedback, ReturnPathFeedbackFactory};
 use tracing::trace;
 use validator::{Validate, ValidationError};
 
@@ -252,9 +251,8 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
 /// Keyed on resolved offchain keys rather than [`NodeId`], because a `NodeId` naming a node by its
 /// chain address is never equal to one naming the same node by its packet key. Callers hold
 /// whichever form their layer happens to use -- Sessions carry chain addresses, the SURB telemetry
-/// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice and, worse,
-/// makes [`PathPlanner::degrade_return_path`] invalidate an entry that does not exist. Resolving
-/// first makes lookup, insertion and invalidation agree by construction.
+/// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice. Resolving
+/// first makes lookup and insertion agree by construction.
 type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
 type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
 
@@ -615,87 +613,6 @@ where
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
-    }
-
-    /// Drops the cached return-path candidates for `destination`, so the next draw re-runs
-    /// selection against current edge scores instead of a list built before the failure.
-    ///
-    /// Invalidation is the whole action. It deliberately does *not* retire the relayers that were
-    /// in use: an earlier version did, because a batch was believed to span K distinct relayers and
-    /// there was no way to tell which had failed. Neither premise holds —
-    /// `HoprPacket::PAYLOAD_SIZE / HoprSurb::SIZE` is 2, so a batch never spanned more than two,
-    /// and per-edge SURB round-trip telemetry now says which ones are actually delivering.
-    ///
-    /// Return-path cache keys are `(destination, me, hops)` — reversed relative to forward paths,
-    /// because a return path runs *from* the destination back to us.
-    pub fn degrade_return_path(&self, destination: NodeId) {
-        let me = self.me;
-        let cache = self.cache.clone();
-        let resolver = self.resolver.clone();
-
-        // `moka::future::Cache::invalidate` is async and this is called from a poll context (the
-        // session's delivery clock), so it cannot be awaited here.
-        hopr_utils::runtime::prelude::spawn(async move {
-            // Resolve to the key the cache is actually keyed on. Passing the `NodeId` straight
-            // through invalidated nothing whenever the caller and the populating Session named the
-            // node by different forms, which is the normal case.
-            let dest_key = match destination {
-                NodeId::Offchain(key) => Some(key),
-                NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
-                    .resolve_transport_address(&addr)
-                    .await
-                    .ok()
-                    .flatten(),
-            };
-            let Some(dest_key) = dest_key else {
-                tracing::warn!(%destination, "cannot resolve degraded return path destination; nothing invalidated");
-                return;
-            };
-
-            for hops in 0..=RoutingOptions::MAX_INTERMEDIATE_HOPS as u32 {
-                cache.invalidate(&(dest_key, me, hops)).await;
-            }
-            tracing::debug!(%destination, "dropped cached return-path candidates after sustained loss");
-        });
-    }
-}
-
-/// Adapts a [`PathPlanner`] into the session layer's [`ReturnPathFeedbackFactory`].
-///
-/// The seam exists so the layer that *detects* return-path failure (the session's delivery clock)
-/// does not depend on the layer that *fixes* it (the path planner), nor the reverse.
-#[derive(Clone)]
-pub struct PlannerReturnPathFeedback<Surb, R, S>(pub PathPlanner<Surb, R, S>);
-
-impl<Surb, R, S> ReturnPathFeedbackFactory for PlannerReturnPathFeedback<Surb, R, S>
-where
-    Surb: SurbStore + Clone + Send + Sync + 'static,
-    R: Clone + ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
-    S: Clone + PathSelector + Send + Sync + 'static,
-{
-    fn for_destination(&self, destination: NodeId) -> Arc<dyn ReturnPathFeedback> {
-        Arc::new(DestinationBoundFeedback {
-            planner: self.0.clone(),
-            destination,
-        })
-    }
-}
-
-/// A [`ReturnPathFeedback`] bound to one destination, since the session knows its counterparty but
-/// the trait method carries no arguments.
-struct DestinationBoundFeedback<Surb, R, S> {
-    planner: PathPlanner<Surb, R, S>,
-    destination: NodeId,
-}
-
-impl<Surb, R, S> ReturnPathFeedback for DestinationBoundFeedback<Surb, R, S>
-where
-    Surb: SurbStore + Send + Sync + 'static,
-    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
-    S: PathSelector + Send + Sync + 'static,
-{
-    fn return_path_degraded(&self) {
-        self.planner.degrade_return_path(self.destination);
     }
 }
 
@@ -1097,14 +1014,13 @@ mod tests {
 
     // ── test: zero-hop path ───────────────────────────────────────────────────
 
-    /// A Session names its destination by chain address; this telemetry names it by packet key.
+    /// A Session names its destination by chain address; the SURB telemetry names it by packet key.
     ///
-    /// Regression: the cache used to be keyed on the `NodeId` as handed in, so an invalidation
-    /// holding the packet key never matched an entry populated from a chain address. Detection
-    /// fired correctly and dropped nothing -- indistinguishable, from the outside, from a
-    /// re-planning mechanism that simply does not help.
+    /// Regression: the cache used to be keyed on the `NodeId` as handed in, and
+    /// `NodeId::Chain(addr) != NodeId::Offchain(key)` even for the same node -- so the two layers
+    /// stored and looked up the same route under different keys without either noticing.
     #[tokio::test]
-    async fn degrading_a_return_path_should_invalidate_it_whichever_form_names_the_node() {
+    async fn a_return_path_should_cache_under_one_key_whichever_form_names_the_node() {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let dest = pubkey(&SECRET_DEST);
@@ -1149,18 +1065,26 @@ mod tests {
             "the return path should be cached after resolution"
         );
 
-        // Degraded the way the SURB telemetry reports it: by packet key.
-        planner.degrade_return_path(NodeId::Offchain(dest));
+        // Asking again the way the SURB telemetry names the node -- by packet key -- must land on
+        // that same entry rather than resolving and caching a second copy.
+        planner.cache.run_pending_tasks().await;
+        assert_eq!(planner.cache.entry_count(), 1, "one resolution, one entry");
 
-        // The invalidation is spawned, so give it a chance to run.
-        for _ in 0..50 {
-            if planner.cache.get(&cache_key).await.is_none() {
-                return;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
+        let _ = planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(dest),
+                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                1,
+            )
+            .await
+            .expect("return path resolution should succeed");
 
-        panic!("degrading by packet key must invalidate an entry cached by chain address");
+        planner.cache.run_pending_tasks().await;
+        assert_eq!(
+            planner.cache.entry_count(),
+            1,
+            "naming the destination by packet key must hit the entry cached from its chain address"
+        );
     }
 
     #[tokio::test]
