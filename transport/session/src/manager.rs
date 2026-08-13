@@ -1009,6 +1009,10 @@ where
                     );
 
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
+                    // The counterparty's store is the same bounded ring buffer as ours, so its
+                    // capacity bounds what our `produced - consumed` estimate can legitimately
+                    // claim it is holding.
+                    surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
@@ -1592,6 +1596,8 @@ where
             };
 
             slot.surb_mgmt.update(&balancer_config);
+            slot.surb_mgmt
+                .set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
             // Spawn the SURB balancer only once we know we have registered the
             // abort handle with the pre-allocated Session slot

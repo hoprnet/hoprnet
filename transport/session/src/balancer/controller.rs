@@ -131,6 +131,14 @@ pub struct BalancerStateValues {
     pub buffer_level: AtomicU64,
     /// Whether this session opted into sustaining production through return-path loss.
     pub sustain_on_return_path_loss: AtomicBool,
+    /// How many SURBs the counterparty can physically hold, or 0 when unknown.
+    ///
+    /// The estimate is `produced - consumed`, and consumption is only observed once a reply
+    /// arrives -- so a return path that drops replies lets the believed level grow without bound.
+    /// The counterparty's store is a ring buffer that evicts the oldest entry on overflow, so
+    /// everything above its capacity was discarded on arrival and was never a real level. Measured
+    /// during an outage: 51 917 believed against a 15 000-entry store.
+    pub counterparty_buffer_capacity: AtomicU64,
     /// Milliseconds from [`EPOCH`] until which the return path counts as degraded.
     ///
     /// A deadline rather than a flag: it is set by a layer that observes the return path and read
@@ -169,6 +177,34 @@ impl BalancerStateValues {
         );
         self.sustain_on_return_path_loss
             .store(cfg.sustain_on_return_path_loss, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Declares how many SURBs the counterparty's store can hold, bounding the level estimate.
+    ///
+    /// Taken from the session manager's `maximum_surb_buffer_size`, which is the same capacity
+    /// already used to clamp a counterparty's requested target. Zero leaves the estimate unbounded.
+    pub fn set_counterparty_buffer_capacity(&self, capacity: u64) {
+        self.counterparty_buffer_capacity
+            .store(capacity, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Caps `level` at what the counterparty can actually hold.
+    ///
+    /// Never below the configured target: a target above the counterparty's capacity is
+    /// unreachable by construction, and clamping to capacity there would hold the error permanently
+    /// negative and pin production at maximum forever -- a worse failure than the unbounded
+    /// estimate this exists to prevent. In that configuration the capacity figure is simply not
+    /// usable for this session.
+    fn clamp_to_counterparty_capacity(&self, level: u64) -> u64 {
+        match self
+            .counterparty_buffer_capacity
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            0 => level,
+            capacity => {
+                level.min(capacity.max(self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed)))
+            }
+        }
     }
 
     /// Marks the return path as degraded for the next `grace` period.
@@ -357,6 +393,18 @@ where
             current = current.saturating_sub(num_decayed_surbs);
             self.last_decay = std::time::Instant::now();
             tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+        }
+
+        // Believing a level the counterparty cannot hold keeps production throttled long after
+        // the surplus was evicted on arrival, so the estimate is bounded by the store it describes.
+        let believed = current;
+        current = self.state.clamp_to_counterparty_capacity(current);
+        if current != believed {
+            tracing::debug!(
+                believed,
+                capacity = current,
+                "counterparty SURB estimate exceeded its store; the surplus was never held"
+            );
         }
 
         let degraded = self.state.should_sustain_through_return_path_loss();
@@ -973,6 +1021,61 @@ mod tests {
         assert!(
             ticks <= 30,
             "refilling must ramp rather than crawl: took {ticks} sampling intervals"
+        );
+    }
+
+    /// The estimate must not claim a level the counterparty's store could never have held.
+    ///
+    /// `produced - consumed` only decreases when a reply arrives, so production that nobody is
+    /// seen to consume accumulates without bound. The counterparty's store is a ring buffer that
+    /// evicts the oldest entry on overflow, so everything above its capacity was discarded on
+    /// arrival. Measured during a live outage: 51 917 believed against a 15 000-entry store, which
+    /// keeps the controller throttling against a buffer that is in fact draining.
+    #[test_log::test]
+    fn surb_balancer_should_not_believe_a_level_the_counterparty_cannot_hold() {
+        const CAPACITY: u64 = 2_000;
+
+        let cfg = sustaining_config(false);
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+        state.set_counterparty_buffer_capacity(CAPACITY);
+
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+
+        // Replies stop, while production continues from a source the controller does not drive --
+        // keep-alives mint on their own schedule, which is how the live estimate ran away.
+        for _ in 0..20 {
+            surb_estimator
+                .produced
+                .fetch_add(500, std::sync::atomic::Ordering::Relaxed);
+            tick(&mut balancer, &surb_estimator, &output, 0);
+        }
+
+        let believed = state.buffer_level.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            believed <= CAPACITY,
+            "the estimate must be bounded by the counterparty's store: believed {believed} against a {CAPACITY}-entry \
+             buffer"
+        );
+    }
+
+    /// The bound must not become the setpoint: a store larger than the target changes nothing.
+    #[test_log::test]
+    fn surb_balancer_should_leave_a_healthy_session_untouched_by_the_capacity_bound() {
+        let cfg = sustaining_config(false);
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+        state.set_counterparty_buffer_capacity(cfg.target_surb_buffer_size * 10);
+
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+
+        let level = state.buffer_level.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            level >= cfg.target_surb_buffer_size / 2,
+            "a capacity well above the target must not hold the session below its setpoint: level {level}, target {}",
+            cfg.target_surb_buffer_size
         );
     }
 
