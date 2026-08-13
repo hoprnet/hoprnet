@@ -659,4 +659,39 @@ mod tests {
 
         Ok(())
     }
+
+    /// The curve feature selects a wire format, and these are its dimensions.
+    ///
+    /// `StartProtocol` derives its `SsaCommit` and `SsaRequest` layouts and its chunking from these
+    /// two sizes, so changing either changes what every PIX peer must parse — while the protocol
+    /// version byte stays where it is. That is why the curve is a network-wide build invariant
+    /// rather than a per-node settlement preference, and why a node announces its
+    /// [`PixSuite`](hopr_protocol_pix::PixSuite) in `PixParams` so a mismatch is refused at Session
+    /// establishment instead of surfacing as undecodable Start traffic.
+    ///
+    /// Pinned per feature arm because a size change is otherwise completely silent: nothing fails to
+    /// compile, and the first symptom is peers that cannot talk to each other.
+    #[test]
+    fn pix_wire_element_sizes_are_fixed_by_the_curve_feature() {
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
+        {
+            assert_eq!(32, size_of::<HoprPixGroupRepr>(), "Baby JubJub compressed point");
+            assert_eq!(64, HOPR_PIX_COMMITMENT_PROOF_SIZE, "Baby JubJub commitment proof");
+            assert_eq!(
+                hopr_protocol_pix::PixSuite::BabyJubJub,
+                <HoprPixSpec as hopr_protocol_pix::PixSpec>::PIX_SUITE,
+                "the announced suite must name the curve actually compiled in"
+            );
+        }
+        #[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
+        {
+            assert_eq!(33, size_of::<HoprPixGroupRepr>(), "secp256k1 compressed point");
+            assert_eq!(65, HOPR_PIX_COMMITMENT_PROOF_SIZE, "secp256k1 commitment proof");
+            assert_eq!(
+                hopr_protocol_pix::PixSuite::Secp256k1,
+                <HoprPixSpec as hopr_protocol_pix::PixSpec>::PIX_SUITE,
+                "the announced suite must name the curve actually compiled in"
+            );
+        }
+    }
 }

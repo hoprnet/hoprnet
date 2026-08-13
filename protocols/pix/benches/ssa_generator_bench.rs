@@ -196,6 +196,27 @@ fn bench_verify_reconstructed(c: &mut Criterion) {
     group.finish();
 }
 
+/// The Entry's per-packet cost, and the half of the polys/threshold decision that was long assumed
+/// away.
+///
+/// `IndexedPolynomial::next_share` evaluates a `threshold`-wide polynomial by Horner for every share
+/// emitted, so unlike `new_ssa_commitment` — which a 4× threshold change moves by 7 % — this term is
+/// genuinely threshold-dependent. Measured on 48 cores:
+///
+/// | threshold | µs/share |
+/// | --------- | -------- |
+/// | 16        | 0.90     |
+/// | 32        | 1.20     |
+/// | 48        | 1.51     |
+/// | 64        | 1.82     |
+///
+/// **Requires `--features all-benchmarks` to say anything**: without it [`THRESHOLDS`] is the single
+/// deployed point, and a one-point sweep cannot show a slope. That is how these figures came to be
+/// missing from the calibration in the first place.
+///
+/// Against the Exit's 10.68 µs/share at the deployed threshold this is ~17 %, which is why the split
+/// is decided on the Exit term — see [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the combined
+/// tables and the stated objective.
 fn bench_next_share(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaShareGenerator::next_share");
     group.throughput(Throughput::Elements(NEXT_SHARE_BATCH as u64));

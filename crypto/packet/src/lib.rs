@@ -105,6 +105,7 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type Pseudonym = SimplePseudonym;
 
     const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:BLAKE3_SSWU_RO_";
+    const PIX_SUITE: hopr_protocol_pix::PixSuite = hopr_protocol_pix::PixSuite::Secp256k1;
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
         PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
@@ -125,6 +126,7 @@ impl hopr_protocol_pix::PixSpec for HoprPixSpec {
     type Pseudonym = SimplePseudonym;
 
     const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"BabyJubJub_XMD:BLAKE3_SSWU_RO_";
+    const PIX_SUITE: hopr_protocol_pix::PixSuite = hopr_protocol_pix::PixSuite::BabyJubJub;
 
     fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
         BjjPublicKey::try_from(group).ok()

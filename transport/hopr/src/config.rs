@@ -1293,8 +1293,40 @@ mod tests {
     /// Stated as the loss rate it covers rather than as four literals: `surplus/(threshold+surplus)`
     /// is the fraction of a polynomial's shares that may go missing before it cannot reconstruct,
     /// and that — not the raw count — is what an operator would compare against measured loss.
+    ///
+    /// Swept over every accepted `ssa_part_size`, not just the deployed multiples of four. Sampling
+    /// only those is what let the underlying ratio round down unnoticed — they are exactly the
+    /// values on which integer division and the intended ratio agree.
+    ///
+    /// `num_ssa_parts` is pinned at its minimum for the sweep so that only the surplus rule is under
+    /// test: at the default 8192 the top of the `ssa_part_size` range lands within 0.4 % of
+    /// `validate_pix_dimension_product`'s ceiling, so a future re-tune of the split would fail this
+    /// test for a reason that has nothing to do with the surplus.
     #[test]
     fn the_derived_surplus_covers_a_fifth_of_a_polynomial_at_every_threshold() {
+        for ssa_part_size in 2usize..=255 {
+            let cfg = PixGlobalConfig {
+                num_ssa_parts: 8,
+                ssa_part_size,
+                ..Default::default()
+            };
+            let surplus = cfg.surplus_shares();
+            let tolerated = surplus as f64 / (ssa_part_size + surplus) as f64;
+            assert!(
+                tolerated >= 0.20,
+                "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating only {tolerated:.4} loss"
+            );
+            assert!(
+                surplus > 0,
+                "ssa_part_size {ssa_part_size} derives no surplus, i.e. no loss tolerance at all"
+            );
+            assert!(
+                cfg.validate().is_ok(),
+                "a derived surplus must never fail the bound it is derived under"
+            );
+        }
+
+        // On the deployed multiples of four the tolerance is the documented 20 % exactly.
         for ssa_part_size in [16usize, 32, 48, 64] {
             let cfg = PixGlobalConfig {
                 ssa_part_size,
@@ -1305,10 +1337,6 @@ mod tests {
             assert!(
                 (0.19..=0.21).contains(&tolerated),
                 "ssa_part_size {ssa_part_size} derives surplus {surplus}, tolerating {tolerated:.3} loss"
-            );
-            assert!(
-                cfg.validate().is_ok(),
-                "a derived surplus must never fail the bound it is derived under"
             );
         }
     }

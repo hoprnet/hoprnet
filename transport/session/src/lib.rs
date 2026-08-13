@@ -37,7 +37,7 @@ pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg
 pub use types::{
     AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
     DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
-    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, ServiceId, SessionId, SessionTarget,
+    HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
@@ -133,8 +133,11 @@ pub struct SessionClientConfig {
     /// [`SessionManager::new_session`] refuses any value that disagrees with it rather than
     /// advertising dimensions it cannot honour. Setting this is therefore an assertion about the
     /// node's own PIX configuration — build it with
-    /// [`PixParams::try_from`](hopr_protocol_pix::PixParams) over that generator's config if you do
-    /// not want to restate it.
+    /// [`PixParams::try_from_config`](hopr_protocol_pix::PixParams::try_from_config) over that
+    /// generator's config if you do not want to restate it.
+    ///
+    /// The fourth component, the curve suite, is fixed by how this node was built rather than
+    /// configured; [`LOCAL_PIX_SUITE`] names it for anyone restating the values by hand.
     ///
     /// Defaults to `None`.
     pub pix_ssa_quota: Option<PixParams>,

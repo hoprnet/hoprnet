@@ -56,10 +56,11 @@ const PIX_SURPLUS: u8 = 2;
 ///
 /// `const` rather than built at the call site so the range check runs at compile time — the values
 /// are constants, so a typo here should not need a cluster to boot before it is noticed.
-const PIX_PARAMS: hopr_lib::PixParams = match hopr_lib::PixParams::try_new(PIX_POLYS, PIX_SHARES, PIX_SURPLUS) {
-    Ok(params) => params,
-    Err(_) => panic!("test PIX parameters must be within the protocol ranges"),
-};
+const PIX_PARAMS: hopr_lib::PixParams =
+    match hopr_lib::PixParams::try_new(PIX_POLYS, PIX_SHARES, PIX_SURPLUS, hopr_lib::LOCAL_PIX_SUITE) {
+        Ok(params) => params,
+        Err(_) => panic!("test PIX parameters must be within the protocol ranges"),
+    };
 
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///

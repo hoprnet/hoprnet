@@ -1071,7 +1071,7 @@ mod tests {
     /// and what actually pins the packed layout across `encode`/`decode`.
     #[test]
     fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
-        let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32)?;
+        let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::BabyJubJub)?;
         let msg_1 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage::new(
             0xfeedbeef_u32,
             params,

@@ -440,12 +440,37 @@ mod tests {
     /// with a physical meaning — `surplus/(threshold + surplus)` is the fraction of a polynomial's
     /// shares that may be lost before it cannot reconstruct. A change to
     /// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to restate what it did to that number.
+    ///
+    /// Swept over the *whole* accepted threshold range rather than the deployed multiples of four.
+    /// Restricting it to those was what let the ratio round down unnoticed: every sampled point
+    /// divided exactly, so integer division and the intended ratio agreed on all of them and
+    /// disagreed on everything else.
     #[test]
     fn the_default_surplus_covers_a_fifth_of_a_polynomial_being_lost() {
-        for threshold in [16u8, 32, 48, 64] {
+        for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
             let surplus = crate::default_surplus_for(threshold);
             let emitted = threshold as f64 + surplus as f64;
             let tolerated = surplus as f64 / emitted;
+
+            // A floor, not an approximation: the surplus may over-cover, never under-cover.
+            assert!(
+                tolerated >= 0.20,
+                "threshold {threshold} + surplus {surplus} tolerates only {tolerated:.4} loss"
+            );
+            // And it over-covers by less than one share, which is what makes rounding up cheap.
+            assert!(
+                surplus as f64 - 1.0 < threshold as f64 / crate::SURPLUS_LOSS_TOLERANCE_DIVISOR as f64,
+                "threshold {threshold} buys {surplus} surplus shares, more than one above the ratio"
+            );
+            // Zero surplus is zero loss tolerance. Rounding down produced it at thresholds 2 and 3.
+            assert!(surplus > 0, "threshold {threshold} derives no surplus at all");
+        }
+
+        // Where the threshold divides exactly the tolerance is the documented 20 % on the nose, and
+        // the deployed threshold is one of those.
+        for threshold in [16u8, 32, 48, 64] {
+            let surplus = crate::default_surplus_for(threshold);
+            let tolerated = surplus as f64 / (threshold as f64 + surplus as f64);
             assert!(
                 (0.19..=0.21).contains(&tolerated),
                 "threshold {threshold} + surplus {surplus} tolerates {tolerated:.3} loss, expected ~0.20"
@@ -457,6 +482,27 @@ mod tests {
             crate::default_surplus_for(DEFAULT_POLY_THRESHOLD),
             "the constant must stay the ratio evaluated at the default threshold, not drift from it"
         );
+    }
+
+    /// A derived surplus must never fail the validator it is derived under.
+    ///
+    /// `default_surplus_for` rounds up and `surplus_must_not_exceed_threshold` bounds the surplus by
+    /// the threshold, so the two meet at the smallest threshold there is: at
+    /// [`MIN_POLY_THRESHOLD`] the derived surplus is 1 against a threshold of 2. Any further
+    /// rounding-up would collide with the bound rather than merely over-insure.
+    #[test]
+    fn every_derived_surplus_passes_the_bound_it_is_derived_under() {
+        for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
+            let cfg = SsaGeneratorConfig {
+                polynomials_per_ssa: 16,
+                threshold,
+                surplus_shares: crate::default_surplus_for(threshold),
+            };
+            assert!(
+                cfg.validate().is_ok(),
+                "the surplus derived for threshold {threshold} fails its own validator"
+            );
+        }
     }
 
     /// A surplus above the threshold pays for more redundancy than payload, and is billed for it.

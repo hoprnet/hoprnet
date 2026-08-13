@@ -33,6 +33,21 @@ x25519 = []
 secp256k1 = []
 # Selects the BabyJubJub instantiation of `HoprPixSpec`, and with it BabyJubJub deposit
 # addresses. Default, because it is what production settles.
+#
+# THE CURVE IS A NETWORK-WIDE INVARIANT, NOT A PER-NODE CHOICE. It sets the width of every
+# curve-sized field in the PIX handshake — each coefficient commitment (32 B here, 33 B on
+# secp256k1) and the commitment proof of knowledge (64 B / 65 B) — and `StartProtocol` derives its
+# `SsaCommit` and `SsaRequest` layouts and chunking from those sizes while advertising one protocol
+# version regardless. Two peers built for different curves therefore cannot run a PIX Session
+# together. Each node announces its curve as a `PixSuite` in the negotiated `PixParams`, so the Exit
+# refuses a mismatched client with `UnacceptablePixParams` at Session establishment rather than
+# leaving it to fail as malformed Start traffic — but it is a refusal, not a negotiation: nothing
+# adapts, and both ends of a deployment must be built the same way.
+#
+# One case is not covered, because it cannot be: a node built before the suite field existed
+# announces all-zero bits, which read as BabyJubJub. Such a node built for secp256k1 is therefore
+# indistinguishable from a BabyJubJub one and still fails later, on the curve-sized fields. New
+# against new, and new against old-BabyJubJub, are both clean.
 pix-bjj = []
 # Overrides `pix-bjj` back to the secp256k1 instantiation, giving Ethereum deposit addresses that
 # a plain `HoprToken.transfer` can reach. Not default, and deliberately an *override* rather
@@ -46,6 +61,10 @@ pix-bjj = []
 # Note this is `pix-secp256k1`, not `secp256k1`: that name is taken above and selects the
 # Sphinx header curve, which is an unrelated axis. Sharing it would make enabling one silently
 # switch the other — the same defect one layer along.
+#
+# Enabling it is a decision about the whole deployment, not about this node's settlement: see
+# `pix-bjj` for why a peer on the other curve cannot establish a PIX Session at all. A consumer that
+# needs Ethereum deposit addresses needs every node it talks PIX to built the same way.
 pix-secp256k1 = []
 serde = [
   "dep:serde",

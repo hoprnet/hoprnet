@@ -49,8 +49,8 @@ use crate::{
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA,
-        HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG,
-        SsaQuota, pix_params_to_quota,
+        HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, LOCAL_PIX_SUITE,
+        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -550,10 +550,10 @@ pub struct IncomingSessionPixConfig {
     /// The quota it is compared against counts the surplus — `polys × (threshold + surplus) ×
     /// PAYLOAD_SIZE` — so this bounds the traffic actually served rather than the fraction of it the
     /// threshold accounts for. It used to bound only the latter, which understated the exposure by
-    /// the surplus factor: 1.5× at the deployed dimensions.
+    /// the surplus factor: 1.25× at the deployed dimensions.
     ///
     /// Defaults to `DEFAULT_PIX_SSA_QUOTA / 4 ..= DEFAULT_PIX_SSA_QUOTA`
-    /// (≈ 195 MiB to ≈ 778 MiB, inclusive).
+    /// (≈ 162 MiB to ≈ 649 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
     /// Maximum time to wait for the SSA to be fully committed and delivered to the Exit.
@@ -971,8 +971,8 @@ impl PixToolbox {
 ///
 /// On the Exit side, `check_pix_params` validates these parameters against:
 /// - The protocol ranges, which [`PixParams::try_from_additional_data`] enforces as it unpacks.
-/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈195
-///   MiB–778 MiB per SSA).
+/// - The configured [`IncomingSessionPixConfig::quota_range`] (by default derived from the default PIX dimensions: ≈162
+///   MiB–649 MiB per SSA).
 /// - Optionally, [`IncomingSessionPixConfig::enforce_pix`] rejects Sessions that do not offer PIX.
 /// - The Exit only checks the *product* `polys × (threshold + surplus)`, not the individual values, so the Entry can
 ///   split it to suit its computing power. The computation is easily parallelizable in the number of polynomials, but
@@ -1520,8 +1520,11 @@ where
             // (and so a different per-SSA quota, and so differently sized deposits) than it sized
             // for. Advertising the caller's value instead would let the Session proceed while
             // producing shares the Exit cannot reconstruct.
+            // The same source for the dimensions and for the curve suite: `HoprPixSpec` is what the
+            // installed generator is instantiated over, so the announced suite cannot disagree with
+            // the one that will actually produce the shares.
             let gen_cfg = pix_toolbox.share_generator.config();
-            let params = PixParams::try_from(gen_cfg)
+            let params = PixParams::try_from_config::<HoprPixSpec>(gen_cfg)
                 .map_err(|error| SessionManagerError::Other(anyhow!("invalid PIX dimensions: {error}")))?;
             if requested != params {
                 return Err(SessionManagerError::Unacceptable(format!(
@@ -2366,6 +2369,23 @@ where
                     )
                 })
                 .ok()?;
+
+            // The Exit decides the curve, and it decides it by refusing anything else: nothing here
+            // is negotiated, because there is nothing to negotiate — the suite is fixed at build
+            // time on both sides. Checked before the quota because it is the cheaper question and
+            // because a suite mismatch makes the dimensions meaningless anyway, and checked at all
+            // because every later PIX field is sized by it. Refusing here means the Exit's own
+            // commitments, the first curve-sized bytes in the exchange, are never sent to a peer
+            // that would read their boundaries in the wrong place.
+            if params.suite() != LOCAL_PIX_SUITE {
+                warn!(
+                    challenge = req.challenge,
+                    offered = %params.suite(),
+                    ours = %LOCAL_PIX_SUITE,
+                    "refusing a client offering a PIX curve suite this node was not built for"
+                );
+                return None;
+            }
 
             let quota_per_ssa = pix_params_to_quota(&params);
             debug!(
@@ -3328,7 +3348,7 @@ mod tests {
     /// hand, which meant a change to the layout altered what every one of them was asserting
     /// without altering a single line of them — plain `u64` literals type-check against anything.
     fn pix_additional_data(polys_per_ssa: u16, shares_per_poly: u8, surplus_shares: u8) -> u64 {
-        PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares)
+        PixParams::try_new(polys_per_ssa, shares_per_poly, surplus_shares, LOCAL_PIX_SUITE)
             .expect("test dimensions must be valid")
             .into_additional_data(0)
     }
@@ -3336,7 +3356,7 @@ mod tests {
     /// The default test dimensions: the smallest legal split, with the surplus the test generators
     /// below are configured with.
     fn small_pix_params() -> PixParams {
-        PixParams::try_new(2, 2, TEST_SURPLUS_SHARES).expect("test dimensions must be valid")
+        PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE).expect("test dimensions must be valid")
     }
 
     /// [`small_pix_params`] as an Entry offering them would pack them into `additional_data`.
@@ -5196,7 +5216,7 @@ mod tests {
                 SessionClientConfig {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?),
+                    pix_ssa_quota: Some(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(0.try_into()?),
                     ..Default::default()
@@ -5238,10 +5258,13 @@ mod tests {
     async fn new_session_rejects_usepix_when_quota_mismatches_generator() -> anyhow::Result<()> {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
 
+        // The surplus is at the threshold rather than above it: `surplus_must_not_exceed_threshold`
+        // began rejecting the latter when the surplus became a billed ratio, and this fixture was
+        // left behind at 5-against-3, which made the generator itself unconstructible.
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 5,
             threshold: 3,
-            surplus_shares: 5,
+            surplus_shares: 3,
         };
         let (pix_toolbox, _) = PixToolbox::new(
             Arc::new(SsaShareGenerator::new(ssa_gen_config)),
@@ -5268,7 +5291,7 @@ mod tests {
                     capabilities: Capability::UsePIX.into(),
                     surb_management: None,
                     // All three pass protocol bounds but polys=10 != generator's 5
-                    pix_ssa_quota: Some(PixParams::try_new(10, 10, 5)?),
+                    pix_ssa_quota: Some(PixParams::try_new(10, 10, 5, LOCAL_PIX_SUITE)?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
                     ..Default::default()
@@ -5297,6 +5320,7 @@ mod tests {
                         ssa_gen_config.polynomials_per_ssa,
                         ssa_gen_config.threshold,
                         ssa_gen_config.surplus_shares + 1,
+                        LOCAL_PIX_SUITE,
                     )?),
                     forward_path_options: RoutingOptions::Hops(1.try_into()?),
                     return_path_options: RoutingOptions::Hops(2.try_into()?),
@@ -6350,7 +6374,11 @@ mod tests {
         let result = mgr
             .handle_ssa_request(
                 alice_pseudonym,
-                SsaServerCommitmentMessage::new(session_id, PixParams::try_new(10, 10, 0)?, BTreeMap::new()),
+                SsaServerCommitmentMessage::new(
+                    session_id,
+                    PixParams::try_new(10, 10, 0, LOCAL_PIX_SUITE)?,
+                    BTreeMap::new(),
+                ),
             )
             .await;
 
@@ -6463,7 +6491,7 @@ mod tests {
                     alice_pseudonym,
                     SsaServerCommitmentMessage::new(
                         session_id,
-                        PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?,
+                        PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                         commitments,
                     ),
                 )
@@ -6919,7 +6947,12 @@ mod tests {
             current_ssa_state: Default::default(),
         };
         slot.current_ssa_state
-            .set(SessionSsaState::new(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?))
+            .set(SessionSsaState::new(PixParams::try_new(
+                2,
+                2,
+                TEST_SURPLUS_SHARES,
+                LOCAL_PIX_SUITE,
+            )?))
             .map_err(|_| anyhow!("pix state must be uninitialized"))?;
         mgr.sessions.insert(alice_pseudonym, slot.clone());
 
@@ -7366,7 +7399,7 @@ mod tests {
         )
         .await?;
 
-        let expected = PixParams::try_new(2, 2, OFFERED_SURPLUS)?;
+        let expected = PixParams::try_new(2, 2, OFFERED_SURPLUS, LOCAL_PIX_SUITE)?;
 
         let slot = mgr.sessions.get(&alice_pseudonym).context("session must exist")?;
         let ssa_state = slot.current_ssa_state.get().context("pix state must be set")?;
@@ -7411,9 +7444,13 @@ mod tests {
         };
         // Packed by hand rather than through `pix_additional_data`, because that helper refuses to
         // build the very values under test. The layout it mirrors is pinned in `PixParams`' own
-        // tests.
+        // tests. The suite is this build's, so that the dimension cases below fail on their
+        // dimensions rather than on a curve mismatch — that rejection has its own test.
         let packed = |polys: u16, shares: u8, surplus: u8| {
-            ((polys as u64) << 48) | ((shares as u64) << 40) | ((surplus as u64) << 32)
+            ((LOCAL_PIX_SUITE as u64) << 62)
+                | ((polys as u64) << 48)
+                | ((shares as u64) << 40)
+                | ((surplus as u64) << 32)
         };
 
         // polys_per_ssa > MAX_POLYS_PER_SSA (16192), and zero, with a valid quota -> should reject
@@ -7439,15 +7476,73 @@ mod tests {
         let accepted = mgr
             .check_pix_params(&offer(packed(8192, 128, 37)))
             .context("should accept valid params")?;
-        assert_eq!(PixParams::try_new(8192, 128, 37)?, accepted);
+        assert_eq!(PixParams::try_new(8192, 128, 37, LOCAL_PIX_SUITE)?, accepted);
 
         // Every surplus a byte can hold is legal.
         for surplus in [0, 1, u8::MAX] {
             assert_eq!(
-                Some(PixParams::try_new(8192, 128, surplus)?),
+                Some(PixParams::try_new(8192, 128, surplus, LOCAL_PIX_SUITE)?),
                 mgr.check_pix_params(&offer(packed(8192, 128, surplus)))
             );
         }
+
+        Ok(())
+    }
+
+    /// The Exit refuses a client whose PIX curve suite is not the one this node was built for.
+    ///
+    /// The curve is a build-time property on both sides and is not negotiated, so the only two
+    /// outcomes are "same suite" and "refused". This matters because it happens *before* the Exit
+    /// commits: every later PIX field — each coefficient commitment, the proof of knowledge — is
+    /// sized by the curve, so a mismatch that got past here would surface as undecodable Start
+    /// traffic on a Session both sides believed they had established.
+    ///
+    /// The quota range is wide open, so nothing but the suite can be doing the rejecting.
+    #[test_log::test(tokio::test)]
+    async fn check_pix_params_must_refuse_a_foreign_curve_suite() -> anyhow::Result<()> {
+        let mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let offer = |suite: hopr_protocol_pix::PixSuite| StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: PixParams::try_new(8192, 128, 37, suite)
+                .expect("test dimensions must be valid")
+                .into_additional_data(0),
+        };
+
+        let foreign = match LOCAL_PIX_SUITE {
+            hopr_protocol_pix::PixSuite::BabyJubJub => hopr_protocol_pix::PixSuite::Secp256k1,
+            hopr_protocol_pix::PixSuite::Secp256k1 => hopr_protocol_pix::PixSuite::BabyJubJub,
+        };
+
+        assert!(
+            mgr.check_pix_params(&offer(foreign)).is_none(),
+            "a client offering {foreign} must be refused by a {LOCAL_PIX_SUITE} Exit"
+        );
+        assert!(
+            mgr.check_pix_params(&offer(LOCAL_PIX_SUITE)).is_some(),
+            "and the same dimensions on this build's own curve must still be accepted"
+        );
+
+        // A suite identifier no curve claims is refused as well, rather than read as a third curve.
+        let unknown = StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
+            capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+            additional_data: (0b11u64 << 62) | (8192u64 << 48) | (128u64 << 40) | (37u64 << 32),
+        };
+        assert!(
+            mgr.check_pix_params(&unknown).is_none(),
+            "an unknown suite identifier must be refused"
+        );
 
         Ok(())
     }

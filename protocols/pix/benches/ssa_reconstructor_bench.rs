@@ -850,9 +850,12 @@ const INTERPOLATION_POLYS: u16 = 128;
 
 /// What the threshold costs the Exit, which is the term the polys/threshold split turns on.
 ///
-/// The Entry side is known to be threshold-free — a 4× threshold change moves `new_ssa_commitment`
-/// by 7 % — so if the Exit is too, the threshold is nearly free on both sides and only the surplus
-/// and fault-detection latency argue for a particular value.
+/// The split is chosen to maximise **Exit** capacity — the Exit is the shared side, serving 10–30
+/// clients — which is why this group is the one that decides it. That is a stated objective, not an
+/// observation that the Entry does not matter: `new_ssa_commitment` is very nearly threshold-free
+/// (a 4× threshold change moves it 7 %), but `SsaShareGenerator::next_share` is not, growing from
+/// 0.90 to 1.82 µs/share across the same sweep. It is measured by `ssa_generator_bench`, and both
+/// tables are recorded on `DEFAULT_POLY_THRESHOLD`.
 ///
 /// # What is being measured
 ///
