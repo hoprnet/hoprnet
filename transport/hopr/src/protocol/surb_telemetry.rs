@@ -212,7 +212,12 @@ pub fn flush_into<G>(registry: &SurbRoundTripRegistry, graph: &G, timestamp: u12
 where
     G: hopr_api::graph::NetworkGraphUpdate,
 {
+    let (mut legs, mut total_expected, mut total_observed) = (0usize, 0u64, 0u64);
+
     for (paths, expected, observed) in registry.drain() {
+        legs += 1;
+        total_expected += expected;
+        total_observed += observed;
         tracing::trace!(expected, observed, "flushing surb round-trip counts");
         graph.record_edge::<NoPeerTelemetry, NoPathTelemetry>(MeasurableEdge::Surb(SurbTelemetry {
             paths,
@@ -220,6 +225,18 @@ where
             expected,
             observed,
         }));
+    }
+
+    if legs > 0 {
+        // One aggregate line per interval rather than one per pair of legs. At `debug` because
+        // `trace` is compiled out of release builds by `max_level_debug`, which would leave this
+        // mechanism unobservable in exactly the builds where it matters.
+        tracing::debug!(
+            legs,
+            expected = total_expected,
+            observed = total_observed,
+            "reported surb round-trips to the graph"
+        );
     }
 }
 
