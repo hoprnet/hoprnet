@@ -233,7 +233,15 @@ where
         legs += 1;
         total_expected += expected;
         total_observed += observed;
-        tracing::trace!(expected, observed, "flushing surb round-trip counts");
+        // Per pair, at debug: the aggregate cannot answer whether a dead relayer's legs diverge
+        // from healthy ones, which is the property any trigger built on this signal depends on.
+        tracing::debug!(
+            forward = ?paths.forward,
+            reply = ?paths.reply,
+            expected,
+            observed,
+            "surb round-trip pair"
+        );
         graph.record_edge::<NoPeerTelemetry, NoPathTelemetry>(MeasurableEdge::Surb(SurbTelemetry {
             paths,
             timestamp,
