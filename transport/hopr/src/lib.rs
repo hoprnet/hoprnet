@@ -849,6 +849,7 @@ where
         );
 
         // -- periodic SURB round-trip flush
+        tracing::info!(?role, "starting surb round-trip flush task");
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         processes.insert(
