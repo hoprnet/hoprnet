@@ -48,7 +48,7 @@ use crate::{
     },
     errors::{self, SessionManagerError, TransportSessionError},
     types::{
-        ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA,
+        ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
         HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, SESSION_APPLICATION_TAG,
         SsaQuota, pix_params_to_quota,
     },
@@ -2057,6 +2057,7 @@ where
             session_id,
             current_ssa_state.params,
             exit_commitments,
+            HoprPixDepositData::default(),
         ));
 
         send_via_msg_sender(
@@ -3073,7 +3074,7 @@ where
     async fn handle_ssa_request(
         &self,
         pseudonym: HoprPseudonym,
-        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositData>,
     ) -> errors::Result<()> {
         let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
@@ -6349,7 +6350,12 @@ mod tests {
         let result = mgr
             .handle_ssa_request(
                 alice_pseudonym,
-                SsaServerCommitmentMessage::new(session_id, PixParams::try_new(10, 10, 0)?, BTreeMap::new()),
+                SsaServerCommitmentMessage::new(
+                    session_id,
+                    PixParams::try_new(10, 10, 0)?,
+                    BTreeMap::new(),
+                    HoprPixDepositData::default(),
+                ),
             )
             .await;
 
@@ -6464,6 +6470,7 @@ mod tests {
                         session_id,
                         PixParams::try_new(2, 2, TEST_SURPLUS_SHARES)?,
                         commitments,
+                        HoprPixDepositData::default(),
                     ),
                 )
                 .await;

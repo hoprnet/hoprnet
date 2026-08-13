@@ -4478,6 +4478,7 @@ dependencies = [
  "pin-project",
  "rand 0.10.2",
  "serde",
+ "serde_bytes",
  "serde_repr",
  "smart-default",
  "strum 0.28.0",

@@ -140,7 +140,7 @@ pub struct StartEstablished<I> {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
-pub enum StartProtocol<I, T, C, G, K> {
+pub enum StartProtocol<I, T, C, G, K, D> {
     /// Request to initiate a new session.
     StartSession(StartInitiation<T, C>),
     /// Confirmation that a new session has been established by the counterparty.
@@ -148,7 +148,7 @@ pub enum StartProtocol<I, T, C, G, K> {
     /// Client's message to fill Client commitments to establish a Session Stealth Address (SSA).
     SsaCommit(SsaClientCommitmentMessage<I, G, K>),
     /// Server-side commitment to Session Stealth Address (SSA).
-    SsaRequest(SsaServerCommitmentMessage<I, G>),
+    SsaRequest(SsaServerCommitmentMessage<I, G, D>),
     /// Counterparty could not establish a new session due to an error.
     SessionError(StartErrorType<I>),
     /// A ping message to keep the session alive.
@@ -236,7 +236,7 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
         //   trailer:    CBOR-encoded session_id
         let header_and_fixed: usize = 4 + 4 + 2 + 2; // header + ssa_index + coeff_index + num_polys
         let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
-            + StartProtocol::<I, (), (), G, K>::PIX_COEFF_COMMITMENT_REPR_SIZE;
+            + StartProtocol::<I, (), (), G, K, ()>::PIX_COEFF_COMMITMENT_REPR_SIZE;
         // Compute the exact CBOR size of the session_id for this instantiation.
         let cbor_session_id_size = serde_cbor_2::to_vec(&session_id)?.len();
         let budget = ApplicationData::PAYLOAD_SIZE.saturating_sub(header_and_fixed + cbor_session_id_size);
@@ -245,7 +245,7 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
         // keeps the full budget, which is what the block size below is aligned to; only phase 1
         // pays for the proof, costing a handful of extra messages per cycle.
         let max_constant_terms_per_message =
-            (budget.saturating_sub(StartProtocol::<I, (), (), G, K>::PIX_COMMITMENT_PROOF_SIZE) / per_entry).max(1);
+            (budget.saturating_sub(StartProtocol::<I, (), (), G, K, ()>::PIX_COMMITMENT_PROOF_SIZE) / per_entry).max(1);
 
         // Group the transposed verifiers by coefficient index, each group sorted by polynomial
         // index. A `BTreeMap` keeps the coefficient order deterministic; the inner sort is what
@@ -316,7 +316,7 @@ impl<I: serde::Serialize + Clone, G: Clone, K: Clone> SsaClientCommitmentMessage
 /// It is then subsequently sent every time the Server needs the next batch of SSAs
 /// (with indices strictly greater than in the last batch) to be committed to.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SsaServerCommitmentMessage<I, G> {
+pub struct SsaServerCommitmentMessage<I, G, D> {
     /// Session ID.
     pub session_id: I,
     /// Parameters of the PIX protocol the server requires, packed by
@@ -327,25 +327,26 @@ pub struct SsaServerCommitmentMessage<I, G> {
     /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
     /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
-    /// Deposit data for the PIX session.
+    /// Deposit/payment data for the PIX session, carried in CBOR.
     ///
-    /// Currently set to all zeroes. Must be preserved through encode/decode.
-    pub deposit_data: [u8; 64],
+    /// Currently set to [`Default::default`]. Must be preserved through encode/decode.
+    pub deposit_data: D,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
 }
 
-impl<I, G> SsaServerCommitmentMessage<I, G> {
+impl<I, G, D> SsaServerCommitmentMessage<I, G, D> {
     /// Convenience constructor for creating a new `SsaServerCommitmentMessage`.
     pub fn new(
         session_id: I,
         params: hopr_protocol_pix::PixParams,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
+        deposit_data: D,
     ) -> Self {
         Self {
             session_id,
             params: params.to_u32(),
-            deposit_data: [0u8; 64],
+            deposit_data,
             commitments: commitments.into_iter().collect(),
         }
     }
@@ -410,15 +411,15 @@ impl<I> From<I> for KeepAliveMessage<I> {
     }
 }
 
-impl<I, T, C, G, K> StartProtocol<I, T, C, G, K> {
+impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
     /// Maximum number of SSAs that can be requested in a single SsaRequest message.
     ///
-    /// Derived from the SsaRequest encode layout with a zero-length CBOR session_id:
-    /// header(4) + params(4) + deposit_data(64) + num_commitments(2) = 74 overhead;
-    /// (PAYLOAD_SIZE - 74) / (SsaIndex + commitment_repr) = (1030 - 74) / (4 + 33) = 25.
+    /// Derived from the SsaRequest encode layout with minimal CBOR deposit_data and session_id:
+    /// header(4) + params(4) + deposit_data(1 for CBOR null) + num_commitments(2) = 11 overhead;
+    /// (PAYLOAD_SIZE - 11) / (SsaIndex + commitment_repr) = (1030 - 11) / (4 + 33) = 27.
     /// Since a zero-length session_id is the smallest possible, any non-empty session_id
     /// only makes this bound tighter, making it a safe decode limit.
-    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 74)
+    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 11)
         / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
         as u16;
     /// Size of the PIX coefficient commitment representation in bytes.
@@ -437,13 +438,14 @@ impl<I, T, C, G, K> StartProtocol<I, T, C, G, K> {
     pub const START_PROTOCOL_VERSION: u8 = 0x03;
 }
 
-impl<I, T, C, G, K> StartProtocol<I, T, C, G, K>
+impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D>
 where
     I: serde::Serialize,
     T: serde::Serialize,
     C: Into<u8>,
     G: AsRef<[u8]>,
     K: AsRef<[u8]>,
+    D: serde::Serialize,
 {
     /// Tries to encode the message into binary format and [`Tag`]
     pub fn encode(self) -> errors::Result<(Tag, Box<[u8]>)> {
@@ -543,7 +545,8 @@ where
             }
             StartProtocol::SsaRequest(req) => {
                 data.extend_from_slice(&req.params.to_be_bytes());
-                data.extend_from_slice(&req.deposit_data);
+                let deposit_data = serde_cbor_2::to_vec(&req.deposit_data)?;
+                data.extend_from_slice(&deposit_data);
 
                 let num_commitments = req.commitments.len() as u16;
                 data.extend_from_slice(&num_commitments.to_be_bytes());
@@ -583,13 +586,14 @@ where
     }
 }
 
-impl<I, T, C, G, K> StartProtocol<I, T, C, G, K>
+impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D>
 where
     I: for<'de> serde::Deserialize<'de>,
     T: for<'de> serde::Deserialize<'de>,
     C: TryFrom<u8>,
     G: for<'a> TryFrom<&'a [u8]>,
     K: for<'a> TryFrom<&'a [u8]>,
+    D: for<'de> serde::Deserialize<'de>,
 {
     /// Tries to decode the message from the binary representation and [`Tag`].
     ///
@@ -822,7 +826,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SsaRequest => {
-                    if body.len() <= size_of::<u32>() + 64 + size_of::<u16>() {
+                    if body.len() <= size_of::<u32>() + 1 {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -831,10 +835,19 @@ where
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("params".into()))?,
                     );
-                    let deposit_data: [u8; 64] = body[size_of::<u32>()..size_of::<u32>() + 64]
-                        .try_into()
-                        .map_err(|_| StartProtocolError::ParseError("deposit_data".into()))?;
-                    let mut next_offset = size_of::<u32>() + 64;
+
+                    // deposit_data is CBOR — decode using a deserializer that tracks its
+                    // byte offset so we can skip only its size and leave the rest of the body
+                    // (num_commitments + entries + session_id) untouched.
+                    let mut de = serde_cbor_2::Deserializer::from_slice(&body[size_of::<u32>()..]);
+                    let deposit_data: D = serde::Deserialize::deserialize(&mut de)
+                        .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
+                    let deposit_data_len = de.byte_offset();
+                    let mut next_offset = size_of::<u32>() + deposit_data_len;
+
+                    if body.len() <= next_offset + size_of::<u16>() {
+                        return Err(StartProtocolError::InvalidLength);
+                    }
 
                     let num_commitments = u16::from_be_bytes(
                         body[next_offset..next_offset + size_of::<u16>()]
@@ -887,29 +900,31 @@ where
     }
 }
 
-impl<I, T, C, G, K> TryFrom<StartProtocol<I, T, C, G, K>> for ApplicationData
+impl<I, T, C, G, K, D> TryFrom<StartProtocol<I, T, C, G, K, D>> for ApplicationData
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,
     C: Into<u8> + TryFrom<u8>,
     G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
     K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
+    D: serde::Serialize + for<'de> serde::Deserialize<'de>,
 {
     type Error = StartProtocolError;
 
-    fn try_from(value: StartProtocol<I, T, C, G, K>) -> Result<Self, Self::Error> {
+    fn try_from(value: StartProtocol<I, T, C, G, K, D>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
         Ok(ApplicationData::new(application_tag, plain_text.into_vec())?)
     }
 }
 
-impl<I, T, C, G, K> TryFrom<ApplicationData> for StartProtocol<I, T, C, G, K>
+impl<I, T, C, G, K, D> TryFrom<ApplicationData> for StartProtocol<I, T, C, G, K, D>
 where
     I: serde::Serialize + for<'de> serde::Deserialize<'de>,
     T: serde::Serialize + for<'de> serde::Deserialize<'de>,
     C: Into<u8> + TryFrom<u8>,
     G: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
     K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>,
+    D: serde::Serialize + for<'de> serde::Deserialize<'de>,
 {
     type Error = StartProtocolError;
 
@@ -930,6 +945,9 @@ mod tests {
 
     use super::*;
 
+    /// A minimal deposit data type for tests (CBOR-encodes as a single byte).
+    type MinimalDeposit = ();
+
     #[test]
     fn start_protocol_start_session_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::StartSession(StartInitiation {
@@ -940,10 +958,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), (), (), MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -951,12 +969,13 @@ mod tests {
 
     #[test]
     fn start_protocol_message_start_session_message_should_allow_for_at_least_two_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::StartSession(StartInitiation {
-            challenge: 0,
-            target: "127.0.0.1:1234".to_string(),
-            capabilities: 0xff,
-            additional_data: 0xffffffff,
-        });
+        let msg =
+            StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::StartSession(StartInitiation {
+                challenge: 0,
+                target: "127.0.0.1:1234".to_string(),
+                capabilities: 0xff,
+                additional_data: 0xffffffff,
+            });
 
         // Two SURBs are needed because if the server wants to establish PIX, it needs to send an additional
         // SsaRequest message next to the SessionEstablished message.
@@ -977,10 +996,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), (), (), MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -994,10 +1013,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), (), (), MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
 
@@ -1008,7 +1027,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_3.clone().encode()?;
-        let msg_4 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_4 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_3, msg_4);
 
         Ok(())
@@ -1024,15 +1043,15 @@ mod tests {
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: [0u8; 64],
+            deposit_data: MinimalDeposit::default(),
             commitments,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), [u8; 33], [u8; 65]>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), [u8; 33], [u8; 65], MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_1, msg_2);
         Ok(())
     }
@@ -1043,14 +1062,17 @@ mod tests {
     #[test]
     fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
         let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32)?;
-        let msg_1 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage::new(
-            0xfeedbeef_u32,
-            params,
-            [(1.try_into()?, [0u8; 33]), (2.try_into()?, [1u8; 33])],
-        ));
+        let msg_1 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaRequest(
+            SsaServerCommitmentMessage::new(
+                0xfeedbeef_u32,
+                params,
+                [(1.try_into()?, [0u8; 33]), (2.try_into()?, [1u8; 33])],
+                MinimalDeposit::default(),
+            ),
+        );
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_1, msg_2);
 
         let StartProtocol::SsaRequest(decoded) = msg_2 else {
@@ -1064,10 +1086,10 @@ mod tests {
     /// yield nonsense dimensions.
     #[test]
     fn start_protocol_ssa_request_dimensions_should_reject_out_of_range_params() {
-        let msg: SsaServerCommitmentMessage<u32, [u8; 33]> = SsaServerCommitmentMessage {
+        let msg: SsaServerCommitmentMessage<u32, [u8; 33], MinimalDeposit> = SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: [0u8; 64],
+            deposit_data: MinimalDeposit::default(),
             commitments: Default::default(),
         };
         assert!(matches!(msg.dimensions(), Err(StartProtocolError::ParseError(_))));
@@ -1084,12 +1106,13 @@ mod tests {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
-        let msg = StartProtocol::<u32, (), u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage {
-            session_id: 0xfeedbeef,
-            params: 0xfeedbeef,
-            deposit_data: [0u8; 64],
-            commitments,
-        });
+        let msg =
+            StartProtocol::<u32, (), u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaRequest(SsaServerCommitmentMessage {
+                session_id: 0xfeedbeef,
+                params: 0xfeedbeef,
+                deposit_data: MinimalDeposit::default(),
+                commitments,
+            });
 
         assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
         Ok(())
@@ -1099,11 +1122,12 @@ mod tests {
     fn start_protocol_session_ssa_commit_message_should_encode_and_decode() -> anyhow::Result<()> {
         assert_eq!(
             33,
-            StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::PIX_COEFF_COMMITMENT_REPR_SIZE
+            StartProtocol::<i32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::PIX_COEFF_COMMITMENT_REPR_SIZE
         );
         // MAX_SSAS_PER_REQUEST must never drop below 25, which is the number of SSA commitments
         // `start_protocol_messages_must_fit_within_hopr_packet` packs into an `SsaRequest`.
-        let ssas_per_request = StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::MAX_SSAS_PER_REQUEST;
+        let ssas_per_request =
+            StartProtocol::<i32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::MAX_SSAS_PER_REQUEST;
         assert!(
             ssas_per_request >= 25,
             "MAX_SSAS_PER_REQUEST={ssas_per_request} is too small to encode 25 SSA commitments",
@@ -1115,9 +1139,9 @@ mod tests {
         // entries carry an `SsaIndex`; using it here under-fills the message by two bytes an entry,
         // so this would stop being the maximum-size encode it is written to be.
         let max_coeffs = (ApplicationData::PAYLOAD_SIZE
-            - StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::START_HEADER_SIZE)
+            - StartProtocol::<i32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::START_HEADER_SIZE)
             / (size_of::<PolynomialIndex>()
-                + StartProtocol::<i32, String, u8, [u8; 33], [u8; 65]>::PIX_COEFF_COMMITMENT_REPR_SIZE);
+                + StartProtocol::<i32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::PIX_COEFF_COMMITMENT_REPR_SIZE);
 
         // A non-zero coefficient index, so this message carries no proof and the entry budget is
         // the full one.
@@ -1130,10 +1154,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), [u8; 33], [u8; 65]>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), [u8; 33], [u8; 65], MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::decode(tag, &msg)?;
         assert_eq!(msg_1, msg_2);
 
         Ok(())
@@ -1148,10 +1172,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), (), (), MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
 
@@ -1162,10 +1186,10 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<(), (), (), (), ()>::START_PROTOCOL_MESSAGE_TAG;
+        let expected: Tag = StartProtocol::<(), (), (), (), (), MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
-        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &msg)?;
+        let msg_2 = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
         Ok(())
@@ -1173,13 +1197,14 @@ mod tests {
 
     #[test]
     fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
-        let msg = StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>>::StartSession(StartInitiation {
-            challenge: StartChallenge::MAX,
-            target: "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530"
-                .to_string(),
-            capabilities: 0x80,
-            additional_data: 0xffffffff,
-        });
+        let msg =
+            StartProtocol::<i32, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::StartSession(StartInitiation {
+                challenge: StartChallenge::MAX,
+                target: "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530"
+                    .to_string(),
+                capabilities: 0x80,
+                additional_data: 0xffffffff,
+            });
 
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -1187,10 +1212,12 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::SessionEstablished(StartEstablished {
-            orig_challenge: StartChallenge::MAX,
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-        });
+        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionEstablished(
+            StartEstablished {
+                orig_challenge: StartChallenge::MAX,
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+            },
+        );
 
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -1198,10 +1225,11 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::SessionError(StartErrorType {
-            identifier: ErrorIdentifier::Challenge(StartChallenge::MAX),
-            reason: StartErrorReason::NoSlotsAvailable,
-        });
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::Challenge(StartChallenge::MAX),
+                reason: StartErrorReason::NoSlotsAvailable,
+            });
 
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -1209,12 +1237,13 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::SessionError(StartErrorType {
-            identifier: ErrorIdentifier::SessionId(
-                "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            ),
-            reason: StartErrorReason::UnacceptablePixParams,
-        });
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::SessionError(StartErrorType {
+                identifier: ErrorIdentifier::SessionId(
+                    "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                ),
+                reason: StartErrorReason::UnacceptablePixParams,
+            });
 
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -1229,25 +1258,29 @@ mod tests {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
-        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            params: 0xfeedbeef,
-            deposit_data: [0u8; 64],
-            commitments,
-        });
+        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaRequest(
+            SsaServerCommitmentMessage {
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                params: 0xfeedbeef,
+                deposit_data: MinimalDeposit::default(),
+                commitments,
+            },
+        );
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "SsaRequest must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            ssa_index: SsaIndex::MAX,
-            coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
-            commitment_proof: None,
-            coefficient_commitments: (0..24).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
-        });
+        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                ssa_index: SsaIndex::MAX,
+                coefficient_index: hopr_protocol_pix::CoefficientIndex::MAX,
+                commitment_proof: None,
+                coefficient_commitments: (0..24).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
+            },
+        );
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "SsaRequest must fit within {}",
@@ -1256,24 +1289,27 @@ mod tests {
 
         // The same message as a constant-term one: it additionally carries the proof, so it must
         // still fit with fewer entries.
-        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            ssa_index: SsaIndex::MAX,
-            coefficient_index: 0,
-            commitment_proof: Some([0u8; 65]),
-            coefficient_commitments: (0..22).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
-        });
+        let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                ssa_index: SsaIndex::MAX,
+                coefficient_index: 0,
+                commitment_proof: Some([0u8; 65]),
+                coefficient_commitments: (0..22).map(|i| (i as PolynomialIndex, [0u8; 33])).collect(),
+            },
+        );
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "SsaCommit carrying a proof must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::KeepAlive(KeepAliveMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            flags: None.into(),
-            additional_data: 0,
-        });
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                flags: None.into(),
+                additional_data: 0,
+            });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "KeepAlive must fit within {}",
@@ -1285,11 +1321,12 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::KeepAlive(KeepAliveMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
-            flags: None.into(),
-            additional_data: 0,
-        });
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
+                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                flags: None.into(),
+                additional_data: 0,
+            });
         let len = msg.encode()?.1.len();
         assert_eq!(
             KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
@@ -1311,7 +1348,7 @@ mod tests {
 
     /// Type the hand-framed bodies are decoded as: 33-byte commitments and a 65-byte proof, the
     /// same shape the production instantiation uses.
-    type Decoder = StartProtocol<u32, String, u8, [u8; 33], [u8; 65]>;
+    type Decoder = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>;
 
     /// Wraps a raw body in the Start protocol envelope (version, discriminant, 16-bit body length)
     /// exactly as `encode` does. Malformed-input tests need bodies the encoder would refuse to
@@ -1351,7 +1388,8 @@ mod tests {
     fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
         let mut body = Vec::new();
         body.extend_from_slice(&0u32.to_be_bytes());
-        body.extend_from_slice(&[0u8; 64]);
+        // CBOR-encoded `()` (`null`), which is the single byte 0xF6
+        body.push(0xf6);
         body.extend_from_slice(&declared_commitments.to_be_bytes());
         for (ssa_index, commitment) in entries {
             body.extend_from_slice(&ssa_index.to_be_bytes());
@@ -1386,32 +1424,36 @@ mod tests {
     /// desynchronise the decoder, so all three disagreements must be refused.
     #[test]
     fn start_protocol_encode_should_refuse_a_proof_that_disagrees_with_the_coefficient_index() {
-        let missing = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
-            session_id: MALFORMED_SESSION_ID,
-            ssa_index: SsaIndex::MIN,
-            coefficient_index: 0,
-            commitment_proof: None,
-            coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
-        });
+        let missing = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 0,
+                commitment_proof: None,
+                coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
+            },
+        );
         assert!(
             matches!(missing.encode(), Err(ref e) if is_parse_error(e, "missing commitment_proof")),
             "a constant-term message without a proof must be refused"
         );
 
-        let unexpected = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
-            session_id: MALFORMED_SESSION_ID,
-            ssa_index: SsaIndex::MIN,
-            coefficient_index: 1,
-            commitment_proof: Some([0u8; 65]),
-            coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
-        });
+        let unexpected = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 1,
+                commitment_proof: Some([0u8; 65]),
+                coefficient_commitments: [(0u16, [0u8; 33])].into_iter().collect(),
+            },
+        );
         assert!(
             matches!(unexpected.encode(), Err(ref e) if is_parse_error(e, "commitment_proof on a non-constant term")),
             "a proof on a non-constant term must be refused"
         );
 
-        let wrong_size =
-            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaCommit(SsaClientCommitmentMessage {
+        let wrong_size = StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes, MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 0,
@@ -1420,12 +1462,20 @@ mod tests {
                     0u16,
                     VarLenBytes(vec![
                         0u8;
-                        StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::PIX_COEFF_COMMITMENT_REPR_SIZE
+                        StartProtocol::<
+                            u32,
+                            String,
+                            u8,
+                            VarLenBytes,
+                            VarLenBytes,
+                            MinimalDeposit,
+                        >::PIX_COEFF_COMMITMENT_REPR_SIZE
                     ]),
                 )]
                 .into_iter()
                 .collect(),
-            });
+            },
+        );
         assert!(
             matches!(wrong_size.encode(), Err(ref e) if is_parse_error(e, "commitment_proof_size")),
             "a proof of the wrong length must be refused"
@@ -1436,26 +1486,28 @@ mod tests {
     /// every field after it. Both message kinds carry entries and both must reject it.
     #[test]
     fn start_protocol_encode_should_refuse_wrongly_sized_commitments() -> anyhow::Result<()> {
-        let commit =
-            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaCommit(SsaClientCommitmentMessage {
+        let commit = StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes, MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 ssa_index: SsaIndex::MIN,
                 coefficient_index: 1,
                 commitment_proof: None,
                 coefficient_commitments: [(0u16, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
-            });
+            },
+        );
         assert!(
             matches!(commit.encode(), Err(ref e) if is_parse_error(e, "commitment_repr_size")),
             "SsaCommit must refuse a commitment of the wrong length"
         );
 
-        let request =
-            StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaRequest(SsaServerCommitmentMessage {
+        let request = StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes, MinimalDeposit>::SsaRequest(
+            SsaServerCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 params: 0,
-                deposit_data: [0u8; 64],
+                deposit_data: MinimalDeposit::default(),
                 commitments: [(SsaIndex::MIN, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
-            });
+            },
+        );
         assert!(
             matches!(request.encode(), Err(ref e) if is_parse_error(e, "commitment_repr_size")),
             "SsaRequest must refuse a commitment of the wrong length"
@@ -1468,13 +1520,15 @@ mod tests {
     /// `num_polys == 0` in any case — so the encoder must not emit one.
     #[test]
     fn start_protocol_encode_should_refuse_an_ssa_commit_without_commitments() {
-        let msg = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65]>::SsaCommit(SsaClientCommitmentMessage {
-            session_id: MALFORMED_SESSION_ID,
-            ssa_index: SsaIndex::MIN,
-            coefficient_index: 1,
-            commitment_proof: None,
-            coefficient_commitments: Default::default(),
-        });
+        let msg = StartProtocol::<u32, String, u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaCommit(
+            SsaClientCommitmentMessage {
+                session_id: MALFORMED_SESSION_ID,
+                ssa_index: SsaIndex::MIN,
+                coefficient_index: 1,
+                commitment_proof: None,
+                coefficient_commitments: Default::default(),
+            },
+        );
 
         assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
     }
@@ -1566,7 +1620,7 @@ mod tests {
     #[test]
     fn start_protocol_decode_should_reject_an_ssa_request_shorter_than_its_fixed_prefix() {
         assert!(matches!(
-            decode_framed(StartProtocolDiscriminants::SsaRequest, &[0u8; 6]),
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &[0u8; 5]),
             Err(StartProtocolError::InvalidLength)
         ));
     }
@@ -1670,14 +1724,18 @@ mod tests {
         let mut max_encoded_size = 0;
 
         for message in messages {
-            let msg_1 =
-                StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement, HoprPixCommitmentProof>::SsaCommit(
-                    message,
-                );
+            let msg_1 = StartProtocol::<
+                DummySessionId,
+                String,
+                u8,
+                HoprPixGroupElement,
+                HoprPixCommitmentProof,
+                MinimalDeposit,
+            >::SsaCommit(message);
 
             let (tag, encoded) = msg_1.clone().encode()?;
             let expected: Tag =
-                StartProtocol::<(), (), (), HoprPixGroupElement, HoprPixCommitmentProof>::START_PROTOCOL_MESSAGE_TAG;
+                StartProtocol::<(), (), (), HoprPixGroupElement, HoprPixCommitmentProof, MinimalDeposit>::START_PROTOCOL_MESSAGE_TAG;
             assert_eq!(tag, expected);
 
             assert!(
@@ -1688,10 +1746,14 @@ mod tests {
             );
             max_encoded_size = max_encoded_size.max(encoded.len());
 
-            let msg_2 =
-                StartProtocol::<DummySessionId, String, u8, HoprPixGroupElement, HoprPixCommitmentProof>::decode(
-                    tag, &encoded,
-                )?;
+            let msg_2 = StartProtocol::<
+                DummySessionId,
+                String,
+                u8,
+                HoprPixGroupElement,
+                HoprPixCommitmentProof,
+                MinimalDeposit,
+            >::decode(tag, &encoded)?;
             assert_eq!(msg_1, msg_2);
         }
 
@@ -1699,7 +1761,7 @@ mod tests {
         // worth of headroom, or `new_multiple` is under-filling packets and emitting more of them
         // than the cycle needs.
         let per_entry = size_of::<hopr_protocol_pix::PolynomialIndex>()
-            + StartProtocol::<DummySessionId, (), (), HoprPixGroupElement, HoprPixCommitmentProof>::PIX_COEFF_COMMITMENT_REPR_SIZE;
+            + StartProtocol::<DummySessionId, (), (), HoprPixGroupElement, HoprPixCommitmentProof, MinimalDeposit>::PIX_COEFF_COMMITMENT_REPR_SIZE;
         let headroom = ApplicationData::PAYLOAD_SIZE - max_encoded_size;
         assert!(
             headroom < per_entry,
@@ -1765,16 +1827,20 @@ mod tests {
 
     #[test]
     fn start_protocol_keep_alive_truncated_lengths_should_not_panic() {
-        let msg = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::KeepAlive(KeepAliveMessage {
-            session_id: "test-session".to_string(),
-            flags: None.into(),
-            additional_data: 0,
-        });
+        let msg =
+            StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
+                session_id: "test-session".to_string(),
+                flags: None.into(),
+                additional_data: 0,
+            });
         let (tag, encoded) = msg.encode().expect("encode must succeed");
         let full_len = encoded.len();
 
         for trunc_len in 4..full_len {
-            let result = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>>::decode(tag, &encoded[..trunc_len]);
+            let result = StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::decode(
+                tag,
+                &encoded[..trunc_len],
+            );
             assert!(
                 result.is_err(),
                 "truncated keep-alive at length {trunc_len}/{full_len} should return error, got {result:?}"
