@@ -227,7 +227,7 @@ where
         }));
     }
 
-    if legs > 0 {
+    {
         // One aggregate line per interval rather than one per pair of legs. At `debug` because
         // `trace` is compiled out of release builds by `max_level_debug`, which would leave this
         // mechanism unobservable in exactly the builds where it matters.
@@ -235,7 +235,7 @@ where
             legs,
             expected = total_expected,
             observed = total_observed,
-            "reported surb round-trips to the graph"
+            "surb round-trip flush tick"
         );
     }
 }
@@ -304,9 +304,17 @@ impl<C> SurbTelemetryCodec<C> {
 
         let forward: Vec<_> = forward_path.transport_path().iter().copied().collect();
 
+        tracing::debug!(
+            minted = minted.len(),
+            return_paths = return_paths.len(),
+            forward_hops = forward.len(),
+            "surb mint seen by telemetry"
+        );
+
         for (surb_id, return_path) in minted.iter().zip(return_paths.iter()) {
             let reply: Vec<_> = return_path.transport_path().iter().copied().collect();
             let Some(paths) = round_trip_paths(&self.slots, &self.me, &forward, &reply) else {
+                tracing::debug!(reply_hops = reply.len(), "surb round-trip legs did not resolve");
                 continue;
             };
 
