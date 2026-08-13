@@ -1,14 +1,29 @@
 //! Entry-side (`SsaShareGenerator`) benchmarks.
 //!
+//! ## The operating box being modelled
+//!
+//! Deployments run a *range* on both dimensions, not a point:
+//!
+//! | | production |
+//! | --------------------- | ---------- |
+//! | polynomials per SSA   | 4 096 – 8 192 |
+//! | threshold             | 16 – 64 |
+//! | surplus shares        | `threshold/4`, covering 20 % share loss |
+//! | SSAs in flight        | 2 – 3 per Session |
+//! | per-Session rate      | 16 – 20 Mbps |
+//! | clients per Exit      | 10 – 30 |
+//!
+//! Quota follows from the first three — `polys × (threshold + surplus) × PAYLOAD_SIZE`, per
+//! `pix_params_to_quota` in `transport/session/src/types.rs` — and spans roughly 153 MB to 714 MB
+//! across the box. It is an *output*, which is why the sweeps below cover the box rather than an
+//! iso-quota diagonal: holding the product fixed models a trade no deployment actually makes.
+//!
 //! ## Dimensions
 //!
-//! The always-measured point is the deployed one: `polys × threshold` =
-//! [`PROD_POLYS_PER_SSA`] × [`PROD_THRESHOLD`], mirroring `DEFAULT_PIX_POLYS_PER_SSA` and
-//! `DEFAULT_PIX_SHARES_PER_POLY` in `transport/session/src/types.rs`. The wider sweeps are
-//! gated behind the `all-benchmarks` feature: every `(threshold, polynomials)` pair in
-//! [`THRESHOLDS`] × [`POLYNOMIALS`] has roughly the same product, so each one costs about
-//! the same as the production point and the full grid is ~16× the runtime for little
-//! extra signal.
+//! The always-measured point is the deployed one: [`PROD_POLYS_PER_SSA`] × [`PROD_THRESHOLD`],
+//! mirroring `DEFAULT_PIX_POLYS_PER_SSA` and `DEFAULT_PIX_SHARES_PER_POLY`. The wider sweeps are
+//! gated behind the `all-benchmarks` feature and walk [`THRESHOLDS`] × [`POLYNOMIALS`], which is
+//! the box above.
 
 #[path = "../tests/common.rs"]
 mod common;
@@ -37,17 +52,54 @@ const PROD_POLYS_PER_SSA: u16 = DEFAULT_POLYS_PER_SSA;
 /// removed.
 const PROD_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
-// These values all correspond to a 512 MB quota (given ca. 1 kb HOPR packet payload capacity).
-// The last entry of each is the deployed value, so the sweep is a superset of the default set.
+/// Surplus shares emitted per polynomial, derived from the threshold being swept.
+///
+/// A function rather than a constant, because the surplus *is* a ratio of the threshold — sized to
+/// absorb 20 % share loss — and a sweep that varies the threshold while holding the surplus fixed
+/// would silently vary the loss tolerance instead, from 20 % at one end to something else at the
+/// other. See `default_surplus_for` in `hopr-protocol-pix`.
+fn prod_surplus(threshold: u8) -> u8 {
+    hopr_protocol_pix::default_surplus_for(threshold)
+}
+
+// The production operating box, per the module documentation. The last entry of each is the
+// deployed value, so the sweep stays a superset of the default set.
+//
+// Every polynomial count here is inside [`MAX_POLYS_PER_SSA`] (16 192) — which the previous set was
+// not. It read `[65535, 32768, 16384, 8192]`, and **three of those four points panicked**:
+// `polynomials_per_ssa` is `#[validate(range(min = 1, max = MAX_POLYS_PER_SSA))]`, so only the
+// deployed point was ever constructible and `--features all-benchmarks` aborted on the first entry.
+//
+// It was then briefly repointed at an iso-quota diagonal (`[15887, 13107, 10922, 8192]`), which
+// compiled but modelled polynomial counts no deployment runs. Both mistakes have the same root:
+// choosing the sweep from an idea about the parameter space rather than from what nodes are
+// configured with.
 #[cfg(feature = "all-benchmarks")]
-const THRESHOLDS: [u8; 4] = [8, 16, 32, PROD_THRESHOLD];
+const THRESHOLDS: [u8; 4] = [16, 32, 48, PROD_THRESHOLD];
 #[cfg(feature = "all-benchmarks")]
-const POLYNOMIALS: [u16; 4] = [65535, 32768, 16384, PROD_POLYS_PER_SSA];
+const POLYNOMIALS: [u16; 3] = [4096, 6144, PROD_POLYS_PER_SSA];
 
 #[cfg(not(feature = "all-benchmarks"))]
 const THRESHOLDS: [u8; 1] = [PROD_THRESHOLD];
 #[cfg(not(feature = "all-benchmarks"))]
 const POLYNOMIALS: [u16; 1] = [PROD_POLYS_PER_SSA];
+
+/// Compile-time check that every swept polynomial count is constructible.
+///
+/// The sweep has been wrong twice, both times by exceeding [`MAX_POLYS_PER_SSA`] and both times
+/// discovered only by a panic partway through a benchmark run. A `const` assertion turns that into
+/// a build failure, which is the whole difference between a benchmark configuration that is checked
+/// and one that merely exists.
+const _: () = {
+    let mut i = 0;
+    while i < POLYNOMIALS.len() {
+        assert!(
+            POLYNOMIALS[i] <= hopr_protocol_pix::MAX_POLYS_PER_SSA,
+            "swept polynomial count exceeds MAX_POLYS_PER_SSA and would panic at run time"
+        );
+        i += 1;
+    }
+};
 
 /// Number of `next_share` calls timed as one criterion sample.
 ///
@@ -73,9 +125,12 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
 
     for &threshold in &THRESHOLDS {
         for &polynomials_per_ssa in &POLYNOMIALS {
-            // One "element" is one coefficient commitment, so the reported throughput is
-            // directly comparable across parameter shapes with the same product.
-            group.throughput(Throughput::Elements(polynomials_per_ssa as u64 * threshold as u64));
+            // One "element" is one *commitment*, which post-M9 means one per polynomial — the
+            // Entry commits to constant terms only. This used to report `polys × threshold`
+            // elements, the pre-M9 Feldman matrix, which understated the per-commitment cost by
+            // the threshold and made two shapes with the same product look identical when their
+            // actual work differs by 4× across this sweep.
+            group.throughput(Throughput::Elements(polynomials_per_ssa as u64));
             group.bench_with_input(
                 BenchmarkId::from_parameter(format!("t{threshold}_p{polynomials_per_ssa}")),
                 &(threshold, polynomials_per_ssa),
@@ -85,7 +140,7 @@ fn bench_new_ssa_commitment(c: &mut Criterion) {
                             let cfg = SsaGeneratorConfig {
                                 threshold,
                                 polynomials_per_ssa,
-                                ..Default::default()
+                                surplus_shares: prod_surplus(threshold),
                             };
                             (SsaShareGenerator::<TestSpec>::new(cfg), SimplePseudonym::random())
                         },
@@ -118,7 +173,7 @@ fn bench_verify_reconstructed(c: &mut Criterion) {
         let cfg = SsaGeneratorConfig {
             threshold,
             polynomials_per_ssa: 1,
-            ..Default::default()
+            surplus_shares: prod_surplus(threshold),
         };
         let generator = SsaShareGenerator::<TestSpec>::new(cfg);
         let c = generator.new_ssa_commitment(&pseudonym, index).unwrap();
@@ -141,6 +196,27 @@ fn bench_verify_reconstructed(c: &mut Criterion) {
     group.finish();
 }
 
+/// The Entry's per-packet cost, and the half of the polys/threshold decision that was long assumed
+/// away.
+///
+/// `IndexedPolynomial::next_share` evaluates a `threshold`-wide polynomial by Horner for every share
+/// emitted, so unlike `new_ssa_commitment` — which a 4× threshold change moves by 7 % — this term is
+/// genuinely threshold-dependent. Measured on 48 cores:
+///
+/// | threshold | µs/share |
+/// | --------- | -------- |
+/// | 16        | 0.90     |
+/// | 32        | 1.20     |
+/// | 48        | 1.51     |
+/// | 64        | 1.82     |
+///
+/// **Requires `--features all-benchmarks` to say anything**: without it [`THRESHOLDS`] is the single
+/// deployed point, and a one-point sweep cannot show a slope. That is how these figures came to be
+/// missing from the calibration in the first place.
+///
+/// Against the Exit's 10.68 µs/share at the deployed threshold this is ~17 %, which is why the split
+/// is decided on the Exit term — see [`hopr_protocol_pix::DEFAULT_POLY_THRESHOLD`] for the combined
+/// tables and the stated objective.
 fn bench_next_share(c: &mut Criterion) {
     let mut group = c.benchmark_group("SsaShareGenerator::next_share");
     group.throughput(Throughput::Elements(NEXT_SHARE_BATCH as u64));
@@ -158,7 +234,7 @@ fn bench_next_share(c: &mut Criterion) {
                 let cfg = SsaGeneratorConfig {
                     threshold,
                     polynomials_per_ssa: NEXT_SHARE_BENCH_POLYS,
-                    ..Default::default()
+                    surplus_shares: prod_surplus(threshold),
                 };
                 // A commitment yields `polys * (threshold + surplus)` shares before the
                 // generator runs dry and starts returning `Ok(None)`.

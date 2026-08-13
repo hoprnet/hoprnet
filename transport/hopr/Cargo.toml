@@ -38,6 +38,10 @@ default = ["pix-bjj", "p2p-announce-quic"]
 # Forwarded from here rather than pinned on the workspace dependency, so that the choice
 # stays expressible at all: Cargo features are additive, and a hard-enabled
 # `hopr-crypto-packet/pix-bjj` could never be turned off downstream.
+#
+# The curve is a network-wide build invariant: peers built for different curves cannot run a PIX
+# Session, and the Exit refuses a mismatched client with `UnacceptablePixParams` rather than
+# negotiating. See `hopr-crypto-packet`'s `pix-bjj` for the wire sizes this decides.
 pix-bjj = ["hopr-crypto-packet/pix-bjj"]
 # Overrides `pix-bjj`; see `hopr-crypto-packet`'s `pix-secp256k1` for why it is an override rather
 # than a peer. This is the supported way for a consumer to get Ethereum deposit addresses —

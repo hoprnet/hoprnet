@@ -13,6 +13,7 @@ use hopr_api::types::{
     },
     primitive::prelude::Address,
 };
+use hopr_crypto_packet::HoprPixSpec;
 use hopr_protocol_app::v1::ApplicationData;
 use hopr_protocol_pix::{
     SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
@@ -72,13 +73,12 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
 
     // One commitment per polynomial — the constant term — chunked into packet-sized messages.
     // Every message carries the proof of knowledge, so the per-message budget loses its size.
-    let expected_ssa_commits = {
-        let max_commitments_per_message = (ApplicationData::PAYLOAD_SIZE
-            - HoprStartProtocol::START_HEADER_SIZE
-            - HoprStartProtocol::PIX_COMMITMENT_PROOF_SIZE)
-            / (size_of::<SsaIndex>() + size_of::<hopr_crypto_packet::prelude::HoprPixGroupElement>());
-        (ssa_gen_config.polynomials_per_ssa as usize).div_ceil(max_commitments_per_message)
-    };
+    //
+    // Asked of the encoder rather than restated here: `SessionId` is an alias of `HoprPseudonym`
+    // (fixed size, so its CBOR length does not depend on which pseudonym), which makes
+    // `alice_pseudonym` a faithful stand-in for the session id the encoder will see.
+    let expected_ssa_commits = (ssa_gen_config.polynomials_per_ssa as usize)
+        .div_ceil(HoprStartProtocol::ssa_commit_chunking(&alice_pseudonym)?.max_constant_terms_per_message);
 
     let mut sequence = mockall::Sequence::new();
     let mut alice_transport = MockMsgSender::new();
@@ -259,7 +259,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
+                    pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -636,7 +636,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
                     pseudonym: alice_pseudonym.into(),
                     capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                     surb_management: None,
-                    pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
+                    pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                     return_path_options: RoutingOptions::Hops(1.try_into()?),
                     ..Default::default()
                 },
@@ -851,7 +851,7 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
                 pseudonym: alice_pseudonym.into(),
                 capabilities: Capability::NoRateControl | Capability::Segmentation | Capability::UsePIX,
                 surb_management: None,
-                pix_ssa_quota: Some(PixParams::try_from(&ssa_gen_config)?),
+                pix_ssa_quota: Some(PixParams::try_from_config::<HoprPixSpec>(&ssa_gen_config)?),
                 return_path_options: RoutingOptions::Hops(1.try_into()?),
                 ..Default::default()
             },

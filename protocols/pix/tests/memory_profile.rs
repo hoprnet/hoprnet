@@ -28,12 +28,13 @@ use std::{
 
 use common::TestSpec;
 use hopr_protocol_pix::{
-    CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA, EntryShareGenerator,
-    ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution, SsaGeneratorConfig, SsaId,
-    SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator, TaggedEncryptedPartialSsaShare,
+    AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
+    EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixScalar, ShareResolution,
+    SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
+    TaggedEncryptedPartialSsaShare,
 };
 use hopr_types::{
-    crypto::prelude::{HalfKey, Keypair, OffchainKeypair, SimplePseudonym},
+    crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
     crypto_random::Randomizable,
     internal::prelude::{Acknowledgement, VerifiedAcknowledgement},
 };
@@ -49,11 +50,32 @@ const COMMITMENTS_PER_SSA_COMMIT_MSG: usize = 28;
 /// Mirrors `HoprPacket::PAYLOAD_SIZE`.
 const QUOTA_BYTES_PER_SHARE: u64 = 1038;
 
+/// Surplus shares emitted per polynomial beyond the threshold.
+///
+/// Derived from the threshold — a ratio sized to absorb 20 % share loss — rather than a flat count.
+/// The cycle is `polys × (threshold + surplus)` shares long, so this decides how much of the
+/// profile's wall clock is spent walking one, and a flat value would mean a different cycle length
+/// relative to the threshold at every dimension.
+const PROD_SURPLUS: u8 = hopr_protocol_pix::default_surplus_for(PROD_THRESHOLD);
+
 /// Operating point being modelled: per-Session return-path rate, in bytes per second.
-const RETURN_RATE_BYTES_PER_SEC: f64 = 1_500_000.0 / 8.0;
+///
+/// 20 Mbps, the top of the deployed 16–20 Mbps range. This was 1.5 Mbps — **13× low** — which made
+/// the modelled cycle thirteen times longer than a real one and, combined with the Session count
+/// below, put the modelled Exit at 18.75 MiB/s against a real 20–75 MiB/s.
+const RETURN_RATE_BYTES_PER_SEC: f64 = 20_000_000.0 / 8.0;
 
 /// Concurrent Sessions per Exit that the profile is extrapolated to.
-const SESSIONS_PER_EXIT: usize = 100;
+///
+/// 30, the top of the deployed 10–30 range; it was 100.
+const SESSIONS_PER_EXIT: usize = 30;
+
+/// SSAs a Session holds in flight at once.
+///
+/// The Exit requests deposits in batches of 2–3, so that many cycles are live per Session
+/// simultaneously — each with its own commitment set, part builders and awaited shares. The profile
+/// walks one cycle and multiplies, so this is the factor that was silently 1.
+const SSAS_IN_FLIGHT: usize = 3;
 
 /// Acknowledgements per `acknowledge_shares` call.
 ///
@@ -157,6 +179,129 @@ fn stage_shares(
     acks
 }
 
+/// Measures what one entry in the `awaiting_acks` buffer costs in live heap.
+///
+/// This is the number `hopr-transport`'s `PixReconstructorConfig` budget is denominated in, and it
+/// cannot be read off `size_of` alone: the payload is ~80 B of inline arrays, and moka's per-entry
+/// bookkeeping — hash map entry, LRU node, TTL timer-wheel node, the `Arc` around the value —
+/// dominates it. Rather than guess a multiple, measure, and let the validation constant cite this.
+///
+/// The occupancy is reported at two points rather than one because moka grows its internal
+/// structures in chunks; a single reading at an unlucky occupancy would report the chunk rather
+/// than the entry. One share is built before the baseline and copied in —
+/// `TaggedEncryptedPartialSsaShare` is `Copy`, so nothing the loop does allocates and the delta is
+/// the cache and nothing else.
+///
+/// Ignored by default: it holds ~100 000 live cache entries.
+#[test]
+#[ignore]
+fn awaiting_ack_entry_cost() {
+    /// Occupancy points to report. The last is the figure to quote.
+    const POINTS: [usize; 2] = [20_000, 100_000];
+
+    let entries = POINTS[POINTS.len() - 1];
+
+    println!("\n=== Type sizes ===");
+    println!(
+        "  HalfKeyChallenge (key)           {:>4} B",
+        size_of::<HalfKeyChallenge>()
+    );
+    println!(
+        "  TaggedEncryptedPartialSsaShare   {:>4} B",
+        size_of::<TaggedEncryptedPartialSsaShare<TestSpec>>()
+    );
+    let payload = size_of::<HalfKeyChallenge>() + size_of::<TaggedEncryptedPartialSsaShare<TestSpec>>();
+    println!("  payload per entry                {payload:>4} B");
+
+    // One polynomial of two shares is enough: the entries are distinguished by their keys, and the
+    // value is the same shape whichever share it holds.
+    let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+        threshold: 2,
+        polynomials_per_ssa: 1,
+        surplus_shares: 0,
+    });
+    let pseudonym = SimplePseudonym::random();
+    let peer = OffchainKeypair::random();
+    let _ = generator.new_ssa_commitment(&pseudonym, SsaIndex::MIN).unwrap();
+    let share = generator.next_share(&pseudonym, b"nonce").unwrap().unwrap();
+    let template = {
+        let ack = HalfKey::random();
+        let enc_share = share.share.encrypt(&share.id, &ack).unwrap();
+        TaggedEncryptedPartialSsaShare::new(pseudonym, b"nonce", enc_share).unwrap()
+    };
+
+    // Keys built up front: `HalfKey::to_challenge` is a scalar multiplication, and doing 100 000 of
+    // them inside the measured region would put the transient curve state in the reading.
+    let challenges = (0..entries)
+        .map(|_| HalfKey::random().to_challenge().unwrap())
+        .collect::<Vec<_>>();
+
+    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
+        // Above the largest occupancy point, so nothing is size-evicted, and long enough that
+        // nothing expires mid-measurement. Both would make the average report a smaller cache.
+        max_awaiting_acks: entries * 2,
+        max_ack_await_time: std::time::Duration::from_secs(7200),
+        // Exactly the occupancy being measured, so the run doubles as a check on the global budget:
+        // fill it to the ceiling and the live heap must land inside the byte figure that ceiling
+        // was denominated in.
+        max_ack_buffer_bytes: entries * AWAITING_ACK_ENTRY_BYTES,
+        ..Default::default()
+    });
+
+    let baseline = live_bytes();
+    println!("\n=== Awaiting-ack buffer, one peer ===");
+    let mut inserted = 0;
+    for point in POINTS {
+        while inserted < point {
+            reconstructor
+                .insert_encrypted_share(peer.public(), challenges[inserted], template)
+                .unwrap();
+            inserted += 1;
+        }
+        // moka applies writes from an internal queue during maintenance. Queued or applied, the
+        // bytes are live either way, so the total is right regardless — this only makes the split
+        // between the two stable enough that the two points are comparable.
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let held = live_bytes().saturating_sub(baseline);
+        println!(
+            "  {point:>7} entries                  {:>9.1} MiB live   {:>4} B/entry  ({:>4} B overhead)",
+            mib(held),
+            held / point,
+            (held / point).saturating_sub(payload)
+        );
+    }
+
+    // The reconstructor is now exactly at its configured budget, so the next share must be refused.
+    // That is the whole claim `AWAITING_ACK_ENTRY_BYTES` exists to support: a ceiling counted in
+    // entries is a ceiling in bytes.
+    let budget = entries * AWAITING_ACK_ENTRY_BYTES;
+    let held = live_bytes().saturating_sub(baseline);
+    let overrun =
+        reconstructor.insert_encrypted_share(peer.public(), HalfKey::random().to_challenge().unwrap(), template);
+    assert!(
+        overrun.is_err(),
+        "a buffer filled to max_ack_buffer_bytes must refuse the next share"
+    );
+    assert!(
+        held <= budget,
+        "live heap {held} B exceeds the {budget} B the same occupancy was budgeted at — AWAITING_ACK_ENTRY_BYTES \
+         ({AWAITING_ACK_ENTRY_BYTES} B) is understated at {} B/entry",
+        held / entries
+    );
+    println!(
+        "  at the configured ceiling         {:>9.1} MiB live against a {:.1} MiB budget ({:.0}% of it)",
+        mib(held),
+        mib(budget),
+        100.0 * held as f64 / budget as f64
+    );
+
+    println!(
+        "\n  Quote the last row as AWAITING_ACK_ENTRY_BYTES in `hopr-protocol-pix`. Round up: the\n  budget is a \
+         ceiling, so under-stating the per-entry cost lets it be exceeded.\n"
+    );
+}
+
 /// Walks one production-width SSA cycle and reports live heap at each phase.
 ///
 /// Ignored by default: it holds a full production commitment matrix and walks every share of a
@@ -167,11 +312,22 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     let polys = PROD_POLYS_PER_SSA as usize;
     let threshold = PROD_THRESHOLD as usize;
     let commitments = polys * threshold;
-    let quota_bytes = commitments as u64 * QUOTA_BYTES_PER_SHARE;
+    // A cycle emits `threshold + surplus` shares per polynomial, and the quota counts every one of
+    // them — `pix_params_to_quota` in `transport/session/src/types.rs` includes the surplus because
+    // H5 established that it is billed on purchase rather than on claim. This used to be
+    // `commitments * QUOTA_BYTES_PER_SHARE`, i.e. threshold only, understating the cycle by 31 % at
+    // the deployed surplus and mis-stating the duration by the same factor.
+    let emitted_shares = polys * (threshold + PROD_SURPLUS as usize);
+    let quota_bytes = emitted_shares as u64 * QUOTA_BYTES_PER_SHARE;
     let cycle_secs = quota_bytes as f64 / RETURN_RATE_BYTES_PER_SEC;
 
     println!("\n=== Operating point ===");
     println!("  polynomials x threshold          {polys} x {threshold} = {commitments} commitments");
+    println!(
+        "  emitted shares per cycle         {emitted_shares} (threshold {threshold} + surplus {PROD_SURPLUS}, factor \
+         {:.2}x)",
+        (threshold + PROD_SURPLUS as usize) as f64 / threshold as f64
+    );
     println!(
         "  quota per cycle                  {:.1} MiB",
         mib(quota_bytes as usize)
@@ -293,27 +449,40 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     let peak_over_baseline = PEAK.load(Ordering::Relaxed).saturating_sub(baseline);
     let install_over_baseline = after_install.saturating_sub(baseline);
 
-    println!("\n=== Extrapolation to {SESSIONS_PER_EXIT} Sessions ===");
+    // An Exit holds `SSAS_IN_FLIGHT` cycles per Session, not one: deposits are requested in
+    // batches, so several cycles are live at once, each with its own commitment set, part builders
+    // and awaited shares. This profile walks a single cycle, so the batch is a multiplier on
+    // everything below — and it used to be missing entirely.
+    let cycles = SSAS_IN_FLIGHT * SESSIONS_PER_EXIT;
+
+    println!("\n=== Extrapolation to {SESSIONS_PER_EXIT} Sessions x {SSAS_IN_FLIGHT} SSAs in flight ===");
     println!(
-        "  peak live state, 1 Session       {:>9.1} MiB",
+        "  peak live state, 1 cycle         {:>9.1} MiB",
         mib(peak_over_baseline)
     );
     println!(
-        "  at commitment install, 1 Session {:>9.1} MiB",
+        "  at commitment install, 1 cycle   {:>9.1} MiB",
         mib(install_over_baseline)
     );
     println!(
-        "  x{SESSIONS_PER_EXIT} Sessions, all in phase        {:>9.2} GiB",
-        mib(peak_over_baseline * SESSIONS_PER_EXIT) / 1024.0
+        "  per Session ({SSAS_IN_FLIGHT} cycles)             {:>9.1} MiB at install",
+        mib(install_over_baseline * SSAS_IN_FLIGHT)
     );
     println!(
-        "  x{SESSIONS_PER_EXIT} Sessions, uniformly staggered {:>9.2} GiB",
-        mib(install_over_baseline * SESSIONS_PER_EXIT / 2) / 1024.0
+        "  x{cycles} cycles, all in phase        {:>9.2} GiB",
+        mib(peak_over_baseline * cycles) / 1024.0
+    );
+    println!(
+        "  x{cycles} cycles, uniformly staggered {:>9.2} GiB",
+        mib(install_over_baseline * cycles / 2) / 1024.0
     );
     println!(
         "\n  Staggered assumes the live verifier set decays linearly from install to recovery,\n  so the mean across \
-         uniformly-phased Sessions is half the post-install figure. Cycles do\n  not stay staggered after an Exit \
-         restart, when every Session re-establishes at once.\n\n  CAVEAT on the intermediate decay points: the \
+         uniformly-phased cycles is half the post-install figure. Cycles do\n  not stay staggered after an Exit \
+         restart, when every Session re-establishes at once.\n\n  Note which multiplier dominates: the batch \
+         ({SSAS_IN_FLIGHT}x) and the Session count ({SESSIONS_PER_EXIT}x)\n  multiply, so a batch of 3 across 30 \
+         clients is {cycles} concurrent cycles — the same order as the\n  100 Sessions this profile used to model \
+         with no batch at all, reached by a different route.\n\n  CAVEAT on the intermediate decay points: the \
          Entry-side generator pops each polynomial\n  off its queue as it is exhausted, freeing memory in the same \
          process, so those readings\n  go negative against the baseline and understate the Exit's remaining live \
          state. The\n  install figure is clean — no share has been consumed at that point — and so is the\n  \

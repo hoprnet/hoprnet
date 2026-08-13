@@ -85,8 +85,8 @@ use hopr_transport_session::{
 };
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, FlowControlConfig, HoprSession,
-    IncomingSession, InvalidPixParams, PixParams, SESSION_MTU, SURB_SIZE, ServiceId, SessionClientConfig, SessionId,
-    SessionTarget, SurbBalancerConfig,
+    IncomingSession, InvalidPixParams, LOCAL_PIX_SUITE, PixParams, SESSION_MTU, SURB_SIZE, ServiceId,
+    SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 #[cfg(feature = "telemetry")]
@@ -106,6 +106,7 @@ use tracing::{Instrument, debug, error, trace, warn};
 use crate::path::BackgroundPathCacheRefreshable;
 pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
 use crate::{
+    config::PixGlobalConfig,
     constants::SESSION_INITIATION_TIMEOUT_BASE,
     errors::HoprTransportError,
     multiaddrs::strip_p2p_protocol,
@@ -853,12 +854,11 @@ where
         // bounds-checks polys_per_ssa and shares_per_poly.  The session quota is
         // a subset of what the global generator covers, so one generator suffices.
         //
-        // `SsaShareGenerator::new` validates its config and *panics* on failure, so the ranges are
-        // checked here and the error propagated instead. This used to be a SAFETY comment asserting
-        // that `PixGlobalConfig` had already been validated "before this code runs" via
+        // Validated here rather than left to the constructor: `PixGlobalConfig` carries more than
+        // the three fields `SsaGeneratorConfig` covers, and this used to be a SAFETY comment
+        // asserting that it had already been validated "before this code runs" via
         // `#[validate(nested)]` — but nothing in this crate calls `validate()`, so the guarantee
-        // rested entirely on every caller remembering to, and a programmatically built config turned
-        // node startup into a panic.
+        // rested entirely on every caller remembering to.
         validator::Validate::validate(&self.cfg.pix)
             .map_err(|error| HoprTransportError::Api(format!("invalid PIX configuration: {error}")))?;
         // Checked rather than `as`-cast: the validation above already bounds all three, but a
@@ -867,13 +867,16 @@ where
         fn narrow<T: TryFrom<usize>>(value: usize, field: &str) -> errors::Result<T> {
             T::try_from(value).map_err(|_| HoprTransportError::Api(format!("PIX {field} out of range: {value}")))
         }
-        let ssa_generator = Arc::new(hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::new(
-            hopr_protocol_pix::SsaGeneratorConfig {
+        // `try_new`, not `new`: the dimensions come from operator configuration, so a range
+        // violation is a startup error to report rather than a panic to take down the node.
+        let ssa_generator = Arc::new(
+            hopr_protocol_pix::SsaShareGenerator::<HoprPixSpec>::try_new(hopr_protocol_pix::SsaGeneratorConfig {
                 polynomials_per_ssa: narrow(self.cfg.pix.num_ssa_parts, "num_ssa_parts")?,
                 threshold: narrow(self.cfg.pix.ssa_part_size, "ssa_part_size")?,
-                surplus_shares: narrow(self.cfg.pix.additional_shares, "additional_shares")?,
-            },
-        ));
+                surplus_shares: narrow(self.cfg.pix.surplus_shares(), "additional_shares")?,
+            })
+            .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
+        );
 
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
@@ -901,6 +904,7 @@ where
                 let (pix_tools, pipeline_builder) = wire_exit_pix(
                     pipeline_builder,
                     ssa_generator.clone(),
+                    ssa_reconstructor(&self.cfg.pix)?,
                     ssa_events,
                     self.smgr.clone(),
                     &mut processes,
@@ -925,6 +929,7 @@ where
                 let (pix_tools, pipeline_builder) = wire_exit_pix(
                     pipeline_builder,
                     ssa_generator.clone(),
+                    ssa_reconstructor(&self.cfg.pix)?,
                     ssa_events,
                     self.smgr.clone(),
                     &mut processes,
@@ -939,10 +944,12 @@ where
                 // to handle incoming SsaRequest messages from the Exit.
                 // No SSA reconstruction needed on Entry — forward events to the
                 // PIX event broadcast so subscribers (e.g. tests) see them.
-                let dummy_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-                    // SAFETY: Default config values are within validated range.
-                    hopr_protocol_pix::SsaReconstructorConfig::default(),
-                ));
+                // Configured like any other, not left on the defaults: this reconstructor is called
+                // "dummy" because Entry does not reconstruct, but it is not provably unreachable —
+                // the comment below records that an inbound `UsePIX` does reach `handle_ssa_commit`
+                // here. A knob that binds on some node roles and not others is the same defect
+                // shape as a comment quoting a constant it does not reference.
+                let dummy_reconstructor = ssa_reconstructor(&self.cfg.pix)?;
                 let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator.clone(), dummy_reconstructor);
                 processes.insert(
                     HoprTransportProcess::PixEvents,
@@ -1431,14 +1438,36 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
     }
 }
 
-/// Wires the Exit-side PIX machinery: reconstructor, [`PixToolbox`], the recovered-share channel
-/// and the [`HoprTransportProcess::PixEvents`] task, returning the toolbox and the pipeline builder
-/// with share processing attached.
+/// Builds the Exit-side SSA reconstructor from operator configuration.
+///
+/// The single place `PixReconstructorConfig` becomes an `SsaReconstructorConfig`, called once per
+/// node role that needs a reconstructor. Both production sites used to take
+/// `SsaReconstructorConfig::default()` instead, which left all seven of the Exit's dials — capacity,
+/// lifetimes, the acknowledgement window — unreachable from a config file.
+///
+/// `try_new` rather than `new`, for the same reason the generator uses it at the one call site
+/// above: these values now come from an operator, so an out-of-range one is a startup error to
+/// report and not a panic to take the node down with. `run_inner` has already validated
+/// `self.cfg.pix` — `reconstructor` is `#[validate(nested)]` — so in practice this reports what that
+/// validation would have caught anyway; it stays fallible because nothing in the type system says
+/// the two must be called in that order.
+fn ssa_reconstructor(cfg: &PixGlobalConfig) -> errors::Result<Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>> {
+    hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::try_new(cfg.reconstructor.into())
+        .map(Arc::new)
+        .map_err(|error| HoprTransportError::Api(format!("invalid SSA reconstructor configuration: {error}")))
+}
+
+/// Wires the Exit-side PIX machinery: [`PixToolbox`], the recovered-share channel and the
+/// [`HoprTransportProcess::PixEvents`] task, returning the toolbox and the pipeline builder with
+/// share processing attached.
 ///
 /// Shared by the `(Exit, Some)` and `(Relay, Some)` arms of `run_inner`, which differ only in the
 /// terminal `build_for_*` call and the relay's extra `with_ticket_events` step. Both need the exact
 /// same wiring, and keeping it in one place is not cosmetic: the previous two copies had already
 /// drifted, with the comment on the reconstructor config fixed in the Exit copy only.
+///
+/// The reconstructor arrives built, like the generator, so that [`ssa_reconstructor`] stays the one
+/// place a config turns into one and this stays infallible.
 ///
 /// The caller keeps the terminal, so this returns the builder rather than the built processes.
 /// Only the `exit_ack_proc` and `ssa_events` type parameters change; the rest pass through
@@ -1447,6 +1476,7 @@ async fn dispatch_share_resolution(smgr: Arc<HoprSessionManager>, resolution: Ho
 fn wire_exit_pix<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, PixEvt>(
     pipeline_builder: HoprPacketPipelineBuilder<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt>,
     ssa_generator: Arc<hopr_protocol_pix::SsaShareGenerator<HoprPixSpec>>,
+    ssa_reconstructor: Arc<hopr_protocol_pix::SsaReconstructor<HoprPixSpec>>,
     ssa_events: &PixEvt,
     smgr: Arc<HoprSessionManager>,
     processes: &mut AbortableList<HoprTransportProcess>,
@@ -1470,15 +1500,6 @@ where
     PixEvt: futures::Sink<PixEvent> + Clone + Unpin + Send + 'static,
     PixEvt::Error: std::error::Error + Clone + Sync + Send + 'static,
 {
-    let ssa_reconstructor = Arc::new(hopr_protocol_pix::SsaReconstructor::<HoprPixSpec>::new(
-        // SAFETY: `SsaReconstructorConfig`'s defaults sit inside the ranges its own
-        // `Validate` derive enforces, so `validate().expect()` in the constructor
-        // cannot panic. Stated as an invariant rather than by quoting the values —
-        // the quoted version drifted (it claimed `max_awaiting_acks = 10_000_000`
-        // against an actual default of 1_000_000) and nothing caught it, because a
-        // comment naming a constant it does not reference cannot be checked.
-        hopr_protocol_pix::SsaReconstructorConfig::default(),
-    ));
     let (pix_tools, session_pix_events) = PixToolbox::new(ssa_generator, ssa_reconstructor.clone());
     let (ssa_share_resolution_events_tx, ssa_share_resolution_events_rx) = bounded_sink_channel(1024);
     processes.insert(

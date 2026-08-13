@@ -5,6 +5,8 @@ use crate::SsaIndex;
 pub enum PixError<P: std::fmt::Display> {
     #[error("invalid input to the function")]
     InvalidInput,
+    #[error("invalid configuration: {0}")]
+    InvalidConfiguration(#[from] validator::ValidationErrors),
     #[error("acknowledgement from this peer is not paired to any encrypted share")]
     UnexpectedShare,
     /// No longer produced by the reconstructor: a share failing verification is expected adversarial
@@ -18,6 +20,14 @@ pub enum PixError<P: std::fmt::Display> {
     InvalidShare(P, SsaIndex),
     #[error("encrypted partial ssa share is empty")]
     ShareIsEmpty,
+    /// The share was dropped rather than buffered: the reconstructor is already holding
+    /// `max_ack_buffer_bytes` worth of shares awaiting acknowledgement.
+    ///
+    /// Deliberately *not* an expected error. Reaching it means share loss — the Exit has put a
+    /// packet on the wire whose acknowledgement will now find nothing — so it should be as loud as
+    /// the caller's log level allows.
+    #[error("awaiting-acknowledgement buffer is at its configured byte budget; share dropped")]
+    AckBufferFull,
     #[error("ssa commitment does not match ssa")]
     InvalidSsa,
     #[error("received duplicate commitment")]

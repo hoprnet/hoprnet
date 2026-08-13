@@ -518,6 +518,10 @@ mod tests {
     }
 
     fn random_pix_group_element() -> HoprPixGroupElement {
+        // Needed only on Baby JubJub, where `mul_by_generator` comes from the trait. secp256k1's
+        // `ProjectivePoint` has it inherently, so importing it there is an unused import — the same
+        // arms the curve selection itself uses, so this tracks it rather than restating it.
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
         use hopr_protocol_pix::Group;
 
         let scalar = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
@@ -575,8 +579,9 @@ mod tests {
     }
 
     /// **M13.** A well-formed encoding of a point outside the prime-order subgroup must not parse
-    /// into a PIX group element. Baby JubJub is the production curve — `bjj` is a default feature —
-    /// and its cofactor is 8, so such points exist.
+    /// into a PIX group element. Baby JubJub is the production curve — `pix-bjj` is a default
+    /// feature and `pix-secp256k1` is not overriding it — and its cofactor is 8, so such points
+    /// exist.
     ///
     /// This pins the *property*, not the mechanism, and deliberately so. The subgroup check in
     /// [`HoprPixGroupElement::try_into_pix_group`] is not the step that rejects here: the backend's
@@ -620,7 +625,11 @@ mod tests {
 
     #[test]
     fn pix_commitment_proof_wire_wrapper_round_trips() -> anyhow::Result<()> {
-        use hopr_protocol_pix::{Group, SsaId};
+        // See `random_pix_group_element` above: trait-provided on Baby JubJub, inherent on
+        // secp256k1.
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
+        use hopr_protocol_pix::Group;
+        use hopr_protocol_pix::SsaId;
 
         let ssa_id = SsaId::new(SimplePseudonym::random(), 1.try_into()?);
         let secret = <hopr_protocol_pix::PixScalar<HoprPixSpec> as crypto_traits::elliptic_curve::Field>::random(
@@ -649,5 +658,40 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    /// The curve feature selects a wire format, and these are its dimensions.
+    ///
+    /// `StartProtocol` derives its `SsaCommit` and `SsaRequest` layouts and its chunking from these
+    /// two sizes, so changing either changes what every PIX peer must parse — while the protocol
+    /// version byte stays where it is. That is why the curve is a network-wide build invariant
+    /// rather than a per-node settlement preference, and why a node announces its
+    /// [`PixSuite`](hopr_protocol_pix::PixSuite) in `PixParams` so a mismatch is refused at Session
+    /// establishment instead of surfacing as undecodable Start traffic.
+    ///
+    /// Pinned per feature arm because a size change is otherwise completely silent: nothing fails to
+    /// compile, and the first symptom is peers that cannot talk to each other.
+    #[test]
+    fn pix_wire_element_sizes_are_fixed_by_the_curve_feature() {
+        #[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
+        {
+            assert_eq!(32, size_of::<HoprPixGroupRepr>(), "Baby JubJub compressed point");
+            assert_eq!(64, HOPR_PIX_COMMITMENT_PROOF_SIZE, "Baby JubJub commitment proof");
+            assert_eq!(
+                hopr_protocol_pix::PixSuite::BabyJubJub,
+                <HoprPixSpec as hopr_protocol_pix::PixSpec>::PIX_SUITE,
+                "the announced suite must name the curve actually compiled in"
+            );
+        }
+        #[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
+        {
+            assert_eq!(33, size_of::<HoprPixGroupRepr>(), "secp256k1 compressed point");
+            assert_eq!(65, HOPR_PIX_COMMITMENT_PROOF_SIZE, "secp256k1 commitment proof");
+            assert_eq!(
+                hopr_protocol_pix::PixSuite::Secp256k1,
+                <HoprPixSpec as hopr_protocol_pix::PixSpec>::PIX_SUITE,
+                "the announced suite must name the curve actually compiled in"
+            );
+        }
     }
 }

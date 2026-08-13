@@ -89,9 +89,32 @@ fn new_polynomial_with_commitment<S: PixSpec>(
     Ok((polynomial, PixGroup::<S>::mul_by_generator(&secret)))
 }
 
+/// Rejects a surplus larger than the threshold it insures.
+///
+/// The bound is deliberately loose — twice the emitted shares a polynomial needs — because the
+/// surplus is legitimately a deployment choice about return-path loss, and over-insuring a bad path
+/// is a reasonable thing to want. What it forbids is the case where the insurance costs more than
+/// the thing insured: since H5 the surplus travels in the negotiated
+/// [`PixParams`](crate::PixParams) and is billed on purchase rather than on claim, so a surplus
+/// above the threshold means an Entry paying for more redundancy than payload in every deposit.
+///
+/// This is a *configuration* bound, not a wire one. `PixParams` packs the surplus as a byte and
+/// accepts the whole range, and a peer offering an extravagant surplus is already caught where it
+/// should be — by the Exit's `quota_range`, since the surplus inflates the quota.
+fn surplus_must_not_exceed_threshold(cfg: &SsaGeneratorConfig) -> Result<(), validator::ValidationError> {
+    if cfg.surplus_shares > cfg.threshold {
+        return Err(validator::ValidationError::new(
+            "surplus_shares must not exceed threshold — the surplus is billed, so this pays for more redundancy than \
+             payload",
+        ));
+    }
+    Ok(())
+}
+
 /// Configuration for the [`SsaShareGenerator`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[validate(schema(function = "surplus_must_not_exceed_threshold", skip_on_field_errors = false))]
 pub struct SsaGeneratorConfig {
     /// The number of polynomials to generate per SSA commitment.
     ///
@@ -119,9 +142,15 @@ pub struct SsaGeneratorConfig {
     /// every case. That is why the surplus is part of the per-SSA quota rather than free service —
     /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
     ///
-    /// Default is [`DEFAULT_SURPLUS_SHARES`]. The whole range of the field is legal, so unlike the
-    /// other two this one needs no validator — it shares the lower half of the negotiated
-    /// [`PixParams`](crate::PixParams) word with `threshold`, and a byte is what fits there.
+    /// Default is [`DEFAULT_SURPLUS_SHARES`] — but prefer [`default_surplus_for`] wherever the
+    /// threshold is known, because this is a *ratio* of it and the constant can only be the ratio
+    /// evaluated at the default threshold.
+    ///
+    /// Bounded by `threshold` rather than by the byte the wire gives it: see
+    /// [`surplus_must_not_exceed_threshold`]. It shares the lower half of the negotiated
+    /// [`PixParams`](crate::PixParams) word with `threshold`, so a byte is all that fits there — but
+    /// what is *representable* and what is sane to configure are different questions, and this field
+    /// used to be documented as needing no validator on the strength of the first.
     #[default(DEFAULT_SURPLUS_SHARES)]
     pub surplus_shares: u8,
 }
@@ -136,17 +165,27 @@ pub struct SsaShareGenerator<S: PixSpec> {
 impl<S: PixSpec> SsaShareGenerator<S> {
     /// Creates a new share generator with the provided configuration.
     ///
-    /// # Panics
-    /// Panics if the configuration fails validation.
-    pub fn new(cfg: SsaGeneratorConfig) -> Self {
-        cfg.validate().expect("invalid SsaGeneratorConfig");
-        Self {
+    /// Fails if the configuration does not validate. Prefer this over [`Self::new`] anywhere the
+    /// configuration is assembled at runtime — a config built programmatically or read from a file
+    /// is input, not a constant, and turning it into a panic makes it un-handleable by the caller.
+    pub fn try_new(cfg: SsaGeneratorConfig) -> errors::Result<Self, S::Pseudonym> {
+        cfg.validate()?;
+        Ok(Self {
             polynomials: moka::sync::CacheBuilder::default()
                 .initial_capacity(100_000)
                 .time_to_idle(std::time::Duration::from_secs(1800))
                 .build_with_hasher(ahash::RandomState::new()),
             cfg,
-        }
+        })
+    }
+
+    /// Creates a new share generator with the provided configuration.
+    ///
+    /// # Panics
+    /// Panics if the configuration fails validation. Use [`Self::try_new`] to handle that case
+    /// instead.
+    pub fn new(cfg: SsaGeneratorConfig) -> Self {
+        Self::try_new(cfg).expect("invalid SsaGeneratorConfig")
     }
 
     /// Returns the configuration used to generate this [`SsaShareGenerator`].
@@ -347,7 +386,11 @@ impl<S: PixSpec> EntryShareGenerator<S> for SsaShareGenerator<S> {
                 }
             })?;
 
-        let ssa_id = *commitments[0].spi.as_ref();
+        // Built from the parameters rather than read back off `commitments[0]`: every element above
+        // was constructed with exactly this `SsaId`, and indexing would have made the whole function
+        // depend on `polynomials_per_ssa >= 1` holding — which is a validation invariant enforced
+        // three call layers away, not something visible here.
+        let ssa_id = SsaId::new(*pseudonym, ssa_index);
         let ssa_commitment = PixGroup::<S>::generator() * our_commitment_secret;
         Ok(SsaCommitment {
             ssa_id,
@@ -390,6 +433,142 @@ mod tests {
 
     use super::*;
     use crate::{tests::TestSpec, traits::EntryShareGenerator};
+
+    /// The surplus is a ratio of the threshold, and the ratio is a loss-rate tolerance.
+    ///
+    /// Pinned as the tolerance rather than as four literals, because the tolerance is the property
+    /// with a physical meaning — `surplus/(threshold + surplus)` is the fraction of a polynomial's
+    /// shares that may be lost before it cannot reconstruct. A change to
+    /// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to restate what it did to that number.
+    ///
+    /// Swept over the *whole* accepted threshold range rather than the deployed multiples of four.
+    /// Restricting it to those was what let the ratio round down unnoticed: every sampled point
+    /// divided exactly, so integer division and the intended ratio agreed on all of them and
+    /// disagreed on everything else.
+    #[test]
+    fn the_default_surplus_covers_a_fifth_of_a_polynomial_being_lost() {
+        for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
+            let surplus = crate::default_surplus_for(threshold);
+            let emitted = threshold as f64 + surplus as f64;
+            let tolerated = surplus as f64 / emitted;
+
+            // A floor, not an approximation: the surplus may over-cover, never under-cover.
+            assert!(
+                tolerated >= 0.20,
+                "threshold {threshold} + surplus {surplus} tolerates only {tolerated:.4} loss"
+            );
+            // And it over-covers by less than one share, which is what makes rounding up cheap.
+            assert!(
+                surplus as f64 - 1.0 < threshold as f64 / crate::SURPLUS_LOSS_TOLERANCE_DIVISOR as f64,
+                "threshold {threshold} buys {surplus} surplus shares, more than one above the ratio"
+            );
+            // Zero surplus is zero loss tolerance. Rounding down produced it at thresholds 2 and 3.
+            assert!(surplus > 0, "threshold {threshold} derives no surplus at all");
+        }
+
+        // Where the threshold divides exactly the tolerance is the documented 20 % on the nose, and
+        // the deployed threshold is one of those.
+        for threshold in [16u8, 32, 48, 64] {
+            let surplus = crate::default_surplus_for(threshold);
+            let tolerated = surplus as f64 / (threshold as f64 + surplus as f64);
+            assert!(
+                (0.19..=0.21).contains(&tolerated),
+                "threshold {threshold} + surplus {surplus} tolerates {tolerated:.3} loss, expected ~0.20"
+            );
+        }
+
+        assert_eq!(
+            DEFAULT_SURPLUS_SHARES,
+            crate::default_surplus_for(DEFAULT_POLY_THRESHOLD),
+            "the constant must stay the ratio evaluated at the default threshold, not drift from it"
+        );
+    }
+
+    /// A derived surplus must never fail the validator it is derived under.
+    ///
+    /// `default_surplus_for` rounds up and `surplus_must_not_exceed_threshold` bounds the surplus by
+    /// the threshold, so the two meet at the smallest threshold there is: at
+    /// [`MIN_POLY_THRESHOLD`] the derived surplus is 1 against a threshold of 2. Any further
+    /// rounding-up would collide with the bound rather than merely over-insure.
+    #[test]
+    fn every_derived_surplus_passes_the_bound_it_is_derived_under() {
+        for threshold in MIN_POLY_THRESHOLD..=MAX_POLY_THRESHOLD {
+            let cfg = SsaGeneratorConfig {
+                polynomials_per_ssa: 16,
+                threshold,
+                surplus_shares: crate::default_surplus_for(threshold),
+            };
+            assert!(
+                cfg.validate().is_ok(),
+                "the surplus derived for threshold {threshold} fails its own validator"
+            );
+        }
+    }
+
+    /// A surplus above the threshold pays for more redundancy than payload, and is billed for it.
+    ///
+    /// The boundary rather than an arbitrary over-large value: the rule is exactly "not more than
+    /// the thing it insures", so the interesting cases are on either side of it. A flat surplus of
+    /// 20 — what deployments used before this became a ratio — is what fails at threshold 16.
+    #[test]
+    fn a_surplus_larger_than_the_threshold_is_rejected() {
+        let at_bound = SsaGeneratorConfig {
+            polynomials_per_ssa: 16,
+            threshold: 16,
+            surplus_shares: 16,
+        };
+        assert!(
+            SsaShareGenerator::<TestSpec>::try_new(at_bound).is_ok(),
+            "a surplus equal to the threshold must be allowed — over-insuring a lossy path is a real choice"
+        );
+
+        let past_bound = SsaGeneratorConfig {
+            surplus_shares: 17,
+            ..at_bound
+        };
+        assert!(matches!(
+            SsaShareGenerator::<TestSpec>::try_new(past_bound),
+            Err(PixError::InvalidConfiguration(_))
+        ));
+
+        let flat_twenty_at_low_threshold = SsaGeneratorConfig {
+            surplus_shares: 20,
+            ..at_bound
+        };
+        assert!(
+            SsaShareGenerator::<TestSpec>::try_new(flat_twenty_at_low_threshold).is_err(),
+            "the configuration this rule exists to catch: 20 shares of insurance against 16 of payload"
+        );
+    }
+
+    #[test]
+    fn ssa_generator_try_new_should_reject_an_invalid_config_without_panicking() {
+        // Zero polynomials is the case the rest of the generator quietly relies on being impossible
+        // — `new_ssa_commitment` builds its `SsaId` from the parameters precisely so that it does
+        // not have to index into an empty commitment vector.
+        let cfg = SsaGeneratorConfig {
+            polynomials_per_ssa: 0,
+            threshold: 10,
+            surplus_shares: 2,
+        };
+
+        assert!(matches!(
+            SsaShareGenerator::<TestSpec>::try_new(cfg),
+            Err(PixError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid SsaGeneratorConfig")]
+    fn ssa_generator_new_should_still_panic_on_an_invalid_config() {
+        // `new` stays panicking on purpose: it is what the benches and tests use, where a bad
+        // constant should abort rather than be threaded through a `Result`.
+        let _ = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 0,
+            threshold: 10,
+            surplus_shares: 2,
+        });
+    }
 
     #[test]
     fn ssa_generator_should_generate_consecutive_spis() -> anyhow::Result<()> {

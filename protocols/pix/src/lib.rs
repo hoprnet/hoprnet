@@ -28,10 +28,10 @@ mod traits;
 mod types;
 
 pub use generator::{SHARE_EMISSION_WINDOW, SsaGeneratorConfig, SsaShareGenerator};
-pub use params::{InvalidPixParams, PixParams};
+pub use params::{InvalidPixParams, PixParams, PixSuite};
 pub use reconstructor::{
-    MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard, SsaReconstructor,
-    SsaReconstructorConfig,
+    AWAITING_ACK_ENTRY_BYTES, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard,
+    SsaReconstructor, SsaReconstructorConfig,
 };
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{
@@ -69,11 +69,83 @@ pub const DEFAULT_POLYS_PER_SSA: u16 = 8192;
 ///
 /// 64 rather than the 128 this was before the split was re-tuned. Dropping the non-constant
 /// coefficient commitments (see [`SsaPartCommitment`]) put every commitment-side cost — wire
-/// volume, ingest, reconstructor memory, share verification — on `polys` alone, leaving
-/// interpolation (`O(threshold²)` per polynomial) and fault-detection latency (`threshold`
-/// return packets) as the only costs that grow with the threshold. The full cost model is
-/// documented on `DEFAULT_PIX_POLYS_PER_SSA` in `hopr-transport-session`.
+/// volume, ingest, reconstructor memory, share verification — on `polys` alone. What still grows
+/// with the threshold is Exit interpolation (`O(threshold²)` per polynomial), fault-detection
+/// latency (`threshold` return packets) and, on the Entry, the per-packet
+/// [`SsaShareGenerator::next_share`], which evaluates a `threshold`-wide polynomial by Horner for
+/// every share it emits. The full cost model is documented on `DEFAULT_PIX_POLYS_PER_SSA` in
+/// `hopr-transport-session`.
+///
+/// # What 64 optimises
+///
+/// **Exit reconstruction capacity, deliberately, and not total network CPU.** The two sides do not
+/// deserve equal weight: an Exit is a shared resource serving 10–30 concurrent clients while each
+/// Entry generates only its own shares, so the Exit is the side that saturates first and the one
+/// whose per-share cost sets what the network can carry. Both were measured (48 cores,
+/// `acknowledge_shares/interpolation` and `SsaShareGenerator::next_share`, µs/share):
+///
+/// | threshold | Exit  | Entry | total |
+/// | --------- | ----- | ----- | ----- |
+/// | 16        | 13.15 | 0.90  | 14.05 |
+/// | 32        | 11.12 | 1.20  | 12.32 |
+/// | 48        | 10.62 | 1.51  | 12.13 |
+/// | 64        | 10.68 | 1.82  | 12.50 |
+///
+/// The Exit curve *falls* and then flattens: fitting µs/polynomial = `A + B·t + C·t²` gives
+/// `A ≈ 81 µs`, `B ≈ 7.61`, `C ≈ 0.028`, so per share it is `A/t + B + C·t` — the fixed
+/// per-polynomial commitment opening is amortised over `threshold` shares and punishes *low*
+/// thresholds harder than interpolation punishes high ones. The Exit-only optimum is
+/// `t = √(A/C) ≈ 54`, flat within 0.5 % from 48 to 64, and 64 sits within 0.4 % of it.
+///
+/// Under the total column 48 is about 3 % cheaper. That reading is recorded rather than acted on:
+/// it weights one Entry's share generation equally with the Exit work of the 10–30 clients that
+/// Exit serves, which is not where the capacity limit is. Moving the split also moves the
+/// negotiated per-SSA quota and everything derived from it, which is not worth 3 % of a model that
+/// does not describe the bottleneck.
 pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
+
+/// Share loss a polynomial's surplus is sized to absorb, as a reciprocal: `1/5` is 20 %.
+///
+/// The surplus is insurance against *lost* shares, and this is the loss rate it covers. A
+/// polynomial reconstructs from the first `threshold` distinct shares to arrive out of
+/// `threshold + surplus` emitted, so surviving a per-packet loss rate of `p` needs
+/// `surplus >= threshold · p/(1−p)` — which makes the surplus inherently a **ratio** of the
+/// threshold, and `surplus/(threshold + surplus)` the loss rate it tolerates.
+///
+/// At `threshold/4` that is 20 %, and [`default_surplus_for`] rounds *up* so it is a floor rather
+/// than an approximation — see there for why the direction matters.
+const SURPLUS_LOSS_TOLERANCE_DIVISOR: u8 = 4;
+
+/// Shares to emit per polynomial beyond `threshold`, to absorb losses.
+///
+/// **A ratio, evaluated at the threshold actually configured** — see
+/// [`SURPLUS_LOSS_TOLERANCE_DIVISOR`] for why a ratio is the physically meaningful shape.
+///
+/// This used to be a bare constant, `DEFAULT_POLY_THRESHOLD / 2`, evaluated once at the *default*
+/// threshold and then applied whatever the configured one was. Deployments run thresholds from 16
+/// to 64, so a single absolute surplus means wildly different insurance across that range: a flat
+/// 20 covers 24 % loss at threshold 64 but 56 % at threshold 16, where it exceeds the shares it
+/// insures. Since H5 the surplus is billed on purchase rather than on claim, so that over-insurance
+/// is quota an Entry pays for in every deposit.
+///
+/// **Rounds up.** The result is a guarantee of *at least* the documented tolerance, not an
+/// approximation of it: shares are indivisible, so a threshold that is not a multiple of
+/// [`SURPLUS_LOSS_TOLERANCE_DIVISOR`] has to land on one side of 20 % or the other, and covering
+/// less than the documented rate is the failure this function exists to prevent. Rounding down
+/// undershot for every such threshold — 33 received 8 surplus shares and covered 19.51 % — and gave
+/// thresholds 2 and 3 a surplus of **zero**, i.e. no loss tolerance at all, at and just above
+/// [`MIN_POLY_THRESHOLD`]. Rounding up over-covers by less than one share, which is most visible at
+/// the smallest thresholds (2 → 1 surplus → 33 %) and vanishes as the threshold grows (63 → 16 →
+/// 20.3 %).
+///
+/// The deployed value is unaffected: [`DEFAULT_POLY_THRESHOLD`] is 64, a multiple of the divisor, so
+/// this returns 16 either way and no negotiated quota moves.
+pub const fn default_surplus_for(threshold: u8) -> u8 {
+    // Not `(threshold + DIVISOR - 1) / DIVISOR`: that addition overflows a `u8` for thresholds above
+    // 252, which `MAX_POLY_THRESHOLD` (255) admits, and would fail const evaluation rather than
+    // merely misbehave.
+    threshold.div_ceil(SURPLUS_LOSS_TOLERANCE_DIVISOR)
+}
 
 /// Shares emitted per polynomial beyond [`DEFAULT_POLY_THRESHOLD`], to absorb losses.
 ///
@@ -84,10 +156,9 @@ pub const DEFAULT_POLY_THRESHOLD: u8 = 64;
 /// being harmless once the per-SSA quota started counting it, because the quota is a `const` and had
 /// to pick one of the two.
 ///
-/// Half the threshold, kept as the expression rather than as `32`, because what is being fixed is
-/// the *factor*: a cycle emits `threshold + surplus` shares per polynomial, so this is what makes
-/// the deployed surplus factor 1.5×. Re-tuning the threshold moves it in step.
-pub const DEFAULT_SURPLUS_SHARES: u8 = DEFAULT_POLY_THRESHOLD / 2;
+/// Only the value of [`default_surplus_for`] at the default threshold. Anything that knows its own
+/// threshold should call that instead — this constant cannot, which is exactly the defect above.
+pub const DEFAULT_SURPLUS_SHARES: u8 = default_surplus_for(DEFAULT_POLY_THRESHOLD);
 
 /// Maximum number of polynomials per SSA supported by the [`SsaReconstructor`].
 pub const MAX_POLYS_PER_SSA: u16 = 16192;
@@ -149,6 +220,13 @@ where
     /// from Debug output would break wire compatibility when dependency versions
     /// change formatting.
     const HASH_TO_SCALAR_SUITE_ID: &'static [u8];
+
+    /// Which curve this spec instantiates, as announced to the peer in [`PixParams`].
+    ///
+    /// Deliberately has no default. It must name the same curve as [`Curve`](Self::Curve), and a
+    /// default would let a new spec inherit a wrong answer silently — the failure it exists to
+    /// prevent is precisely two peers disagreeing about a curve neither of them states.
+    const PIX_SUITE: PixSuite;
 
     /// Performs conversion of the given `spi` and `msg` into [`PixScalar`] of this spec.
     fn msg_to_scalar(
@@ -356,6 +434,7 @@ pub(crate) mod tests {
         type Pseudonym = SimplePseudonym;
 
         const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:BLAKE3_SSWU_RO_";
+        const PIX_SUITE: PixSuite = PixSuite::Secp256k1;
 
         fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
             PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())

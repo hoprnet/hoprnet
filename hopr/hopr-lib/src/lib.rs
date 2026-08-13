@@ -74,8 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, PixParams, SessionCapabilities,
-    SessionCapability, SessionTarget, SurbBalancerConfig,
+    FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, LOCAL_PIX_SUITE, PixParams,
+    SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -158,8 +158,9 @@ pub struct HoprSessionClientConfig {
     ///
     /// These must match this node's own PIX configuration exactly — see
     /// [`SessionClientConfig::pix_ssa_quota`](hopr_transport::SessionClientConfig) — so the usual
-    /// way to build one is [`PixParams::try_from`] over the installed generator's config rather
-    /// than by restating the three values.
+    /// way to build one is `PixParams::try_from_config` over the installed generator's config rather
+    /// than by restating the values. The curve suite among them is fixed at build time, not
+    /// configured; [`LOCAL_PIX_SUITE`] names this build's.
     ///
     /// Defaults to `None`.
     pub pix_ssa_quota: Option<PixParams>,
