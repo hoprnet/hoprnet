@@ -165,6 +165,20 @@ impl SurbRoundTripRegistry {
             *since < FLUSHES_BETWEEN_REPLANS
         });
 
+        // Which destinations had *some* pair deliver in this flush.
+        //
+        // This is what makes silence mean anything. On its own, "minted and got nothing back" is
+        // produced identically by a dead relayer and by a peer with nothing to say -- keep-alives
+        // mint either way. Only a sibling pair still delivering to the same destination tells the
+        // two apart, and it does so without a threshold: if the peer had gone quiet, every pair
+        // would be silent together.
+        let delivering: std::collections::HashSet<OffchainPublicKey> = self
+            .inner
+            .iter()
+            .filter(|entry| entry.value().peek().1 > 0)
+            .filter_map(|entry| self.destinations.get(entry.key()).map(|d| *d))
+            .collect();
+
         for entry in self.inner.iter() {
             let paths = *entry.key();
             let (expected, observed) = entry.value().peek();
@@ -189,21 +203,32 @@ impl SurbRoundTripRegistry {
                 continue;
             }
 
+            let Some(dest) = self.destinations.get(&paths).map(|d| *d) else {
+                continue;
+            };
+
+            // Corroboration: some other pair to this destination is still getting replies home, so
+            // the peer is demonstrably talking and this pair's silence is its own fault. The run
+            // resets when nothing corroborates, so `runs` counts consecutive flushes in which this
+            // pair was silent *while the peer was demonstrably answering elsewhere* -- not merely
+            // flushes in which it was quiet.
+            if !delivering.contains(&dest) {
+                state.runs = 0;
+                continue;
+            }
+
             state.runs += 1;
             if state.runs >= SILENT_FLUSHES_BEFORE_DEGRADED {
                 // Re-arm rather than accumulate: re-planning the same destination on every
                 // subsequent flush churns its cached candidates instead of letting the new
                 // selection settle.
                 state.runs = 0;
-                if let Some(dest) = self.destinations.get(&paths) {
-                    let dest = *dest;
-                    // Only if this destination is not already serving out a cooldown: another of
-                    // its pairs may have reported it moments ago, and re-planning again now would
-                    // discard the candidate that re-plan just chose.
-                    if !self.replanned.contains_key(&dest) {
-                        self.replanned.insert(dest, 0);
-                        degraded.push(dest);
-                    }
+                // Only if this destination is not already serving out a cooldown: another of its
+                // pairs may have reported it moments ago, and re-planning again now would discard
+                // the candidate that re-plan just chose.
+                if !self.replanned.contains_key(&dest) {
+                    self.replanned.insert(dest, 0);
+                    degraded.push(dest);
                 }
             }
         }
@@ -786,6 +811,17 @@ mod tests {
         registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
     }
 
+    /// A sibling pair to the same destination that keeps answering.
+    ///
+    /// Silence is only actionable against a peer that is demonstrably still talking, so any test
+    /// of the silence logic has to keep one pair delivering or nothing can ever fire.
+    fn heartbeat() -> ForwardAndReturnPath {
+        ForwardAndReturnPath {
+            forward: [0, 3, 0, 0, 0],
+            reply: [3, 0, 0, 0, 0],
+        }
+    }
+
     fn legs() -> ForwardAndReturnPath {
         ForwardAndReturnPath {
             forward: [0, 1, 0, 0, 0],
@@ -804,13 +840,15 @@ mod tests {
         deliver(&registry, paths, destination);
         assert!(flush(&registry).is_empty());
 
-        // Then it goes quiet while still minting. One quiet interval is not a dead path, which is
-        // why the gate counts runs.
+        // Then it goes quiet while still minting, with a sibling still answering to prove the
+        // peer is talking. One quiet interval is not a dead path, which is why the gate counts runs.
         for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
             mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
             assert!(flush(&registry).is_empty());
         }
         mint_only(&registry, paths, destination);
+        deliver(&registry, heartbeat(), destination);
         assert_eq!(vec![destination], flush(&registry));
         let _ = (graph, me);
     }
@@ -866,6 +904,7 @@ mod tests {
         for _ in 0..WINDOW {
             mint_only(&registry, first, destination);
             mint_only(&registry, second, destination);
+            deliver(&registry, heartbeat(), destination);
             reports += flush(&registry).len();
         }
 
@@ -881,6 +920,43 @@ mod tests {
             "a destination must not be re-planned faster than a new path can settle: {reports} re-plans in {WINDOW} \
              flushes"
         );
+
+        let _ = (graph, me);
+    }
+
+    /// A peer that simply stops talking must not be mistaken for a dead relayer.
+    ///
+    /// This is the case that killed every absolute gate: after a busy stretch the counters look
+    /// exactly like a failing path -- SURBs still minted by keep-alives, nothing coming back. A
+    /// delivered-ever bool, a recency decay, a volume threshold and a ratio collapse all fire here.
+    /// Corroboration cannot, because when the peer goes quiet it goes quiet on *every* pair, so
+    /// there is never a sibling to corroborate against.
+    #[test]
+    fn a_peer_that_goes_quiet_should_not_be_mistaken_for_a_dead_return_path() {
+        let (graph, me, peers) = graph_with(2);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+
+        let first = legs();
+        let second = heartbeat();
+
+        // A busy stretch: both pairs carrying real return traffic.
+        for _ in 0..10 {
+            deliver(&registry, first, destination);
+            deliver(&registry, second, destination);
+            assert!(flush(&registry).is_empty());
+        }
+
+        // The application goes idle. Keep-alives keep minting on both pairs; the peer has nothing
+        // to say on either.
+        for _ in 0..(4 * SILENT_FLUSHES_BEFORE_DEGRADED) {
+            mint_only(&registry, first, destination);
+            mint_only(&registry, second, destination);
+            assert!(
+                flush(&registry).is_empty(),
+                "a quiet peer is not a dead return path, however long it stays quiet"
+            );
+        }
 
         let _ = (graph, me);
     }
@@ -942,15 +1018,18 @@ mod tests {
         flush(&registry);
         for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
             mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
             flush(&registry);
         }
         mint_only(&registry, paths, destination);
+        deliver(&registry, heartbeat(), destination);
         assert_eq!(vec![destination], flush(&registry));
 
         // Re-planning the same destination every second churns its cached candidates instead of
         // letting the new selection settle, so the gate re-arms from zero.
         for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
             mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
             assert!(flush(&registry).is_empty());
         }
         let _ = (graph, me);
