@@ -852,11 +852,20 @@ where
         tracing::info!(?role, "starting surb round-trip flush task");
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
+        let surb_flush_planner = self.path_planner.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
                 futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval))
                     .for_each(|_| {
+                        // Detection before the drain: `degraded_destinations` reads the counts the
+                        // flush is about to reset.
+                        for destination in surb_round_trips.degraded_destinations() {
+                            tracing::info!(%destination, "return path silent; re-planning");
+                            surb_flush_planner
+                                .degrade_return_path(hopr_api::types::internal::prelude::NodeId::Offchain(destination));
+                        }
+
                         protocol::surb_telemetry::flush_into(
                             &surb_round_trips,
                             &surb_flush_graph,

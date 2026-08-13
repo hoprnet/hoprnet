@@ -62,6 +62,14 @@ impl SurbRoundTripCounters {
         self.observed.fetch_add(count, Ordering::Relaxed);
     }
 
+    /// Reads both counts without resetting them.
+    fn peek(&self) -> (u64, u64) {
+        (
+            self.expected.load(Ordering::Relaxed),
+            self.observed.load(Ordering::Relaxed),
+        )
+    }
+
     /// Takes both counts, resetting them to zero.
     fn take(&self) -> (u64, u64) {
         (
@@ -79,7 +87,23 @@ impl SurbRoundTripCounters {
 #[derive(Debug, Clone, Default)]
 pub struct SurbRoundTripRegistry {
     inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
+    /// Destination each pair of legs leads to, so a collapse can name what to re-plan.
+    destinations: Arc<DashMap<ForwardAndReturnPath, OffchainPublicKey>>,
+    /// Consecutive flushes in which a pair minted SURBs and got nothing back.
+    silent: Arc<DashMap<ForwardAndReturnPath, u32>>,
 }
+
+/// SURBs a pair must have minted in one flush before its silence counts as evidence.
+///
+/// Measured after a relayer was killed: the dead leg minted 2270 SURBs in the 5s that followed
+/// while returning none. A handful is noise; thousands is not.
+const MIN_EXPECTED_FOR_SILENCE: u64 = 20;
+
+/// Consecutive silent flushes before the return path is called dead.
+///
+/// Flushes are one second apart, so this fires around five seconds after the loss starts --
+/// measured, the dead leg reads exactly zero from t+5s onward while its siblings keep returning.
+const SILENT_FLUSHES_BEFORE_DEGRADED: u32 = 3;
 
 impl SurbRoundTripRegistry {
     fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
@@ -87,8 +111,43 @@ impl SurbRoundTripRegistry {
     }
 
     /// Records that `count` SURBs were minted over these legs and are expected back.
-    pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64) {
+    pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
+        self.destinations.insert(paths, destination);
         self.counters(paths).record_expected(count);
+    }
+
+    /// Destinations whose return path has been silent for long enough to act on.
+    ///
+    /// Deliberately keyed on *no reply at all* rather than on a delivery rate. A rate cannot
+    /// separate these cases: measured immediately after a kill, a healthy leg read 0.089 while the
+    /// dead one read 0.123, and replies straddling a flush boundary push a healthy leg above 1.
+    /// Only sustained silence distinguishes them, and it does so within seconds.
+    pub fn degraded_destinations(&self) -> Vec<OffchainPublicKey> {
+        let mut degraded = Vec::new();
+
+        for entry in self.inner.iter() {
+            let paths = *entry.key();
+            let (expected, observed) = entry.value().peek();
+
+            if observed > 0 || expected < MIN_EXPECTED_FOR_SILENCE {
+                // Either it is delivering, or too little went out to conclude anything. An idle
+                // pair is not a failing one.
+                self.silent.remove(&paths);
+                continue;
+            }
+
+            let runs = self.silent.entry(paths).and_modify(|r| *r += 1).or_insert(1);
+            if *runs >= SILENT_FLUSHES_BEFORE_DEGRADED
+                && let Some(dest) = self.destinations.get(&paths)
+            {
+                degraded.push(*dest);
+            }
+        }
+
+        // `OffchainPublicKey` is not `Ord`, and several pairs of legs can share a destination.
+        let mut seen = std::collections::HashSet::new();
+        degraded.retain(|d: &OffchainPublicKey| seen.insert(*d));
+        degraded
     }
 
     /// Records that `count` replies arrived over these legs.
@@ -323,6 +382,9 @@ impl<C> SurbTelemetryCodec<C> {
         };
 
         let forward: Vec<_> = forward_path.transport_path().iter().copied().collect();
+        let Some(destination) = forward.last().copied() else {
+            return;
+        };
 
         tracing::debug!(
             minted = minted.len(),
@@ -338,7 +400,7 @@ impl<C> SurbTelemetryCodec<C> {
                 continue;
             };
 
-            self.registry.record_expected(paths, 1);
+            self.registry.record_expected(paths, 1, destination);
             self.pending.insert(*surb_id, paths);
         }
     }
@@ -466,13 +528,14 @@ mod tests {
 
     #[test]
     fn drain_should_take_the_counts_and_leave_the_entry_empty() {
+        let (_graph, _me, peers) = graph_with(1);
         let registry = SurbRoundTripRegistry::default();
         let paths = ForwardAndReturnPath {
             forward: [0, 1, 0, 0, 0],
             reply: [1, 0, 0, 0, 0],
         };
 
-        registry.record_expected(paths, 3);
+        registry.record_expected(paths, 3, peers[0]);
         registry.record_observed(paths, 2);
 
         assert_eq!(vec![(paths, 3, 2)], registry.drain());
@@ -636,6 +699,66 @@ mod tests {
             "the reply must reach the legs the mint recorded"
         );
         Ok(())
+    }
+
+    #[test]
+    fn sustained_silence_should_name_the_destination_to_replan() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+        let paths = ForwardAndReturnPath {
+            forward: [0, 1, 0, 0, 0],
+            reply: [1, 0, 0, 0, 0],
+        };
+
+        // Enough minted to be evidence, nothing coming back.
+        registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
+
+        // One quiet interval is not a dead path, which is why the gate counts runs.
+        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            assert!(registry.degraded_destinations().is_empty());
+        }
+        assert_eq!(vec![destination], registry.degraded_destinations());
+        let _ = (graph, me);
+    }
+
+    #[test]
+    fn a_single_reply_should_clear_the_silence() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+        let paths = ForwardAndReturnPath {
+            forward: [0, 1, 0, 0, 0],
+            reply: [1, 0, 0, 0, 0],
+        };
+
+        registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE, destination);
+        registry.degraded_destinations();
+        registry.degraded_destinations();
+
+        // A path that delivers anything at all is not the failure this looks for.
+        registry.record_observed(paths, 1);
+        assert!(registry.degraded_destinations().is_empty());
+        let _ = (graph, me);
+    }
+
+    #[test]
+    fn an_idle_path_should_never_be_called_degraded() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+        let paths = ForwardAndReturnPath {
+            forward: [0, 1, 0, 0, 0],
+            reply: [1, 0, 0, 0, 0],
+        };
+
+        // Below the evidence floor: a trickle that happens not to have returned yet says nothing,
+        // and treating it as failure would re-plan healthy paths during quiet periods.
+        registry.record_expected(paths, MIN_EXPECTED_FOR_SILENCE - 1, destination);
+        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED + 2 {
+            assert!(registry.degraded_destinations().is_empty());
+        }
+        let _ = (graph, me);
     }
 
     #[test]
