@@ -1776,6 +1776,13 @@ where
             match &session_slot.routing_opts {
                 // Session is outgoing - keep-alive was received from the Exit
                 DestinationRouting::Forward { .. } => {
+                    // Record the arrival itself, not just a change of value: an unchanged level is
+                    // still confirmation that the counterparty is being heard, and it is the
+                    // absence of that confirmation the balancer keys on.
+                    if msg.flags.contains(KeepAliveFlag::BalancerState) && !session_slot.surb_mgmt.is_disabled() {
+                        session_slot.surb_mgmt.record_level_report();
+                    }
+
                     if msg.flags.contains(KeepAliveFlag::BalancerState)
                         && !session_slot.surb_mgmt.is_disabled()
                         && session_slot.surb_mgmt.buffer_level() != msg.additional_data

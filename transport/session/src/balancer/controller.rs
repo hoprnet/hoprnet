@@ -105,6 +105,12 @@ pub struct BalancerStateValues {
     pub decay_duration_msec: AtomicU64,
     pub decay_volume_pct: AtomicU8,
     pub buffer_level: AtomicU64,
+    /// Monotonic count of level reports received from the counterparty.
+    ///
+    /// The counterparty knows its own SURB level exactly and reports it; this counts how often that
+    /// report actually arrived. Since the report travels the same path as everything else, the
+    /// count going flat is itself the signal that the level is no longer being corrected.
+    pub level_reports: AtomicU64,
 }
 
 impl BalancerStateValues {
@@ -160,6 +166,16 @@ impl BalancerStateValues {
         .map(|(d, p)| (Duration::from_millis(d), p as f64 / 100.0))
     }
 
+    /// Records that the counterparty reported its SURB level.
+    pub fn record_level_report(&self) {
+        self.level_reports.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Number of level reports received so far.
+    pub fn level_reports(&self) -> u64 {
+        self.level_reports.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Gets the current estimated SURB buffer level.
     #[inline]
     pub fn buffer_level(&self) -> u64 {
@@ -210,18 +226,22 @@ pub struct SurbBalancer<C, E, F> {
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
-    /// When consumption at the counterparty was last confirmed by a packet coming back.
+    /// When the counterparty last reported its SURB level.
     last_confirmed_consumption: std::time::Instant,
+    /// Level report count observed at that point.
+    last_level_reports: u64,
 }
 
-/// How long SURBs may flow with nothing confirmed before the buffer estimate is discarded.
+/// How long SURBs may flow without a level report before the buffer estimate is discarded.
+///
+/// Keyed on the report rather than on consumption, because consumption is only a proxy: with one
+/// relayer of several dead, replies keep arriving over the survivors and consumption never stops,
+/// so a consumption-based gate never fires on the partial loss that actually occurs. The level
+/// report is the specific feedback that corrects the estimate, and it is its absence that leaves
+/// the level stale.
 ///
 /// Must be a duration, not a count of update windows: the balancer samples several times a second,
-/// so a handful of windows is tens of milliseconds and ordinary bursty traffic clears it -- which
-/// discards a perfectly good estimate and drives the controller into over-production.
-///
-/// Long enough that a briefly quiet counterparty is not mistaken for a broken return path, short
-/// enough that recovery is seconds rather than a decay window.
+/// so a handful of windows is tens of milliseconds and ordinary traffic clears it.
 const UNCONFIRMED_BEFORE_RESET: Duration = Duration::from_secs(3);
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -257,6 +277,7 @@ where
             last_decay: std::time::Instant::now(),
             was_below_target: true,
             last_confirmed_consumption: std::time::Instant::now(),
+            last_level_reports: 0,
         }
     }
 
@@ -295,7 +316,9 @@ where
             .estimate_surbs_consumed()
             .saturating_sub(self.last_estimator_state.estimate_surbs_consumed());
 
-        if consumed_delta > 0 {
+        let reports = self.state.level_reports();
+        if reports != self.last_level_reports {
+            self.last_level_reports = reports;
             self.last_confirmed_consumption = std::time::Instant::now();
         }
         let unconfirmed_for = self.last_confirmed_consumption.elapsed();
@@ -319,7 +342,10 @@ where
         // Nothing has confirmed the counterparty still holds what we think it does, so stop acting
         // on it. Zeroing rather than decaying makes the controller produce at full rate until real
         // evidence arrives; the first packet back rebuilds the estimate from measurement.
-        if produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
+        // Only meaningful once the counterparty has reported at least once: a peer that never
+        // reports leaves dead reckoning as the only estimate available, and discarding it there
+        // would pin production at maximum for the life of the session.
+        if self.last_level_reports > 0 && produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
             tracing::debug!(
                 ?unconfirmed_for,
                 discarded = current,
