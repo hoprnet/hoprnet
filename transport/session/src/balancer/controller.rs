@@ -1,10 +1,17 @@
 use std::{
     sync::{
-        Arc,
-        atomic::{AtomicU8, AtomicU64},
+        Arc, LazyLock,
+        atomic::{AtomicBool, AtomicU8, AtomicU64},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
+
+/// Monotonic origin for the degraded-return-path deadline.
+///
+/// An `Instant` cannot live in an atomic, and the deadline is written by one layer and read by
+/// another, so it travels as milliseconds elapsed from a fixed point. Monotonic rather than
+/// wall-clock, so a clock adjustment cannot extend or cancel the window.
+static EPOCH: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 use futures::{StreamExt, pin_mut};
 use hopr_utils::runtime::AbortHandle;
@@ -87,6 +94,23 @@ pub struct SurbBalancerConfig {
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
     #[default(_code = "Some((Duration::from_secs(60), 0.05))")]
     pub surb_decay: Option<(Duration, f64)>,
+
+    /// Keeps producing SURBs while the return path is known to be failing, instead of reading the
+    /// resulting silence as a full counterparty buffer.
+    ///
+    /// The remote buffer is estimated as *produced − consumed*, and consumption is only observed
+    /// when a reply reaches us. A return path that drops every reply therefore looks exactly like a
+    /// counterparty that is well stocked, so production is throttled at the very moment the
+    /// counterparty is in fact draining towards empty and needs more.
+    ///
+    /// Distinguishing that from a peer which simply has nothing to say is impossible from here --
+    /// both show no consumption -- so this only takes effect once an outside observer marks the
+    /// return path degraded, and it expires on its own if no further evidence arrives.
+    ///
+    /// Off by default: sustaining production spends bandwidth on a path that may be genuinely idle,
+    /// which is only worth it for sessions that value recovery latency over that bandwidth.
+    #[default(false)]
+    pub sustain_on_return_path_loss: bool,
 }
 
 impl SurbBalancerConfig {
@@ -105,6 +129,15 @@ pub struct BalancerStateValues {
     pub decay_duration_msec: AtomicU64,
     pub decay_volume_pct: AtomicU8,
     pub buffer_level: AtomicU64,
+    /// Whether this session opted into sustaining production through return-path loss.
+    pub sustain_on_return_path_loss: AtomicBool,
+    /// Milliseconds from [`EPOCH`] until which the return path counts as degraded.
+    ///
+    /// A deadline rather than a flag: it is set by a layer that observes the return path and read
+    /// here, and nothing is guaranteed to come back and clear it. Expiring on its own bounds the
+    /// damage of a marker that is never withdrawn to a short over-production instead of a session
+    /// that mints forever.
+    pub return_path_degraded_until_ms: AtomicU64,
 }
 
 impl BalancerStateValues {
@@ -134,6 +167,38 @@ impl BalancerStateValues {
                 .unwrap_or_default(),
             std::sync::atomic::Ordering::Relaxed,
         );
+        self.sustain_on_return_path_loss
+            .store(cfg.sustain_on_return_path_loss, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Marks the return path as degraded for the next `grace` period.
+    ///
+    /// Called by whichever layer can actually tell a dead return path from a quiet peer -- from
+    /// here the two are indistinguishable, since neither delivers replies. Re-marking simply
+    /// extends the window.
+    pub fn mark_return_path_degraded(&self, grace: Duration) {
+        let until = EPOCH.elapsed().saturating_add(grace).as_millis().min(u64::MAX as u128) as u64;
+        self.return_path_degraded_until_ms
+            .fetch_max(until, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Whether production should currently ignore the counterparty buffer estimate.
+    ///
+    /// Both the opt-in and live evidence are required: without the opt-in this is not our
+    /// behaviour to change, and without evidence there is nothing to distinguish a dead return path
+    /// from an idle one.
+    fn should_sustain_through_return_path_loss(&self) -> bool {
+        let deadline = self
+            .return_path_degraded_until_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        // Zero is "never marked", not "marked at the epoch" -- otherwise every session that opted
+        // in would start out believing its return path was already dead.
+        deadline > 0
+            && (EPOCH.elapsed().as_millis() as u64) < deadline
+            && self
+                .sustain_on_return_path_loss
+                .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Extracts the [`SurbBalancerConfig`] from the [`BalancerStateValues`].
@@ -142,6 +207,9 @@ impl BalancerStateValues {
             target_surb_buffer_size: self.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
             max_surbs_per_sec: self.max_surbs_per_sec.load(std::sync::atomic::Ordering::Relaxed),
             surb_decay: self.surb_decay(),
+            sustain_on_return_path_loss: self
+                .sustain_on_return_path_loss
+                .load(std::sync::atomic::Ordering::Relaxed),
         }
     }
 
@@ -210,6 +278,8 @@ pub struct SurbBalancer<C, E, F> {
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
+    /// Whether the previous update ran in open loop, so both edges can be acted on.
+    was_degraded: bool,
 }
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -244,6 +314,7 @@ where
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
+            was_degraded: false,
         }
     }
 
@@ -283,6 +354,37 @@ where
             current = current.saturating_sub(num_decayed_surbs);
             self.last_decay = std::time::Instant::now();
             tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+        }
+
+        let degraded = self.state.should_sustain_through_return_path_loss();
+        if degraded != self.was_degraded {
+            // The estimate stops meaning what it meant on both edges: entering, it is inflated by
+            // production nobody was seen to consume; leaving, it is a level that was never
+            // observed. Either way the accumulated error belongs to a regime that has ended.
+            self.controller.reset();
+            self.was_degraded = degraded;
+
+            if !degraded {
+                // Coming back, treat the counterparty as freshly started rather than as whatever
+                // the outage left behind. It really did drain while replies were lost, and this is
+                // the estimate that self-corrects: consumption is observable again, so the buffer
+                // level climbs on its own as production outruns it.
+                current = 0;
+                self.last_decay = std::time::Instant::now();
+                tracing::debug!("return path recovered; restarting closed-loop SURB control");
+            }
+        }
+
+        if degraded {
+            // While replies are being lost there is no valid estimate to act on: every SURB the
+            // counterparty spends is invisible from here, so the accumulated `produced - consumed`
+            // reads as a filling buffer precisely when it is emptying. Drop to open loop and assume
+            // the worst, which drives production to the maximum until replies resume.
+            tracing::debug!(
+                believed = current,
+                "return path degraded; ignoring the counterparty buffer estimate"
+            );
+            current = 0;
         }
 
         self.state
@@ -420,6 +522,7 @@ mod tests {
             target_surb_buffer_size: 1000,
             max_surbs_per_sec: 500,
             surb_decay: None,
+            sustain_on_return_path_loss: false,
         };
         let bounds = cfg.as_controller_bounds();
         assert_eq!(bounds.target(), 1000);
@@ -432,6 +535,7 @@ mod tests {
             target_surb_buffer_size: 0,
             max_surbs_per_sec: 0,
             surb_decay: None,
+            sustain_on_return_path_loss: false,
         };
         let state = BalancerStateValues::new(cfg);
         assert!(state.is_disabled());
@@ -450,6 +554,7 @@ mod tests {
             target_surb_buffer_size: 3000,
             max_surbs_per_sec: 1500,
             surb_decay: Some((Duration::from_secs(30), 0.10)),
+            sustain_on_return_path_loss: false,
         };
         state.update(&cfg);
         assert_eq!(state.as_config(), cfg);
@@ -462,6 +567,7 @@ mod tests {
             target_surb_buffer_size: 1000,
             max_surbs_per_sec: 500,
             surb_decay: None,
+            sustain_on_return_path_loss: false,
         };
         let state = BalancerStateValues::new(cfg);
         assert!(state.surb_decay().is_none());
@@ -486,6 +592,7 @@ mod tests {
             target_surb_buffer_size: 5000,
             max_surbs_per_sec: 2500,
             surb_decay: Some((Duration::from_secs(60), 0.05)),
+            sustain_on_return_path_loss: false,
         };
         let state: BalancerStateValues = cfg.into();
         assert_eq!(state.as_config(), cfg);
@@ -556,6 +663,7 @@ mod tests {
                     target_surb_buffer_size: 5_000,
                     max_surbs_per_sec: 2500,
                     surb_decay: None,
+                    sustain_on_return_path_loss: false,
                 }
                 .into(),
             ),
@@ -635,6 +743,180 @@ mod tests {
         }
     }
 
+    /// A balancer whose production follows its own control output, as it does in a live Session.
+    ///
+    /// Returns the balancer, the shared estimator and the latest control output. Production must be
+    /// fed back rather than held constant: with production pinned to consumption the buffer never
+    /// fills, maximum output is the correct answer, and every phase of the test reads the same.
+    #[allow(clippy::type_complexity)]
+    fn balancer_with_feedback(
+        cfg: SurbBalancerConfig,
+    ) -> (
+        SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>,
+        AtomicSurbFlowEstimator,
+        Arc<BalancerStateValues>,
+        Arc<AtomicU64>,
+    ) {
+        let output = Arc::new(AtomicU64::new(0));
+        let output_clone = output.clone();
+        let mut controller = MockSurbFlowController::new();
+        controller.expect_adjust_surb_flow().returning(move |r| {
+            output_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
+        });
+
+        let surb_estimator = AtomicSurbFlowEstimator::default();
+        let state: Arc<BalancerStateValues> = Arc::new(cfg.into());
+        let balancer = SurbBalancer::new(
+            HoprPseudonym::random(),
+            PidBalancerController::default(),
+            surb_estimator.clone(),
+            controller,
+            state.clone(),
+        );
+
+        (balancer, surb_estimator, state, output)
+    }
+
+    /// One sampling interval: mint at the rate last commanded, and consume `consumed` of them.
+    fn tick(
+        balancer: &mut SurbBalancer<PidBalancerController, AtomicSurbFlowEstimator, MockSurbFlowController>,
+        surb_estimator: &AtomicSurbFlowEstimator,
+        output: &AtomicU64,
+        consumed: u64,
+    ) {
+        let step = Duration::from_millis(50);
+        std::thread::sleep(step);
+
+        let minted = output.load(std::sync::atomic::Ordering::Relaxed) * step.as_millis() as u64 / 1000;
+        surb_estimator
+            .produced
+            .fetch_add(minted, std::sync::atomic::Ordering::Relaxed);
+        surb_estimator
+            .consumed
+            .fetch_add(consumed, std::sync::atomic::Ordering::Relaxed);
+        balancer.update();
+    }
+
+    /// SURBs the counterparty spends per interval while it is answering normally.
+    const REPLIES_PER_TICK: u64 = 40;
+
+    /// Drives a balancer through a healthy stretch, then through one where no reply comes back.
+    ///
+    /// Returns the control output at the end of each stretch. The two phases are deliberately
+    /// indistinguishable from inside the balancer -- consumption simply stops -- which is the whole
+    /// point: only the caller's `sustain` choice separates a dead return path from an idle peer.
+    fn drive_until_replies_stop(cfg: SurbBalancerConfig, mark_degraded: bool) -> (u64, u64) {
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+        let healthy = output.load(std::sync::atomic::Ordering::Relaxed);
+
+        if mark_degraded {
+            state.mark_return_path_degraded(Duration::from_secs(30));
+        }
+
+        // Replies stop while production continues.
+        for _ in 0..20 {
+            tick(&mut balancer, &surb_estimator, &output, 0);
+        }
+
+        (healthy, output.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
+    fn sustaining_config(sustain: bool) -> SurbBalancerConfig {
+        SurbBalancerConfig {
+            // Small enough that the healthy phase actually reaches the setpoint and backs off
+            // within the test's tick budget; saturated-at-maximum makes every phase read alike.
+            target_surb_buffer_size: 1_000,
+            max_surbs_per_sec: 2_500,
+            surb_decay: None,
+            sustain_on_return_path_loss: sustain,
+        }
+    }
+
+    /// A peer with nothing to say really is filling up, so throttling it is correct.
+    ///
+    /// This is the case that makes the estimate impossible to fix locally: it is byte-for-byte the
+    /// same observation as a dead return path.
+    #[test_log::test]
+    fn surb_balancer_should_throttle_when_a_quiet_counterparty_stops_consuming() {
+        let (healthy, quiet) = drive_until_replies_stop(sustaining_config(false), false);
+
+        assert!(healthy > 0, "a balanced session must keep minting");
+        assert!(
+            quiet < healthy,
+            "an idle counterparty accumulates SURBs, so production must back off: healthy={healthy}/s, idle={quiet}/s"
+        );
+    }
+
+    /// Once told the return path is dead, the same observation must not be read as a full buffer.
+    ///
+    /// `consumed` advances only when a reply reaches the entry (`manager.rs`, the `session_rx`
+    /// inspect counting "received packets = SURB consumption estimate"). A return path that drops
+    /// every reply therefore looks like a well-stocked counterparty, and production is cut at the
+    /// exact moment the counterparty is draining towards empty -- the feedback signal travels on
+    /// the very path whose failure it is meant to reveal.
+    #[test_log::test]
+    fn surb_balancer_should_sustain_production_through_a_degraded_return_path() {
+        let (healthy, degraded) = drive_until_replies_stop(sustaining_config(true), true);
+
+        assert!(healthy > 0, "a balanced session must keep minting");
+        assert!(
+            degraded >= healthy,
+            "the counterparty is burning SURBs it cannot replace, so production must not be cut: healthy={healthy}/s, \
+             degraded={degraded}/s"
+        );
+    }
+
+    /// Both edges of a degraded window: open loop must engage at once, and let go afterwards.
+    #[test_log::test]
+    fn surb_balancer_should_return_to_closed_loop_when_the_return_path_recovers() {
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(sustaining_config(true));
+
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+        let healthy = output.load(std::sync::atomic::Ordering::Relaxed);
+
+        state.mark_return_path_degraded(Duration::from_millis(500));
+        tick(&mut balancer, &surb_estimator, &output, 0);
+        let first_degraded = output.load(std::sync::atomic::Ordering::Relaxed);
+
+        for _ in 0..9 {
+            tick(&mut balancer, &surb_estimator, &output, 0);
+        }
+
+        // The mark lapses and the counterparty starts answering again.
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+        let recovered = output.load(std::sync::atomic::Ordering::Relaxed);
+
+        assert!(
+            first_degraded > healthy,
+            "open loop must engage on the first update after the mark, not ramp towards it: healthy={healthy}/s, \
+             first degraded update={first_degraded}/s"
+        );
+        assert!(
+            recovered < first_degraded,
+            "once replies are arriving again the controller must return to closed loop rather than stay pinned at \
+             maximum: degraded={first_degraded}/s, recovered={recovered}/s"
+        );
+    }
+
+    /// The opt-in is what enables it; evidence alone must not change a session's behaviour.
+    #[test_log::test]
+    fn surb_balancer_should_ignore_a_degraded_return_path_unless_configured_to_sustain() {
+        let (healthy, degraded) = drive_until_replies_stop(sustaining_config(false), true);
+
+        assert!(
+            degraded < healthy,
+            "without the opt-in this is not our behaviour to change: healthy={healthy}/s, degraded={degraded}/s"
+        );
+    }
+
     #[test_log::test(tokio::test)]
     async fn surb_balancer_should_start_decrease_level_when_above_target_and_decay_enabled() {
         const NUM_STEPS: usize = 5;
@@ -643,6 +925,7 @@ mod tests {
             target_surb_buffer_size: 5_000,
             max_surbs_per_sec: 2500,
             surb_decay: Some((Duration::from_millis(200), 0.05)),
+            sustain_on_return_path_loss: false,
         };
 
         let mut mock_flow_ctl = MockSurbFlowController::new();

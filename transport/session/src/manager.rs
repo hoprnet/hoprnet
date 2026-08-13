@@ -1340,6 +1340,28 @@ where
         }
     }
 
+    /// Marks the return path to `destination` as degraded on every Session routed there.
+    ///
+    /// The Session layer cannot tell a dead return path from a peer with nothing to say -- both
+    /// simply stop consuming SURBs -- so the judgement is made where sibling paths can be compared
+    /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
+    /// their counterparty buffer estimate for `grace`.
+    ///
+    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
+    pub fn mark_return_path_degraded(
+        &self,
+        destination: &hopr_api::types::internal::NodeId,
+        grace: std::time::Duration,
+    ) -> usize {
+        self.sessions
+            .iter()
+            .filter(|(_, slot)| {
+                matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
+            })
+            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
+            .count()
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -1587,6 +1609,7 @@ where
                 // No SURB decay at the Exit, since we know almost exactly how many SURBs
                 // were received
                 surb_decay: None,
+                sustain_on_return_path_loss: false,
             };
 
             slot.surb_mgmt.update(&balancer_config);

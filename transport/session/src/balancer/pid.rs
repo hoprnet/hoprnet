@@ -130,6 +130,12 @@ impl SurbBalancerController for PidBalancerController {
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
         self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
     }
+
+    fn reset(&mut self) {
+        // Only the integral carries history across calls; P and D are derived from the current
+        // sample, so clearing the accumulated error is the whole of "start again".
+        self.0.reset_integral_term();
+    }
 }
 
 #[cfg(test)]

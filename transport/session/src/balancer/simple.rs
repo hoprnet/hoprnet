@@ -24,6 +24,11 @@ impl SurbBalancerController for SimpleBalancerController {
         let ratio = current_buffer_level as f64 / self.bounds.target() as f64;
         (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
     }
+
+    fn reset(&mut self) {
+        // Nothing to discard: the output is a pure function of the level handed in, so this
+        // controller has no history that could outlive the regime it was accumulated under.
+    }
 }
 
 #[cfg(test)]

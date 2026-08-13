@@ -850,9 +850,14 @@ where
 
         // -- periodic SURB round-trip flush
         tracing::info!(?role, "starting surb round-trip flush task");
+        // Long enough to outlast the silence gate that produced the evidence, so a path that stays
+        // dead is re-marked before the previous mark lapses, and short enough that a path which
+        // recovers unnoticed returns to closed-loop control promptly.
+        const RETURN_PATH_DEGRADED_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_planner = self.path_planner.clone();
+        let surb_flush_smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -861,9 +866,17 @@ where
                         // Detection before the drain: `degraded_destinations` reads the counts the
                         // flush is about to reset.
                         for destination in surb_round_trips.degraded_destinations() {
-                            tracing::info!(%destination, "return path silent; re-planning");
-                            surb_flush_planner
-                                .degrade_return_path(hopr_api::types::internal::prelude::NodeId::Offchain(destination));
+                            let node = hopr_api::types::internal::prelude::NodeId::Offchain(destination);
+
+                            // Re-planning only changes which return path the *next* SURBs are minted
+                            // on. The counterparty also has to still be receiving SURBs to reply
+                            // with, and its silence has by now convinced our balancer that it is
+                            // well stocked -- so tell the Sessions routed there to stop believing
+                            // that estimate while the evidence says otherwise.
+                            let marked = surb_flush_smgr.mark_return_path_degraded(&node, RETURN_PATH_DEGRADED_GRACE);
+
+                            tracing::info!(%destination, sessions = marked, "return path silent; re-planning");
+                            surb_flush_planner.degrade_return_path(node);
                         }
 
                         protocol::surb_telemetry::flush_into(

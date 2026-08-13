@@ -97,6 +97,13 @@ pub trait SurbBalancerController {
     fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds);
     /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64;
+    /// Discards accumulated history, leaving the bounds intact.
+    ///
+    /// Used when the buffer estimate the controller has been acting on stops meaning what it meant
+    /// -- crossing into or out of a period where the counterparty could not be observed at all.
+    /// Carrying the error accumulated under the old regime into the new one makes the controller
+    /// answer a question nobody asked.
+    fn reset(&mut self);
 }
 
 /// Implementation of [`SurbFlowEstimator`] that tracks the number of produced
