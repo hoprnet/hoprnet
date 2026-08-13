@@ -858,6 +858,7 @@ where
         let surb_flush_interval = self.cfg.surb_flush_interval;
         let surb_flush_planner = self.path_planner.clone();
         let surb_flush_smgr = self.smgr.clone();
+        let surb_flush_chain = self.chain_api.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -868,12 +869,24 @@ where
                         for destination in surb_round_trips.degraded_destinations() {
                             let node = hopr_api::types::internal::prelude::NodeId::Offchain(destination);
 
+                            // Sessions name their destination by its chain address, this telemetry
+                            // by its packet key, and a `NodeId` holding one is never equal to a
+                            // `NodeId` holding the other -- so the match has to be made on a
+                            // resolved form, not on the enum.
+                            let as_session_names_it = surb_flush_chain
+                                .packet_key_to_chain_key(&destination)
+                                .ok()
+                                .flatten()
+                                .map(hopr_api::types::internal::prelude::NodeId::Chain);
+
                             // Re-planning only changes which return path the *next* SURBs are minted
                             // on. The counterparty also has to still be receiving SURBs to reply
                             // with, and its silence has by now convinced our balancer that it is
                             // well stocked -- so tell the Sessions routed there to stop believing
                             // that estimate while the evidence says otherwise.
-                            let marked = surb_flush_smgr.mark_return_path_degraded(&node, RETURN_PATH_DEGRADED_GRACE);
+                            let marked = as_session_names_it
+                                .map(|n| surb_flush_smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
+                                .unwrap_or(0);
 
                             tracing::info!(%destination, sessions = marked, "return path silent; re-planning");
                             surb_flush_planner.degrade_return_path(node);

@@ -248,7 +248,14 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
 ///
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
 /// paths bypass the cache), so the key stores the hop count as a plain `u32`.
-type PlannerCacheKey = (NodeId, NodeId, u32);
+///
+/// Keyed on resolved offchain keys rather than [`NodeId`], because a `NodeId` naming a node by its
+/// chain address is never equal to one naming the same node by its packet key. Callers hold
+/// whichever form their layer happens to use -- Sessions carry chain addresses, the SURB telemetry
+/// reports packet keys -- so a raw-`NodeId` key silently stores the same route twice and, worse,
+/// makes [`PathPlanner::degrade_return_path`] invalidate an entry that does not exist. Resolving
+/// first makes lookup, insertion and invalidation agree by construction.
+type PlannerCacheKey = (OffchainPublicKey, OffchainPublicKey, u32);
 type PlannerCacheValue = Arc<hopr_utils::statistics::WeightedCollection<ValidatedPath>>;
 
 /// Path planner that resolves [`DestinationRouting`] to [`ResolvedTransportRouting`].
@@ -403,7 +410,7 @@ where
         let src_key = self.resolve_node_id_to_offchain_key(&source).await?;
         let dest_key = self.resolve_node_id_to_offchain_key(&destination).await?;
 
-        let cache_key: PlannerCacheKey = (source, destination, u32::from(hops));
+        let cache_key: PlannerCacheKey = (src_key, dest_key, u32::from(hops));
 
         let resolver = self.resolver.clone();
         let selector = self.selector.clone();
@@ -622,14 +629,31 @@ where
     /// Return-path cache keys are `(destination, me, hops)` — reversed relative to forward paths,
     /// because a return path runs *from* the destination back to us.
     pub fn degrade_return_path(&self, destination: NodeId) {
-        let me = NodeId::Offchain(self.me);
+        let me = self.me;
         let cache = self.cache.clone();
+        let resolver = self.resolver.clone();
 
         // `moka::future::Cache::invalidate` is async and this is called from a poll context (the
         // session's delivery clock), so it cannot be awaited here.
         hopr_utils::runtime::prelude::spawn(async move {
+            // Resolve to the key the cache is actually keyed on. Passing the `NodeId` straight
+            // through invalidated nothing whenever the caller and the populating Session named the
+            // node by different forms, which is the normal case.
+            let dest_key = match destination {
+                NodeId::Offchain(key) => Some(key),
+                NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
+                    .resolve_transport_address(&addr)
+                    .await
+                    .ok()
+                    .flatten(),
+            };
+            let Some(dest_key) = dest_key else {
+                tracing::warn!(%destination, "cannot resolve degraded return path destination; nothing invalidated");
+                return;
+            };
+
             for hops in 0..=RoutingOptions::MAX_INTERMEDIATE_HOPS as u32 {
-                cache.invalidate(&(destination, me, hops)).await;
+                cache.invalidate(&(dest_key, me, hops)).await;
             }
             tracing::debug!(%destination, "dropped cached return-path candidates after sustained loss");
         });
@@ -706,7 +730,7 @@ where
 
             async move {
                 for (key, _) in cache.iter() {
-                    let (src, dest, hops_u32) = {
+                    let (src_key, dest_key, hops_u32) = {
                         let k = key.as_ref();
                         (k.0, k.1, k.2)
                     };
@@ -716,24 +740,11 @@ where
                     }
                     let hops_usize = hops_u32 as usize;
 
-                    let resolve_key = |node: NodeId| {
-                        let resolver = resolver.clone();
+                    // The key already holds resolved offchain keys, which is what the selector
+                    // wants -- so nothing has to be resolved again here.
+                    let src = NodeId::Offchain(src_key);
 
-                        async move {
-                            match node {
-                                NodeId::Offchain(k) => Some(k),
-                                NodeId::Chain(addr) => ChainPathResolver::from(&*resolver)
-                                    .resolve_transport_address(&addr)
-                                    .await
-                                    .ok()
-                                    .flatten(),
-                            }
-                        }
-                    };
-
-                    if let (Some(src_key), Some(dest_key)) = (resolve_key(src).await, resolve_key(dest).await)
-                        && let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize)
-                    {
+                    if let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize) {
                         let chain_resolver = ChainPathResolver::from(&*resolver);
                         let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
                         let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
@@ -771,7 +782,7 @@ where
                                     "weighted candidate path",
                                 );
                             }
-                            cache.insert((src, dest, hops_u32), Arc::new(weighted)).await;
+                            cache.insert((src_key, dest_key, hops_u32), Arc::new(weighted)).await;
                         }
                     }
                 }
@@ -1086,6 +1097,72 @@ mod tests {
 
     // ── test: zero-hop path ───────────────────────────────────────────────────
 
+    /// A Session names its destination by chain address; this telemetry names it by packet key.
+    ///
+    /// Regression: the cache used to be keyed on the `NodeId` as handed in, so an invalidation
+    /// holding the packet key never matched an entry populated from a chain address. Detection
+    /// fired correctly and dropped nothing -- indistinguishable, from the outside, from a
+    /// re-planning mechanism that simply does not help.
+    #[tokio::test]
+    async fn degrading_a_return_path_should_invalidate_it_whichever_form_names_the_node() {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        graph.add_node(a);
+        graph.add_node(dest);
+        // A return path runs from the destination back to us.
+        graph.add_edge(&dest, &a).unwrap();
+        graph.add_edge(&a, &me).unwrap();
+        mark_edge_full(&graph, &dest, &a);
+        mark_edge_full(&graph, &a, &me);
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph,
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (dest, dest_addr())])
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr());
+        let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
+        let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
+
+        // Populated the way a Session does it: by chain address.
+        let _ = planner
+            .resolve_diverse_return_paths(
+                NodeId::Chain(dest_addr()),
+                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                1,
+            )
+            .await
+            .expect("return path resolution should succeed");
+
+        let cache_key: PlannerCacheKey = (dest, me, 1);
+        assert!(
+            planner.cache.get(&cache_key).await.is_some(),
+            "the return path should be cached after resolution"
+        );
+
+        // Degraded the way the SURB telemetry reports it: by packet key.
+        planner.degrade_return_path(NodeId::Offchain(dest));
+
+        // The invalidation is spawned, so give it a chance to run.
+        for _ in 0..50 {
+            if planner.cache.get(&cache_key).await.is_none() {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+
+        panic!("degrading by packet key must invalidate an entry cached by chain address");
+    }
+
     #[tokio::test]
     async fn zero_hop_path_should_bypass_selector() {
         let me = pubkey(&SECRET_ME);
@@ -1318,7 +1395,12 @@ mod tests {
             .expect("zero return paths is not an error");
         assert!(paths.is_empty());
 
-        let cache_key: PlannerCacheKey = (dest, NodeId::Offchain(pubkey(&SECRET_ME)), 1);
+        // Keyed on resolved offchain keys, so the test names the nodes the same way.
+        let dest_key = match dest {
+            NodeId::Offchain(k) => k,
+            NodeId::Chain(_) => unreachable!("the fixture names the destination by its packet key"),
+        };
+        let cache_key: PlannerCacheKey = (dest_key, pubkey(&SECRET_ME), 1);
         assert!(
             planner.cache.get(&cache_key).await.is_none(),
             "nothing requested must not query the planner"
@@ -1414,7 +1496,7 @@ mod tests {
         let surb_store = hopr_protocol_hopr::MemorySurbStore::default();
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
 
-        let cache_key: PlannerCacheKey = (NodeId::Offchain(me), NodeId::Offchain(dest), 1);
+        let cache_key: PlannerCacheKey = (me, dest, 1);
 
         assert!(
             planner.cache.get(&cache_key).await.is_none(),
