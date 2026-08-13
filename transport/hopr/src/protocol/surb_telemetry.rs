@@ -346,10 +346,13 @@ where
     }
 
     {
-        // One aggregate line per interval rather than one per pair of legs. At `debug` because
-        // `trace` is compiled out of release builds by `max_level_debug`, which would leave this
-        // mechanism unobservable in exactly the builds where it matters.
-        tracing::debug!(
+        // One aggregate line per interval rather than one per pair of legs.
+        //
+        // DIAGNOSTIC: at `info` while the recovery gap is under investigation. This is the pair of
+        // numbers that separates "the counterparty never got SURBs" from "it got them, replied, and
+        // the replies did not arrive" -- the two explanations left for a return path carrying
+        // packets while the application receives almost nothing. Drop back to `debug` once settled.
+        tracing::info!(
             legs,
             expected = total_expected,
             observed = total_observed,

@@ -280,6 +280,8 @@ pub struct SurbBalancer<C, E, F> {
     was_below_target: bool,
     /// Whether the previous update ran in open loop, so both edges can be acted on.
     was_degraded: bool,
+    /// DIAGNOSTIC: when the last balancer-state line was emitted, to rate-limit it.
+    last_report: std::time::Instant,
 }
 
 impl<C, E, F> SurbBalancer<C, E, F>
@@ -315,6 +317,7 @@ where
             last_decay: std::time::Instant::now(),
             was_below_target: true,
             was_degraded: false,
+            last_report: std::time::Instant::now(),
         }
     }
 
@@ -413,6 +416,25 @@ where
 
         let output = self.controller.next_control_output(current);
         tracing::trace!(output, "next balancer control output for session");
+
+        // DIAGNOSTIC: both ends run this same loop -- the Entry with the PID driving production,
+        // the Exit with the proportional controller gating egress -- so one report covers both and
+        // the session id tells them apart. At `info` deliberately: the harness filters at info, and
+        // the point is to see supply and spend on both sides during an outage.
+        // Rate-limited to one line per second so it can run under a full-rate session.
+        if self.last_report.elapsed() >= Duration::from_secs(1) {
+            self.last_report = std::time::Instant::now();
+            tracing::info!(
+                session = %self.session_id,
+                level = current,
+                target = self.controller.bounds().target(),
+                output,
+                produced = self.surb_estimator.estimate_surbs_produced(),
+                consumed = self.surb_estimator.estimate_surbs_consumed(),
+                degraded,
+                "surb balancer state"
+            );
+        }
 
         self.flow_control.adjust_surb_flow(output as usize);
 
@@ -903,6 +925,54 @@ mod tests {
             recovered < first_degraded,
             "once replies are arriving again the controller must return to closed loop rather than stay pinned at \
              maximum: degraded={first_degraded}/s, recovered={recovered}/s"
+        );
+    }
+
+    /// After the outage the counterparty must be refilled, not merely un-throttled.
+    ///
+    /// Returning to closed loop is only half the claim: production has to actually climb the curve
+    /// again and restore the buffer. Resetting the controller is what makes that prompt -- the error
+    /// accumulated while the estimate was meaningless would otherwise have to be unwound first.
+    #[test_log::test]
+    fn surb_balancer_should_refill_the_counterparty_after_the_return_path_recovers() {
+        let cfg = sustaining_config(true);
+        let (mut balancer, surb_estimator, state, output) = balancer_with_feedback(cfg);
+
+        for _ in 0..40 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+        }
+        // A band, not the setpoint itself: the controller oscillates around its target, so a
+        // sample taken at an arbitrary tick legitimately sits either side of it.
+        let refilled = cfg.target_surb_buffer_size / 2;
+        assert!(
+            state.buffer_level.load(std::sync::atomic::Ordering::Relaxed) >= refilled,
+            "the healthy phase must reach the setpoint band before an outage means anything"
+        );
+
+        // The return path dies: replies stop, and open loop takes over.
+        state.mark_return_path_degraded(Duration::from_millis(400));
+        for _ in 0..8 {
+            tick(&mut balancer, &surb_estimator, &output, 0);
+        }
+
+        // The mark lapses, the counterparty answers again, and the belief restarts from empty.
+        let mut ticks_to_refill = None;
+        for n in 1..=60 {
+            tick(&mut balancer, &surb_estimator, &output, REPLIES_PER_TICK);
+            if state.buffer_level.load(std::sync::atomic::Ordering::Relaxed) >= refilled {
+                ticks_to_refill = Some(n);
+                break;
+            }
+        }
+
+        let ticks = ticks_to_refill.expect("the counterparty must be refilled to the setpoint after recovery");
+        tracing::info!(ticks, "refilled the counterparty after the outage");
+
+        // Each tick is one sampling interval; the balancer samples far more often than this in a
+        // live Session, so a bound in ticks is a bound in sampling intervals, not in wall clock.
+        assert!(
+            ticks <= 30,
+            "refilling must ramp rather than crawl: took {ticks} sampling intervals"
         );
     }
 
