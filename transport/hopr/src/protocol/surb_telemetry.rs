@@ -123,6 +123,21 @@ pub fn no_path_slots() -> PathSlotResolver {
     Arc::new(|_| None)
 }
 
+/// Legs each outstanding SURB was minted over, shared between the two codec halves.
+///
+/// Minting happens on the encoder and the reply arrives at the decoder, so this **must** be one map
+/// shared by both. Giving each half its own leaves every lookup missing and silently discards the
+/// entire observation side of the metric.
+pub type PendingLegs = moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>;
+
+/// Builds the shared pending map, bounded by capacity and TTL.
+pub fn pending_legs(max_pending: u64) -> PendingLegs {
+    moka::sync::Cache::builder()
+        .max_capacity(max_pending)
+        .time_to_live(PENDING_SURB_TTL)
+        .build()
+}
+
 /// Reads path slots out of a network graph.
 pub fn path_slots_of<G>(graph: G) -> PathSlotResolver
 where
@@ -253,8 +268,8 @@ pub struct SurbTelemetryCodec<C> {
     /// Legs each outstanding SURB was minted over.
     ///
     /// Bounded by capacity and TTL rather than by replies arriving, so a peer that never replies
-    /// cannot grow it without limit.
-    pending: moka::sync::Cache<HoprSurbId, ForwardAndReturnPath>,
+    /// cannot grow it without limit. Shared with the other codec half -- see [`PendingLegs`].
+    pending: PendingLegs,
 }
 
 impl<C: std::fmt::Debug> std::fmt::Debug for SurbTelemetryCodec<C> {
@@ -274,17 +289,14 @@ impl<C> SurbTelemetryCodec<C> {
         me: OffchainPublicKey,
         slots: PathSlotResolver,
         registry: SurbRoundTripRegistry,
-        max_pending: u64,
+        pending: PendingLegs,
     ) -> Self {
         Self {
             inner,
             me,
             slots,
             registry,
-            pending: moka::sync::Cache::builder()
-                .max_capacity(max_pending)
-                .time_to_live(PENDING_SURB_TTL)
-                .build(),
+            pending,
         }
     }
 
@@ -406,7 +418,13 @@ mod tests {
     /// The trait impls are pass-throughs, so the tests drive the attribution logic directly.
     fn recorder(graph: ChannelGraph) -> SurbTelemetryCodec<()> {
         let me = *graph.identity();
-        SurbTelemetryCodec::new((), me, path_slots_of(graph), SurbRoundTripRegistry::default(), 128)
+        SurbTelemetryCodec::new(
+            (),
+            me,
+            path_slots_of(graph),
+            SurbRoundTripRegistry::default(),
+            pending_legs(128),
+        )
     }
 
     fn surb_id(seed: u8) -> HoprSurbId {
@@ -577,6 +595,38 @@ mod tests {
         // Counts belong to the interval that produced them; carrying them into the next flush would
         // keep reporting a round-trip that happened once as though it kept happening.
         assert!(recorder.registry.drain().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_reply_should_be_credited_when_the_halves_are_separate_instances() -> anyhow::Result<()> {
+        // Regression: the pipeline wraps the encoder and the decoder in *separate* instances, so a
+        // pending map built per-instance leaves every lookup missing and silently discards the
+        // entire observation side. Every other test here drives one instance and cannot see it.
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+        let pending = pending_legs(128);
+
+        let minting = SurbTelemetryCodec::new((), me, path_slots_of(graph.clone()), registry.clone(), pending.clone());
+        let observing = SurbTelemetryCodec::new((), me, path_slots_of(graph), registry.clone(), pending);
+
+        minting.on_minted(
+            &ResolvedTransportRouting::Forward {
+                pseudonym: HoprPseudonym::random(),
+                forward_path: ValidatedPath::direct(destination, address()),
+                return_paths: vec![ValidatedPath::direct(me, address())],
+            },
+            &[surb_id(1)],
+        );
+        observing.on_replied(&surb_id(1));
+
+        let (_, expected, observed) = registry.drain()[0];
+        assert_eq!(
+            (1, 1),
+            (expected, observed),
+            "the reply must reach the legs the mint recorded"
+        );
         Ok(())
     }
 

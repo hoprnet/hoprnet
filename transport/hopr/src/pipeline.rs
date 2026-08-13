@@ -393,14 +393,16 @@ where
         // ever identified and the decorator costs one closure call per minted SURB.
         let (surb_registry, path_slots) = surb_telemetry;
         let me = *packet_key.public();
+        // One map for both halves: the encoder mints and the decoder observes the reply.
+        let pending_legs = surb_telemetry::pending_legs(MAX_PENDING_SURBS);
         let encoder = SurbTelemetryCodec::new(
             encoder,
             me,
             path_slots.clone(),
             surb_registry.clone(),
-            MAX_PENDING_SURBS,
+            pending_legs.clone(),
         );
-        let decoder = SurbTelemetryCodec::new(decoder, me, path_slots, surb_registry, MAX_PENDING_SURBS);
+        let decoder = SurbTelemetryCodec::new(decoder, me, path_slots, surb_registry, pending_legs);
 
         #[allow(unused_mut)]
         let mut processes = AbortableList::default();
