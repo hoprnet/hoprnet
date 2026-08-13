@@ -373,7 +373,13 @@ where
             current,
             "surb balancer gate inputs"
         );
-        if armed && produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
+        // Deliberately not conditioned on current production. Requiring it made the gate
+        // self-defeating: measured, `produced_delta` is non-zero only during the first second of a
+        // session (the initial fill) and zero for 92% of samples afterwards, so the one state the
+        // gate exists for -- production having stalled while the level is stale -- was the one
+        // state in which it could never fire. What matters is whether the level is still evidence,
+        // not whether SURBs happen to be leaving right now.
+        if armed && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
             tracing::debug!(
                 ?unconfirmed_for,
                 discarded = current,
