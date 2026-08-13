@@ -114,22 +114,25 @@ where
 
     // DropAbortable not needed because the stream only generates items when polled
     let (ka_stream, abort_handle) = futures::stream::abortable(
-        futures::stream::repeat_with(move || match &notification_mode {
-            SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: KeepAliveFlag::BalancerTarget.into(),
-                additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
-            }),
-            SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: KeepAliveFlag::BalancerState.into(),
-                additional_data: estimator.saturating_diff(),
-            }),
-            SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
-                session_id,
-                flags: None.into(),
-                additional_data: 0,
-            }),
+        futures::stream::repeat_with(move || {
+            tracing::debug!(%session_id, "keep-alive stream emitting");
+            match &notification_mode {
+                SurbNotificationMode::Target => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: KeepAliveFlag::BalancerTarget.into(),
+                    additional_data: cfg.target_surb_buffer_size.load(std::sync::atomic::Ordering::Relaxed),
+                }),
+                SurbNotificationMode::Level(estimator) => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: KeepAliveFlag::BalancerState.into(),
+                    additional_data: estimator.saturating_diff(),
+                }),
+                SurbNotificationMode::DoNotNotify => HoprStartProtocol::KeepAlive(KeepAliveMessage {
+                    session_id,
+                    flags: None.into(),
+                    additional_data: 0,
+                }),
+            }
         })
         .rate_limit_with_controller(&controller),
     );

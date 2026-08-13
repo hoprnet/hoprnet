@@ -164,8 +164,9 @@ pub struct SurbControllerWithCorrection(pub RateController, pub u32);
 
 impl SurbFlowController for SurbControllerWithCorrection {
     fn adjust_surb_flow(&self, surbs_per_sec: usize) {
-        self.0
-            .set_rate_per_unit(surbs_per_sec, self.1 * std::time::Duration::from_secs(1));
+        let unit = self.1 * std::time::Duration::from_secs(1);
+        tracing::debug!(surbs_per_sec, correction = self.1, ?unit, "adjusting surb flow rate");
+        self.0.set_rate_per_unit(surbs_per_sec, unit);
     }
 }
 
