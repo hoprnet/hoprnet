@@ -361,6 +361,18 @@ where
         // So act on silence either way, but give a peer that simply does not report time to prove
         // it: the grace exceeds a report period, and a healthy session reports well inside it.
         let armed = self.last_level_reports > 0 || self.started_at.elapsed() >= NEVER_REPORTED_GRACE;
+
+        // Temporary: the gate has never fired in a cluster run and its inputs are otherwise only
+        // visible at `trace`, which release builds compile out.
+        tracing::debug!(
+            armed,
+            produced_delta,
+            consumed_delta,
+            ?unconfirmed_for,
+            reports = self.last_level_reports,
+            current,
+            "surb balancer gate inputs"
+        );
         if armed && produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
             tracing::debug!(
                 ?unconfirmed_for,
