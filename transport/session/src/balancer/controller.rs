@@ -230,7 +230,16 @@ pub struct SurbBalancer<C, E, F> {
     last_confirmed_consumption: std::time::Instant,
     /// Level report count observed at that point.
     last_level_reports: u64,
+    /// When this balancer started, for the never-reported grace.
+    started_at: std::time::Instant,
 }
+
+/// How long a session may run without ever receiving a level report before silence is acted on.
+///
+/// Comfortably longer than the counterparty's reporting period (15s as configured), so a peer that
+/// reports normally is never treated as silent, while one that has never managed to report at all
+/// stops holding the estimate hostage.
+const NEVER_REPORTED_GRACE: Duration = Duration::from_secs(30);
 
 /// How long SURBs may flow without a level report before the buffer estimate is discarded.
 ///
@@ -278,6 +287,7 @@ where
             was_below_target: true,
             last_confirmed_consumption: std::time::Instant::now(),
             last_level_reports: 0,
+            started_at: std::time::Instant::now(),
         }
     }
 
@@ -342,10 +352,16 @@ where
         // Nothing has confirmed the counterparty still holds what we think it does, so stop acting
         // on it. Zeroing rather than decaying makes the controller produce at full rate until real
         // evidence arrives; the first packet back rebuilds the estimate from measurement.
-        // Only meaningful once the counterparty has reported at least once: a peer that never
-        // reports leaves dead reckoning as the only estimate available, and discarding it there
-        // would pin production at maximum for the life of the session.
-        if self.last_level_reports > 0 && produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
+        // Silence from the very start is the *more* diagnostic case, not the less: the level report
+        // costs a SURB and travels the return path, so a counterparty that has run out cannot send
+        // the message whose whole purpose is to say so. Waiting for a first report before acting
+        // makes the deadlock permanent -- measured, the counterparty was armed to report every 15s
+        // and not one arrived.
+        //
+        // So act on silence either way, but give a peer that simply does not report time to prove
+        // it: the grace exceeds a report period, and a healthy session reports well inside it.
+        let armed = self.last_level_reports > 0 || self.started_at.elapsed() >= NEVER_REPORTED_GRACE;
+        if armed && produced_delta > 0 && unconfirmed_for >= UNCONFIRMED_BEFORE_RESET {
             tracing::debug!(
                 ?unconfirmed_for,
                 discarded = current,
