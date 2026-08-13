@@ -93,6 +93,17 @@ pub struct SurbRoundTripRegistry {
     silence: Arc<DashMap<ForwardAndReturnPath, Silence>>,
     /// Flushes since each destination was last reported, so one is not re-planned repeatedly.
     replanned: Arc<DashMap<OffchainPublicKey, u32>>,
+    /// Slot this node occupies, learned from the first pair recorded.
+    ///
+    /// A [`PathId`] is zero-padded with no length, and slot 0 is a legitimate index, so the end of
+    /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
+    /// reply leg terminates here. [`u64::MAX`] means not yet known.
+    me_slot: Arc<AtomicU64>,
+}
+
+/// Relayers carrying the reply leg: everything between the destination and ourselves.
+fn return_relayers(reply: &PathId, me_slot: u64) -> impl Iterator<Item = u64> + '_ {
+    reply.iter().skip(1).take_while(move |&&slot| slot != me_slot).copied()
 }
 
 /// Per-pair silence bookkeeping, carried between flushes.
@@ -140,6 +151,11 @@ impl SurbRoundTripRegistry {
         self.inner.entry(paths).or_default().value().clone()
     }
 
+    /// Tells the registry which slot is ours, so a leg's relayers can be told from its padding.
+    pub fn note_me_slot(&self, slot: u64) {
+        self.me_slot.store(slot, Ordering::Relaxed);
+    }
+
     /// Records that `count` SURBs were minted over these legs and are expected back.
     pub fn record_expected(&self, paths: ForwardAndReturnPath, count: u64, destination: OffchainPublicKey) {
         self.destinations.insert(paths, destination);
@@ -179,6 +195,20 @@ impl SurbRoundTripRegistry {
             .filter_map(|entry| self.destinations.get(entry.key()).map(|d| *d))
             .collect();
 
+        // Which relayers are demonstrably still carrying replies.
+        //
+        // A relayer that dies takes down every path through it and nothing else, so silence that
+        // correlates with one node is a dead relayer, while silence spread evenly over all of them
+        // is a quiet peer. Naming the node is also what lets the blame land on the edges that
+        // deserve it instead of on every edge the loop happened to touch.
+        let me_slot = self.me_slot.load(Ordering::Relaxed);
+        let delivering_relayers: std::collections::HashSet<u64> = self
+            .inner
+            .iter()
+            .filter(|entry| entry.value().peek().1 > 0)
+            .flat_map(|entry| return_relayers(&entry.key().reply, me_slot).collect::<Vec<_>>())
+            .collect();
+
         for entry in self.inner.iter() {
             let paths = *entry.key();
             let (expected, observed) = entry.value().peek();
@@ -213,6 +243,14 @@ impl SurbRoundTripRegistry {
             // pair was silent *while the peer was demonstrably answering elsewhere* -- not merely
             // flushes in which it was quiet.
             if !delivering.contains(&dest) {
+                state.runs = 0;
+                continue;
+            }
+
+            // Sharpened: the peer is talking, and this pair carries at least one relayer that is
+            // not carrying replies anywhere else. Silence that every relayer shares is the peer
+            // being selective, not a relay failing.
+            if return_relayers(&paths.reply, me_slot).all(|r| delivering_relayers.contains(&r)) {
                 state.runs = 0;
                 continue;
             }
@@ -474,6 +512,10 @@ impl<C> SurbTelemetryCodec<C> {
         let Some(destination) = forward.last().copied() else {
             return;
         };
+
+        if let Some(slot) = (self.slots)(&self.me) {
+            self.registry.note_me_slot(slot);
+        }
 
         tracing::debug!(
             minted = minted.len(),
@@ -817,15 +859,19 @@ mod tests {
     /// of the silence logic has to keep one pair delivering or nothing can ever fire.
     fn heartbeat() -> ForwardAndReturnPath {
         ForwardAndReturnPath {
-            forward: [0, 3, 0, 0, 0],
-            reply: [3, 0, 0, 0, 0],
+            forward: [0, 3, 2, 0, 0],
+            reply: [2, 3, 0, 0, 0],
         }
     }
 
+    /// me(0) -> relay(1) -> dest(2), and back dest(2) -> relay(1) -> me(0).
+    ///
+    /// The reply leg carries a real intermediate relayer: a zero-hop return has no relay to blame,
+    /// so silence over it can never name one.
     fn legs() -> ForwardAndReturnPath {
         ForwardAndReturnPath {
-            forward: [0, 1, 0, 0, 0],
-            reply: [1, 0, 0, 0, 0],
+            forward: [0, 1, 2, 0, 0],
+            reply: [2, 1, 0, 0, 0],
         }
     }
 
@@ -870,8 +916,8 @@ mod tests {
 
         let first = legs();
         let second = ForwardAndReturnPath {
-            forward: [0, 2, 0, 0, 0],
-            reply: [2, 0, 0, 0, 0],
+            forward: [0, 4, 2, 0, 0],
+            reply: [2, 4, 0, 0, 0],
         };
         assert_ne!(
             first, second,
@@ -920,6 +966,70 @@ mod tests {
             "a destination must not be re-planned faster than a new path can settle: {reports} re-plans in {WINDOW} \
              flushes"
         );
+
+        let _ = (graph, me);
+    }
+
+    /// A relayer still carrying replies elsewhere is not the one at fault.
+    ///
+    /// A dead relayer takes down every path through it and nothing else, so blame belongs to a node
+    /// appearing only in silent legs. One demonstrably delivering on another pair is alive, and the
+    /// silence has some other cause -- selective traffic, or a fault further along the leg.
+    #[test]
+    fn a_relayer_still_delivering_elsewhere_should_not_be_blamed() {
+        let (graph, me, peers) = graph_with(3);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+
+        // Two distinct pairs sharing return relay 1, differing only in their forward leg.
+        let delivering = legs();
+        let silent = ForwardAndReturnPath {
+            forward: [0, 4, 2, 0, 0],
+            reply: [2, 1, 0, 0, 0],
+        };
+        assert_ne!(delivering, silent, "the pairs must be distinct keys");
+
+        deliver(&registry, silent, destination);
+        assert!(flush(&registry).is_empty());
+
+        // Relay 1 keeps carrying replies on the other pair, so it cannot be what is broken.
+        for _ in 0..(3 * SILENT_FLUSHES_BEFORE_DEGRADED) {
+            mint_only(&registry, silent, destination);
+            deliver(&registry, delivering, destination);
+            assert!(
+                flush(&registry).is_empty(),
+                "a relayer that is delivering elsewhere must not be blamed for this pair's silence"
+            );
+        }
+
+        let _ = (graph, me);
+    }
+
+    /// Silence spread over every relayer is the peer, not a relay.
+    #[test]
+    fn silence_on_every_relayer_should_blame_none_of_them() {
+        let (graph, me, peers) = graph_with(3);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+
+        let first = legs();
+        let second = heartbeat();
+
+        for _ in 0..5 {
+            deliver(&registry, first, destination);
+            deliver(&registry, second, destination);
+            assert!(flush(&registry).is_empty());
+        }
+
+        // Every relay goes quiet together: that is the counterparty, not a relay failure.
+        for _ in 0..(3 * SILENT_FLUSHES_BEFORE_DEGRADED) {
+            mint_only(&registry, first, destination);
+            mint_only(&registry, second, destination);
+            assert!(
+                flush(&registry).is_empty(),
+                "silence shared by every relayer names none of them"
+            );
+        }
 
         let _ = (graph, me);
     }
