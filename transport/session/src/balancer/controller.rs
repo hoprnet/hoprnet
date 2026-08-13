@@ -210,7 +210,15 @@ pub struct SurbBalancer<C, E, F> {
     last_update: std::time::Instant,
     last_decay: std::time::Instant,
     was_below_target: bool,
+    /// Consecutive windows in which SURBs were sent and none were confirmed consumed.
+    unverified_windows: u32,
 }
+
+/// How many consecutive unverified windows before the buffer estimate is discarded.
+///
+/// More than one, because a momentarily quiet counterparty is not a broken return path; few enough
+/// that recovery is a matter of seconds rather than of the decay window.
+const UNVERIFIED_WINDOWS_BEFORE_RESET: u32 = 3;
 
 impl<C, E, F> SurbBalancer<C, E, F>
 where
@@ -244,6 +252,7 @@ where
             last_update: std::time::Instant::now(),
             last_decay: std::time::Instant::now(),
             was_below_target: true,
+            unverified_windows: 0,
         }
     }
 
@@ -269,6 +278,25 @@ where
             return current;
         };
 
+        // Consumption at the counterparty is inferred from packets coming back, so a broken return
+        // path is indistinguishable from a counterparty that simply stopped spending its SURBs.
+        // Both look like "the buffer is filling up", and the controller answers by producing less --
+        // starving the return direction exactly when it needs more. Track windows where SURBs went
+        // out and nothing at all came back; after enough of them the level is an assumption rather
+        // than a measurement.
+        let produced_delta = snapshot
+            .estimate_surbs_produced()
+            .saturating_sub(self.last_estimator_state.estimate_surbs_produced());
+        let consumed_delta = snapshot
+            .estimate_surbs_consumed()
+            .saturating_sub(self.last_estimator_state.estimate_surbs_consumed());
+
+        if produced_delta > 0 && consumed_delta == 0 {
+            self.unverified_windows = self.unverified_windows.saturating_add(1);
+        } else {
+            self.unverified_windows = 0;
+        }
+
         self.last_estimator_state = snapshot;
         current = current.saturating_add_signed(target_buffer_change);
 
@@ -283,6 +311,19 @@ where
             current = current.saturating_sub(num_decayed_surbs);
             self.last_decay = std::time::Instant::now();
             tracing::trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+        }
+
+        // Nothing has confirmed the counterparty still holds what we think it does, so stop acting
+        // on it. Zeroing rather than decaying makes the controller produce at full rate until real
+        // evidence arrives; the first packet back rebuilds the estimate from measurement.
+        if self.unverified_windows >= UNVERIFIED_WINDOWS_BEFORE_RESET {
+            tracing::debug!(
+                windows = self.unverified_windows,
+                discarded = current,
+                "no SURB consumption confirmed while producing; discarding the buffer estimate"
+            );
+            current = 0;
+            self.unverified_windows = 0;
         }
 
         self.state
