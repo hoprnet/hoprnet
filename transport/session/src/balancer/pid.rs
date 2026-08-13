@@ -158,6 +158,34 @@ mod tests {
         assert_eq!(0, c.next_control_output(0), "a zero limit clamps every term to zero");
     }
 
+    /// Reproduces the exact operating point observed on a cluster: target 9803, empty buffer,
+    /// default limit. Production logged `output=0` there, and 15 minutes per observation is too
+    /// slow a loop to debug in -- so pin it here at 80ms instead.
+    #[test]
+    fn pid_should_produce_at_the_operating_point_seen_in_production() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(
+            9_803,
+            crate::SurbBalancerConfig::default().max_surbs_per_sec,
+        ));
+
+        let out = c.next_control_output(0);
+        assert!(out > 0, "target 9803 with an empty buffer produced {out}");
+    }
+
+    /// The very first output after configuration, which is the one that matters on a cold start or
+    /// straight after the estimate is discarded.
+    #[test]
+    fn pid_first_output_after_reconfiguration_should_not_be_zero() {
+        let mut c = PidBalancerController::default();
+        c.set_target_and_limit(BalancerControllerBounds::new(7_000, 5_000));
+
+        assert!(
+            c.next_control_output(0) > 0,
+            "first output after reconfiguration was zero"
+        );
+    }
+
     // --- PidControllerGains tests ---
 
     #[test]
