@@ -842,7 +842,11 @@ mod tests {
         .await;
 
         let edges = graph.edges();
-        assert_eq!(edges.len(), 1, "the event following the service ones must still be routed");
+        assert_eq!(
+            edges.len(),
+            1,
+            "the event following the service ones must still be routed"
+        );
         assert_eq!(
             edges[0].capacity,
             Some(10),
