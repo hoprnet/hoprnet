@@ -327,6 +327,10 @@ pub struct SsaServerCommitmentMessage<I, G> {
     /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
     /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
+    /// Deposit data for the PIX session.
+    ///
+    /// Currently set to all zeroes. Must be preserved through encode/decode.
+    pub deposit_data: [u8; 64],
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
 }
@@ -341,6 +345,7 @@ impl<I, G> SsaServerCommitmentMessage<I, G> {
         Self {
             session_id,
             params: params.to_u32(),
+            deposit_data: [0u8; 64],
             commitments: commitments.into_iter().collect(),
         }
     }
@@ -409,11 +414,11 @@ impl<I, T, C, G, K> StartProtocol<I, T, C, G, K> {
     /// Maximum number of SSAs that can be requested in a single SsaRequest message.
     ///
     /// Derived from the SsaRequest encode layout with a zero-length CBOR session_id:
-    /// header(4) + params(4) + num_commitments(2) = 10 overhead;
-    /// (PAYLOAD_SIZE - 10) / (SsaIndex + commitment_repr) = (1030 - 10) / (4 + 33) = 27.
+    /// header(4) + params(4) + deposit_data(64) + num_commitments(2) = 74 overhead;
+    /// (PAYLOAD_SIZE - 74) / (SsaIndex + commitment_repr) = (1030 - 74) / (4 + 33) = 25.
     /// Since a zero-length session_id is the smallest possible, any non-empty session_id
     /// only makes this bound tighter, making it a safe decode limit.
-    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 10)
+    pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 74)
         / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
         as u16;
     /// Size of the PIX coefficient commitment representation in bytes.
@@ -538,6 +543,7 @@ where
             }
             StartProtocol::SsaRequest(req) => {
                 data.extend_from_slice(&req.params.to_be_bytes());
+                data.extend_from_slice(&req.deposit_data);
 
                 let num_commitments = req.commitments.len() as u16;
                 data.extend_from_slice(&num_commitments.to_be_bytes());
@@ -816,7 +822,7 @@ where
                     })
                 }
                 StartProtocolDiscriminants::SsaRequest => {
-                    if body.len() <= size_of::<u32>() + size_of::<u16>() {
+                    if body.len() <= size_of::<u32>() + 64 + size_of::<u16>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
@@ -825,7 +831,10 @@ where
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("params".into()))?,
                     );
-                    let mut next_offset = size_of::<u32>();
+                    let deposit_data: [u8; 64] = body[size_of::<u32>()..size_of::<u32>() + 64]
+                        .try_into()
+                        .map_err(|_| StartProtocolError::ParseError("deposit_data".into()))?;
+                    let mut next_offset = size_of::<u32>() + 64;
 
                     let num_commitments = u16::from_be_bytes(
                         body[next_offset..next_offset + size_of::<u16>()]
@@ -869,6 +878,7 @@ where
                     StartProtocol::SsaRequest(SsaServerCommitmentMessage {
                         session_id: serde_cbor_2::from_slice(&body[next_offset..])?,
                         params,
+                        deposit_data,
                         commitments,
                     })
                 }
@@ -1014,6 +1024,7 @@ mod tests {
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
+            deposit_data: [0u8; 64],
             commitments,
         });
 
@@ -1056,6 +1067,7 @@ mod tests {
         let msg: SsaServerCommitmentMessage<u32, [u8; 33]> = SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
+            deposit_data: [0u8; 64],
             commitments: Default::default(),
         };
         assert!(matches!(msg.dimensions(), Err(StartProtocolError::ParseError(_))));
@@ -1075,6 +1087,7 @@ mod tests {
         let msg = StartProtocol::<u32, (), u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
+            deposit_data: [0u8; 64],
             commitments,
         });
 
@@ -1209,14 +1222,17 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
+        // The deposit_data field (64 bytes) slightly reduces the per-request capacity, but
+        // 23 commitments must still fit alongside a realistic long session-id.
         let mut commitments = std::collections::BTreeMap::new();
-        for i in 1..26 {
+        for i in 1..24 {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
         let msg = StartProtocol::<String, String, u8, [u8; 33], [u8; 65]>::SsaRequest(SsaServerCommitmentMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             params: 0xfeedbeef,
+            deposit_data: [0u8; 64],
             commitments,
         });
         assert!(
@@ -1335,6 +1351,7 @@ mod tests {
     fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
         let mut body = Vec::new();
         body.extend_from_slice(&0u32.to_be_bytes());
+        body.extend_from_slice(&[0u8; 64]);
         body.extend_from_slice(&declared_commitments.to_be_bytes());
         for (ssa_index, commitment) in entries {
             body.extend_from_slice(&ssa_index.to_be_bytes());
@@ -1436,6 +1453,7 @@ mod tests {
             StartProtocol::<u32, String, u8, VarLenBytes, VarLenBytes>::SsaRequest(SsaServerCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 params: 0,
+                deposit_data: [0u8; 64],
                 commitments: [(SsaIndex::MIN, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
             });
         assert!(
