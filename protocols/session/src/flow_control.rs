@@ -312,6 +312,10 @@ impl FlowControlConfig {
             persist_stall_parks: 8,
             frame_retries: 8,
             max_frame_age: Some(Duration::from_secs(2)),
+            // Detection belongs with the rest of the tail-tolerance bundle. Left unset, the return
+            // path is corrected by probing alone -- EMA-smoothed behind a path cache, so tens of
+            // seconds -- which is the gap this profile exists to close.
+            return_path_replan: Some(ReturnPathReplanConfig::default()),
             ..Self::default()
         }
     }
@@ -730,6 +734,13 @@ mod tests {
     #[test]
     fn robust_profile_should_bound_frame_age() {
         assert_eq!(FlowControlConfig::robust().max_frame_age, Some(Duration::from_secs(2)));
+        // Detection has to be on for the profile to do what it claims: left unset it was never
+        // enabled by anything -- not by a profile, not by hoprd, not by the edge client -- so the
+        // loss clock never ran and no return path was ever re-planned.
+        assert!(
+            FlowControlConfig::robust().return_path_replan.is_some(),
+            "the robust profile must enable return-path re-planning"
+        );
         assert_eq!(FlowControlConfig::default().max_frame_age, None);
     }
 
