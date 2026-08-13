@@ -186,6 +186,35 @@ mod tests {
         );
     }
 
+    /// The exact live bounds, read off a cluster run: target 9803, output limit 1960, empty buffer.
+    /// Production logs `output=0` here while the same controller with a 5000 limit produces.
+    #[test]
+    fn pid_should_produce_at_the_live_bounds() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(9_803, 1_960));
+
+        let out = c.next_control_output(0);
+        assert!(out > 0, "target 9803 / limit 1960 with an empty buffer produced {out}");
+    }
+
+    /// A buffer that was healthy and then drained must be refilled. This is the return-path failure
+    /// exactly: the session runs at target, the return path breaks, the buffer empties -- and
+    /// production commands nothing despite an error of -9803.
+    #[test]
+    fn pid_should_recover_after_a_healthy_buffer_drains() {
+        let mut c = PidBalancerController::from_gains(PidControllerGains::default());
+        c.set_target_and_limit(BalancerControllerBounds::new(9_803, 1_960));
+
+        // Healthy: sitting at target, so the controller has nothing to do for a while.
+        for _ in 0..100 {
+            c.next_control_output(9_803);
+        }
+
+        // The return path breaks and the buffer drains.
+        let out = c.next_control_output(0);
+        assert!(out > 0, "an emptied buffer after a healthy period produced {out}");
+    }
+
     // --- PidControllerGains tests ---
 
     #[test]
