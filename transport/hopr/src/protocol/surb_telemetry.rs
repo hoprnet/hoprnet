@@ -91,6 +91,8 @@ pub struct SurbRoundTripRegistry {
     destinations: Arc<DashMap<ForwardAndReturnPath, OffchainPublicKey>>,
     /// What each pair's recent flushes say about whether it still works.
     silence: Arc<DashMap<ForwardAndReturnPath, Silence>>,
+    /// Flushes since each destination was last reported, so one is not re-planned repeatedly.
+    replanned: Arc<DashMap<OffchainPublicKey, u32>>,
 }
 
 /// Per-pair silence bookkeeping, carried between flushes.
@@ -120,6 +122,19 @@ const MIN_EXPECTED_FOR_SILENCE: u64 = 20;
 /// budget -- the dead leg reads exactly zero from t+5s onward while its siblings keep returning.
 const SILENT_FLUSHES_BEFORE_DEGRADED: u32 = 5;
 
+/// Flushes a destination must wait before it can be re-planned again.
+///
+/// Silence accrues per pair of legs, but re-planning acts on the *destination*, and a destination
+/// carries several pairs at once. Re-arming each pair individually therefore still allows one
+/// destination to be re-planned every couple of seconds -- faster than a freshly chosen return path
+/// can be established and start delivering, so each re-plan destroys the candidate the previous one
+/// selected. Measured with the invalidation finally reaching the cache: fifteen re-plans during a
+/// thirty-second healthy baseline, which collapsed it from 100% to 0.1% arrival.
+///
+/// Long enough for a new path to prove itself (it needs [`SILENT_FLUSHES_BEFORE_DEGRADED`] flushes
+/// just to be judged), short enough to retry twice inside the recovery budget.
+const FLUSHES_BETWEEN_REPLANS: u32 = 8;
+
 impl SurbRoundTripRegistry {
     fn counters(&self, paths: ForwardAndReturnPath) -> Arc<SurbRoundTripCounters> {
         self.inner.entry(paths).or_default().value().clone()
@@ -143,6 +158,12 @@ impl SurbRoundTripRegistry {
     /// a pair that has not yet returned its first reply is indistinguishable from a dead one.
     pub fn degraded_destinations(&self) -> Vec<OffchainPublicKey> {
         let mut degraded = Vec::new();
+
+        // Age the per-destination cooldowns once per flush, dropping those that have served out.
+        self.replanned.retain(|_, since| {
+            *since += 1;
+            *since < FLUSHES_BETWEEN_REPLANS
+        });
 
         for entry in self.inner.iter() {
             let paths = *entry.key();
@@ -175,14 +196,18 @@ impl SurbRoundTripRegistry {
                 // selection settle.
                 state.runs = 0;
                 if let Some(dest) = self.destinations.get(&paths) {
-                    degraded.push(*dest);
+                    let dest = *dest;
+                    // Only if this destination is not already serving out a cooldown: another of
+                    // its pairs may have reported it moments ago, and re-planning again now would
+                    // discard the candidate that re-plan just chose.
+                    if !self.replanned.contains_key(&dest) {
+                        self.replanned.insert(dest, 0);
+                        degraded.push(dest);
+                    }
                 }
             }
         }
 
-        // `OffchainPublicKey` is not `Ord`, and several pairs of legs can share a destination.
-        let mut seen = std::collections::HashSet::new();
-        degraded.retain(|d: &OffchainPublicKey| seen.insert(*d));
         degraded
     }
 
@@ -787,6 +812,76 @@ mod tests {
         }
         mint_only(&registry, paths, destination);
         assert_eq!(vec![destination], flush(&registry));
+        let _ = (graph, me);
+    }
+
+    /// Several pairs lead to one destination, but re-planning acts on the destination.
+    ///
+    /// Regression: silence accrues per pair, so pairs re-armed independently and between them kept
+    /// re-planning the same destination every couple of seconds. With the invalidation finally
+    /// reaching the path cache, that destroyed each freshly chosen return path before it could
+    /// deliver -- a healthy baseline measured 0.1% arrival with fifteen re-plans inside it.
+    ///
+    /// The two pairs are staggered so they come due on *different* flushes; collapsing duplicates
+    /// within one flush was already handled and is not what failed.
+    #[test]
+    fn one_destination_should_not_be_replanned_again_while_a_new_path_is_settling() {
+        let (graph, me, peers) = graph_with(2);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+
+        let first = legs();
+        let second = ForwardAndReturnPath {
+            forward: [0, 2, 0, 0, 0],
+            reply: [2, 0, 0, 0, 0],
+        };
+        assert_ne!(
+            first, second,
+            "the two pairs must be distinct for this to test anything"
+        );
+
+        deliver(&registry, first, destination);
+        deliver(&registry, second, destination);
+        assert!(flush(&registry).is_empty());
+
+        // `first` goes quiet immediately; `second` keeps answering for three more flushes, so its
+        // own silence comes due well after the first re-plan.
+        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            mint_only(&registry, first, destination);
+            deliver(&registry, second, destination);
+            assert!(flush(&registry).is_empty());
+        }
+        mint_only(&registry, first, destination);
+        deliver(&registry, second, destination);
+        assert_eq!(
+            vec![destination],
+            flush(&registry),
+            "the first silence must be acted on"
+        );
+
+        // Now both stay silent. Suppression still resets the pair's counter, so it comes due
+        // again and again; what must be bounded is how often the *destination* is acted on.
+        const WINDOW: u32 = 4 * SILENT_FLUSHES_BEFORE_DEGRADED;
+        let mut reports = 0;
+        for _ in 0..WINDOW {
+            mint_only(&registry, first, destination);
+            mint_only(&registry, second, destination);
+            reports += flush(&registry).len();
+        }
+
+        // Two pairs coming due every five flushes would otherwise report roughly eight times in
+        // this window; measured in the cluster, fifteen re-plans in thirty flushes was enough to
+        // hold a healthy session at 0.1% arrival.
+        // An absolute bound, deliberately not derived from `FLUSHES_BETWEEN_REPLANS` -- a limit
+        // computed from the constant under test moves with it and can never fail. Suppression
+        // resets the pair, so it comes due every five flushes; the cooldown lets roughly every
+        // other one through, which over twenty flushes is at most three.
+        assert!(
+            reports <= 3,
+            "a destination must not be re-planned faster than a new path can settle: {reports} re-plans in {WINDOW} \
+             flushes"
+        );
+
         let _ = (graph, me);
     }
 
