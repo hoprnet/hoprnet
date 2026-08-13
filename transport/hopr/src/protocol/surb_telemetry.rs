@@ -326,8 +326,9 @@ impl<C> SurbTelemetryCodec<C> {
     /// Credits the legs a reply came back on.
     fn on_replied(&self, surb_id: &HoprSurbId) {
         // A SURB is single-use, so the association is consumed with it.
-        if let Some(paths) = self.pending.remove(surb_id) {
-            self.registry.record_observed(paths, 1);
+        match self.pending.remove(surb_id) {
+            Some(paths) => self.registry.record_observed(paths, 1),
+            None => tracing::debug!("reply on a surb with no pending legs"),
         }
     }
 }
@@ -370,6 +371,10 @@ where
         data: Bytes,
     ) -> Result<IncomingPacket, IncomingPacketError<<Self as PacketDecoder>::Error>> {
         let packet = self.inner.decode(sender, data)?;
+
+        if let IncomingPacket::Final(f) = &packet {
+            tracing::debug!(on_surb = f.replied_on_surb.is_some(), "final packet decoded");
+        }
 
         if let IncomingPacket::Final(final_packet) = &packet
             && let Some(surb_id) = final_packet.replied_on_surb
