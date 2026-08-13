@@ -866,7 +866,19 @@ where
                     .for_each(|_| {
                         // Detection before the drain: `degraded_destinations` reads the counts the
                         // flush is about to reset.
+                        // DIAGNOSTIC kill-switch. Re-planning became destructive the moment its
+                        // invalidation started matching real cache entries, and it is not yet
+                        // established whether the damage comes from the invalidation itself or from
+                        // something else in the same change. Toggling this lets one binary produce
+                        // both arms of that comparison, so the two runs differ in nothing else.
+                        let replanning_disabled = std::env::var_os("HOPR_DISABLE_RETURN_PATH_REPLAN").is_some();
+
                         for destination in surb_round_trips.degraded_destinations() {
+                            if replanning_disabled {
+                                tracing::info!(%destination, "return path silent; re-planning DISABLED");
+                                continue;
+                            }
+
                             let node = hopr_api::types::internal::prelude::NodeId::Offchain(destination);
 
                             // Sessions name their destination by its chain address, this telemetry
