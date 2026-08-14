@@ -1046,7 +1046,7 @@ mod tests {
             total_latency_ms: Some(latency_ms),
             min_probe_success_rate: None,
             min_ack_rate: None,
-            capacity_floor: Some(1000),
+            fundable_tickets_floor: Some(1000),
         }
     }
 
