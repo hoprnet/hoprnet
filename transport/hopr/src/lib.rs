@@ -341,8 +341,8 @@ where
             graph,
             path_planner,
             my_multiaddresses,
-            smgr: Arc::new(
-                SessionManager::new(SessionManagerConfig {
+            smgr: Arc::new(SessionManager::new(
+                SessionManagerConfig {
                     frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                         .ok()
                         .and_then(|s| s.parse::<usize>().ok())
@@ -373,9 +373,9 @@ where
                     surb_target_notify: true,
                     maximum_sessions: cfg.session.maximum_managed_sessions,
                     ..Default::default()
-                })
-                .with_return_path_feedback(return_path_feedback),
-            ),
+                },
+                Some(return_path_feedback),
+            )),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,

@@ -124,9 +124,7 @@ pub struct FlowControlConfig {
     /// direction triggers a re-plan of the return path instead of waiting for probing to notice.
     ///
     /// `None` (the default) leaves the return path to be corrected by probing alone, which is
-    /// EMA-smoothed behind a path cache and therefore takes tens of seconds — measured at 54–55 %
-    /// arrival for a session opened right after a return relayer dies, against 100 % for one opened
-    /// 60 s later.
+    /// EMA-smoothed behind a path cache and therefore takes tens of seconds.
     #[default(None)]
     pub return_path_replan: Option<ReturnPathReplanConfig>,
 }

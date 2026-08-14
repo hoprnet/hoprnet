@@ -134,15 +134,15 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = "1.21.0"
+hopr-api = "1.22.0"
 hopr-types = { version = "2.2.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.7.0", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.8.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "4.0.2-rc.10", path = "hopr/hopr-lib" }
+hopr-lib = { version = "4.0.2-rc.11", path = "hopr/hopr-lib" }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
 hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
@@ -159,7 +159,7 @@ hopr-chain-connector = "0.22.1"
 hopr-session-server-forwarder = { version = "0.1.0", default-features = false }
 hopr-transport-p2p = { version = "0.9.4", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.3.0", default-features = false }
-hopr-network-graph = { version = "0.3.3", default-features = false }
+hopr-network-graph = { version = "0.3.4", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -228,11 +228,3 @@ ignored = [
   "hopr-session-server-forwarder",
   "hopr-utils-session",
 ]
-
-# Pinned to the unreleased upstream branches that carry SURB round-trip telemetry. Replace with
-# plain crates.io versions once hopr-api 1.21.0, hopr-utilities 0.7.0 and hopr-network-graph 0.4.0
-# are published.
-[patch.crates-io]
-hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "4a53ed13634a5080a63760b9ca84bd9fe7710114" }
-hopr-utilities = { git = "https://github.com/hoprnet/hopr-utilities", rev = "e17451a8db2fd72cecde273ac8ef87de96c8bac0" }
-hopr-network-graph = { git = "https://github.com/hoprnet/hopr-impls", rev = "d9dc437108b59776b8b9673664c88d9b177d7769" }
