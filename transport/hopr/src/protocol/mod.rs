@@ -27,6 +27,8 @@ mod pipeline;
 /// Stream processing utilities
 pub mod stream;
 
+/// Sequences re-planning ahead of refilling when a return path goes silent.
+pub mod return_path_recovery;
 /// Records SURB round-trips as network graph edge telemetry.
 pub mod surb_telemetry;
 

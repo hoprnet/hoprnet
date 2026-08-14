@@ -17,10 +17,8 @@ use std::{
     time::Duration,
 };
 
-use hopr_api::types::internal::prelude::NodeId;
-pub use hopr_protocol_session::flow_control::ReturnPathFeedback;
 use hopr_protocol_session::flow_control::{
-    Backoff, DeliveryClock, DeliverySignal, FlowControlConfig, ReturnPathMonitor, SupplyConstraint, WindowController,
+    Backoff, DeliveryClock, DeliverySignal, FlowControlConfig, SupplyConstraint, WindowController,
 };
 
 use crate::balancer::BalancerStateValues;
@@ -83,16 +81,6 @@ impl SupplyConstraint for SurbSupply {
     }
 }
 
-/// Builds a [`ReturnPathFeedback`] handle bound to a specific session destination.
-///
-/// The session layer knows *when* a return path has gone bad; only the transport layer knows how
-/// to re-plan one. This factory is the seam between the two, so the session manager can hand each
-/// session a handle without depending on the path planner.
-pub trait ReturnPathFeedbackFactory: Send + Sync {
-    /// Returns a handle that re-plans the return path from `destination` back to this node.
-    fn for_destination(&self, destination: NodeId) -> Arc<dyn ReturnPathFeedback>;
-}
-
 /// Wraps a Session socket, admitting writes only while the [`WindowController`] has room against the
 /// honest delivery clock and the SURB ceiling. Reads are delegated untouched (never gated), so the
 /// duplex socket cannot deadlock; the window always keeps at least `min_window_size` admissible.
@@ -119,9 +107,6 @@ pub struct PacedWriter<S> {
     sent_total: u64,
     /// `refresh_window` call counter, for throttling the diagnostic trace.
     refreshes: u64,
-    /// Opt-in watcher that re-plans the return path on sustained loss. `None` leaves return-path
-    /// correction to probing alone.
-    return_path: Option<ReturnPathMonitor>,
 }
 
 impl<S> PacedWriter<S> {
@@ -139,19 +124,7 @@ impl<S> PacedWriter<S> {
             persist_after: cfg.persist_stall_parks,
             sent_total: 0,
             refreshes: 0,
-            return_path: None,
         }
-    }
-
-    /// Enables reactive return-path re-planning, reporting to `feedback`.
-    ///
-    /// A no-op unless [`FlowControlConfig::return_path_replan`] is set, so the caller can wire the
-    /// handle unconditionally and let configuration decide.
-    pub fn with_return_path_feedback(mut self, cfg: FlowControlConfig, feedback: Arc<dyn ReturnPathFeedback>) -> Self {
-        self.return_path = cfg
-            .return_path_replan
-            .map(|replan_cfg| ReturnPathMonitor::new(feedback, replan_cfg));
-        self
     }
 
     /// Folds the latest honest delivery into the window. `cwnd` moves **only** on the honest delivery
@@ -163,12 +136,6 @@ impl<S> PacedWriter<S> {
         self.window.apply_delivery(delivered);
         if delivered.acked_bytes > 0 || delivered.lost_bytes > 0 {
             self.stalled_parks = 0;
-        }
-
-        // Same observation, different question: the window asks "how fast may I send", the monitor
-        // asks "is the return path still there at all".
-        if let Some(monitor) = self.return_path.as_mut() {
-            monitor.observe(delivered);
         }
 
         self.refreshes = self.refreshes.wrapping_add(1);

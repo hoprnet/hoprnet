@@ -92,7 +92,7 @@ use tracing::{Instrument, debug, error, trace, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
-pub use crate::{config::HoprProtocolConfig, path::PlannerReturnPathFeedback, protocol::PeerProtocolCounterRegistry};
+pub use crate::{config::HoprProtocolConfig, protocol::PeerProtocolCounterRegistry};
 use crate::{
     constants::SESSION_INITIATION_TIMEOUT_BASE,
     errors::HoprTransportError,
@@ -331,7 +331,6 @@ where
             selector,
             planner_config,
         );
-        let return_path_feedback = Arc::new(PlannerReturnPathFeedback(path_planner.clone()));
 
         Ok(Self {
             packet_key: identity.1.clone(),
@@ -341,41 +340,38 @@ where
             graph,
             path_planner,
             my_multiaddresses,
-            smgr: Arc::new(SessionManager::new(
-                SessionManagerConfig {
-                    frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
-                        .ok()
-                        .and_then(|s| s.parse::<usize>().ok())
-                        .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
-                        .max(SESSION_MTU),
-                    max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
-                        .ok()
-                        .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
-                        .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
-                        .max(Duration::from_millis(100)),
-                    max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
-                        .ok()
-                        .and_then(|s| s.parse::<usize>().ok())
-                        .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                    balancer_sampling_interval: cfg.session.balancer_sampling_interval,
-                    initial_return_session_egress_rate: 10,
-                    minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
-                    maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
-                    // The lower bound is enforced once in `SessionManager::new` via
-                    // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
-                    surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")
-                        .ok()
-                        .and_then(|s| s.parse::<u64>().ok())
-                        .map(|ms| Some(Duration::from_millis(ms)))
-                        .unwrap_or(cfg.session.surb_balance_notify_period),
-                    surb_target_notify: true,
-                    maximum_sessions: cfg.session.maximum_managed_sessions,
-                    ..Default::default()
-                },
-                Some(return_path_feedback),
-            )),
+            smgr: Arc::new(SessionManager::new(SessionManagerConfig {
+                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                    .max(SESSION_MTU),
+                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                    .max(Duration::from_millis(100)),
+                max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_buffered_segments),
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                initial_return_session_egress_rate: 10,
+                minimum_surb_buffer_duration: cfg.session.balancer_minimum_surb_buffer_duration,
+                maximum_surb_buffer_size: cfg.packet.surb_store.rb_capacity,
+                // The lower bound is enforced once in `SessionManager::new` via
+                // `MIN_SURB_BUFFER_NOTIFICATION_PERIOD`; don't duplicate that floor as a literal here.
+                surb_balance_notify_period: std::env::var("HOPR_SESSION_SURB_BALANCE_NOTIFY_PERIOD_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(|ms| Some(Duration::from_millis(ms)))
+                    .unwrap_or(cfg.session.surb_balance_notify_period),
+                surb_target_notify: true,
+                maximum_sessions: cfg.session.maximum_managed_sessions,
+                ..Default::default()
+            })),
             chain_api: resolver,
             session_telemetry_tag_allocator,
             probing_tag_allocator,
@@ -850,23 +846,79 @@ where
 
         // -- periodic SURB round-trip flush
         tracing::info!(?role, "starting surb round-trip flush task");
+        // Long enough to outlast the silence gate that produced the evidence, so a path that stays
+        // dead is re-marked before the previous mark lapses, and short enough that a path which
+        // recovers unnoticed returns to closed-loop control promptly.
+        const RETURN_PATH_DEGRADED_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
         let surb_flush_graph = self.graph.clone();
         let surb_flush_interval = self.cfg.surb_flush_interval;
+        let surb_flush_smgr = self.smgr.clone();
+        let surb_flush_chain = self.chain_api.clone();
+        let surb_flush_planner = self.path_planner.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
-                futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval))
-                    .for_each(|_| {
-                        protocol::surb_telemetry::flush_into(
-                            &surb_round_trips,
-                            &surb_flush_graph,
-                            hopr_utils::platform::time::native::current_time()
-                                .as_unix_timestamp()
-                                .as_millis(),
-                        );
-                        futures::future::ready(())
-                    })
-                    .await;
+                let mut episodes = protocol::return_path_recovery::ReturnPathEpisodes::new(RETURN_PATH_DEGRADED_GRACE);
+                let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
+
+                while ticks.next().await.is_some() {
+                    // Detection before the drain: `degraded_destinations` reads the counts the
+                    // flush is about to reset.
+                    let silent = surb_round_trips.degraded_destinations();
+
+                    // The graph has to see this interval's counts *before* anything re-plans on it,
+                    // otherwise the re-plan that the silence just triggered reads a graph one whole
+                    // tick behind the evidence that triggered it.
+                    protocol::surb_telemetry::flush_into(
+                        &surb_round_trips,
+                        &surb_flush_graph,
+                        hopr_utils::platform::time::native::current_time()
+                            .as_unix_timestamp()
+                            .as_millis(),
+                    );
+
+                    // Re-plan first, refill only if re-planning moved traffic. Run the other way
+                    // round the refill mints SURBs onto the very route the planner is abandoning --
+                    // see `protocol::return_path_recovery`.
+                    //
+                    // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
+                    // they capture has to survive being invoked once per silent destination.
+                    let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
+                    for step in episodes
+                        .tick(
+                            silent,
+                            |destination| async move { planner.recompute_paths_from(&destination).await },
+                            |destination| async move {
+                                // Sessions name their destination by its chain address, this
+                                // telemetry by its packet key, and a `NodeId` holding one is never
+                                // equal to a `NodeId` holding the other -- so the match has to be
+                                // made on a resolved form, not on the enum.
+                                //
+                                // The counterparty has to still be receiving SURBs to reply with,
+                                // and its silence has by now convinced our balancer that it is well
+                                // stocked -- so tell the Sessions routed there to stop believing
+                                // that estimate while the evidence says otherwise.
+                                chain
+                                    .packet_key_to_chain_key(&destination)
+                                    .ok()
+                                    .flatten()
+                                    .map(hopr_api::types::internal::prelude::NodeId::Chain)
+                                    .map(|n| smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
+                                    .unwrap_or(0)
+                            },
+                        )
+                        .await
+                    {
+                        match step {
+                            protocol::return_path_recovery::RecoveryStep::Replanned { destination, moved } => {
+                                tracing::info!(%destination, entries = moved, "return path silent, re-planned")
+                            }
+                            protocol::return_path_recovery::RecoveryStep::Refilled { destination, sessions } => {
+                                tracing::info!(%destination, sessions, "refilling behind the re-plan")
+                            }
+                        }
+                    }
+                }
             }),
         );
 
