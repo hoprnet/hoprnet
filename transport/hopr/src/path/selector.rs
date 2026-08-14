@@ -123,11 +123,13 @@ where
 
             // Probe rate: taking the min of immediate and intermediate guards against nodes that
             // look good on direct probes but degrade under multi-hop load.
+            // `and_then`, not `map`: a stream with no observations contributes nothing to the min
+            // rather than contributing a zero it never measured.
             let edge_probe = observed
                 .immediate_qos()
-                .map(|m| m.average_probe_rate())
+                .and_then(|m| m.average_probe_rate())
                 .into_iter()
-                .chain(observed.intermediate_qos().map(|m| m.average_probe_rate()))
+                .chain(observed.intermediate_qos().and_then(|m| m.average_probe_rate()))
                 .reduce(f64::min);
             let min_probe_success_rate = opt_min(prev.min_probe_success_rate, edge_probe);
 

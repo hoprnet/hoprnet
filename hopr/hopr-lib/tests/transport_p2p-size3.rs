@@ -140,7 +140,10 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
             node.inner()
                 .transport()
                 .network_peer_observations(peer)
-                .and_then(|obs| obs.immediate_qos().map(|imm| imm.average_probe_rate() > 0.0))
+                .and_then(|obs| {
+                    obs.immediate_qos()
+                        .map(|imm| imm.average_probe_rate().is_some_and(|r| r > 0.0))
+                })
                 .unwrap_or(false)
         });
         if scored_all {

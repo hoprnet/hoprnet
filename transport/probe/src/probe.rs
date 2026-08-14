@@ -488,14 +488,10 @@ mod tests {
             None
         }
 
-        fn average_probe_rate(&self) -> f64 {
-            1.0
-        }
-
-        // `has_observations` must agree with `score`: both report a measured, perfect link so the
-        // probe tests see the same edge they did before the trait gained the presence distinction.
-        fn has_observations(&self) -> bool {
-            true
+        // A measured, perfect link — so the probe tests see the same edge they did before the
+        // trait gained the presence distinction. `has_observations` derives from this.
+        fn average_probe_rate(&self) -> Option<f64> {
+            Some(1.0)
         }
 
         fn score(&self) -> Option<f64> {
@@ -504,8 +500,8 @@ mod tests {
     }
 
     impl EdgeNetworkObservableRead for TestEdgeTransportObservations {
-        fn is_connected(&self) -> bool {
-            true
+        fn is_connected(&self) -> Option<bool> {
+            Some(true)
         }
     }
 
