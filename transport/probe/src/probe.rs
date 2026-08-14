@@ -492,8 +492,14 @@ mod tests {
             1.0
         }
 
-        fn score(&self) -> f64 {
-            1.0
+        // `has_observations` must agree with `score`: both report a measured, perfect link so the
+        // probe tests see the same edge they did before the trait gained the presence distinction.
+        fn has_observations(&self) -> bool {
+            true
+        }
+
+        fn score(&self) -> Option<f64> {
+            Some(1.0)
         }
     }
 
@@ -504,7 +510,7 @@ mod tests {
     }
 
     impl EdgeProtocolObservable for TestEdgeTransportObservations {
-        fn capacity(&self) -> Option<u128> {
+        fn balance(&self) -> Option<hopr_api::graph::traits::Balance> {
             None
         }
     }
@@ -540,8 +546,8 @@ mod tests {
             None
         }
 
-        fn score(&self) -> f64 {
-            1.0
+        fn score(&self) -> Option<f64> {
+            Some(1.0)
         }
     }
 
@@ -583,6 +589,8 @@ mod tests {
         {
             unimplemented!()
         }
+
+        fn set_ticket_face_value(&self, _ticket_face_value: hopr_api::graph::traits::Balance) {}
     }
 
     #[async_trait]
@@ -592,6 +600,10 @@ mod tests {
 
         fn identity(&self) -> &OffchainPublicKey {
             &self.me
+        }
+
+        fn ticket_face_value(&self) -> Option<hopr_api::graph::traits::Balance> {
+            None
         }
 
         fn node_count(&self) -> usize {
