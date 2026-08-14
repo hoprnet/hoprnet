@@ -157,7 +157,13 @@ async fn probe_warmup_should_populate_graph_edges_for_all_peers(cluster: &Cluste
             .network_peer_observations(peer)
             .context("peer should have observations in the graph")?;
 
-        assert!(obs.score() > 0.0, "score should be positive for {peer}");
+        // `score` is `Option<f64>` since hopr-api 2.0.0: `None` is unobserved, `Some(0.0)` is
+        // measured and unusable. A probed neighbour must be the former of neither.
+        assert!(
+            obs.score().is_some_and(|score| score > 0.0),
+            "score should be observed and positive for {peer}, got {:?}",
+            obs.score()
+        );
     }
 
     Ok(())
@@ -184,7 +190,11 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
             .all_network_peers(0.0)
             .await
             .context("failed to get all network peers")?;
-        if all_peers.len() >= expected_count && all_peers.iter().all(|(_, obs)| obs.score() > 0.0) {
+        if all_peers.len() >= expected_count
+            && all_peers
+                .iter()
+                .all(|(_, obs)| obs.score().is_some_and(|score| score > 0.0))
+        {
             break;
         }
         sleep(Duration::from_secs(2)).await;
@@ -193,7 +203,11 @@ async fn all_network_peers_should_return_scored_entries(cluster: &ClusterGuard) 
     assert!(!all_peers.is_empty(), "should have at least one peer with score > 0");
 
     for (peer_id, obs) in &all_peers {
-        assert!(obs.score() > 0.0, "peer {peer_id} score should be positive");
+        assert!(
+            obs.score().is_some_and(|score| score > 0.0),
+            "peer {peer_id} score should be observed and positive, got {:?}",
+            obs.score()
+        );
         assert!(
             obs.last_update().as_millis() > 0,
             "peer {peer_id} should have a last_update timestamp"
