@@ -270,6 +270,25 @@ pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 /// Maximum time to wait for counterparty to receive the target number of SURBs.
 const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How long the Entry holds a *near-miss* `SsaRequest` while the Exit's returned data catches up to
+/// the successor boundary.
+///
+/// Absorbs mixer reordering between the returned packets and the `SsaRequest` they earned — the two
+/// travel the same mixed path, so the request can arrive ahead of the last few packets that
+/// justified it. Nothing longer: a sustained shortfall never reaches this wait, because the gate only
+/// enters it for a request already within one emission window of the boundary.
+///
+/// Comfortably inside the Exit's `max_ssa_delivery_time` (20 s by default, batch-scaled), which is
+/// what closes the Session as `CommitmentTimeout` if no `SsaCommit` follows. That budget also has to
+/// cover generating the commitments and shipping the burst, so this takes a small slice of it.
+const SSA_SUCCESSOR_SERVICE_WAIT: Duration = Duration::from_secs(2);
+
+/// How often [`SSA_SUCCESSOR_SERVICE_WAIT`] re-reads the returned-packet count.
+///
+/// Polled rather than notified: the alternative is waking a waiter from the Session receive path,
+/// which would put a branch on every inbound packet to serve a case that arises once per SSA cycle.
+const SSA_SUCCESSOR_SERVICE_POLL: Duration = Duration::from_millis(250);
+
 /// Minimum timeout until an unfinished frame is discarded.
 const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
@@ -376,6 +395,14 @@ struct SessionSsaState {
     /// Entry-side only; an Exit never commits and leaves it at zero. [`SsaIndex`] is a `NonZero<u32>`,
     /// which is what makes `0` an unambiguous "none" rather than a sentinel that has to be defended.
     committed_ssa_watermark: std::sync::atomic::AtomicU32,
+    /// [`SessionSlot::returned_packets`] as it stood when this Session first committed.
+    ///
+    /// The successor gate counts service *since* that instant, not since the Session opened. Before
+    /// the first commitment the generator holds no polynomials, so the SURBs going out carry no
+    /// shares — and an Exit may legitimately be served up to `max_predeposit_packets` of them before
+    /// any deposit exists. Crediting that prefix would let the Exit bank unpaid service against the
+    /// first cycle it *is* paid for. Everything after this point rides a share.
+    returned_at_first_commit: std::sync::atomic::AtomicU64,
 }
 
 impl SessionSsaState {
@@ -383,6 +410,7 @@ impl SessionSsaState {
         Self {
             params,
             committed_ssa_watermark: std::sync::atomic::AtomicU32::new(0),
+            returned_at_first_commit: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -392,13 +420,28 @@ impl SessionSsaState {
         SsaIndex::new(self.committed_ssa_watermark.load(Ordering::Relaxed))
     }
 
-    /// Raises the committed-index watermark to `index` if it is higher.
+    /// Raises the committed-index watermark to `index` if it is higher, taking the returned-packet
+    /// baseline on the first commitment.
     ///
     /// `fetch_max` rather than a store: the gate serialises requests per pseudonym, but a Session's
-    /// slot is shared and monotonicity here must not depend on that lock staying where it is.
+    /// slot is shared and monotonicity here must not depend on that lock staying where it is. Its
+    /// *previous* value is also what makes the baseline race-free without leaning on that lock —
+    /// exactly one caller can observe a prior watermark of zero, so exactly one stores.
     #[inline]
-    pub fn note_committed(&self, index: SsaIndex) {
-        self.committed_ssa_watermark.fetch_max(index.get(), Ordering::Relaxed);
+    pub fn note_committed(&self, index: SsaIndex, returned_packets: u64) {
+        if self.committed_ssa_watermark.fetch_max(index.get(), Ordering::Relaxed) == 0 {
+            self.returned_at_first_commit.store(returned_packets, Ordering::Relaxed);
+        }
+    }
+
+    /// Exit → Entry packets received since this Session's first commitment.
+    ///
+    /// Saturating rather than wrapping: `returned_packets` is monotonic and the baseline is a past
+    /// value of it, so an underflow is impossible — and if one ever became possible, reporting zero
+    /// service closes the successor gate rather than opening it.
+    #[inline]
+    pub fn served_since_first_commit(&self, returned_packets: u64) -> u64 {
+        returned_packets.saturating_sub(self.returned_at_first_commit.load(Ordering::Relaxed))
     }
 
     /// Data quota one SSA cycle of these dimensions covers.
@@ -438,6 +481,20 @@ pub(crate) struct SessionSlot {
     /// Held separately from `pix_supervisor` because the egress path touches it per packet and has
     /// no use for the rest of the handle.
     pix_egress_gate: Arc<OnceLock<Arc<ServiceGate>>>,
+    /// Exit → Entry Session packets received on this Session, ever.
+    ///
+    /// Entry-side only; stays zero on the Exit, which is the side that *sends* them. Each such
+    /// packet consumed one return SURB, and a SURB carries at most one PIX share which the Exit can
+    /// only decrypt by using it — so this counts shares the Exit has unlocked, measured without
+    /// asking it. That is what makes it usable as a deposit gate: see the successor gate in
+    /// [`SessionManager::handle_ssa_request`].
+    ///
+    /// Deliberately *not* [`surb_estimator`](Self::surb_estimator)`.consumed`, which increments on
+    /// the same event on this side today. That field is documented as an *estimate* feeding the PID
+    /// balancer, and it is only wired when `surb_management` is enabled; this one decides whether
+    /// money is spent and must be neither. Carrying the increment twice is the cheaper mistake: a
+    /// receive path that forgets this counter makes the gate stricter, never laxer.
+    returned_packets: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -1757,6 +1814,8 @@ where
                         balancer.start_control_loop(self.cfg.balancer_sampling_interval);
                     abort_handles.insert(SessionHandles::Balancer, balancer_abort_handle);
 
+                    let returned_packets = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
                     // Insert the slot before the SURB readiness wait so any echo packets that
                     // arrive during pre-loading are accepted rather than dropped as unknown.
                     // Early return from the wait below drops slot_guard uncommitted, which removes
@@ -1775,6 +1834,7 @@ where
                                 // there is no supervisor here and nothing gates egress.
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
+                                returned_packets: returned_packets.clone(),
                             },
                         )
                         .ok_or_else(|| {
@@ -1834,6 +1894,8 @@ where
                                 surb_estimator_for_rx
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                // Same event, separate counter, on purpose — see `returned_packets`.
+                                returned_packets.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 #[cfg(feature = "telemetry")]
                                 telemetry::record_session_surb_consumed(&session_id, 1);
                             }),
@@ -1859,6 +1921,12 @@ where
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
 
+                    // Counted here too, unlike `surb_estimator`: the PIX successor gate reads this,
+                    // and a knob that binds on some Sessions and not others is how a deposit gate
+                    // silently becomes a gate that never opens.
+                    let returned_packets = Arc::new(std::sync::atomic::AtomicU64::new(0));
+                    let returned_packets_for_rx = returned_packets.clone();
+
                     // Insert the slot and obtain a guard that rolls it back if any
                     // subsequent setup step fails.
                     let mut slot_guard = self
@@ -1874,6 +1942,7 @@ where
                                 // Entry side: the Exit is authoritative for the PIX lifecycle.
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
+                                returned_packets,
                             },
                         )
                         .ok_or_else(|| {
@@ -1905,7 +1974,12 @@ where
                         session_id,
                         forward_routing,
                         session_config(&self.cfg, cfg.capabilities),
-                        (reduced_surb_sender, session_rx),
+                        (
+                            reduced_surb_sender,
+                            session_rx.inspect(move |_| {
+                                returned_packets_for_rx.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }),
+                        ),
                         Some(notifier),
                     )?;
 
@@ -2494,6 +2568,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            returned_packets: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -2523,6 +2598,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            returned_packets: Default::default(),
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -2682,6 +2758,7 @@ where
             current_ssa_state: Default::default(),
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
+            returned_packets: Default::default(),
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -3519,6 +3596,81 @@ where
             _ => {}
         }
 
+        // Second half of the successor gate, and the one that measures the Exit rather than us.
+        //
+        // Emission above is this node's own work: it counts shares handed to the local packet
+        // pipeline by `create_surb_for_path`, a consumption that is not even rolled back when the
+        // rest of the packet build fails. An Exit that requests, is funded, and then returns nothing
+        // still walks that counter forward for as long as we keep sending, so on its own it prices
+        // deposits against work we did to ourselves.
+        //
+        // What is checked here is service that actually arrived. A share is encrypted with the first
+        // relayer's challenge solution and rides a return SURB, so the Exit can only decrypt it by
+        // *using* that SURB — one returned packet is one SURB consumed is one share unlocked. The
+        // Exit cannot inflate this without unlocking exactly as many shares, which advances the
+        // recovery it is claiming to have made. Nothing it reports is trusted.
+        //
+        // Skipped before the first commitment: the opening batch is the one nothing has been paid
+        // for yet, and there is no service to have been rendered against it.
+        if let Some(state) = session_slot.current_ssa_state.get()
+            && let Some(watermark) = state.committed_watermark()
+        {
+            let shares_per_cycle = our_params.polys_per_ssa() as u64 * our_params.emitted_shares_per_poly() as u64;
+            let target = (watermark.get() as u64 - 1) * shares_per_cycle + min_emitted;
+
+            // Discounted by exactly the loss the surplus insures against. The Exit unlocks a share
+            // when the *first relayer* acknowledges, which is upstream of us, so every packet lost
+            // after that point is progress it legitimately has and we cannot see. Demanding the
+            // undiscounted figure would refuse conforming Exits on any lossy path; an Exit losing
+            // more than the surplus covers could not have reconstructed the cycle anyway.
+            //
+            // `u128` for the multiplication only — at the extremes of the accepted ranges the
+            // numerator overflows `u64`. The quotient cannot, since the ratio is at most one.
+            let required = (target as u128 * our_params.shares_per_poly() as u128
+                / our_params.emitted_shares_per_poly() as u128) as u64;
+
+            let served = |slot: &SessionSlot| {
+                state.served_since_first_commit(slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed))
+            };
+            let mut observed = served(&session_slot);
+
+            if observed < required {
+                // A conforming Exit asks the instant its reconstructor crosses the threshold, and the
+                // request travels the same mixed path as the packets that earned it — so it can
+                // overtake the last few of them. Refusing that is not a refusal at all: `RequestSsa`
+                // is emitted once per index and never retried, so the Exit sits in
+                // `AwaitingCommitment` until `max_ssa_delivery_time` and then closes the Session.
+                // A short wait costs nothing and saves the Session.
+                //
+                // Entered only for a near miss, and that is what keeps the wait from being a lever:
+                // this handler runs under a bounded `for_each_concurrent` and holds the
+                // per-pseudonym request lock, so an Exit must already have returned all but one
+                // emission window of what it owes to occupy either. Anything further out is refused
+                // on the spot, at no cost to us.
+                //
+                // One window rather than a fraction of `required`: it is the unit emission advances
+                // in, so a shortfall below it is genuinely in-flight, and a percentage would round to
+                // zero at exactly the small dimensions where this matters most.
+                let near_miss = observed > 0 && required - observed <= hopr_protocol_pix::SHARE_EMISSION_WINDOW as u64;
+                if near_miss {
+                    let deadline = Instant::now() + SSA_SUCCESSOR_SERVICE_WAIT;
+                    while observed < required && Instant::now() < deadline {
+                        hopr_utils::runtime::prelude::sleep(SSA_SUCCESSOR_SERVICE_POLL).await;
+                        observed = served(&session_slot);
+                    }
+                }
+            }
+
+            if observed < required {
+                let error = SessionManagerError::Unacceptable(format!(
+                    "Exit asked for SSAs having returned {observed} of the {required} packets its batch committed up \
+                     to {watermark} has been paid for"
+                ));
+                warn!(session_id = %msg.session_id, %error, "refused an under-served SSA request");
+                return Err(error.into());
+            }
+        }
+
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
         let session_id = msg.session_id;
 
@@ -3602,7 +3754,10 @@ where
             // only ever makes the successor gate stricter, and a batch abandoned between here and
             // publication has still moved the generator.
             if let Some(state) = session_slot.current_ssa_state.get() {
-                state.note_committed(ssa_index);
+                state.note_committed(
+                    ssa_index,
+                    session_slot.returned_packets.load(std::sync::atomic::Ordering::Relaxed),
+                );
             }
 
             // Construct the full SSA by adding the client and exit commitments, getting the deposit address
@@ -3817,6 +3972,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                returned_packets: Default::default(),
             },
         );
 
@@ -5220,6 +5376,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                returned_packets: Default::default(),
             },
         );
 
@@ -5322,6 +5479,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                returned_packets: Default::default(),
             },
         );
 
@@ -6746,6 +6904,37 @@ mod tests {
         seen
     }
 
+    /// Credits `count` Exit → Entry packets to the Session, as its receive path would.
+    ///
+    /// These fixtures build their slot through `handle_incoming_session_initiation`, whose receive
+    /// path counts the *outgoing* direction, so the Entry-side counter the successor gate reads has
+    /// to be driven by hand. `returned_packets_are_counted_on_the_entry_receive_path` is what pins
+    /// that a real Entry Session advances it; here it only has to move.
+    fn credit_returned_packets<S>(mgr: &SessionManager<S>, pseudonym: &HoprPseudonym, count: u64)
+    where
+        S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+        S::Error: std::error::Error + Send + Sync + 'static,
+    {
+        mgr.sessions
+            .get(pseudonym)
+            .expect("session must exist")
+            .returned_packets
+            .fetch_add(count, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Packets the successor gate requires before it will admit a batch beyond `watermark`.
+    ///
+    /// Mirrors `handle_ssa_request`'s arithmetic rather than calling it, so that a change to the
+    /// boundary has to be restated here — a helper shared with the code under test would agree with
+    /// itself whatever either of them did.
+    fn required_returned_packets(params: &PixParams, watermark: u32) -> u64 {
+        let min_emitted =
+            hopr_protocol_pix::min_emission_for_early_recovery(params, hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD);
+        let shares_per_cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
+        let target = (watermark as u64 - 1) * shares_per_cycle + min_emitted;
+        (target as u128 * params.shares_per_poly() as u128 / params.emitted_shares_per_poly() as u128) as u64
+    }
+
     /// The successor gate must open at the protocol floor, not at the local reconstructor's threshold.
     ///
     /// The value that decides when a correct Exit asks for its next batch is the *peer's*
@@ -6772,6 +6961,9 @@ mod tests {
         .await
         .context("the opening batch must be accepted")?;
         assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        // Fully served, so that the emission boundary is the only thing this test can be measuring.
+        credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&params, 1));
 
         let at_floor = hopr_protocol_pix::min_emission_for_early_recovery(
             &params,
@@ -6893,6 +7085,431 @@ mod tests {
         Ok(())
     }
 
+    /// Emission is not service: a successor must be refused until the Exit has returned data.
+    ///
+    /// This is H6, and it is the case the emission half of the gate cannot see. `emission_progress`
+    /// counts shares this node handed to its own packet pipeline — a consumption `create_surb_for_path`
+    /// does not even roll back when the rest of the packet build fails. An Exit that requests, is
+    /// funded and then returns nothing still walks that counter forward for as long as the Entry keeps
+    /// sending, so on its own it prices deposits against work the Entry did to itself.
+    ///
+    /// The fixture therefore satisfies the emission half completely and the returned half not at all.
+    /// Before this gate existed the request below was admitted and a second deposit instruction went
+    /// out for it.
+    #[test_log::test(tokio::test)]
+    async fn entry_refuses_a_successor_the_exit_has_not_paid_for_with_returned_data() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        // Emit the whole cycle: the emission half of the gate is now satisfied several times over,
+        // and it is the only half that would have been consulted before.
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+        let progress = generator.emission_progress(&pseudonym).expect("committed");
+        assert!(
+            progress.is_serving_last_committed()
+                && progress.front_emitted
+                    >= hopr_protocol_pix::min_emission_for_early_recovery(
+                        &params,
+                        hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD
+                    ),
+            "the fixture must satisfy the emission half outright, or it is not testing the other one"
+        );
+
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            )
+            .await
+            .expect_err("a successor must not be funded before the Exit has returned anything");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(
+            0,
+            drain_pix_events(&mut pix_events),
+            "a refused successor must not emit a single ReadyToDeposit"
+        );
+        assert_eq!(
+            vec![pseudonym],
+            mgr.active_sessions(),
+            "an under-served request is refused, not fatal — the Exit may still earn the batch it holds"
+        );
+
+        // And the same request is admitted the moment the service exists.
+        credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&params, 1));
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+        )
+        .await
+        .context("a successor must be admitted once the Exit has returned what it owes")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// An Exit that has returned nothing is refused immediately, not held.
+    ///
+    /// The deferral below the boundary exists for reordering, and it holds a bounded
+    /// `for_each_concurrent` slot and the per-pseudonym request lock while it runs. That is only safe
+    /// because it is entered exclusively for a *near miss*: an Exit which has returned nothing at all
+    /// must cost nothing at all to refuse, or "ask early and say nothing" becomes a way to park one of
+    /// this node's Start-protocol slots per Session it holds.
+    #[test_log::test(tokio::test)]
+    async fn an_unserved_successor_is_refused_without_waiting() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        let started = std::time::Instant::now();
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            )
+            .await
+            .expect_err("an unserved successor must be refused");
+        let elapsed = started.elapsed();
+
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert!(
+            elapsed * 4 < SSA_SUCCESSOR_SERVICE_WAIT,
+            "refusing an Exit that returned nothing took {elapsed:?}, which is within reach of the \
+             {SSA_SUCCESSOR_SERVICE_WAIT:?} near-miss wait — it must not have entered it at all"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// A request that arrives just ahead of the packets that earned it is waited for, not refused.
+    ///
+    /// A conforming Exit asks the instant its reconstructor crosses the threshold, and that request
+    /// travels the same mixed path as the returned packets which unlocked the shares — so it can
+    /// overtake the last few of them. Refusing it is not a mild outcome: `RequestSsa` is emitted once
+    /// per index and never retried, so the Exit sits in `AwaitingCommitment` until
+    /// `max_ssa_delivery_time` and then closes the Session as `CommitmentTimeout`. The gate must
+    /// therefore absorb the reordering rather than treat it as under-service.
+    #[test_log::test(tokio::test)]
+    async fn a_near_miss_successor_waits_for_the_packets_still_in_flight() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        // One packet short: the request is in flight ahead of the last one that earned it.
+        let required = required_returned_packets(&params, 1);
+        assert!(required > 1, "the fixture needs room to be one short");
+        credit_returned_packets(&mgr, &pseudonym, required - 1);
+
+        // The straggler lands while the request is already being evaluated.
+        let mgr_clone = mgr.clone();
+        let late = tokio::spawn(async move {
+            tokio::time::sleep(SSA_SUCCESSOR_SERVICE_POLL).await;
+            credit_returned_packets(&mgr_clone, &pseudonym, 1);
+        });
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+        )
+        .await
+        .context("a request one packet ahead of its own service must be waited for, not refused")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+        late.await?;
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// Service rendered before the first commitment does not pay for the first successor.
+    ///
+    /// Until a cycle is committed the generator holds no polynomials, so the SURBs going out carry no
+    /// shares — and the Exit may legitimately be served up to `max_predeposit_packets` of them before
+    /// any deposit exists. Crediting that prefix would let an Exit bank unpaid service against the
+    /// first cycle it *is* paid for, which is the one window in a Session's life where the gate has no
+    /// prior cycle to measure against.
+    #[test_log::test(tokio::test)]
+    async fn service_returned_before_the_first_commitment_is_not_credited() -> anyhow::Result<()> {
+        let params = wide_pix_params();
+        let (mgr, generator, pseudonym, mut pix_events, bob_sender, bob_handle) =
+            entry_with_pix_session(params, SsaReconstructorConfig::default().early_recovery_threshold).await?;
+
+        // Generously served *before* anything is committed, and none of it may count.
+        let required = required_returned_packets(&params, 1);
+        credit_returned_packets(&mgr, &pseudonym, required * 10);
+
+        mgr.handle_ssa_request(
+            pseudonym,
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+        )
+        .await
+        .context("the opening batch must be accepted")?;
+        assert_eq!(1, drain_pix_events(&mut pix_events));
+
+        for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
+            generator.next_share(&pseudonym, &sent.to_be_bytes())?;
+        }
+
+        let err = mgr
+            .handle_ssa_request(
+                pseudonym,
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            )
+            .await
+            .expect_err("pre-commitment service must not pay for the first successor");
+        assert!(
+            matches!(
+                err,
+                TransportSessionError::Manager(SessionManagerError::Unacceptable(_))
+            ),
+            "expected Unacceptable, got {err:?}"
+        );
+        assert_eq!(0, drain_pix_events(&mut pix_events));
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
+    /// The boundary is discounted by exactly the loss the surplus insures against.
+    ///
+    /// The Exit unlocks a share when the *first relayer* acknowledges its returned packet, which is
+    /// upstream of the Entry — so everything lost after that point is progress the Exit legitimately
+    /// has and this node cannot observe. Demanding the undiscounted emission boundary would refuse
+    /// conforming Exits on any lossy path; an Exit losing more than the surplus covers could not have
+    /// reconstructed the cycle at all, so the surplus ratio is the honest allowance.
+    ///
+    /// Pinned at the deployed dimensions because the resulting fraction is not something a reader can
+    /// check by inspection, and it is what decides when real money moves.
+    #[test]
+    fn the_successor_boundary_is_discounted_by_the_surplus_it_insures() -> anyhow::Result<()> {
+        use crate::{DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SURPLUS_SHARES};
+
+        let params = PixParams::try_new(
+            DEFAULT_PIX_POLYS_PER_SSA,
+            DEFAULT_PIX_SHARES_PER_POLY,
+            DEFAULT_PIX_SURPLUS_SHARES,
+            LOCAL_PIX_SUITE,
+        )?;
+        let cycle = params.polys_per_ssa() as u64 * params.emitted_shares_per_poly() as u64;
+        assert_eq!(655_360, cycle);
+
+        let undiscounted = hopr_protocol_pix::min_emission_for_early_recovery(
+            &params,
+            hopr_protocol_pix::MIN_EARLY_RECOVERY_THRESHOLD,
+        );
+        assert_eq!(569_140, undiscounted);
+
+        let required = required_returned_packets(&params, 1);
+        assert_eq!(455_312, required);
+        assert_eq!(
+            undiscounted * DEFAULT_PIX_SHARES_PER_POLY as u64
+                / (DEFAULT_PIX_SHARES_PER_POLY + DEFAULT_PIX_SURPLUS_SHARES) as u64,
+            required,
+            "the discount must be the surplus ratio and nothing else"
+        );
+
+        let fraction = required as f64 / cycle as f64;
+        assert!(
+            (0.694..0.696).contains(&fraction),
+            "the deployed successor boundary must sit at ~69.5% of a cycle's returned packets, got {fraction}"
+        );
+
+        // Each further cycle of a batch is demanded in full, at the same discount.
+        assert_eq!(
+            required
+                + cycle * DEFAULT_PIX_SHARES_PER_POLY as u64
+                    / (DEFAULT_PIX_SHARES_PER_POLY + DEFAULT_PIX_SURPLUS_SHARES) as u64,
+            required_returned_packets(&params, 2),
+            "a batch of two must demand the first cycle's whole discounted worth plus the second's boundary"
+        );
+
+        Ok(())
+    }
+
+    /// A real Entry Session must advance the counter the successor gate reads.
+    ///
+    /// The gate's worst failure is not being too strict, it is being wired to a counter nothing
+    /// feeds: that closes it permanently, and every PIX Session then dies on its second cycle with
+    /// the Exit blaming its own commitment deadline. The other tests here drive
+    /// `returned_packets` by hand, so none of them would notice.
+    ///
+    /// Deliberately built with `surb_management: None`. That is the branch which passed `session_rx`
+    /// through untouched and left `surb_estimator` at its default — the one place where reusing the
+    /// balancer's estimate instead of a counter of our own would have produced exactly that silent
+    /// permanent closure.
+    #[test_log::test(tokio::test)]
+    async fn returned_packets_are_counted_on_the_entry_receive_path() -> anyhow::Result<()> {
+        use hopr_protocol_start::StartProtocolDiscriminants;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(Default::default());
+
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice → Bob, and Bob → Alice, with no filtering: the handshake is not what is under test.
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport.expect_send_message().returning(move |_, data| {
+            let bob_mgr_clone = bob_mgr_clone.clone();
+            Box::pin(async move {
+                let _ = bob_mgr_clone.dispatch_message(
+                    alice_pseudonym,
+                    ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    },
+                );
+                Ok(())
+            })
+        });
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .withf(|_, data| msg_type(data, StartProtocolDiscriminants::SessionEstablished))
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(
+                        alice_pseudonym,
+                        ApplicationDataIn {
+                            data: data.data,
+                            packet_info: Default::default(),
+                        },
+                    )?;
+                    Ok(())
+                })
+            });
+
+        let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
+        let (new_session_tx_alice, _alice_rx) = futures::channel::mpsc::channel(1024);
+        alice_mgr.start(alice_sender.clone(), new_session_tx_alice, None)?;
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+        bob_mgr.start(bob_sender.clone(), new_session_tx_bob, None)?;
+        let _bob_notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx_bob);
+            while let Some(_session) = new_session_rx_bob.next().await {}
+        });
+
+        let alice_session = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    capabilities: None.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .context("the session must establish")?;
+
+        let counter = alice_mgr
+            .sessions
+            .get(&alice_pseudonym)
+            .expect("alice must hold the session slot")
+            .returned_packets;
+        assert_eq!(
+            0,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "nothing has come back yet"
+        );
+
+        // Three packets arriving the way the Exit's return traffic does.
+        for i in 0..3u8 {
+            alice_mgr.dispatch_message(
+                alice_pseudonym,
+                ApplicationDataIn {
+                    data: ApplicationData::new(SESSION_APPLICATION_TAG, &[i])?,
+                    packet_info: Default::default(),
+                },
+            )?;
+        }
+
+        // The count is taken as the Session drains its receiver, and the receiver is only polled by a
+        // reader — which is exactly how it behaves in production, where the client is reading.
+        let mut alice_session = alice_session;
+        let mut buffer = [0u8; 16];
+        for _ in 0..50 {
+            if counter.load(std::sync::atomic::Ordering::Relaxed) >= 3 {
+                break;
+            }
+            let _ = tokio::time::timeout(
+                Duration::from_millis(20),
+                futures::AsyncReadExt::read(&mut alice_session, &mut buffer),
+            )
+            .await;
+        }
+        assert_eq!(
+            3,
+            counter.load(std::sync::atomic::Ordering::Relaxed),
+            "every Exit → Entry packet must be counted, or the successor gate can never open"
+        );
+
+        drop(alice_session);
+        alice_sender.close_channel();
+        bob_sender.close_channel();
+        let _ = alice_handle.await?;
+        let _ = bob_handle.await?;
+        Ok(())
+    }
+
     /// The Entry's half of the successor gate: a batch asked for before emission has reached the last
     /// cycle of the batch already committed must be refused, committing nothing and depositing
     /// nothing — and the Session must survive it.
@@ -6994,6 +7611,10 @@ mod tests {
             BATCH as usize,
             "the opening batch must yield one deposit address per SSA"
         );
+
+        // Fully served for the batch, so emission ordering is the only thing under test here. The
+        // returned-data half of the gate has its own tests.
+        credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&small_pix_params(), BATCH));
 
         // Asking again before a single share has gone out is a whole batch early.
         let err = mgr
@@ -7182,6 +7803,9 @@ mod tests {
         .await
         .context("the opening batch must be accepted")?;
         assert_eq!(BATCH as usize, drain_deposits(&mut pix_events));
+
+        // Served for the batch, so that serialisation is the only thing deciding the outcome below.
+        credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&small_pix_params(), BATCH));
 
         let min_emitted = hopr_protocol_pix::min_emission_for_early_recovery(
             &small_pix_params(),
@@ -8265,6 +8889,7 @@ mod tests {
                 current_ssa_state: Default::default(),
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
+                returned_packets: Default::default(),
             },
         );
         assert!(guard.is_some(), "slot allocation must succeed");

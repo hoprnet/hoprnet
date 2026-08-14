@@ -129,7 +129,40 @@ the `hopr-crypto-packet` unit tests under the default BabyJubJub build, secp256k
 default-plus-secp override build. One new low cleanup was raised and is now **fixed at `14bb5aedbe`**:
 L26, stale “triple”/“all three” prose left where `PixParams` has four components.
 
-### Follow-up: stacked `lukas/session-pix-supervisor` branch
+**Combined-branch post-merge audit (2026-08-14).** Checked the current checkout,
+`lukas/session-pix-supervisor` at `128e44c3d1` (the branch referred to as the Session PIX manager
+branch), after all of `lukas/pix` through `d48244448c` was merged into it. The merge preserves the
+base fixes: M2/M3's configured reconstructor is the instance installed and validated at
+`SessionManager::start`, the suite travels in `PixParams`, surplus is priced and rounded up, and the
+supervisor owns commitment/deposit/recovery deadlines and retirement guards. No functional merge
+regression was found.
+
+Verification at the combined tip:
+
+- `cargo nextest run -p hopr-protocol-pix -p hopr-transport-session --features runtime-tokio` →
+  **393/393 pass** (two explicitly skipped tests);
+- `cargo test -p hopr-crypto-packet --lib` under default BabyJubJub, secp256k1-only, and the
+  default-plus-secp override → **93/93, 92/92 and 92/92 pass**;
+- `cargo nextest run -p hopr-transport --features serde --lib config::tests` → **46/46 pass**;
+- `cargo nextest run -p hopr-lib --features testing --test transport_session_pix -j 1` →
+  **8/8 pass**, including batching, 1–3 hops, deposit timeout, hard-recovery timeout and strict
+  prepay. The sandboxed attempt could not bind its local UDP ports and timed out before connectivity;
+  the unrestricted rerun passed, so that was an environment limitation rather than a regression.
+
+Two review residuals now belong directly to this combined branch. **H6 is fixed**: the Entry gates a
+successor on `SessionSlot::returned_packets`, the Exit→Entry packets it actually received, discounted
+by the surplus ratio and with a bounded wait for reordering.
+
+- **M15 remains open:** serialized config rejects a recovery deadline too short for the accepted
+  quota, while a direct `SessionManagerConfig` can still select (for example) one second.
+- **H3 Tier 3 remains open in its narrow form:** calibrate/enforce the global Session × overlapping
+  cycles × per-cycle-memory budget (including tombstones), and settle or implement the repeated
+  unpaid-cycle Session-termination policy for batches above one.
+
+H1 and H2 remain separately tracked, and the strategy-owned findings remain outside this repository.
+No additional finding was introduced by the merge.
+
+### Historical follow-up audit before the branches were merged
 
 **Reviewed at `6d671409ea` (2026-08-09), which contains `4f30a70629`.** The
 targeted suite was run from an archive of that commit so this worktree did not have
@@ -148,7 +181,7 @@ open item below disappear. The important delta is:
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C3 residual / H2 stalled funded cycle | **Bounded.** A per-Session supervisor owns separate commitment, deposit, recovery-idle and hard-recovery deadlines. A deposit can no longer cancel the commitment clock. Commitment NACK/retransmission is tracked separately as [#8318](https://github.com/hoprnet/hoprnet/issues/8318).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | H3 Tier 3 / cycle admission           | **Substantially implemented; supervisor-only residual.** The Exit-side supervisor owns requests, permits only the last funded/recovering cycle of a batch to request one successor batch, and bounds failed cycles with commitment, deposit and recovery deadlines. `RetireSsa` drops the matching `SsaCommitmentGuard`; Session teardown drops every remaining guard. The remaining work is to calibrate/validate the finite `maximum_sessions × overlapping batch size × per-cycle memory` ceiling and, if batching is enabled, decide whether repeated unpaid-cycle failures must close the whole Session rather than merely retire one member. The reconstructor's TTL-only `retired_ssas` should be included in that audit. None of this belongs on `lukas/pix`.                                                                                                                                                                                                                          |
-| H6 repeated SSA requests              | **Strongly mitigated; one measurement mismatch remains.** The protocol floor rejects `early_recovery_threshold < 0.85`, and the Entry admits a successor only after the corresponding derived boundary. But its local counter is share _emission_ during SURB construction, not Exit→Entry data actually delivered. Gate the next deposit on the Entry's received-data counter to enforce the intended 85% service condition.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| H6 repeated SSA requests              | **Fixed.** The protocol floor rejects `early_recovery_threshold < 0.85`, and the Entry now admits a successor only once it has _received_ the corresponding Exit→Entry packets — `SessionSlot::returned_packets`, discounted by the surplus ratio since a share unlocks on first-relayer acknowledgement rather than on delivery here. A shortfall within one emission window is waited out rather than refused, because `RequestSsa` is never retried.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | M2 / M3 — reconstructor configuration | **Both fixed on the base branch; the stacked branch's version is now the older one.** `PixReconstructorConfig` mirrors all eight `SsaReconstructorConfig` fields under `pix.reconstructor`, and one `ssa_reconstructor()` helper feeds every construction site including the Entry "dummy". The acknowledgement buffer is bounded at runtime by `max_ack_buffer_bytes` rather than by validating a workload model — a model has to assume a Session count and a packet rate, and this node enforces neither (`maximum_managed_sessions` validates to 100 000 and `NoRateControl` removes egress shaping). The insertion check deliberately permits an overshoot of at most the concurrently in-flight insertions; that is a small bounded concurrency allowance, not M2's former product-scale growth. The stacked branch should drop `ssa_reconstructor_config()` for the base helper on rebase, which closes L20 there too, and retarget `validate_pix_supervision` at the configured value. |
 | L5 / L6 / L18                         | **Fixed on the stacked branch.** `PixKillSwitch` and `DepositAwaiter` are gone. One supervisor owns the timers; `RetireSsa` aborts the per-cycle `PixDepositObserver`, and Session teardown aborts the action driver and retires its live guards.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | L4 / L14 / L19                        | **Fixed.** The deposit channel is allocated inside the first-encounter guard; `try_new` is now the validating constructor on both `SsaShareGenerator` and `SsaReconstructor`, with `new` a documented-panicking delegate, and `new_ssa_commitment` derives its `SsaId` from its parameters instead of indexing `commitments[0]`; and the integration test asks `StartProtocol::ssa_commit_chunking` for the bound rather than restating it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -352,12 +385,10 @@ to the Entry's commitment, so the symmetric attack is unavailable to it. Reversi
 would move the exploit to the Exit and oblige it to prove instead. Worth stating in any future
 protocol revision that touches the handshake order.
 
-**Residual, out of scope here:** the missing post-deposit progress deadline
-(`transport/session/src/manager.rs`, the `DepositAwaiter` TODO). The fix above stops the Entry
-keeping its money, so griefing now costs it the full deposit — but the Exit will still serve a whole
-cycle before noticing no progress. **Fixed on `lukas/session-pix-supervisor`:** its service gate,
-`max_recovery_idle` and `max_recovery_time` bound this independently of the deposit observer. This
-remains open on `lukas/pix` itself and belongs with H2.
+**Historical base-only residual, now fixed in the combined branch:** the old
+`DepositAwaiter` had no post-deposit progress deadline, so the Exit could serve a whole cycle before
+noticing no progress. The merged supervisor's service gate, `max_recovery_idle` and
+`max_recovery_time` now bound this independently of the deposit observer.
 
 ### C1. Default PIX parameters are rejected by the default Exit quota range — PIX cannot establish a session out of the box, and the config is unreachable
 
@@ -1152,13 +1183,11 @@ not move with it.
 > sweep at teardown — but that bounds teardown cost, not the Entry's exposure to repeated
 > funding.
 >
-> **Branch ownership:** retain this finding against `lukas/pix` as the reason the standalone branch
-> is incomplete, but do **not** put its residual into the `lukas/pix` implementation queue. The
-> Entry-side service/deposit lifecycle needed to finish it is owned by
-> `lukas/session-pix-supervisor`; the received-data-vs-emission correction described below belongs
-> there.
+> **Branch ownership after the merge:** this was correctly deferred from standalone `lukas/pix` to
+> `lukas/session-pix-supervisor`. At combined HEAD `128e44c3d1`, those branches are now together, so
+> the received-data-vs-emission residual described below is branch-local and immediately actionable.
 >
-> **Stacked-branch update (`6d671409ea`): strongly mitigated, with one narrower residual.** The
+> **Combined-branch state (`128e44c3d1`): strongly mitigated, with one narrower residual.** The
 > successor gate now serialises requests per pseudonym and requires emission to have reached the
 > last committed cycle and the exact boundary at which the earliest conforming Exit can signal
 > early recovery. This prevents a malicious Exit from firing an unbounded sequence of increasing
@@ -1179,6 +1208,49 @@ not move with it.
 > counter (using the same conservative boundary implied by the 0.85 floor), rather than from
 > generator emission. Then the Entry locally enforces "at least this much service arrived before I
 > prepay again," without trusting the Exit to report recovery.
+>
+> ---
+>
+> **STATUS: FIXED.** `SessionSlot::returned_packets` counts Exit→Entry Session packets on both Entry
+> receive paths — including the `surb_management: None` branch, which previously passed `session_rx`
+> through untouched. It is a counter of its own rather than `surb_estimator.consumed`, which
+> increments on the same event but is documented as a balancer _estimate_ and is only wired when the
+> balancer runs; a deposit gate must be neither, and duplicating the increment fails safe.
+>
+> The measure is exact rather than approximate, which is what makes it usable without trusting the
+> peer: a share is encrypted with the first relayer's challenge solution and rides a return SURB, so
+> the Exit can only decrypt it by _using_ that SURB. One returned packet is one SURB consumed is one
+> share unlocked. An Exit cannot inflate the count without unlocking exactly as many shares, which
+> advances the recovery it is claiming.
+>
+> Two things the naive form of this gets wrong, and both had to be handled:
+>
+> - **A refused request is fatal on a delay.** `RequestSsa` is emitted once per index and never
+>   retried — `supervisor.rs` gives `AwaitingCommitment` one exit, `CommitmentTimeout`, which closes
+>   the Session. The old comment calling an early refusal "not fatal" held only because the gate read
+>   emission, which the Entry advances itself, so a conforming Exit could not trip it. A gate reading
+>   returned traffic can trip on reordering alone: the `SsaRequest` travels the same mixed path as the
+>   packets that earned it and can overtake them. So a shortfall within one `SHARE_EMISSION_WINDOW`
+>   is now _waited_ for (`SSA_SUCCESSOR_SERVICE_WAIT`, 2 s) rather than refused. Only a near miss
+>   waits: an Exit that has returned nothing is refused immediately, which is what stops the wait
+>   being a way to park one of this node's bounded Start-protocol slots per Session.
+> - **The Entry's count structurally lags the Exit's progress.** The share unlocks when the _first
+>   relayer_ acknowledges, upstream of the Entry, so everything lost after that point is progress the
+>   Exit legitimately has and this node cannot see. The boundary is therefore discounted by
+>   `threshold/(threshold + surplus)` — exactly the loss the surplus already insures. At the deployed
+>   dimensions that is **455 312 returned packets, 69.5 % of a 655 360-share cycle**, against an
+>   undiscounted 569 140. An Exit losing more than the surplus covers could not have reconstructed
+>   the cycle anyway.
+>
+> Service rendered before the first commitment is excluded by a baseline taken on the 0 → n watermark
+> transition: until a cycle is committed the generator holds no polynomials, so those SURBs carry no
+> shares and the Exit may be served up to `max_predeposit_packets` of them unpaid. Crediting that
+> prefix would let it bank unpaid service against the first cycle it _is_ paid for.
+>
+> Six tests, of which `entry_refuses_a_successor_the_exit_has_not_paid_for_with_returned_data` is the
+> regression — it satisfies the emission half outright and the returned half not at all, and was
+> admitted before. `returned_packets_are_counted_on_the_entry_receive_path` guards the failure that
+> would otherwise be silent and permanent: a gate wired to a counter nothing feeds.
 
 `manager.rs:2770-2835` iterates over **all** `msg.commitments`. The decoder caps
 this at `MAX_SSAS_PER_REQUEST = 27` (`start/lib.rs:349`), but the Entry applies no
@@ -2659,8 +2731,8 @@ residual, and the `retired_ssas` capacity audit folded into the supervisor-only 
 
 ## Status summary
 
-_Re-verified at base tip `01466b416e`, while still counting fixes from the intended supervisor
-follow-up `6d671409ea`, 2026-08-12._
+_Re-verified on the combined `lukas/session-pix-supervisor` tip `128e44c3d1`, which contains
+`lukas/pix` through `d48244448c`, 2026-08-14._
 
 | Finding                                                   | Status                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2669,17 +2741,17 @@ follow-up `6d671409ea`, 2026-08-12._
 | C3 — Entry can reclaim its own deposit (rogue-key)        | **fixed** (Schnorr PoK on the client SSA commitment)                                                                                                                                                                                                                                                                                                                  |
 | H1 — O(n) `pending_ack_keys` drain per call               | **O(n) defect fixed; residual tracked separately.** The parked-resolution delivery concern is not part of this branch's immediate implementation queue                                                                                                                                                                                                                |
 | H2 — Start channel sizing                                 | **sizing fixed**; retransmission is tracked separately in [#8318](https://github.com/hoprnet/hoprnet/issues/8318)                                                                                                                                                                                                                                                     |
-| H3 — reconstructor memory per session                     | **Tiers 1, 2 & 4 fixed**; **no Tier 3 task on `lukas/pix`**. The supervisor branch substantially implements Exit-owned lifecycle/admission; only its capacity calibration, tombstone audit and optional repeated-unpaid-failure policy remain                                                                                                                         |
+| H3 — reconstructor memory per session                     | **Tiers 1, 2 & 4 fixed; Tier 3 residual open on this combined branch.** Exit-owned lifecycle/admission is implemented; capacity calibration/enforcement, the tombstone audit and the repeated-unpaid-failure policy remain                                                                                                                                            |
 | H4 — commitments decoded 2–3×                             | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
 | H5 — quota ignores `surplus_shares`                       | **FIXED** (`15458c1d69`, `20845807ae`) — surplus is on the wire in `PixParams` and priced into the quota; #8237 no longer needed for this                                                                                                                                                                                                                             |
-| H6 — SSAs funded per request                              | **resolved for this merge sequence by the supervisor branch.** It owns the successor/deposit lifecycle and enforces the 0.85 floor. Any received-data-versus-emission refinement is supervisor-only follow-up work, not a `lukas/pix` task                                                                                                                            |
+| H6 — SSAs funded per request                              | **fixed** — batch size, request serialization and the 0.85 floor were already enforced; successor admission now counts Exit→Entry packets received (`returned_packets`), discounted by the surplus ratio, with a near-miss wait so reordering does not kill a conforming Session                                                                                      |
 | H7 — serialised PIX event dispatch                        | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
 | H8 — cycle outlives `unused_verifier_lifetime`            | **fixed** (`SsaCycle`: reclamation scoped to the cycle, not the polynomial)                                                                                                                                                                                                                                                                                           |
 | H9 — SURB eviction silently kills an SSA cycle            | **fixed** (round-robin emission, 2/3 target ceiling, larger ring buffer)                                                                                                                                                                                                                                                                                              |
 | H10 — SURB ring buffer reserves capacity per peer         | **fixed** (`VecDeque`; ~205 GB VSZ ceiling → allocation tracks occupancy)                                                                                                                                                                                                                                                                                             |
 | M1 — `pending_ack_keys` has no TTL                        | **fixed** by H1's rewrite (TTL, bounded capacity, per-bucket cap)                                                                                                                                                                                                                                                                                                     |
 | M2 — `max_awaiting_acks × max_tracked_peers`              | **fixed on base** — `max_ack_buffer_bytes` (1 GiB) enforced at insertion on a measured 400 B/entry, with a resync backstop. The check deliberately permits only a concurrency-sized overshoot; the unbounded caps product is gone. The rejected workload model assumed a Session count and packet rate the node does not enforce                                      |
-| M3 — reconstructor not configurable                       | **fixed on base** — all eight fields settable under `pix.reconstructor`; one `ssa_reconstructor()` feeds all three sites via `try_new`. Supervisor validation must retain its actual-installed-config check when rebased onto this helper                                                                                                                             |
+| M3 — reconstructor not configurable                       | **fixed** — all eight fields are settable under `pix.reconstructor`; one `ssa_reconstructor()` feeds all three sites via `try_new`, and the merged branch validates the actually installed reconstructor in `SessionManager::start`                                                                                                                                   |
 | M8 — commitment traffic competes with SURBs               | **largely moot** via M9 (~19 000 Start packets per cycle → ~320)                                                                                                                                                                                                                                                                                                      |
 | M9 — naive share verification                             | **fixed** (Feldman removed; one check per polynomial, wire format kept)                                                                                                                                                                                                                                                                                               |
 | M10 — PIX was unmeasured                                  | **fixed** (benchmarks; two optimisation leads handed to M9/M14)                                                                                                                                                                                                                                                                                                       |
@@ -2687,7 +2759,7 @@ follow-up `6d671409ea`, 2026-08-12._
 | M12 — sequential Exit ack pipeline                        | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
 | M13 — small-order commitment poisons a cell               | **fixed**; not pinned, and unpinnable — the backend's `from_bytes` rejects first, so `is_torsion_free` is defence in depth                                                                                                                                                                                                                                            |
 | M14 — 152 µs per commitment ingest (81 s/cycle)           | **closed** via M9 (81 s → 1.25 s); proposed random-combination subgroup batching is unsound for small cofactor torsion                                                                                                                                                                                                                                                |
-| M15 — programmatic recovery deadline bypasses quota check | **new on supervisor** — serialized config rejects an impossible deadline, direct `SessionManagerConfig` construction does not                                                                                                                                                                                                                                         |
+| M15 — programmatic recovery deadline bypasses quota check | **open on this combined branch** — serialized config rejects an impossible deadline, direct `SessionManagerConfig` construction does not                                                                                                                                                                                                                              |
 | M16 — curve override is not negotiated/versioned          | **fixed** — `PixSuite` rides the two free high bits of the `PixParams` word; the Exit refuses a foreign suite with `UnacceptablePixParams` before any curve-sized field is exchanged. Pre-suite BabyJubJub remains compatible and old peers reject new secp words early. One residual: pre-suite secp builds announce zeros and are indistinguishable from BabyJubJub |
 | M17 — threshold calibration omits Entry share generation  | **fixed** — objective stated as Exit bottleneck capacity, `8192 × 64` retained, three false threshold-free comments corrected, both measured tables recorded in-tree, and the total-CPU reading that favours 48 recorded as rejected rather than missed                                                                                                               |
 | M4–M7 — `NonAnonymousPixStrategy` robustness              | **out of scope** — implementation lives in the standalone `hopr-strategy` repository                                                                                                                                                                                                                                                                                  |
@@ -2702,7 +2774,16 @@ follow-up `6d671409ea`, 2026-08-12._
 | L26 — `PixParams` still documented as a triple            | **fixed** (`14bb5aedbe`) — comments say quadruple/all four; the one passage that keeps “three” now states why (the suite is not a dimension and does not enter the quota)                                                                                                                                                                                             |
 | M4–M7, L8–L12, L17                                        | **out of scope on this branch** — owned by the standalone `hopr-strategy` repository, which consumes `hopr-lib`'s `PixEvent`s                                                                                                                                                                                                                                         |
 
-### Immediately actionable on `lukas/pix` only
+### Immediately actionable on the combined branch
+
+1. **M15:** apply the quota-versus-minimum-supported-packet-rate recovery-deadline validation to
+   directly constructed `SessionManagerConfig`s, with a direct-construction regression test.
+2. **H3 Tier 3 residual:** calculate and enforce a safe node-wide live-cycle/tombstone memory budget.
+   For `ssas_per_request > 1`, also decide the tolerated number of unpaid-cycle failures and close
+   the Session when that policy is exceeded; at the default batch size of one, an unpaid-cycle
+   timeout already closes the Session.
+
+### Completed `lukas/pix` queue (history)
 
 **The four previously queued items are done.** Recorded for the audit trail:
 
@@ -2720,10 +2801,12 @@ follow-up `6d671409ea`, 2026-08-12._
 5. ~~**L26**~~ — the five-comment terminology cleanup this re-review raised, done at `14bb5aedbe`.
    It never reopened M16's runtime result.
 
-**Explicitly excluded from this branch queue:** H1 is tracked separately; H2 retransmission is
-[#8318](https://github.com/hoprnet/hoprnet/issues/8318); H3 Tier 3, H6 and M15 belong to the
-supervisor branch; L5/L6/L18 are already fixed there; funding/sweeping/recovery storage belong to
-`hopr-strategy`; M14 needs no fix. C2 documentation remains a decision, not immediate work.
+**Explicitly excluded from that historical base-branch queue:** H1 is tracked separately; H2
+retransmission is [#8318](https://github.com/hoprnet/hoprnet/issues/8318); H3 Tier 3, H6 and M15 were
+deferred to the supervisor branch, where H6 is now fixed and the other two are the combined-branch
+queue immediately above; L5/L6/L18 are fixed; funding/sweeping/recovery storage belong to
+`hopr-strategy`; M14 needs no fix. C2 documentation remains a decision, not immediate implementation
+work.
 
 ## Calibration results
 
@@ -2880,13 +2963,18 @@ startup with a message naming the field rather than degrading silently.
 
 ## Remaining work
 
-**The `lukas/pix` queue is empty.** M17, L23 (with L25) and M16 all landed, and L26's terminology
-cleanup with them; L21 and L22 were done before. The remaining substantive work is owned elsewhere,
-and deliberately so:
+**The standalone `lukas/pix` queue is empty, and H6 is now fixed, leaving this combined branch two
+residuals:**
+
+- **M15:** enforce quota/recovery-deadline consistency for direct `SessionManagerConfig`
+  construction.
+- **H3 Tier 3:** finish capacity calibration/enforcement, include `retired_ssas`, and decide the
+  repeated-unpaid-cycle termination threshold when batching above one.
+
+The remaining work owned elsewhere is:
 
 - **H1**'s parked-resolution delivery residual — tracked separately.
 - **H2**'s `SsaCommit` retransmission — [#8318](https://github.com/hoprnet/hoprnet/issues/8318).
-- **H3 Tier 3**, **H6** and **M15** — the `lukas/session-pix-supervisor` branch.
 - **M4–M7, L8–L12, L17** — the standalone `hopr-strategy` repository.
 - **C2**'s operator-facing documentation — a decision, not implementation work.
 - **M14** needs no fix.
@@ -2898,6 +2986,6 @@ corrections for `quota_range`'s stale "≈195 MiB to ≈778 MiB" are done here, 
 
 ---
 
-_The base-branch sweep's L19 is fixed. The follow-up fixes L18 by deleting the awaiter machinery,
-and its L20 disappears when rebased over the base branch's configured reconstructor helper. H1 is
-tracked separately; H3/H6/M15 are supervisor-owned. The base-branch queue is now clear._
+_The base-branch sweep's L19 is fixed. The merged supervisor fixes L18 by deleting the awaiter
+machinery, and L20 disappeared when merged over the base branch's configured reconstructor helper.
+H1/H2 are tracked separately; H3 Tier 3 and M15 are the remaining combined-branch residuals._
