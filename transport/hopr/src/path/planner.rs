@@ -252,6 +252,71 @@ fn temper_weights(weights: &[f64], temper: f64) -> Vec<f64> {
     weights.iter().map(|w| w.max(0.0).powf(temper)).collect()
 }
 
+/// Rebuilds the weighted candidate collection for one `(source, destination, hops)` triple from
+/// whatever the graph currently says.
+///
+/// Shared by the lazy cache fill, the background sweep and the on-demand recompute, so all three
+/// necessarily agree: a divergence here would make a session's weights depend on which of the three
+/// happened to run last.
+///
+/// `Ok(None)` means the selector offered nothing, or nothing survived validation. Callers decide
+/// what that means — a fill turns it into `PathNotFound`, a refresh leaves the existing entry
+/// alone. `Err` is reserved for a selector that actually failed.
+async fn rebuild_candidates<R, S>(
+    resolver: &R,
+    selector: &S,
+    weighting: WeightingParams,
+    src_key: OffchainPublicKey,
+    dest_key: OffchainPublicKey,
+    hops: usize,
+    kind: &'static str,
+) -> Result<Option<hopr_utils::statistics::WeightedCollection<ValidatedPath>>>
+where
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync,
+    S: PathSelector,
+{
+    let candidates = selector.select_path(src_key, dest_key, hops)?;
+
+    let chain_resolver = ChainPathResolver::from(resolver);
+    let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
+    let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
+    for mut pwc in candidates {
+        let path_nodes = std::mem::take(&mut pwc.path);
+        let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
+        match ValidatedPath::new(NodeId::Offchain(src_key), node_ids, &chain_resolver).await {
+            Ok(vp) => {
+                valid_paths.push((vp, composite_weight(&pwc, hops, weighting)));
+                path_metrics.push(pwc);
+            }
+            Err(e) => tracing::debug!(kind, error = %e, "path candidate failed validation"),
+        }
+    }
+
+    if valid_paths.is_empty() {
+        return Ok(None);
+    }
+
+    let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
+    let total_wt = weighted.total_weight();
+    for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
+        tracing::debug!(
+            kind,
+            destination = %dest_key,
+            hops,
+            path = %vp,
+            cost = pwm.cost,
+            composite_weight = w,
+            sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
+            total_latency_ms = ?pwm.total_latency_ms,
+            min_probe_success_rate = ?pwm.min_probe_success_rate,
+            min_ack_rate = ?pwm.min_ack_rate,
+            capacity_floor = ?pwm.capacity_floor,
+            "weighted candidate path",
+        );
+    }
+    Ok(Some(weighted))
+}
+
 /// Cache key for the path planner: `(source, destination, hops)`.
 ///
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
@@ -426,52 +491,58 @@ where
         self.cache
             .try_get_with(cache_key, async move {
                 trace!(hops = hops_usize, "path cache miss, querying selector");
-                let candidates = selector.select_path(src_key, dest_key, hops_usize)?;
-
-                let chain_resolver = ChainPathResolver::from(&*resolver);
-                let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-                let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-                for mut pwc in candidates {
-                    let path_nodes = std::mem::take(&mut pwc.path);
-                    let node_ids: Vec<NodeId> = path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                    match ValidatedPath::new(source, node_ids, &chain_resolver).await {
-                        Ok(vp) => {
-                            valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
-                            path_metrics.push(pwc);
-                        }
-                        Err(e) => tracing::debug!(error = %e, "path candidate failed validation"),
-                    }
-                }
-
-                if valid_paths.is_empty() {
-                    return Err(PathPlannerError::Path(PathError::PathNotFound(
-                        hops_usize,
-                        src_key.to_hex(),
-                        dest_key.to_hex(),
-                    )));
-                }
-
-                let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-                let total_wt = weighted.total_weight();
-                for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-                    tracing::debug!(
-                        %destination,
-                        hops = hops_usize,
-                        path = %vp,
-                        cost = pwm.cost,
-                        composite_weight = w,
-                        sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-                        total_latency_ms = ?pwm.total_latency_ms,
-                        min_probe_success_rate = ?pwm.min_probe_success_rate,
-                        min_ack_rate = ?pwm.min_ack_rate,
-                        capacity_floor = ?pwm.capacity_floor,
-                        "weighted candidate path",
-                    );
-                }
-                Ok(Arc::new(weighted))
+                rebuild_candidates(&*resolver, &*selector, weighting, src_key, dest_key, hops_usize, "fill")
+                    .await?
+                    .map(Arc::new)
+                    .ok_or_else(|| {
+                        PathPlannerError::Path(PathError::PathNotFound(hops_usize, src_key.to_hex(), dest_key.to_hex()))
+                    })
             })
             .await
             .map_err(PathPlannerError::CacheError)
+    }
+
+    /// Rebuilds every cached entry whose paths originate at `source`, replacing each in place.
+    ///
+    /// Return paths are cached under `(counterparty, me, hops)`, so this is how a caller that has
+    /// just learned a counterparty's return traffic went silent forces those weights to be rebuilt
+    /// from the current graph, instead of waiting up to
+    /// [`PathPlannerConfig::refresh_period`] for the background sweep to reach them.
+    ///
+    /// Entries are replaced, never dropped: one that rebuilds to nothing keeps serving what it
+    /// already holds. Dropping them was measured to collapse a healthy session from 100 % to
+    /// 0.14 %, because a live session draws its next return path from this very entry.
+    ///
+    /// Returns how many entries were actually replaced.
+    pub async fn recompute_paths_from(&self, source: &OffchainPublicKey) -> usize {
+        // 0-hop entries name a direct route with nothing to re-weight, exactly as in the sweep.
+        let keys = self
+            .cache
+            .iter()
+            .map(|(key, _)| *key.as_ref())
+            .filter(|(src, _, hops)| src == source && *hops > 0)
+            .collect::<Vec<PlannerCacheKey>>();
+
+        let mut replaced = 0usize;
+        for (src_key, dest_key, hops) in keys {
+            if let Ok(Some(weighted)) = rebuild_candidates(
+                &*self.resolver,
+                &*self.selector,
+                self.weighting,
+                src_key,
+                dest_key,
+                hops as usize,
+                "recompute",
+            )
+            .await
+            {
+                self.cache.insert((src_key, dest_key, hops), Arc::new(weighted)).await;
+                replaced += 1;
+            }
+        }
+
+        tracing::debug!(%source, replaced, "recomputed cached paths originating at peer");
+        replaced
     }
 
     /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
@@ -664,52 +735,21 @@ where
                     if hops_u32 == 0 {
                         continue;
                     }
-                    let hops_usize = hops_u32 as usize;
 
                     // The key already holds resolved offchain keys, which is what the selector
                     // wants -- so nothing has to be resolved again here.
-                    let src = NodeId::Offchain(src_key);
-
-                    if let Ok(candidates) = selector.select_path(src_key, dest_key, hops_usize) {
-                        let chain_resolver = ChainPathResolver::from(&*resolver);
-                        let mut valid_paths: Vec<(ValidatedPath, f64)> = Vec::with_capacity(candidates.len());
-                        let mut path_metrics: Vec<PathWithMetrics> = Vec::with_capacity(candidates.len());
-                        for mut pwc in candidates {
-                            let path_nodes = std::mem::take(&mut pwc.path);
-                            let node_ids: Vec<NodeId> =
-                                path_nodes.into_iter().map(NodeId::Offchain).collect::<Vec<_>>();
-                            match ValidatedPath::new(src, node_ids, &chain_resolver).await {
-                                Ok(vp) => {
-                                    valid_paths.push((vp, composite_weight(&pwc, hops_usize, weighting)));
-                                    path_metrics.push(pwc);
-                                }
-                                Err(e) => {
-                                    tracing::debug!(error = %e, "background refresh: path candidate failed validation")
-                                }
-                            }
-                        }
-
-                        if !valid_paths.is_empty() {
-                            let weighted = hopr_utils::statistics::WeightedCollection::new(valid_paths);
-                            let total_wt = weighted.total_weight();
-                            for ((vp, w), pwm) in weighted.iter().zip(path_metrics.iter()) {
-                                tracing::debug!(
-                                    kind = "background-refresh",
-                                    destination = %dest_key,
-                                    hops = hops_usize,
-                                    path = %vp,
-                                    cost = pwm.cost,
-                                    composite_weight = w,
-                                    sampling_probability = if total_wt > 0.0 && *w > 0.0 { *w / total_wt } else { 0.0 },
-                                    total_latency_ms = ?pwm.total_latency_ms,
-                                    min_probe_success_rate = ?pwm.min_probe_success_rate,
-                                    min_ack_rate = ?pwm.min_ack_rate,
-                                    capacity_floor = ?pwm.capacity_floor,
-                                    "weighted candidate path",
-                                );
-                            }
-                            cache.insert((src_key, dest_key, hops_u32), Arc::new(weighted)).await;
-                        }
+                    if let Ok(Some(weighted)) = rebuild_candidates(
+                        &*resolver,
+                        &*selector,
+                        weighting,
+                        src_key,
+                        dest_key,
+                        hops_u32 as usize,
+                        "background-refresh",
+                    )
+                    .await
+                    {
+                        cache.insert((src_key, dest_key, hops_u32), Arc::new(weighted)).await;
                     }
                 }
             }
@@ -752,6 +792,8 @@ mod tests {
     const SECRET_ME: [u8; 32] = hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d");
     const SECRET_A: [u8; 32] = hex!("71bf1f42ebbfcd89c3e197a3fd7cda79b92499e509b6fefa0fe44d02821d146a");
     const SECRET_DEST: [u8; 32] = hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299");
+    /// A second relayer, so a return fixture can offer a real alternative to the one that dies.
+    const SECRET_B: [u8; 32] = hex!("3d5f2c8a91b4e07d6a3c1f8e2b95d40c7e6a1938f2c5b8d04e7a1c396b2f8d05");
 
     fn pubkey(secret: &[u8; 32]) -> OffchainPublicKey {
         *OffchainKeypair::from_secret(secret).expect("valid secret").public()
@@ -1020,6 +1062,9 @@ mod tests {
     }
     fn dest_addr() -> Address {
         Address::from_str("0x30004105095c8c10f804109b4d1199a9ac40ed46").expect("valid addr")
+    }
+    fn b_addr() -> Address {
+        Address::from_str("0x40001a7ec3d5b28f9047c6b1e83d5a2f9c71b0e4").expect("valid addr")
     }
 
     // ── graph helpers ──────────────────────────────────────────────────────────
@@ -1547,6 +1592,229 @@ mod tests {
         let planner = PathPlanner::new(me, surb_store, chain_api, selector, small_config());
         // Just ensure it compiles and produces a future.
         let _future = planner.run_background_refresh();
+    }
+
+    // ── recomputing one cache entry in place ──────────────────────────────────
+
+    type TestPlanner =
+        PathPlanner<hopr_protocol_hopr::MemorySurbStore, TestChainApi, HoprGraphPathSelector<ChannelGraph>>;
+
+    /// Return-path fixture with two interchangeable relayers: `dest -> {A, B} -> me`.
+    ///
+    /// Both start fully observed and identically good, so any later divergence in their share of
+    /// the return draws is attributable to what the test recorded and not to the fixture.
+    ///
+    /// The graph is returned alongside the planner because it is the handle a test needs to move
+    /// the evidence *under* an already-populated cache -- which is the whole point of the primitive
+    /// under test.
+    fn two_relayer_return_planner() -> (TestPlanner, ChannelGraph) {
+        let me = pubkey(&SECRET_ME);
+        let a = pubkey(&SECRET_A);
+        let b = pubkey(&SECRET_B);
+        let dest = pubkey(&SECRET_DEST);
+
+        let graph = ChannelGraph::new(me);
+        for node in [a, b, dest] {
+            graph.add_node(node);
+        }
+        for (src, dst) in [(dest, a), (a, me), (dest, b), (b, me)] {
+            graph.add_edge(&src, &dst).expect("edge should be addable");
+            mark_edge_full(&graph, &src, &dst);
+        }
+
+        let cfg = small_config();
+        let selector = HoprGraphPathSelector::new(
+            me,
+            graph.clone(),
+            cfg.max_cached_paths,
+            cfg.edge_penalty,
+            cfg.min_ack_rate,
+            cfg.min_paths_anonymity_floor,
+        );
+        let chain_api = TestChainApi::new(me, me_addr(), vec![(a, a_addr()), (b, b_addr()), (dest, dest_addr())])
+            .with_open_channel(dest_addr(), a_addr())
+            .with_open_channel(a_addr(), me_addr())
+            .with_open_channel(dest_addr(), b_addr())
+            .with_open_channel(b_addr(), me_addr());
+
+        let planner = PathPlanner::new(
+            me,
+            hopr_protocol_hopr::MemorySurbStore::default(),
+            chain_api,
+            selector,
+            cfg,
+        );
+        (planner, graph)
+    }
+
+    /// Populates the return-path cache the way a Session does and hands back the cached entry.
+    async fn fill_return_cache(planner: &TestPlanner) -> PlannerCacheValue {
+        planner
+            .resolve_diverse_return_paths(
+                NodeId::Offchain(pubkey(&SECRET_DEST)),
+                RoutingOptions::Hops(1.try_into().expect("valid 1")),
+                1,
+            )
+            .await
+            .expect("return path resolution should succeed");
+        planner
+            .cache
+            .get(&(pubkey(&SECRET_DEST), pubkey(&SECRET_ME), 1))
+            .await
+            .expect("the return path should be cached after resolution")
+    }
+
+    /// Share of the collection's total weight held by candidates whose first hop is `relayer`.
+    ///
+    /// This -- not the raw weight -- is what decides how much of a session's return stream rides on
+    /// one relay, because the draw normalises over the collection.
+    fn share_of(paths: &PlannerCacheValue, relayer: &OffchainPublicKey) -> f64 {
+        let total: f64 = paths.iter().map(|(_, w)| *w).sum();
+        let held: f64 = paths
+            .iter()
+            .filter(|(vp, _)| vp.first() == Some(relayer))
+            .map(|(_, w)| *w)
+            .sum();
+        if total > 0.0 { held / total } else { 0.0 }
+    }
+
+    /// The candidate paths as stable strings, weights discarded.
+    fn candidate_set(paths: &PlannerCacheValue) -> std::collections::BTreeSet<String> {
+        paths.iter().map(|(vp, _)| vp.to_string()).collect()
+    }
+
+    /// Records `rounds` SURB round-trips on the edge, of which `observed` per round came back.
+    fn record_surbs(
+        graph: &ChannelGraph,
+        src: &OffchainPublicKey,
+        dst: &OffchainPublicKey,
+        expected: u64,
+        observed: u64,
+    ) {
+        use hopr_api::graph::traits::EdgeWeightType;
+        graph.upsert_edge(src, dst, |obs| {
+            obs.record(EdgeWeightType::SurbRoundTrips { expected, observed });
+        });
+    }
+
+    /// A relay that stops delivering must lose its share of the return draws *without* the
+    /// candidate set changing underneath the live session.
+    ///
+    /// Both halves matter and they pull against each other: dropping the candidates is what
+    /// collapsed a healthy session from 100 % to 0.14 % in the cluster, while leaving the weights
+    /// alone is what kept minting SURBs onto a dead relay for a full refresh period.
+    #[tokio::test]
+    async fn recomputing_an_entry_should_reweight_the_candidates_without_changing_the_set() {
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, b, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_B), pubkey(&SECRET_DEST));
+
+        let before = fill_return_cache(&planner).await;
+        let set_before = candidate_set(&before);
+        let share_before = share_of(&before, &b);
+
+        assert_eq!(
+            set_before.len(),
+            2,
+            "the fixture must offer both relayers as candidates"
+        );
+        assert!(
+            share_before > 0.2,
+            "vacuity guard: B must hold a material share before the collapse, held {share_before}"
+        );
+
+        // A delivers, B stops. Same interval, so the contrast is in the evidence and not in time.
+        record_surbs(&graph, &dest, &pubkey(&SECRET_A), 1_000, 1_000);
+        record_surbs(&graph, &dest, &b, 1_000, 1_000);
+        record_surbs(&graph, &dest, &b, 4_000, 0);
+
+        let replaced = planner.recompute_paths_from(&dest).await;
+        assert_eq!(
+            replaced, 1,
+            "exactly the one cached return entry should have been rebuilt"
+        );
+
+        let after = planner
+            .cache
+            .get(&(dest, me, 1))
+            .await
+            .expect("the entry must still exist after a recompute");
+
+        assert_eq!(
+            candidate_set(&after),
+            set_before,
+            "a recompute must re-weight the candidates, never replace the set"
+        );
+
+        let share_after = share_of(&after, &b);
+        assert!(
+            share_after < share_before,
+            "the relay that stopped delivering must lose share: {share_before} -> {share_after}"
+        );
+    }
+
+    /// A recompute that finds nothing must leave the previous candidates in place.
+    ///
+    /// This is the property that separates recomputation from invalidation. A live session draws
+    /// its next return path from this entry, so an empty result has to mean "no better information"
+    /// rather than "no route".
+    #[tokio::test]
+    async fn recomputing_an_entry_should_keep_the_old_candidates_when_it_finds_none() {
+        let (planner, graph) = two_relayer_return_planner();
+        let (me, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
+
+        let before = fill_return_cache(&planner).await;
+        let set_before = candidate_set(&before);
+
+        // Total blackout: every route out of the destination disappears from the graph, so the
+        // selector can no longer offer any candidate at all.
+        for relay in [pubkey(&SECRET_A), pubkey(&SECRET_B)] {
+            graph.remove_edge(&dest, &relay);
+        }
+
+        let replaced = planner.recompute_paths_from(&dest).await;
+        assert_eq!(replaced, 0, "a recompute that finds nothing must replace nothing");
+
+        let after = planner
+            .cache
+            .get(&(dest, me, 1))
+            .await
+            .expect("an entry must never be dropped by a recompute that found nothing");
+        assert_eq!(
+            candidate_set(&after),
+            set_before,
+            "the previous candidates must survive a fruitless recompute"
+        );
+    }
+
+    /// A recompute is addressed at one counterparty, so it must not sweep the whole cache.
+    ///
+    /// Rebuilding every entry on every detection would put the cost of one dead relay onto every
+    /// other session the node is carrying.
+    #[tokio::test]
+    async fn recomputing_should_rebuild_only_the_entries_originating_at_that_peer() {
+        let (planner, _graph) = two_relayer_return_planner();
+        let (me, a, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_A), pubkey(&SECRET_DEST));
+
+        let _ = fill_return_cache(&planner).await;
+        // A second entry in the other direction, which no `dest` recompute may touch.
+        let _ = planner
+            .cached_paths(
+                NodeId::Offchain(me),
+                NodeId::Offchain(a),
+                1.try_into().expect("valid 1"),
+            )
+            .await;
+
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            1,
+            "only the entry whose paths start at the named peer should be rebuilt"
+        );
+        assert_eq!(
+            planner.recompute_paths_from(&pubkey(&SECRET_B)).await,
+            0,
+            "a peer with no cached entries of its own must rebuild nothing"
+        );
     }
 
     // ── composite weight helpers ──────────────────────────────────────────────
