@@ -111,11 +111,7 @@ pub struct PathPlannerConfig {
     /// traffic on poor relays). With weights `(0.4, 0.3, 0.2, 0.1)`, `γ = 0.5` moves the busiest
     /// relay's share from 40% to 33% and the ratio between busiest and least-busy from 4.0 to 2.0.
     ///
-    /// This replaces an earlier attempt to spread a *batch* over K distinct relayers. That could
-    /// not work: a batch is the SURBs that fit in one packet, and `HoprPacket::PAYLOAD_SIZE /
-    /// HoprSurb::SIZE` is 2, so K never exceeded 2 regardless of configuration, and each packet
-    /// re-drew independently anyway. Tempering has no such ceiling — it applies to every draw at
-    /// any candidate count. Defaults to 0.5.
+    /// Defaults to 0.5.
     #[validate(custom(function = "validate_weight_temper"))]
     #[default = 0.5]
     pub return_path_weight_temper: f64,
