@@ -470,7 +470,7 @@ where
         // tells them apart. Rate-limited to one per second so it can run under a full-rate session.
         if self.last_report.elapsed() >= Duration::from_secs(1) {
             self.last_report = std::time::Instant::now();
-            tracing::debug!(
+            tracing::info!(
                 session = %self.session_id,
                 level = current,
                 target = self.controller.bounds().target(),
