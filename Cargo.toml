@@ -152,21 +152,21 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.5.2", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949" }
+hopr-ticket-manager = { version = "0.5.2", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d" }
 hopr-transport = { version = "0.44.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.26.2", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.22.2", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949" }
+hopr-chain-connector = { version = "0.22.2", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.1.1", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949", default-features = false }
-hopr-transport-p2p = { version = "0.9.5", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949", features = [
+hopr-session-server-forwarder = { version = "0.1.1", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d", default-features = false }
+hopr-transport-p2p = { version = "0.9.5", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d", features = [
   "transport-quic",
 ] }
-hopr-ct-full-network = { version = "0.4.0", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949", default-features = false }
-hopr-network-graph = { version = "0.5.0", git = "https://github.com/hoprnet/hopr-impls", rev = "eca69c009cfa74eabbe2570378d9052e1be3a949", default-features = false }
+hopr-ct-full-network = { version = "0.4.0", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d", default-features = false }
+hopr-network-graph = { version = "0.5.0", git = "https://github.com/hoprnet/hopr-impls", rev = "e476452adf8303fbf161c7a835edf2c1ecc7bc8d", default-features = false }
 
 [profile.dev]
 panic = "abort"

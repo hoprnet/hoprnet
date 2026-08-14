@@ -4093,7 +4093,7 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.22.2"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=eca69c009cfa74eabbe2570378d9052e1be3a949#eca69c009cfa74eabbe2570378d9052e1be3a949"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=e476452adf8303fbf161c7a835edf2c1ecc7bc8d#e476452adf8303fbf161c7a835edf2c1ecc7bc8d"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4149,7 +4149,7 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.4.0"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=eca69c009cfa74eabbe2570378d9052e1be3a949#eca69c009cfa74eabbe2570378d9052e1be3a949"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=e476452adf8303fbf161c7a835edf2c1ecc7bc8d#e476452adf8303fbf161c7a835edf2c1ecc7bc8d"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4212,7 +4212,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.5.0"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=eca69c009cfa74eabbe2570378d9052e1be3a949#eca69c009cfa74eabbe2570378d9052e1be3a949"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=e476452adf8303fbf161c7a835edf2c1ecc7bc8d#e476452adf8303fbf161c7a835edf2c1ecc7bc8d"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4339,7 +4339,7 @@ dependencies = [
 [[package]]
 name = "hopr-ticket-manager"
 version = "0.5.2"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=eca69c009cfa74eabbe2570378d9052e1be3a949#eca69c009cfa74eabbe2570378d9052e1be3a949"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=e476452adf8303fbf161c7a835edf2c1ecc7bc8d#e476452adf8303fbf161c7a835edf2c1ecc7bc8d"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4444,7 +4444,7 @@ dependencies = [
 [[package]]
 name = "hopr-transport-p2p"
 version = "0.9.5"
-source = "git+https://github.com/hoprnet/hopr-impls?rev=eca69c009cfa74eabbe2570378d9052e1be3a949#eca69c009cfa74eabbe2570378d9052e1be3a949"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=e476452adf8303fbf161c7a835edf2c1ecc7bc8d#e476452adf8303fbf161c7a835edf2c1ecc7bc8d"
 dependencies = [
  "async-broadcast",
  "async-trait",
