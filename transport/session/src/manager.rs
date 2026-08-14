@@ -3243,8 +3243,7 @@ mod tests {
             idle_timeout: Duration::from_secs(3600),
             ..Default::default()
         };
-        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(cfg);
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> = SessionManager::new(cfg);
 
         let mut transport = MockMsgSender::new();
         // Two incoming sessions: first sends SessionEstablished, second sends SessionError (no slots).

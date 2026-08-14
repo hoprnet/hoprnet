@@ -84,7 +84,7 @@ impl SurbRoundTripCounters {
 /// Batching is not an optimisation here but a requirement: recording an edge takes a write lock on
 /// the whole graph, a packet carries several SURBs, and a session at 0.5 MB/s moves hundreds of
 /// packets a second -- reporting per event would contend the graph thousands of times a second.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SurbRoundTripRegistry {
     inner: Arc<DashMap<ForwardAndReturnPath, Arc<SurbRoundTripCounters>>>,
     /// Destination each pair of legs leads to, so a collapse can name what to re-plan.
@@ -97,8 +97,27 @@ pub struct SurbRoundTripRegistry {
     ///
     /// A [`PathId`] is zero-padded with no length, and slot 0 is a legitimate index, so the end of
     /// a leg cannot be found by looking for padding. It can be found by looking for *us*: every
-    /// reply leg terminates here. [`u64::MAX`] means not yet known.
+    /// reply leg terminates here. [`ME_SLOT_UNKNOWN`] means not yet known.
     me_slot: Arc<AtomicU64>,
+}
+
+/// `me_slot` value meaning "this node's slot has not been learned yet".
+///
+/// Cannot collide with a real slot, unlike 0, which is both a legitimate index and what
+/// `AtomicU64::default()` would yield -- a derived `Default` would silently claim we sit in slot 0
+/// and make every reply leg look like it terminates at its padding.
+const ME_SLOT_UNKNOWN: u64 = u64::MAX;
+
+impl Default for SurbRoundTripRegistry {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            destinations: Default::default(),
+            silence: Default::default(),
+            replanned: Default::default(),
+            me_slot: Arc::new(AtomicU64::new(ME_SLOT_UNKNOWN)),
+        }
+    }
 }
 
 /// Relayers carrying the reply leg: everything between the destination and ourselves.
@@ -201,7 +220,14 @@ impl SurbRoundTripRegistry {
         // correlates with one node is a dead relayer, while silence spread evenly over all of them
         // is a quiet peer. Naming the node is also what lets the blame land on the edges that
         // deserve it instead of on every edge the loop happened to touch.
+        // Without our own slot every leg's relayers are unknowable, and the corroboration step
+        // below is what keeps a quiet peer from being called a dead relay. Guessing here would
+        // trade a missed detection for a false one, so make no claim until the slot is known.
         let me_slot = self.me_slot.load(Ordering::Relaxed);
+        if me_slot == ME_SLOT_UNKNOWN {
+            return degraded;
+        }
+
         let delivering_relayers: std::collections::HashSet<u64> = self
             .inner
             .iter()
@@ -660,7 +686,7 @@ mod tests {
     #[test]
     fn drain_should_take_the_counts_and_leave_the_entry_empty() {
         let (_graph, _me, peers) = graph_with(1);
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = ForwardAndReturnPath {
             forward: [0, 1, 0, 0, 0],
             reply: [1, 0, 0, 0, 0],
@@ -807,7 +833,7 @@ mod tests {
         // entire observation side. Every other test here drives one instance and cannot see it.
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let pending = pending_legs(128);
 
         let minting = SurbTelemetryCodec::new((), me, path_slots_of(graph.clone()), registry.clone(), pending.clone());
@@ -840,6 +866,17 @@ mod tests {
         let degraded = registry.degraded_destinations();
         registry.drain();
         degraded
+    }
+
+    /// A registry that already knows its own slot.
+    ///
+    /// The `legs()`/`heartbeat()` fixtures put us in slot 0, which the live codec would learn from
+    /// the graph on the first mint. Stating it here keeps the fixtures' assumption explicit rather
+    /// than leaning on whatever the field happens to be initialised to.
+    fn registry_at_slot_zero() -> SurbRoundTripRegistry {
+        let registry = SurbRoundTripRegistry::default();
+        registry.note_me_slot(0);
+        registry
     }
 
     /// A pair that mints steadily and returns replies -- the healthy case.
@@ -875,11 +912,54 @@ mod tests {
         }
     }
 
+    /// Every relayer identity in a leg is read relative to our own slot, so until that slot is
+    /// known there is nothing to read them against.
+    ///
+    /// Regression: a derived `Default` initialised `me_slot` to 0, which is a legitimate slot
+    /// rather than a sentinel. A node that is not in slot 0 would then take the zero *padding* at
+    /// the end of every reply leg to be itself, mis-attributing the relayers each leg carries and
+    /// feeding the corroboration gate a set it never observed.
+    #[test]
+    fn silence_should_not_be_attributed_before_our_own_slot_is_known() {
+        let (graph, me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = SurbRoundTripRegistry::default();
+        let paths = legs();
+
+        // The exact sequence that names a destination once the slot is known (see the test below),
+        // run for longer than it would take, yields nothing while the slot is unknown.
+        deliver(&registry, paths, destination);
+        assert!(flush(&registry).is_empty());
+        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED + 2 {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            assert!(
+                flush(&registry).is_empty(),
+                "no relayer can be identified without our own slot, so nothing may be blamed"
+            );
+        }
+
+        // Learning the slot makes the same evidence actionable.
+        registry.note_me_slot(0);
+        deliver(&registry, paths, destination);
+        assert!(flush(&registry).is_empty());
+        for _ in 1..SILENT_FLUSHES_BEFORE_DEGRADED {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            assert!(flush(&registry).is_empty());
+        }
+        mint_only(&registry, paths, destination);
+        deliver(&registry, heartbeat(), destination);
+        assert_eq!(vec![destination], flush(&registry));
+
+        let _ = (graph, me);
+    }
+
     #[test]
     fn sustained_silence_should_name_the_destination_to_replan() {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = legs();
 
         // First establish that the pair works. Silence only means something against that.
@@ -912,7 +992,7 @@ mod tests {
     fn one_destination_should_not_be_replanned_again_while_a_new_path_is_settling() {
         let (graph, me, peers) = graph_with(2);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
 
         let first = legs();
         let second = ForwardAndReturnPath {
@@ -979,7 +1059,7 @@ mod tests {
     fn a_relayer_still_delivering_elsewhere_should_not_be_blamed() {
         let (graph, me, peers) = graph_with(3);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
 
         // Two distinct pairs sharing return relay 1, differing only in their forward leg.
         let delivering = legs();
@@ -1010,7 +1090,7 @@ mod tests {
     fn silence_on_every_relayer_should_blame_none_of_them() {
         let (graph, me, peers) = graph_with(3);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
 
         let first = legs();
         let second = heartbeat();
@@ -1045,7 +1125,7 @@ mod tests {
     fn a_peer_that_goes_quiet_should_not_be_mistaken_for_a_dead_return_path() {
         let (graph, me, peers) = graph_with(2);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
 
         let first = legs();
         let second = heartbeat();
@@ -1075,7 +1155,7 @@ mod tests {
     fn a_pair_that_never_delivered_should_never_be_called_degraded() {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = legs();
 
         // Measured regression: silence alone fired six times during healthy operation, once per
@@ -1095,7 +1175,7 @@ mod tests {
     fn a_single_reply_should_clear_the_silence() {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = legs();
 
         deliver(&registry, paths, destination);
@@ -1121,7 +1201,7 @@ mod tests {
     fn a_degraded_pair_should_not_fire_again_on_the_next_flush() {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = legs();
 
         deliver(&registry, paths, destination);
@@ -1149,7 +1229,7 @@ mod tests {
     fn an_idle_path_should_never_be_called_degraded() {
         let (graph, me, peers) = graph_with(1);
         let destination = peers[0];
-        let registry = SurbRoundTripRegistry::default();
+        let registry = registry_at_slot_zero();
         let paths = legs();
 
         deliver(&registry, paths, destination);

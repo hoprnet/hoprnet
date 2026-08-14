@@ -139,7 +139,8 @@ pub struct BalancerStateValues {
     /// everything above its capacity was discarded on arrival and was never a real level. Measured
     /// during an outage: 51 917 believed against a 15 000-entry store.
     pub counterparty_buffer_capacity: AtomicU64,
-    /// Milliseconds from [`EPOCH`] until which the return path counts as degraded.
+    /// Milliseconds from the crate-internal `EPOCH` monotonic origin until which the return path
+    /// counts as degraded.
     ///
     /// A deadline rather than a flag: it is set by a layer that observes the return path and read
     /// here, and nothing is guaranteed to come back and clear it. Expiring on its own bounds the
@@ -400,9 +401,15 @@ where
         let believed = current;
         current = self.state.clamp_to_counterparty_capacity(current);
         if current != believed {
+            // Not the configured capacity: the bound applied is `max(capacity, target)`, so name
+            // the clamped level and the capacity separately rather than conflating them.
             tracing::debug!(
                 believed,
-                capacity = current,
+                clamped_to = current,
+                counterparty_capacity = self
+                    .state
+                    .counterparty_buffer_capacity
+                    .load(std::sync::atomic::Ordering::Relaxed),
                 "counterparty SURB estimate exceeded its store; the surplus was never held"
             );
         }
@@ -468,9 +475,13 @@ where
         // Both ends run this same loop -- the Entry with the PID driving production, the Exit with
         // the proportional controller gating egress -- so one line covers both and the session id
         // tells them apart. Rate-limited to one per second so it can run under a full-rate session.
+        //
+        // At `debug` rather than `info`: one line per session per second is fine for a handful of
+        // sessions and is a lot of formatting work for a node carrying many, none of which an
+        // operator needs to see during healthy operation.
         if self.last_report.elapsed() >= Duration::from_secs(1) {
             self.last_report = std::time::Instant::now();
-            tracing::info!(
+            tracing::debug!(
                 session = %self.session_id,
                 level = current,
                 target = self.controller.bounds().target(),
