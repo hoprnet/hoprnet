@@ -32,8 +32,9 @@ pub use generator::{
 };
 pub use params::{InvalidPixParams, PixParams, PixSuite};
 pub use reconstructor::{
-    AWAITING_ACK_ENTRY_BYTES, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, SsaCommitmentGuard,
-    SsaReconstructor, SsaReconstructorConfig,
+    AWAITING_ACK_ENTRY_BYTES, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, MAX_RETIRED_SSAS,
+    PART_BUILDER_OVERHEAD_BYTES, SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig, TOMBSTONE_ENTRY_BYTES,
+    peak_cycle_bytes,
 };
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
 pub use types::{

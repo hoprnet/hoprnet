@@ -130,17 +130,17 @@ default-plus-secp override build. One new low cleanup was raised and is now **fi
 L26, stale “triple”/“all three” prose left where `PixParams` has four components.
 
 **Combined-branch post-merge audit (2026-08-14).** Checked the current checkout,
-`lukas/session-pix-supervisor` at `128e44c3d1` (the branch referred to as the Session PIX manager
-branch), after all of `lukas/pix` through `d48244448c` was merged into it. The merge preserves the
-base fixes: M2/M3's configured reconstructor is the instance installed and validated at
-`SessionManager::start`, the suite travels in `PixParams`, surplus is priced and rounded up, and the
-supervisor owns commitment/deposit/recovery deadlines and retirement guards. No functional merge
-regression was found.
+`lukas/session-pix-supervisor` at `cd4370f233` (the branch referred to as the Session PIX manager
+branch), after all of `lukas/pix` through `d48244448c` was merged into it and H6's returned-data gate
+landed. The merge preserves the base fixes: M2/M3's configured reconstructor is the instance
+installed and validated at `SessionManager::start`, the suite travels in `PixParams`, surplus is
+priced and rounded up, and the supervisor owns commitment/deposit/recovery deadlines and retirement
+guards. No functional merge or H6 regression was found.
 
 Verification at the combined tip:
 
 - `cargo nextest run -p hopr-protocol-pix -p hopr-transport-session --features runtime-tokio` →
-  **393/393 pass** (two explicitly skipped tests);
+  **399/399 pass** (two explicitly skipped tests), including the six new H6 tests;
 - `cargo test -p hopr-crypto-packet --lib` under default BabyJubJub, secp256k1-only, and the
   default-plus-secp override → **93/93, 92/92 and 92/92 pass**;
 - `cargo nextest run -p hopr-transport --features serde --lib config::tests` → **46/46 pass**;
@@ -153,11 +153,13 @@ Two review residuals now belong directly to this combined branch. **H6 is fixed*
 successor on `SessionSlot::returned_packets`, the Exit→Entry packets it actually received, discounted
 by the surplus ratio and with a bounded wait for reordering.
 
+**H3 Tier 3 is also fixed**: the per-cycle memory model was re-derived post-M9 (the ≈49 MiB figure
+three sites carried was the deleted Feldman matrix), exported as `peak_cycle_bytes`, and is now
+reserved node-wide at Session admission; `retired_ssas` has a capacity derived from that budget; and
+a cumulative unpaid-cycle failure limit closes a batched Session.
+
 - **M15 remains open:** serialized config rejects a recovery deadline too short for the accepted
   quota, while a direct `SessionManagerConfig` can still select (for example) one second.
-- **H3 Tier 3 remains open in its narrow form:** calibrate/enforce the global Session × overlapping
-  cycles × per-cycle-memory budget (including tombstones), and settle or implement the repeated
-  unpaid-cycle Session-termination policy for batches above one.
 
 H1 and H2 remain separately tracked, and the strategy-owned findings remain outside this repository.
 No additional finding was introduced by the merge.
@@ -180,7 +182,7 @@ open item below disappear. The important delta is:
 | Finding on `lukas/pix`                | State on `lukas/session-pix-supervisor`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C3 residual / H2 stalled funded cycle | **Bounded.** A per-Session supervisor owns separate commitment, deposit, recovery-idle and hard-recovery deadlines. A deposit can no longer cancel the commitment clock. Commitment NACK/retransmission is tracked separately as [#8318](https://github.com/hoprnet/hoprnet/issues/8318).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| H3 Tier 3 / cycle admission           | **Substantially implemented; supervisor-only residual.** The Exit-side supervisor owns requests, permits only the last funded/recovering cycle of a batch to request one successor batch, and bounds failed cycles with commitment, deposit and recovery deadlines. `RetireSsa` drops the matching `SsaCommitmentGuard`; Session teardown drops every remaining guard. The remaining work is to calibrate/validate the finite `maximum_sessions × overlapping batch size × per-cycle memory` ceiling and, if batching is enabled, decide whether repeated unpaid-cycle failures must close the whole Session rather than merely retire one member. The reconstructor's TTL-only `retired_ssas` should be included in that audit. None of this belongs on `lukas/pix`.                                                                                                                                                                                                                          |
+| H3 Tier 3 / cycle admission           | **Substantially implemented; supervisor-only residual.** The Exit-side supervisor owns requests, permits only the last funded/recovering cycle of a batch to request one successor batch, and bounds failed cycles with commitment, deposit and recovery deadlines. `RetireSsa` drops the matching `SsaCommitmentGuard`; Session teardown drops every remaining guard. The residual — the capacity ceiling, the tombstone audit and the batched unpaid-cycle policy — **is now fixed on the combined branch**: `peak_cycle_bytes` replaces the stale pre-M9 model, a Session reserves against `max_live_cycle_bytes` at admission, `retired_ssas` is capped from that same budget, and `max_failed_cycles` closes a Session losing cycles repeatedly. None of it belonged on `lukas/pix`.                                                                                                                                                                                                      |
 | H6 repeated SSA requests              | **Fixed.** The protocol floor rejects `early_recovery_threshold < 0.85`, and the Entry now admits a successor only once it has _received_ the corresponding Exit→Entry packets — `SessionSlot::returned_packets`, discounted by the surplus ratio since a share unlocks on first-relayer acknowledgement rather than on delivery here. A shortfall within one emission window is waited out rather than refused, because `RequestSsa` is never retried.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | M2 / M3 — reconstructor configuration | **Both fixed on the base branch; the stacked branch's version is now the older one.** `PixReconstructorConfig` mirrors all eight `SsaReconstructorConfig` fields under `pix.reconstructor`, and one `ssa_reconstructor()` helper feeds every construction site including the Entry "dummy". The acknowledgement buffer is bounded at runtime by `max_ack_buffer_bytes` rather than by validating a workload model — a model has to assume a Session count and a packet rate, and this node enforces neither (`maximum_managed_sessions` validates to 100 000 and `NoRateControl` removes egress shaping). The insertion check deliberately permits an overshoot of at most the concurrently in-flight insertions; that is a small bounded concurrency allowance, not M2's former product-scale growth. The stacked branch should drop `ssa_reconstructor_config()` for the base helper on rebase, which closes L20 there too, and retarget `validate_pix_supervision` at the configured value. |
 | L5 / L6 / L18                         | **Fixed on the stacked branch.** `PixKillSwitch` and `DepositAwaiter` are gone. One supervisor owns the timers; `RetireSsa` aborts the per-cycle `PixDepositObserver`, and Session teardown aborts the action driver and retires its live guards.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -212,7 +214,7 @@ one second) that cannot serve the configured quota.
 45 inline comments across two CodeRabbit passes on PR #8095, has been folded in and deleted:
 its still-open items are **L18** under P3 and **H1**'s parked-resolution delivery
 residual, plus the supervisor-side
-`retired_ssas` capacity audit under **H3 Tier 3** (**L19**, its other, is now fixed);
+`retired_ssas` capacity audit under **H3 Tier 3** (both now fixed, along with **L19**, its other);
 its corrections are recorded against the findings they correct (**H1**,
 **M13**, **L15**), and its provenance and rejected findings are under "The CodeRabbit pass,
 folded in".
@@ -711,8 +713,10 @@ already knows exactly which cells are empty).
 
 ### H3. Reconstructor memory is ~100–150 MB per active session; caches are deliberately unbounded
 
-> **STATUS: Tiers 1, 2 and 4 implemented. Tier 3 is substantially implemented by
-> `lukas/session-pix-supervisor`; its narrow residual belongs only there.**
+> **STATUS: all four tiers implemented.** Tier 3's residual — the node-wide live-cycle and tombstone
+> budget, and the repeated-unpaid-cycle policy — is now closed on the combined branch; see the
+> `STATUS: FIXED` block under Tier 3. Note that the per-cycle figures in the measurements below
+> predate M9 and are corrected there.
 >
 > Also applied: the `threshold` 128 → 64 / `num_ssa_parts` 4096 → 8192 re-tune described
 > at the end of this section, with `additional_shares` 64 → 32. The quota product is
@@ -841,8 +845,8 @@ PixGroup>>` and are copied into per-polynomial vectors at `Completed`. Instead p
 > commitment directly into its slot, with a `polys × threshold` occupancy bitset (524 288 bits =
 > 64 KiB) for duplicate detection and completeness.
 
-**Tier 3 — Exit-driven lifecycle and admission. NOT A `lukas/pix` TASK;
-SUBSTANTIALLY IMPLEMENTED ON `lukas/session-pix-supervisor`.** The earlier version of
+**Tier 3 — Exit-driven lifecycle and admission. IMPLEMENTED; its capacity residual is now
+closed too — see the `STATUS: FIXED` block below.** The earlier version of
 this finding treated the lack of a reconstructor-global counter as if it were the only
 possible bound. That missed the component which actually owns admission: the Exit-side
 Session supervisor.
@@ -871,6 +875,74 @@ while funded siblings keep the Session alive; there is no cumulative “unpaid c
 failures” counter. If repeated failures must terminate the Session, that counter and
 limit belong in `SessionPixSupervisor`. At the default `ssas_per_request = 1`, an unpaid
 cycle is the only cycle and its failure already closes the Session.
+
+> **STATUS: FIXED.** The residual above is closed. Three parts, and the first mattered most.
+>
+> **The per-cycle figure this whole tier was reasoned about was stale.** Three sites in code —
+> `manager.rs:303`, `supervision/mod.rs:396`, `transport/hopr/src/config.rs:341` — stated ≈49 MiB of
+> peak reconstructor state per cycle. That is `polys × threshold × 96 B`, the Feldman commitment
+> matrix, and **M9 deleted that dimension**: `SsaPartCommitment` is now one `PixGroup` per
+> polynomial, and the memory profile already measures the whole commitment pass at ~0.3 MiB. A budget
+> derived from those numbers would have been sized against a structure that no longer exists. All
+> three now state the re-derived model.
+>
+> What dominates today is `SsaPartBuilder::shares`, and how much of it is live depends on **share
+> order, which the Entry chooses**. The shipped generator emits polynomial-major over a 256-wide
+> window, so a conforming cycle peaks at a measured 7.8 MiB; nothing constrains the order, so a peer
+> running anything else can hold _every_ polynomial one share short of its threshold and never
+> release a buffer — a measured 39.1 MiB at the deployed dimensions, modelled at 41.1 MiB.
+> `peak_cycle_bytes` models the second, because a bound a conforming peer can exceed fivefold is not
+> a bound. It is a capacity bound rather than a
+> security one: a share only reaches the Exit on a return SURB the Exit itself spends, so reaching
+> that peak costs the peer a full quota deposit per cycle.
+>
+> **1. The budget is reserved at Session admission.** `IncomingSessionPixConfig::max_live_cycle_bytes`
+> (3 GiB); a PIX Session charges `MAX_OVERLAPPING_BATCHES × ssas_per_request ×
+peak_cycle_bytes(offered params)` when it is accepted, and is refused with the existing
+> `StartErrorReason::NoSlotsAvailable` if it does not fit. The pipelining factor of two is structural:
+> only a batch's last cycle may ask for a successor and it asks once, while a recovered cycle's state
+> is already gone via `remove_cycle`. The default is derived, not picked — ≈82 MiB per Session at the
+> deployed dimensions, so 3 GiB admits ≈37, comfortably covering the 10–30 clients per Exit the
+> calibration profile models. **The same defaults with `maximum_sessions = 100` and no budget imply
+> ≈8 GiB**, which is what makes this bind rather than decorate. It is a ceiling on _reservations_,
+> not an allocation: nothing is claimed up front, and a node serving conforming peers holds five
+> times less than it has reserved.
+>
+> Admission rather than the successor-request point, which was the other candidate: by then the Entry
+> has funded a cycle and refusing costs it that deposit, whereas a Session refused at admission is one
+> the peer retries elsewhere at no charge. And a runtime byte budget rather than validating
+> `maximum_sessions × …` at config load, for exactly the reason M2's workload model was rejected — the
+> product is a number no node holds, so the check would only ever reject the shipping defaults. What
+> _is_ checked at load is that the budget admits one Session at the top of the operator's own
+> `quota_range`, since otherwise the Exit advertises dimensions it will always refuse.
+>
+> Released explicitly by `close_session`, with `Drop` as the backstop, idempotently. Both, because the
+> slot lives in a `moka` cache: `remove` hands the value back but drops the cache's own clone in a
+> later maintenance pass, so a purely refcount-driven release returns the budget at an unpredictable
+> time — a node whose Sessions had all closed could still refuse the next one. Caught by the release
+> test, not by reasoning.
+>
+> **2. `retired_ssas` has a capacity, derived from that budget.** `MAX_RETIRED_SSAS = 262 144`, with
+> the reachable count worked out in the declaration: the budget admits ≈37 concurrent Sessions, each
+> retiring at most `ssas_per_request` cycles per generation and unable to replace one faster than
+> `max_ssa_delivery_time`, so ≈67 000 within `unused_verifier_lifetime` at any batch size — a larger
+> batch buys proportionally fewer Sessions, so the product is flat. ~3.9× headroom, ~72 MiB at the
+> measured 256 B/entry. The "belongs with the global admission
+> control the memory work still owes" note is replaced by that arithmetic — Part 1 is that admission
+> control.
+>
+> **3. Repeated unpaid-cycle failures close the Session.** `SupervisorConfig::max_failed_cycles`,
+> default 1, counted cumulatively across the Session rather than per batch — which is the point, since
+> retiring a member leaves no trace on its siblings and the two losses that matter are typically in
+> _different_ batches. One loss stays survivable, so the retire-and-hand-on-the-successor-gate path is
+> unchanged; the second closes the Session, carrying the _first_ failure's reason. Nothing changes at
+> the shipping `ssas_per_request = 1`, where the failing cycle is always the last one standing and
+> that closes the Session first.
+>
+> Measurement: the profile gained a worst-case-share-order phase — the existing one feeds shares
+> polynomial-major, so it only ever produced the conforming peak — which asserts the measured peak
+> stays inside `peak_cycle_bytes`, plus per-entry costs for the two new constants. The same
+> measured-constant-with-an-assertion shape as `AWAITING_ACK_ENTRY_BYTES`.
 
 > **Base-branch history (`4f30a70629`).** The three caches this was written against are gone —
 > H8's `SsaCycle` collapsed `ssa_builders` + `ssa_verifiers` + `ssa_num_polys` into one
@@ -2683,9 +2755,10 @@ obvious (a batch containing a repeat can never complete, and every retransmissio
 then be rejected against the slots the first batch did fill — which is why the whole batch is
 rejected rather than de-duplicated), and attached a concrete reachability argument to **L14**.
 
-**Everything from that pass is now closed** except **L18**, **H1**'s parked-resolution delivery
-residual, and the `retired_ssas` capacity audit folded into the supervisor-only residual of
-**H3 Tier 3**. **L19**, its other promoted item, is fixed.
+**Everything from that pass is now closed** except **L18** and **H1**'s parked-resolution delivery
+residual. The `retired_ssas` capacity audit folded into **H3 Tier 3**'s residual is fixed — the cache
+has a capacity derived from the Session layer's live-cycle budget — as is **L19**, its other promoted
+item.
 
 ### Considered and rejected — recorded so they are not re-filed
 
@@ -2731,57 +2804,56 @@ residual, and the `retired_ssas` capacity audit folded into the supervisor-only 
 
 ## Status summary
 
-_Re-verified on the combined `lukas/session-pix-supervisor` tip `128e44c3d1`, which contains
+_Re-verified on the combined `lukas/session-pix-supervisor` tip `cd4370f233`, which contains
 `lukas/pix` through `d48244448c`, 2026-08-14._
 
-| Finding                                                   | Status                                                                                                                                                                                                                                                                                                                                                                |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1 — default quota range rejects default dimensions       | **fixed** (range re-derived again when H5 moved the quota; still pinned by containment tests)                                                                                                                                                                                                                                                                         |
-| C2 — deposit burned on incomplete cycle                   | by design (author); operator-facing documentation still owed                                                                                                                                                                                                                                                                                                          |
-| C3 — Entry can reclaim its own deposit (rogue-key)        | **fixed** (Schnorr PoK on the client SSA commitment)                                                                                                                                                                                                                                                                                                                  |
-| H1 — O(n) `pending_ack_keys` drain per call               | **O(n) defect fixed; residual tracked separately.** The parked-resolution delivery concern is not part of this branch's immediate implementation queue                                                                                                                                                                                                                |
-| H2 — Start channel sizing                                 | **sizing fixed**; retransmission is tracked separately in [#8318](https://github.com/hoprnet/hoprnet/issues/8318)                                                                                                                                                                                                                                                     |
-| H3 — reconstructor memory per session                     | **Tiers 1, 2 & 4 fixed; Tier 3 residual open on this combined branch.** Exit-owned lifecycle/admission is implemented; capacity calibration/enforcement, the tombstone audit and the repeated-unpaid-failure policy remain                                                                                                                                            |
-| H4 — commitments decoded 2–3×                             | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
-| H5 — quota ignores `surplus_shares`                       | **FIXED** (`15458c1d69`, `20845807ae`) — surplus is on the wire in `PixParams` and priced into the quota; #8237 no longer needed for this                                                                                                                                                                                                                             |
-| H6 — SSAs funded per request                              | **fixed** — batch size, request serialization and the 0.85 floor were already enforced; successor admission now counts Exit→Entry packets received (`returned_packets`), discounted by the surplus ratio, with a near-miss wait so reordering does not kill a conforming Session                                                                                      |
-| H7 — serialised PIX event dispatch                        | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
-| H8 — cycle outlives `unused_verifier_lifetime`            | **fixed** (`SsaCycle`: reclamation scoped to the cycle, not the polynomial)                                                                                                                                                                                                                                                                                           |
-| H9 — SURB eviction silently kills an SSA cycle            | **fixed** (round-robin emission, 2/3 target ceiling, larger ring buffer)                                                                                                                                                                                                                                                                                              |
-| H10 — SURB ring buffer reserves capacity per peer         | **fixed** (`VecDeque`; ~205 GB VSZ ceiling → allocation tracks occupancy)                                                                                                                                                                                                                                                                                             |
-| M1 — `pending_ack_keys` has no TTL                        | **fixed** by H1's rewrite (TTL, bounded capacity, per-bucket cap)                                                                                                                                                                                                                                                                                                     |
-| M2 — `max_awaiting_acks × max_tracked_peers`              | **fixed on base** — `max_ack_buffer_bytes` (1 GiB) enforced at insertion on a measured 400 B/entry, with a resync backstop. The check deliberately permits only a concurrency-sized overshoot; the unbounded caps product is gone. The rejected workload model assumed a Session count and packet rate the node does not enforce                                      |
-| M3 — reconstructor not configurable                       | **fixed** — all eight fields are settable under `pix.reconstructor`; one `ssa_reconstructor()` feeds all three sites via `try_new`, and the merged branch validates the actually installed reconstructor in `SessionManager::start`                                                                                                                                   |
-| M8 — commitment traffic competes with SURBs               | **largely moot** via M9 (~19 000 Start packets per cycle → ~320)                                                                                                                                                                                                                                                                                                      |
-| M9 — naive share verification                             | **fixed** (Feldman removed; one check per polynomial, wire format kept)                                                                                                                                                                                                                                                                                               |
-| M10 — PIX was unmeasured                                  | **fixed** (benchmarks; two optimisation leads handed to M9/M14)                                                                                                                                                                                                                                                                                                       |
-| M11 — `nextest --lib -p hopr-lib` does not compile        | **FIXED** — `cfg` reverted to feature-only; verified compiling. The session crate's test-module gating went with it                                                                                                                                                                                                                                                   |
-| M12 — sequential Exit ack pipeline                        | **fixed**                                                                                                                                                                                                                                                                                                                                                             |
-| M13 — small-order commitment poisons a cell               | **fixed**; not pinned, and unpinnable — the backend's `from_bytes` rejects first, so `is_torsion_free` is defence in depth                                                                                                                                                                                                                                            |
-| M14 — 152 µs per commitment ingest (81 s/cycle)           | **closed** via M9 (81 s → 1.25 s); proposed random-combination subgroup batching is unsound for small cofactor torsion                                                                                                                                                                                                                                                |
-| M15 — programmatic recovery deadline bypasses quota check | **open on this combined branch** — serialized config rejects an impossible deadline, direct `SessionManagerConfig` construction does not                                                                                                                                                                                                                              |
-| M16 — curve override is not negotiated/versioned          | **fixed** — `PixSuite` rides the two free high bits of the `PixParams` word; the Exit refuses a foreign suite with `UnacceptablePixParams` before any curve-sized field is exchanged. Pre-suite BabyJubJub remains compatible and old peers reject new secp words early. One residual: pre-suite secp builds announce zeros and are indistinguishable from BabyJubJub |
-| M17 — threshold calibration omits Entry share generation  | **fixed** — objective stated as Exit bottleneck capacity, `8192 × 64` retained, three false threshold-free comments corrected, both measured tables recorded in-tree, and the total-CPU reading that favours 48 recorded as rejected rather than missed                                                                                                               |
-| M4–M7 — `NonAnonymousPixStrategy` robustness              | **out of scope** — implementation lives in the standalone `hopr-strategy` repository                                                                                                                                                                                                                                                                                  |
-| L1, L3, L7, L13, L15, L16                                 | **fixed** (L1/L7 by the H1 and M9 rewrites; L3 removed by M9; L15 completed by `4f30a70629`)                                                                                                                                                                                                                                                                          |
-| L2 — intra-batch duplicate polynomial indices             | **FIXED** (`606e51ea8e`) — batch-local `seen` set; the whole batch is rejected, keeping the retry path open                                                                                                                                                                                                                                                           |
-| L5 / L6 / L18 — awaiter / kill-switch lifecycle           | **fixed by the supervisor branch**, therefore counted fixed in this combined view                                                                                                                                                                                                                                                                                     |
-| L20 — stale `max_awaiting_acks` safety comment            | **fixed in the combined merge sequence** — rebasing onto M3 removes the follow-up's default-config helper and its stale comment                                                                                                                                                                                                                                       |
-| L21 — acknowledgement-budget minimum documentation        | **fixed** — the doc states the enforced 25 600 B floor with its derivation, and `the_documented_ack_budget_floor_is_the_enforced_one` pins the number so prose and validator cannot drift apart again                                                                                                                                                                 |
-| L22 — PIX curve-feature override cleanup                  | **fixed** — root manifest and M13 comments describe the override model; the two `Group` imports carry the same cfg arms the curve selection uses, so all three supported combinations are warning-free                                                                                                                                                                |
-| L23 — surplus ratio rounds down                           | **fixed** — ceiling division makes 20 % a floor; both tolerance tests sweep the whole threshold range rather than the four values on which the bug was invisible. No negotiated value moved                                                                                                                                                                           |
-| L25 — `42f7edf9c6` left two failing tests behind          | **fixed** — the surplus ratio change and its new validator were not carried into the session layer; found while implementing L23, along with five stale `1.5×`/778 MiB prose sites                                                                                                                                                                                    |
-| L26 — `PixParams` still documented as a triple            | **fixed** (`14bb5aedbe`) — comments say quadruple/all four; the one passage that keeps “three” now states why (the suite is not a dimension and does not enter the quota)                                                                                                                                                                                             |
-| M4–M7, L8–L12, L17                                        | **out of scope on this branch** — owned by the standalone `hopr-strategy` repository, which consumes `hopr-lib`'s `PixEvent`s                                                                                                                                                                                                                                         |
+| Finding                                                   | Status                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1 — default quota range rejects default dimensions       | **fixed** (range re-derived again when H5 moved the quota; still pinned by containment tests)                                                                                                                                                                                                                                                                                       |
+| C2 — deposit burned on incomplete cycle                   | by design (author); operator-facing documentation still owed                                                                                                                                                                                                                                                                                                                        |
+| C3 — Entry can reclaim its own deposit (rogue-key)        | **fixed** (Schnorr PoK on the client SSA commitment)                                                                                                                                                                                                                                                                                                                                |
+| H1 — O(n) `pending_ack_keys` drain per call               | **O(n) defect fixed; residual tracked separately.** The parked-resolution delivery concern is not part of this branch's immediate implementation queue                                                                                                                                                                                                                              |
+| H2 — Start channel sizing                                 | **sizing fixed**; retransmission is tracked separately in [#8318](https://github.com/hoprnet/hoprnet/issues/8318)                                                                                                                                                                                                                                                                   |
+| H3 — reconstructor memory per session                     | **fixed, all four tiers.** Tier 3's residual closed: the per-cycle model was re-derived post-M9 (the ≈49 MiB in three comments was the deleted Feldman matrix), exported as `peak_cycle_bytes`, and is reserved node-wide at Session admission against `max_live_cycle_bytes`; `retired_ssas` is capped from that budget; a cumulative `max_failed_cycles` closes a batched Session |
+| H4 — commitments decoded 2–3×                             | **fixed**                                                                                                                                                                                                                                                                                                                                                                           |
+| H5 — quota ignores `surplus_shares`                       | **FIXED** (`15458c1d69`, `20845807ae`) — surplus is on the wire in `PixParams` and priced into the quota; #8237 no longer needed for this                                                                                                                                                                                                                                           |
+| H6 — SSAs funded per request                              | **fixed** — batch size, request serialization and the 0.85 floor were already enforced; successor admission now counts Exit→Entry packets received (`returned_packets`), discounted by the surplus ratio, with a near-miss wait so reordering does not kill a conforming Session                                                                                                    |
+| H7 — serialised PIX event dispatch                        | **fixed**                                                                                                                                                                                                                                                                                                                                                                           |
+| H8 — cycle outlives `unused_verifier_lifetime`            | **fixed** (`SsaCycle`: reclamation scoped to the cycle, not the polynomial)                                                                                                                                                                                                                                                                                                         |
+| H9 — SURB eviction silently kills an SSA cycle            | **fixed** (round-robin emission, 2/3 target ceiling, larger ring buffer)                                                                                                                                                                                                                                                                                                            |
+| H10 — SURB ring buffer reserves capacity per peer         | **fixed** (`VecDeque`; ~205 GB VSZ ceiling → allocation tracks occupancy)                                                                                                                                                                                                                                                                                                           |
+| M1 — `pending_ack_keys` has no TTL                        | **fixed** by H1's rewrite (TTL, bounded capacity, per-bucket cap)                                                                                                                                                                                                                                                                                                                   |
+| M2 — `max_awaiting_acks × max_tracked_peers`              | **fixed on base** — `max_ack_buffer_bytes` (1 GiB) enforced at insertion on a measured 400 B/entry, with a resync backstop. The check deliberately permits only a concurrency-sized overshoot; the unbounded caps product is gone. The rejected workload model assumed a Session count and packet rate the node does not enforce                                                    |
+| M3 — reconstructor not configurable                       | **fixed** — all eight fields are settable under `pix.reconstructor`; one `ssa_reconstructor()` feeds all three sites via `try_new`, and the merged branch validates the actually installed reconstructor in `SessionManager::start`                                                                                                                                                 |
+| M8 — commitment traffic competes with SURBs               | **largely moot** via M9 (~19 000 Start packets per cycle → ~320)                                                                                                                                                                                                                                                                                                                    |
+| M9 — naive share verification                             | **fixed** (Feldman removed; one check per polynomial, wire format kept)                                                                                                                                                                                                                                                                                                             |
+| M10 — PIX was unmeasured                                  | **fixed** (benchmarks; two optimisation leads handed to M9/M14)                                                                                                                                                                                                                                                                                                                     |
+| M11 — `nextest --lib -p hopr-lib` does not compile        | **FIXED** — `cfg` reverted to feature-only; verified compiling. The session crate's test-module gating went with it                                                                                                                                                                                                                                                                 |
+| M12 — sequential Exit ack pipeline                        | **fixed**                                                                                                                                                                                                                                                                                                                                                                           |
+| M13 — small-order commitment poisons a cell               | **fixed**; not pinned, and unpinnable — the backend's `from_bytes` rejects first, so `is_torsion_free` is defence in depth                                                                                                                                                                                                                                                          |
+| M14 — 152 µs per commitment ingest (81 s/cycle)           | **closed** via M9 (81 s → 1.25 s); proposed random-combination subgroup batching is unsound for small cofactor torsion                                                                                                                                                                                                                                                              |
+| M15 — programmatic recovery deadline bypasses quota check | **open on this combined branch** — serialized config rejects an impossible deadline, direct `SessionManagerConfig` construction does not                                                                                                                                                                                                                                            |
+| M16 — curve override is not negotiated/versioned          | **fixed** — `PixSuite` rides the two free high bits of the `PixParams` word; the Exit refuses a foreign suite with `UnacceptablePixParams` before any curve-sized field is exchanged. Pre-suite BabyJubJub remains compatible and old peers reject new secp words early. One residual: pre-suite secp builds announce zeros and are indistinguishable from BabyJubJub               |
+| M17 — threshold calibration omits Entry share generation  | **fixed** — objective stated as Exit bottleneck capacity, `8192 × 64` retained, three false threshold-free comments corrected, both measured tables recorded in-tree, and the total-CPU reading that favours 48 recorded as rejected rather than missed                                                                                                                             |
+| M4–M7 — `NonAnonymousPixStrategy` robustness              | **out of scope** — implementation lives in the standalone `hopr-strategy` repository                                                                                                                                                                                                                                                                                                |
+| L1, L3, L7, L13, L15, L16                                 | **fixed** (L1/L7 by the H1 and M9 rewrites; L3 removed by M9; L15 completed by `4f30a70629`)                                                                                                                                                                                                                                                                                        |
+| L2 — intra-batch duplicate polynomial indices             | **FIXED** (`606e51ea8e`) — batch-local `seen` set; the whole batch is rejected, keeping the retry path open                                                                                                                                                                                                                                                                         |
+| L5 / L6 / L18 — awaiter / kill-switch lifecycle           | **fixed by the supervisor branch**, therefore counted fixed in this combined view                                                                                                                                                                                                                                                                                                   |
+| L20 — stale `max_awaiting_acks` safety comment            | **fixed in the combined merge sequence** — rebasing onto M3 removes the follow-up's default-config helper and its stale comment                                                                                                                                                                                                                                                     |
+| L21 — acknowledgement-budget minimum documentation        | **fixed** — the doc states the enforced 25 600 B floor with its derivation, and `the_documented_ack_budget_floor_is_the_enforced_one` pins the number so prose and validator cannot drift apart again                                                                                                                                                                               |
+| L22 — PIX curve-feature override cleanup                  | **fixed** — root manifest and M13 comments describe the override model; the two `Group` imports carry the same cfg arms the curve selection uses, so all three supported combinations are warning-free                                                                                                                                                                              |
+| L23 — surplus ratio rounds down                           | **fixed** — ceiling division makes 20 % a floor; both tolerance tests sweep the whole threshold range rather than the four values on which the bug was invisible. No negotiated value moved                                                                                                                                                                                         |
+| L25 — `42f7edf9c6` left two failing tests behind          | **fixed** — the surplus ratio change and its new validator were not carried into the session layer; found while implementing L23, along with five stale `1.5×`/778 MiB prose sites                                                                                                                                                                                                  |
+| L26 — `PixParams` still documented as a triple            | **fixed** (`14bb5aedbe`) — comments say quadruple/all four; the one passage that keeps “three” now states why (the suite is not a dimension and does not enter the quota)                                                                                                                                                                                                           |
+| M4–M7, L8–L12, L17                                        | **out of scope on this branch** — owned by the standalone `hopr-strategy` repository, which consumes `hopr-lib`'s `PixEvent`s                                                                                                                                                                                                                                                       |
 
 ### Immediately actionable on the combined branch
 
 1. **M15:** apply the quota-versus-minimum-supported-packet-rate recovery-deadline validation to
    directly constructed `SessionManagerConfig`s, with a direct-construction regression test.
-2. **H3 Tier 3 residual:** calculate and enforce a safe node-wide live-cycle/tombstone memory budget.
-   For `ssas_per_request > 1`, also decide the tolerated number of unpaid-cycle failures and close
-   the Session when that policy is exceeded; at the default batch size of one, an unpaid-cycle
-   timeout already closes the Session.
+
+~~**H3 Tier 3 residual**~~ — done: the node-wide live-cycle/tombstone budget is calibrated and
+enforced at Session admission, and `max_failed_cycles` settles the batched unpaid-cycle policy.
 
 ### Completed `lukas/pix` queue (history)
 
@@ -2803,7 +2875,7 @@ _Re-verified on the combined `lukas/session-pix-supervisor` tip `128e44c3d1`, wh
 
 **Explicitly excluded from that historical base-branch queue:** H1 is tracked separately; H2
 retransmission is [#8318](https://github.com/hoprnet/hoprnet/issues/8318); H3 Tier 3, H6 and M15 were
-deferred to the supervisor branch, where H6 is now fixed and the other two are the combined-branch
+deferred to the supervisor branch, where H6 and H3 Tier 3 are now fixed and M15 is the combined-branch
 queue immediately above; L5/L6/L18 are fixed; funding/sweeping/recovery storage belong to
 `hopr-strategy`; M14 needs no fix. C2 documentation remains a decision, not immediate implementation
 work.
@@ -2963,13 +3035,11 @@ startup with a message naming the field rather than degrading silently.
 
 ## Remaining work
 
-**The standalone `lukas/pix` queue is empty, and H6 is now fixed, leaving this combined branch two
-residuals:**
+**The standalone `lukas/pix` queue is empty, and H6 and H3 Tier 3 are now fixed, leaving this
+combined branch one residual:**
 
 - **M15:** enforce quota/recovery-deadline consistency for direct `SessionManagerConfig`
   construction.
-- **H3 Tier 3:** finish capacity calibration/enforcement, include `retired_ssas`, and decide the
-  repeated-unpaid-cycle termination threshold when batching above one.
 
 The remaining work owned elsewhere is:
 
@@ -2988,4 +3058,4 @@ corrections for `quota_range`'s stale "≈195 MiB to ≈778 MiB" are done here, 
 
 _The base-branch sweep's L19 is fixed. The merged supervisor fixes L18 by deleting the awaiter
 machinery, and L20 disappeared when merged over the base branch's configured reconstructor helper.
-H1/H2 are tracked separately; H3 Tier 3 and M15 are the remaining combined-branch residuals._
+H1/H2 are tracked separately; M15 is the last combined-branch residual._

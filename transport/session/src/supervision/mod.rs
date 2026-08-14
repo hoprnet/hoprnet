@@ -261,6 +261,7 @@
 //! | Parameter | Default | What it prevents |
 //! |---|---|---|
 //! | `ssas_per_request` | 1 | Nothing by itself — an exposure dial. Raising it amortises the request round trip over several cycles, at the price of multiplying the *unfunded* exposure to that many quotas, and it scales the two deadlines below. |
+//! | `max_failed_cycles` | 1 | An Entry losing one cycle per batch indefinitely while a single funded sibling holds the Session open. One loss is survivable, the second closes the Session. Only reachable above a batch of one, where the failing cycle is not always the last one standing. |
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
@@ -280,7 +281,8 @@
 //! actually in use: `max_recovery_idle >= max_ack_await_time`; `tombstone_retention_window >=
 //! max_ack_await_time`; `max_recovery_idle < unused_verifier_lifetime`; `ssas_per_request` in
 //! `1..=MAX_SSA_BATCH_SIZE`; both scaled deadlines under 24 h; non-zero durations; a share fraction in
-//! `0.0..=1.0`; and non-zero `max_served_without_progress` and `min_share_order_sample`.
+//! `0.0..=1.0`; and non-zero `max_served_without_progress`, `min_share_order_sample` and
+//! `max_failed_cycles`.
 //!
 //! ### The surplus run, and why it no longer constrains anything
 //!
@@ -342,6 +344,7 @@
 //! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
 //! | `max_unverifiable_shares_per_ssa` / `_per_session` | 0 / 0 | Shipped values; a failed polynomial has already doomed the cycle |
 //! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
+//! | `max_failed_cycles` | 1 | Shipped value, and inert at this batch size of one — the failing cycle is always the last one standing, which closes the Session first |
 //! | `min_deposit` | ≥ one quota's value | 162.2 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
 //!
 //! Related settings outside [`SupervisorConfig`] that this profile also pins:
@@ -355,6 +358,7 @@
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
 //! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the 54 s pipelining runway quoted above. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
 //! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
+//! | `IncomingSessionPixConfig::max_live_cycle_bytes` | 3 GiB | Shipped value. At `2048 × 64 + 16` a Session reserves ≈20.5 MiB, so this profile admits ≈150 concurrent PIX Sessions rather than the ≈37 the default dimensions imply. It is the ceiling on live reconstructor state, and it — not `maximum_managed_sessions` — is what decides how many PIX Sessions this Exit accepts |
 
 use std::time::Duration;
 
@@ -393,8 +397,10 @@ pub struct SupervisorConfig {
     ///
     /// Two things it costs, both linear in the value:
     ///
-    /// * The Exit holds that many live reconstructor cycles at once (≈49 MiB of peak state each at the profiled
-    ///   dimensions).
+    /// * The Exit holds that many live reconstructor cycles at once — worst case ≈41 MiB each at the profiled
+    ///   dimensions, per `hopr_protocol_pix::peak_cycle_bytes`. That cost is reserved up front against
+    ///   `IncomingSessionPixConfig::max_live_cycle_bytes`, so this value divides the number of PIX Sessions the node
+    ///   will admit.
     /// * The unfunded exposure. The supervisor never lets a *second* batch go out while the first is still unfunded,
     ///   but within one batch every cycle is unfunded at once — so the ceiling is this many SSA quotas rather than
     ///   one.
@@ -413,6 +419,25 @@ pub struct SupervisorConfig {
     /// Default: 1, which reproduces the unbatched exchange byte-for-byte.
     #[default(1)]
     pub ssas_per_request: usize,
+
+    /// Cycles this Session may lose without recovering them before it is closed. The next one closes
+    /// it.
+    ///
+    /// Counted over the whole Session, not per batch, because a retired cycle leaves no trace on its
+    /// siblings: without a cumulative count an Entry can lose one cycle per batch forever while a
+    /// single funded sibling keeps the Session alive, paying for a fraction of what it is served.
+    ///
+    /// Only reachable with [`ssas_per_request`](Self::ssas_per_request)` > 1`. At the shipping batch
+    /// of one the failing cycle is always the last one standing, and that closes the Session before
+    /// this is ever consulted — so nothing changes at the defaults.
+    ///
+    /// A recovered cycle never counts: it leaves through tombstone expiry, not through the failure
+    /// path.
+    ///
+    /// Default: 1 — one lost cycle is survivable, which is what the retire-and-hand-on-the-successor
+    /// -gate path exists for, and a second is not.
+    #[default(1)]
+    pub max_failed_cycles: usize,
 
     /// Maximum time to wait for the SSA to be fully committed.
     ///
@@ -801,6 +826,14 @@ pub fn validate_pix_supervision(
             crate::MAX_SSA_BATCH_SIZE
         )));
     }
+    // Zero would close the Session on the first lost cycle *and* on the last one standing, which is
+    // the same thing at the shipping batch size but silently disables batching above it. The
+    // supervisor clamps to one where it reads this; rejecting here is what an operator sees.
+    if cfg.max_failed_cycles == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "max_failed_cycles must be non-zero".into(),
+        ));
+    }
     if cfg.max_ssa_delivery_time.is_zero() {
         return Err(TransportSessionError::InvalidConfig(
             "max_ssa_delivery_time must be non-zero".into(),
@@ -968,6 +1001,7 @@ mod tests {
     fn valid_cfg() -> SupervisorConfig {
         SupervisorConfig {
             ssas_per_request: 1,
+            max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),

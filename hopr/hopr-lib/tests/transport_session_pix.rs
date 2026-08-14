@@ -320,6 +320,9 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
         IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
+            // Not what any of these tests is about; the shipped ceiling is far above one cluster
+            // Session at these dimensions.
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
@@ -498,6 +501,9 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
         IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
+            // Not what any of these tests is about; the shipped ceiling is far above one cluster
+            // Session at these dimensions.
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 // The deadline under test.
                 max_deposit_wait: MAX_DEPOSIT_WAIT,
@@ -632,6 +638,9 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
         IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
+            // Not what any of these tests is about; the shipped ceiling is far above one cluster
+            // Session at these dimensions.
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
                 // The setting under test: not one packet before the deposit.
@@ -747,6 +756,9 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
         IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
+            // Not what any of these tests is about; the shipped ceiling is far above one cluster
+            // Session at these dimensions.
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
                 // Both far out of reach, so that neither can be what closes the Session: a deposit
@@ -930,6 +942,9 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
         IncomingSessionPixConfig {
             quota_range: 0..=100_000,
             enforce_pix: false,
+            // Not what any of these tests is about; the shipped ceiling is far above one cluster
+            // Session at these dimensions.
+            max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),

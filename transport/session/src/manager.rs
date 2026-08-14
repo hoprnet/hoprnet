@@ -165,6 +165,13 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
     // it drops them.
     session_data.abort_handles.lock().abort_all();
 
+    // And return the memory those cycles were admitted against, now rather than whenever the last
+    // clone of this slot happens to be dropped. Idempotent, so the slot's own `Drop` — including
+    // the cache's deferred one — is free to run afterwards.
+    if let Some(reservation) = session_data.cycle_budget.as_ref() {
+        reservation.release();
+    }
+
     #[cfg(all(feature = "telemetry", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
@@ -300,8 +307,10 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
 ///   burst of thousands of `SsaCommit` packets, and its own `ReadyToDeposit` — i.e. its own on-chain deposit.
-/// * Exit: every entry is a live reconstructor cycle, ≈49 MiB of peak state, held until that cycle recovers. At this
-///   ceiling that is ≈1 GB per Session.
+/// * Exit: every entry is a live reconstructor cycle, held until that cycle recovers — worst case ≈41 MiB at the
+///   deployed dimensions (`hopr_protocol_pix::peak_cycle_bytes`), so ≈820 MiB per Session at this ceiling, before the
+///   pipelining factor. That is what a Session reserves against [`IncomingSessionPixConfig::max_live_cycle_bytes`], so
+///   raising the batch size directly divides how many PIX Sessions the node will accept.
 ///
 /// It also bounds the supervisor's deadline scaling: a batch multiplies both
 /// [`max_ssa_delivery_time`](crate::SupervisorConfig::max_ssa_delivery_time) and
@@ -312,6 +321,55 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// [`SessionManagerConfig::max_ssas_per_ssa_request`] are clamped to `1..=Self` where they are read,
 /// so a programmatically built config that never calls `validate()` cannot exceed it.
 pub const MAX_SSA_BATCH_SIZE: usize = 20;
+
+/// SSA batches whose reconstructor state can be live on the Exit at the same moment.
+///
+/// Two, and structurally so. Only the *last* cycle of a batch may ask for a successor, and it asks
+/// once (`supervision`'s "Rolling SSAs"), so a batch has at most one successor outstanding. The
+/// predecessor cannot add a third: full recovery calls `remove_cycle` immediately, and what survives
+/// until `RetireSsa` is the supervisor's own record and a tombstone, not cycle state.
+///
+/// Used as the pipelining factor when a Session reserves against
+/// [`IncomingSessionPixConfig::max_live_cycle_bytes`].
+pub const MAX_OVERLAPPING_BATCHES: u64 = 2;
+
+/// What a PIX Session at these dimensions costs the node's live-cycle budget.
+///
+/// The worst case one cycle can hold, times every cycle that can be live at once. Both factors come
+/// from configuration rather than observation, because the charge is made before the Session exists.
+/// `ssas_per_request` is clamped for the reason [`SessionManager::new`] clamps it — a
+/// programmatically built config must not be able to understate the reservation and then overrun it.
+pub fn cycle_budget_for(params: &PixParams, ssas_per_request: usize) -> u64 {
+    hopr_protocol_pix::peak_cycle_bytes::<HoprPixSpec>(params)
+        .saturating_mul(ssas_per_request.clamp(1, MAX_SSA_BATCH_SIZE) as u64)
+        .saturating_mul(MAX_OVERLAPPING_BATCHES)
+}
+
+/// The largest reservation any offer inside a `quota_range` ending at `quota_bytes` can produce.
+///
+/// The quota fixes `polys × (threshold + surplus)` but not the split, and the two terms of
+/// [`hopr_protocol_pix::peak_cycle_bytes`] pull opposite ways — the share buffers want a high
+/// threshold, the per-polynomial overhead wants many polynomials — so the maximum is found by
+/// walking the thresholds rather than by a closed form. 254 iterations, once, at config load.
+///
+/// `surplus = 0` throughout, which is what makes each candidate the worst of its threshold: the
+/// surplus is priced into the quota but holds no reconstructor state, so any surplus at all buys
+/// fewer polynomials for the same quota.
+///
+/// Used to reject a [`IncomingSessionPixConfig::max_live_cycle_bytes`] that could never admit even
+/// one Session at the dimensions its own `quota_range` advertises.
+pub fn max_cycle_budget_for_quota(quota_bytes: u64, ssas_per_request: usize) -> u64 {
+    let quota_shares = quota_bytes / HoprPacket::PAYLOAD_SIZE as u64;
+
+    (hopr_protocol_pix::MIN_POLY_THRESHOLD..=hopr_protocol_pix::MAX_POLY_THRESHOLD)
+        .filter_map(|threshold| {
+            let polys = u16::try_from((quota_shares / threshold as u64).min(MAX_POLYS_PER_SSA as u64)).ok()?;
+            PixParams::try_new(polys, threshold, 0, LOCAL_PIX_SUITE).ok()
+        })
+        .map(|params| cycle_budget_for(&params, ssas_per_request))
+        .max()
+        .unwrap_or_default()
+}
 
 /// Default for [`SessionManagerConfig::max_ssas_per_ssa_request`] — how many SSA commitments an Entry
 /// accepts in a single [`SsaServerCommitmentMessage`].
@@ -495,6 +553,70 @@ pub(crate) struct SessionSlot {
     /// money is spent and must be neither. Carrying the increment twice is the cheaper mistake: a
     /// receive path that forgets this counter makes the gate stricter, never laxer.
     returned_packets: Arc<std::sync::atomic::AtomicU64>,
+    /// This Session's share of the node's live reconstructor-cycle budget.
+    ///
+    /// Exit-side and PIX-only; `None` everywhere else, since nothing else holds cycle state. Behind
+    /// an `Arc` so the budget is returned when the last clone of this slot goes: a slot is cloned
+    /// into the Session cache and into its [`SessionSlotGuard`], so no single one of them can be
+    /// made responsible for the release.
+    ///
+    /// [`close_session`] returns it explicitly, which is what makes the release simultaneous with
+    /// the closure; the `Drop` behind the `Arc` is the backstop for anything that bypasses that
+    /// function. Both are safe to run because the release is idempotent.
+    cycle_budget: Option<Arc<CycleBudgetReservation>>,
+}
+
+/// One Session's reservation against the node's live reconstructor-cycle budget.
+///
+/// Charged when a PIX Session is accepted and returned when its Session closes. Deliberately a
+/// projection rather than a measurement: the alternative is to weigh the reconstructor's actual
+/// state and refuse a share once it is too large, which loses the cycle of whichever Session
+/// happened to arrive last rather than of the one that inflated it. A reservation taken up front can
+/// only ever refuse a Session that does not exist yet.
+#[derive(Debug)]
+pub(crate) struct CycleBudgetReservation {
+    bytes: u64,
+    outstanding: Arc<std::sync::atomic::AtomicU64>,
+    /// Whether [`release`](Self::release) has already run, so it can be called from both the close
+    /// path and `Drop` without the budget being returned twice.
+    released: std::sync::atomic::AtomicBool,
+}
+
+impl CycleBudgetReservation {
+    /// Returns the reservation to the node's budget. Idempotent.
+    ///
+    /// Called explicitly by [`close_session`], and by `Drop` as the backstop.
+    ///
+    /// Both, and not just `Drop`, because the slot lives in a `moka` cache: `remove` hands the value
+    /// back but drops the cache's own clone during a later maintenance pass, so a purely
+    /// refcount-driven release would return the budget at an unpredictable time — and a node whose
+    /// Sessions all closed could still refuse the next one. The explicit call makes the release
+    /// simultaneous with the closure that caused it; the flag is what keeps the deferred drop from
+    /// crediting it a second time.
+    fn release(&self) {
+        if self.released.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        // Saturating, so a release the flag somehow failed to suppress could not wrap the counter
+        // into a budget that admits everything.
+        let outstanding = self
+            .outstanding
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |held| {
+                Some(held.saturating_sub(self.bytes))
+            })
+            .unwrap_or_default()
+            .saturating_sub(self.bytes);
+        trace!(
+            released = self.bytes,
+            outstanding, "released live-cycle budget reservation"
+        );
+    }
+}
+
+impl Drop for CycleBudgetReservation {
+    fn drop(&mut self) {
+        self.release();
+    }
 }
 
 /// RAII guard that rolls back a freshly inserted [`SessionSlot`] unless the
@@ -597,6 +719,33 @@ pub struct IncomingSessionPixConfig {
     /// (≈ 162 MiB to ≈ 649 MiB, inclusive).
     #[default(_code = "DEFAULT_PIX_SSA_QUOTA / DEFAULT_PIX_QUOTA_RANGE_SPAN..=DEFAULT_PIX_SSA_QUOTA")]
     pub quota_range: std::ops::RangeInclusive<u64>,
+    /// Ceiling on the live Exit-side reconstructor state this node will commit to, in bytes.
+    ///
+    /// **This, not [`SessionManagerConfig::maximum_sessions`], is what bounds reconstructor
+    /// memory.** A PIX Session reserves `MAX_OVERLAPPING_BATCHES × ssas_per_request ×
+    /// hopr_protocol_pix::peak_cycle_bytes(offered params)` when it is accepted and holds it until
+    /// it closes; a Session that does not fit is refused with
+    /// [`StartErrorReason::NoSlotsAvailable`] before any state is allocated for it. The reservation
+    /// is computed from the parameters the *peer* offered, so a Session asking for smaller
+    /// dimensions costs proportionally less of the budget.
+    ///
+    /// Enforced at admission rather than validated as a product of the configuration, for the reason
+    /// `SsaReconstructorConfig::max_ack_buffer_bytes` gives: `maximum_sessions` validates to
+    /// 100 000, and the resulting product is a number no node could hold, so validating it would
+    /// only ever reject the shipping defaults. Counting what has actually been committed to is
+    /// indifferent to how the ceiling was configured.
+    ///
+    /// Default is 3 GiB. Derived from the deployed operating point rather than picked: at the
+    /// default dimensions a Session reserves ≈82 MiB, so this admits ≈37 concurrent PIX Sessions,
+    /// comfortably covering the 10–30 clients per Exit the calibration profile models. The same
+    /// defaults with `maximum_sessions = 100` and no budget imply ≈8 GiB.
+    ///
+    /// A ceiling on *reservations*, not an allocation: nothing is claimed up front, and because the
+    /// reservation is denominated at the adversarial peak, a node serving conforming peers holds an
+    /// order of magnitude less than it has reserved. The number exists to stop an Exit selling more
+    /// service than its memory can hold, not to describe what it will typically use.
+    #[default(3 * 1024 * 1024 * 1024)]
+    pub max_live_cycle_bytes: u64,
     /// Deadlines, fault limits and service budget the Exit-side PIX supervisor enforces on a
     /// Session.
     ///
@@ -1126,6 +1275,13 @@ pub struct SessionManager<S> {
     /// A `moka` cache rather than a map, for its idle eviction: a `HashMap` keyed by pseudonym would
     /// otherwise retain one entry per Session for the life of the process.
     ssa_request_locks: moka::future::Cache<HoprPseudonym, Arc<futures::lock::Mutex<()>>>,
+    /// Live reconstructor-cycle bytes this node has committed to, summed over every PIX Session.
+    ///
+    /// The counterpart of `active_sessions`, and the reason that one is not sufficient: a Session is
+    /// admitted on a slot count, but what it costs the reconstructor is set by the dimensions its
+    /// peer offered. Charged in `handle_incoming_session_initiation` and returned by
+    /// [`CycleBudgetReservation`]'s `Drop`, so no removal path has to remember to decrement it.
+    live_cycle_bytes: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl<S> Clone for SessionManager<S> {
@@ -1135,6 +1291,7 @@ impl<S> Clone for SessionManager<S> {
             session_notifiers: self.session_notifiers.clone(),
             start_protocol_tx: self.start_protocol_tx.clone(),
             active_sessions: self.active_sessions.clone(),
+            live_cycle_bytes: self.live_cycle_bytes.clone(),
             sessions: self.sessions.clone(),
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
@@ -1302,6 +1459,7 @@ where
             session_notifiers: Arc::new(OnceLock::new()),
             start_protocol_tx: Arc::new(OnceLock::new()),
             active_sessions,
+            live_cycle_bytes: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
             // Idle rather than live TTL, and generous: the entry must outlive the gap between two
@@ -1835,6 +1993,9 @@ where
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
                                 returned_packets: returned_packets.clone(),
+                                // Nor does it hold reconstructor state: the live-cycle budget is
+                                // charged by the side that reconstructs.
+                                cycle_budget: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -1943,6 +2104,9 @@ where
                                 pix_supervisor: Default::default(),
                                 pix_egress_gate: Default::default(),
                                 returned_packets,
+                                // Nor does it hold reconstructor state: the live-cycle budget is
+                                // charged by the side that reconstructs.
+                                cycle_budget: None,
                             },
                         )
                         .ok_or_else(|| {
@@ -2569,6 +2733,8 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             returned_packets: Default::default(),
+            // Never PIX, so there is no reconstructor state to charge for.
+            cycle_budget: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -2599,6 +2765,8 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             returned_packets: Default::default(),
+            // Never PIX, so there is no reconstructor state to charge for.
+            cycle_budget: None,
         };
         self.sessions.insert(session_id, slot);
         self.slot_allocated
@@ -2606,6 +2774,33 @@ where
             .unwrap_or_else(|e| e.into_inner())
             .remove(&session_id);
         session_rx
+    }
+
+    /// Charges `params`' worth of reconstructor state against the node-wide budget.
+    ///
+    /// Returns `None` if the node has already committed to as much as
+    /// [`IncomingSessionPixConfig::max_live_cycle_bytes`] allows — the caller must then refuse the
+    /// Session, because nothing later in establishment can give the memory back.
+    ///
+    /// A CAS loop rather than an unconditional `fetch_add` with a rollback: an add that is
+    /// provisionally over the ceiling is briefly visible to every concurrent initiation, and with
+    /// enough of them arriving at once the budget would appear exhausted to Sessions that do fit.
+    fn reserve_cycle_budget(&self, params: &PixParams) -> Option<Arc<CycleBudgetReservation>> {
+        let bytes = cycle_budget_for(params, self.cfg.pix_config.supervision.ssas_per_request);
+        let ceiling = self.cfg.pix_config.max_live_cycle_bytes;
+
+        self.live_cycle_bytes
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |held| {
+                held.checked_add(bytes).filter(|total| *total <= ceiling)
+            })
+            .ok()
+            .map(|_| {
+                Arc::new(CycleBudgetReservation {
+                    bytes,
+                    outstanding: self.live_cycle_bytes.clone(),
+                    released: std::sync::atomic::AtomicBool::new(false),
+                })
+            })
     }
 
     /// Checks the PIX parameters offered by the Entry during the Session Initiation.
@@ -2734,6 +2929,46 @@ where
 
         info!(params = %client_params, "client offered acceptable PIX parameters");
 
+        // Charge this Session's reconstructor state against the node-wide budget before anything is
+        // allocated for it. Only a PIX Session holds cycle state, so only a PIX Session is charged —
+        // `check_pix_params` hands back nominal parameters for a peer that offered none, and
+        // reserving on those would bill Sessions that never reconstruct anything.
+        //
+        // Refused here rather than at the successor request, which is the other place the ceiling
+        // could be applied: by then the Entry has funded a cycle and refusing costs it that deposit,
+        // whereas a Session refused now is one the peer can retry elsewhere at no charge.
+        let cycle_budget = if session_req.capabilities.0.contains(Capability::UsePIX) {
+            let Some(reservation) = self.reserve_cycle_budget(&client_params) else {
+                warn!(
+                    challenge = session_req.challenge,
+                    requested = cycle_budget_for(&client_params, self.cfg.pix_config.supervision.ssas_per_request),
+                    outstanding = self.live_cycle_bytes.load(Ordering::Relaxed),
+                    ceiling = self.cfg.pix_config.max_live_cycle_bytes,
+                    "refusing a PIX session: the node's live reconstructor-cycle budget is exhausted"
+                );
+
+                let reason = StartErrorReason::NoSlotsAvailable;
+                let data = HoprStartProtocol::SessionError(StartErrorType {
+                    identifier: ErrorIdentifier::Challenge(session_req.challenge),
+                    reason,
+                });
+                send_via_msg_sender(
+                    &mut msg_sender,
+                    reply_routing,
+                    data,
+                    "session error message due to an exhausted live-cycle budget",
+                )
+                .await?;
+
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()]);
+                return Ok(());
+            };
+            Some(reservation)
+        } else {
+            None
+        };
+
         let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
             .get()
@@ -2759,6 +2994,7 @@ where
             pix_supervisor: Default::default(),
             pix_egress_gate: Default::default(),
             returned_packets: Default::default(),
+            cycle_budget,
         };
         slot.abort_handles.lock().insert(SessionHandles::Ingress, session_rx_ah);
 
@@ -3973,6 +4209,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 returned_packets: Default::default(),
+                cycle_budget: None,
             },
         );
 
@@ -5036,6 +5273,203 @@ mod tests {
         Ok(())
     }
 
+    /// The node refuses a PIX Session it has no reconstructor memory left for, and does so before
+    /// allocating anything.
+    ///
+    /// This is the bound `maximum_sessions` cannot express: a session slot is one slot whatever the
+    /// peer offered, while the reconstructor state behind it is set by the peer's dimensions. Here
+    /// `maximum_sessions` is wide open and the budget is exactly one Session's worth, so nothing but
+    /// the budget can be doing the refusing.
+    ///
+    /// Refused, not queued: nothing later in establishment can give the memory back, and the peer is
+    /// free to retry against another Exit.
+    #[test_log::test(tokio::test)]
+    async fn a_pix_session_over_the_live_cycle_budget_is_refused() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let params = small_pix_params();
+        let one_session = cycle_budget_for(&params, DEFAULT_SSAS_PER_SSA_REQUEST);
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                maximum_sessions: 100,
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=10_000_000_000_000,
+                    // Room for exactly one Session at these dimensions.
+                    max_live_cycle_bytes: one_session,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let ssa_gen_config = SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: TEST_SURPLUS_SHARES,
+        };
+        let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
+            SsaShareGenerator::new(ssa_gen_config).into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| futures::future::ok(()).boxed());
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let offer = |pseudonym| {
+            (
+                pseudonym,
+                StartInitiation {
+                    challenge: MIN_CHALLENGE,
+                    target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
+                    capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                    additional_data: small_pix_additional_data(),
+                },
+            )
+        };
+
+        let (p1, req1) = offer(HoprPseudonym::random());
+        mgr.handle_incoming_session_initiation(p1, req1).await?;
+        assert_eq!(1, mgr.num_active_sessions(), "the first PIX session must be admitted");
+        assert_eq!(
+            one_session,
+            mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "and must have charged exactly one session's worth"
+        );
+
+        // The budget is spent, so this one is refused — handled internally as a `SessionError`,
+        // hence `Ok` with no new slot.
+        let (p2, req2) = offer(HoprPseudonym::random());
+        mgr.handle_incoming_session_initiation(p2, req2).await?;
+        assert_eq!(
+            1,
+            mgr.num_active_sessions(),
+            "a session over the live-cycle budget must not be admitted"
+        );
+        assert_eq!(
+            one_session,
+            mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "and a refused session must not leave a reservation behind"
+        );
+
+        // Closing the admitted session returns its share, and the next request fits again.
+        assert!(mgr.close_session(&p1));
+        assert_eq!(
+            0,
+            mgr.live_cycle_bytes.load(Ordering::Relaxed),
+            "closing a session must return its reservation"
+        );
+
+        let (p3, req3) = offer(HoprPseudonym::random());
+        mgr.handle_incoming_session_initiation(p3, req3).await?;
+        assert_eq!(
+            1,
+            mgr.num_active_sessions(),
+            "the freed budget must admit the next session"
+        );
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
+    /// A Session is charged for the dimensions its *peer* offered, not for this node's defaults.
+    ///
+    /// The Exit accepts a range of dimensions, and the reconstructor state behind them differs by
+    /// more than an order of magnitude across it. Charging a flat figure would either refuse small
+    /// Sessions that fit easily or admit large ones that do not.
+    #[test]
+    fn the_live_cycle_reservation_scales_with_the_offered_dimensions() -> anyhow::Result<()> {
+        let small = PixParams::try_new(1024, 64, 16, LOCAL_PIX_SUITE)?;
+        let large = PixParams::try_new(8192, 64, 16, LOCAL_PIX_SUITE)?;
+
+        assert_eq!(
+            8 * cycle_budget_for(&small, 1),
+            cycle_budget_for(&large, 1),
+            "eight times the polynomials must cost eight times the budget"
+        );
+        assert_eq!(
+            3 * cycle_budget_for(&large, 1),
+            cycle_budget_for(&large, 3),
+            "and a batch of three must cost three times a batch of one"
+        );
+
+        // The pipelining factor is in there once, and only once: a batch may have one successor
+        // outstanding, not one per member.
+        assert_eq!(
+            MAX_OVERLAPPING_BATCHES * hopr_protocol_pix::peak_cycle_bytes::<HoprPixSpec>(&large),
+            cycle_budget_for(&large, 1)
+        );
+
+        // The clamp matches the one `SessionManager::new` applies, so a config that never went
+        // through it cannot understate its own reservation.
+        assert_eq!(cycle_budget_for(&large, 1), cycle_budget_for(&large, 0));
+        assert_eq!(
+            cycle_budget_for(&large, MAX_SSA_BATCH_SIZE),
+            cycle_budget_for(&large, usize::MAX)
+        );
+
+        Ok(())
+    }
+
+    /// A non-PIX Session reserves nothing.
+    ///
+    /// `check_pix_params` hands back nominal parameters for a peer that offered no PIX at all, and
+    /// charging on those would bill every plain Session for reconstructor state that will never
+    /// exist — silently capping a node that does not run PIX.
+    #[test_log::test(tokio::test)]
+    async fn a_non_pix_session_does_not_touch_the_live_cycle_budget() -> anyhow::Result<()> {
+        use hopr_utils::network_types::prelude::SealedHost;
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    // Not enough for any PIX session at all; a plain one must be unaffected.
+                    max_live_cycle_bytes: 1,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        let mut transport = MockMsgSender::new();
+        transport
+            .expect_send_message()
+            .returning(|_, _| futures::future::ok(()).boxed());
+        let (sender, _handle) = mock_packet_planning(transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(sender.clone(), new_session_tx, None)?;
+
+        mgr.handle_incoming_session_initiation(
+            HoprPseudonym::random(),
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities::empty(),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        assert_eq!(1, mgr.num_active_sessions());
+        assert_eq!(0, mgr.live_cycle_bytes.load(Ordering::Relaxed));
+
+        sender.close_channel();
+        _handle.await??;
+        Ok(())
+    }
+
     /// Verifies the early `TooManySessions` return at the top of `new_session` (line 767).
     /// Unlike `session_manager_should_reject_new_session_when_max_sessions_reached`, which fills
     /// incoming slots and hits the slot-guard path at line 957, this test fills all `maximum_sessions`
@@ -5377,6 +5811,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 returned_packets: Default::default(),
+                cycle_budget: None,
             },
         );
 
@@ -5480,6 +5915,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 returned_packets: Default::default(),
+                cycle_budget: None,
             },
         );
 
@@ -8890,6 +9326,7 @@ mod tests {
                 pix_supervisor: Default::default(),
                 pix_egress_gate: Default::default(),
                 returned_packets: Default::default(),
+                cycle_budget: None,
             },
         );
         assert!(guard.is_some(), "slot allocation must succeed");

@@ -11,9 +11,10 @@ use utils::{AddShareOutcome, SsaCommitmentBuilder, SsaCycle};
 use validator::Validate;
 
 use crate::{
-    CoefficientIndex, ExitAcknowledgementShareProcessor, Group, MAX_POLYS_PER_SSA, PixGroup, PixGroupRepr, PixParams,
-    PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof, SsaCommitmentState,
-    SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError, types::SsaId,
+    CoefficientIndex, CompletedShare, ExitAcknowledgementShareProcessor, Group, MAX_POLYS_PER_SSA, PixGroup,
+    PixGroupRepr, PixParams, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof,
+    SsaCommitmentState, SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError,
+    types::SsaId,
 };
 
 /// Rejects an early-recovery fraction that is not a finite value in `0.0..=1.0`.
@@ -178,6 +179,108 @@ pub struct SsaReconstructorConfig {
 /// Every entry is this size — the payload is fixed-width inline arrays with no indirection — which
 /// is what lets the runtime bound count entries rather than weigh each one.
 pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
+
+/// Per-polynomial live heap a cycle holds that `size_of` cannot account for, in bytes.
+///
+/// [`peak_cycle_bytes`] reads the two large per-polynomial terms — the part builder and the
+/// commitment map entry retained behind it — straight from the types, so they track the curve and
+/// the structs without anyone maintaining a number. This covers what is left:
+///
+/// * `SsaBuilder`'s received-index set, sized at `num_polys` on construction;
+/// * the `Box<[_]>` header the part builders live in, and allocator rounding on both collections;
+/// * the acknowledgement-path residue a cycle drags along while it fills. `awaiting_acks` is bounded globally by
+///   [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes) rather than per cycle, but `moka` applies
+///   removals on a later maintenance pass, so a cycle being fed at line rate carries a backlog of redeemed-but-not-yet
+///   -reclaimed entries. Charging a slice of it twice is deliberate: it is the difference between a model that is a
+///   ceiling and one that is merely a good estimate.
+///
+/// **Measured, not derived**, like [`AWAITING_ACK_ENTRY_BYTES`]:
+/// `exit_reconstructor_worst_case_share_order` in `tests/memory_profile.rs` prints the modelled and
+/// measured per-polynomial figures side by side with the share buffers subtracted, which is exactly
+/// this number. At the time of writing it measures 908 B against the 458 B `size_of` accounts for.
+///
+/// Set to roughly twice what `size_of` accounts for, which leaves ~5 % headroom over that
+/// measurement. Headroom rather than the measured figure because the acknowledgement residue above
+/// is a scheduling artefact and will not reproduce identically, and because understating this would
+/// let the Session layer's live-cycle budget be exceeded.
+pub const PART_BUILDER_OVERHEAD_BYTES: usize = 704;
+
+/// Live heap one entry in the retirement tombstone set costs, in bytes.
+///
+/// **Measured, not derived**, for the same reason as [`AWAITING_ACK_ENTRY_BYTES`]: the payload is an
+/// [`SsaId`] key against a unit value, and moka's per-entry bookkeeping — hash map entry, LRU node,
+/// TTL timer-wheel node — is everything else. Run `tombstone_entry_cost` in
+/// `tests/memory_profile.rs` to re-derive it; at the time of writing it reports 256 B/entry at
+/// 20 000 entries and 255 B at 100 000, on `TestSpec`'s 40 B key — wider than the deployed
+/// `HoprPseudonym`'s, so the measurement over-covers production. Rounded up, because understating it
+/// would understate what [`MAX_RETIRED_SSAS`] can cost.
+pub const TOMBSTONE_ENTRY_BYTES: usize = 288;
+
+/// Capacity of the retirement tombstone set.
+///
+/// A tombstone is what stops a cycle that has been retired from being resurrected by a commitment
+/// completing concurrently, and it must also keep a re-registered `SsaId` retired *permanently* —
+/// so a size eviction is not a lost optimisation, it is the failure the set exists to prevent. The
+/// cap therefore has to sit far above the count reachable while `time_to_idle` still holds an entry.
+///
+/// Derived from the Session layer's live-cycle budget, which is what makes the count finite. That
+/// budget admits `max_live_cycle_bytes / (MAX_OVERLAPPING_BATCHES × ssas_per_request ×
+/// peak_cycle_bytes)` concurrent PIX Sessions — ~37 at the shipping 3 GiB and the deployed
+/// dimensions. Each retires at most `ssas_per_request` cycles per generation, and a cycle cannot be
+/// replaced faster than its commitment deadline (`max_ssa_delivery_time`, 20 s), so within the
+/// 1800 s `unused_verifier_lifetime` one Session contributes at most
+/// `1800 / 20 × ssas_per_request` = 90 at the shipping batch of one, 1800 at `MAX_SSA_BATCH_SIZE`.
+/// A larger batch buys proportionally fewer concurrent Sessions, so the product is flat: ~37 × 1800
+/// ≈ 67 000 either way, and a Session that closes and is replaced costs a full initiation round trip
+/// per replacement, so churn does not change the order.
+///
+/// 262 144 leaves ~3.9× headroom over that and costs at most ~72 MiB at
+/// [`TOMBSTONE_ENTRY_BYTES`] — a fortieth of the budget it is derived from, and only if every entry
+/// is live at once, which the arithmetic above says cannot happen.
+pub const MAX_RETIRED_SSAS: usize = 262_144;
+
+/// Worst-case live heap one Exit-side SSA cycle can hold, in bytes.
+///
+/// This is the figure the Session layer's live-cycle budget is denominated in, and it is
+/// deliberately the **adversarial** peak rather than the conforming one. Nothing constrains the
+/// order in which an Entry emits shares within a cycle: the shipped generator walks polynomials in
+/// blocks of [`SHARE_EMISSION_WINDOW`](crate::SHARE_EMISSION_WINDOW), so only that window holds
+/// share buffers at once and a conforming cycle peaks five times below this — 7.8 MiB against
+/// 39.1 MiB measured at the deployed dimensions — but a peer running anything else can drive *every*
+/// polynomial to one share short of its threshold and hold the lot.
+/// `SsaPartBuilder::release_verification_state` frees a buffer when its polynomial reconstructs; a
+/// polynomial one share short never reconstructs.
+///
+/// Not free to the peer, which is why this is a capacity bound and not a security one: a share only
+/// reaches the Exit on a return SURB the Exit itself spends, so reaching this peak costs a full
+/// quota deposit per cycle. What it bounds is an Exit selling more service than its memory can hold.
+///
+/// Excludes the awaiting-acknowledgement buffer, which is bounded separately and globally by
+/// [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes) — counting it here would
+/// charge the same bytes twice.
+pub fn peak_cycle_bytes<S: PixSpec>(params: &PixParams) -> u64 {
+    // `Vec` doubles from a minimum of four elements, so a buffer holding `threshold - 1` shares has
+    // a capacity of `threshold.next_power_of_two()` — up to twice what is stored. Modelling the
+    // allocation rather than the occupancy is what makes this a ceiling.
+    let share_buffer = (params.shares_per_poly() as u64)
+        .next_power_of_two()
+        .max(4)
+        .saturating_mul(size_of::<CompletedShare<S>>() as u64);
+
+    // Read from the types rather than restated as a constant, so the model follows the curve this
+    // node was built for and cannot drift when a field is added to either struct.
+    //
+    // The commitment map term is the one that surprises: `SsaCommitmentBuilder` is *drained* when
+    // the part builders are handed out, but `drain` does not return the allocation and the builder
+    // lives until `remove_cycle` — so a completed cycle still holds a bucket per polynomial. The
+    // factor of two is hashbrown's power-of-two bucket count at its 87.5 % load factor, and the
+    // extra byte is the control byte beside each one.
+    let per_poly = size_of::<parking_lot::Mutex<utils::SsaPartBuilder<S>>>() as u64
+        + 2 * (size_of::<(PolynomialIndex, PixGroup<S>)>() as u64 + 1)
+        + PART_BUILDER_OVERHEAD_BYTES as u64;
+
+    (params.polys_per_ssa() as u64).saturating_mul(per_poly + share_buffer)
+}
 
 /// The defaults, named so that a mirror can share them instead of restating them.
 ///
@@ -510,11 +613,14 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // `abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it` asserts. Shortening
             // this to the width of the race would break that contract silently.
             //
-            // Unbounded in count, deliberately for now: a size eviction here permits exactly the
-            // resurrection the tombstone prevents, so a capacity has to be chosen against the
-            // concurrent-Session budget rather than picked. That belongs with the global admission
-            // control the memory work still owes.
+            // Capacity chosen against the concurrent-Session budget, not picked: a size eviction
+            // here permits exactly the resurrection the tombstone prevents, so the cap has to sit
+            // above the count this node can create while any of them still matters. See
+            // `MAX_RETIRED_SSAS` for that arithmetic — it is derived from the Session layer's
+            // live-cycle budget, which is the global admission control this cap used to be waiting
+            // on.
             retired_ssas: moka::sync::Cache::builder()
+                .max_capacity(MAX_RETIRED_SSAS as u64)
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
             ack_buffer_entries: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -1453,6 +1559,57 @@ mod tests {
         tests::TestSpec,
         traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor},
     };
+
+    /// The two structural claims [`peak_cycle_bytes`] rests on, pinned where CI can see them.
+    ///
+    /// The empirical check is `exit_reconstructor_worst_case_share_order` in
+    /// `tests/memory_profile.rs`, which needs a tracking allocator and a production-width cycle and
+    /// is therefore `#[ignore]`d. This catches the two ways the model can silently stop being a
+    /// ceiling without anyone running that: a part builder growing past the per-polynomial constant,
+    /// and `Vec`'s growth policy allocating more than the next power of two for a buffer that stops
+    /// one share short of its threshold.
+    #[test]
+    fn peak_cycle_bytes_rests_on_the_sizes_it_claims() {
+        // `Vec` doubles from a minimum of four, which is what makes `next_power_of_two` the
+        // allocation for a buffer holding `threshold - 1` shares. Modelled with a same-sized array
+        // so the check does not need a live cycle; the equality below keeps the proxy honest.
+        assert_eq!(
+            64,
+            size_of::<CompletedShare<TestSpec>>(),
+            "the growth model below assumes a 64 B share"
+        );
+        for threshold in [2usize, 3, 4, 5, 64, 65, 128, 255] {
+            let mut shares: Vec<[u8; 64]> = Vec::new();
+            for _ in 0..threshold - 1 {
+                shares.push([0; 64]);
+            }
+            assert!(
+                shares.capacity() as u64 <= (threshold as u64).next_power_of_two().max(4),
+                "a buffer of {} shares allocated {} slots, past the modelled {}",
+                threshold - 1,
+                shares.capacity(),
+                (threshold as u64).next_power_of_two().max(4)
+            );
+        }
+
+        // The share buffers are what the model is *for*, so they must dominate it at the shipped
+        // dimensions. If the per-polynomial terms ever caught up, the whole "worst share order is
+        // the worst case" argument would stop being the thing worth bounding.
+        let params = PixParams::try_from_config::<TestSpec>(&SsaGeneratorConfig {
+            polynomials_per_ssa: DEFAULT_POLYS_PER_SSA,
+            threshold: DEFAULT_POLY_THRESHOLD,
+            surplus_shares: DEFAULT_SURPLUS_SHARES,
+        })
+        .expect("the shipped dimensions must be valid");
+        let total = peak_cycle_bytes::<TestSpec>(&params);
+        let buffers = DEFAULT_POLYS_PER_SSA as u64
+            * (DEFAULT_POLY_THRESHOLD as u64).next_power_of_two()
+            * size_of::<CompletedShare<TestSpec>>() as u64;
+        assert!(
+            buffers * 2 > total,
+            "share buffers ({buffers} B) must dominate the modelled cycle ({total} B)"
+        );
+    }
 
     #[test]
     fn ssa_reconstructor_try_new_should_reject_an_invalid_config_without_panicking() {

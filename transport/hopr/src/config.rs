@@ -286,17 +286,23 @@ fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), Vali
 
 /// Rejects an [`IncomingSessionPixConfig`] that cannot work.
 ///
-/// Two independent failures, both of which would otherwise only show up at runtime:
+/// Three independent failures, all of which would otherwise only show up at runtime:
 ///
 /// `quota_range` is operator-settable, and an empty (inverted) range silently makes
 /// `check_pix_params` reject every offered PIX parameter set, which surfaces only as
 /// `UnacceptablePixParams` errors at Session establishment time.
 ///
-/// And `max_recovery_time` has to cover a whole cycle at the widest dimensions this Exit will
+/// `max_recovery_time` has to cover a whole cycle at the widest dimensions this Exit will
 /// *accept*, or it closes honest Sessions partway through one. That check is possible at all only
 /// because the quota now counts the surplus: `quota_range.end()` is the number of bytes a cycle
 /// actually puts on the wire, so the packet count follows by division with nothing left to guess.
 /// While the surplus was unpriced this needed the peer's `additional_shares`, which never travelled.
+///
+/// And `max_live_cycle_bytes` has to admit at least one Session at those same widest dimensions,
+/// or the Exit advertises a `quota_range` whose top it will always refuse for want of budget —
+/// again as a Start error the operator cannot attribute. Deliberately *one* Session and not
+/// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
+/// number no node holds, so checking it here would only ever reject the shipping defaults.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
     if cfg.quota_range.is_empty() {
         return Err(ValidationError::new(
@@ -325,6 +331,23 @@ fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Resul
         return Err(e);
     }
 
+    let widest =
+        hopr_transport_session::max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
+    if cfg.max_live_cycle_bytes < widest {
+        let mut e = ValidationError::new("pix max_live_cycle_bytes cannot admit one session at the accepted quota");
+        e.message = Some(
+            format!(
+                "max_live_cycle_bytes is {}, but one session offering the largest accepted quota ({} bytes) reserves \
+                 up to {widest} bytes of reconstructor state. Raise max_live_cycle_bytes, lower the top of \
+                 quota_range, or lower ssas_per_request.",
+                cfg.max_live_cycle_bytes,
+                cfg.quota_range.end(),
+            )
+            .into(),
+        );
+        return Err(e);
+    }
+
     Ok(())
 }
 
@@ -338,7 +361,8 @@ const MAX_PIX_DIMENSION_PRODUCT_FACTOR: usize = 4;
 ///
 /// `num_ssa_parts` and `ssa_part_size` are range-validated independently, and their ranges permit
 /// 16192 × 255 = 4 128 960 commitments, about 8× the profiled operating point of 8192 × 64 =
-/// 524 288 (≈49 MiB of peak reconstructor state and ≈1.25 s of commitment ingest per cycle). Nothing
+/// 524 288 (worst case ≈41 MiB of peak reconstructor state per cycle, per
+/// `hopr_protocol_pix::peak_cycle_bytes`, and ≈1.25 s of commitment ingest). Nothing
 /// downstream catches that: the product *is* the per-cycle quota, and the only guard on it is the
 /// peer Exit's `quota_range` rejection — which protects the Exit, and arrives after this node has
 /// already generated the cycle.
@@ -1300,6 +1324,56 @@ mod tests {
         );
     }
 
+    /// The live-cycle budget must admit at least one Session at the widest quota this Exit accepts.
+    ///
+    /// Otherwise the Exit advertises a `quota_range` whose top it will always refuse for want of
+    /// memory, and the peer sees only a `NoSlotsAvailable` it cannot attribute to a dimension it
+    /// chose. Deliberately *one* Session: the whole reason this budget exists is that the product
+    /// with `maximum_managed_sessions` is a number no node holds, so checking that product here
+    /// would only ever reject the shipping defaults.
+    #[test]
+    fn a_live_cycle_budget_too_small_for_the_accepted_quota_is_rejected() {
+        let cfg = IncomingSessionPixConfig::default();
+        let widest = hopr_transport_session::max_cycle_budget_for_quota(
+            *cfg.quota_range.end(),
+            cfg.supervision.ssas_per_request,
+        );
+
+        assert!(
+            cfg.max_live_cycle_bytes >= widest,
+            "the shipping default budget ({}) must admit one session at the top of its own quota range ({widest})",
+            cfg.max_live_cycle_bytes
+        );
+        validate_incoming_session_pix_config(&cfg).expect("the shipping default must validate");
+
+        let starved = IncomingSessionPixConfig {
+            max_live_cycle_bytes: widest - 1,
+            ..Default::default()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&starved).is_err(),
+            "a budget one byte short of a single session must be refused"
+        );
+
+        // The other way round: the budget is untouched and the operator asked for more cycles. This
+        // rather than a widened `quota_range`, because widening the quota does *not* scale the
+        // reservation without limit — `MAX_POLYS_PER_SSA` caps the polynomial count, so past a
+        // point a larger quota only buys a bigger threshold. The batch size has no such ceiling
+        // below `MAX_SSA_BATCH_SIZE`, and it multiplies the whole figure.
+        let batched = IncomingSessionPixConfig {
+            supervision: SupervisorConfig {
+                ssas_per_request: hopr_transport_session::MAX_SSA_BATCH_SIZE,
+                ..cfg.supervision.clone()
+            },
+            ..cfg.clone()
+        };
+        assert!(
+            validate_incoming_session_pix_config(&batched).is_err(),
+            "a batch of {} live cycles per session needs a budget raised to match",
+            hopr_transport_session::MAX_SSA_BATCH_SIZE
+        );
+    }
+
     // The reversed range is the point of the test: `quota_range` is operator-settable, so an
     // inverted range is reachable from a config file and must be rejected by validation rather
     // than silently matching nothing.
@@ -1578,8 +1652,14 @@ mod tests {
         // that has to reject an out-of-range batch — reached through `HoprProtocolConfig`'s schema
         // validator rather than the incoming-config one, because the pairing needs the sibling
         // `pix.reconstructor` field that only the parent can see.
+        // The budget is raised with the batch size, because the two are coupled: a batch of `n`
+        // holds `n` live reconstructor cycles, and `validate_incoming_session_pix_config` refuses a
+        // configuration whose declared memory cannot hold the batch it asks for. Leaving the default
+        // 2 GiB here would make every case below fail on memory rather than on the batch range this
+        // test is about.
         let with_supervision = |supervision: SupervisorConfig| HoprProtocolConfig {
             incoming_session_pix_config: IncomingSessionPixConfig {
+                max_live_cycle_bytes: u64::MAX,
                 supervision,
                 ..Default::default()
             },

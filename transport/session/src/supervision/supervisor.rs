@@ -147,6 +147,13 @@ pub struct SessionPixSupervisor {
     /// Tracks the first failure reason when multiple SSAs fail, so the
     /// earliest cause is used for the final `Close` action rather than the last.
     first_failure_reason: Option<SessionPixCloseReason>,
+    /// Cycles this Session has lost without recovering them, over its whole life.
+    ///
+    /// Cumulative, and that is the whole point: retiring a failed member leaves no trace on its
+    /// siblings, so without a counter that survives the retirement an Entry can lose one cycle per
+    /// batch indefinitely while a single funded sibling holds the Session open. Bounded by
+    /// [`SupervisorConfig::max_failed_cycles`].
+    failed_cycles: usize,
     /// Greatest SSA index that has been retired (closed and removed).
     ///
     /// Prevents a stale `SsaRequestSent` from resurrecting a closed SSA. A high-watermark rather
@@ -182,6 +189,7 @@ impl SessionPixSupervisor {
             release_service_emitted: false,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
+            failed_cycles: 0,
             highest_retired_ssa_index: None,
         };
 
@@ -937,6 +945,11 @@ impl SessionPixSupervisor {
         self.first_failure_reason.get_or_insert(reason);
         let close_reason = self.first_failure_reason.unwrap_or(reason);
 
+        // Charged before the branches below, because the whole point is a count that outlives the
+        // record being retired. Every path into this function is a cycle lost without recovering —
+        // a recovered cycle leaves through tombstone expiry in `handle_deadline`, not through here.
+        self.failed_cycles += 1;
+
         // Warn-level diagnostic with full SSA state before closing.
         let ssa = &self.ssas[idx];
         tracing::warn!(
@@ -958,6 +971,24 @@ impl SessionPixSupervisor {
         self.ssas[idx].phase = SsaPhase::Closing;
 
         if self.ssas.len() == 1 {
+            self.closed = true;
+            return vec![SessionPixAction::Close(close_reason)];
+        }
+
+        // A batch has siblings to fall back on, which is what makes retiring one member survivable —
+        // but only up to a point. Past the limit the Session goes, with the *first* failure's reason
+        // rather than this one's, so the report names the cause instead of the last symptom.
+        //
+        // Strictly greater: the field is how many failures are *tolerated*, so the shipping value of
+        // one keeps the existing "retire the member and carry on" behaviour for a batch's first loss
+        // — including handing on the successor gate below — and closes on the second.
+        if self.failed_cycles > self.cfg.max_failed_cycles.max(1) {
+            tracing::warn!(
+                failed_cycles = self.failed_cycles,
+                max_failed_cycles = self.cfg.max_failed_cycles,
+                ?close_reason,
+                "closing PIX session: too many cycles lost without recovering"
+            );
             self.closed = true;
             return vec![SessionPixAction::Close(close_reason)];
         }
@@ -1138,6 +1169,7 @@ mod tests {
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
             ssas_per_request: 1,
+            max_failed_cycles: 1,
             max_ssa_delivery_time: Duration::from_secs(20),
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
@@ -1219,6 +1251,30 @@ mod tests {
                 &SessionPixEvent::DepositConfirmed {
                     ssa_id: id,
                     amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+    }
+
+    /// Drives a range of a batch's cycles to `AwaitingDeposit` and leaves them there.
+    ///
+    /// The complement of [`fund_batch`]: this is the state a cycle is *lost* from, and a funded one
+    /// cannot be — `DepositObserverClosed` on a recovering cycle is a no-op.
+    fn commit_unfunded(
+        sup: &mut SessionPixSupervisor,
+        p: HoprPseudonym,
+        indices: std::ops::RangeInclusive<u32>,
+        now: Instant,
+    ) {
+        for idx in indices {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::CommitmentVerified {
+                    ssa_id: id,
+                    expected_deposit: Some(sufficient_balance()),
                 },
                 now,
                 0,
@@ -3327,6 +3383,89 @@ mod tests {
             ),
             other => panic!("expected RequestSsa, got {other:?}"),
         }
+    }
+
+    /// A second lost cycle closes a batched Session, however many funded siblings are still standing.
+    ///
+    /// Retiring a member and carrying on is what keeps one bad cycle from costing a whole Session,
+    /// but it leaves no trace on the survivors — so without a count that outlives the retirement an
+    /// Entry can lose one cycle per batch forever, paying for a fraction of what it is served. The
+    /// counter is cumulative for exactly that reason: here the two losses are in *different* batches,
+    /// and nothing in a per-batch view would connect them.
+    ///
+    /// The close carries the *first* failure's reason, so the report names the cause rather than the
+    /// last symptom.
+    #[test]
+    fn the_second_lost_cycle_closes_a_batched_session() {
+        const BATCH: usize = 4;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            max_failed_cycles: 1,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        // Cycles 1 and 2 are funded and recovering; 3 and 4 are stuck awaiting their deposits, which
+        // is the state an unpaid cycle is lost from.
+        fund_batch(&mut sup, p, 2, now);
+        commit_unfunded(&mut sup, p, 3..=BATCH as u32, now);
+
+        // First loss: survivable, and the batch carries on.
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 3)), now, 0);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::RetireSsa(id) if *id == ssa_id(p, 3))),
+            "the first lost cycle must be retired rather than close the Session, got {actions:?}"
+        );
+        assert!(!sup.closed, "one loss is inside the limit");
+
+        // Second loss, with two funded siblings still recovering: over the limit, so the Session
+        // goes anyway — which is the point, since those siblings are what would otherwise keep an
+        // Entry losing one cycle per batch alive indefinitely.
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 4)), now, 0);
+        assert!(
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::DepositObserverClosed))),
+            "the second lost cycle must close the Session, got {actions:?}"
+        );
+        assert!(sup.closed);
+        assert_eq!(2, sup.failed_cycles);
+    }
+
+    /// Raising the limit buys exactly the extra losses it names, and no more.
+    ///
+    /// The counter has to survive the retirement of the cycle that incremented it, so this drives
+    /// three separate losses through a batch large enough that a survivor always remains — a
+    /// per-batch or per-cycle count would never reach the limit.
+    #[test]
+    fn a_raised_failure_limit_tolerates_exactly_that_many_losses() {
+        const BATCH: usize = 6;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            max_failed_cycles: 3,
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        // One funded cycle, so the Session always has a survivor and only the limit can close it.
+        fund_batch(&mut sup, p, 1, now);
+        commit_unfunded(&mut sup, p, 2..=BATCH as u32, now);
+
+        for idx in 2..=4 {
+            sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, idx)), now, 0);
+            assert!(!sup.closed, "loss {} of 3 is inside the limit", idx - 1);
+        }
+
+        sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 5)), now, 0);
+        assert!(sup.closed, "the fourth loss is over a limit of three");
     }
 
     #[test]

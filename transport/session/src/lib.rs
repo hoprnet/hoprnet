@@ -26,7 +26,8 @@ pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlCo
 pub use hopr_utils::network_types::types::*;
 pub use manager::{
     DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, IncomingSessionPixConfig,
-    MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager, SessionManagerConfig,
+    MAX_OVERLAPPING_BATCHES, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
+    SessionManagerConfig, cycle_budget_for, max_cycle_budget_for_quota,
 };
 pub use supervision::{SupervisorConfig, validate_pix_supervision};
 #[cfg(any(test, feature = "testing"))]
