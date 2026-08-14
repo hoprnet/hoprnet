@@ -13,6 +13,48 @@ use tracing::instrument;
 
 use crate::{errors::SessionError, protocol::FrameId};
 
+/// Buffer entry pairing an item with when it entered the buffer.
+///
+/// Ordering delegates entirely to `item`, so the heap behaves exactly as before; `buffered_at`
+/// exists only to age the entry out.
+#[derive(Clone, Copy, Debug)]
+struct Buffered<T> {
+    item: T,
+    buffered_at: Instant,
+}
+
+impl<T: PartialEq> PartialEq for Buffered<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.item.eq(&other.item)
+    }
+}
+
+impl<T: Eq> Eq for Buffered<T> {}
+
+impl<T: PartialOrd> PartialOrd for Buffered<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.item.partial_cmp(&other.item)
+    }
+}
+
+impl<T: Ord> Ord for Buffered<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.item.cmp(&other.item)
+    }
+}
+
+impl<T: PartialOrd<FrameId>> PartialEq<FrameId> for Buffered<T> {
+    fn eq(&self, other: &FrameId) -> bool {
+        self.item.partial_cmp(other) == Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<T: PartialOrd<FrameId>> PartialOrd<FrameId> for Buffered<T> {
+    fn partial_cmp(&self, other: &FrameId) -> Option<std::cmp::Ordering> {
+        self.item.partial_cmp(other)
+    }
+}
+
 /// Sequencer is an adaptor for streams, that yield elements that have a natural ordering and
 /// can be compared with [`FrameId`] and puts them in the correct sequence starting with
 /// `FrameId` equal to 1.
@@ -43,10 +85,13 @@ pub struct Sequencer<S: futures::Stream> {
     inner: S,
     #[pin]
     timer: futures_time::task::Sleep,
-    buffer: BinaryHeap<std::cmp::Reverse<S::Item>>,
+    buffer: BinaryHeap<std::cmp::Reverse<Buffered<S::Item>>>,
     next_id: FrameId,
     last_emitted: Instant,
     max_wait: Duration,
+    /// Anti-bufferbloat bound: items buffered longer than this are dropped, not emitted, so a
+    /// stall shows up as loss rather than a latency tail. `None` disables it.
+    max_item_age: Option<Duration>,
     state: State,
 }
 
@@ -59,7 +104,7 @@ where
     ///
     /// The `frame_size` value will be clamped into the `[C, (C - SessionMessage::SEGMENT_OVERHEAD) * SeqIndicator::MAX
     /// + 1]` interval.
-    fn new(inner: S, max_wait: Duration, capacity: usize) -> Self {
+    fn new(inner: S, max_wait: Duration, capacity: usize, max_item_age: Option<Duration>) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
             inner,
@@ -68,6 +113,7 @@ where
             next_id: 1,
             last_emitted: Instant::now(),
             max_wait,
+            max_item_age: max_item_age.filter(|age| !age.is_zero()),
             state: State::Polling,
         }
     }
@@ -133,7 +179,10 @@ where
                                 } else {
                                     // Push new item to the buffer
                                     tracing::trace!("new item");
-                                    this.buffer.push(std::cmp::Reverse(item));
+                                    this.buffer.push(std::cmp::Reverse(Buffered {
+                                        item,
+                                        buffered_at: Instant::now(),
+                                    }));
                                     *this.state = State::BufferUpdated;
                                 }
                             }
@@ -157,13 +206,28 @@ where
                     // The buffer has been updated, check if we can yield something
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.eq(this.next_id) {
+                            let stale = this
+                                .max_item_age
+                                .is_some_and(|max_age| next.buffered_at.elapsed() >= max_age);
+
                             *this.next_id = this.next_id.wrapping_add(1);
                             *this.last_emitted = Instant::now();
                             *this.state = State::BufferUpdated;
 
+                            // Anti-bufferbloat: the frame is the one due next, but it has been held
+                            // so long that delivering it would only add latency. Report it as
+                            // discarded — the same signal the consumer already handles for a lost
+                            // frame — instead of emitting it late.
+                            if stale {
+                                let discarded = this.next_id.wrapping_sub(1);
+                                this.buffer.pop();
+                                tracing::trace!(discarded, "discard frame that exceeded max age");
+                                return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                            }
+
                             tracing::trace!("emit next frame");
 
-                            return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
+                            return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
                         } else if this.last_emitted.elapsed() >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
                         {
@@ -198,7 +262,7 @@ where
                             *this.next_id = this.next_id.wrapping_add(1);
                             tracing::trace!("emit next frame when done");
 
-                            Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)))
+                            Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)))
                         } else {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
@@ -225,7 +289,22 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity)
+        Sequencer::new(self, timeout, capacity, None)
+    }
+
+    /// As [`SequencerExt::sequencer`], but discards items buffered longer than `max_item_age`
+    /// instead of emitting them late.
+    fn sequencer_with_max_age(
+        self,
+        timeout: Duration,
+        capacity: usize,
+        max_item_age: Option<Duration>,
+    ) -> Sequencer<Self>
+    where
+        Self::Item: Ord + PartialOrd<FrameId>,
+        Self: Sized,
+    {
+        Sequencer::new(self, timeout, capacity, max_item_age)
     }
 }
 
@@ -250,6 +329,75 @@ mod tests {
 
         expected.sort();
         assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_discard_entries_that_exceeded_the_max_age() -> anyhow::Result<()> {
+        let (seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        // `max_wait` is long, so nothing here is discarded for being *missing* — only for being stale.
+        let seq_stream =
+            seq_stream.sequencer_with_max_age(Duration::from_secs(30), 4096, Some(Duration::from_millis(100)));
+
+        pin_mut!(seq_sink);
+        pin_mut!(seq_stream);
+
+        // Frame 2 arrives first and waits in the buffer for the missing frame 1 — a transport stall.
+        seq_sink.send(2u32).await?;
+
+        // Drive the sequencer so frame 2 actually lands in its buffer; until it is polled the item
+        // only sits in the channel and its buffered-at clock has not started.
+        assert!(
+            seq_stream
+                .try_next()
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err(),
+            "nothing is emitted while frame 1 is missing"
+        );
+
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+
+        // Frame 1 arrives fresh and is delivered; frame 2 is now 250 ms stale and must be
+        // reported as discarded rather than handed over a quarter of a second late.
+        seq_sink.send(1u32).await?;
+
+        assert_eq!(Some(1), seq_stream.try_next().await?, "the fresh frame is delivered");
+        assert!(
+            matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(2))),
+            "the stale frame must be discarded, not delivered late"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_deliver_entries_within_the_max_age() -> anyhow::Result<()> {
+        let (seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        let seq_stream =
+            seq_stream.sequencer_with_max_age(Duration::from_secs(30), 4096, Some(Duration::from_secs(30)));
+
+        pin_mut!(seq_sink);
+        pin_mut!(seq_stream);
+
+        // Same out-of-order arrival and the same buffering delay, but comfortably inside the
+        // bound: nothing is dropped.
+        seq_sink.send(2u32).await?;
+        assert!(
+            seq_stream
+                .try_next()
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err()
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        seq_sink.send(1u32).await?;
+
+        assert_eq!(Some(1), seq_stream.try_next().await?);
+        assert_eq!(Some(2), seq_stream.try_next().await?);
 
         Ok(())
     }

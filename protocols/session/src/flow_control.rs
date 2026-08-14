@@ -107,6 +107,18 @@ pub struct FlowControlConfig {
     /// frame leaves a gap → stream corruption).
     #[default(2)]
     pub frame_retries: u32,
+
+    /// **Anti-bufferbloat bound (opt-in).** Maximum age of a data-path frame — from its first send
+    /// on the sending side, from entering the ordering buffer on the receiving side.
+    ///
+    /// Older frames are dropped rather than delivered late, so a stall surfaces as clean loss
+    /// instead of a multi-second latency tail (the burst-drain "sawtooth"). A packet arriving
+    /// seconds late is worthless to a real-time consumer, but the latency it adds is not.
+    ///
+    /// Distinct from `frame_timeout`, which bounds how long a *missing* frame is waited for; this
+    /// bounds how stale a *present* frame may be. `None` (default) keeps the previous behaviour.
+    #[default(None)]
+    pub max_frame_age: Option<Duration>,
 }
 
 impl FlowControlConfig {
@@ -130,16 +142,23 @@ impl FlowControlConfig {
             // At least one retry: under reliable-mode flow control an abandoned frame leaves a gap
             // (stream corruption), so `frame_retries` must never clamp the retry budget to 0.
             frame_retries: self.frame_retries.max(1),
+            // A zero bound would drop every frame on sight; treat it as "not set".
+            max_frame_age: self.max_frame_age.filter(|age| !age.is_zero()),
         }
     }
 
     /// The **robust** profile: the clean defaults plus the opt-in tail-tolerance bundle (persist
     /// probe + larger retransmission budget) for deliberately SURB-throttled / high-latency return
     /// paths. See [`Self::persist_stall_parks`] and [`Self::frame_retries`].
+    ///
+    /// The larger retry budget alone would let a transport stall be absorbed as buffering and
+    /// drained afterwards as a multi-second latency sawtooth, so the profile also bounds frame age
+    /// at 2 seconds: past that a frame surfaces as recoverable loss instead of arriving late.
     pub fn robust() -> Self {
         Self {
             persist_stall_parks: 8,
             frame_retries: 8,
+            max_frame_age: Some(Duration::from_secs(2)),
             ..Self::default()
         }
     }
@@ -459,6 +478,12 @@ impl DeliverySignal for DeliveryClock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn robust_profile_should_bound_frame_age() {
+        assert_eq!(FlowControlConfig::robust().max_frame_age, Some(Duration::from_secs(2)));
+        assert_eq!(FlowControlConfig::default().max_frame_age, None);
+    }
 
     /// A `SupplyConstraint` with a fixed ceiling and no distress — the "honest, generous supply"
     /// baseline used to isolate the delivery clock.
