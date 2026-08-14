@@ -4141,6 +4141,7 @@ dependencies = [
  "moka",
  "parameterized",
  "parking_lot",
+ "rstest",
  "serde",
  "serde_with",
  "smart-default",
