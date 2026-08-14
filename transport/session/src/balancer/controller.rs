@@ -465,14 +465,12 @@ where
         let output = self.controller.next_control_output(current);
         tracing::trace!(output, "next balancer control output for session");
 
-        // DIAGNOSTIC: both ends run this same loop -- the Entry with the PID driving production,
-        // the Exit with the proportional controller gating egress -- so one report covers both and
-        // the session id tells them apart. At `info` deliberately: the harness filters at info, and
-        // the point is to see supply and spend on both sides during an outage.
-        // Rate-limited to one line per second so it can run under a full-rate session.
+        // Both ends run this same loop -- the Entry with the PID driving production, the Exit with
+        // the proportional controller gating egress -- so one line covers both and the session id
+        // tells them apart. Rate-limited to one per second so it can run under a full-rate session.
         if self.last_report.elapsed() >= Duration::from_secs(1) {
             self.last_report = std::time::Instant::now();
-            tracing::info!(
+            tracing::debug!(
                 session = %self.session_id,
                 level = current,
                 target = self.controller.bounds().target(),

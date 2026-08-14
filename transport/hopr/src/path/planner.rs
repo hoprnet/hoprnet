@@ -317,6 +317,48 @@ where
     Ok(Some(weighted))
 }
 
+/// Smallest change in a candidate's share of the draws that counts as traffic having moved.
+///
+/// Weights are recomputed from live observations, so they jitter constantly without meaning
+/// anything. One percentage point of a candidate's share is well below the shift a relayer going
+/// silent produces (measured: 33% to near zero) and well above the noise of an idle graph.
+const MIN_SHARE_SHIFT: f64 = 0.01;
+
+/// Each candidate's share of the total weight, keyed by the route it takes.
+fn shares_by_route(paths: &hopr_utils::statistics::WeightedCollection<ValidatedPath>) -> Vec<(String, f64)> {
+    let total: f64 = paths.iter().map(|(_, w)| w.max(0.0)).sum();
+    paths
+        .iter()
+        .map(|(vp, w)| {
+            let share = if total > 0.0 { w.max(0.0) / total } else { 0.0 };
+            (vp.to_string(), share)
+        })
+        .collect()
+}
+
+/// Whether re-weighting would send a materially different share of the draws somewhere else.
+///
+/// Shares rather than raw weights, because the draw normalises over the collection: every weight
+/// halving changes nothing about where traffic goes. Callers use this to decide whether a re-plan
+/// achieved anything, and a re-plan that moved nothing is a reason *not* to act on it -- so
+/// answering "yes" by default would defeat the check it exists for.
+fn weights_moved(
+    before: &hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+    after: &hopr_utils::statistics::WeightedCollection<ValidatedPath>,
+) -> bool {
+    let (before, after) = (shares_by_route(before), shares_by_route(after));
+    if before.len() != after.len() {
+        return true;
+    }
+    before.iter().any(|(route, was)| {
+        // A route that vanished has lost its whole share, which is the largest move there is.
+        after
+            .iter()
+            .find(|(other, _)| other == route)
+            .is_none_or(|(_, now)| (now - was).abs() >= MIN_SHARE_SHIFT)
+    })
+}
+
 /// Cache key for the path planner: `(source, destination, hops)`.
 ///
 /// Only the `Hops` variant of [`RoutingOptions`] is cached (explicit intermediate
@@ -513,7 +555,10 @@ where
     /// already holds. Dropping them was measured to collapse a healthy session from 100 % to
     /// 0.14 %, because a live session draws its next return path from this very entry.
     ///
-    /// Returns how many entries were actually replaced.
+    /// Returns how many entries came back with a materially different **share** of the draws --
+    /// not how many were rebuilt. Callers use this to decide whether the re-plan achieved anything
+    /// worth acting on, and on a healthy graph a rebuild always succeeds, so counting rebuilds
+    /// would answer "something moved" every time.
     pub async fn recompute_paths_from(&self, source: &OffchainPublicKey) -> usize {
         // 0-hop entries name a direct route with nothing to re-weight, exactly as in the sweep.
         let keys = self
@@ -523,7 +568,7 @@ where
             .filter(|(src, _, hops)| src == source && *hops > 0)
             .collect::<Vec<PlannerCacheKey>>();
 
-        let mut replaced = 0usize;
+        let mut moved = 0usize;
         for (src_key, dest_key, hops) in keys {
             if let Ok(Some(weighted)) = rebuild_candidates(
                 &*self.resolver,
@@ -536,13 +581,22 @@ where
             )
             .await
             {
-                self.cache.insert((src_key, dest_key, hops), Arc::new(weighted)).await;
-                replaced += 1;
+                let key = (src_key, dest_key, hops);
+                // A fresh entry counts as moved -- there was no previous distribution to compare
+                // against, so nothing here can say the traffic stayed put.
+                let shifted = match self.cache.get(&key).await {
+                    Some(previous) => weights_moved(&previous, &weighted),
+                    None => true,
+                };
+                self.cache.insert(key, Arc::new(weighted)).await;
+                if shifted {
+                    moved += 1;
+                }
             }
         }
 
-        tracing::debug!(%source, replaced, "recomputed cached paths originating at peer");
-        replaced
+        tracing::debug!(%source, moved, "recomputed cached paths originating at peer");
+        moved
     }
 
     /// Resolves `count` return paths from `destination` back to this node, drawn weighted-random
@@ -1790,12 +1844,48 @@ mod tests {
     ///
     /// Rebuilding every entry on every detection would put the cost of one dead relay onto every
     /// other session the node is carrying.
+    /// A recompute that lands on the same weights has moved no traffic, and the caller uses that
+    /// answer to decide whether refilling is worth anything.
+    ///
+    /// Reporting the number of entries *rebuilt* instead would say "moved" every time, since a
+    /// rebuild always succeeds on a healthy graph -- and refilling behind a re-plan that changed
+    /// nothing just mints more SURBs onto the same route.
+    #[tokio::test]
+    async fn a_recompute_that_lands_on_the_same_weights_should_report_nothing_moved() {
+        let (planner, graph) = two_relayer_return_planner();
+        let dest = pubkey(&SECRET_DEST);
+
+        let _ = fill_return_cache(&planner).await;
+
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            0,
+            "nothing about the graph changed, so no traffic can have moved"
+        );
+
+        // Vacuity guard: the same call must report movement once the evidence actually shifts.
+        // B has to deliver first -- the rate is read against a peak, so a relayer that never had
+        // one has no rate to fall from and the collapse would be invisible.
+        record_surbs(&graph, &dest, &pubkey(&SECRET_A), 1_000, 1_000);
+        record_surbs(&graph, &dest, &pubkey(&SECRET_B), 1_000, 1_000);
+        record_surbs(&graph, &dest, &pubkey(&SECRET_B), 4_000, 0);
+        assert_eq!(
+            planner.recompute_paths_from(&dest).await,
+            1,
+            "a collapse on one relayer must register as moved"
+        );
+    }
+
     #[tokio::test]
     async fn recomputing_should_rebuild_only_the_entries_originating_at_that_peer() {
-        let (planner, _graph) = two_relayer_return_planner();
+        let (planner, graph) = two_relayer_return_planner();
         let (me, a, dest) = (pubkey(&SECRET_ME), pubkey(&SECRET_A), pubkey(&SECRET_DEST));
 
         let _ = fill_return_cache(&planner).await;
+        // Something has to actually move, or the count below would be zero for the wrong reason.
+        record_surbs(&graph, &dest, &a, 1_000, 1_000);
+        record_surbs(&graph, &dest, &pubkey(&SECRET_B), 1_000, 1_000);
+        record_surbs(&graph, &dest, &pubkey(&SECRET_B), 4_000, 0);
         // A second entry in the other direction, which no `dest` recompute may touch.
         let _ = planner
             .cached_paths(
@@ -1808,7 +1898,7 @@ mod tests {
         assert_eq!(
             planner.recompute_paths_from(&dest).await,
             1,
-            "only the entry whose paths start at the named peer should be rebuilt"
+            "only the entry whose paths start at the named peer should be re-weighted"
         );
         assert_eq!(
             planner.recompute_paths_from(&pubkey(&SECRET_B)).await,

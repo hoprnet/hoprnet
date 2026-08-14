@@ -4284,7 +4284,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.43.0"
+version = "0.44.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4421,7 +4421,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.26.0"
+version = "0.26.1"
 dependencies = [
  "anyhow",
  "async-trait",
