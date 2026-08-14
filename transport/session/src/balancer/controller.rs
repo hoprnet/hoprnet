@@ -224,6 +224,16 @@ impl BalancerStateValues {
     /// Both the opt-in and live evidence are required: without the opt-in this is not our
     /// behaviour to change, and without evidence there is nothing to distinguish a dead return path
     /// from an idle one.
+    /// Whether the counterparty buffer estimate is currently meaningless.
+    ///
+    /// `pub` because it is not only the controller's business. While this holds, the controller
+    /// deliberately writes `0` into [`buffer_level`](Self::buffer_level) to drive production to
+    /// the maximum — but that zero is an *instruction to the controller*, not a measurement, and
+    /// anything reading the level as a supply ceiling has to know the difference.
+    pub fn return_path_estimate_is_stale(&self) -> bool {
+        self.should_sustain_through_return_path_loss()
+    }
+
     fn should_sustain_through_return_path_loss(&self) -> bool {
         let deadline = self
             .return_path_degraded_until_ms
@@ -442,6 +452,8 @@ where
                 believed = current,
                 "return path degraded; ignoring the counterparty buffer estimate"
             );
+            // Reads as "produce flat out" to the controller below. `SurbSupply` must not read it
+            // as "the buffer is empty, admit nothing" -- see `return_path_estimate_is_stale`.
             current = 0;
         }
 
