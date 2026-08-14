@@ -234,8 +234,26 @@ impl MemorySurbStore {
             1 => true,
             // A chain length is hops + 1, so 0 cannot occur on a well-formed SURB. Refuse it rather
             // than let a malformed value pass as "direct" and bypass the check below.
-            0 => false,
-            _ => !self.invalidated_relayers.read().contains(&surb.first_relayer),
+            //
+            // The length is an unvalidated byte off a SURB minted by the counterparty, so this is a
+            // statement about that peer, not a local fault we could act on: `warn`, not `error`.
+            0 => {
+                tracing::warn!(
+                    first_relayer = %surb.first_relayer,
+                    "refusing a malformed SURB declaring a zero-length return path"
+                );
+                false
+            }
+            _ => {
+                let usable = !self.invalidated_relayers.read().contains(&surb.first_relayer);
+                if !usable {
+                    tracing::trace!(
+                        first_relayer = %surb.first_relayer,
+                        "refusing a SURB whose first relayer is invalidated"
+                    );
+                }
+                usable
+            }
         }
     }
 }
