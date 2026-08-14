@@ -125,7 +125,7 @@ fn make_manager_with_session() -> (
         session_forward_capacity: BENCHMARK_CHANNEL_CAPACITY,
         ..Default::default()
     };
-    let manager = SessionManager::new(cfg);
+    let manager = SessionManager::new(cfg, None);
 
     let (msg_sender, msg_receiver) = futures::channel::mpsc::unbounded();
     let (session_notifier, session_notifier_rx) = futures::channel::mpsc::channel(1);
@@ -172,7 +172,7 @@ fn make_manager_without_session() -> (
         session_forward_capacity: BENCHMARK_CHANNEL_CAPACITY,
         ..Default::default()
     };
-    let manager = SessionManager::new(cfg);
+    let manager = SessionManager::new(cfg, None);
 
     let (msg_sender, msg_receiver) = futures::channel::mpsc::unbounded();
     let (session_notifier, session_notifier_rx) = futures::channel::mpsc::channel(1);
