@@ -827,27 +827,6 @@ mod tests {
         }
     }
 
-    // ── return-path diversity helpers ─────────────────────────────────────────
-
-    /// A one-element path whose only (and therefore first) hop is `key`.
-    fn path_via(key: OffchainPublicKey, addr: Address) -> ValidatedPath {
-        ValidatedPath::direct(key, addr)
-    }
-
-    fn diversity_fixture() -> Vec<(ValidatedPath, f64)> {
-        // Three candidates via relayer A, two via ME, one via DEST — deliberately lopsided, which
-        // is exactly the shape that makes independent weighted draws concentrate.
-        let (a, m, d) = (pubkey(&SECRET_A), pubkey(&SECRET_ME), pubkey(&SECRET_DEST));
-        vec![
-            (path_via(a, a_addr()), 10.0),
-            (path_via(a, a_addr()), 9.0),
-            (path_via(a, a_addr()), 8.0),
-            (path_via(m, me_addr()), 2.0),
-            (path_via(m, me_addr()), 1.0),
-            (path_via(d, dest_addr()), 1.0),
-        ]
-    }
-
     #[test]
     fn config_should_reject_a_weight_temper_outside_the_unit_range() {
         assert!(PathPlannerConfig::default().validate().is_ok());
