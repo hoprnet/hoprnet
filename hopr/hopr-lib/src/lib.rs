@@ -159,6 +159,21 @@ pub struct HoprSessionClientConfig {
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
     #[default(None)]
     pub flow_control: Option<FlowControlConfig>,
+    /// Abandon the frame due next once the sequence has advanced this far past it, instead of
+    /// holding everything already received for the whole frame timeout.
+    ///
+    /// Head-of-line bound for this session's incoming direction. `None` inherits the node's
+    /// setting, `Some(0)` disables it here, `Some(n)` sets it -- the same zero-disables convention
+    /// as `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`, so the two knobs cannot mean opposite things by
+    /// the same value.
+    ///
+    /// Worth setting per session because the right value tracks reordering depth -- throughput x
+    /// latency spread / frame size -- which is a property of the traffic, not of the node: a bulk
+    /// data session and a control session on the same node differ by orders of magnitude.
+    ///
+    /// Has no effect on a session carrying a retransmission capability, where a missing frame can
+    /// still be recovered and waiting for it is productive.
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -183,6 +198,8 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub always_max_out_surbs: bool,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
+    /// As [`HoprSessionClientConfig::max_frames_behind_gap`].
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
@@ -197,6 +214,7 @@ impl Default for HoprSessionClientExplicitPathConfig {
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
             flow_control: None,
+            max_frames_behind_gap: None,
         }
     }
 }
@@ -212,6 +230,7 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
             flow_control: value.flow_control,
+            max_frames_behind_gap: value.max_frames_behind_gap,
         }
     }
 }
@@ -234,6 +253,7 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
             flow_control: value.flow_control,
+            max_frames_behind_gap: value.max_frames_behind_gap,
         })
     }
 }
@@ -897,9 +917,16 @@ mod tests {
             surb_management: None,
             always_max_out_surbs: false,
             flow_control: None,
+            max_frames_behind_gap: Some(8),
         })
         .context("explicit path config conversion must succeed")?;
 
+        assert_eq!(
+            cfg.max_frames_behind_gap,
+            Some(8),
+            "the session's head-of-line bound has to survive the conversion, or it silently reverts to the node \
+             default"
+        );
         assert!(matches!(
             cfg.forward_path_options,
             hopr_transport::RoutingOptions::IntermediatePath(_)

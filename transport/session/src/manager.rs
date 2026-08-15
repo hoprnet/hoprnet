@@ -578,6 +578,22 @@ impl<S> Clone for SessionManager<S> {
 }
 
 fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
+    session_config_with(cfg, capabilities, None)
+}
+
+/// As [`session_config`], with the initiating session's own head-of-line bound.
+///
+/// `None` inherits the node default; `Some(0)` disables the bound for this session; `Some(n)` sets
+/// it. The zero-disables convention matches `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`, so the per-session
+/// and node-wide knobs cannot mean opposite things by the same value.
+///
+/// Sessions accepted from a peer pass `None`: the bound governs how *we* reassemble what arrives,
+/// so it is ours to choose, not the initiator's to impose on us.
+fn session_config_with(
+    cfg: &SessionManagerConfig,
+    capabilities: crate::Capabilities,
+    max_frames_behind_gap: Option<usize>,
+) -> HoprSessionConfig {
     // Only a session that cannot recover the missing frame should abandon it early. With
     // retransmission the gap is a request away, so waiting is productive and cutting it short
     // would discard data that was on its way back; without it the wait is for something that is
@@ -585,12 +601,20 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
     let can_retransmit =
         capabilities.contains(Capability::RetransmissionAck) || capabilities.contains(Capability::RetransmissionNack);
 
+    // The session's own value when it stated one, the node's otherwise; `Some(0)` is a session
+    // saying "not for me" rather than a threshold of zero.
+    let bound = match max_frames_behind_gap {
+        Some(0) => None,
+        Some(n) => Some(n),
+        None => cfg.max_frames_behind_gap,
+    };
+
     HoprSessionConfig {
         capabilities,
         frame_mtu: cfg.frame_mtu,
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
-        max_frames_behind_gap: (!can_retransmit).then_some(cfg.max_frames_behind_gap).flatten(),
+        max_frames_behind_gap: (!can_retransmit).then_some(bound).flatten(),
     }
 }
 
@@ -1144,7 +1168,7 @@ where
                     let session = HoprSession::new_with_surb_state(
                         session_id,
                         forward_routing,
-                        session_config(&self.cfg, cfg.capabilities),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
                         (
                             reduced_surb_scoring_sender,
                             session_rx.inspect(move |_| {
@@ -1219,7 +1243,7 @@ where
                     let session = HoprSession::new(
                         session_id,
                         forward_routing,
-                        session_config(&self.cfg, cfg.capabilities),
+                        session_config_with(&self.cfg, cfg.capabilities, cfg.max_frames_behind_gap),
                         (reduced_surb_sender, session_rx),
                         Some(notifier),
                     )?;
@@ -1952,6 +1976,44 @@ mod tests {
                 "without retransmission the gap must be bounded"
             );
         }
+    }
+
+    /// The right value tracks throughput x latency spread, which is a property of the *session*,
+    /// not of the node: a bulk data session and a control session on the same node have entirely
+    /// different reordering depths. A caller that knows its own traffic must be able to say so.
+    #[test]
+    fn a_session_should_be_able_to_override_the_nodes_gap_bound() {
+        let node = SessionManagerConfig {
+            max_frames_behind_gap: Some(256),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            session_config_with(&node, Capabilities::empty(), Some(16)).max_frames_behind_gap,
+            Some(16),
+            "the session's own value must win over the node default"
+        );
+        assert_eq!(
+            session_config_with(&node, Capabilities::empty(), None).max_frames_behind_gap,
+            Some(256),
+            "saying nothing must inherit the node default"
+        );
+        assert_eq!(
+            session_config_with(&node, Capabilities::empty(), Some(0)).max_frames_behind_gap,
+            None,
+            "zero disables the bound for this session, matching the env knob's semantics"
+        );
+    }
+
+    /// A per-session override must not be able to re-enable the bound where waiting is productive.
+    #[test]
+    fn a_session_override_should_not_reach_a_session_that_can_retransmit() {
+        let node = SessionManagerConfig::default();
+        assert_eq!(
+            session_config_with(&node, Capability::RetransmissionAck.into(), Some(4)).max_frames_behind_gap,
+            None,
+            "retransmission can recover the gap, so no caller should be able to cut the wait short"
+        );
     }
 
     /// Disabling has to be reachable, since the bound trades reordering tolerance for latency and
