@@ -139,9 +139,9 @@ validator = { version = "0.21.0", features = ["derive"] }
 # `hopr_api::chain::DeployedSafe` two distinct types. `version` alongside `git` is the "multiple
 # locations" form: git wins locally, the version requirement survives packaging. Revert to plain
 # versions once hopr-api 2.0.0, hopr-utilities 0.9.0 and the hopr-impls crates are published.
-hopr-api = { version = "2.0.0", git = "https://github.com/hoprnet/hopr-api", rev = "4739d419926904f609ebc8ef8d71e7d35e2bd967" }
+hopr-api = { version = "2.0.0", git = "https://github.com/hoprnet/hopr-api", rev = "ee65b340cf09fd6031735477cc1171d7610694a3" }
 hopr-types = { version = "2.2.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.9.0", git = "https://github.com/hoprnet/hopr-utilities", rev = "1d3693356538025710791ea1f8797b8f5ecd5380", default-features = false }
+hopr-utils = { package = "hopr-utilities", version = "0.9.0", git = "https://github.com/hoprnet/hopr-utilities", rev = "68e648be4aa9f1442c75df4006a53db414932f7e", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -152,21 +152,21 @@ hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-feature
 hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
-hopr-ticket-manager = { version = "0.5.2", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae" }
+hopr-ticket-manager = { version = "0.5.2", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7" }
 hopr-transport = { version = "0.44.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.26.2", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.22.2", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae" }
+hopr-chain-connector = { version = "0.22.2", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7" }
 
 # referential implementations (published to crates.io)
-hopr-session-server-forwarder = { version = "0.1.1", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae", default-features = false }
-hopr-transport-p2p = { version = "0.9.5", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae", features = [
+hopr-session-server-forwarder = { version = "0.1.1", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7", default-features = false }
+hopr-transport-p2p = { version = "0.9.5", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7", features = [
   "transport-quic",
 ] }
-hopr-ct-full-network = { version = "0.4.0", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae", default-features = false }
-hopr-network-graph = { version = "0.5.0", git = "https://github.com/hoprnet/hopr-impls", rev = "f990e535f82e55a7785b25f0e355db890a0277ae", default-features = false }
+hopr-ct-full-network = { version = "0.4.0", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7", default-features = false }
+hopr-network-graph = { version = "0.5.0", git = "https://github.com/hoprnet/hopr-impls", rev = "81399f427c7bf93aba1ccc3c432382c7e379b6e7", default-features = false }
 
 [profile.dev]
 panic = "abort"
