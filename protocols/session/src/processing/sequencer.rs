@@ -589,8 +589,7 @@ mod tests {
         }
         assert!(
             now.elapsed() < max_wait / 2,
-            "a single frame far ahead is evidence enough, with no frames buffered behind the gap \
-             to count; took {:?}",
+            "a single frame far ahead is evidence enough, with no frames buffered behind the gap to count; took {:?}",
             now.elapsed()
         );
 
