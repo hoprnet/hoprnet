@@ -1152,6 +1152,102 @@ mod tests {
         Ok(())
     }
 
+    /// Drives the head-of-line case end to end over the real socket pipeline.
+    ///
+    /// Segment 0 is dropped, so frame 1 can never be completed, and the sender is deliberately
+    /// left **open**: closing it would drain the sequencer through `State::Done`, which discards
+    /// missing frames immediately and would hide the very stall under test. Returns how long the
+    /// surviving frames took to arrive, and asserts they arrived intact.
+    async fn time_delivery_behind_a_lost_frame(max_frames_behind_gap: Option<usize>) -> anyhow::Result<Duration> {
+        // hoprd's production value, chosen to clear the ~2 s SURB KeepAlive.
+        const FRAME_TIMEOUT: Duration = Duration::from_secs(3);
+
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            TestTelemetryTracker::default(),
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: FRAME_TIMEOUT,
+                max_frames_behind_gap,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            TestTelemetryTracker::default(),
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket
+            .write_all(&data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        alice_socket.flush().await?;
+
+        // Everything except the lost first frame.
+        let mut received = vec![0u8; DATA_SIZE - FRAME_SIZE];
+        let started = std::time::Instant::now();
+        bob_socket
+            .read_exact(&mut received)
+            .timeout(futures_time::time::Duration::from_secs(20))
+            .await??;
+        let elapsed = started.elapsed();
+
+        assert_eq!(
+            &data[FRAME_SIZE..],
+            &received,
+            "the frames that did arrive must be delivered intact, whenever they are released"
+        );
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+        Ok(elapsed)
+    }
+
+    /// The fix, at the socket level: frames behind an unfillable gap are released on the evidence
+    /// that later frames are queued, not after the frame timeout has run its course.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_release_frames_behind_a_gap_without_waiting_for_the_timeout() -> anyhow::Result<()>
+    {
+        let elapsed = time_delivery_behind_a_lost_frame(Some(2)).await?;
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "frames already received must not wait on a frame that cannot arrive; took {elapsed:?}"
+        );
+        Ok(())
+    }
+
+    /// The witness for the test above: with the bound disabled, the same loss on the same pipeline
+    /// stalls for the whole frame timeout. Without this, a fast run could be crediting the fix for
+    /// something the network or the harness was doing anyway.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_without_the_gap_bound_should_stall_for_the_whole_frame_timeout() -> anyhow::Result<()> {
+        let elapsed = time_delivery_behind_a_lost_frame(None).await?;
+        assert!(
+            elapsed >= Duration::from_secs(3),
+            "the unbounded path is what the fix removes; it must still be observable here, took {elapsed:?}"
+        );
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn stateful_socket_unidirectional_should_should_not_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(
