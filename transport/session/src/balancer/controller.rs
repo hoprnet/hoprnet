@@ -219,17 +219,21 @@ impl BalancerStateValues {
             .fetch_max(until, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Whether production should currently ignore the counterparty buffer estimate.
+    /// Whether [`buffer_level`](Self::buffer_level) is currently an instruction rather than a
+    /// measurement.
     ///
-    /// Both the opt-in and live evidence are required: without the opt-in this is not our
-    /// behaviour to change, and without evidence there is nothing to distinguish a dead return path
-    /// from an idle one.
-    /// Whether the counterparty buffer estimate is currently meaningless.
+    /// While this holds, the controller deliberately writes `0` into the level to drive production
+    /// to its maximum. That zero says "produce flat out", not "the counterparty holds nothing", so
+    /// anything reading the level as a *supply ceiling* must consult this first or it will read the
+    /// instruction as an order to send nothing.
     ///
-    /// `pub` because it is not only the controller's business. While this holds, the controller
-    /// deliberately writes `0` into [`buffer_level`](Self::buffer_level) to drive production to
-    /// the maximum — but that zero is an *instruction to the controller*, not a measurement, and
-    /// anything reading the level as a supply ceiling has to know the difference.
+    /// True only when both the opt-in (`sustain_on_return_path_loss`) and live evidence
+    /// ([`mark_return_path_degraded`](Self::mark_return_path_degraded), within its window) are
+    /// present: without the opt-in this is not our behaviour to change, and without evidence there
+    /// is nothing to tell a dead return path from an idle one.
+    ///
+    /// `pub` because it is not only the controller's business — hence the emphasis above on what
+    /// the flag does *not* mean. It is not a general "the return path is degraded" signal.
     pub fn return_path_estimate_is_stale(&self) -> bool {
         self.should_sustain_through_return_path_loss()
     }

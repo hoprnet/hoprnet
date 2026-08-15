@@ -313,9 +313,12 @@ mod tests {
     #[test]
     fn a_degraded_return_path_should_not_zero_the_supply_ceiling() {
         let state = balancer(7_000, 0);
-        state
-            .sustain_on_return_path_loss
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        // Through the config, as a caller would: the opt-in is a configuration decision, and going
+        // via the atomic would couple this test to a representation it has no business knowing.
+        state.update(&crate::SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
         state.mark_return_path_degraded(Duration::from_secs(30));
         assert!(
             state.return_path_estimate_is_stale(),
