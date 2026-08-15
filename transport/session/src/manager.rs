@@ -268,12 +268,19 @@ pub struct SessionManagerConfig {
     /// returned over the wire, 0.60 % reached the application, and the application-side
     /// inter-arrival median sat exactly on the 3 s timeout.
     ///
-    /// The right value tracks reordering depth -- throughput x latency spread -- so it is
-    /// deployment-specific. Tune with `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`; too low converts
+    /// The right value tracks reordering depth -- throughput x latency spread / frame size -- so
+    /// it is deployment-specific. Tune with `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`; too low converts
     /// ordinary reordering into loss, too high leaves the stall in place.
     ///
-    /// Default is 64.
-    #[default(Some(64))]
+    /// Default is 256, which is roughly 3-4x the reordering depth of the cluster it was measured
+    /// on (~0.5 MB/s over paths spread across 10-260 ms, 1500 B frames, so ~70-85 frames in
+    /// flight out of order). The margin is not cosmetic: at 64 -- about one reordering depth --
+    /// a *healthy* baseline dropped from 100 % to 92.2 % arrival, because ordinary reordering was
+    /// being read as loss. At 256 the same baseline returned 100 % while a return relayer killed
+    /// mid-session still recovered 97.1 %, against 0.60 % with the bound absent.
+    ///
+    /// Default is 256.
+    #[default(Some(256))]
     pub max_frames_behind_gap: Option<usize>,
 
     /// The base timeout for initiation of Session initiation.
@@ -1921,7 +1928,7 @@ mod tests {
     fn session_config_should_bound_the_gap_only_without_retransmission() {
         assert_eq!(
             SessionManagerConfig::default().max_frames_behind_gap,
-            Some(64),
+            Some(256),
             "the default must bound the gap, or the stall stays in place unless opted out of"
         );
 
