@@ -92,6 +92,9 @@ pub struct Sequencer<S: futures::Stream> {
     /// Anti-bufferbloat bound: items buffered longer than this are dropped, not emitted, so a
     /// stall shows up as loss rather than a latency tail. `None` disables it.
     max_item_age: Option<Duration>,
+    /// Head-of-line bound: abandon the frame due next once this many later frames are waiting
+    /// behind it, rather than holding them for `max_wait`. `None` disables it.
+    max_frames_behind_gap: Option<usize>,
     state: State,
 }
 
@@ -104,7 +107,13 @@ where
     ///
     /// The `frame_size` value will be clamped into the `[C, (C - SessionMessage::SEGMENT_OVERHEAD) * SeqIndicator::MAX
     /// + 1]` interval.
-    fn new(inner: S, max_wait: Duration, capacity: usize, max_item_age: Option<Duration>) -> Self {
+    fn new(
+        inner: S,
+        max_wait: Duration,
+        capacity: usize,
+        max_item_age: Option<Duration>,
+        max_frames_behind_gap: Option<usize>,
+    ) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
             inner,
@@ -114,6 +123,10 @@ where
             last_emitted: Instant::now(),
             max_wait,
             max_item_age: max_item_age.filter(|age| !age.is_zero()),
+            // Zero would abandon the frame due next before anything had arrived to justify it,
+            // turning every momentary gap into loss. One later frame is the strictest evidence
+            // that still *is* evidence.
+            max_frames_behind_gap: max_frames_behind_gap.map(|n| n.max(1)),
             state: State::Polling,
         }
     }
@@ -230,6 +243,15 @@ where
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
                         } else if this.last_emitted.elapsed() >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
+                            // Enough later frames are queued behind the gap to conclude the
+                            // missing one was lost rather than reordered. Waiting out `max_wait`
+                            // cannot change that verdict, and on a session with no retransmission
+                            // nothing else can either -- it only holds everything already received
+                            // for the full duration. Measured on a cluster: 98.5% of bytes
+                            // returning over the wire, 0.60% reaching the application.
+                            || this
+                                .max_frames_behind_gap
+                                .is_some_and(|n| this.buffer.len() >= n)
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
@@ -280,6 +302,32 @@ where
     }
 }
 
+/// How a [`Sequencer`] decides to stop waiting for a frame that has not arrived.
+///
+/// Grouped rather than passed positionally: the two stopping rules below answer different
+/// questions, and a bare list of `Duration`/`Option<usize>` arguments at the call site gives no
+/// hint which is which.
+#[derive(Clone, Copy, Debug)]
+pub struct SequencerConfig {
+    /// Longest the frame due next is waited for before it is abandoned.
+    pub max_wait: Duration,
+    /// Maximum number of buffered items.
+    pub capacity: usize,
+    /// Discards items buffered longer than this instead of emitting them late; `None` disables.
+    pub max_item_age: Option<Duration>,
+    /// Abandons the frame due next once this many later frames are already waiting behind it.
+    ///
+    /// `None` waits out [`Self::max_wait`] regardless of how much has piled up, which is correct
+    /// only when the missing frame can still be recovered. On a session without retransmission it
+    /// cannot: the wait is for something that is never coming, and everything already received is
+    /// held behind it for the full duration.
+    ///
+    /// Counting later frames rather than watching a clock makes the decision on evidence. One or
+    /// two frames arriving ahead is ordinary reordering across paths of differing latency; a queue
+    /// building up behind a gap is a frame that was lost.
+    pub max_frames_behind_gap: Option<usize>,
+}
+
 /// Stream extensions methods for item sequencing.
 pub trait SequencerExt: futures::Stream {
     /// Attaches a [`Sequencer`] to the underlying stream, given the item `timeout` and `capacity`
@@ -289,7 +337,7 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, None)
+        Sequencer::new(self, timeout, capacity, None, None)
     }
 
     /// As [`SequencerExt::sequencer`], but discards items buffered longer than `max_item_age`
@@ -304,7 +352,22 @@ pub trait SequencerExt: futures::Stream {
         Self::Item: Ord + PartialOrd<FrameId>,
         Self: Sized,
     {
-        Sequencer::new(self, timeout, capacity, max_item_age)
+        Sequencer::new(self, timeout, capacity, max_item_age, None)
+    }
+
+    /// As [`SequencerExt::sequencer`], with every stopping rule stated explicitly.
+    fn sequencer_with(self, cfg: SequencerConfig) -> Sequencer<Self>
+    where
+        Self::Item: Ord + PartialOrd<FrameId>,
+        Self: Sized,
+    {
+        Sequencer::new(
+            self,
+            cfg.max_wait,
+            cfg.capacity,
+            cfg.max_item_age,
+            cfg.max_frames_behind_gap,
+        )
     }
 }
 
@@ -423,6 +486,124 @@ mod tests {
         seq_sink.send(3u32).await?;
         assert_eq!(Some(3), seq_stream.try_next().await?);
 
+        Ok(())
+    }
+
+    /// Frames waiting behind a gap must not be held for `max_wait`.
+    ///
+    /// This is the head-of-line stall, measured on a live cluster: with `max_wait` at 3 s a
+    /// session returning 98.5 % of its bytes over the wire delivered 0.60 % of them to the
+    /// application, and the application-side inter-arrival median sat exactly on the timeout. On a
+    /// session with no retransmission the missing frame is never coming, so every second of that
+    /// wait is spent on an outcome that cannot change while the frames already received are held.
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_abandon_a_gap_once_enough_later_frames_are_waiting() -> anyhow::Result<()> {
+        // Far longer than the test should take. Any reliance on the timer is then unmistakable in
+        // the elapsed assertion rather than a matter of tuning margins.
+        let max_wait = Duration::from_secs(5);
+        let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        // Frame 1 never arrives.
+        for v in [2u32, 3, 4] {
+            seq_sink.feed(v).await?;
+        }
+        seq_sink.flush().await?;
+
+        let seq_stream = seq_stream.sequencer_with(SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(2),
+        });
+        pin_mut!(seq_stream);
+
+        let now = Instant::now();
+        assert!(
+            matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(1))),
+            "the gap must be reported as loss, the signal the consumer already handles"
+        );
+        assert_eq!(Some(2), seq_stream.try_next().await?);
+        assert_eq!(Some(3), seq_stream.try_next().await?);
+        assert_eq!(Some(4), seq_stream.try_next().await?);
+        assert!(
+            now.elapsed() < max_wait / 2,
+            "frames already received must not wait on a frame that is never coming; took {:?}",
+            now.elapsed()
+        );
+
+        // Held open deliberately: closing the sink would drain the buffer through `State::Done`,
+        // which has its own emit path and would pass this test without the rule under test.
+        drop(seq_sink);
+        Ok(())
+    }
+
+    /// The inverse, so the rule cannot become "never wait". Below the threshold the sequencer must
+    /// still hold the gap open — one frame arriving ahead is ordinary reordering across paths of
+    /// differing latency, not a loss.
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_keep_waiting_while_fewer_frames_are_behind_the_gap() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(300);
+        let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        // Frame 1 is missing and only one frame is waiting behind it, under the threshold of 3.
+        seq_sink.feed(2u32).await?;
+        seq_sink.flush().await?;
+
+        let seq_stream = seq_stream.sequencer_with(SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(3),
+        });
+        pin_mut!(seq_stream);
+
+        let now = Instant::now();
+        assert!(matches!(
+            seq_stream.try_next().await,
+            Err(SessionError::FrameDiscarded(1))
+        ));
+        assert!(
+            now.elapsed() >= max_wait,
+            "under the threshold the timeout still governs; took {:?}",
+            now.elapsed()
+        );
+
+        drop(seq_sink);
+        Ok(())
+    }
+
+    /// A session that *can* recover a missing frame must be unaffected: `None` keeps the timeout
+    /// as the only rule, however much piles up behind the gap.
+    #[test_log::test(tokio::test)]
+    async fn sequencer_without_the_gap_bound_should_still_wait_for_the_timeout() -> anyhow::Result<()> {
+        let max_wait = Duration::from_millis(300);
+        let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        for v in [2u32, 3, 4, 5, 6] {
+            seq_sink.feed(v).await?;
+        }
+        seq_sink.flush().await?;
+
+        let seq_stream = seq_stream.sequencer_with(SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: None,
+        });
+        pin_mut!(seq_stream);
+
+        let now = Instant::now();
+        assert!(matches!(
+            seq_stream.try_next().await,
+            Err(SessionError::FrameDiscarded(1))
+        ));
+        assert!(
+            now.elapsed() >= max_wait,
+            "with no gap bound the timeout is the only rule; took {:?}",
+            now.elapsed()
+        );
+
+        drop(seq_sink);
         Ok(())
     }
 

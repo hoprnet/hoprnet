@@ -351,6 +351,13 @@ where
                     .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
                     .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
                     .max(Duration::from_millis(100)),
+                // `0` disables the bound, so a run can compare against the old
+                // hold-for-the-whole-timeout behaviour without rebuilding.
+                max_frames_behind_gap: std::env::var("HOPR_SESSION_MAX_FRAMES_BEHIND_GAP")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .map(|n| (n > 0).then_some(n))
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_frames_behind_gap),
                 max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
                     .ok()
                     .and_then(|s| s.parse::<usize>().ok())

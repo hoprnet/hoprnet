@@ -255,6 +255,27 @@ pub struct SessionManagerConfig {
     #[default(0)]
     pub max_buffered_segments: usize,
 
+    /// Abandon the frame due next once this many later frames are waiting behind it, rather than
+    /// holding them for the whole of [`Self::max_frame_timeout`].
+    ///
+    /// The two answer different questions. `max_frame_timeout` is how long a *missing* frame is
+    /// waited for, and is set here to exceed the ~2 s SURB KeepAlive so a starved peer's late echo
+    /// is not discarded. This bounds how much *already received* data is held hostage during that
+    /// wait -- a cost paid once per gap, which compounds as later frames queue up.
+    ///
+    /// Without it, a session that cannot retransmit waits the full timeout for a frame that will
+    /// never arrive. Measured on a 5-node cluster after killing a return relayer: 98.5 % of bytes
+    /// returned over the wire, 0.60 % reached the application, and the application-side
+    /// inter-arrival median sat exactly on the 3 s timeout.
+    ///
+    /// The right value tracks reordering depth -- throughput x latency spread -- so it is
+    /// deployment-specific. Tune with `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`; too low converts
+    /// ordinary reordering into loss, too high leaves the stall in place.
+    ///
+    /// Default is 64.
+    #[default(Some(64))]
+    pub max_frames_behind_gap: Option<usize>,
+
     /// The base timeout for initiation of Session initiation.
     ///
     /// The actual timeout is adjusted according to the number of hops for that Session:
@@ -550,11 +571,19 @@ impl<S> Clone for SessionManager<S> {
 }
 
 fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities) -> HoprSessionConfig {
+    // Only a session that cannot recover the missing frame should abandon it early. With
+    // retransmission the gap is a request away, so waiting is productive and cutting it short
+    // would discard data that was on its way back; without it the wait is for something that is
+    // never coming, and every frame behind the gap is held for nothing.
+    let can_retransmit =
+        capabilities.contains(Capability::RetransmissionAck) || capabilities.contains(Capability::RetransmissionNack);
+
     HoprSessionConfig {
         capabilities,
         frame_mtu: cfg.frame_mtu,
         frame_timeout: cfg.max_frame_timeout,
         max_buffered_segments: cfg.max_buffered_segments,
+        max_frames_behind_gap: (!can_retransmit).then_some(cfg.max_frames_behind_gap).flatten(),
     }
 }
 
@@ -1878,6 +1907,55 @@ mod tests {
                 segments
             );
         }
+    }
+
+    /// The head-of-line bound must reach a session that cannot recover a missing frame, and must
+    /// not reach one that can.
+    ///
+    /// Both halves matter. Without the first, a session with no retransmission holds every frame
+    /// behind a gap for the full frame timeout, waiting for something that is never coming —
+    /// measured on a cluster as 98.5 % of bytes arriving over the wire and 0.60 % reaching the
+    /// application. Without the second, a session that *would* have retransmitted the gap instead
+    /// abandons it, turning recoverable frames into loss.
+    #[test]
+    fn session_config_should_bound_the_gap_only_without_retransmission() {
+        assert_eq!(
+            SessionManagerConfig::default().max_frames_behind_gap,
+            Some(64),
+            "the default must bound the gap, or the stall stays in place unless opted out of"
+        );
+
+        let cfg = SessionManagerConfig {
+            max_frames_behind_gap: Some(8),
+            ..Default::default()
+        };
+
+        for reliable in [Capability::RetransmissionAck, Capability::RetransmissionNack] {
+            assert_eq!(
+                session_config(&cfg, reliable.into()).max_frames_behind_gap,
+                None,
+                "{reliable:?} can recover the gap, so the wait is productive and must be left alone"
+            );
+        }
+
+        for unreliable in [Capabilities::empty(), Capability::Segmentation.into()] {
+            assert_eq!(
+                session_config(&cfg, unreliable).max_frames_behind_gap,
+                Some(8),
+                "without retransmission the gap must be bounded"
+            );
+        }
+    }
+
+    /// Disabling has to be reachable, since the bound trades reordering tolerance for latency and
+    /// the right value is deployment-specific. `None` restores the previous behaviour exactly.
+    #[test]
+    fn session_config_should_allow_the_gap_bound_to_be_disabled() {
+        let cfg = SessionManagerConfig {
+            max_frames_behind_gap: None,
+            ..Default::default()
+        };
+        assert_eq!(session_config(&cfg, Capabilities::empty()).max_frames_behind_gap, None);
     }
 
     #[async_trait::async_trait]

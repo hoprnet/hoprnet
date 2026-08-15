@@ -87,6 +87,21 @@ pub struct SessionSocketConfig {
     /// latency tail this bound exists to remove.
     #[default(None)]
     pub max_frame_age: Option<Duration>,
+    /// Abandon the frame due next once this many later frames are already waiting behind it,
+    /// instead of holding them for [`Self::frame_timeout`].
+    ///
+    /// Head-of-line bound. `frame_timeout` waits for a frame that may still arrive; this bounds
+    /// how much already-received data is held hostage while that wait runs. On a session without
+    /// retransmission the missing frame is never coming, so the wait is pure cost: measured on a
+    /// cluster, 98.5% of bytes returned over the wire while 0.60% reached the application and the
+    /// application-side inter-arrival median sat exactly on the timeout.
+    ///
+    /// Counting frames rather than watching a clock decides on evidence -- a queue building up
+    /// behind a gap is a lost frame, where one or two frames ahead is ordinary reordering. The
+    /// right value tracks reordering depth, which is throughput x latency spread, so it is
+    /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
+    #[default(None)]
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 enum WriteState {
@@ -234,7 +249,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer_with_max_age(cfg.frame_timeout, cfg.capacity, cfg.max_frame_age)
+            .sequencer_with(crate::processing::SequencerConfig {
+                max_wait: cfg.frame_timeout,
+                capacity: cfg.capacity,
+                max_item_age: cfg.max_frame_age,
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
+            })
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -440,7 +460,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer_with_max_age(cfg.frame_timeout, cfg.capacity, cfg.max_frame_age)
+            .sequencer_with(crate::processing::SequencerConfig {
+                max_wait: cfg.frame_timeout,
+                capacity: cfg.capacity,
+                max_item_age: cfg.max_frame_age,
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
+            })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
