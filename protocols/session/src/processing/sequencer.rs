@@ -92,8 +92,8 @@ pub struct Sequencer<S: futures::Stream> {
     /// Anti-bufferbloat bound: items buffered longer than this are dropped, not emitted, so a
     /// stall shows up as loss rather than a latency tail. `None` disables it.
     max_item_age: Option<Duration>,
-    /// Head-of-line bound: abandon the frame due next once this many later frames are waiting
-    /// behind it, rather than holding them for `max_wait`. `None` disables it.
+    /// Head-of-line bound: abandon the frame due next once the sequence has advanced this far
+    /// past it, rather than holding everything for `max_wait`. `None` disables it.
     max_frames_behind_gap: Option<usize>,
     state: State,
 }
@@ -243,15 +243,24 @@ where
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0.item)));
                         } else if this.last_emitted.elapsed() >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
-                            // Enough later frames are queued behind the gap to conclude the
-                            // missing one was lost rather than reordered. Waiting out `max_wait`
+                            // The sequence has moved far enough past the gap to conclude the
+                            // missing frame was lost rather than reordered. Waiting out `max_wait`
                             // cannot change that verdict, and on a session with no retransmission
                             // nothing else can either -- it only holds everything already received
                             // for the full duration. Measured on a cluster: 98.5% of bytes
                             // returning over the wire, 0.60% reaching the application.
-                            || this
-                                .max_frames_behind_gap
-                                .is_some_and(|n| this.buffer.len() >= n)
+                            || this.max_frames_behind_gap.is_some_and(|n| {
+                                // Two readings of the same evidence, because each is blind where
+                                // the other sees. The count catches a run of frames arriving
+                                // behind the gap. The distance catches the case that actually
+                                // dominates under loss: the frames in between never completed, so
+                                // they never reach the sequencer and the buffer stays nearly
+                                // empty however far the sender has moved on -- measured on a
+                                // cluster as the same setting delivering 95-97% on some runs and
+                                // 0.5% on others, the failing ones back on the frame timeout.
+                                this.buffer.len() >= n
+                                    || next.gt(&this.next_id.saturating_add(n as FrameId - 1))
+                            })
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
@@ -533,6 +542,58 @@ mod tests {
 
         // Held open deliberately: closing the sink would drain the buffer through `State::Done`,
         // which has its own emit path and would pass this test without the rule under test.
+        drop(seq_sink);
+        Ok(())
+    }
+
+    /// Under real loss the frames between the gap and the newest arrival mostly never complete, so
+    /// they never reach the sequencer at all and the buffer stays nearly empty. A rule counting
+    /// buffered frames then never fires and the timeout takes over — which is exactly what a
+    /// cluster showed: at an identical setting the scenario delivered 95–97 % on some runs and
+    /// 0.5 % on others, the failing ones with an application-side inter-arrival median sitting
+    /// back on the 3 s timeout.
+    ///
+    /// What is available regardless is how far the sequence has advanced past the gap. One frame
+    /// arriving at id 40 says as much about frame 1 as forty buffered frames would.
+    #[test_log::test(tokio::test)]
+    async fn sequencer_should_abandon_a_gap_when_the_sequence_has_advanced_past_it() -> anyhow::Result<()> {
+        let max_wait = Duration::from_secs(5);
+        let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
+
+        // Frame 1 is missing and frames 2..=39 never completed, so only one frame is buffered --
+        // far below any count-based threshold, yet the sequence has clearly moved on.
+        seq_sink.feed(40u32).await?;
+        seq_sink.flush().await?;
+
+        let seq_stream = seq_stream.sequencer_with(SequencerConfig {
+            max_wait,
+            capacity: 4096,
+            max_item_age: None,
+            max_frames_behind_gap: Some(4),
+        });
+        pin_mut!(seq_stream);
+
+        // Only the frames that the sequence has genuinely left behind. The last `n - 1` before the
+        // newest arrival are still inside the reordering window -- the sequence has not advanced
+        // far enough past *them* to call them lost -- so they keep the timeout, which is the
+        // conservative half of the same rule.
+        let now = Instant::now();
+        for expected_gap in 1..=36u32 {
+            assert!(
+                matches!(
+                    seq_stream.try_next().await,
+                    Err(SessionError::FrameDiscarded(id)) if id == expected_gap
+                ),
+                "frame {expected_gap} is behind the advanced sequence and must be given up on"
+            );
+        }
+        assert!(
+            now.elapsed() < max_wait / 2,
+            "a single frame far ahead is evidence enough, with no frames buffered behind the gap \
+             to count; took {:?}",
+            now.elapsed()
+        );
+
         drop(seq_sink);
         Ok(())
     }
