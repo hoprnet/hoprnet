@@ -139,19 +139,27 @@ where
             // Expressed in single-hop tickets, not base units: the weighting factor below is a
             // log ratio, and a base-unit balance would compress every realistic channel into a
             // sliver of its output range.
-            let edge_tickets = observed.intermediate_qos().and_then(|m| m.balance()).map(|balance| {
-                let face_value = ticket_face_value.unwrap_or_else(hopr_api::graph::traits::Balance::one);
-                let tickets = if face_value.is_zero() {
-                    hopr_api::graph::traits::Balance::zero()
-                } else {
-                    balance / face_value
-                };
-                if tickets > hopr_api::graph::traits::Balance::from(u128::MAX) {
-                    u128::MAX
-                } else {
-                    tickets.low_u128()
-                }
-            });
+            //
+            // `zip`, not a fallback: an absent face value means the price is unknown, not that it
+            // is one. Dividing a base-unit balance by `1` yields a ticket count that saturates to
+            // `u128::MAX` and reads downstream as unlimited capacity — the opposite of what not
+            // knowing should imply. Contribute nothing to the floor until pricing arrives.
+            let edge_tickets = observed
+                .intermediate_qos()
+                .and_then(|m| m.balance())
+                .zip(ticket_face_value)
+                .map(|(balance, face_value)| {
+                    let tickets = if face_value.is_zero() {
+                        hopr_api::graph::traits::Balance::zero()
+                    } else {
+                        balance / face_value
+                    };
+                    if tickets > hopr_api::graph::traits::Balance::from(u128::MAX) {
+                        u128::MAX
+                    } else {
+                        tickets.low_u128()
+                    }
+                });
             let fundable_tickets_floor = opt_min(prev.fundable_tickets_floor, edge_tickets);
 
             PathCostWithMetrics {
@@ -435,6 +443,11 @@ where
         let length = std::num::NonZeroUsize::new(hops + 1)
             .expect("can never fail, it is physically at least 1 after the addition");
 
+        // One read for the whole query. A concurrent `set_ticket_face_value` between two reads
+        // would let the traversal cost and the fundable-ticket floor come from different snapshots
+        // of the same graph, so `composite_weight` would rank a candidate against itself.
+        let ticket_face_value = self.graph.ticket_face_value();
+
         let paths = if src == self.me {
             // Phase 1: search for full-length forward paths to dest.
             let mut found = compute_paths(
@@ -444,13 +457,8 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::forward(
-                        length,
-                        self.edge_penalty,
-                        self.min_ack_rate,
-                        self.graph.ticket_face_value(),
-                    ),
-                    ticket_face_value: self.graph.ticket_face_value(),
+                    inner: EdgeValueFn::forward(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    ticket_face_value,
                 },
             );
             tracing::debug!(
@@ -485,13 +493,8 @@ where
                 length,
                 self.max_paths,
                 MetricsValueFn {
-                    inner: EdgeValueFn::returning(
-                        length,
-                        self.edge_penalty,
-                        self.min_ack_rate,
-                        self.graph.ticket_face_value(),
-                    ),
-                    ticket_face_value: self.graph.ticket_face_value(),
+                    inner: EdgeValueFn::returning(length, self.edge_penalty, self.min_ack_rate, ticket_face_value),
+                    ticket_face_value,
                 },
             );
             tracing::debug!(direction, count = found.len(), "[return] candidates");
@@ -529,7 +532,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::{
         graph::{
-            NetworkGraphWrite,
+            NetworkGraphUpdate, NetworkGraphWrite,
             traits::{EdgeObservableWrite, EdgeWeightType},
         },
         types::{
@@ -1289,6 +1292,11 @@ mod tests {
         let graph = ChannelGraph::new(me);
         graph.add_node(hop);
         graph.add_node(dest);
+
+        // Stated, not assumed. A face value of one makes the ticket count equal the balance, which
+        // is what keeps the numbers below readable — but it has to be pushed, because without a
+        // price the floor is now `None` rather than silently dividing by one.
+        graph.set_ticket_face_value(hopr_api::graph::traits::Balance::one());
 
         graph.upsert_edge(&me, &hop, |obs| {
             obs.record(EdgeWeightType::Connected(true));

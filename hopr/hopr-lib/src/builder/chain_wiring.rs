@@ -56,6 +56,12 @@ pub(super) async fn process_chain_events<C, G, S>(
 {
     pin_mut!(events);
 
+    // Seed the face value before the first event. Startup replays on-chain state as channel events,
+    // and a pricing event only follows if the price actually changes — so without this the graph
+    // would record balances while `ticket_face_value()` was still `None`, and selection would price
+    // every path off the fallback until the next price change happened to arrive.
+    push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
+
     // Tracks the node's currently-open channel IDs per direction so `hopr_channels_count`
     // can be maintained incrementally from channel events. The initial on-chain state is
     // replayed as `ChannelOpened` events by the state-sync subscription at startup, so the
@@ -213,7 +219,12 @@ fn push_ticket_face_value<G>(
 ) where
     G: NetworkGraphUpdate,
 {
-    match ticket_price.read().div_f64(win_probability.read().as_f64()) {
+    // Both guards are released before the division: holding one while taking the other is a lock
+    // order this code would then be obliged to honour everywhere else.
+    let price = *ticket_price.read();
+    let probability = win_probability.read().as_f64();
+
+    match price.div_f64(probability) {
         Ok(face_value) => {
             let face_value = face_value.amount();
             tracing::debug!(%face_value, "recording ticket face value change");
@@ -693,8 +704,11 @@ mod tests {
 
         assert_eq!(
             graph.face_values(),
-            vec![hopr_api::graph::traits::Balance::from(20u64)],
-            "a price change must push exactly one recomputed face value"
+            vec![
+                hopr_api::graph::traits::Balance::from(10u64),
+                hopr_api::graph::traits::Balance::from(20u64),
+            ],
+            "the seeded face value, then the one recomputed from the price change"
         );
 
         let edges = graph.edges();
@@ -734,8 +748,11 @@ mod tests {
 
         assert_eq!(
             graph.face_values(),
-            vec![hopr_api::graph::traits::Balance::from(20u64)],
-            "a winning-probability change must push exactly one recomputed face value"
+            vec![
+                hopr_api::graph::traits::Balance::from(10u64),
+                hopr_api::graph::traits::Balance::from(20u64),
+            ],
+            "the seeded face value, then the one recomputed from the probability change"
         );
 
         let edges = graph.edges();
@@ -746,6 +763,44 @@ mod tests {
             "the emitted balance must not depend on the winning probability"
         );
         Ok(())
+    }
+
+    /// Startup replays on-chain state as channel events, and a pricing event follows only if the
+    /// price actually changed. Without a seed the graph would then hold balances while
+    /// `ticket_face_value()` was still `None`, and selection would price every path off the
+    /// fallback for as long as the price happened to stay put.
+    #[tokio::test]
+    async fn a_face_value_is_seeded_before_any_pricing_event() {
+        let (src_offchain, src_chain) = make_keypairs();
+        let (dst_offchain, dst_chain) = make_keypairs();
+        let src_addr = src_chain.public().to_address();
+        let dst_addr = dst_chain.public().to_address();
+
+        let graph = RecordingGraph::default();
+        let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
+
+        // Only a channel event: exactly the startup replay, with no price or probability change.
+        run(
+            vec![ChainEvent::ChannelOpened(channel(
+                src_addr,
+                dst_addr,
+                200,
+                ChannelStatus::Open,
+            ))],
+            stub,
+            graph.clone(),
+            src_addr,
+            *src_offchain.public(),
+            HoprBalance::from(10u64),
+            WinningProbability::ALWAYS,
+        )
+        .await;
+
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::Balance::from(10u64)],
+            "the graph must know the price before it records a balance it will be compared against"
+        );
     }
 
     #[tokio::test]
