@@ -601,12 +601,12 @@ fn session_config_with(
     let can_retransmit =
         capabilities.contains(Capability::RetransmissionAck) || capabilities.contains(Capability::RetransmissionNack);
 
-    // The session's own value when it stated one, the node's otherwise; `Some(0)` is a session
-    // saying "not for me" rather than a threshold of zero.
-    let bound = match max_frames_behind_gap {
-        Some(0) => None,
+    // The session's own value when it stated one, the node's otherwise. `Some(0)` disables the
+    // bound at either level -- a threshold of zero would abandon every gap before a single frame
+    // arrived behind it, which nobody wants and which the sequencer would silently clamp to one.
+    let bound = match max_frames_behind_gap.or(cfg.max_frames_behind_gap) {
+        Some(0) | None => None,
         Some(n) => Some(n),
-        None => cfg.max_frames_behind_gap,
     };
 
     HoprSessionConfig {
@@ -2022,6 +2022,18 @@ mod tests {
     fn session_config_should_allow_the_gap_bound_to_be_disabled() {
         let cfg = SessionManagerConfig {
             max_frames_behind_gap: None,
+            ..Default::default()
+        };
+        assert_eq!(session_config(&cfg, Capabilities::empty()).max_frames_behind_gap, None);
+    }
+
+    #[test]
+    fn a_zero_gap_bound_should_disable_it_at_the_node_level_too() {
+        // `0` means "not for me" wherever it is written. Read literally it would be the strictest
+        // possible bound -- abandon the gap before a single frame arrives behind it -- so the two
+        // levels would mean opposite things by the same value.
+        let cfg = SessionManagerConfig {
+            max_frames_behind_gap: Some(0),
             ..Default::default()
         };
         assert_eq!(session_config(&cfg, Capabilities::empty()).max_frames_behind_gap, None);

@@ -255,7 +255,11 @@ where
                                 // they never reach the sequencer and the buffer stays nearly
                                 // empty however far the sender has moved on.
                                 this.buffer.len() >= n
-                                    || next.gt(&this.next_id.saturating_add(n as FrameId - 1))
+                                    // Saturating, not `as`: the bound is configuration, and a value past `FrameId`'s
+                                // range would wrap into a small threshold rather than a large one.
+                                || next.gt(&this.next_id.saturating_add(
+                                    FrameId::try_from(n).unwrap_or(FrameId::MAX).saturating_sub(1),
+                                ))
                             })
                         {
                             let discarded = *this.next_id;
