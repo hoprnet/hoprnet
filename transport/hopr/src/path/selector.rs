@@ -367,8 +367,9 @@ where
         shorter_length: std::num::NonZeroUsize,
         take: usize,
         existing: &[PathWithMetrics],
+        // The caller's snapshot, so both phases of one query cost against the same face value.
+        ticket_face_value: Option<hopr_api::graph::traits::Balance>,
     ) -> Vec<PathWithMetrics> {
-        let ticket_face_value = self.graph.ticket_face_value();
         let value_fn = MetricsValueFn {
             inner: EdgeValueFn::forward_without_self_loopback(
                 shorter_length,
@@ -474,7 +475,8 @@ where
                 && let Some(shorter) = std::num::NonZeroUsize::new(length.get() - 1)
             {
                 let remaining = self.max_paths - found.len();
-                let extended = self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found);
+                let extended =
+                    self.compute_extended_forward_paths(&src, &dest, shorter, remaining, &found, ticket_face_value);
                 tracing::debug!(
                     direction,
                     phase = 2,
