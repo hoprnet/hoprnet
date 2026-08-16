@@ -224,6 +224,10 @@ fn push_ticket_face_value<G>(
     let price = *ticket_price.read();
     let probability = win_probability.read().as_f64();
 
+    // The `f64` carries the probability, it does not convert it. `as_f64` packs the 56-bit encoded
+    // value into the mantissa of a number in [1, 2), and `div_f64` strips it straight back out and
+    // divides in `U256` — the balance never becomes a float, and a whole probability short-circuits
+    // to the identity. A hand-rolled integer division here would gain nothing but the guards.
     match price.div_f64(probability) {
         Ok(face_value) => {
             let face_value = face_value.amount();
