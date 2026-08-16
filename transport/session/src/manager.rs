@@ -269,7 +269,7 @@ pub struct SessionManagerConfig {
     /// inter-arrival median sat exactly on the 3 s timeout.
     ///
     /// The right value tracks reordering depth -- throughput x latency spread / frame size -- so
-    /// it is deployment-specific. Tune with `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`; too low converts
+    /// it is deployment-specific. Tune with `SessionConfig::max_frames_behind_gap`; too low converts
     /// ordinary reordering into loss, too high leaves the stall in place.
     ///
     /// Default is 256, which is roughly 3-4x the reordering depth of the cluster it was measured
@@ -584,7 +584,7 @@ fn session_config(cfg: &SessionManagerConfig, capabilities: crate::Capabilities)
 /// As [`session_config`], with the initiating session's own head-of-line bound.
 ///
 /// `None` inherits the node default; `Some(0)` disables the bound for this session; `Some(n)` sets
-/// it. The zero-disables convention matches `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`, so the per-session
+/// it. The zero-disables convention matches the node setting, so the per-session
 /// and node-wide knobs cannot mean opposite things by the same value.
 ///
 /// Sessions accepted from a peer pass `None`: the bound governs how *we* reassemble what arrives,

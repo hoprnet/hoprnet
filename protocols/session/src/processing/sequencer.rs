@@ -246,18 +246,14 @@ where
                             // The sequence has moved far enough past the gap to conclude the
                             // missing frame was lost rather than reordered. Waiting out `max_wait`
                             // cannot change that verdict, and on a session with no retransmission
-                            // nothing else can either -- it only holds everything already received
-                            // for the full duration. Measured on a cluster: 98.5% of bytes
-                            // returning over the wire, 0.60% reaching the application.
+                            // nothing else can either.
                             || this.max_frames_behind_gap.is_some_and(|n| {
                                 // Two readings of the same evidence, because each is blind where
                                 // the other sees. The count catches a run of frames arriving
                                 // behind the gap. The distance catches the case that actually
                                 // dominates under loss: the frames in between never completed, so
                                 // they never reach the sequencer and the buffer stays nearly
-                                // empty however far the sender has moved on -- measured on a
-                                // cluster as the same setting delivering 95-97% on some runs and
-                                // 0.5% on others, the failing ones back on the frame timeout.
+                                // empty however far the sender has moved on.
                                 this.buffer.len() >= n
                                     || next.gt(&this.next_id.saturating_add(n as FrameId - 1))
                             })
@@ -507,8 +503,8 @@ mod tests {
     /// wait is spent on an outcome that cannot change while the frames already received are held.
     #[test_log::test(tokio::test)]
     async fn sequencer_should_abandon_a_gap_once_enough_later_frames_are_waiting() -> anyhow::Result<()> {
-        // Far longer than the test should take. Any reliance on the timer is then unmistakable in
-        // the elapsed assertion rather than a matter of tuning margins.
+        // Far longer than the test should take, so any reliance on the timer trips the bound below
+        // rather than becoming a matter of tuning margins.
         let max_wait = Duration::from_secs(5);
         let (mut seq_sink, seq_stream) = futures::channel::mpsc::unbounded();
 
@@ -526,19 +522,19 @@ mod tests {
         });
         pin_mut!(seq_stream);
 
-        let now = Instant::now();
-        assert!(
-            matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(1))),
-            "the gap must be reported as loss, the signal the consumer already handles"
-        );
-        assert_eq!(Some(2), seq_stream.try_next().await?);
-        assert_eq!(Some(3), seq_stream.try_next().await?);
-        assert_eq!(Some(4), seq_stream.try_next().await?);
-        assert!(
-            now.elapsed() < max_wait / 2,
-            "frames already received must not wait on a frame that is never coming; took {:?}",
-            now.elapsed()
-        );
+        // The bound is the assertion: without the rule the sequencer holds everything for the full
+        // `max_wait`, so a regression trips the timeout instead of blocking the suite for 5 s.
+        let released: Vec<u32> = tokio::time::timeout(max_wait / 2, async {
+            assert!(
+                matches!(seq_stream.try_next().await, Err(SessionError::FrameDiscarded(1))),
+                "the gap must be reported as loss, the signal the consumer already handles"
+            );
+            seq_stream.by_ref().take(3).try_collect().await
+        })
+        .await
+        .map_err(|_| anyhow::anyhow!("frames already received waited on a frame that is never coming"))??;
+
+        assert_eq!(vec![2, 3, 4], released, "everything behind the gap must follow it out");
 
         // Held open deliberately: closing the sink would drain the buffer through `State::Done`,
         // which has its own emit path and would pass this test without the rule under test.

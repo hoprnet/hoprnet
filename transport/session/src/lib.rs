@@ -117,9 +117,7 @@ pub struct SessionClientConfig {
     /// holding everything already received for the whole frame timeout.
     ///
     /// Head-of-line bound for this session's incoming direction. `None` inherits the node's
-    /// setting, `Some(0)` disables it here, `Some(n)` sets it -- the same zero-disables convention
-    /// as `HOPR_SESSION_MAX_FRAMES_BEHIND_GAP`, so the two knobs cannot mean opposite things by
-    /// the same value.
+    /// setting, `Some(0)` disables it here, `Some(n)` sets it.
     ///
     /// Worth setting per session because the right value tracks reordering depth -- throughput x
     /// latency spread / frame size -- which is a property of the traffic, not of the node: a bulk
