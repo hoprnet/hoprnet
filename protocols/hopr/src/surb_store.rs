@@ -7,7 +7,11 @@ use validator::ValidationError;
 
 use crate::{FoundSurb, traits::SurbStore};
 
-const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
+/// Lower bound on [`SurbStoreConfig::pseudonyms_lifetime`], enforced by the config validator.
+///
+/// Public so that callers applying their own override can floor it identically, rather than
+/// reaching a value the config file itself would have been rejected for.
+pub const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
 const MINIMUM_OPENER_PSEUDONYMS: usize = 1000;
 const MINIMUM_OPENERS_PER_PSEUDONYM: usize = 1000;
 const MINIMUM_SURBS_PER_PSEUDONYM: usize = 1000;

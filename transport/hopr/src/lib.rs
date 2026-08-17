@@ -321,11 +321,28 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
+        // A pseudonym's SURB ring buffer is dropped once no SURBs have arrived for
+        // `pseudonyms_lifetime` (600 s by default), which is the point at which that pseudonym's
+        // return path becomes permanently unresolvable. Nothing else in the node can be made to
+        // reach that state on a test timescale — the Session slot is evicted for idleness long
+        // before it — so without a way to shorten this timer, the behaviour past it is not
+        // observable end-to-end at all. Floored at the same `MINIMUM_SURB_LIFETIME` the config
+        // validator enforces, so this cannot reach a value the config file could not also express.
+        let surb_store_cfg = hopr_protocol_hopr::SurbStoreConfig {
+            pseudonyms_lifetime: std::env::var("HOPR_INTERNAL_SURB_PSEUDONYM_LIFETIME_MS")
+                .ok()
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .map(Duration::from_millis)
+                .map(|d| d.max(hopr_protocol_hopr::MINIMUM_SURB_LIFETIME))
+                .unwrap_or(cfg.packet.surb_store.pseudonyms_lifetime),
+            ..cfg.packet.surb_store
+        };
+
         // Built before the session manager so the latter can be handed the seam that lets a
         // session re-plan its return path on sustained loss.
         let path_planner = PathPlanner::new(
             me_offchain,
-            MemorySurbStore::new(cfg.packet.surb_store),
+            MemorySurbStore::new(surb_store_cfg),
             resolver.clone(),
             selector,
             planner_config,
