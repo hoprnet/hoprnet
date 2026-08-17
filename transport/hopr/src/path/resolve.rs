@@ -13,9 +13,26 @@ use futures::{Stream, StreamExt};
 use hopr_api::types::internal::routing::{DestinationRouting, ResolvedTransportRouting};
 use hopr_crypto_packet::prelude::{HoprSurb, PacketSignal};
 use hopr_protocol_app::prelude::ApplicationDataOut;
-use tracing::{Instrument, error, trace};
+use tracing::{Instrument, error, trace, warn};
 
 use super::errors::Result as PathResult;
+
+/// How often a return route whose SURBs have not arrived is retried.
+const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
+
+/// How long the stage keeps retrying a return route whose SURBs have not arrived.
+///
+/// A momentary gap is normal — the SURB pool refills asynchronously, and dropping a return packet
+/// on the first miss loses data on a session that was only waiting. That is why the retry exists.
+///
+/// What it must not do is wait indefinitely. When the counterparty is gone no SURB is ever coming,
+/// and because this stage preserves submission order, one such packet withholds every other packet
+/// the node would originate, for the life of the process.
+///
+/// One second is ~200 retry cycles, far longer than a refill needs, and inside the session's 3 s
+/// frame timeout — a packet held past that is discarded by the receiver anyway, so waiting longer
+/// cannot save it and can only cost the node its egress.
+pub(crate) const SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Resolves the routing of every outgoing packet, emitting the resolved packets in submission
 /// order.
@@ -24,20 +41,20 @@ use super::errors::Result as PathResult;
 /// [`PathPlanner::resolve_routing`](super::PathPlanner::resolve_routing), taking the payload size
 /// hint, the maximum number of SURBs the packet can carry, and the unresolved routing.
 ///
-/// A packet whose routing cannot be resolved at all is dropped and counted. A packet whose *return*
-/// routing finds no SURB is retried every 5 ms, on the assumption that the counterparty will
-/// deliver more. That assumption does not hold once the counterparty is gone, and the retry has no
-/// bound — see the tests for what that costs.
+/// A packet whose routing cannot be resolved is dropped and counted. A packet whose *return* routing
+/// finds no SURB is retried for up to `surb_wait` before being dropped the same way; see
+/// [`SURB_RESOLUTION_WAIT`] for why that bound has to exist.
 ///
 /// Ordering is deliberate: out-of-order delivery to the entry's reassembler makes the sequencer
-/// discard frames that arrive after `frame_timeout`. It is also what turns a single unresolvable
-/// packet into a node-wide stall, since [`buffered`](futures::StreamExt::buffered) withholds
-/// completed futures behind an unfinished one.
+/// discard frames that arrive after `frame_timeout`. It is also why an unbounded wait here is fatal
+/// rather than merely slow — [`buffered`](futures::StreamExt::buffered) withholds completed futures
+/// behind an unfinished one, so the stall is node-wide rather than confined to one packet.
 pub(crate) fn resolve_routing_stage<St, F, Fut>(
     input: St,
     resolve: F,
     distress_threshold: usize,
     concurrency: usize,
+    surb_wait: std::time::Duration,
 ) -> impl Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>
 where
     St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
@@ -51,7 +68,9 @@ where
                 // Retry on SURB starvation: the SURB pool on the exit side refills asynchronously
                 // (target 600, ~300/sec via keep-alive). Silently dropping return-path packets when
                 // the pool is momentarily empty causes irreversible data loss; instead we yield
-                // briefly so the pool can replenish before retrying.
+                // briefly so the pool can replenish before retrying — but only for `surb_wait`,
+                // after which no SURB is coming and continuing to wait costs the node its egress.
+                let deadline = std::time::Instant::now() + surb_wait;
                 loop {
                     hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -90,10 +109,24 @@ where
                             trace!(?resolved, "resolved routing for packet");
                             return Some((resolved, data));
                         }
+                        Err(error) if error.is_surb() && std::time::Instant::now() >= deadline => {
+                            hopr_transport_session::counters::ROUTING_RESOLUTION_SURB_TIMEOUTS
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            // Warn rather than trace: this is the only externally visible sign that
+                            // a counterparty has stopped replenishing, and the outage it replaces
+                            // was invisible precisely because nothing on this path said anything.
+                            warn!(
+                                ?unresolved,
+                                ?surb_wait,
+                                %error,
+                                "dropping an outgoing packet: no SURB for its return path within the wait"
+                            );
+                            return None;
+                        }
                         Err(error) if error.is_surb() => {
                             // No SURB available yet (possibly cache-wrapped); yield briefly so the
                             // pool can refill.
-                            futures_timer::Delay::new(std::time::Duration::from_millis(5)).await;
+                            futures_timer::Delay::new(SURB_RETRY_INTERVAL).await;
                         }
                         Err(error) => {
                             hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
@@ -134,6 +167,12 @@ mod tests {
     /// Bound on every test in this module. The stall under test is unbounded, so a test that hits
     /// this limit has reproduced it rather than merely run slowly.
     const TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+    /// The stage's SURB wait, shortened for the tests.
+    ///
+    /// Well clear of [`SURB_RETRY_INTERVAL`] so a retry-then-succeed case has room, and far enough
+    /// below [`TEST_TIMEOUT`] that "the bound fired" and "the test timed out" cannot be confused.
+    const TEST_SURB_WAIT: std::time::Duration = std::time::Duration::from_millis(200);
 
     const TEST_TAG: u64 = 1234;
 
@@ -207,6 +246,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn a_starved_return_packet_should_not_withhold_the_packets_behind_it() -> anyhow::Result<()> {
         let starved = HoprPseudonym::random();
+        let dropped_before = hopr_transport_session::counters::routing_resolution_surb_timeout_count();
 
         let input = futures::stream::iter(vec![
             (return_routing(starved), packet(0)),
@@ -224,6 +264,7 @@ mod tests {
             },
             TEST_DISTRESS_THRESHOLD,
             TEST_CONCURRENCY,
+            TEST_SURB_WAIT,
         )
         .take(2)
         .collect::<Vec<_>>()
@@ -242,6 +283,14 @@ mod tests {
             emitted.iter().map(|(_, data)| marker_of(data)).collect::<Vec<_>>(),
             vec![1, 2],
             "the packets behind the starved one must be emitted, in order"
+        );
+
+        // The starved packet is dropped, and that has to be *countable*. A silent drop leaves the
+        // operator with the same nothing the unbounded wait did: traffic missing and no signal
+        // saying why.
+        assert!(
+            hopr_transport_session::counters::routing_resolution_surb_timeout_count() > dropped_before,
+            "the starved packet was dropped without being counted, so the condition stays invisible"
         );
 
         Ok(())
@@ -276,6 +325,7 @@ mod tests {
                 },
                 TEST_DISTRESS_THRESHOLD,
                 TEST_CONCURRENCY,
+                TEST_SURB_WAIT,
             )
             .take(1)
             .collect::<Vec<_>>()
@@ -326,6 +376,7 @@ mod tests {
             },
             TEST_DISTRESS_THRESHOLD,
             TEST_CONCURRENCY,
+            TEST_SURB_WAIT,
         )
         .collect::<Vec<_>>()
         .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))

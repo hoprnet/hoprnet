@@ -734,6 +734,7 @@ where
             },
             distress_threshold,
             routing_concurrency,
+            crate::path::resolve::SURB_RESOLUTION_WAIT,
         );
 
         let channels_dst = self
