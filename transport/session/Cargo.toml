@@ -121,7 +121,7 @@ rand = { workspace = true }
 test-log = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_with", "humantime-serde"]
+ignored = ["serde_bytes", "serde_with", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"

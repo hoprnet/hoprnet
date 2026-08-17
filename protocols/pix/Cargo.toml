@@ -65,3 +65,6 @@ harness = false
 
 [lib]
 doctest = false
+
+[package.metadata.cargo-shear]
+ignored = ["elliptic-curve-tools"]
