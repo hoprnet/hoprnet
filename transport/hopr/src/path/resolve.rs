@@ -182,6 +182,26 @@ mod tests {
 
     const TEST_DISTRESS_THRESHOLD: usize = 2;
 
+    /// The stage under test with the test constants applied, so each test differs only in the two
+    /// things that matter to it: what goes in, and what resolution does.
+    fn stage<St, F, Fut>(
+        input: St,
+        resolve: F,
+    ) -> impl Stream<Item = (ResolvedTransportRouting<HoprSurb>, ApplicationDataOut)>
+    where
+        St: Stream<Item = (DestinationRouting, ApplicationDataOut)>,
+        F: Fn(usize, usize, DestinationRouting) -> Fut + Clone,
+        Fut: Future<Output = PathResult<(ResolvedTransportRouting<HoprSurb>, Option<usize>)>>,
+    {
+        resolve_routing_stage(
+            input,
+            resolve,
+            TEST_DISTRESS_THRESHOLD,
+            TEST_CONCURRENCY,
+            TEST_SURB_WAIT,
+        )
+    }
+
     /// A resolution result the stage accepts. The variant is a forward one because a
     /// [`ResolvedTransportRouting::Return`] needs a real `HoprSurb`, and no test here depends on
     /// which variant came back — only on *whether* the packet was emitted.
@@ -254,7 +274,7 @@ mod tests {
             (forward_routing(), packet(2)),
         ]);
 
-        let emitted = resolve_routing_stage(
+        let emitted = stage(
             input,
             |_size_hint, _max_surbs, routing: DestinationRouting| async move {
                 match routing {
@@ -262,9 +282,6 @@ mod tests {
                     DestinationRouting::Forward { .. } => Ok((resolved(), None)),
                 }
             },
-            TEST_DISTRESS_THRESHOLD,
-            TEST_CONCURRENCY,
-            TEST_SURB_WAIT,
         )
         .take(2)
         .collect::<Vec<_>>()
@@ -311,22 +328,16 @@ mod tests {
 
         let emitted = {
             let attempts = attempts.clone();
-            resolve_routing_stage(
-                input,
-                move |_size_hint, _max_surbs, routing: DestinationRouting| {
-                    let attempts = attempts.clone();
-                    async move {
-                        if attempts.fetch_add(1, Ordering::Relaxed) < FAILURES_BEFORE_SUCCESS {
-                            Err(no_surb(&routing))
-                        } else {
-                            Ok((resolved(), Some(0)))
-                        }
+            stage(input, move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                let attempts = attempts.clone();
+                async move {
+                    if attempts.fetch_add(1, Ordering::Relaxed) < FAILURES_BEFORE_SUCCESS {
+                        Err(no_surb(&routing))
+                    } else {
+                        Ok((resolved(), Some(0)))
                     }
-                },
-                TEST_DISTRESS_THRESHOLD,
-                TEST_CONCURRENCY,
-                TEST_SURB_WAIT,
-            )
+                }
+            })
             .take(1)
             .collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
@@ -364,7 +375,7 @@ mod tests {
             (forward_routing(), packet(2)),
         ]);
 
-        let emitted = resolve_routing_stage(
+        let emitted = stage(
             input,
             |_size_hint, _max_surbs, _routing: DestinationRouting| async move {
                 static SEEN: AtomicUsize = AtomicUsize::new(0);
@@ -374,9 +385,6 @@ mod tests {
                     Ok((resolved(), None))
                 }
             },
-            TEST_DISTRESS_THRESHOLD,
-            TEST_CONCURRENCY,
-            TEST_SURB_WAIT,
         )
         .collect::<Vec<_>>()
         .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
