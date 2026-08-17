@@ -2708,6 +2708,155 @@ mod tests {
         Ok(())
     }
 
+    /// Collects everything that arrives on `rx` during `window`, returning once it elapses.
+    async fn originated_during(
+        rx: &mut futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>,
+        window: Duration,
+    ) -> Vec<(DestinationRouting, ApplicationDataOut)> {
+        let mut collected = Vec::new();
+        let deadline = tokio::time::Instant::now() + window;
+        while let Ok(Some(item)) = timeout(
+            deadline.saturating_duration_since(tokio::time::Instant::now()),
+            rx.next(),
+        )
+        .await
+        {
+            collected.push(item);
+        }
+        collected
+    }
+
+    /// The manager floors the keep-alive period at [`MIN_SURB_BUFFER_NOTIFICATION_PERIOD`], so this
+    /// is as fast as an Exit keep-alive can be made to run, and it sets the pace of these tests.
+    const KEEP_ALIVE_PERIOD: Duration = MIN_SURB_BUFFER_NOTIFICATION_PERIOD;
+
+    type RecordingManager = SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>;
+    type Originated = futures::channel::mpsc::UnboundedReceiver<(DestinationRouting, ApplicationDataOut)>;
+
+    /// Brings up an Exit-side session and returns once its keep-alive stream is observably running.
+    ///
+    /// The "observably running" part is load-bearing for every caller: `nothing was originated` is
+    /// equally true of a stream that stopped and one that never started, so a test that does not
+    /// first establish the stream is alive proves nothing when it later sees silence.
+    async fn exit_session_originating_keep_alives(
+        cfg: SessionManagerConfig,
+    ) -> anyhow::Result<(RecordingManager, Originated, HoprPseudonym)> {
+        let mgr = RecordingManager::new(SessionManagerConfig {
+            surb_balance_notify_period: Some(KEEP_ALIVE_PERIOD),
+            ..cfg
+        });
+
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        // Held, not dropped: dropping it would fail the establishment notification instead.
+        let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(4);
+        mgr.start(msg_tx, new_session_tx)?;
+
+        let pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                // Empty capabilities keep rate control on, which is what spawns the balancer and
+                // the keep-alive stream. `NoRateControl` would skip both and make this vacuous.
+                capabilities: ByteCapabilities(Capabilities::empty()),
+                additional_data: 0,
+            },
+        )
+        .await?;
+
+        let observed = originated_during(&mut msg_rx, KEEP_ALIVE_PERIOD * 2 + Duration::from_millis(500)).await;
+        let keep_alives = observed
+            .iter()
+            .filter(|(routing, data)| {
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &pseudonym)
+            })
+            .count();
+        anyhow::ensure!(
+            keep_alives > 0,
+            "no return-routed keep-alive was originated, so this test cannot tell a stopped stream from one that \
+             never ran; {} message(s) were observed in total",
+            observed.len()
+        );
+
+        Ok((mgr, msg_rx, pseudonym))
+    }
+
+    /// Asserts `mgr` originates nothing further for `pseudonym`.
+    ///
+    /// Packets already handed to the sender before the closure are in flight rather than newly
+    /// originated, so they are drained first and only what appears afterwards counts.
+    async fn assert_no_further_origination(rx: &mut Originated, closure: &str) {
+        let _in_flight = originated_during(rx, Duration::from_millis(200)).await;
+
+        let window = KEEP_ALIVE_PERIOD * 3;
+        let after = originated_during(rx, window).await;
+        assert!(
+            after.is_empty(),
+            "an Exit session closed by {closure} originated {} further packet(s) over {window:?} — each one is \
+             return-routed to a pseudonym whose SURBs are gone, and one such packet is enough to stall all \
+             origination on the node",
+            after.len()
+        );
+    }
+
+    /// An Exit session must originate nothing once it has been closed explicitly.
+    ///
+    /// The Exit's keep-alive stream is a `repeat_with` on a rate limiter: it produces a
+    /// return-routed packet every period regardless of whether a SURB exists to carry it. That is
+    /// fine while the initiator is present and replenishing, and it is the *supply* side of the
+    /// `london-01` outage once the initiator is gone — every such packet is one the routing
+    /// resolution stage can never resolve, and one unresolvable packet there stalls all origination
+    /// on the node (see `hopr_transport::path::resolve`).
+    ///
+    /// Teardown is therefore the only thing standing between a departed initiator and an unbounded
+    /// supply of unresolvable packets, which is why each closure path has to be shown to stop the
+    /// stream rather than merely drop the slot.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_session_should_originate_nothing_after_an_explicit_close() -> anyhow::Result<()> {
+        // Default idle timeout (180 s), so eviction cannot confound what the explicit close proves.
+        let (mgr, mut msg_rx, pseudonym) = exit_session_originating_keep_alives(Default::default()).await?;
+
+        assert!(mgr.close_session(&pseudonym), "the session must exist to be closed");
+
+        assert_no_further_origination(&mut msg_rx, "an explicit close").await;
+        Ok(())
+    }
+
+    /// An Exit session must originate nothing once it has been evicted for being idle.
+    ///
+    /// This is the path that matters most for a departed initiator: nobody closes that session, so
+    /// idle eviction is what ends it, and eviction runs through a Moka listener rather than the
+    /// explicit close path. A keep-alive stream that survives eviction would go on originating
+    /// unresolvable return packets with no session left to account for them.
+    #[test_log::test(tokio::test)]
+    async fn an_exit_session_should_originate_nothing_after_idle_eviction() -> anyhow::Result<()> {
+        let idle_timeout = KEEP_ALIVE_PERIOD * 3;
+        let (mgr, mut msg_rx, _) = exit_session_originating_keep_alives(SessionManagerConfig {
+            idle_timeout,
+            ..Default::default()
+        })
+        .await?;
+
+        // Moka evicts lazily, so drive its maintenance rather than waiting for the manager's own
+        // (jittered, multi-second) eviction tick: this makes the eviction prompt and deterministic.
+        for _ in 0..50 {
+            mgr.sessions.run_pending_tasks();
+            if mgr.active_sessions().is_empty() {
+                break;
+            }
+            tokio::time::sleep(idle_timeout / 10).await;
+        }
+        assert!(
+            mgr.active_sessions().is_empty(),
+            "the idle session was never evicted, so this test cannot say anything about eviction"
+        );
+
+        assert_no_further_origination(&mut msg_rx, "idle eviction").await;
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
