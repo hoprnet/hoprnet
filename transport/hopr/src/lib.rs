@@ -63,7 +63,7 @@ use hopr_api::{
 pub use hopr_crypto_packet::HoprPixSpec;
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::MemorySurbStore;
+pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 /// Re-exported so a consumer can name `<HoprPixSpec as PixSpec>::DepositAddress` and assert at
 /// compile time that it is the variant it can actually settle. Which instantiation is in play is
 /// a feature-graph outcome rather than a local decision, and getting it wrong is otherwise silent
@@ -195,6 +195,8 @@ pub enum HoprTransportProcess {
     OutgoingIndexSync,
     #[strum(to_string = "periodic protocol counter flush")]
     CounterFlush,
+    /// Periodically reports SURB round-trip counts into the network graph.
+    SurbFlush,
     #[strum(to_string = "mixer→wire forwarder")]
     MixerForwarder,
     #[cfg(feature = "capture")]
@@ -358,19 +360,23 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
+        // Built before the session manager so the latter can be handed the seam that lets a
+        // session re-plan its return path on sustained loss.
+        let path_planner = PathPlanner::new(
+            me_offchain,
+            MemorySurbStore::new(cfg.packet.surb_store),
+            resolver.clone(),
+            selector,
+            planner_config,
+        );
+
         Ok(Self {
             packet_key: identity.1.clone(),
             chain_key: identity.0.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(OnceLock::new()),
             graph,
-            path_planner: PathPlanner::new(
-                me_offchain,
-                MemorySurbStore::new(cfg.packet.surb_store),
-                resolver.clone(),
-                selector,
-                planner_config,
-            ),
+            path_planner,
             my_multiaddresses,
             smgr: Arc::new(SessionManager::new(SessionManagerConfig {
                 frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
@@ -878,6 +884,8 @@ where
             .map_err(|error| HoprTransportError::Api(format!("invalid SSA generator configuration: {error}")))?,
         );
 
+        let surb_round_trips = protocol::surb_telemetry::SurbRoundTripRegistry::default();
+
         let pipeline_builder = HoprPacketPipelineBuilder::new()
             .identity((&self.chain_key, &self.packet_key))
             .transport((mixing_channel_tx, wire_msg_rx))
@@ -888,6 +896,10 @@ where
             .ssa_generator(ssa_generator.clone())
             .channels_dst(channels_dst)
             .with_counters(self.counters.clone())
+            .with_surb_telemetry(
+                surb_round_trips.clone(),
+                protocol::surb_telemetry::path_slots_of(self.graph.clone()),
+            )
             .with_config(self.cfg.packet);
 
         // ── PixToolbox for the SessionManager ────────────────────────────
@@ -1032,6 +1044,84 @@ where
                         futures::future::ready(())
                     })
                     .await;
+            }),
+        );
+
+        // -- periodic SURB round-trip flush
+        tracing::info!(?role, "starting surb round-trip flush task");
+        // Long enough to outlast the silence gate that produced the evidence, so a path that stays
+        // dead is re-marked before the previous mark lapses, and short enough that a path which
+        // recovers unnoticed returns to closed-loop control promptly.
+        const RETURN_PATH_DEGRADED_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+        let surb_flush_graph = self.graph.clone();
+        let surb_flush_interval = self.cfg.surb_flush_interval;
+        let surb_flush_smgr = self.smgr.clone();
+        let surb_flush_chain = self.chain_api.clone();
+        let surb_flush_planner = self.path_planner.clone();
+        processes.insert(
+            HoprTransportProcess::SurbFlush,
+            hopr_utils::spawn_as_abortable!(async move {
+                let mut episodes = protocol::return_path_recovery::ReturnPathEpisodes::new(RETURN_PATH_DEGRADED_GRACE);
+                let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
+
+                while ticks.next().await.is_some() {
+                    // Detection before the drain: `degraded_destinations` reads the counts the
+                    // flush is about to reset.
+                    let silent = surb_round_trips.degraded_destinations();
+
+                    // The graph has to see this interval's counts *before* anything re-plans on it,
+                    // otherwise the re-plan that the silence just triggered reads a graph one whole
+                    // tick behind the evidence that triggered it.
+                    protocol::surb_telemetry::flush_into(
+                        &surb_round_trips,
+                        &surb_flush_graph,
+                        hopr_utils::platform::time::native::current_time()
+                            .as_unix_timestamp()
+                            .as_millis(),
+                    );
+
+                    // Re-plan first, refill only if re-planning moved traffic. Run the other way
+                    // round the refill mints SURBs onto the very route the planner is abandoning --
+                    // see `protocol::return_path_recovery`.
+                    //
+                    // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
+                    // they capture has to survive being invoked once per silent destination.
+                    let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
+                    for step in episodes
+                        .tick(
+                            silent,
+                            |destination| async move { planner.recompute_paths_from(&destination).await },
+                            |destination| async move {
+                                // Sessions name their destination by its chain address, this
+                                // telemetry by its packet key, and a `NodeId` holding one is never
+                                // equal to a `NodeId` holding the other -- so the match has to be
+                                // made on a resolved form, not on the enum.
+                                //
+                                // The counterparty has to still be receiving SURBs to reply with,
+                                // and its silence has by now convinced our balancer that it is well
+                                // stocked -- so tell the Sessions routed there to stop believing
+                                // that estimate while the evidence says otherwise.
+                                chain
+                                    .packet_key_to_chain_key(&destination)
+                                    .ok()
+                                    .flatten()
+                                    .map(hopr_api::types::internal::prelude::NodeId::Chain)
+                                    .map(|n| smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
+                                    .unwrap_or(0)
+                            },
+                        )
+                        .await
+                    {
+                        match step {
+                            protocol::return_path_recovery::RecoveryStep::Replanned { destination, moved } => {
+                                tracing::info!(%destination, entries = moved, "return path silent, re-planned")
+                            }
+                            protocol::return_path_recovery::RecoveryStep::Refilled { destination, sessions } => {
+                                tracing::info!(%destination, sessions, "refilling behind the re-plan")
+                            }
+                        }
+                    }
+                }
             }),
         );
 
@@ -1237,6 +1327,14 @@ where
         &self.graph
     }
 
+    /// Returns a reference to the SURB store.
+    ///
+    /// Exposed so that chain-level channel events can invalidate stored SURBs whose return path
+    /// starts with a relayer this node can no longer pay.
+    pub fn surb_store(&self) -> &MemorySurbStore {
+        &self.path_planner.surb_store
+    }
+
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn local_multiaddresses(&self) -> Vec<Multiaddr> {
         self.network
@@ -1362,6 +1460,11 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
             id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
+            // `None` rather than the handshake's `deposit_data`: that field is carried by the Start
+            // protocol's `SsaRequest` (`hopr-protocol-start`) and is not surfaced through
+            // `AgreedSsaQuota`, so there is nothing here to forward yet. Threading it through is a
+            // change to the Session layer's event types, not to this mapping.
+            additional_data: None,
         }),
         HoprSessionOutPixEvent::DepositNeeded(
             AgreedSsaQuota {
@@ -1374,6 +1477,9 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
             id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
+            // See `NewDepositAddress` above: the handshake's `deposit_data` does not reach
+            // `AgreedSsaQuota`, so there is nothing to forward yet.
+            additional_data: None,
             deposit_updated: Some(notifier),
         }),
     }

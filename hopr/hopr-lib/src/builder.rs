@@ -680,6 +680,7 @@ where
         let proc = chain_wiring::process_chain_events(
             chain_reader,
             graph_updater,
+            transport_api.surb_store().clone(),
             chain_events,
             own_chain_addr,
             own_packet_key,

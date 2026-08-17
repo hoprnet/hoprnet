@@ -1105,8 +1105,7 @@ mod tests {
 
         // Garbage of the right length parses but must not verify: `try_from_bytes` checks the
         // length only, deliberately routing a malformed proof and an invalid one down one path.
-        let garbage =
-            SsaCommitmentProof::<TestSpec>::try_from_bytes(&vec![0xAA; SsaCommitmentProof::<TestSpec>::SIZE])?;
+        let garbage = SsaCommitmentProof::<TestSpec>::try_from_bytes(&[0xAA; SsaCommitmentProof::<TestSpec>::SIZE])?;
         assert!(!garbage.verify(&ssa_id, &commitment));
 
         Ok(())

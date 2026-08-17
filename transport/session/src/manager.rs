@@ -52,7 +52,7 @@ use crate::{
         SupervisorConfig, spawn_supervisor_worker,
     },
     types::{
-        ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA,
+        ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
         HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, LOCAL_PIX_SUITE,
         SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
     },
@@ -1940,6 +1940,10 @@ where
                     );
 
                     let surb_mgmt = Arc::new(BalancerStateValues::from(balancer_config));
+                    // The counterparty's store is the same bounded ring buffer as ours, so its
+                    // capacity bounds what our `produced - consumed` estimate can legitimately
+                    // claim it is holding.
+                    surb_mgmt.set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
                     // Spawn the SURB-bearing keep alive stream towards the Exit
                     let (ka_controller, ka_abort_handle) = utils::spawn_keep_alive_stream(
@@ -2485,7 +2489,12 @@ where
 
         // Construct and send the Exit SSA commitment request message.
         // The parameters were previously verified to be acceptable.
-        let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(session_id, params, exit_commitments));
+        let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            session_id,
+            params,
+            exit_commitments,
+            HoprPixDepositData::default(),
+        ));
 
         send_via_msg_sender(
             &mut msg_sender,
@@ -2644,6 +2653,28 @@ where
         }
 
         Ok(())
+    }
+
+    /// Marks the return path to `destination` as degraded on every Session routed there.
+    ///
+    /// The Session layer cannot tell a dead return path from a peer with nothing to say -- both
+    /// simply stop consuming SURBs -- so the judgement is made where sibling paths can be compared
+    /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
+    /// their counterparty buffer estimate for `grace`.
+    ///
+    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
+    pub fn mark_return_path_degraded(
+        &self,
+        destination: &hopr_api::types::internal::NodeId,
+        grace: std::time::Duration,
+    ) -> usize {
+        self.sessions
+            .iter()
+            .filter(|(_, slot)| {
+                matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
+            })
+            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
+            .count()
     }
 
     /// The main method to be called whenever data are received.
@@ -3131,9 +3162,12 @@ where
                 // No SURB decay at the Exit, since we know almost exactly how many SURBs
                 // were received
                 surb_decay: None,
+                sustain_on_return_path_loss: false,
             };
 
             slot.surb_mgmt.update(&balancer_config);
+            slot.surb_mgmt
+                .set_counterparty_buffer_capacity(self.cfg.maximum_surb_buffer_size as u64);
 
             // Spawn the SURB balancer only once we know we have registered the
             // abort handle with the pre-allocated Session slot
@@ -3589,7 +3623,7 @@ where
     async fn handle_ssa_request(
         &self,
         pseudonym: HoprPseudonym,
-        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement>,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositData>,
     ) -> errors::Result<()> {
         let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
@@ -7170,6 +7204,7 @@ mod tests {
                     session_id,
                     PixParams::try_new(10, 10, 0, LOCAL_PIX_SUITE)?,
                     BTreeMap::new(),
+                    HoprPixDepositData::default(),
                 ),
             )
             .await;
@@ -7392,7 +7427,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7418,7 +7453,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
             )
             .await
             .expect_err("a request one share below the boundary must be refused");
@@ -7443,7 +7478,7 @@ mod tests {
         );
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
         )
         .await
         .context("a request at the protocol floor must be accepted whatever the local threshold is")?;
@@ -7478,7 +7513,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7494,7 +7529,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
             )
             .await
             .expect_err("a successor request against discarded generator state must be refused");
@@ -7540,7 +7575,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7565,7 +7600,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
             )
             .await
             .expect_err("a successor must not be funded before the Exit has returned anything");
@@ -7591,7 +7626,7 @@ mod tests {
         credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&params, 1));
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
         )
         .await
         .context("a successor must be admitted once the Exit has returned what it owes")?;
@@ -7617,7 +7652,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7631,7 +7666,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
             )
             .await
             .expect_err("an unserved successor must be refused");
@@ -7671,7 +7706,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7695,7 +7730,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
         )
         .await
         .context("a request one packet ahead of its own service must be waited for, not refused")?;
@@ -7726,7 +7761,7 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1)),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -7739,7 +7774,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2)),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
             )
             .await
             .expect_err("pre-commitment service must not pay for the first successor");
@@ -8038,7 +8073,7 @@ mod tests {
         // The opening batch is accepted: nothing is committed yet, so there is nothing to be early for.
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1)),
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -8056,7 +8091,12 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
+                SsaServerCommitmentMessage::new(
+                    pseudonym,
+                    small_pix_params(),
+                    batch(BATCH + 1),
+                    HoprPixDepositData::default(),
+                ),
             )
             .await
             .expect_err("a batch asked for before any share was emitted must be refused");
@@ -8111,7 +8151,12 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
+                SsaServerCommitmentMessage::new(
+                    pseudonym,
+                    small_pix_params(),
+                    batch(BATCH + 1),
+                    HoprPixDepositData::default(),
+                ),
             )
             .await
             .expect_err("reaching the last cycle must not by itself admit the next batch");
@@ -8132,7 +8177,12 @@ mod tests {
         emit_until(&|p| p.front_emitted >= min_emitted)?;
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1)),
+            SsaServerCommitmentMessage::new(
+                pseudonym,
+                small_pix_params(),
+                batch(BATCH + 1),
+                HoprPixDepositData::default(),
+            ),
         )
         .await
         .context("a batch asked for on time must be accepted")?;
@@ -8234,7 +8284,7 @@ mod tests {
         // batch is legitimately admissible.
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1)),
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), HoprPixDepositData::default()),
         )
         .await
         .context("the opening batch must be accepted")?;
@@ -8272,7 +8322,12 @@ mod tests {
                 barrier.wait().await;
                 mgr.handle_ssa_request(
                     pseudonym,
-                    SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), commitments),
+                    SsaServerCommitmentMessage::new(
+                        pseudonym,
+                        small_pix_params(),
+                        commitments,
+                        HoprPixDepositData::default(),
+                    ),
                 )
                 .await
             })
@@ -8397,6 +8452,7 @@ mod tests {
                         session_id,
                         PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                         commitments,
+                        HoprPixDepositData::default(),
                     ),
                 )
                 .await;
@@ -8560,6 +8616,7 @@ mod tests {
                     alice_pseudonym,
                     PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                     commitments,
+                    HoprPixDepositData::default(),
                 ),
             )
             .await;

@@ -75,6 +75,7 @@ pub fn create_hopr_instance_config(
             counter_flush_interval: Default::default(),
             pix: pix_global_config.unwrap_or_default(),
             incoming_session_pix_config: pix_config.unwrap_or_default(),
+            surb_flush_interval: std::time::Duration::from_secs(1),
         },
         publish: true,
         ..Default::default()

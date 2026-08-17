@@ -122,7 +122,10 @@ const SURPLUS_LOSS_TOLERANCE_DIVISOR: u8 = 4;
 /// Shares to emit per polynomial beyond `threshold`, to absorb losses.
 ///
 /// **A ratio, evaluated at the threshold actually configured** — see
-/// [`SURPLUS_LOSS_TOLERANCE_DIVISOR`] for why a ratio is the physically meaningful shape.
+// `SURPLUS_LOSS_TOLERANCE_DIVISOR` is deliberately unlinked here and below: it is crate-private, so
+// an intra-doc link from this public function trips `rustdoc::private_intra_doc_links`, which the
+// `nix build .#docs` job builds as an error.
+/// `SURPLUS_LOSS_TOLERANCE_DIVISOR` for why a ratio is the physically meaningful shape.
 ///
 /// This used to be a bare constant, `DEFAULT_POLY_THRESHOLD / 2`, evaluated once at the *default*
 /// threshold and then applied whatever the configured one was. Deployments run thresholds from 16
@@ -133,7 +136,7 @@ const SURPLUS_LOSS_TOLERANCE_DIVISOR: u8 = 4;
 ///
 /// **Rounds up.** The result is a guarantee of *at least* the documented tolerance, not an
 /// approximation of it: shares are indivisible, so a threshold that is not a multiple of
-/// [`SURPLUS_LOSS_TOLERANCE_DIVISOR`] has to land on one side of 20 % or the other, and covering
+/// `SURPLUS_LOSS_TOLERANCE_DIVISOR` has to land on one side of 20 % or the other, and covering
 /// less than the documented rate is the failure this function exists to prevent. Rounding down
 /// undershot for every such threshold — 33 received 8 surplus shares and covered 19.51 % — and gave
 /// thresholds 2 and 3 a surplus of **zero**, i.e. no loss tolerance at all, at and just above
@@ -441,7 +444,7 @@ pub(crate) mod tests {
         primitive::prelude::Address,
     };
     use vsss_rs::{
-        ParticipantIdGeneratorType, ReadableShareSet, ShareVerifierGroup,
+        ParticipantIdGenerator, ReadableShareSet, ShareVerifierGroup,
         elliptic_curve::{Field, rand_core::CryptoRng},
         feldman,
     };
@@ -486,13 +489,13 @@ pub(crate) mod tests {
         anyhow::ensure!(x.len() >= t, "x must have at least t elements");
 
         let (shares, verifier_set) =
-            feldman::split_secret_with_participant_generator::<Share<S>, ShareVerifierGroup<PixGroup<S>>>(
+            feldman::split_secret_with_participant_generators::<Share<S>, ShareVerifierGroup<PixGroup<S>>>(
                 t,
                 x.len(),
                 &secret.into(),
                 None,
                 &mut rng,
-                &[ParticipantIdGeneratorType::list(
+                &[ParticipantIdGenerator::list(
                     &x.iter().map(|x| (*x).into()).collect::<Vec<_>>(),
                 )],
             )

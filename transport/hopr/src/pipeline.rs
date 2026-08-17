@@ -16,8 +16,17 @@ use hopr_utils::runtime::AbortableList;
 use crate::{
     HoprTransportProcess, PeerProtocolCounterRegistry,
     config::HoprPacketPipelineConfig,
-    protocol::{NopExitAcknowledgementShareProcessor, PacketPipelineBuilder, Unset},
+    protocol::{
+        NopExitAcknowledgementShareProcessor, PacketPipelineBuilder, Unset, surb_telemetry,
+        surb_telemetry::{PathSlotResolver, SurbRoundTripRegistry, SurbTelemetryCodec},
+    },
 };
+
+/// Ceiling on SURBs awaiting a reply before the oldest are forgotten.
+///
+/// Only bounds memory: a SURB evicted early simply stops being creditable, which understates
+/// delivery slightly rather than misattributing it.
+const MAX_PENDING_SURBS: u64 = 100_000;
 
 /// Builder for the HOPR packet pipeline.
 ///
@@ -68,6 +77,7 @@ pub struct HoprPacketPipelineBuilder<
     ticket_factory: TFact,
     ssa_generator: G,
     counters: PeerProtocolCounterRegistry,
+    surb_telemetry: (SurbRoundTripRegistry, PathSlotResolver),
     channels_dst: Option<Hash>,
     cfg: HoprPacketPipelineConfig,
     ticket_events: Option<TEvt>,
@@ -123,6 +133,7 @@ impl
             ticket_factory: Unset,
             ssa_generator: Unset,
             counters: PeerProtocolCounterRegistry::default(),
+            surb_telemetry: (SurbRoundTripRegistry::default(), surb_telemetry::no_path_slots()),
             channels_dst: None,
             cfg: HoprPacketPipelineConfig::default(),
             ticket_events: None,
@@ -146,6 +157,15 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
     #[must_use]
     pub fn with_counters(mut self, counters: PeerProtocolCounterRegistry) -> Self {
         self.counters = counters;
+        self
+    }
+
+    /// Accumulates SURB round-trips into `registry`, naming paths via `slots`.
+    ///
+    /// Without this the codec is still wrapped, but nothing resolves and nothing is recorded.
+    #[must_use]
+    pub fn with_surb_telemetry(mut self, registry: SurbRoundTripRegistry, slots: PathSlotResolver) -> Self {
+        self.surb_telemetry = (registry, slots);
         self
     }
 
@@ -184,6 +204,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -208,6 +229,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -232,6 +254,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -256,6 +279,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -280,6 +304,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -304,6 +329,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -329,6 +355,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: Some(ticket_events),
@@ -360,6 +387,7 @@ impl<WIn, WOut, Chain, S, TFact, G, AppOut, AppIn, TEvt, A, SEvt>
             ticket_factory: self.ticket_factory,
             ssa_generator: self.ssa_generator,
             counters: self.counters,
+            surb_telemetry: self.surb_telemetry,
             channels_dst: self.channels_dst,
             cfg: self.cfg,
             ticket_events: self.ticket_events,
@@ -421,6 +449,7 @@ where
             ticket_factory,
             ssa_generator,
             counters,
+            surb_telemetry,
             channels_dst,
             cfg,
             ticket_events,
@@ -457,6 +486,21 @@ where
             channels_dst,
             cfg.codec,
         );
+
+        // Wrapped unconditionally: with no resolver configured nothing places a node, so no leg is
+        // ever identified and the decorator costs one closure call per minted SURB.
+        let (surb_registry, path_slots) = surb_telemetry;
+        let me = *packet_key.public();
+        // One map for both halves: the encoder mints and the decoder observes the reply.
+        let pending_legs = surb_telemetry::pending_legs(MAX_PENDING_SURBS);
+        let encoder = SurbTelemetryCodec::new(
+            encoder,
+            me,
+            path_slots.clone(),
+            surb_registry.clone(),
+            pending_legs.clone(),
+        );
+        let decoder = SurbTelemetryCodec::new(decoder, me, path_slots, surb_registry, pending_legs);
 
         #[allow(unused_mut)]
         let mut processes = AbortableList::default();
@@ -522,11 +566,14 @@ where
     TFact: TicketFactory + Clone + Send + Sync + 'static,
 {
     #[cfg(not(feature = "capture"))]
-    Plain(HoprEncoder<Chain, G, S, TFact>, HoprDecoder<Chain, S, TFact>),
+    Plain(
+        SurbTelemetryCodec<HoprEncoder<Chain, G, S, TFact>>,
+        SurbTelemetryCodec<HoprDecoder<Chain, S, TFact>>,
+    ),
     #[cfg(feature = "capture")]
     Captured(
-        crate::capture::CapturePacketCodec<HoprEncoder<Chain, G, S, TFact>>,
-        crate::capture::CapturePacketCodec<HoprDecoder<Chain, S, TFact>>,
+        crate::capture::CapturePacketCodec<SurbTelemetryCodec<HoprEncoder<Chain, G, S, TFact>>>,
+        crate::capture::CapturePacketCodec<SurbTelemetryCodec<HoprDecoder<Chain, S, TFact>>>,
     ),
 }
 

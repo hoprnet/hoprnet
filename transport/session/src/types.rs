@@ -84,8 +84,21 @@ impl AsRef<Capabilities> for HoprSessionCapabilities {
 }
 
 /// Start protocol instantiation for HOPR.
-pub type HoprStartProtocol =
-    StartProtocol<SessionId, SessionTarget, HoprSessionCapabilities, HoprPixGroupElement, HoprPixCommitmentProof>;
+pub type HoprStartProtocol = StartProtocol<
+    SessionId,
+    SessionTarget,
+    HoprSessionCapabilities,
+    HoprPixGroupElement,
+    HoprPixCommitmentProof,
+    HoprPixDepositData,
+>;
+
+/// Deposit data placeholder, CBOR-encoded as a byte string.
+///
+/// Currently set to an empty byte string (zero-length Vec). Uses [`serde_bytes`] for compact
+/// CBOR byte-string encoding.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct HoprPixDepositData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Quota per single SSA in bytes.
 ///
@@ -412,6 +425,7 @@ impl HoprSession {
     /// flow-control config. `flow_control` = the client's [`FlowControlConfig`] for this session
     /// (`None` leaves it unpaced); `surb_mgmt` gives the window its anti-grief down-only SURB ceiling.
     /// The entry (sending) side passes `Some(..)`; sites without them pass `None`.
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip_all, fields(id, routing, cfg, session_id = %id))]
     pub fn new_with_surb_state<Tx, Rx>(
         id: SessionId,
@@ -466,6 +480,9 @@ impl HoprSession {
                 capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 max_buffered_segments: cfg.max_buffered_segments,
+                // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
+                // also where the honest clock that observes the resulting loss lives.
+                max_frame_age: flow_control.and_then(|c| c.max_frame_age),
                 ..Default::default()
             };
 
@@ -494,6 +511,9 @@ impl HoprSession {
                     // `.max(1)`: never drop the retry budget to 0 — an abandoned frame under
                     // reliable-mode flow control leaves a gap and corrupts the stream.
                     max_outgoing_frame_retries: fc.map(|c| c.frame_retries.max(1) as usize).unwrap_or(2),
+                    // Retire an outgoing frame that is already too stale to be worth delivering,
+                    // rather than spending the remaining retry budget on it.
+                    max_frame_age: fc.and_then(|c| c.max_frame_age),
                     ..Default::default()
                 };
 
