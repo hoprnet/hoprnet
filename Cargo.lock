@@ -4248,7 +4248,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-hopr"
-version = "6.0.0"
+version = "6.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4365,7 +4365,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.45.0"
+version = "0.48.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4411,6 +4411,7 @@ dependencies = [
  "rand_distr",
  "rstest",
  "serde",
+ "serde-saphyr",
  "serial_test",
  "smart-default",
  "strum",
@@ -4502,7 +4503,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "async-trait",

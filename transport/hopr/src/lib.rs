@@ -59,7 +59,6 @@ use hopr_api::{
     network::{BoxedProcessFn, NetworkStreamControl},
     types::primitive::prelude::*,
 };
-use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 pub use hopr_protocol_hopr::{MemorySurbStore, SurbStore};
 pub use hopr_transport_probe::{NeighborTelemetry, PathTelemetry, errors::ProbeError, ping::PingQueryReplier};
@@ -88,7 +87,7 @@ use hopr_utils::{
     runtime::AbortableList,
 };
 pub use multiaddr::Protocol;
-use tracing::{Instrument, debug, error, trace, warn};
+use tracing::{debug, warn};
 
 #[cfg(feature = "runtime-tokio")]
 use crate::path::BackgroundPathCacheRefreshable;
@@ -322,11 +321,28 @@ where
         let probing_tag_allocator =
             probing_tag_allocator.ok_or_else(|| HoprTransportError::Api("probing tag allocator missing".into()))?;
 
+        // A pseudonym's SURB ring buffer is dropped once no SURBs have arrived for
+        // `pseudonyms_lifetime` (600 s by default), which is the point at which that pseudonym's
+        // return path becomes permanently unresolvable. Nothing else in the node can be made to
+        // reach that state on a test timescale — the Session slot is evicted for idleness long
+        // before it — so without a way to shorten this timer, the behaviour past it is not
+        // observable end-to-end at all. Floored at the same `MINIMUM_SURB_LIFETIME` the config
+        // validator enforces, so this cannot reach a value the config file could not also express.
+        let surb_store_cfg = hopr_protocol_hopr::SurbStoreConfig {
+            pseudonyms_lifetime: std::env::var("HOPR_INTERNAL_SURB_PSEUDONYM_LIFETIME_MS")
+                .ok()
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .map(Duration::from_millis)
+                .map(|d| d.max(hopr_protocol_hopr::MINIMUM_SURB_LIFETIME))
+                .unwrap_or(cfg.packet.surb_store.pseudonyms_lifetime),
+            ..cfg.packet.surb_store
+        };
+
         // Built before the session manager so the latter can be handed the seam that lets a
         // session re-plan its return path on sustained loss.
         let path_planner = PathPlanner::new(
             me_offchain,
-            MemorySurbStore::new(cfg.packet.surb_store),
+            MemorySurbStore::new(surb_store_cfg),
             resolver.clone(),
             selector,
             planner_config,
@@ -710,80 +726,16 @@ where
                 .filter(|&n| n > 0)
                 .unwrap_or(avail)
         };
-        let all_resolved_external_msg_rx = merged_unresolved_output_data
-            .map(move |(unresolved, mut data)| {
+        let all_resolved_external_msg_rx = crate::path::resolve::resolve_routing_stage(
+            merged_unresolved_output_data,
+            move |size_hint, max_surbs, unresolved| {
                 let path_planner = path_planner.clone();
-                async move {
-                    // Retry on SURB starvation: the SURB pool on the exit side
-                    // refills asynchronously (target 600, ~300/sec via keep-alive).
-                    // Silently dropping return-path packets when the pool is
-                    // momentarily empty causes irreversible data loss; instead we
-                    // yield briefly so the pool can replenish before retrying.
-                    //
-                    // We use `map().buffered()` (ordered) rather than `then_concurrent`
-                    // (unordered) so that routing resolution preserves the original
-                    // packet sequence.  Out-of-order delivery to the ENTRY reassembler
-                    // causes the sequencer to discard frames that arrive after
-                    // `frame_timeout`.  The retry loop bounds any head-of-line delay
-                    // to ~5 ms per SURB-arrival cycle, which is far below the 3 s
-                    // frame timeout.
-                    loop {
-                        hopr_transport_session::counters::ROUTING_RESOLUTION_ATTEMPTS
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        trace!(?unresolved, "resolving routing for packet");
-                        match path_planner
-                            .resolve_routing(
-                                data.data.total_len(),
-                                data.estimate_surbs_with_msg(),
-                                unresolved.clone(),
-                            )
-                            .await
-                        {
-                            Ok((resolved, rem_surbs)) => {
-                                // Set the SURB distress/out-of-SURBs flag if applicable.
-                                // These flags are translated into HOPR protocol packet signals and are
-                                // applicable only on the return path.
-                                let mut signals_to_dst = data
-                                    .packet_info
-                                    .as_ref()
-                                    .map(|info| info.signals_to_destination)
-                                    .unwrap_or_default();
-
-                                if resolved.is_return() {
-                                    signals_to_dst = match rem_surbs {
-                                        Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                            signals_to_dst | PacketSignal::SurbDistress
-                                        }
-                                        Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
-                                        _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
-                                    };
-                                } else {
-                                    // Unset these flags as they make no sense on the forward path.
-                                    signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
-                                }
-
-                                data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
-                                trace!(?resolved, "resolved routing for packet");
-                                return Some((resolved, data));
-                            }
-                            Err(error) if error.is_surb() => {
-                                // No SURB available yet (possibly cache-wrapped); yield briefly so the
-                                // pool can refill.
-                                futures_timer::Delay::new(std::time::Duration::from_millis(5)).await;
-                            }
-                            Err(error) => {
-                                hopr_transport_session::counters::ROUTING_RESOLUTION_FAILURES
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                error!(%error, "failed to resolve routing");
-                                return None;
-                            }
-                        }
-                    }
-                }
-                .in_current_span()
-            })
-            .buffered(routing_concurrency)
-            .filter_map(futures::future::ready);
+                async move { path_planner.resolve_routing(size_hint, max_surbs, unresolved).await }
+            },
+            distress_threshold,
+            routing_concurrency,
+            crate::path::resolve::surb_resolution_wait(self.cfg.packet.pipeline.surb_resolution_wait),
+        );
 
         let channels_dst = self
             .chain_api
