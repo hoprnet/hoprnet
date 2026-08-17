@@ -114,7 +114,7 @@ pub struct PacketPipelineConfig {
     /// How long routing resolution keeps waiting for a return path's SURBs before giving up on the
     /// packet.
     ///
-    /// `None` falls back to the default of 1 s. `Some(0)` disables the wait entirely, dropping a
+    /// `None` falls back to the default of 6 s. `Some(0)` disables the wait entirely, dropping a
     /// return packet the first time its SURBs are missing.
     ///
     /// The right value trades two failures against each other. Too short loses data on a session
@@ -125,9 +125,10 @@ pub struct PacketPipelineConfig {
     /// production exit's entire egress down for 1h44m while it still forwarded and acknowledged
     /// normally.
     ///
-    /// The default is ~200 retry cycles, far longer than a refill needs, and stays inside the
-    /// session's 3 s frame timeout — a packet held past that is discarded by the receiver anyway.
-    /// Raising it much beyond the frame timeout buys nothing and reopens the stall.
+    /// **Set this if you know your session's frame timeout.** The default errs long, because a
+    /// library cannot know it; a packet held past that timeout is discarded by the receiver anyway,
+    /// so the wait is pure stall from then on. hoprd, whose sessions time frames out at 3 s,
+    /// configures 1 s.
     #[cfg_attr(feature = "serde", serde(default, with = "humantime_serde"))]
     pub surb_resolution_wait: Option<std::time::Duration>,
     /// Configuration of the packet acknowledgement processing

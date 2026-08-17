@@ -29,12 +29,15 @@ const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_milli
 /// and because this stage preserves submission order, one such packet withholds every other packet
 /// the node would originate, for the life of the process.
 ///
-/// One second is ~200 retry cycles, far longer than a refill needs, and inside the session's 3 s
-/// frame timeout — a packet held past that is discarded by the receiver anyway, so waiting longer
-/// cannot save it and can only cost the node its egress.
+/// Six seconds is deliberately generous, because this is a *library* default and the useful ceiling
+/// belongs to the caller. A packet held past the session's frame timeout — 3 s for the sessions
+/// hoprd runs — cannot be used by the receiver anyway, so a deployment that knows its own timeout
+/// should configure something tighter, as hoprd does. What a library default must not do is drop a
+/// packet a slower or reliable session would still have made use of, so it errs long and leaves the
+/// tightening to whoever knows the traffic.
 ///
 /// [cfg]: crate::protocol::PacketPipelineConfig::surb_resolution_wait
-pub(crate) const DEFAULT_SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+pub(crate) const DEFAULT_SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
 
 /// The wait a node should use, given what its configuration says.
 ///
