@@ -488,7 +488,10 @@ fn validate_pix_reconstructor_config(cfg: &PixReconstructorConfig) -> Result<(),
 /// below is written exhaustively, so a field added to [`SsaReconstructorConfig`] fails to compile
 /// until it is mirrored here; and `pix_reconstructor_mirror_matches_the_protocol_defaults` asserts
 /// the two default sets still agree. Validation is not duplicated at all — see
-/// [`validate_pix_reconstructor_config`].
+// `validate_pix_reconstructor_config` is deliberately unlinked: it is module-private, so an
+// intra-doc link from this public type trips `rustdoc::private_intra_doc_links`, which the
+// `nix build .#docs` job builds as an error.
+/// `validate_pix_reconstructor_config`.
 ///
 /// Each field's rationale lives on the protocol type and is linked rather than copied, since a
 /// third copy of the same prose is a third thing to keep true.

@@ -142,12 +142,16 @@ pub struct SsaGeneratorConfig {
     /// every case. That is why the surplus is part of the per-SSA quota rather than free service —
     /// the Entry is buying insurance, and insurance is paid for whether or not it is claimed.
     ///
-    /// Default is [`DEFAULT_SURPLUS_SHARES`] — but prefer [`default_surplus_for`] wherever the
-    /// threshold is known, because this is a *ratio* of it and the constant can only be the ratio
-    /// evaluated at the default threshold.
+    /// Default is [`DEFAULT_SURPLUS_SHARES`] — but prefer
+    /// [`default_surplus_for`](crate::default_surplus_for) wherever the threshold is known, because
+    /// this is a *ratio* of it and the constant can only be the ratio evaluated at the default
+    /// threshold.
     ///
     /// Bounded by `threshold` rather than by the byte the wire gives it: see
-    /// [`surplus_must_not_exceed_threshold`]. It shares the lower half of the negotiated
+    // `surplus_must_not_exceed_threshold` is deliberately unlinked: it is crate-private, so an
+    // intra-doc link from this public field trips `rustdoc::private_intra_doc_links`, which the
+    // `nix build .#docs` job builds as an error.
+    /// `surplus_must_not_exceed_threshold`. It shares the lower half of the negotiated
     /// [`PixParams`](crate::PixParams) word with `threshold`, so a byte is all that fits there — but
     /// what is *representable* and what is sane to configure are different questions, and this field
     /// used to be documented as needing no validator on the strength of the first.
