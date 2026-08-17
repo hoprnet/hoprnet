@@ -416,7 +416,7 @@ pub(crate) mod tests {
         primitive::prelude::Address,
     };
     use vsss_rs::{
-        ParticipantIdGeneratorType, ReadableShareSet, ShareVerifierGroup,
+        ParticipantIdGenerator, ReadableShareSet, ShareVerifierGroup,
         elliptic_curve::{Field, rand_core::CryptoRng},
         feldman,
     };
@@ -461,13 +461,13 @@ pub(crate) mod tests {
         anyhow::ensure!(x.len() >= t, "x must have at least t elements");
 
         let (shares, verifier_set) =
-            feldman::split_secret_with_participant_generator::<Share<S>, ShareVerifierGroup<PixGroup<S>>>(
+            feldman::split_secret_with_participant_generators::<Share<S>, ShareVerifierGroup<PixGroup<S>>>(
                 t,
                 x.len(),
                 &secret.into(),
                 None,
                 &mut rng,
-                &[ParticipantIdGeneratorType::list(
+                &[ParticipantIdGenerator::list(
                     &x.iter().map(|x| (*x).into()).collect::<Vec<_>>(),
                 )],
             )

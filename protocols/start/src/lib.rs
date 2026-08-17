@@ -1101,6 +1101,10 @@ mod tests {
     /// The round-trip test above deliberately uses an out-of-range sentinel to prove the codec is
     /// total. This one goes through the constructor and the accessor, which is what production uses
     /// and what actually pins the packed layout across `encode`/`decode`.
+    // `MinimalDeposit` is `()` — the instantiation that carries no deposit data — so passing
+    // `MinimalDeposit::default()` as the generic `deposit_data` argument is literally passing a
+    // unit value. That is the point of this instantiation, not an oversight.
+    #[allow(clippy::unit_arg)]
     #[test]
     fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
         let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::BabyJubJub)?;

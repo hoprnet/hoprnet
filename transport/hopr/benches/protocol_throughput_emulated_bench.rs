@@ -35,7 +35,7 @@ const SAMPLE_SIZE: usize = 50;
 ///
 /// This is what sets the per-share cost: `next_share` is a Horner evaluation over `threshold`
 /// coefficients.
-const PIX_THRESHOLD: u16 = DEFAULT_POLY_THRESHOLD;
+const PIX_THRESHOLD: u8 = DEFAULT_POLY_THRESHOLD;
 
 /// Whether the PIX share generator handed to the encoder has a committed SSA.
 ///
