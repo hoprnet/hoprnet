@@ -2,6 +2,10 @@ use crate::balancer::{BalancerControllerBounds, SurbBalancerController};
 
 /// Controller that uses the simple linear formula `limit * min(current / setpoint, 1.0)` to
 /// compute the control output.
+///
+/// Scaling with the *level* rather than the deficit is deliberate: this drives egress (each sent
+/// packet spends a SURB), so an empty buffer must send nothing. Do not invert it -- that is only
+/// correct for a controller driving production.
 #[derive(Clone, Debug, Default)]
 pub struct SimpleBalancerController {
     bounds: BalancerControllerBounds,
@@ -19,6 +23,11 @@ impl SurbBalancerController for SimpleBalancerController {
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
         let ratio = current_buffer_level as f64 / self.bounds.target() as f64;
         (self.bounds.output_limit() as f64 * ratio.clamp(0.0, 1.0)).floor() as u64
+    }
+
+    fn reset(&mut self) {
+        // Nothing to discard: the output is a pure function of the level handed in, so this
+        // controller has no history that could outlive the regime it was accumulated under.
     }
 }
 

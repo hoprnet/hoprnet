@@ -204,13 +204,23 @@ where
 
         // If the following operation fails, it means that the packet is not a valid Hopr packet,
         // and as such should not be acknowledged later.
+        // Which of our SURBs this packet came back on, if any. Captured here because resolving the
+        // opener is the only point that knows it; by the time the decoded packet exists the sender
+        // id is gone.
+        let replied_on_surb = std::cell::Cell::new(None);
         let packet = trace_timed!("sphinx_decode complete", {
             HoprPacket::from_incoming(
                 &data,
                 &self.packet_key,
                 previous_hop,
                 self.chain_api.key_id_mapper_ref(),
-                |p| self.surb_store.find_reply_opener(p),
+                |p| {
+                    let opener = self.surb_store.find_reply_opener(p);
+                    if opener.is_some() {
+                        replied_on_surb.set(Some(p.surb_id()));
+                    }
+                    opener
+                },
             )
         })
         .map_err(IncomingPacketError::undecodable)?;
@@ -284,6 +294,7 @@ where
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
                             sender: incoming.sender,
+                            replied_on_surb: replied_on_surb.get(),
                             plain_text: incoming.plain_text,
                             ack_key,
                             info,

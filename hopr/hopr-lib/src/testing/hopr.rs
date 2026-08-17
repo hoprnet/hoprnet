@@ -70,6 +70,7 @@ pub fn create_hopr_instance_config(
             stream: Default::default(),
             path_planner: Default::default(),
             counter_flush_interval: Default::default(),
+            surb_flush_interval: std::time::Duration::from_secs(1),
         },
         publish: true,
         ..Default::default()
