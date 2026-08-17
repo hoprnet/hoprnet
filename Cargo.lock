@@ -4168,7 +4168,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "4.0.2-rc.11"
+version = "4.0.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4282,7 +4282,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4365,7 +4365,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.44.0"
+version = "0.45.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4502,7 +4502,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.26.3"
+version = "0.27.0"
 dependencies = [
  "anyhow",
  "async-trait",

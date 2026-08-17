@@ -351,6 +351,7 @@ where
                     .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
                     .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
                     .max(Duration::from_millis(100)),
+                max_frames_behind_gap: cfg.session.max_frames_behind_gap,
                 max_buffered_segments: std::env::var("HOPR_SESSION_MAX_BUFFERED_SEGMENTS")
                     .ok()
                     .and_then(|s| s.parse::<usize>().ok())
