@@ -109,7 +109,9 @@ where
 
         // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
+        let mut minted_surbs = Vec::with_capacity(openers.len());
         openers.into_iter().for_each(|(surb_id, opener)| {
+            minted_surbs.push(surb_id);
             self.surb_store
                 .insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener);
         });
@@ -126,6 +128,7 @@ where
             next_hop: out.next_hop,
             ack_challenge: out.ack_challenge,
             data: transport_payload.freeze(),
+            minted_surbs,
         })
     }
 }

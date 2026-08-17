@@ -135,24 +135,24 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 
-hopr-api = "1.19.0"
-hopr-types = { version = "2.2.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.6.0", default-features = false }
+hopr-api = "1.22.0"
+hopr-types = { version = "2.2.1", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.8.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
-hopr-lib = { version = "4.0.2-rc.10", path = "hopr/hopr-lib" }
+hopr-lib = { version = "4.0.2-rc.11", path = "hopr/hopr-lib" }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { version = "4.7.0", path = "protocols/hopr", default-features = false }
+hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = "0.5.1"
-hopr-transport = { version = "0.38.0", path = "transport/hopr" }
+hopr-transport = { version = "0.45.0", path = "transport/hopr" }
 hopr-transport-mixer = { version = "1.0.0", path = "transport/mixer", default-features = false }
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
-hopr-transport-session = { version = "0.25.0", path = "transport/session", default-features = false }
+hopr-transport-session = { version = "0.26.2", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
 hopr-chain-connector = "0.22.1"
 
@@ -160,7 +160,7 @@ hopr-chain-connector = "0.22.1"
 hopr-session-server-forwarder = { version = "0.1.0", default-features = false }
 hopr-transport-p2p = { version = "0.9.4", features = ["transport-quic"] }
 hopr-ct-full-network = { version = "0.3.0", default-features = false }
-hopr-network-graph = { version = "0.3.1", default-features = false }
+hopr-network-graph = { version = "0.3.4", default-features = false }
 
 [profile.dev]
 panic = "abort"

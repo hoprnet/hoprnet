@@ -10,6 +10,12 @@ pub struct OutgoingPacket {
     pub ack_challenge: HalfKeyChallenge,
     /// Encoded HOPR packet.
     pub data: Bytes,
+    /// SURBs minted onto this packet, in the order of the return paths that produced them.
+    ///
+    /// Surfaced so a layer above can pair each SURB with the return path it encodes — the ids exist
+    /// only inside packet construction, and the routing that produced them only outside it, so this
+    /// is the single point where the two can be associated. Empty for packets carrying no SURBs.
+    pub minted_surbs: Vec<HoprSurbId>,
 }
 
 impl std::fmt::Debug for OutgoingPacket {
@@ -40,6 +46,12 @@ pub struct IncomingFinalPacket {
     pub previous_hop: OffchainPublicKey,
     /// Sender pseudonym.
     pub sender: HoprPseudonym,
+    /// SURB this packet was a reply on, when it was one.
+    ///
+    /// `None` for a packet that was not sent using one of our SURBs. Surfaced because decoding
+    /// already resolves the sender id to find the reply opener, so the id is known here and
+    /// nowhere later.
+    pub replied_on_surb: Option<HoprSurbId>,
     /// Plain text payload of the packet.
     pub plain_text: Box<[u8]>,
     /// Acknowledgement to be sent to the previous hop.

@@ -101,6 +101,15 @@ pub struct AcknowledgementStateConfig {
     /// Default is 16 384.
     #[default(16384)]
     pub lookbehind_segments: usize,
+
+    /// Maximum age of an outgoing frame before it is retired as lost instead of retransmitted.
+    ///
+    /// Bounds how stale data on the wire may be after a stall, and feeds the retirement to the
+    /// honest delivery clock so flow control sees the stall as loss.
+    ///
+    /// `None` (default) bounds frames only by [`Self::max_outgoing_frame_retries`] and backoff.
+    #[default(None)]
+    pub max_frame_age: Option<Duration>,
 }
 
 impl AcknowledgementStateConfig {
@@ -113,6 +122,8 @@ impl AcknowledgementStateConfig {
             max_outgoing_frame_retries: self.max_outgoing_frame_retries,
             acknowledgement_delay: self.acknowledgement_delay.max(Duration::from_millis(1)),
             lookbehind_segments: self.lookbehind_segments.max(1024),
+            // A zero bound would retire every frame on sight; treat it as "not set".
+            max_frame_age: self.max_frame_age.filter(|age| !age.is_zero()),
         }
     }
 }
@@ -349,9 +360,21 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let delivery_tap = self.delivery_tap.clone();
         hopr_utils::runtime::prelude::spawn(
             outgoing_frame_retries_rx
-                .map(move |rf: RetriedFrameId| {
-                    // Find out if the frame can be retried again in the future
+                .filter_map(move |rf: RetriedFrameId| {
                     let frame_id = rf.frame_id;
+
+                    // Anti-bufferbloat: data this stale is worthless to the peer, but the latency
+                    // it would add on a burst drain is not. Retire it as lost instead — which also
+                    // tells the honest clock the truth about the stall.
+                    if cfg.max_frame_age.is_some_and(|max_age| rf.age() >= max_age) {
+                        tracing::trace!(frame_id, age = ?rf.age(), "outgoing frame exceeded max age; retiring as lost");
+                        if let Some(tap) = &delivery_tap {
+                            tap.on_lost_frame();
+                        }
+                        return futures::future::ready(None);
+                    }
+
+                    // Find out if the frame can be retried again in the future
                     if let Some(next) = rf.next() {
                         // Register the next retry if still possible
                         let retry_at =
@@ -371,7 +394,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                         }
                     }
                     tracing::trace!(frame_id, "going to re-send entire frame");
-                    frame_id
+                    futures::future::ready(Some(frame_id))
                 })
                 .flat_map(move |frame_id| {
                     // Find out all the segments of that frame to be retransmitted
@@ -759,6 +782,59 @@ mod tests {
             .take(total_segments * NUM_RETRIES)
             .collect::<Vec<_>>();
         assert_eq!(expected_segments, retransmitted_segments);
+
+        Ok(())
+    }
+
+    /// Runs one unacknowledged frame through the retry pipeline and returns how many segments were
+    /// retransmitted before `run_for` elapsed.
+    async fn retransmissions_with_max_frame_age(max_frame_age: Option<Duration>) -> anyhow::Result<usize> {
+        // A generous retry budget, so the only thing that can cut the retries short is the age bound.
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(5),
+            max_outgoing_frame_retries: 20,
+            max_frame_age,
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = bounded_sink_channel::<SessionMessage<MTU>>(1024);
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        for segment in &segment(hopr_types::crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)? {
+            state.segment_sent(segment)?;
+        }
+
+        // Never acknowledge: the frame stays in the retry pipeline for the whole window.
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        Ok(ctl_msgs.into_iter().filter_map(|m| m.try_as_segment()).count())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_sender_should_stop_resending_a_frame_that_exceeded_the_max_age() -> anyhow::Result<()> {
+        let unbounded = retransmissions_with_max_frame_age(None).await?;
+        let bounded = retransmissions_with_max_frame_age(Some(Duration::from_millis(50))).await?;
+
+        assert!(
+            unbounded > 0,
+            "the retry pipeline must retransmit at all without an age bound"
+        );
+        assert!(
+            bounded < unbounded,
+            "an age bound must cut retransmissions short: got {bounded} bounded vs {unbounded} unbounded"
+        );
 
         Ok(())
     }

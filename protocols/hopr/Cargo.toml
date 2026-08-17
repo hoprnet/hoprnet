@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-hopr"
-version = "4.7.0"
+version = "6.0.0"
 description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
 edition.workspace = true
 license.workspace = true
@@ -44,7 +44,6 @@ const-hex = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
-ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 humantime-serde = { workspace = true, optional = true }
@@ -64,6 +63,7 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 parameterized = { workspace = true }
+rstest = { workspace = true }
 tokio = { workspace = true }
 
 hopr-chain-connector = { workspace = true, features = [
