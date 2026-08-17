@@ -20,7 +20,7 @@ use super::errors::Result as PathResult;
 /// How often a return route whose SURBs have not arrived is retried.
 const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
 
-/// How long the stage keeps retrying a return route whose SURBs have not arrived.
+/// Default for [`PacketPipelineConfig::surb_resolution_wait`][cfg], used when it is unset.
 ///
 /// A momentary gap is normal — the SURB pool refills asynchronously, and dropping a return packet
 /// on the first miss loses data on a session that was only waiting. That is why the retry exists.
@@ -32,7 +32,18 @@ const SURB_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_milli
 /// One second is ~200 retry cycles, far longer than a refill needs, and inside the session's 3 s
 /// frame timeout — a packet held past that is discarded by the receiver anyway, so waiting longer
 /// cannot save it and can only cost the node its egress.
-pub(crate) const SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+///
+/// [cfg]: crate::protocol::PacketPipelineConfig::surb_resolution_wait
+pub(crate) const DEFAULT_SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The wait a node should use, given what its configuration says.
+///
+/// Unset means the default; zero is honoured as "do not wait", which drops a return packet the
+/// first time its SURBs are missing. Kept as one function so both meanings live in one place
+/// rather than being re-derived at the call site.
+pub(crate) fn surb_resolution_wait(configured: Option<std::time::Duration>) -> std::time::Duration {
+    configured.unwrap_or(DEFAULT_SURB_RESOLUTION_WAIT)
+}
 
 /// Resolves the routing of every outgoing packet, emitting the resolved packets in submission
 /// order.
@@ -43,7 +54,7 @@ pub(crate) const SURB_RESOLUTION_WAIT: std::time::Duration = std::time::Duration
 ///
 /// A packet whose routing cannot be resolved is dropped and counted. A packet whose *return* routing
 /// finds no SURB is retried for up to `surb_wait` before being dropped the same way; see
-/// [`SURB_RESOLUTION_WAIT`] for why that bound has to exist.
+/// [`DEFAULT_SURB_RESOLUTION_WAIT`] for why that bound has to exist.
 ///
 /// Ordering is deliberate: out-of-order delivery to the entry's reassembler makes the sequencer
 /// discard frames that arrive after `frame_timeout`. It is also why an unbounded wait here is fatal
@@ -308,6 +319,70 @@ mod tests {
         assert!(
             hopr_transport_session::counters::routing_resolution_surb_timeout_count() > dropped_before,
             "the starved packet was dropped without being counted, so the condition stays invisible"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn an_unset_wait_should_fall_back_to_the_default() {
+        assert_eq!(DEFAULT_SURB_RESOLUTION_WAIT, surb_resolution_wait(None));
+    }
+
+    #[test]
+    fn a_configured_wait_should_be_honoured() {
+        let configured = std::time::Duration::from_millis(2_500);
+        assert_eq!(configured, surb_resolution_wait(Some(configured)));
+    }
+
+    /// Zero is honoured rather than treated as "unset".
+    ///
+    /// The sibling concurrency knobs in the same config read `Some(0)` as "use the default", so the
+    /// difference is worth pinning: for a wait, zero has a meaning of its own — do not wait at all.
+    #[test]
+    fn a_zero_wait_should_mean_no_wait_rather_than_the_default() {
+        assert_eq!(
+            std::time::Duration::ZERO,
+            surb_resolution_wait(Some(std::time::Duration::ZERO))
+        );
+    }
+
+    /// With the wait disabled, a starved return packet is dropped on its first miss.
+    ///
+    /// This is the behaviour a zero wait buys, and the reason it is a footgun rather than a
+    /// tuning: any momentary SURB gap becomes loss. Asserting the attempt count is what separates
+    /// "did not wait" from "waited briefly".
+    #[test_log::test(tokio::test)]
+    async fn a_zero_wait_should_drop_a_starved_return_packet_without_retrying() -> anyhow::Result<()> {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let input = futures::stream::iter(vec![(return_routing(HoprPseudonym::random()), packet(0))]);
+
+        let emitted = {
+            let attempts = attempts.clone();
+            resolve_routing_stage(
+                input,
+                move |_size_hint, _max_surbs, routing: DestinationRouting| {
+                    let attempts = attempts.clone();
+                    async move {
+                        attempts.fetch_add(1, Ordering::Relaxed);
+                        Err(no_surb(&routing))
+                    }
+                },
+                TEST_DISTRESS_THRESHOLD,
+                TEST_CONCURRENCY,
+                surb_resolution_wait(Some(std::time::Duration::ZERO)),
+            )
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from(TEST_TIMEOUT))
+            .await
+            .map_err(|_| anyhow::anyhow!("a zero wait still stalled instead of dropping immediately"))?
+        };
+
+        assert!(emitted.is_empty(), "the starved packet must not be emitted");
+        assert_eq!(
+            1,
+            attempts.load(Ordering::Relaxed),
+            "a zero wait must resolve once and give up, not retry"
         );
 
         Ok(())

@@ -4365,7 +4365,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.46.0"
+version = "0.47.0"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4411,6 +4411,7 @@ dependencies = [
  "rand_distr",
  "rstest",
  "serde",
+ "serde-saphyr",
  "serial_test",
  "smart-default",
  "strum",
