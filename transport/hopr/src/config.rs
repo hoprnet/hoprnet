@@ -7,7 +7,7 @@ use std::{
 };
 
 use hopr_api::Multiaddr;
-pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbStoreConfig};
+pub use hopr_protocol_hopr::{HoprCodecConfig, HoprUnacknowledgedTicketProcessorConfig, SurbPopOrder, SurbStoreConfig};
 use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
@@ -152,6 +152,18 @@ fn default_counter_flush_interval() -> Duration {
     DEFAULT_COUNTER_FLUSH_INTERVAL
 }
 
+/// How often SURB round-trip counts reach the network graph.
+///
+/// Much shorter than the protocol counter flush, which is the same order as the recovery window
+/// this signal exists to shorten -- evidence about a dead relayer sitting unreported for 15 s would
+/// defeat the point. Still well inside the graph's own bucket width, so batching adds no
+/// distortion while cutting graph write locks by orders of magnitude.
+const DEFAULT_SURB_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
+
+fn default_surb_flush_interval() -> Duration {
+    DEFAULT_SURB_FLUSH_INTERVAL
+}
+
 /// Simulated per-packet transit latency inserted between the mixer and the wire.
 ///
 /// When set on a node's config, every packet emitted by the mixer is held for a
@@ -241,6 +253,15 @@ pub struct HoprProtocolConfig {
         serde(default = "default_counter_flush_interval", with = "humantime_serde")
     )]
     pub counter_flush_interval: Duration,
+    /// Interval at which SURB round-trip counts are flushed into the network graph.
+    ///
+    /// Default is 1 second.
+    #[default(default_surb_flush_interval())]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_surb_flush_interval", with = "humantime_serde")
+    )]
+    pub surb_flush_interval: Duration,
 }
 
 /// Rejects an [`IncomingSessionPixConfig`] whose acceptance range can never match anything, or whose

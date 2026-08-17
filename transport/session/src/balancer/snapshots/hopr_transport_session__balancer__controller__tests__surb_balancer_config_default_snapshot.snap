@@ -11,4 +11,5 @@ SurbBalancerConfig {
             0.05,
         ),
     ),
+    sustain_on_return_path_loss: false,
 }

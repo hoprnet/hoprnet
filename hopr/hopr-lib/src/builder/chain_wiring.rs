@@ -8,10 +8,13 @@ use hopr_api::{
     types::{
         chain::chain_events::ChainEvent,
         internal::prelude::ChannelStatus,
-        primitive::prelude::{Address, UnitaryFloatOps},
+        primitive::{
+            prelude::{Address, UnitaryFloatOps},
+            traits::KeyIdMapping,
+        },
     },
 };
-use hopr_transport::{NeighborTelemetry, PathTelemetry};
+use hopr_transport::{NeighborTelemetry, PathTelemetry, SurbStore};
 use parking_lot::RwLock;
 use tracing::Instrument;
 
@@ -30,11 +33,16 @@ lazy_static::lazy_static! {
 /// `ChainEvent`s into [`NetworkGraphUpdate`] calls so the routing graph stays current.
 /// When `peer_discovery_tx` is `Some`, each [`ChainEvent::Announcement`] is also forwarded
 /// to the p2p network layer so it can initiate connections to newly discovered peers.
+///
+/// Status changes on *our own outgoing* channels are also reported to `surb_store`, so SURBs whose
+/// return path starts at a relayer we can no longer pay are shed rather than replied with.
+///
 /// Runs until the supplied `events` stream terminates.
 #[allow(clippy::too_many_arguments)]
-pub(super) async fn process_chain_events<C, G>(
+pub(super) async fn process_chain_events<C, G, S>(
     chain_reader: C,
     graph_updater: G,
+    surb_store: S,
     events: impl futures::Stream<Item = ChainEvent> + Send + 'static,
     own_chain_addr: Address,
     own_packet_key: OffchainPublicKey,
@@ -44,6 +52,7 @@ pub(super) async fn process_chain_events<C, G>(
 ) where
     C: ChainKeyOperations + Clone + Send + Sync + 'static,
     G: NetworkGraphUpdate + Send + Sync + 'static,
+    S: SurbStore + Send + Sync + 'static,
 {
     pin_mut!(events);
 
@@ -148,6 +157,26 @@ pub(super) async fn process_chain_events<C, G>(
                                 dest: to,
                             }),
                         ));
+
+                        // Only our own outgoing channels matter for SURBs: `to` is then the peer
+                        // we would have to pay as the first relayer of a stored SURB's return path.
+                        if src_addr == own_chain_addr {
+                            match chain_reader.key_id_mapper_ref().map_key_to_id(&to) {
+                                // Matched exhaustively on purpose: a wildcard would silently
+                                // revalidate any future non-payable status, handing out SURBs that
+                                // cannot be paid for, with no compiler warning.
+                                Some(relayer) => match channel.status {
+                                    ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => {
+                                        surb_store.invalidate_relayer(&relayer)
+                                    }
+                                    ChannelStatus::Open => surb_store.revalidate_relayer(&relayer),
+                                },
+                                None => tracing::warn!(
+                                    %channel,
+                                    "no key id for own channel counterparty; SURB validity not updated"
+                                ),
+                            }
+                        }
                     }
                     Ok(None) => {
                         tracing::error!(
@@ -196,6 +225,7 @@ mod tests {
             primitive::prelude::Address,
         },
     };
+    use hopr_transport::MemorySurbStore;
     use parking_lot::RwLock;
 
     use super::process_chain_events;
@@ -208,37 +238,43 @@ mod tests {
     #[error("stub: {0}")]
     struct StubError(String);
 
-    #[derive(Debug, Clone)]
-    struct NoopMapper;
+    /// Maps only the keys it was given; empty by default, in which case it maps nothing.
+    #[derive(Debug, Clone, Default)]
+    struct StubMapper(HashMap<OffchainPublicKey, HoprKeyIdent>);
 
-    impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for NoopMapper {
-        fn map_key_to_id(&self, _key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
-            None
+    impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for StubMapper {
+        fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
+            self.0.get(key).copied()
         }
 
-        fn map_id_to_public(&self, _id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
-            None
+        fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
+            self.0.iter().find_map(|(k, v)| (v == id).then_some(*k))
         }
     }
 
     #[derive(Debug, Clone)]
     struct StubChainKeys {
         keys: HashMap<Address, OffchainPublicKey>,
-        mapper: NoopMapper,
+        mapper: StubMapper,
     }
 
     impl StubChainKeys {
         fn new(pairs: impl IntoIterator<Item = (Address, OffchainPublicKey)>) -> Self {
             Self {
                 keys: pairs.into_iter().collect(),
-                mapper: NoopMapper,
+                mapper: StubMapper::default(),
             }
+        }
+
+        fn with_key_ids(mut self, ids: impl IntoIterator<Item = (OffchainPublicKey, HoprKeyIdent)>) -> Self {
+            self.mapper = StubMapper(ids.into_iter().collect());
+            self
         }
     }
 
     impl ChainKeyOperations for StubChainKeys {
         type Error = StubError;
-        type Mapper = NoopMapper;
+        type Mapper = StubMapper;
 
         fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
             Ok(self.keys.get(chain).copied())
@@ -367,6 +403,7 @@ mod tests {
         process_chain_events(
             chain,
             graph,
+            MemorySurbStore::default(),
             futures::stream::iter(events),
             own_chain_addr,
             own_packet_key,
@@ -376,6 +413,28 @@ mod tests {
         )
         .await;
         rx.collect().await
+    }
+
+    /// Runs the event loop against a caller-supplied SURB store, so the test can inspect it after.
+    async fn run_with_surb_store(
+        events: Vec<ChainEvent>,
+        chain: StubChainKeys,
+        surb_store: MemorySurbStore,
+        own_chain_addr: Address,
+        own_packet_key: OffchainPublicKey,
+    ) {
+        process_chain_events(
+            chain,
+            RecordingGraph::default(),
+            surb_store,
+            futures::stream::iter(events),
+            own_chain_addr,
+            own_packet_key,
+            Arc::new(RwLock::new(HoprBalance::from(1u32))),
+            Arc::new(RwLock::new(WinningProbability::ALWAYS)),
+            None,
+        )
+        .await;
     }
 
     // ---------------------------------------------------------------------------
@@ -712,6 +771,7 @@ mod tests {
         process_chain_events(
             StubChainKeys::new([]),
             RecordingGraph::default(),
+            MemorySurbStore::default(),
             futures::stream::iter(vec![ChainEvent::Announcement(account(*offchain.public(), addr))]),
             addr,
             *offchain.public(),
@@ -720,5 +780,89 @@ mod tests {
             Some(tx),
         )
         .await;
+    }
+
+    // ---------------------------------------------------------------------------
+    // SURB store invalidation
+    // ---------------------------------------------------------------------------
+
+    /// Sets up `me -> peer` with `peer` mapped to key id 1, and runs the given channel events.
+    async fn run_own_channel_events(
+        statuses: impl IntoIterator<Item = ChannelStatus>,
+    ) -> (MemorySurbStore, HoprKeyIdent) {
+        let (me_offchain, me_chain) = make_keypairs();
+        let (peer_offchain, peer_chain) = make_keypairs();
+        let (me_addr, peer_addr) = (me_chain.public().to_address(), peer_chain.public().to_address());
+        let peer_id = HoprKeyIdent::from(1u32);
+
+        let stub = StubChainKeys::new([(me_addr, *me_offchain.public()), (peer_addr, *peer_offchain.public())])
+            .with_key_ids([(*peer_offchain.public(), peer_id)]);
+
+        let surb_store = MemorySurbStore::default();
+        let events = statuses
+            .into_iter()
+            .map(|status| ChainEvent::ChannelOpened(channel(me_addr, peer_addr, 100, status)))
+            .collect();
+
+        run_with_surb_store(events, stub, surb_store.clone(), me_addr, *me_offchain.public()).await;
+
+        (surb_store, peer_id)
+    }
+
+    #[tokio::test]
+    async fn closing_an_own_outgoing_channel_should_invalidate_that_relayer() {
+        let (store, peer_id) =
+            run_own_channel_events([ChannelStatus::PendingToClose(std::time::SystemTime::now())]).await;
+        assert!(store.is_relayer_invalidated(&peer_id), "PendingToClose must invalidate");
+
+        let (store, peer_id) = run_own_channel_events([ChannelStatus::Closed]).await;
+        assert!(store.is_relayer_invalidated(&peer_id), "Closed must invalidate");
+    }
+
+    #[tokio::test]
+    async fn reopening_an_own_outgoing_channel_should_revalidate_that_relayer() {
+        let (store, peer_id) = run_own_channel_events([ChannelStatus::Closed, ChannelStatus::Open]).await;
+        assert!(!store.is_relayer_invalidated(&peer_id), "re-opening must revalidate");
+    }
+
+    #[tokio::test]
+    async fn a_channel_that_is_not_ours_should_not_invalidate_anything() {
+        // Same topology, but the event is for a channel between two other parties.
+        let (me_offchain, me_chain) = make_keypairs();
+        let (a_offchain, a_chain) = make_keypairs();
+        let (b_offchain, b_chain) = make_keypairs();
+        let (me_addr, a_addr, b_addr) = (
+            me_chain.public().to_address(),
+            a_chain.public().to_address(),
+            b_chain.public().to_address(),
+        );
+        let b_id = HoprKeyIdent::from(1u32);
+
+        let stub = StubChainKeys::new([
+            (me_addr, *me_offchain.public()),
+            (a_addr, *a_offchain.public()),
+            (b_addr, *b_offchain.public()),
+        ])
+        .with_key_ids([(*b_offchain.public(), b_id)]);
+
+        let store = MemorySurbStore::default();
+        run_with_surb_store(
+            vec![ChainEvent::ChannelClosed(channel(
+                a_addr,
+                b_addr,
+                100,
+                ChannelStatus::Closed,
+            ))],
+            stub,
+            store.clone(),
+            me_addr,
+            *me_offchain.public(),
+        )
+        .await;
+
+        assert!(
+            !store.is_relayer_invalidated(&b_id),
+            "someone else's channel must not affect our SURBs"
+        );
     }
 }

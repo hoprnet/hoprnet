@@ -73,6 +73,20 @@ pub struct SessionSocketConfig {
     /// Default is 2048.
     #[default(2048)]
     pub control_channel_capacity: usize,
+    /// Maximum time a fully-received frame may sit in the ordering buffer before being discarded
+    /// rather than delivered.
+    ///
+    /// Bounds how stale delivered data can be, so a stall surfaces as clean loss instead of a burst
+    /// of seconds-old frames. Distinct from [`Self::frame_timeout`], which bounds how long a
+    /// *missing* frame is waited for. Default `None` (no bound).
+    ///
+    /// A frame dropped here has already been acknowledged, since the acknowledgement is queued at
+    /// reassembly. That is deliberate: the ack states that the *path* delivered the frame, which it
+    /// did, and the drop is a local freshness policy applied afterwards. Withholding the ack would
+    /// make the sender retransmit data we discarded precisely for being stale, reintroducing the
+    /// latency tail this bound exists to remove.
+    #[default(None)]
+    pub max_frame_age: Option<Duration>,
 }
 
 enum WriteState {
@@ -220,7 +234,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            .sequencer_with_max_age(cfg.frame_timeout, cfg.capacity, cfg.max_frame_age)
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -426,7 +440,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            .sequencer_with_max_age(cfg.frame_timeout, cfg.capacity, cfg.max_frame_age)
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {

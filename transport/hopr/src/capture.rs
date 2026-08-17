@@ -220,6 +220,9 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     plain_text,
                     ack_key,
                     info,
+                    // Which SURB the reply came back on is routing telemetry, not wire content;
+                    // the capture format records the packet as it travelled.
+                    replied_on_surb: _,
                 } = final_packet.as_ref();
 
                 out.push(PacketType::Final as u8);
