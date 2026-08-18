@@ -22,7 +22,11 @@ informational_warnings = ["unmaintained"]
 severity_threshold = "low"
 
 [database]
-path = "~/.cargo/advisory-db"
+# No `path` key on purpose. cargo-audit does not expand `~` read from this file: it takes the value
+# literally, relative to the working directory, so `path = "~/.cargo/advisory-db"` made `cargo audit`
+# clone ~40 MB into a directory actually named `~` in the repo root — untracked, ungitignored, and
+# re-cloned per repo. The `--db` default is already `~/.cargo/advisory-db` and *is* expanded
+# correctly, so naming it here only broke the thing it was restating.
 url = "https://github.com/RustSec/advisory-db.git"
 fetch = true
 stale = false
