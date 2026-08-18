@@ -219,11 +219,25 @@ impl BalancerStateValues {
             .fetch_max(until, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Whether production should currently ignore the counterparty buffer estimate.
+    /// Whether [`buffer_level`](Self::buffer_level) is currently an instruction rather than a
+    /// measurement.
     ///
-    /// Both the opt-in and live evidence are required: without the opt-in this is not our
-    /// behaviour to change, and without evidence there is nothing to distinguish a dead return path
-    /// from an idle one.
+    /// While this holds, the controller deliberately writes `0` into the level to drive production
+    /// to its maximum. That zero says "produce flat out", not "the counterparty holds nothing", so
+    /// anything reading the level as a *supply ceiling* must consult this first or it will read the
+    /// instruction as an order to send nothing.
+    ///
+    /// True only when both the opt-in (`sustain_on_return_path_loss`) and live evidence
+    /// ([`mark_return_path_degraded`](Self::mark_return_path_degraded), within its window) are
+    /// present: without the opt-in this is not our behaviour to change, and without evidence there
+    /// is nothing to tell a dead return path from an idle one.
+    ///
+    /// `pub` because it is not only the controller's business — hence the emphasis above on what
+    /// the flag does *not* mean. It is not a general "the return path is degraded" signal.
+    pub fn return_path_estimate_is_stale(&self) -> bool {
+        self.should_sustain_through_return_path_loss()
+    }
+
     fn should_sustain_through_return_path_loss(&self) -> bool {
         let deadline = self
             .return_path_degraded_until_ms
@@ -442,6 +456,8 @@ where
                 believed = current,
                 "return path degraded; ignoring the counterparty buffer estimate"
             );
+            // Reads as "produce flat out" to the controller below. `SurbSupply` must not read it
+            // as "the buffer is empty, admit nothing" -- see `return_path_estimate_is_stale`.
             current = 0;
         }
 

@@ -379,6 +379,12 @@ pub struct HoprSessionConfig {
     /// Default is 0.
     #[default(0)]
     pub max_buffered_segments: usize,
+    /// Abandon the frame due next once this many later frames are waiting behind it.
+    ///
+    /// Head-of-line bound, distinct from [`Self::frame_timeout`]: that one waits for a frame that
+    /// may still arrive, this bounds how much already-received data is held while it waits. `None`
+    /// keeps the timeout as the only rule.
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -483,6 +489,13 @@ impl HoprSession {
                 // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
                 // also where the honest clock that observes the resulting loss lives.
                 max_frame_age: flow_control.and_then(|c| c.max_frame_age),
+                // Head-of-line bound, and deliberately *not* gated on flow control the way
+                // `max_frame_age` is. The reasoning there runs backwards for this one: a session
+                // that can retransmit may still recover a missing frame, so waiting is
+                // productive, while a session without retransmission is waiting for something
+                // that is never coming and holds everything already received behind it. The
+                // sessions that need this bound most are exactly the ones flow control excludes.
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
                 ..Default::default()
             };
 

@@ -168,6 +168,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
                 always_max_out_surbs: true,
                 pix_ssa_quota: None,
                 flow_control: None,
+                max_frames_behind_gap: None,
             },
         )
         .await?;
@@ -223,6 +224,7 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
                 always_max_out_surbs: true,
                 pix_ssa_quota: None,
                 flow_control: None,
+                max_frames_behind_gap: None,
             },
         )
         .await?;

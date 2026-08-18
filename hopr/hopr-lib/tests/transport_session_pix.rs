@@ -202,6 +202,7 @@ async fn establish_pix_session(
                 always_max_out_surbs: false,
                 pix_ssa_quota: Some(PIX_PARAMS),
                 flow_control: None,
+                max_frames_behind_gap: None,
             },
         ),
     )
@@ -880,6 +881,7 @@ async fn enforce_pix_rejects_non_pix_session(#[case] hops: usize) -> anyhow::Res
                 always_max_out_surbs: false,
                 pix_ssa_quota: None,
                 flow_control: None,
+                max_frames_behind_gap: None,
             },
         ),
     )

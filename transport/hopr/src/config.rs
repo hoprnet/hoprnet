@@ -943,6 +943,10 @@ fn default_session_surb_balance_notify_period() -> Option<Duration> {
     Some(Duration::from_secs(15))
 }
 
+fn default_session_max_frames_behind_gap() -> Option<usize> {
+    Some(256)
+}
+
 fn validate_session_idle_timeout(value: &Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
@@ -1066,6 +1070,20 @@ pub struct SessionGlobalConfig {
         )
     )]
     pub surb_balance_notify_period: Option<Duration>,
+
+    /// How many later frames may queue behind a missing one before the reassembler gives up on it
+    /// and releases what it already has.
+    ///
+    /// Only applies to Sessions without retransmission, where a missing frame is never coming and
+    /// waiting out the frame timeout cannot change the outcome — it only holds everything behind
+    /// it. The right value tracks reordering depth (throughput × latency spread ÷ frame size), so
+    /// a bulk-data Session and a control Session on the same node differ by orders of magnitude;
+    /// an individual Session may override it.
+    ///
+    /// Default is 256. Set to `null` to disable the bound and wait out the frame timeout instead.
+    #[default(default_session_max_frames_behind_gap())]
+    #[cfg_attr(feature = "serde", serde(default = "default_session_max_frames_behind_gap"))]
+    pub max_frames_behind_gap: Option<usize>,
 
     /// Tag allocator partition configuration.
     #[validate(nested)]
