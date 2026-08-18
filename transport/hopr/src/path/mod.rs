@@ -11,6 +11,7 @@
 
 pub mod errors;
 pub mod planner;
+pub(crate) mod resolve;
 pub mod selector;
 pub mod traits;
 

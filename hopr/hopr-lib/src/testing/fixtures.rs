@@ -203,6 +203,7 @@ impl ClusterGuard {
                     surb_management,
                     always_max_out_surbs: false,
                     flow_control: None,
+                    max_frames_behind_gap: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))
@@ -251,6 +252,7 @@ impl ClusterGuard {
                     surb_management: Some(SurbBalancerConfig::default()),
                     always_max_out_surbs: false,
                     flow_control: None,
+                    max_frames_behind_gap: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))
