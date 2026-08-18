@@ -149,6 +149,19 @@ pub struct SessionClientConfig {
     /// the client's explicit dial (only meaningful on a reliable / `RetransmissionAck` session).
     #[default(None)]
     pub flow_control: Option<FlowControlConfig>,
+    /// Abandon the frame due next once the sequence has advanced this far past it, instead of
+    /// holding everything already received for the whole frame timeout.
+    ///
+    /// Head-of-line bound for this session's incoming direction. `None` inherits the node's
+    /// setting, `Some(0)` disables it here, `Some(n)` sets it.
+    ///
+    /// Worth setting per session because the right value tracks reordering depth -- throughput x
+    /// latency spread / frame size -- which is a property of the traffic, not of the node: a bulk
+    /// data session and a control session on the same node differ by orders of magnitude.
+    ///
+    /// Has no effect on a session carrying a retransmission capability, where a missing frame can
+    /// still be recovered and waiting for it is productive.
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 #[cfg(test)]

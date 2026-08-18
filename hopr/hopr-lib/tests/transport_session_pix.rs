@@ -198,6 +198,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         always_max_out_surbs: false,
                         pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
+                        max_frames_behind_gap: None,
                     },
                 )
                 .await
@@ -427,6 +428,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                         always_max_out_surbs: false,
                         pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
+                        max_frames_behind_gap: None,
                     },
                 )
                 .await

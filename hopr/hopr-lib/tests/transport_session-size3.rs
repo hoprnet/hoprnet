@@ -42,6 +42,7 @@ async fn test_keep_alive_session(cluster: &ClusterGuard) -> anyhow::Result<()> {
                 always_max_out_surbs: false,
                 pix_ssa_quota: None,
                 flow_control: None,
+                max_frames_behind_gap: None,
             },
         )
         .await?;

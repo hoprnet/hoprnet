@@ -205,6 +205,7 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                     pix_ssa_quota: None,
                     flow_control: None,
+                    max_frames_behind_gap: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))
@@ -254,6 +255,7 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                     pix_ssa_quota: None,
                     flow_control: None,
+                    max_frames_behind_gap: None,
                 },
             )
             .timeout(futures_time::time::Duration::from(timeout))

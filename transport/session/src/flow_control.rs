@@ -59,11 +59,26 @@ impl SupplyConstraint for SurbSupply {
         if self.state.is_disabled() {
             return usize::MAX;
         }
+        // Same reasoning while the return path is degraded. The controller stores `0` there to
+        // drive production to the maximum, not because it measured an empty buffer. Reading that
+        // as a ceiling yields zero admissible bytes -- and the persist probe cannot escape it,
+        // since it is itself capped by the ceiling -- so a session that opted into surviving
+        // return-path loss would instead stop sending for the whole degraded window, which is the
+        // opposite of the intent. Defer to the honest delivery clock, which still sees the missing
+        // acknowledgements and throttles on real evidence.
+        if self.state.return_path_estimate_is_stale() {
+            return usize::MAX;
+        }
         (self.state.buffer_level() as usize).saturating_mul(self.bytes_per_reply_packet)
     }
 
     fn backoff_hint(&self) -> Option<Backoff> {
         if self.state.is_disabled() {
+            return None;
+        }
+        // A degraded-path zero is an instruction to the controller, not an observation, so it is
+        // not evidence of an empty buffer and must not collapse the window to the floor.
+        if self.state.return_path_estimate_is_stale() {
             return None;
         }
         let level = self.state.buffer_level();
@@ -285,6 +300,53 @@ mod tests {
             .buffer_level
             .store(buffer_level, std::sync::atomic::Ordering::Relaxed);
         state
+    }
+
+    /// Regression: the controller stores `0` into `buffer_level` while the return path is
+    /// degraded to drive SURB production to the maximum. That zero is an instruction, not a
+    /// measurement — but `SurbSupply` also reads the same atomic as a supply ceiling, so it used
+    /// to yield zero admissible bytes for the whole degraded window, and the persist probe could
+    /// not escape it because the probe is itself capped by the ceiling.
+    ///
+    /// A session that opted into surviving return-path loss would therefore have stopped sending
+    /// entirely — the opposite of the feature's intent, and indistinguishable from a dead session.
+    #[test]
+    fn a_degraded_return_path_should_not_zero_the_supply_ceiling() {
+        let state = balancer(7_000, 0);
+        // Through the config, as a caller would: the opt-in is a configuration decision, and going
+        // via the atomic would couple this test to a representation it has no business knowing.
+        state.update(&crate::SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::from_secs(30));
+        assert!(
+            state.return_path_estimate_is_stale(),
+            "precondition: the estimate must be marked stale"
+        );
+
+        let supply = SurbSupply::new(state.clone(), 1_000);
+
+        assert_eq!(
+            usize::MAX,
+            supply.max_admissible_inflight(),
+            "a degraded-path zero must not cap the window; the delivery clock governs instead"
+        );
+        assert_eq!(
+            None,
+            supply.backoff_hint(),
+            "a degraded-path zero is not evidence of an empty buffer"
+        );
+    }
+
+    /// The inverse: once the mark expires the level is a measurement again, and a genuinely empty
+    /// buffer must still close the window.
+    #[test]
+    fn an_empty_buffer_should_still_cap_the_window_when_not_degraded() {
+        let supply = SurbSupply::new(balancer(7_000, 0), 1_000);
+
+        assert_eq!(0, supply.max_admissible_inflight());
+        assert_eq!(Some(Backoff::Hard), supply.backoff_hint());
     }
 
     // ---- Persist probe (anti-deadlock at the un-acked tail), configurable ----
