@@ -515,7 +515,7 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     ///
     /// Handed to every [`SsaPartBuilder`] as its `max_credited_surplus`. Kept alongside the
     /// threshold rather than derived from it: the two are independent halves of the negotiated
-    /// [`PixParams`](crate::PixParams) word, and the ratio between them is an operator choice.
+    /// [`PixParams`] word, and the ratio between them is an operator choice.
     poly_surplus: usize,
     num_polys: usize,
     /// Constant-term commitments received so far, **decoded**: each is decompressed and

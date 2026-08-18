@@ -5,7 +5,7 @@
 //! runs a deterministic supervisor that tracks each *Secret Sharing Aggregate*
 //! (SSA) through a well-defined lifecycle, enforcing timeouts, deposit
 //! sufficiency, recovery progress, and fault tolerances.  Egress data
-//! packets are gated behind a concurrent [`ServiceGate`] that allows
+//! packets are gated behind a concurrent `ServiceGate` that allows
 //! bounded predeposit service before funding and a ceiling-limited
 //! post-funding path.
 //!
@@ -30,14 +30,14 @@
 //!
 //! | Component | File | Role |
 //! |---|---|---|
-//! | [`SessionPixSupervisor`] | [`supervisor`] | Pure state machine — no I/O, no async, no spawning.  Driven by explicit [`Instant`] timestamps and service-gate snapshots. |
-//! | [`ServiceGate`] | [`gate`] | Concurrent, lock-free egress gate.  Before funding: bounded predeposit budget.  After funding: ceiling on packets served without SSA recovery progress.  Callers park on a generation-counter waker. |
-//! | Worker loop | [`worker`] | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, and forwards supervisor actions to the caller. |
+//! | `SessionPixSupervisor` | `supervisor` | Pure state machine — no I/O, no async, no spawning.  Driven by explicit `Instant` timestamps and service-gate snapshots. |
+//! | `ServiceGate` | `gate` | Concurrent, lock-free egress gate.  Before funding: bounded predeposit budget.  After funding: ceiling on packets served without SSA recovery progress.  Callers park on a generation-counter waker. |
+//! | Worker loop | `worker` | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, and forwards supervisor actions to the caller. |
 //!
-//! The [`SlotNotify`](crate::utils::SlotNotify) multi-waker primitive is shared from [`utils`](crate::utils) and used
-//! by [`ServiceGate`] to park and wake callers without a tokio dependency.
+//! The [`SlotNotify`](crate::utils::SlotNotify) multi-waker primitive is shared from [`utils`] and used
+//! by `ServiceGate` to park and wake callers without a tokio dependency.
 //!
-//! ## The [`SessionPixSupervisor`] state machine
+//! ## The `SessionPixSupervisor` state machine
 //!
 //! The supervisor tracks each SSA through these phases:
 //!
@@ -95,10 +95,10 @@
 //! Live cycles at any moment are therefore `ssas_per_request` plus whatever the overlap has already
 //! requested, each with its own reconstructor state, plus tombstones inside their retention window.
 //!
-//! ## The [`ServiceGate`] — egress gating
+//! ## The `ServiceGate` — egress gating
 //!
 //! Every egress data packet from the Exit back to the Entry must pass
-//! through the [`ServiceGate`] via [`acquire`](ServiceGate::acquire):
+//! through the `ServiceGate` via `acquire`:
 //!
 //! ### Pre-funding (predeposit)
 //!
@@ -110,8 +110,8 @@
 //! for the small dimensions used in tests.
 //!
 //! When the budget is exhausted, `acquire` parks the caller on a
-//! [`SlotNotify`] future.  A concurrent [`release_service`](ServiceGate::release_service),
-//! [`notify_progress`](ServiceGate::notify_progress), or [`poison`](ServiceGate::poison)
+//! `SlotNotify` future.  A concurrent `release_service`,
+//! `notify_progress`, or `poison`
 //! wakes all parkers.
 //!
 //! ### Strict prepay (`max_predeposit_packets = 0`)
@@ -122,8 +122,7 @@
 //!
 //! This does not deadlock, because nothing on the path to funding passes through the gate:
 //!
-//! * The `SsaRequest` goes out on the [`SessionManager`](crate::SessionManager)'s own message sender, not the Session's
-//!   gated sink.
+//! * The `SsaRequest` goes out on the [`SessionManager`]'s own message sender, not the Session's gated sink.
 //! * The Entry's commitment travels Entry→Exit, and the deposit is on-chain.
 //! * The SURB-level keep-alive stream is deliberately left ungated, precisely so an exhausted budget cannot silence the
 //!   signal that keeps the Session fundable. Under strict prepay this carries more weight than it does at a non-zero
@@ -135,21 +134,21 @@
 //! So the Entry can always be asked for a deposit and can always answer, whatever the budget is.
 //! What a zero budget costs is latency, not liveness: the application stalls until the deposit
 //! confirms, instead of proceeding optimistically. If the deposit never arrives, the deposit
-//! deadline closes the Session and [`poison`](ServiceGate::poison) fails the parked writer rather
+//! deadline closes the Session and `poison` fails the parked writer rather
 //! than leaving it pending.
 //!
 //! ### Post-funding (ceiling)
 //!
 //! Once the first deposit is confirmed and the supervisor emits
-//! [`ReleaseService`](SessionPixAction::ReleaseService), the gate flips
+//! `ReleaseService`, the gate flips
 //! to funded mode.  It then enforces `max_served_without_progress`: a
 //! ceiling on how many packets may be served between SSA recovery progress
 //! events, as a defense-in-depth backstop even when the supervisor's
-//! service-gated idle timer is alive.  Each [`ProgressNotification`](SessionPixAction::ProgressNotification)
+//! service-gated idle timer is alive.  Each `ProgressNotification`
 //! resets the ceiling by snapshotting the served counter as the new watermark.
 //!
 //! The gate is implemented with lock-free atomics and CAS loops.  It uses
-//! the generation-counter [`SlotNotify`] to avoid the two classic
+//! the generation-counter `SlotNotify` to avoid the two classic
 //! race conditions of waker-vector approaches:
 //!
 //! 1. **Latent wake** — notification between future creation and first `poll()` is caught because the generation was
@@ -159,10 +158,10 @@
 //!
 //! ## The Worker — bridging pure logic to async
 //!
-//! [`spawn_supervisor_worker`] creates the [`SessionPixSupervisor`],
-//! the [`ServiceGate`], and a bounded async command channel.  It returns
-//! a [`SessionPixSupervisorHandle`] (cloneable, for sending events) and an
-//! [`ActionRx`] receiver (for driving actions).
+//! `spawn_supervisor_worker` creates the `SessionPixSupervisor`,
+//! the `ServiceGate`, and a bounded async command channel.  It returns
+//! a `SessionPixSupervisorHandle` (cloneable, for sending events) and an
+//! `ActionRx` receiver (for driving actions).
 //!
 //! The worker loop:
 //!
@@ -182,7 +181,7 @@
 //! are non-coalescible — if they cannot be delivered, the channel is
 //! genuinely wedged and the worker fails the session.
 //!
-//! ## Integration with [`SessionManager`](crate::SessionManager)
+//! ## Integration with [`SessionManager`]
 //!
 //! ### Exit side (incoming sessions)
 //!
@@ -200,7 +199,7 @@
 //!
 //!    | Action | Driver behaviour |
 //!    |---|---|
-//!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor.  Tracks SSA in [`SsaRetirementGuard`] for Drop-safe cleanup. |
+//!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor.  Tracks SSA in `SsaRetirementGuard` for Drop-safe cleanup. |
 //!    | `ReleaseService` | Calls `gate.release_service()` — flips to funded mode. |
 //!    | `ProgressNotification` | Calls `gate.notify_progress()` — resets ceiling watermark. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
@@ -705,7 +704,7 @@ pub use hopr_protocol_pix::PixParams;
 // SessionPixEvent
 // ---------------------------------------------------------------------------
 
-/// Events consumed by the [`SessionPixSupervisor`].
+/// Events consumed by the [`SessionPixSupervisor`](supervisor::SessionPixSupervisor).
 #[derive(Debug, Clone)]
 pub enum SessionPixEvent {
     /// The initial or next SSA request was successfully sent on the wire.
@@ -739,7 +738,7 @@ pub enum SessionPixEvent {
 // SessionPixAction
 // ---------------------------------------------------------------------------
 
-/// Actions emitted by the [`SessionPixSupervisor`] for the caller to execute.
+/// Actions emitted by the [`SessionPixSupervisor`](supervisor::SessionPixSupervisor) for the caller to execute.
 #[derive(Debug, Clone)]
 pub enum SessionPixAction {
     /// Request one or more new SSAs with the given dimensions.
@@ -772,7 +771,7 @@ pub enum SessionPixAction {
 
 /// Internal close reasons emitted by the supervisor.
 ///
-/// These are mapped to public [`ClosureReason`] by the caller.
+/// These are mapped to public [`ClosureReason`](crate::types::ClosureReason) by the caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display)]
 pub enum SessionPixCloseReason {
     /// The commitment delivery deadline expired.

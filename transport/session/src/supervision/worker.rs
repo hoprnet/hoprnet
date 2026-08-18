@@ -36,7 +36,7 @@ pub type ActionRx = AsyncRx<ActionChannel>;
 // SessionPixSupervisorHandle
 // ---------------------------------------------------------------------------
 
-/// Cloneable handle to a running [`SessionPixWorker`].
+/// Cloneable handle to a running `SessionPixWorker`.
 #[derive(Clone)]
 pub struct SessionPixSupervisorHandle {
     cmd_tx: CmdTx,

@@ -29,15 +29,15 @@ use crate::{
 
 /// Runtime-agnostic multi-waker notification primitive.
 ///
-/// Uses a generation counter to detect notification events: [`notify_waiters`]
-/// bumps the generation, and [`notified`] futures compare the generation at
+/// Uses a generation counter to detect notification events: [`notify_waiters`](SlotNotify::notify_waiters)
+/// bumps the generation, and [`notified`](SlotNotify::notified) futures compare the generation at
 /// creation time against the current one on each `poll()`. This prevents two
 /// race conditions a simple waker-vector approach cannot handle:
 ///
-/// 1. **Latent wake.** A [`notified`] future registers its waker on first `poll()`. If [`notify_waiters`] fires between
-///    the creation of the future and that first `poll`, the waker-vector is empty and the notification is lost. With a
-///    generation counter, `gen_at_creation` already captures the pre-notification value, so the first `poll()` sees the
-///    advanced generation and returns `Ready`.
+/// 1. **Latent wake.** A [`notified`](SlotNotify::notified) future registers its waker on first `poll()`. If
+///    [`notify_waiters`](SlotNotify::notify_waiters) fires between the creation of the future and that first `poll`,
+///    the waker-vector is empty and the notification is lost. With a generation counter, `gen_at_creation` already
+///    captures the pre-notification value, so the first `poll()` sees the advanced generation and returns `Ready`.
 ///
 /// 2. **Spurious `Ready`.** A second `poll()` of an already-registered future can return `Ready` unconditionally if the
 ///    notification check is only done on registration. Generation re-check on every `poll()` prevents this.
@@ -85,7 +85,7 @@ impl SlotNotify {
     /// Return a future that completes the next time `notify_waiters` is called.
     ///
     /// The future captures the current generation at creation time. A
-    /// concurrent [`notify_waiters`] call that fires before the first
+    /// concurrent [`notify_waiters`](SlotNotify::notify_waiters) call that fires before the first
     /// `poll()` will have bumped the generation, so the future still
     /// completes — no notification is lost.
     pub fn notified(&self) -> SlotNotifyFuture {

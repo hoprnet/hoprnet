@@ -21,7 +21,8 @@ use crate::{
 ///
 /// A `range` validator does not cover this. Every IEEE comparison against `NaN` is false, so `NaN`
 /// satisfies `min = 0.0, max = 1.0` untouched — and it does not stay inert downstream:
-/// [`SsaCommitmentBuilder::check_early_threshold`] computes `(threshold * num_polys).ceil() as usize`,
+/// [`SsaBuilder::check_early_threshold`](utils::SsaBuilder::check_early_threshold) computes
+/// `(threshold * num_polys).ceil() as usize`,
 /// and casting a `NaN` float to an integer saturates to zero in Rust. The early-recovery signal then
 /// fires on the very first reconstructed polynomial rather than at 85 % of them, which is the
 /// earliest instant the Exit can possibly ask for its next batch — and the Entry's successor gate,
@@ -369,7 +370,7 @@ enum Deferral {
 ///
 /// It is *not* unreachable in general: both halves are a byte wide, so a conforming Entry may
 /// legitimately announce up to `255 + 255` and have its excess deferrals silently discarded. Both
-/// values now travel in [`PixParams`](crate::PixParams), so an Exit that cares *can* compare
+/// values now travel in [`PixParams`], so an Exit that cares *can* compare
 /// `shares_per_poly + surplus_shares` against this cap when it accepts a Session.
 ///
 /// Deliberately not refused on that comparison, though, and the distinction matters. Only shares

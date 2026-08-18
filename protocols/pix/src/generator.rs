@@ -244,7 +244,7 @@ fn new_polynomial_with_commitment<S: PixSpec>(
 /// surplus is legitimately a deployment choice about return-path loss, and over-insuring a bad path
 /// is a reasonable thing to want. What it forbids is the case where the insurance costs more than
 /// the thing insured: since H5 the surplus travels in the negotiated
-/// [`PixParams`](crate::PixParams) and is billed on purchase rather than on claim, so a surplus
+/// [`PixParams`] and is billed on purchase rather than on claim, so a surplus
 /// above the threshold means an Entry paying for more redundancy than payload in every deposit.
 ///
 /// This is a *configuration* bound, not a wire one. `PixParams` packs the surplus as a byte and
@@ -301,7 +301,7 @@ pub struct SsaGeneratorConfig {
     // intra-doc link from this public field trips `rustdoc::private_intra_doc_links`, which the
     // `nix build .#docs` job builds as an error.
     /// `surplus_must_not_exceed_threshold`. It shares the lower half of the negotiated
-    /// [`PixParams`](crate::PixParams) word with `threshold`, so a byte is all that fits there — but
+    /// [`PixParams`] word with `threshold`, so a byte is all that fits there — but
     /// what is *representable* and what is sane to configure are different questions, and this field
     /// used to be documented as needing no validator on the strength of the first.
     #[default(DEFAULT_SURPLUS_SHARES)]
