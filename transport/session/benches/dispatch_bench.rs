@@ -27,12 +27,12 @@ use hopr_api::types::{
     internal::{prelude::HoprPseudonym, routing::DestinationRouting},
 };
 use hopr_protocol_app::{
-    prelude::ApplicationDataOut,
-    v1::{ApplicationData, ApplicationDataIn, Tag},
+    prelude::{ApplicationDataOut, Tag::Reserved},
+    v1::{ApplicationData, ApplicationDataIn, ReservedTag, Tag},
 };
 use hopr_protocol_start::{StartChallenge, StartInitiation, StartProtocol};
 use hopr_transport_session::{
-    ByteCapabilities, IncomingSession, SESSION_APPLICATION_TAG, SessionId, SessionManager, SessionManagerConfig,
+    HoprSessionCapabilities, HoprStartProtocol, IncomingSession, SessionId, SessionManager, SessionManagerConfig,
     SessionTarget,
 };
 use hopr_utils::network_types::prelude::SealedHost;
@@ -69,10 +69,10 @@ const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(3);
 fn make_start_protocol_data() -> ApplicationDataIn {
     let challenge = StartChallenge::MAX;
     let target = SessionTarget::UdpStream(SealedHost::Plain(SocketAddr::from(([127, 0, 0, 1], 13301)).into()));
-    let msg = StartProtocol::<SessionId, SessionTarget, ByteCapabilities>::StartSession(StartInitiation {
+    let msg = HoprStartProtocol::StartSession(StartInitiation {
         challenge,
         target,
-        capabilities: ByteCapabilities::try_from(0u8).unwrap(),
+        capabilities: HoprSessionCapabilities::try_from(0u8).unwrap(),
         additional_data: 0,
     });
     let (tag, bytes) = msg.encode().unwrap();
@@ -86,7 +86,7 @@ fn make_start_protocol_data() -> ApplicationDataIn {
 /// Builds valid `ApplicationDataIn` with the Session protocol tag and fixed payload.
 fn make_session_data(size: usize) -> ApplicationDataIn {
     ApplicationDataIn {
-        data: ApplicationData::new(SESSION_APPLICATION_TAG, vec![0u8; size]).unwrap(),
+        data: ApplicationData::new(ReservedTag::Session, vec![0u8; size]).unwrap(),
         packet_info: Default::default(),
     }
 }
@@ -132,7 +132,7 @@ fn make_manager_with_session() -> (
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier)
+            .start(msg_sender, session_notifier, None)
             .expect("manager.start() must succeed");
     });
 
@@ -179,7 +179,7 @@ fn make_manager_without_session() -> (
 
     runtime.block_on(async {
         manager
-            .start(msg_sender, session_notifier)
+            .start(msg_sender, session_notifier, None)
             .expect("manager.start() must succeed");
     });
 

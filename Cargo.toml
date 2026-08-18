@@ -7,6 +7,7 @@ members = [
   "hopr/hopr-lib",
   "protocols/app",
   "protocols/hopr",
+  "protocols/pix",
   "protocols/session",
   "protocols/start",
   "transport/hopr",
@@ -68,6 +69,7 @@ criterion = { version = "0.8.2", default-features = false, features = [
 ] }
 crossfire = { version = "3.1.19", default-features = false }
 dashmap = { version = "6.2.1", features = ["inline"] }
+elliptic-curve-tools = "0.3.0"
 flagset = "0.4.7"
 futures = { version = "0.3.33", default-features = false, features = [
   "std",
@@ -110,6 +112,7 @@ rust-stream-ext-concurrent = "2.0.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
+serde_json = "1.0.151"
 serde_repr = "0.1.21"
 serde-saphyr = "1.0.1"
 serde_with = { version = "3.21.0", features = ["base64"] }
@@ -133,6 +136,7 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 ] }
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
+vsss-rs = { version = "6.0.1", default-features = false }
 
 # TEMPORARY: pinned to unreleased branches so this change compiles and is tested end to end,
 # and pinned together so a single hopr-api major is in the graph — two majors coexisting makes
@@ -144,12 +148,25 @@ hopr-types = { version = "2.2.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.9.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
+# The PIX curve is chosen by `pix-bjj` (default) or overridden by `pix-secp256k1`, and neither is
+# named here: `pix-bjj` reaches this crate through `hopr-transport` and `hopr-lib`, both of which
+# keep it in their `default` set, so building any hoprnet crate directly is unchanged.
+#
+# This used to say that `bjj` was withheld here so a downstream consumer could turn it off. That
+# reasoning no longer applies and never worked: Cargo features are additive, so withholding one
+# only holds while every crate in the graph agrees to it. `pix-secp256k1` replaces the omission
+# with a positive override that wins wherever it is enabled — see `crypto/packet/Cargo.toml`.
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
 hopr-lib = { version = "4.0.2-rc.11", path = "hopr/hopr-lib" }
 hopr-protocol-app = { version = "1.0.1", path = "protocols/app", default-features = false }
-hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false }
+hopr-protocol-hopr = { version = "6.0.0", path = "protocols/hopr", default-features = false, features = [
+  "rayon",
+] }
+hopr-protocol-pix = { version = "0.1.0", path = "protocols/pix", default-features = false, features = [
+  "rayon",
+] }
 hopr-protocol-session = { version = "1.2.0", path = "protocols/session", default-features = false }
 hopr-protocol-start = { version = "1.1.0", path = "protocols/start", default-features = false }
 hopr-ticket-manager = { version = "0.5.2" }
@@ -226,10 +243,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = [
-  "oas3",
-  "serde_bytes",
-  "humantime-serde",
-  "hopr-session-server-forwarder",
-  "hopr-utils-session",
-]
+ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
