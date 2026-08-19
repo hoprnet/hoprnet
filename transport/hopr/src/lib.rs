@@ -1018,52 +1018,43 @@ where
                 let mut ticks = futures_time::stream::interval(futures_time::time::Duration::from(surb_flush_interval));
 
                 while ticks.next().await.is_some() {
-                    // Detection before the drain: `degraded_destinations` reads the counts the
-                    // flush is about to reset.
-                    let silent = surb_round_trips.degraded_destinations();
-
-                    // The graph has to see this interval's counts *before* anything re-plans on it,
-                    // otherwise the re-plan that the silence just triggered reads a graph one whole
-                    // tick behind the evidence that triggered it.
-                    protocol::surb_telemetry::flush_into(
-                        &surb_round_trips,
-                        &surb_flush_graph,
-                        hopr_utils::platform::time::native::current_time()
-                            .as_unix_timestamp()
-                            .as_millis(),
-                    );
-
                     // Re-plan first, refill only if re-planning moved traffic. Run the other way
                     // round the refill mints SURBs onto the very route the planner is abandoning --
-                    // see `protocol::return_path_recovery`.
+                    // see `protocol::return_path_recovery`. Detection/flush/tick ordering lives in
+                    // `run_flush_tick`.
                     //
                     // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
                     // they capture has to survive being invoked once per silent destination.
                     let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
-                    for step in episodes
-                        .tick(
-                            silent,
-                            |destination| async move { planner.recompute_paths_from(&destination).await },
-                            |destination| async move {
-                                // Sessions name their destination by its chain address, this
-                                // telemetry by its packet key, and a `NodeId` holding one is never
-                                // equal to a `NodeId` holding the other -- so the match has to be
-                                // made on a resolved form, not on the enum.
-                                //
-                                // The counterparty has to still be receiving SURBs to reply with,
-                                // and its silence has by now convinced our balancer that it is well
-                                // stocked -- so tell the Sessions routed there to stop believing
-                                // that estimate while the evidence says otherwise.
-                                chain
-                                    .packet_key_to_chain_key(&destination)
-                                    .ok()
-                                    .flatten()
-                                    .map(hopr_api::types::internal::prelude::NodeId::Chain)
-                                    .map(|n| smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
-                                    .unwrap_or(0)
-                            },
-                        )
-                        .await
+                    let now_ms = hopr_utils::platform::time::native::current_time()
+                        .as_unix_timestamp()
+                        .as_millis();
+                    for step in protocol::return_path_recovery::run_flush_tick(
+                        &surb_round_trips,
+                        &surb_flush_graph,
+                        now_ms,
+                        &mut episodes,
+                        |destination| async move { planner.recompute_paths_from(&destination).await },
+                        |destination| async move {
+                            // Sessions name their destination by its chain address, this
+                            // telemetry by its packet key, and a `NodeId` holding one is never
+                            // equal to a `NodeId` holding the other -- so the match has to be
+                            // made on a resolved form, not on the enum.
+                            //
+                            // The counterparty has to still be receiving SURBs to reply with,
+                            // and its silence has by now convinced our balancer that it is well
+                            // stocked -- so tell the Sessions routed there to stop believing
+                            // that estimate while the evidence says otherwise.
+                            chain
+                                .packet_key_to_chain_key(&destination)
+                                .ok()
+                                .flatten()
+                                .map(hopr_api::types::internal::prelude::NodeId::Chain)
+                                .map(|n| smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
+                                .unwrap_or(0)
+                        },
+                    )
+                    .await
                     {
                         match step {
                             protocol::return_path_recovery::RecoveryStep::Replanned { destination, moved } => {
@@ -1152,6 +1143,13 @@ where
                             Ok(DispatchResult::Unrelated(data)) => {
                                 tracing::trace!("unrelated message dispatch completed");
                                 Some(data)
+                            }
+                            // Benign session teardown race (sink closed / inbox full / session
+                            // deregistered). Counted in the session manager; logged quietly here so
+                            // a departing counterparty cannot spam ERROR once per in-flight packet.
+                            Ok(DispatchResult::Dropped(reason)) => {
+                                tracing::trace!(?reason, "dropped packet for a torn-down session");
+                                None
                             }
                             Err(error) => {
                                 tracing::error!(%error, "error while dispatching packet in the session manager");
