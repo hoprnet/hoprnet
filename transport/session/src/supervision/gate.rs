@@ -295,8 +295,14 @@ mod tests {
         ServiceGate::new(predeposit, u64::MAX)
     }
 
+    /// `new` stores what it is given and starts both flags clear.
+    ///
+    /// Named after that and nothing more. The `min(target_useful_shares - 1, max_predeposit_packets)`
+    /// this used to claim to test is computed in `spawn_supervisor_worker`, not here — this file
+    /// cannot observe it — and is covered there by `zero_predeposit_config_reaches_the_gate_as_strict_prepay`
+    /// and `predeposit_budget_is_bounded_by_the_ssa_dimensions`.
     #[tokio::test]
-    async fn budget_is_min_of_target_minus_one_and_config_cap() {
+    async fn new_stores_its_budget_and_ceiling_and_starts_unfunded() {
         let gate = ServiceGate::new(100, 256);
         assert_eq!(gate.remaining.load(Ordering::Acquire), 100);
         assert_eq!(gate.ceiling.load(Ordering::Acquire), 256);

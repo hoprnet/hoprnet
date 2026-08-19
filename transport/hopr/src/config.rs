@@ -1171,7 +1171,7 @@ mod tests {
     /// `a_surplus_only_snapshot_is_liveness_without_payment` in the supervisor, which drives a
     /// surplus-only run through the gate and the idle deadline.
     #[test]
-    fn default_pix_gate_must_outlast_the_generator_surplus_run() {
+    fn default_pix_emission_fits_one_deferral_bucket() {
         let cfg = HoprProtocolConfig::default();
 
         let emitted_per_poly = cfg.pix.ssa_part_size + cfg.pix.surplus_shares();
@@ -1194,8 +1194,11 @@ mod tests {
         let surplus_run = cfg.pix.surplus_shares() as u64 * cfg.pix.num_ssa_parts.min(SHARE_EMISSION_WINDOW) as u64;
         assert_eq!(
             4096, surplus_run,
-            "the shipped dimensions produce a 4096-packet run of non-useful shares; if this moves, re-check that \
-             nothing has started keying liveness on useful shares again"
+            "the shipped dimensions produce a 4096-packet run of non-useful shares. This is a tripwire on the product \
+             of three values rather than an invariant: if it moves, one of `PixGlobalConfig::ssa_part_size` (which \
+             sets the surplus at a quarter of it), `PixGlobalConfig::num_ssa_parts`, or \
+             `hopr_protocol_pix::SHARE_EMISSION_WINDOW` has changed. Re-derive the run, then re-check that nothing \
+             has started keying liveness on useful shares again"
         );
     }
 
