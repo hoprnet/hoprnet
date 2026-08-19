@@ -684,10 +684,19 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
         let mut notifier_tx = Some(notifier_tx);
         while let Some(event) = exit_events.next().await {
             match event {
-                PixEvent::DepositAddressReceived(data) => match (notifier_tx.take(), data.deposit_updated) {
-                    (Some(tx), Some(notifier)) => {
+                // Matched on the notifier alone, so the sender is taken only once one is actually in
+                // hand. Matching on the tuple built it — and therefore ran `take` — before any arm
+                // was tested, so a first `DepositAddressReceived` carrying no notifier dropped the
+                // sender in the fallthrough arm and closed the channel. `notifier_rx` below then
+                // resolved to `Canceled` and failed the test with a message naming a supervisor
+                // defect that had not occurred, with no later event able to recover.
+                PixEvent::DepositAddressReceived(data) => match data.deposit_updated {
+                    Some(notifier) if notifier_tx.is_some() => {
                         tracing::info!(id = ?data.id, "Exit: DepositAddressReceived — withholding the deposit");
-                        let _ = tx.send((data.id, notifier));
+                        let _ = notifier_tx
+                            .take()
+                            .expect("guarded by the match arm")
+                            .send((data.id, notifier));
                     }
                     _ => tracing::debug!(id = ?data.id, "further deposit request"),
                 },
