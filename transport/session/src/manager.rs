@@ -2401,6 +2401,8 @@ where
                     Err(crossfire::TrySendError::Disconnected(_)) => {
                         trace!(%session_id, "dropping data for a session whose sink has closed");
                         crate::counters::SESSION_INBOX_CLOSED_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_DISPATCHED_MSGS.increment_by(&["dropped_sink_closed"], 1);
                         Ok(DispatchResult::Dropped(DropReason::SinkClosed))
                     }
                     // Genuine backpressure: the reader is not keeping up. Rate-limited so a
@@ -2411,6 +2413,8 @@ where
                         if prev.is_multiple_of(SESSION_INBOX_FULL_WARN_INTERVAL) {
                             warn!(%session_id, dropped = prev + 1, "session inbox full, dropping data (backpressure)");
                         }
+                        #[cfg(all(feature = "telemetry", not(test)))]
+                        METRIC_DISPATCHED_MSGS.increment_by(&["dropped_sink_full"], 1);
                         Ok(DispatchResult::Dropped(DropReason::SinkFull))
                     }
                 }
@@ -2419,6 +2423,8 @@ where
                 // Quiet — see [`DropReason::Unregistered`].
                 trace!(%session_id, "dropping data for an unregistered session");
                 crate::counters::SESSION_UNKNOWN_DATA_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                #[cfg(all(feature = "telemetry", not(test)))]
+                METRIC_DISPATCHED_MSGS.increment_by(&["dropped_unregistered"], 1);
                 Ok(DispatchResult::Dropped(DropReason::Unregistered))
             };
         }
