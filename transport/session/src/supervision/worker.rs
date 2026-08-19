@@ -163,9 +163,10 @@ async fn worker_loop(
     gate: Arc<ServiceGate>,
     initial_actions: Vec<SessionPixAction>,
 ) {
-    // Emit initial actions.
-    if !send_actions(&initial_actions, &action_tx) {
-        gate.poison();
+    // Emit initial actions. `closed` is `false` rather than `supervisor.closed` to keep this
+    // exactly what it was: a freshly built supervisor has nothing to report yet, and only a failed
+    // delivery should stop the worker before it has run once.
+    if !dispatch(&initial_actions, false, &action_tx, &gate) {
         return;
     }
 
@@ -176,13 +177,7 @@ async fn worker_loop(
             let now = Instant::now();
             if now >= dl {
                 let actions = supervisor.handle_deadline(now, gate.served_total());
-                if supervisor.closed {
-                    send_actions(&actions, &action_tx);
-                    gate.poison();
-                    return;
-                }
-                if !send_actions(&actions, &action_tx) {
-                    gate.poison();
+                if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                     return;
                 }
                 continue;
@@ -203,13 +198,7 @@ async fn worker_loop(
                 Err(_) => {
                     let now = Instant::now();
                     let actions = supervisor.handle_deadline(now, gate.served_total());
-                    if supervisor.closed {
-                        send_actions(&actions, &action_tx);
-                        gate.poison();
-                        return;
-                    }
-                    if !send_actions(&actions, &action_tx) {
-                        gate.poison();
+                    if !dispatch(&actions, supervisor.closed, &action_tx, &gate) {
                         return;
                     }
                 }
@@ -235,11 +224,10 @@ async fn process_cmd(
     let cmd = match cmd {
         Some(c) => c,
         None => {
-            // All senders dropped — close.
+            // All senders dropped — close. Terminal by construction, so `dispatch` is told the
+            // supervisor is closed and its `false` is the verdict.
             let actions = vec![SessionPixAction::Close(SessionPixCloseReason::SupervisorUnavailable)];
-            send_actions(&actions, action_tx);
-            gate.poison();
-            return false;
+            return dispatch(&actions, true, action_tx, gate);
         }
     };
 
@@ -247,29 +235,37 @@ async fn process_cmd(
         WorkerCommand::Event(ev) => {
             let now = Instant::now();
             let actions = supervisor.handle_event(&ev, now, gate.served_total());
-            if supervisor.closed {
-                send_actions(&actions, action_tx);
-                gate.poison();
-                return false;
-            }
-            if !send_actions(&actions, action_tx) {
-                gate.poison();
+            if !dispatch(&actions, supervisor.closed, action_tx, gate) {
                 return false;
             }
         }
         WorkerCommand::ActionResult { action, ok } => {
             let now = Instant::now();
             let actions = supervisor.action_result(&action, ok, now);
-            if supervisor.closed {
-                send_actions(&actions, action_tx);
-                gate.poison();
-                return false;
-            }
-            if !send_actions(&actions, action_tx) {
-                gate.poison();
+            if !dispatch(&actions, supervisor.closed, action_tx, gate) {
                 return false;
             }
         }
+    }
+    true
+}
+
+/// Forward `actions`, then report whether the worker should keep running.
+///
+/// The four places that produce actions — the two deadline paths in [`worker_loop`] and the two
+/// command arms in [`process_cmd`] — all had the same four-way branch spelled out: send, check
+/// whether the supervisor closed, poison, return. Fail-close is the property that matters most here
+/// and it was stated four times, so a correction to it had to be made four times.
+///
+/// Poisons the gate on every terminal path, so no caller has to remember to. `closed` is passed
+/// rather than read from the supervisor because the callers hold it by different borrows.
+fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, gate: &Arc<ServiceGate>) -> bool {
+    // Sent before the verdict either way: a closing supervisor's last actions carry the reason it
+    // closed, and dropping them would leave the driver to infer it.
+    let delivered = send_actions(actions, action_tx);
+    if closed || !delivered {
+        gate.poison();
+        return false;
     }
     true
 }
@@ -349,6 +345,24 @@ mod tests {
     /// See the identically-named helper in [`super::supervisor`] for why the surplus is non-zero.
     fn dims() -> PixParams {
         PixParams::try_new(10, 5, 7, crate::types::LOCAL_PIX_SUITE).expect("test dimensions must be valid")
+    }
+
+    /// Wait for `condition` to hold, failing the test if it never does.
+    ///
+    /// The worker is a detached task, so every assertion about its effects is really an assertion
+    /// that it has been scheduled. A fixed sleep encodes a guess about the scheduler, and the guess
+    /// is wrong under CI load or on a busy single-core runner — the test then fails with nothing
+    /// wrong in the code. Polling asserts the same property and can only fail if it genuinely never
+    /// happens, which is why the deadline is generous: it is reached only on a real failure.
+    async fn poll_until(what: &str, mut condition: impl FnMut() -> bool) {
+        const DEADLINE: Duration = Duration::from_secs(5);
+        tokio::time::timeout(DEADLINE, async {
+            while !condition() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("{what} — not observed within {DEADLINE:?}"));
     }
 
     #[tokio::test]
@@ -431,10 +445,15 @@ mod tests {
         // Drop the action receiver — worker should detect and close.
         drop(action_rx);
 
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        poll_until("the gate is poisoned after the action driver is dropped", || {
+            handle.gate.try_acquire_sync().is_err()
+        })
+        .await;
 
-        let result = handle.gate.acquire().await;
-        assert!(result.is_err(), "gate should be poisoned after driver dropped");
+        assert!(
+            handle.gate.acquire().await.is_err(),
+            "a poisoned gate must refuse the awaiting path too, not only the synchronous one"
+        );
     }
 
     #[tokio::test]
@@ -553,13 +572,10 @@ mod tests {
         // Drop the handle — last cmd_tx sender is dropped, cmd_rx yields None.
         drop(handle);
 
-        // Give the worker time to process the disconnect and poison the gate.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        assert!(
-            gate.try_acquire_sync().is_err(),
-            "gate should be poisoned after all senders dropped"
-        );
+        poll_until("the gate is poisoned after all command senders are dropped", || {
+            gate.try_acquire_sync().is_err()
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -602,12 +618,21 @@ mod tests {
         // Drop the action receiver — worker's next send_actions will fail.
         drop(action_rx);
 
-        // Give the worker time to detect the failure and exit.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        // send_event should fail because the worker already exited.
+        // Polled on the assertion itself rather than on a proxy, because the worker drops its
+        // command receiver only after poisoning the gate. The channel holds 64 and at most one send
+        // can land in the window between those two, so this cannot fill it.
         let id = SsaId::new(p, SsaIndex::new(1).unwrap());
-        assert!(handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.is_err());
+        let terminated = tokio::time::timeout(Duration::from_secs(5), async {
+            while handle.send_event(SessionPixEvent::SsaRequestSent(id)).await.is_ok() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await;
+
+        assert!(
+            terminated.is_ok(),
+            "the worker must exit after a failed action send, which closes the command channel"
+        );
     }
 
     #[tokio::test]
