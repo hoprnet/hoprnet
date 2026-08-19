@@ -513,7 +513,10 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
                 // commitment verifies, and the recovery clocks need a cycle that was funded.
                 max_ssa_delivery_time: OTHER_CLOCKS,
                 max_recovery_idle: OTHER_CLOCKS,
-                max_recovery_time: OTHER_CLOCKS,
+                // Strictly above the idle deadline, which `validate_pix_supervision` requires: a
+                // backstop at or below the rule it backs up pre-empts that rule on every cycle.
+                // Still far outside the observation window, which is all this test asks of it.
+                max_recovery_time: OTHER_CLOCKS * 2,
                 ..Default::default()
             },
         },
@@ -771,13 +774,19 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
             max_live_cycle_bytes: IncomingSessionPixConfig::default().max_live_cycle_bytes,
             supervision: SupervisorConfig {
                 max_ssa_delivery_time: Duration::from_secs(10),
-                // Both far out of reach, so that neither can be what closes the Session: a deposit
-                // that silently failed to register would otherwise look exactly like the deadline
-                // under test firing.
+                // Far out of reach, so that a deposit which silently failed to register cannot look
+                // like the deadline under test firing.
                 max_deposit_wait: Duration::from_secs(600),
-                max_recovery_idle: Duration::from_secs(600),
+                // At its floor (`>= max_ack_await_time`), which puts it *below* the deadline under
+                // test. What stops it firing first is not its value but its gating: the idle rule
+                // only runs while the Session is consuming service, and nothing is served between
+                // the deposit below and the wait that follows. `validate_pix_supervision` requires
+                // `max_recovery_time > max_recovery_idle`, so the previous formulation — idle parked
+                // at 600 s to put it "out of reach" — is no longer expressible; it was belt and
+                // braces rather than what isolated the deadline.
+                max_recovery_idle: Duration::from_secs(30),
                 // The deadline under test.
-                max_recovery_time: Duration::from_secs(15),
+                max_recovery_time: Duration::from_secs(40),
                 ..Default::default()
             },
         },
@@ -812,8 +821,9 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
     .await
     .context("timed out waiting for the deposit request")??;
 
-    // Wait out the recovery deadline with the Session idle.
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    // Wait out the recovery deadline with the Session idle. Comfortably past the 40 s deadline, and
+    // still inside `TEST_GLOBAL_TIMEOUT` with the cluster bootstrap and the observation below.
+    tokio::time::sleep(Duration::from_secs(50)).await;
 
     // Now send: the Session must already be gone. The recovery deadline has passed, so the write half
     // has to be closed — a read timeout would only show the Session quiet, which it has been all along.
