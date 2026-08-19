@@ -842,13 +842,20 @@ where
                             // and its silence has by now convinced our balancer that it is well
                             // stocked -- so tell the Sessions routed there to stop believing
                             // that estimate while the evidence says otherwise.
-                            chain
-                                .packet_key_to_chain_key(&destination)
-                                .ok()
-                                .flatten()
-                                .map(hopr_api::types::internal::prelude::NodeId::Chain)
-                                .map(|n| smgr.mark_return_path_degraded(&n, RETURN_PATH_DEGRADED_GRACE))
-                                .unwrap_or(0)
+                            match chain.packet_key_to_chain_key(&destination) {
+                                Ok(Some(address)) => smgr.mark_return_path_degraded(
+                                    &hopr_api::types::internal::prelude::NodeId::Chain(address),
+                                    RETURN_PATH_DEGRADED_GRACE,
+                                ),
+                                // A resolver error is exactly the failure this recovery path exists
+                                // to surface, so it must not be collapsed into "no chain key" — log
+                                // it rather than silently marking zero sessions.
+                                Err(error) => {
+                                    tracing::warn!(%destination, %error, "could not resolve a silent destination's chain key to mark it degraded");
+                                    0
+                                }
+                                Ok(None) => 0,
+                            }
                         },
                     )
                     .await
@@ -965,11 +972,12 @@ where
                                 tracing::trace!("unrelated message dispatch completed");
                                 Some(data)
                             }
-                            // Benign session teardown race (sink closed / inbox full / session
-                            // deregistered). Counted in the session manager; logged quietly here so
-                            // a departing counterparty cannot spam ERROR once per in-flight packet.
+                            // Benign drop: the session's sink has closed, its inbox is momentarily
+                            // full (backpressure), or the session is already deregistered. Counted
+                            // in the session manager and logged quietly here so a departing
+                            // counterparty cannot spam ERROR once per in-flight packet.
                             Ok(DispatchResult::Dropped(reason)) => {
-                                tracing::trace!(?reason, "dropped packet for a torn-down session");
+                                tracing::trace!(?reason, "dropped session packet");
                                 None
                             }
                             Err(error) => {

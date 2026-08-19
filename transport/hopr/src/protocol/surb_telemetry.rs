@@ -1025,14 +1025,14 @@ mod tests {
             &graph,
             0,
             &mut episodes,
-            |_d| {
+            |_d| async {
                 replans.set(replans.get() + 1);
-                async { 1usize }
+                1usize
             },
-            |_d| {
+            |_d| async {
                 refills.set(refills.get() + 1);
                 balancer.mark_return_path_degraded(grace);
-                async { 1usize }
+                1usize
             },
         )
         .await;
@@ -1049,14 +1049,14 @@ mod tests {
                 &graph,
                 0,
                 &mut episodes,
-                |_d| {
+                |_d| async {
                     replans.set(replans.get() + 1);
-                    async { 1usize }
+                    1usize
                 },
-                |_d| {
+                |_d| async {
                     refills.set(refills.get() + 1);
                     balancer.mark_return_path_degraded(grace);
-                    async { 1usize }
+                    1usize
                 },
             )
             .await;
@@ -1101,14 +1101,14 @@ mod tests {
             &graph,
             0,
             &mut episodes,
-            |_d| {
+            |_d| async {
                 replans.set(replans.get() + 1);
-                async { 1usize }
+                1usize
             },
-            |_d| {
+            |_d| async {
                 refills.set(refills.get() + 1);
                 balancer.mark_return_path_degraded(grace);
-                async { 1usize }
+                1usize
             },
         )
         .await;

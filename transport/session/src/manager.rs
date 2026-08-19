@@ -221,7 +221,7 @@ impl Drop for SessionSlotGuard<'_> {
 ///
 /// All three are ordinary consequences of a session tearing down or being briefly overwhelmed, not
 /// faults: a departing counterparty leaves packets in flight that arrive after its slot's sink is
-/// gone or after the slot itself is deregistered. They are reported as an [`DispatchResult::Dropped`]
+/// gone or after the slot itself is deregistered. They are reported as a [`DispatchResult::Dropped`]
 /// outcome rather than an `Err` precisely so the caller does not log them at `ERROR` — the loud
 /// teardown-race spam this distinction exists to remove.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1491,7 +1491,7 @@ where
                         let prev =
                             crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         if prev.is_multiple_of(SESSION_INBOX_FULL_WARN_INTERVAL) {
-                            warn!(%session_id, dropped = prev + 1, "session inbox full, dropping data (backpressure)");
+                            warn!(%session_id, total_inbox_full_drops = prev + 1, "session inbox full, dropping data (backpressure)");
                         }
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_DISPATCHED_MSGS.increment_by(&["dropped_sink_full"], 1);
