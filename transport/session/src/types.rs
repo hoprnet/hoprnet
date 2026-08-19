@@ -849,7 +849,23 @@ mod tests {
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
             ClosureReason::UnrealizedDeposit,
+            ClosureReason::PixFailure,
         ];
+
+        // The array above is hand-maintained, and a snapshot that silently stops covering a variant
+        // is worse than no snapshot: it reads as a guarantee it no longer gives. `PixFailure` was
+        // missing for exactly that reason. This match is exhaustive and wildcard-free, so adding a
+        // variant to `ClosureReason` fails to compile *here*, which is where the array is.
+        for reason in reasons {
+            match reason {
+                ClosureReason::WriteClosed
+                | ClosureReason::EmptyRead
+                | ClosureReason::Eviction
+                | ClosureReason::UnrealizedDeposit
+                | ClosureReason::PixFailure => {}
+            }
+        }
+
         insta::assert_debug_snapshot!(reasons);
     }
 
