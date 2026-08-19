@@ -198,12 +198,24 @@ pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 /// **Measured, not derived**, like [`AWAITING_ACK_ENTRY_BYTES`]:
 /// `exit_reconstructor_worst_case_share_order` in `tests/memory_profile.rs` prints the modelled and
 /// measured per-polynomial figures side by side with the share buffers subtracted, which is exactly
-/// this number. At the time of writing it measures 908 B against the 458 B `size_of` accounts for.
+/// this number. Run it to re-derive every figure below.
 ///
-/// Set to roughly twice what `size_of` accounts for, which leaves ~5 % headroom over that
-/// measurement. Headroom rather than the measured figure because the acknowledgement residue above
-/// is a scheduling artefact and will not reproduce identically, and because understating this would
-/// let the Session layer's live-cycle budget be exceeded.
+/// The arithmetic, at the time of writing and at the deployed dimensions:
+///
+/// * measured per polynomial, share buffers excluded: **876 B**;
+/// * of which `size_of` accounts for **458 B**, leaving a **418 B** residue the types cannot see;
+/// * this constant is **704 B**, ~1.7× that residue, so the model charges 458 + 704 = **1162 B** per polynomial — ~33 %
+///   above the measurement;
+/// * across a whole cycle that dilutes to ~6 %, because the share buffers are modelled exactly and dominate: **41.1
+///   MiB** modelled against **38.8 MiB** measured, of which 32.0 MiB is share buffers.
+///
+/// Both headroom figures are worth keeping straight, because they answer different questions: ~33 %
+/// is the margin on the term this constant actually sets, and ~6 % is the margin on the number the
+/// Session layer's live-cycle budget is denominated in.
+///
+/// Headroom rather than the measured figure because the acknowledgement residue above is a
+/// scheduling artefact and will not reproduce identically, and because understating this would let
+/// that budget be exceeded.
 pub const PART_BUILDER_OVERHEAD_BYTES: usize = 704;
 
 /// Live heap one entry in the retirement tombstone set costs, in bytes.
@@ -227,17 +239,27 @@ pub const TOMBSTONE_ENTRY_BYTES: usize = 288;
 /// Derived from the Session layer's live-cycle budget, which is what makes the count finite. That
 /// budget admits `max_live_cycle_bytes / (MAX_OVERLAPPING_BATCHES × ssas_per_request ×
 /// peak_cycle_bytes)` concurrent PIX Sessions — ~37 at the shipping 3 GiB and the deployed
-/// dimensions. Each retires at most `ssas_per_request` cycles per generation, and a cycle cannot be
-/// replaced faster than its commitment deadline (`max_ssa_delivery_time`, 20 s), so within the
-/// 1800 s `unused_verifier_lifetime` one Session contributes at most
-/// `1800 / 20 × ssas_per_request` = 90 at the shipping batch of one, 1800 at `MAX_SSA_BATCH_SIZE`.
-/// A larger batch buys proportionally fewer concurrent Sessions, so the product is flat: ~37 × 1800
-/// ≈ 67 000 either way, and a Session that closes and is replaced costs a full initiation round trip
-/// per replacement, so churn does not change the order.
+/// dimensions, where `peak_cycle_bytes` is ~41 MiB.
 ///
-/// 262 144 leaves ~3.9× headroom over that and costs at most ~72 MiB at
-/// [`TOMBSTONE_ENTRY_BYTES`] — a fortieth of the budget it is derived from, and only if every entry
-/// is live at once, which the arithmetic above says cannot happen.
+/// One Session contributes at most 90 tombstones per `unused_verifier_lifetime`, **whatever the
+/// batch size**. It retires `ssas_per_request` cycles per generation, and a generation cannot be
+/// shorter than its commitment deadline — which is itself batch-scaled, `scaled_deadline` of
+/// `max_ssa_delivery_time` — so the two factors cancel: `1800 / (20 × b) × b` = 90 for every `b`.
+///
+/// The concurrent-Session count, meanwhile, falls as `1/b`. The product is therefore *largest at a
+/// batch of one*, at ~37 × 90 ≈ **3 300** — and a Session that closes and is replaced costs a full
+/// initiation round trip per replacement, so churn does not change the order.
+///
+/// 262 144 leaves ~79× headroom over that and costs at most ~72 MiB at [`TOMBSTONE_ENTRY_BYTES`] — a
+/// fortieth of the budget it is derived from, and only if every entry is live at once, which the
+/// arithmetic above says cannot happen.
+///
+/// That headroom is not slack, it is what absorbs the one term the arithmetic above holds fixed. The
+/// Session layer charges the *offered* `peak_cycle_bytes`, so a node whose `quota_range` floor admits
+/// cycles much smaller than the deployed ones admits proportionally more Sessions and consumes the
+/// headroom at the same rate. At the shipping range that leaves the cap two orders of magnitude
+/// clear; a node that widens its `quota_range` downwards by more than ~79× should re-run this
+/// derivation rather than assume it still holds.
 pub const MAX_RETIRED_SSAS: usize = 262_144;
 
 /// Worst-case live heap one Exit-side SSA cycle can hold, in bytes.
@@ -1301,6 +1323,17 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     /// No range check on the dimensions: holding a [`PixParams`] is what proves them in range, since
     /// [`PixParams::try_new`] is the only way to make one and the two bounded fields are as wide as
     /// their types. The check this replaced tested exactly those bounds.
+    ///
+    /// "The two bounded fields" is `polys_per_ssa` and `shares_per_poly`, and the omission of
+    /// `surplus_shares` is deliberate rather than an oversight — worth stating, because the surplus
+    /// does reach `SsaPartBuilder::max_credited_surplus` and so does size how much post-reconstruction
+    /// traffic one completed polynomial may credit as liveness. `try_new` accepts the whole `u8`
+    /// range for it on purpose: the surplus is a *wire* value, `surplus_must_not_exceed_threshold`
+    /// bounds only what this node will locally configure, and an extravagant surplus is caught where
+    /// it costs the peer something — the Exit's `quota_range`, which prices `polys × (threshold +
+    /// surplus)` and so rises with it. A peer declaring a surplus of 255 against a threshold of 2 is
+    /// asking to be charged 128× and is refused unless the operator configured a range that admits
+    /// it, in which case the traffic it credits is traffic it paid for.
     fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>, params: PixParams) -> Result<PixGroup<S>, Self::Error> {
         let exit_commitment_secret = PixScalar::<S>::random(&mut hopr_types::crypto_random::rng());
         let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
