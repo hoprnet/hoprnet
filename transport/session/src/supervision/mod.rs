@@ -1102,6 +1102,83 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
     }
 
+    /// Both ends of the batch range, and the zero that the supervisor would otherwise clamp away.
+    ///
+    /// Zero is the one worth spelling out: the supervisor clamps `ssas_per_request` to at least one
+    /// where it reads it, so a zero here does not fail loudly at runtime, it silently becomes a
+    /// batch of one. This is the only place an operator is told the value was not honoured.
+    #[test]
+    fn validation_rejects_an_out_of_range_batch_size() {
+        let rcn = valid_rcn_cfg();
+        for batch in [0, crate::MAX_SSA_BATCH_SIZE + 1] {
+            let mut cfg = valid_cfg();
+            cfg.ssas_per_request = batch;
+            assert!(
+                validate_pix_supervision(&cfg, &rcn).is_err(),
+                "ssas_per_request = {batch} is outside 1..={} and must be rejected",
+                crate::MAX_SSA_BATCH_SIZE
+            );
+        }
+
+        for batch in [1, crate::MAX_SSA_BATCH_SIZE] {
+            let mut cfg = valid_cfg();
+            cfg.ssas_per_request = batch;
+            assert!(
+                validate_pix_supervision(&cfg, &rcn).is_ok(),
+                "ssas_per_request = {batch} is on the boundary and must be accepted"
+            );
+        }
+    }
+
+    /// Zero tolerated failures closes the Session on the first lost cycle.
+    ///
+    /// Reads as the consistent thing to allow next to the zero-value knobs that *are* legal, and is
+    /// not: at the shipping batch of one it is indistinguishable from a limit of one, so it would
+    /// pass unnoticed and then silently disable batching for anyone who raised `ssas_per_request`.
+    #[test]
+    fn validation_rejects_zero_max_failed_cycles() {
+        let mut cfg = valid_cfg();
+        cfg.max_failed_cycles = 0;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
+    /// The off-front fraction is a ratio, and a value outside `0.0..=1.0` is unreachable rather than
+    /// strict — so a typo silently disables the check instead of tightening it.
+    ///
+    /// `NaN` is the case that needs the finiteness test in front of the range: every IEEE comparison
+    /// against `NaN` is false, so a bare range test admits it, and an admitted `NaN` makes every
+    /// later comparison against the fraction false too. That is the check disabled, not relaxed.
+    #[test]
+    fn validation_rejects_an_out_of_range_off_front_fraction() {
+        let rcn = valid_rcn_cfg();
+        for fraction in [-0.1, 1.1, f64::NAN, f64::INFINITY] {
+            let mut cfg = valid_cfg();
+            cfg.max_off_front_share_fraction = fraction;
+            assert!(
+                validate_pix_supervision(&cfg, &rcn).is_err(),
+                "max_off_front_share_fraction = {fraction} must be rejected"
+            );
+        }
+
+        for fraction in [0.0, 1.0] {
+            let mut cfg = valid_cfg();
+            cfg.max_off_front_share_fraction = fraction;
+            assert!(
+                validate_pix_supervision(&cfg, &rcn).is_ok(),
+                "max_off_front_share_fraction = {fraction} is on the boundary and must be accepted"
+            );
+        }
+    }
+
+    /// A zero sample would judge the very first off-front share, which mixnet reordering alone
+    /// produces on an entirely conforming Entry.
+    #[test]
+    fn validation_rejects_zero_min_share_order_sample() {
+        let mut cfg = valid_cfg();
+        cfg.min_share_order_sample = 0;
+        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+    }
+
     /// Zero predeposit packets is strict prepay, and it has to stay a legal configuration.
     ///
     /// Worth an explicit test because the neighbouring zero-checks make rejecting this one look like
