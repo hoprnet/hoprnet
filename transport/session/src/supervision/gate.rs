@@ -183,12 +183,18 @@ impl ServiceGate {
     /// check starts from the moment of funding and does not count predeposit
     /// packets against the post-funding budget.
     pub fn release_service(self: &Arc<Self>) {
-        self.funded.store(true, Ordering::Release);
         // Snapshot the served counter at the moment of funding so the ceiling
         // check does not count predeposit traffic against the post-funding
         // max_served_without_progress budget.
         self.served_at_last_progress
             .store(self.served.load(Ordering::Acquire), Ordering::Release);
+        // Published *after* the watermark, so a caller that observes `funded` observes the snapshot
+        // too — the release store orders everything sequenced before it. The other way round leaves
+        // a window in which the funded branch judges the whole predeposit-era `served` count against
+        // the ceiling and refuses service that is in fact available. The window is self-clearing,
+        // since the wake below releases whoever parked in it, but it costs a spurious refusal on
+        // every funding event for nothing.
+        self.funded.store(true, Ordering::Release);
         // Wake all parkers — predeposit-parked writers re-enter and take the
         // funded path, which checks the ceiling.
         self.notify.notify_waiters();
@@ -220,30 +226,40 @@ impl ServiceGate {
     ///
     /// Returns `Ok(true)` on success, `Ok(false)` if the predeposit budget is
     /// exhausted (and gate not yet funded) or the ceiling is exceeded (gate
-    /// funded), or `Err(())` if poisoned.
+    /// funded), or [`GateClosed`] if poisoned.
+    ///
+    /// `Ok(false)` means *the gate refused*, and only ever that: both branches retry a lost
+    /// compare-exchange rather than reporting it. Contention on `served` is not a refusal — service
+    /// was available and the caller would be turned away anyway — and with several concurrent egress
+    /// writers, reporting it as one converts contention into spurious refusals on the documented
+    /// fast path.
     ///
     /// Every outgoing data packet of a supervised Session comes through here, and service is
     /// available for all but a vanishing fraction of them, so this answering synchronously is what
     /// keeps gating off the allocator: only [`acquire`](Self::acquire)'s parking path needs a future
     /// large enough to box, and that path is about to block anyway.
-    pub fn try_acquire_sync(&self) -> Result<bool, ()> {
+    pub fn try_acquire_sync(&self) -> Result<bool, GateClosed> {
         if self.poisoned.load(Ordering::Acquire) {
-            return Err(());
+            return Err(GateClosed);
         }
         if self.funded.load(Ordering::Acquire) {
-            let served = self.served.load(Ordering::Acquire);
-            let base = self.served_at_last_progress.load(Ordering::Acquire);
-            if served.saturating_sub(base) >= self.ceiling.load(Ordering::Acquire) {
-                return Ok(false);
+            // Ceiling-checking CAS loop, matching the predeposit branch below and `acquire`'s own
+            // funded path. Re-reads the ceiling inputs on every attempt, so a retry cannot admit a
+            // packet the ceiling has meanwhile closed on.
+            loop {
+                let served = self.served.load(Ordering::Acquire);
+                let base = self.served_at_last_progress.load(Ordering::Acquire);
+                if served.saturating_sub(base) >= self.ceiling.load(Ordering::Acquire) {
+                    return Ok(false);
+                }
+                if self
+                    .served
+                    .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
+                    .is_ok()
+                {
+                    return Ok(true);
+                }
             }
-            if self
-                .served
-                .compare_exchange(served, served + 1, Ordering::AcqRel, Ordering::Relaxed)
-                .is_ok()
-            {
-                return Ok(true);
-            }
-            return Ok(false);
         }
         // Try to consume from predeposit budget (non-blocking CAS loop).
         loop {

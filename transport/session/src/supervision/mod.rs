@@ -803,6 +803,11 @@ pub enum SessionPixCloseReason {
 // Re-exports from submodules
 // ---------------------------------------------------------------------------
 
+// `GateClosed` is re-exported despite nothing in the crate naming it today: it is the error type of
+// both [`ServiceGate::acquire`] and [`ServiceGate::try_acquire_sync`], and an error a caller cannot
+// name is one it cannot match on or downcast to. `manager` currently only forwards it into an
+// `io::Error`, which is why the import reads as unused.
+#[allow(unused_imports)]
 pub use gate::{GateClosed, ServiceGate};
 pub use worker::{ActionRx, SessionPixSupervisorHandle, spawn_supervisor_worker};
 

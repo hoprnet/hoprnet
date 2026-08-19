@@ -123,9 +123,9 @@ fn acquire_egress_permit(
 
     match gate.try_acquire_sync() {
         Ok(true) => futures::future::Either::Left(std::future::ready(Ok((routing, data)))),
-        Err(_) => futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(
-            crate::supervision::GateClosed,
-        )))),
+        // Forwarded rather than reconstructed: the gate now names its own error, so both of its
+        // entry points report the same one and neither caller has to know what a refusal means.
+        Err(closed) => futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed)))),
         // Budget exhausted: park until the supervisor releases service, reports progress, or gives
         // up on the Session entirely.
         Ok(false) => futures::future::Either::Right(Box::pin(async move {
