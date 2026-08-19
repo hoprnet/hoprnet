@@ -545,6 +545,61 @@ mod tests {
         );
     }
 
+    /// One `notify_waiters` call must wake *every* parked waiter, not just one.
+    ///
+    /// `wakers` is a `Vec` and the type calls itself a multi-waker primitive, but every other test
+    /// here drives a single future, so the vector never holds more than one entry and a `pop()` in
+    /// place of `drain(..)` would pass all of them.
+    ///
+    /// Asserted on the wakes rather than on the futures completing, which is the part that is easy
+    /// to get wrong: the generation counter makes `poll` return `Ready` after any notification
+    /// whether or not *that* waiter was woken, so polling every future to completion would pass with
+    /// a single-waker regression. What a real executor needs is the wake itself — without it the
+    /// future is never polled again and the generation is never read.
+    #[test]
+    fn one_notification_wakes_every_parked_waiter() {
+        struct CountingWaker(std::sync::atomic::AtomicUsize);
+
+        impl std::task::Wake for CountingWaker {
+            fn wake(self: Arc<Self>) {
+                self.wake_by_ref();
+            }
+
+            fn wake_by_ref(self: &Arc<Self>) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+
+        const WAITERS: usize = 4;
+
+        let n = SlotNotify::new();
+        let counters: Vec<Arc<CountingWaker>> = (0..WAITERS)
+            .map(|_| Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0))))
+            .collect();
+        let mut futures: Vec<_> = (0..WAITERS).map(|_| n.notified()).collect();
+
+        for (i, (fut, counter)) in futures.iter_mut().zip(&counters).enumerate() {
+            let waker = std::task::Waker::from(counter.clone());
+            let mut cx = std::task::Context::from_waker(&waker);
+            assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending, "waiter {i} must park");
+        }
+        assert_eq!(
+            WAITERS,
+            n.inner.lock().wakers.len(),
+            "every waiter must have registered"
+        );
+
+        n.notify_waiters();
+
+        for (i, counter) in counters.iter().enumerate() {
+            assert_eq!(
+                1,
+                counter.0.load(std::sync::atomic::Ordering::Relaxed),
+                "waiter {i} must be woken exactly once by the single notification"
+            );
+        }
+    }
+
     // -------------------------------------------------------------------
     // Async tests (tokio runtime)
     // -------------------------------------------------------------------
