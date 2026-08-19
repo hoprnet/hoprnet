@@ -2398,7 +2398,7 @@ where
             owned_ssas.clear();
 
             #[cfg(feature = "telemetry")]
-            crate::telemetry::record_pix_closure(&reason.to_string());
+            crate::telemetry::record_pix_closure(reason);
 
             // Tell the Entry, so it can drop its side rather than wait out its own timeout. The
             // Session is closed either way, so a send failure here changes nothing.

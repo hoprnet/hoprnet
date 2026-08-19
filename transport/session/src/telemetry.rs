@@ -405,6 +405,14 @@ pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
 /// and never repeats, so labelling by it would mint a new time series per SSA cycle and never
 /// retire any of them. A Session runs at most a few cycles concurrently and they advance together,
 /// so the latest snapshot is a fair summary of where recovery stands.
+///
+/// Unlike its siblings this does **not** call [`touch_session_activity`], and the asymmetry is
+/// deliberate rather than an omission. Shares reach the Exit only on data-packet acknowledgements,
+/// so a Session whose recovery is advancing is a Session passing data, and
+/// [`record_session_read`]/[`record_session_write`] have already stamped its activity on the packets
+/// that carried those shares. Stamping again here would put a second atomic on a path that runs per
+/// progress snapshot and change nothing: `hopr_session_lifetime_idle_ms` cannot climb for a Session
+/// that is making progress, because the traffic producing the progress is what keeps it down.
 pub fn set_pix_recovery_progress(session_id: &SessionId, useful_shares: u64, target_useful_shares: u64) {
     if target_useful_shares == 0 {
         return;
@@ -418,8 +426,13 @@ pub fn set_pix_recovery_progress(session_id: &SessionId, useful_shares: u64, tar
 ///
 /// Labelled by reason rather than by Session: the reasons are a closed enum, so the cardinality is
 /// bounded, which is what makes this safe to keep after the Session is gone.
-pub fn record_pix_closure(reason: &str) {
-    METRIC_SESSION_PIX_CLOSURES_TOTAL.increment(&[reason]);
+///
+/// Takes the enum rather than a `&str` so that boundedness is a property of the signature instead of
+/// a promise the doc makes on behalf of every future caller. `&'static str` would not have done it
+/// either — it admits any string literal, and a literal is exactly what an unbounded label looks
+/// like at the call site. The label is derived here, so there is one spelling of each reason.
+pub fn record_pix_closure(reason: crate::supervision::SessionPixCloseReason) {
+    METRIC_SESSION_PIX_CLOSURES_TOTAL.increment(&[reason.to_string().as_str()]);
 }
 
 fn refresh_lifetime_metrics(session_id: &SessionId, now_us: u64, created_at_us: u64, last_activity_us: u64) {
