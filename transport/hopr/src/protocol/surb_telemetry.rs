@@ -979,6 +979,146 @@ mod tests {
         let _ = (graph, me);
     }
 
+    /// End-to-end through the extracted flush tick: a silent return path drives re-plan → refill and
+    /// marks the balancer's estimate stale — **while the balancer's SURB supply reads healthy**.
+    ///
+    /// This is the seam the component tests leave open: detection (`degraded_destinations`),
+    /// sequencing (`ReturnPathEpisodes::tick`) and the balancer's degraded flag are each tested in
+    /// isolation, but nothing wires the real registry through [`run_flush_tick`] into a real
+    /// [`BalancerStateValues`]. It also pins the incident's supply-vs-delivery separation
+    /// (assertion #3): the buffer sits *at target* the whole time, so the signal that fires is a
+    /// return-path *delivery* signal, not SURB-distress.
+    #[tokio::test]
+    async fn a_silent_return_path_drives_replan_then_refill_and_marks_the_balancer_stale() {
+        use hopr_transport_session::{BalancerStateValues, SurbBalancerConfig};
+
+        use crate::protocol::return_path_recovery::{RecoveryStep, ReturnPathEpisodes, run_flush_tick};
+
+        let (graph, _me, peers) = graph_with(1);
+        let destination = peers[0];
+        let registry = registry_at_slot_zero();
+        let paths = legs();
+        let grace = Duration::from_secs(10);
+        let mut episodes = ReturnPathEpisodes::new(grace);
+
+        // A session whose SURB *supply* is healthy: a target is set and the buffer sits at it. If the
+        // return-path signal fires against this, it cannot be a supply/distress signal.
+        let balancer = BalancerStateValues::new(SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        balancer.buffer_level.store(1000, Ordering::Relaxed);
+        assert!(!balancer.is_disabled(), "precondition: SURB supply is enabled");
+        assert!(
+            !balancer.return_path_estimate_is_stale(),
+            "precondition: nothing has marked the return path yet"
+        );
+
+        let replans = std::cell::Cell::new(0usize);
+        let refills = std::cell::Cell::new(0usize);
+
+        // Establish the pair works; silence only means something against a pair that once delivered.
+        deliver(&registry, paths, destination);
+        let first = run_flush_tick(
+            &registry,
+            &graph,
+            0,
+            &mut episodes,
+            |_d| {
+                replans.set(replans.get() + 1);
+                async { 1usize }
+            },
+            |_d| {
+                refills.set(refills.get() + 1);
+                balancer.mark_return_path_degraded(grace);
+                async { 1usize }
+            },
+        )
+        .await;
+        assert!(first.is_empty(), "a freshly delivering pair is not degraded");
+        assert_eq!((replans.get(), refills.get()), (0, 0), "nothing to recover yet");
+
+        // Then it goes quiet while a sibling keeps answering, until the tick names it and recovers.
+        let mut steps = Vec::new();
+        for _ in 0..SILENT_FLUSHES_BEFORE_DEGRADED {
+            mint_only(&registry, paths, destination);
+            deliver(&registry, heartbeat(), destination);
+            steps = run_flush_tick(
+                &registry,
+                &graph,
+                0,
+                &mut episodes,
+                |_d| {
+                    replans.set(replans.get() + 1);
+                    async { 1usize }
+                },
+                |_d| {
+                    refills.set(refills.get() + 1);
+                    balancer.mark_return_path_degraded(grace);
+                    async { 1usize }
+                },
+            )
+            .await;
+            if !steps.is_empty() {
+                break;
+            }
+        }
+
+        // Re-plan happened first and, because it moved traffic, a refill followed — in that order.
+        assert!(
+            matches!(
+                steps.as_slice(),
+                [
+                    RecoveryStep::Replanned { destination: d1, moved: 1 },
+                    RecoveryStep::Refilled { destination: d2, sessions: 1 },
+                ] if *d1 == destination && *d2 == destination
+            ),
+            "expected re-plan then refill for the silent destination, got {steps:?}"
+        );
+        assert_eq!(refills.get(), 1, "exactly one refill, behind the re-plan");
+
+        // The refill marked the balancer: the estimate is now stale even though supply is healthy.
+        assert!(
+            balancer.return_path_estimate_is_stale(),
+            "the refill must mark the return path degraded"
+        );
+        assert!(
+            !balancer.is_disabled(),
+            "supply-vs-delivery: SURB supply is still healthy…"
+        );
+        assert_eq!(
+            balancer.buffer_level.load(Ordering::Relaxed),
+            1000,
+            "…the buffer never left its target — the signal is delivery, not distress"
+        );
+
+        // Recovery: a reply arrives, so detection stops naming the destination and no further
+        // recovery is driven.
+        deliver(&registry, paths, destination);
+        let recovered = run_flush_tick(
+            &registry,
+            &graph,
+            0,
+            &mut episodes,
+            |_d| {
+                replans.set(replans.get() + 1);
+                async { 1usize }
+            },
+            |_d| {
+                refills.set(refills.get() + 1);
+                balancer.mark_return_path_degraded(grace);
+                async { 1usize }
+            },
+        )
+        .await;
+        assert!(
+            recovered.is_empty(),
+            "once a reply arrives the return path is no longer named silent, got {recovered:?}"
+        );
+        assert_eq!(refills.get(), 1, "no second refill after the path recovered");
+    }
+
     /// Several pairs lead to one destination, but re-planning acts on the destination.
     ///
     /// Regression: silence accrues per pair, so pairs re-armed independently and between them kept

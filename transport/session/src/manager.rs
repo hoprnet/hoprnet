@@ -217,6 +217,27 @@ impl Drop for SessionSlotGuard<'_> {
     }
 }
 
+/// Why an inbound session data packet was dropped without being delivered.
+///
+/// All three are ordinary consequences of a session tearing down or being briefly overwhelmed, not
+/// faults: a departing counterparty leaves packets in flight that arrive after its slot's sink is
+/// gone or after the slot itself is deregistered. They are reported as an [`DispatchResult::Dropped`]
+/// outcome rather than an `Err` precisely so the caller does not log them at `ERROR` — the loud
+/// teardown-race spam this distinction exists to remove.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropReason {
+    /// The slot is still registered but its data sink (receiver) has been dropped
+    /// (`TrySendError::Disconnected`). The common case when a session is being torn down.
+    SinkClosed,
+    /// The slot's inbox is full (`TrySendError::Full`): genuine backpressure, the reader is not
+    /// keeping up. Distinct from [`SinkClosed`](Self::SinkClosed) because it is transient, not a
+    /// teardown.
+    SinkFull,
+    /// No slot for this session id is registered (formerly the `UnknownData` error): the session
+    /// was fully deregistered before this packet arrived.
+    Unregistered,
+}
+
 /// Indicates the result of processing a message.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DispatchResult {
@@ -224,6 +245,9 @@ pub enum DispatchResult {
     Processed,
     /// The message was not related to Start or Session protocol.
     Unrelated(ApplicationDataIn),
+    /// The message belonged to a session but could not be delivered and was dropped. Benign — see
+    /// [`DropReason`]. Reported as `Ok` so the caller logs it quietly instead of as an `ERROR`.
+    Dropped(DropReason),
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1437,27 +1461,45 @@ where
         } else if in_data.data.application_tag == SESSION_APPLICATION_TAG {
             let session_id = pseudonym;
 
+            // How often a sustained inbox-full condition is allowed to log. Backpressure can
+            // affect every packet on the hot path, so warning per drop would reproduce exactly
+            // the ERROR spam this dispatch was rewritten to avoid — warn once per interval instead.
+            const SESSION_INBOX_FULL_WARN_INTERVAL: usize = 256;
+
             return if let Some(session_slot) = self.sessions.get(&session_id) {
                 trace!(%session_id, "received data for a registered session");
 
-                Ok(session_slot
-                    .session_tx
-                    .try_send(in_data)
-                    .map(|_| {
+                match session_slot.session_tx.try_send(in_data) {
+                    Ok(_) => {
                         #[cfg(all(feature = "telemetry", not(test)))]
                         METRIC_DISPATCHED_MSGS.increment_by(&["processed"], 1);
 
-                        DispatchResult::Processed
-                    })
-                    .map_err(|error| {
-                        error!(%session_id, %error, "failed to dispatch session data");
-                        crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        SessionManagerError::other(error)
-                    })?)
+                        Ok(DispatchResult::Processed)
+                    }
+                    // Benign teardown race: the slot is still registered but its data sink was
+                    // dropped. Quiet on purpose — see [`DropReason`].
+                    Err(crossfire::TrySendError::Disconnected(_)) => {
+                        trace!(%session_id, "dropping data for a session whose sink has closed");
+                        crate::counters::SESSION_INBOX_CLOSED_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        Ok(DispatchResult::Dropped(DropReason::SinkClosed))
+                    }
+                    // Genuine backpressure: the reader is not keeping up. Rate-limited so a
+                    // sustained overload cannot become per-packet log spam.
+                    Err(crossfire::TrySendError::Full(_)) => {
+                        let prev =
+                            crate::counters::SESSION_INBOX_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        if prev.is_multiple_of(SESSION_INBOX_FULL_WARN_INTERVAL) {
+                            warn!(%session_id, dropped = prev + 1, "session inbox full, dropping data (backpressure)");
+                        }
+                        Ok(DispatchResult::Dropped(DropReason::SinkFull))
+                    }
+                }
             } else {
-                error!(%session_id, "received data from an unestablished session");
+                // Fully deregistered session: packets still in flight for a torn-down session.
+                // Quiet — see [`DropReason::Unregistered`].
+                trace!(%session_id, "dropping data for an unregistered session");
                 crate::counters::SESSION_UNKNOWN_DATA_DROPS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                Err(TransportSessionError::UnknownData)
+                Ok(DispatchResult::Dropped(DropReason::Unregistered))
             };
         }
 
@@ -1476,8 +1518,8 @@ where
     /// Intended for benchmarks that need a session to exist before calling
     /// [`SessionManager::dispatch_message`].
     ///
-    /// Requires the `"benchmark"` feature.
-    #[cfg(feature = "benchmark")]
+    /// Requires the `"benchmark"` feature (or a test build).
+    #[cfg(any(feature = "benchmark", test))]
     pub fn pre_populate_session(&self, session_id: SessionId, routing_opts: DestinationRouting) {
         let (session_tx, _) =
             crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(self.cfg.session_forward_capacity);
@@ -1494,8 +1536,8 @@ where
     /// Like [`pre_populate_session`](SessionManager::pre_populate_session) but also returns the
     /// session channel receiver so the caller can spawn a drain task.
     ///
-    /// Requires the `"benchmark"` feature.
-    #[cfg(feature = "benchmark")]
+    /// Requires the `"benchmark"` feature (or a test build).
+    #[cfg(any(feature = "benchmark", test))]
     pub fn pre_populate_session_with_receiver(
         &self,
         session_id: SessionId,
@@ -3716,38 +3758,105 @@ mod tests {
         Ok(())
     }
 
+    /// Convenience: a session data packet carrying `payload`.
+    #[cfg(test)]
+    fn session_data_packet(payload: &[u8]) -> anyhow::Result<ApplicationDataIn> {
+        Ok(ApplicationDataIn {
+            data: ApplicationData::new(SESSION_APPLICATION_TAG, payload)?,
+            packet_info: Default::default(),
+        })
+    }
+
+    /// The manager sink type used by the dispatch drop tests, which never open a session and so
+    /// never exercise the sink — its concrete type only needs to be nameable.
+    #[cfg(test)]
+    type TestManager =
+        SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>>;
+
+    // Test B (fully deregistered): a data packet for a session id absent from the registry is a
+    // benign, quiet drop counted as UnknownData — NOT an error, and NOT one ERROR log per packet.
+    // Under the old behaviour this returned `Err(UnknownData)` and the caller logged it at ERROR,
+    // which is what produced the per-packet spam during the incident.
     #[test_log::test(tokio::test)]
-    async fn session_manager_should_return_unknown_data_error_when_dispatching_to_unknown_session() -> anyhow::Result<()>
-    {
-        let mgr: SessionManager<futures::channel::mpsc::UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
-            SessionManager::new(Default::default());
+    async fn dispatching_to_an_unregistered_session_should_be_a_quiet_counted_drop() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
 
-        let transport = MockMsgSender::new();
-        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
-        let _notifications = tokio::spawn(async move {
-            pin_mut!(new_session_rx);
-            while let Some(_session) = new_session_rx.next().await {}
-        });
-        let (sender, _handle) = mock_packet_planning(transport);
-        mgr.start(sender.clone(), new_session_tx)?;
-        assert!(mgr.is_started());
-
-        // Send data with session application tag but no session exists
         let pseudonym = HoprPseudonym::random();
-        let result = mgr.dispatch_message(
-            pseudonym,
-            ApplicationDataIn {
-                data: ApplicationData::new(SESSION_APPLICATION_TAG, b"test data")?,
-                packet_info: Default::default(),
-            },
+        let before = crate::counters::session_unknown_data_drop_count();
+
+        // N packets → N drops, each an Ok(Dropped(Unregistered)), no panic, no unbounded error.
+        const N: usize = 5;
+        for _ in 0..N {
+            let result = mgr.dispatch_message(pseudonym, session_data_packet(b"test data")?);
+            assert!(
+                matches!(result, Ok(DispatchResult::Dropped(DropReason::Unregistered))),
+                "unregistered-session packet must be a benign Dropped(Unregistered), got {result:?}"
+            );
+        }
+
+        // Counter advanced by at least N (>= rather than == because it is a process-global atomic
+        // other tests in this binary may also touch).
+        assert!(crate::counters::session_unknown_data_drop_count() >= before + N);
+
+        Ok(())
+    }
+
+    // Test A (primary regression): a data packet for a session whose data sink has been dropped
+    // while the slot is still registered must be dropped quietly as SinkClosed — NOT an error.
+    // This is the "sending on a disconnected channel" ERROR from the incident. The bad-behaviour
+    // assertion is the silent-vs-loud distinction: the result is Ok(Dropped(SinkClosed)), not Err,
+    // and specifically not SinkFull (which would misattribute a teardown as backpressure).
+    #[test_log::test(tokio::test)]
+    async fn dispatching_to_a_session_whose_sink_closed_should_be_a_quiet_counted_drop() -> anyhow::Result<()> {
+        let mgr: TestManager = SessionManager::new(Default::default());
+
+        // `pre_populate_session` registers the slot and immediately drops its receiver, so the
+        // sink is closed while the slot is still present — exactly the incident's race.
+        let pseudonym = HoprPseudonym::random();
+        mgr.pre_populate_session(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        let before = crate::counters::session_inbox_closed_drop_count();
+        let result = mgr.dispatch_message(pseudonym, session_data_packet(b"after teardown")?);
+
+        assert!(
+            matches!(result, Ok(DispatchResult::Dropped(DropReason::SinkClosed))),
+            "closed-sink packet must be a benign Dropped(SinkClosed), not an error or SinkFull, got {result:?}"
+        );
+        assert!(crate::counters::session_inbox_closed_drop_count() > before);
+
+        Ok(())
+    }
+
+    // Genuine backpressure (inbox full, reader alive but not keeping up) is distinct from a
+    // teardown: it is Dropped(SinkFull) and counted in SESSION_INBOX_DROPS, not the closed counter.
+    #[test_log::test(tokio::test)]
+    async fn dispatching_to_a_full_session_inbox_should_be_a_backpressure_drop() -> anyhow::Result<()> {
+        // Capacity 1 so a single unread packet fills the inbox deterministically.
+        let cfg = SessionManagerConfig {
+            session_forward_capacity: 1,
+            ..Default::default()
+        };
+        let mgr: TestManager = SessionManager::new(cfg);
+
+        // Keep the receiver alive but never read it, so the channel is open but saturates.
+        let pseudonym = HoprPseudonym::random();
+        let _rx = mgr.pre_populate_session_with_receiver(pseudonym, DestinationRouting::Return(pseudonym.into()));
+
+        // First packet fills the single slot and is accepted.
+        let accepted = mgr.dispatch_message(pseudonym, session_data_packet(b"fills the slot")?);
+        assert!(
+            matches!(accepted, Ok(DispatchResult::Processed)),
+            "first packet should be accepted, got {accepted:?}"
         );
 
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TransportSessionError::UnknownData));
-
-        // Cleanup: close sender and await handle
-        sender.close_channel();
-        let _ = _handle.await;
+        // Second packet finds the inbox full → backpressure drop.
+        let before = crate::counters::session_inbox_drop_count();
+        let overflow = mgr.dispatch_message(pseudonym, session_data_packet(b"overflows")?);
+        assert!(
+            matches!(overflow, Ok(DispatchResult::Dropped(DropReason::SinkFull))),
+            "overflow packet must be a Dropped(SinkFull) backpressure drop, got {overflow:?}"
+        );
+        assert!(crate::counters::session_inbox_drop_count() > before);
 
         Ok(())
     }

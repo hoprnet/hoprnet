@@ -1159,4 +1159,52 @@ mod tests {
             "expected at least one decay step: {levels:?}"
         );
     }
+
+    // --- return-path-degraded deadline primitive (Test C, gap 1) ---------------------------------
+    //
+    // The behavioural loop tests above (sustain / ignore-unless-opted-in / return-to-closed-loop /
+    // refill) already cover how the balancer *reacts* to the signal. What they do not isolate are
+    // three edge cases of the `mark_return_path_degraded` / `return_path_estimate_is_stale`
+    // deadline primitive itself, each guarding a specific correctness invariant.
+
+    /// The zero-guard: never marked is never degraded. `return_path_degraded_until_ms == 0` means
+    /// "never marked", not "marked at the epoch" — without the explicit `deadline > 0` check every
+    /// opted-in session would believe its return path was dead from the first packet.
+    #[test]
+    fn return_path_should_not_be_stale_before_it_is_ever_marked() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        assert!(!state.return_path_estimate_is_stale());
+    }
+
+    /// The window expires on its own, independently of any recovery signal. The behavioural tests
+    /// clear the degraded state by resuming replies; this pins the other exit — a marker nobody
+    /// ever withdraws must still lapse, bounding over-production to the grace window. Marking with a
+    /// zero grace sets the deadline to "now"; the monotonic clock only moves forward, so the
+    /// subsequent read is already past it — no sleep, no flake.
+    #[test]
+    fn an_expired_degraded_window_should_no_longer_be_stale() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::ZERO);
+        assert!(!state.return_path_estimate_is_stale());
+    }
+
+    /// Re-marking extends the window: an already-expired deadline followed by a fresh mark is stale
+    /// again. Guards the `fetch_max` in `mark_return_path_degraded`.
+    #[test]
+    fn re_marking_should_reopen_an_expired_window() {
+        let state = BalancerStateValues::new(SurbBalancerConfig {
+            sustain_on_return_path_loss: true,
+            ..Default::default()
+        });
+        state.mark_return_path_degraded(Duration::ZERO);
+        assert!(!state.return_path_estimate_is_stale());
+        state.mark_return_path_degraded(Duration::from_secs(10));
+        assert!(state.return_path_estimate_is_stale());
+    }
 }
