@@ -146,6 +146,14 @@ async fn open_path_channels(
     cluster: &hopr_lib::testing::fixtures::RoleClusterGuard,
     hops: usize,
 ) -> anyhow::Result<()> {
+    // `hops.saturating_sub(1)` below shows the zero case was considered, but the two `relays`
+    // indices around it are unguarded and `hops - 1` underflows before either can fail. No caller
+    // passes zero today; this is a shared helper taking `hops` as a parameter, so say so rather
+    // than leaving the next one an arithmetic panic.
+    if hops == 0 {
+        anyhow::bail!("open_path_channels needs at least one relay; a zero-hop path has no channels to open");
+    }
+
     tracing::info!("opening channels");
     let funding = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
@@ -986,9 +994,11 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
     let session = establish_pix_session(&cluster, hops).await?;
     tracing::info!("session established");
 
-    // Traffic is what moves shares, so the cycles only advance while this runs. Why it eventually
-    // stops is not this test's subject — the assertions below are all about PIX events.
-    let echo_handle = spawn_echo_task(session, EchoStopCell::default(), Duration::from_secs(10));
+    // Traffic is what moves shares, so the cycles only advance while this runs. The stop reason is
+    // kept rather than discarded: it is not what this test asserts, but it is the difference between
+    // the two ways the observation below can time out — see the diagnostic there.
+    let echo_stopped = EchoStopCell::default();
+    let echo_handle = spawn_echo_task(session, echo_stopped.clone(), Duration::from_secs(10));
 
     // ── Observe two consecutive batches ───────────────────────────────────
     let mut entry_ids: Vec<hopr_api::node::PixAddressId> = Vec::new();
@@ -1067,10 +1077,21 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
         anyhow::Ok(())
     };
 
-    tokio::time::timeout(BATCH_OBSERVATION_BUDGET, observe).await.context(
-        "timed out observing two SSA batches — the Exit most likely stopped requesting SSAs after the first batch, \
-         which is how an off-by-one in the supervisor's index bookkeeping manifests",
-    )??;
+    // The stop cell is reported rather than a cause asserted. Shares travel only with data-packet
+    // acknowledgements, so a dead echo task halts every cycle and produces exactly the same timeout
+    // as the supervisor defect this test is looking for — and at a 150 s budget, naming the wrong
+    // one is an expensive thing to hand an operator.
+    tokio::time::timeout(BATCH_OBSERVATION_BUDGET, observe)
+        .await
+        .with_context(|| {
+            format!(
+                "timed out observing two SSA batches (echo task: {:?}). Still running means the Exit most likely \
+                 stopped requesting SSAs after the first batch, which is how an off-by-one in the supervisor's index \
+                 bookkeeping manifests; already stopped means the cycles simply ran out of traffic and this says \
+                 nothing about the supervisor",
+                echo_stopped.get()
+            )
+        })??;
 
     // ── 1. The whole batch is allocated before the first cycle completes ──
     let before_first_recovery = addresses_before_first_recovery.context("the Exit never recovered a key")?;
