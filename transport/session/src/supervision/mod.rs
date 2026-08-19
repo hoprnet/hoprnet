@@ -957,6 +957,28 @@ pub fn validate_pix_supervision(
             )));
         }
     }
+    // The two recovery clocks measure different things and only one of them is an anti-drip rule.
+    // `max_recovery_idle` is service-gated, so it spares a Session that is merely quiet and closes
+    // one that is consuming service while returning nothing. `max_recovery_time` is neither gated nor
+    // refreshable — it is a resource backstop for the slot and the reconstructor state, and is
+    // documented as such throughout this module.
+    //
+    // Set at or below the idle deadline, the backstop fires first on *every* cycle. The idle rule —
+    // the only instrument that can tell a slow honest Session from a cheating one — becomes
+    // unreachable, and honest Sessions are closed on `RecoveryDeadline` instead. Both values pass
+    // every check above individually, so this inversion is invisible unless the two are compared.
+    //
+    // Checked after the cap loop deliberately. An over-cap `max_recovery_idle` cannot satisfy this
+    // rule either — no legal `max_recovery_time` exceeds it — so running this first would make the
+    // cap's own `max_recovery_idle` branch unreachable and swap a precise diagnostic for a vaguer
+    // one. Representability first, then policy.
+    if cfg.max_recovery_time <= cfg.max_recovery_idle {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "max_recovery_time ({:?}) must be > max_recovery_idle ({:?}); the hard deadline is a resource backstop, \
+             and at or below the idle deadline it pre-empts the service-gated idle rule on every cycle",
+            cfg.max_recovery_time, cfg.max_recovery_idle
+        )));
+    }
     Ok(())
 }
 
@@ -1198,8 +1220,47 @@ mod tests {
         );
     }
 
+    /// The hard recovery deadline is a backstop, so it has to sit outside the rule that should bind.
+    ///
+    /// `max_recovery_idle` is service-gated and `max_recovery_time` is not, so inverting them does not
+    /// merely reorder two timeouts: the ungated deadline fires on every cycle and the gated one — the
+    /// only rule that distinguishes a quiet Session from a cheating one — is never consulted. Both
+    /// values are individually legal at every boundary tested elsewhere in this module, so nothing
+    /// short of comparing them catches it.
+    #[test]
+    fn validation_rejects_a_recovery_deadline_that_pre_empts_the_idle_rule() {
+        let mut cfg = valid_cfg();
+        let rcn = valid_rcn_cfg();
+        let idle = cfg.max_recovery_idle;
+
+        cfg.max_recovery_time = idle;
+        assert!(
+            validate_pix_supervision(&cfg, &rcn).is_err(),
+            "equal must reject: a backstop that expires with the rule it backs up has replaced it"
+        );
+
+        cfg.max_recovery_time = idle - Duration::from_secs(1);
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err(), "below must reject");
+
+        cfg.max_recovery_time = idle + Duration::from_secs(1);
+        assert!(
+            validate_pix_supervision(&cfg, &rcn).is_ok(),
+            "strictly above is the whole requirement; how far above is an operator's call"
+        );
+
+        let shipped = SupervisorConfig::default();
+        assert!(
+            shipped.max_recovery_time > shipped.max_recovery_idle,
+            "the shipped defaults must themselves satisfy the rule"
+        );
+    }
+
     /// `max_recovery_idle` is bounded from both directions, so its cap check must be reachable
     /// without first tripping the verifier-lifetime rule above.
+    ///
+    /// The recovery-clock pairing rule is checked after the duration cap for this reason: an idle
+    /// deadline above the cap admits no legal `max_recovery_time` greater than it, so running the
+    /// pairing first would make this branch unreachable.
     #[test]
     fn validation_rejects_an_over_cap_idle_against_a_long_verifier_lifetime() {
         let mut cfg = valid_cfg();
