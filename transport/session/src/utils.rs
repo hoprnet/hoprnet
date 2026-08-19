@@ -530,7 +530,11 @@ mod tests {
         let waker = std::task::Waker::from(Arc::new(ReentrantWaker(n.clone())));
         let mut cx = std::task::Context::from_waker(&waker);
 
-        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending, "the first poll registers the waker");
+        assert_eq!(
+            fut.poll_unpin(&mut cx),
+            Poll::Pending,
+            "the first poll registers the waker"
+        );
 
         n.notify_waiters();
 
