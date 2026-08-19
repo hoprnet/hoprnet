@@ -2835,11 +2835,18 @@ mod tests {
     #[test]
     fn an_invalid_share_for_a_completed_polynomial_is_not_liveness() -> anyhow::Result<()> {
         let peer = OffchainKeypair::random();
-        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(2, 2, 0, &peer)?;
+        // The negotiated surplus must be non-zero, and that is the whole reason this test can fail.
+        // At a surplus of zero `max_credited_surplus` is zero too, so a share arriving for a
+        // completed polynomial is refused as `SurplusOverBudget` whichever side of the
+        // `reconstructed` check the zero-coordinate validation sits on — and the assertion below
+        // would hold even with the laundering channel wide open.
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(2, 2, 1, &peer)?;
 
-        // Emission alternates polynomials. The first and third acknowledgements complete polynomial
-        // zero while polynomial one — and therefore the cycle — remains incomplete.
-        for ack in acks.into_iter().step_by(2) {
+        // Emission alternates polynomials, so the even positions are polynomial zero's shares. Only
+        // `threshold` of them are needed to complete it; taking exactly two leaves its surplus
+        // credit unspent, which is the state an Entry would want to launder a malformed share
+        // through. Polynomial one is never touched, so the cycle stays incomplete.
+        for ack in acks.into_iter().step_by(2).take(2) {
             reconstructor.acknowledge_shares(*peer.public(), vec![ack])?;
         }
 
@@ -2859,6 +2866,14 @@ mod tests {
         assert!(
             resolutions.iter().all(|r| !matches!(r, ShareResolution::Progress(_))),
             "a provably invalid zero share must not reset the service gate; got {resolutions:?}"
+        );
+        // Stated positively as well, so the test cannot pass by the share being dropped somewhere
+        // upstream of the validation it exists to pin.
+        assert!(
+            resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::InvalidShares { ssa_id: id, .. } if *id == ssa_id)),
+            "the share must be reported as a fault, not merely absorbed; got {resolutions:?}"
         );
 
         Ok(())
