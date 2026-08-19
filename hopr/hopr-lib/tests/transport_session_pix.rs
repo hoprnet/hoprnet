@@ -597,18 +597,34 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
         "the Session must be observed *closed*, not merely quiet; got {stop:?}"
     );
 
-    // And it must have closed on the deposit clock: no earlier than the deadline, and far enough
-    // inside the others that none of them could have been what fired.
+    // Attribution comes from the observation budget, not from comparing `elapsed` against
+    // OTHER_CLOCKS. The loop above is wrapped in a timeout of MAX_DEPOSIT_WAIT + OBSERVATION_SLACK,
+    // so `elapsed` cannot reach OTHER_CLOCKS and an assertion against it could never fail — it
+    // looked like it established attribution and established nothing. What actually has to hold is
+    // a property of the setup, so that is what is asserted: every other clock configured beyond the
+    // window in which the closure is observed. Lower one of them under the budget and this fails,
+    // which is the edit that would silently destroy the attribution.
+    assert!(
+        OTHER_CLOCKS > MAX_DEPOSIT_WAIT + OBSERVATION_SLACK,
+        "the other supervisor clocks ({OTHER_CLOCKS:?}) must sit outside the observation budget ({:?}), or a closure \
+         seen inside it cannot be attributed to the deposit deadline",
+        MAX_DEPOSIT_WAIT + OBSERVATION_SLACK
+    );
+
+    // And it must not have closed before the deadline could expire, which is what rules out an
+    // immediate failure wearing the deposit clock's clothes.
+    //
+    // `armed_at` is taken when this test's event stream *delivers* `DepositAddressReceived`, which is
+    // strictly after the Exit armed the clock, so the measured interval understates the real one by
+    // however long that delivery took. Against a 5 s deadline on a loaded cluster that is not a
+    // negligible fraction, hence the tolerance: without it a slow stream fails the test and reports
+    // it as "something other than the deposit deadline closed it".
+    const DELIVERY_LAG_TOLERANCE: Duration = Duration::from_secs(1);
     let elapsed = stopped_at.saturating_duration_since(armed_at);
     assert!(
-        elapsed >= MAX_DEPOSIT_WAIT,
-        "closed {elapsed:?} after the deposit clock was armed, before its {MAX_DEPOSIT_WAIT:?} deadline could expire \
-         — so something other than the deposit deadline closed it"
-    );
-    assert!(
-        elapsed < OTHER_CLOCKS,
-        "closed {elapsed:?} after the deposit clock was armed, which is past the {OTHER_CLOCKS:?} the other clocks \
-         are set to — the closure cannot be attributed to the deposit deadline"
+        elapsed + DELIVERY_LAG_TOLERANCE >= MAX_DEPOSIT_WAIT,
+        "closed {elapsed:?} after the deposit clock was observed armed, more than {DELIVERY_LAG_TOLERANCE:?} short of \
+         its {MAX_DEPOSIT_WAIT:?} deadline — so something other than the deposit deadline closed it"
     );
     tracing::info!(?elapsed, ?stop, "closed on the deposit deadline");
 
