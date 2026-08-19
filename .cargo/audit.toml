@@ -22,18 +22,6 @@ informational_warnings = ["unmaintained"]
 severity_threshold = "low"
 
 [database]
-# No `path` key on purpose. cargo-audit does not expand `~` read from this file: it takes the value
-# literally, relative to the working directory, so `path = "~/.cargo/advisory-db"` made `cargo audit`
-# clone ~40 MB into a directory actually named `~` in the repo root, once per checkout.
-#
-# `.gitignore` used to carry two entries spelled `~/.cargo/advisory-db`, which git reads as
-# repository-relative — so they matched that clone and kept it out of `git status` entirely. The copy
-# was invisible rather than merely untracked, and only `git status --ignored` showed it. Those two
-# entries are removed with this change: they described the bug rather than anything intended, and the
-# directory they were hiding is no longer created.
-#
-# The `--db` default is already `~/.cargo/advisory-db` and *is* expanded correctly, so naming it here
-# only broke the thing it was restating.
 url = "https://github.com/RustSec/advisory-db.git"
 fetch = true
 stale = false
