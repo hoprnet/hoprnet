@@ -207,6 +207,17 @@ pub const MAX_POLY_THRESHOLD: u8 = u8::MAX;
 /// early-recovery logic in a unit test needs thresholds well below anything deployable.
 pub const MIN_EARLY_RECOVERY_THRESHOLD: f64 = 0.85;
 
+// The shipped default must itself be admissible under the floor it is checked against. The two are
+// defined independently and only compared at configuration time, so a default lowered below this
+// would ship, validate every hand-written config, and then be rejected the moment an operator wrote
+// the default out explicitly — or worse, be accepted locally and refused by every conforming Entry.
+// Asserted here rather than only in a test because it costs nothing and cannot be skipped.
+const _: () = assert!(
+    SsaReconstructorConfig::DEFAULT_EARLY_RECOVERY_THRESHOLD >= MIN_EARLY_RECOVERY_THRESHOLD,
+    "SsaReconstructorConfig::DEFAULT_EARLY_RECOVERY_THRESHOLD must not sit below MIN_EARLY_RECOVERY_THRESHOLD — a \
+     stock Exit would ask for its next SSA batch before any conforming Entry admits the request"
+);
+
 /// Specification of the Protocol for Incentivization of eXits (PIX) instantiation.
 pub trait PixSpec: Send + Sync + 'static
 where
