@@ -521,10 +521,25 @@ enum ProcessedAckResult<S: PixSpec> {
 ///
 /// Concurrent batches share a cycle's counters, so snapshots taken microseconds apart can be
 /// unordered. Keeping the maximum means one batch never reports its own SSA going backwards.
+///
+/// Merged **componentwise** rather than by choosing one snapshot whole, because the counters are two
+/// independent axes and a batch can advance either alone. A surplus share moves only `shares_seen`,
+/// so selecting on `useful_shares` discarded exactly the snapshots that say an Entry is still
+/// serving during a surplus run — the run this crate emits `Progressed` for in the first place, and
+/// the axis the Session layer's egress gate and idle deadline both read. Selecting on `shares_seen`
+/// instead would only move the same defect onto the other axis, since the two orderings disagree
+/// precisely when a snapshot is worth keeping.
+///
+/// Every field merged here is monotone over a cycle's life, so the componentwise maximum is itself a
+/// reachable state rather than an artefact. `target_useful_shares` is fixed at construction and
+/// `ssa_id` is the key, so neither is merged.
 fn record_progress<P: PartialEq>(acc: &mut Vec<SsaRecoveryProgress<P>>, snapshot: SsaRecoveryProgress<P>) {
     match acc.iter_mut().find(|p| p.ssa_id == snapshot.ssa_id) {
-        Some(existing) if existing.useful_shares >= snapshot.useful_shares => {}
-        Some(existing) => *existing = snapshot,
+        Some(existing) => {
+            existing.useful_shares = existing.useful_shares.max(snapshot.useful_shares);
+            existing.shares_seen = existing.shares_seen.max(snapshot.shares_seen);
+            existing.recovered_polynomials = existing.recovered_polynomials.max(snapshot.recovered_polynomials);
+        }
         None => acc.push(snapshot),
     }
 }
@@ -2702,6 +2717,49 @@ mod tests {
             snapshots,
             "(useful, seen): the third entry is the surplus share — seen advances, useful holds. The sixth share \
              arrives after full recovery removed the cycle, so it reports nothing."
+        );
+
+        Ok(())
+    }
+
+    /// A batch that ends on a surplus share reports that share's liveness, not the batch's last
+    /// *useful* one.
+    ///
+    /// Every other test in this module feeds acknowledgements one at a time, so each batch carries a
+    /// single snapshot and `record_progress` never has to merge anything. Batching is what makes the
+    /// merge observable, and the merge is where a surplus run can be lost: the two counters are
+    /// independent axes, and a selector keyed on `useful_shares` alone keeps the older snapshot for
+    /// every share that advances only `shares_seen`.
+    ///
+    /// That is not a cosmetic loss. `shares_seen` is the axis the Session layer's egress gate and
+    /// recovery-idle deadline both read, precisely so that the `surplus × window` run at the end of
+    /// every emission window is not mistaken for the Entry falling silent. Dropping the surplus
+    /// snapshot inside a batch reinstates exactly the reading those consumers were built to avoid.
+    #[test]
+    fn a_batch_ending_in_surplus_reports_the_surplus_share() -> anyhow::Result<()> {
+        let peer = OffchainKeypair::random();
+        let (reconstructor, _ssa_id, acks) = cycle_with_pending_acks(2, 2, 1, &peer)?;
+
+        // Emission alternates polynomials, so the even positions are polynomial zero's three shares:
+        // two useful, then one surplus. Handed over as a single batch, they collapse to one snapshot.
+        let batch: Vec<_> = acks.into_iter().step_by(2).collect();
+        assert_eq!(3, batch.len(), "threshold 2 plus 1 surplus for polynomial zero");
+
+        let snapshots: Vec<_> = reconstructor
+            .acknowledge_shares(*peer.public(), batch)?
+            .into_iter()
+            .filter_map(|r| match r {
+                ShareResolution::Progress(p) => Some((p.useful_shares, p.shares_seen)),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            vec![(2, 3)],
+            snapshots,
+            "(useful, seen): the batch's last share is surplus, so `seen` must reach 3 while `useful` holds at 2. \
+             Reporting (2, 2) means the surplus snapshot was discarded for having an equal `useful_shares`, and the \
+             Exit sees a batch it was served as one it was not."
         );
 
         Ok(())

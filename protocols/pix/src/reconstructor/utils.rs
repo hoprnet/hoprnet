@@ -130,9 +130,16 @@ impl<S: PixSpec> SsaCycle<S> {
     }
 
     /// Records a share that advanced reconstruction — both a useful share and a share seen.
+    ///
+    /// `shares_seen` first, so that in program order the counters never pass through a state where
+    /// `useful_shares` leads. [`SsaRecoveryProgress::shares_seen`] promises to be at least
+    /// `useful_shares`, and a consumer computing the surplus as the difference would otherwise
+    /// underflow a `u64` on the intermediate state. The two are separate `Relaxed` atomics, so this
+    /// alone does not settle what another thread observes — [`progress`](Self::progress) clamps for
+    /// that — but it removes the window rather than only papering over it.
     pub fn record_useful_share(&self) {
-        self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
         self.shares_seen.fetch_add(1, PROGRESS_ORDERING);
+        self.useful_shares.fetch_add(1, PROGRESS_ORDERING);
     }
 
     /// Records a share that arrived for an already-reconstructed polynomial.
@@ -161,11 +168,20 @@ impl<S: PixSpec> SsaCycle<S> {
     }
 
     /// Absolute recovery progress for this cycle.
+    ///
+    /// The two share counters are independent `Relaxed` atomics, so a reader can observe them in
+    /// either order regardless of the order they were written in. `useful_shares` is loaded first and
+    /// `shares_seen` clamped up to it, which is what actually makes
+    /// [`SsaRecoveryProgress::shares_seen`]'s "always at least `useful_shares`" a contract rather
+    /// than a description: a consumer deriving the surplus as the difference cannot underflow. The
+    /// clamp is engaged only for the instant a concurrent [`record_useful_share`](Self::record_useful_share)
+    /// is mid-flight, and overstates `shares_seen` by at most the number of such writers.
     pub fn progress(&self) -> SsaRecoveryProgress<S::Pseudonym> {
+        let useful_shares = self.useful_shares.load(PROGRESS_ORDERING);
         SsaRecoveryProgress {
             ssa_id: self.id,
-            useful_shares: self.useful_shares.load(PROGRESS_ORDERING),
-            shares_seen: self.shares_seen.load(PROGRESS_ORDERING),
+            useful_shares,
+            shares_seen: self.shares_seen.load(PROGRESS_ORDERING).max(useful_shares),
             target_useful_shares: self.target_useful_shares,
             // Bounded by `num_polys`, itself bounded by `MAX_POLYS_PER_SSA`, so the saturation
             // below is unreachable rather than lossy.
