@@ -988,8 +988,12 @@ pub(crate) fn scaled_deadline(per_cycle: Duration, ssas_per_request: usize) -> D
 // Tests
 // ---------------------------------------------------------------------------
 
+// Deliberately *not* gated on `runtime-tokio`: every test below is a synchronous `#[test]` over the
+// pure validator, and `default = []`, so a feature gate here removed the whole suite from
+// `cargo test -p hopr-transport-session`. The gate was invisible because the workspace build
+// unifies the feature in from other crates — the coverage was only missing for the one command an
+// operator of this crate would run.
 #[cfg(test)]
-#[cfg(feature = "runtime-tokio")]
 mod tests {
     use std::time::Duration;
 
