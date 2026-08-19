@@ -202,20 +202,21 @@ pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 ///
 /// The arithmetic, at the time of writing and at the deployed dimensions:
 ///
-/// * measured per polynomial, share buffers excluded: **876 B**;
-/// * of which `size_of` accounts for **458 B**, leaving a **418 B** residue the types cannot see;
-/// * this constant is **704 B**, ~1.7× that residue, so the model charges 458 + 704 = **1162 B** per polynomial — ~33 %
+/// * measured per polynomial, share buffers excluded: **~880–905 B**. A range because it is a range: the
+///   acknowledgement residue is a scheduling artefact, and two runs of the same test on the same machine gave 876 B and
+///   904 B. That variance is the reason this constant is set with headroom rather than at the measurement;
+/// * of which `size_of` accounts for **458 B**, leaving a **~420–450 B** residue the types cannot see;
+/// * this constant is **704 B**, ~1.6× that residue, so the model charges 458 + 704 = **1162 B** per polynomial — ~30 %
 ///   above the measurement;
 /// * across a whole cycle that dilutes to ~6 %, because the share buffers are modelled exactly and dominate: **41.1
 ///   MiB** modelled against **38.8 MiB** measured, of which 32.0 MiB is share buffers.
 ///
-/// Both headroom figures are worth keeping straight, because they answer different questions: ~33 %
+/// Both headroom figures are worth keeping straight, because they answer different questions: ~30 %
 /// is the margin on the term this constant actually sets, and ~6 % is the margin on the number the
 /// Session layer's live-cycle budget is denominated in.
 ///
-/// Headroom rather than the measured figure because the acknowledgement residue above is a
-/// scheduling artefact and will not reproduce identically, and because understating this would let
-/// that budget be exceeded.
+/// Headroom rather than the measured figure for the variance above, and because understating this
+/// would let that budget be exceeded.
 pub const PART_BUILDER_OVERHEAD_BYTES: usize = 704;
 
 /// Live heap one entry in the retirement tombstone set costs, in bytes.
@@ -262,6 +263,26 @@ pub const TOMBSTONE_ENTRY_BYTES: usize = 288;
 /// derivation rather than assume it still holds.
 pub const MAX_RETIRED_SSAS: usize = 262_144;
 
+/// The per-polynomial share buffer [`peak_cycle_bytes`] models, in bytes.
+///
+/// `Vec` doubles from a minimum of four elements, so a buffer holding `threshold - 1` shares has a
+/// capacity of `threshold.next_power_of_two()` — up to twice what is stored. Modelling the
+/// allocation rather than the occupancy is what makes [`peak_cycle_bytes`] a ceiling.
+///
+/// Public because it is the one term of that model a consumer has reason to subtract back out:
+/// `tests/memory_profile.rs` reports the per-polynomial figure both with and without it, since the
+/// buffers dominate at the deployed dimensions and the residue is what
+/// [`PART_BUILDER_OVERHEAD_BYTES`] is set against. Restating the expression at the call site is what
+/// this exists to prevent — an external caller cannot reproduce it even in principle, because
+/// `CompletedShare` is crate-private and they would have to assume it is two scalars. True of the
+/// shipped specs, and not what the model reads.
+pub fn peak_share_buffer_bytes<S: PixSpec>(params: &PixParams) -> u64 {
+    (params.shares_per_poly() as u64)
+        .next_power_of_two()
+        .max(4)
+        .saturating_mul(size_of::<CompletedShare<S>>() as u64)
+}
+
 /// Worst-case live heap one Exit-side SSA cycle can hold, in bytes.
 ///
 /// This is the figure the Session layer's live-cycle budget is denominated in, and it is
@@ -282,13 +303,7 @@ pub const MAX_RETIRED_SSAS: usize = 262_144;
 /// [`max_ack_buffer_bytes`](SsaReconstructorConfig::max_ack_buffer_bytes) — counting it here would
 /// charge the same bytes twice.
 pub fn peak_cycle_bytes<S: PixSpec>(params: &PixParams) -> u64 {
-    // `Vec` doubles from a minimum of four elements, so a buffer holding `threshold - 1` shares has
-    // a capacity of `threshold.next_power_of_two()` — up to twice what is stored. Modelling the
-    // allocation rather than the occupancy is what makes this a ceiling.
-    let share_buffer = (params.shares_per_poly() as u64)
-        .next_power_of_two()
-        .max(4)
-        .saturating_mul(size_of::<CompletedShare<S>>() as u64);
+    let share_buffer = peak_share_buffer_bytes::<S>(params);
 
     // Read from the types rather than restated as a constant, so the model follows the curve this
     // node was built for and cannot drift when a field is added to either struct.

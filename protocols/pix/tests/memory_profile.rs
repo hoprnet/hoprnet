@@ -31,7 +31,7 @@ use hopr_protocol_pix::{
     AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixScalar,
     ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
-    TOMBSTONE_ENTRY_BYTES, TaggedEncryptedPartialSsaShare, peak_cycle_bytes,
+    TOMBSTONE_ENTRY_BYTES, TaggedEncryptedPartialSsaShare, peak_cycle_bytes, peak_share_buffer_bytes,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
@@ -91,6 +91,21 @@ struct TrackingAllocator;
 
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
+
+/// Serializes the four tests that measure `LIVE` or re-arm `PEAK`.
+///
+/// Both counters are process-global, so two measuring tests running as threads of one binary
+/// observe each other's allocations: one re-arms the high-water mark under the other, and each
+/// reads the other's live bytes against its own baseline. `cargo nextest` gives every test its own
+/// process and does not need this; `cargo test` runs a binary's tests as threads and does.
+///
+/// Worth guarding even though the repository standardises on nextest, because of what these tests
+/// assert. They are memory *ceilings* — `peak_over_baseline <= modelled` and
+/// `live / entries <= TOMBSTONE_ENTRY_BYTES` — so a false failure reads as a genuine regression
+/// against `peak_cycle_bytes`, which is among the most expensive things here to chase. The
+/// `#[ignore]` attributes reduce the exposure but do not remove it: these are run deliberately, and
+/// more than one at a time.
+static MEASURING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
@@ -196,6 +211,9 @@ fn stage_shares(
 #[test]
 #[ignore]
 fn awaiting_ack_entry_cost() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     /// Occupancy points to report. The last is the figure to quote.
     const POINTS: [usize; 2] = [20_000, 100_000];
 
@@ -309,6 +327,9 @@ fn awaiting_ack_entry_cost() {
 #[test]
 #[ignore]
 fn exit_reconstructor_memory_profile_at_production_dimensions() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     let polys = PROD_POLYS_PER_SSA as usize;
     let threshold = PROD_THRESHOLD as usize;
     let commitments = polys * threshold;
@@ -471,10 +492,14 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
     );
     // The per-polynomial cost with an empty share buffer, which is what `peak_cycle_bytes` models
     // for every polynomial of a cycle before any share arrives.
-    let modelled_per_poly =
-        peak_cycle_bytes::<TestSpec>(&PixParams::try_from_config::<TestSpec>(generator.config()).unwrap()) as usize
-            / polys
-            - threshold.next_power_of_two() * size_of::<PixScalar<TestSpec>>() * 2;
+    //
+    // The buffer term comes from the crate rather than being restated here. Restating it assumed a
+    // `CompletedShare` is two scalars and dropped the `.max(4)` clamp, so it agreed with the model
+    // only by coincidence at the deployed dimensions — and a `usize` subtraction that disagreed
+    // would underflow rather than report, making the assertion below vacuous instead of failing.
+    let params = PixParams::try_from_config::<TestSpec>(generator.config()).unwrap();
+    let modelled_per_poly = (peak_cycle_bytes::<TestSpec>(&params) as usize / polys)
+        .saturating_sub(peak_share_buffer_bytes::<TestSpec>(&params) as usize);
     println!(
         "  per polynomial at install        {:>9} B  (modelled as {modelled_per_poly} B)",
         install_over_baseline / polys
@@ -539,6 +564,9 @@ fn exit_reconstructor_memory_profile_at_production_dimensions() {
 #[test]
 #[ignore]
 fn exit_reconstructor_worst_case_share_order() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     let polys = PROD_POLYS_PER_SSA as usize;
     let threshold = PROD_THRESHOLD as usize;
 
@@ -669,13 +697,14 @@ fn exit_reconstructor_worst_case_share_order() {
         mib(modelled),
         100.0 * peak_over_baseline as f64 / modelled as f64
     );
+    // Taken from the crate, not restated: see the note in the sibling report above.
+    let buffer_slots = peak_share_buffer_bytes::<TestSpec>(&params) as usize;
     println!(
         "  of which share buffers           {:>9.1} MiB  ({polys} x {} slots x {} B)",
-        mib(polys * threshold.next_power_of_two() * size_of::<PixScalar<TestSpec>>() * 2),
+        mib(polys * buffer_slots),
         threshold.next_power_of_two(),
-        size_of::<PixScalar<TestSpec>>() * 2
+        buffer_slots / threshold.next_power_of_two()
     );
-    let buffer_slots = threshold.next_power_of_two() * size_of::<PixScalar<TestSpec>>() * 2;
     println!(
         "  per polynomial, modelled         {:>9} B     measured {:>9} B",
         modelled / polys,
@@ -684,7 +713,7 @@ fn exit_reconstructor_worst_case_share_order() {
     println!(
         "    minus share buffers            {:>9} B     measured {:>9} B  <- PART_BUILDER_OVERHEAD_BYTES covers the \
          gap",
-        modelled / polys - buffer_slots,
+        (modelled / polys).saturating_sub(buffer_slots),
         (peak_over_baseline / polys).saturating_sub(buffer_slots)
     );
     println!(
@@ -715,6 +744,9 @@ fn exit_reconstructor_worst_case_share_order() {
 #[test]
 #[ignore]
 fn tombstone_entry_cost() {
+    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
+    // test would be read as this one's allocations. See `MEASURING`.
+    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
     const POINTS: [usize; 2] = [20_000, 100_000];
 
     let entries = POINTS[POINTS.len() - 1];
