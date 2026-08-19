@@ -74,10 +74,22 @@ impl SlotNotify {
     /// Bumps the generation counter **before** draining wakers so that
     /// futures created between this call and their first `poll()` see the
     /// advanced generation and return `Ready` immediately.
+    ///
+    /// The guard is released before any waker runs. `Waker::wake` executes arbitrary executor code,
+    /// and an executor that polls the woken task inline re-enters [`SlotNotifyFuture::poll`] — or its
+    /// `Drop` — both of which lock this same non-reentrant mutex. Waking under the guard is therefore
+    /// a self-deadlock against exactly the runtimes this type advertises support for; tokio only
+    /// enqueues, so the shipped path never hit it. Draining into a local buffer costs one allocation
+    /// per notification that actually has waiters to wake, and nothing at all when it does not.
     pub fn notify_waiters(&self) {
-        let mut inner = self.inner.lock();
-        inner.generation += 1;
-        for (_, waker) in inner.wakers.drain(..) {
+        let woken = {
+            let mut inner = self.inner.lock();
+            inner.generation += 1;
+            // `drain` rather than `mem::take`: an empty drain allocates nothing and the inner
+            // `Vec` keeps its capacity, which is the common case on a gate that rarely parks.
+            inner.wakers.drain(..).collect::<Vec<_>>()
+        };
+        for (_, waker) in woken {
             waker.wake();
         }
     }
@@ -488,6 +500,45 @@ mod tests {
         }
         // After the future is dropped, the inner waker list should be empty.
         assert!(n.inner.lock().wakers.is_empty());
+    }
+
+    /// `notify_waiters` must have released the lock by the time any waker runs.
+    ///
+    /// `Waker::wake` runs arbitrary executor code, and an executor that polls the woken task inline
+    /// re-enters this type: both [`SlotNotifyFuture::poll`] and its `Drop` take the same
+    /// `parking_lot::Mutex`, which is not reentrant. Waking under the guard self-deadlocks against
+    /// precisely the runtime-agnostic contract this type advertises. Tokio only enqueues, so no
+    /// shipped caller ever exercised it and no test could have caught it.
+    ///
+    /// The waker below stands in for such an executor. Note the failure mode: on a regression this
+    /// test does not fail, it *hangs*, and surfaces as a timeout. That is the only observable a
+    /// deadlock has.
+    #[test]
+    fn notify_waiters_releases_the_lock_before_waking() {
+        struct ReentrantWaker(SlotNotify);
+
+        impl std::task::Wake for ReentrantWaker {
+            fn wake(self: Arc<Self>) {
+                // What an inline-polling executor does: re-enter the notifier from inside `wake`.
+                // `notified` takes the very lock `notify_waiters` is in the middle of.
+                drop(self.0.notified());
+            }
+        }
+
+        let n = SlotNotify::new();
+        let mut fut = n.notified();
+        let waker = std::task::Waker::from(Arc::new(ReentrantWaker(n.clone())));
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        assert_eq!(fut.poll_unpin(&mut cx), Poll::Pending, "the first poll registers the waker");
+
+        n.notify_waiters();
+
+        assert_eq!(
+            fut.poll_unpin(&mut cx),
+            Poll::Ready(()),
+            "the generation advanced, so the waiter is done"
+        );
     }
 
     // -------------------------------------------------------------------
