@@ -828,13 +828,20 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
         while let Some(event) = exit_events.next().await {
             match event {
                 PixEvent::DepositAddressReceived(data) => {
-                    if let Some(mut notifier) = data.deposit_updated {
-                        notifier
-                            .send((data.id, HoprBalance::new_base(1)))
-                            .await
-                            .context("failed to signal deposit via notifier")?;
-                        tracing::info!(id = ?data.id, "deposit signalled, no traffic flowing");
-                    }
+                    // Return only once something was actually funded. Returning on an event that
+                    // carried no notifier would leave the SSA unfunded, so recovery is never entered
+                    // and `max_recovery_time` is not the clock that governs — but the assertion 80 s
+                    // below would still name it, reporting a supervisor defect that did not occur.
+                    // The `bail!` past the loop is the correct diagnostic for that case.
+                    let Some(mut notifier) = data.deposit_updated else {
+                        tracing::debug!(id = ?data.id, "deposit request carried no notifier, still waiting");
+                        continue;
+                    };
+                    notifier
+                        .send((data.id, HoprBalance::new_base(1)))
+                        .await
+                        .context("failed to signal deposit via notifier")?;
+                    tracing::info!(id = ?data.id, "deposit signalled, no traffic flowing");
                     return anyhow::Ok(());
                 }
                 other => tracing::debug!("Exit PixEvent while awaiting the deposit request: {other:?}"),
