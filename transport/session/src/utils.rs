@@ -149,7 +149,15 @@ impl Future for SlotNotifyFuture {
             // spurious wake (or a replaced waker). Update the stored waker
             // and stay Pending.
             if let Some((_, w)) = inner.wakers.iter_mut().find(|(id, _)| *id == this.waker_id) {
-                *w = cx.waker().clone();
+                // `will_wake` first: a re-poll of the same task is the common case here — the gate
+                // parks callers that are then polled spuriously — and the clone costs a refcount
+                // bump, or an allocation for a waker that is not `Arc`-backed. Replacing only when
+                // the target actually changed keeps the correctness property that matters, which is
+                // that the *latest* waker is the one stored: `will_wake` returning true means
+                // waking the stored one wakes the same task.
+                if !w.will_wake(cx.waker()) {
+                    *w = cx.waker().clone();
+                }
             }
             return Poll::Pending;
         }
@@ -598,6 +606,62 @@ mod tests {
                 "waiter {i} must be woken exactly once by the single notification"
             );
         }
+    }
+
+    /// Re-polling with a *different* waker must replace the stored one.
+    ///
+    /// The `will_wake` guard in `poll` skips the clone when the stored waker would wake the same
+    /// task, which is the common case and the point of the guard. Getting its polarity backwards
+    /// would keep the first waker forever: the future would then be parked against a task that is no
+    /// longer polling it, and nothing would wake the one that is — a hang, not a slowdown. This is
+    /// the half of that guard worth pinning; the skipped clone is unobservable by design.
+    #[test]
+    fn repolling_with_a_new_waker_replaces_the_stored_one() {
+        struct CountingWaker(std::sync::atomic::AtomicUsize);
+
+        impl std::task::Wake for CountingWaker {
+            fn wake(self: Arc<Self>) {
+                self.wake_by_ref();
+            }
+
+            fn wake_by_ref(self: &Arc<Self>) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+
+        let n = SlotNotify::new();
+        let mut fut = n.notified();
+
+        let first = Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0)));
+        let second = Arc::new(CountingWaker(std::sync::atomic::AtomicUsize::new(0)));
+
+        let w1 = std::task::Waker::from(first.clone());
+        assert_eq!(
+            fut.poll_unpin(&mut std::task::Context::from_waker(&w1)),
+            Poll::Pending,
+            "the first poll registers"
+        );
+
+        // A distinct task, so `will_wake` is false and the replacement must happen.
+        let w2 = std::task::Waker::from(second.clone());
+        assert_eq!(
+            fut.poll_unpin(&mut std::task::Context::from_waker(&w2)),
+            Poll::Pending,
+            "no notification has happened, so the future stays parked"
+        );
+
+        n.notify_waiters();
+
+        assert_eq!(
+            0,
+            first.0.load(std::sync::atomic::Ordering::Relaxed),
+            "the superseded waker must not be the one woken"
+        );
+        assert_eq!(
+            1,
+            second.0.load(std::sync::atomic::Ordering::Relaxed),
+            "the waker from the most recent poll must be woken exactly once"
+        );
     }
 
     // -------------------------------------------------------------------
