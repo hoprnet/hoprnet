@@ -107,10 +107,23 @@ impl<S: PixSpec> SsaCycle<S> {
             .map(|slot| slot.ok_or(errors::PixError::InvalidInput))
             .collect::<errors::Result<Vec<_>, S::Pseudonym>>()?;
 
-        // Every part builder was handed the same `SsaCommitmentBuilder::poly_threshold`, so any of
-        // them reports the negotiated threshold. Read it before the builders are wrapped in mutexes,
-        // which would otherwise make this a lock acquisition.
-        let poly_threshold = parts.first().ok_or(errors::PixError::InvalidInput)?.min_shares() as u64;
+        // Taken from the negotiated `PixParams` by way of the builder, not recomputed here. This
+        // number reaches `SsaRecoveryProgress::target_useful_shares`, which a consumer compares
+        // against its own expectation to detect a protocol violation — so a second derivation of it
+        // is a second thing that can disagree, and the disagreement would read as the violation.
+        let target_useful_shares = builder.target_useful_shares();
+
+        // The old derivation, kept as a cross-check rather than deleted: every part builder was
+        // handed the same `SsaCommitmentBuilder::poly_threshold`, so any of them reports the
+        // negotiated threshold, and the product must match what the params said. Debug-only because
+        // this is an internal consistency claim about two paths out of one `PixParams`, not
+        // untrusted input — a release build has nothing to gain by re-checking it, and a test build
+        // fails loudly if the two ever part company.
+        debug_assert_eq!(
+            target_useful_shares,
+            num_polys as u64 * parts.first().ok_or(errors::PixError::InvalidInput)?.min_shares() as u64,
+            "the params-derived recovery target disagrees with the part builders' own threshold"
+        );
 
         Ok(Self {
             id,
@@ -120,7 +133,7 @@ impl<S: PixSpec> SsaCycle<S> {
             shares_seen: Default::default(),
             recovered_polynomials: Default::default(),
             invalid_shares: Default::default(),
-            target_useful_shares: num_polys as u64 * poly_threshold,
+            target_useful_shares,
         })
     }
 
@@ -207,22 +220,36 @@ impl<S: PixSpec> SsaCycle<S> {
 pub struct SsaBuilder<S: PixSpec> {
     pub full_commitment: PixGroup<S>,
     num_polys: usize,
+    /// Carried from the negotiated [`PixParams`] rather than recomputed. See
+    /// [`SsaCommitmentBuilder::target_useful_shares`].
+    target_useful_shares: u64,
     builder: PixScalar<S>,
     received_indices: ahash::HashSet<PolynomialIndex>,
     early_notified: bool,
 }
 
 impl<S: PixSpec> SsaBuilder<S> {
-    pub fn new(full_commitment: PixGroup<S>, exit_secret_scalar: PixScalar<S>, num_polys: usize) -> Self {
+    pub fn new(
+        full_commitment: PixGroup<S>,
+        exit_secret_scalar: PixScalar<S>,
+        num_polys: usize,
+        target_useful_shares: u64,
+    ) -> Self {
         use ahash::HashSetExt;
 
         Self {
             full_commitment,
             builder: exit_secret_scalar,
             num_polys,
+            target_useful_shares,
             received_indices: ahash::HashSet::with_capacity(num_polys),
             early_notified: false,
         }
+    }
+
+    /// Useful shares that constitute full recovery, as negotiated.
+    pub fn target_useful_shares(&self) -> u64 {
+        self.target_useful_shares
     }
 
     /// Number of polynomials this SSA is composed of.
@@ -534,6 +561,14 @@ pub struct SsaCommitmentBuilder<S: PixSpec> {
     /// [`PixParams`] word, and the ratio between them is an operator choice.
     poly_surplus: usize,
     num_polys: usize,
+    /// Useful shares that constitute full recovery, taken from
+    /// [`PixParams::target_useful_shares`] rather than recomputed here.
+    ///
+    /// Carried down to [`SsaCycle`] so the number a consumer compares against its own expectation
+    /// has one source. It reaches [`SsaRecoveryProgress::target_useful_shares`], which is documented
+    /// as a protocol-violation detector — and two derivations of a detector can disagree, at which
+    /// point the disagreement reads as the violation.
+    target_useful_shares: u64,
     /// Constant-term commitments received so far, **decoded**: each is decompressed and
     /// subgroup-checked exactly once, on arrival. Keeping the compressed representation instead
     /// would force a second decompression when the part builders are created, and decompression
@@ -574,6 +609,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
             poly_threshold: params.shares_per_poly() as usize,
             poly_surplus: params.surplus_shares() as usize,
             num_polys: params.polys_per_ssa() as usize,
+            target_useful_shares: params.target_useful_shares(),
             exit_commitment_secret,
             exit_commitment_public,
             committed_polynomials: std::collections::HashMap::new(),
@@ -735,6 +771,7 @@ impl<S: PixSpec> SsaCommitmentBuilder<S> {
                 full_ssa_commitment,
                 self.exit_commitment_secret,
                 self.num_polys,
+                self.target_useful_shares,
             ));
 
             // Hand out every polynomial's part builder in this same call. Each commitment was

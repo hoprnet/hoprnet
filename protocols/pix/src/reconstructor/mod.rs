@@ -2501,10 +2501,14 @@ mod tests {
     }
 
     /// Helper: create an SsaBuilder that accepts zero-valued sub-secrets.
+    ///
+    /// These tests exercise part accumulation rather than progress reporting, so the recovery target
+    /// only has to be self-consistent: one useful share per polynomial is the smallest value that
+    /// keeps `SsaCycle::new`'s cross-check satisfiable for callers that go on to build a cycle.
     fn make_builder(num_polys: usize) -> SsaBuilder<TestSpec> {
         let exit_secret = PixScalar::<TestSpec>::default();
         let full_commitment = PixGroup::<TestSpec>::default();
-        SsaBuilder::new(full_commitment, exit_secret, num_polys)
+        SsaBuilder::new(full_commitment, exit_secret, num_polys, num_polys as u64)
     }
 
     /// Helper: add `n` zero-valued polynomial parts to `builder`, returning
