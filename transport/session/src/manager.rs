@@ -9,12 +9,13 @@ use anyhow::anyhow;
 use futures::{FutureExt, Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
 use hopr_api::types::{
+    crypto::prelude::{CurvyScanPublicKey, CurvyScanSecret, SecretKey},
     crypto_random::Randomizable,
     internal::{
         prelude::HoprPseudonym,
         routing::{DestinationRouting, RoutingOptions},
     },
-    primitive::prelude::Address,
+    primitive::prelude::{Address, U256},
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
@@ -31,6 +32,7 @@ use hopr_protocol_start::{
 };
 use hopr_utils::runtime::AbortableList;
 use tracing::{debug, error, info, trace, warn};
+use zeroize::Zeroizing;
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry::{
@@ -97,6 +99,51 @@ lazy_static::lazy_static! {
 /// `unused_verifier_lifetime`, whereas sweeping every index a session ever used is unbounded work on
 /// the eviction listener, and leaves a tombstone per index behind it.
 const SSA_TEARDOWN_SWEEP_WINDOW: u32 = 64;
+
+/// Generates the scan-only Curvy identity attached to one SSA allocation.
+///
+/// Curvy also generates a temporary secp256k1 spend scalar. PIX deliberately discards it: note
+/// ownership remains the independently derived SSA BabyJubJub key, whose private scalar is only
+/// reconstructed from protocol shares. The Exit retains only `v`; the Entry receives `(K,V)`.
+fn generate_curvy_scan_identity() -> anyhow::Result<(CurvyScanPublicKey, CurvyScanSecret)> {
+    let (spend_secret, view_secret, spend_meta_key, view_public_key) =
+        curvy_core::stealth::new_meta().map_err(|error| anyhow!("failed to generate Curvy scan identity: {error}"))?;
+    let _spend_secret = Zeroizing::new(spend_secret);
+    let view_secret = Zeroizing::new(view_secret);
+
+    let (spend_x, spend_y) = curvy_point_to_bytes(&spend_meta_key, "Curvy spend meta-key K")?;
+    let (view_x, view_y) = curvy_point_to_bytes(&view_public_key, "Curvy view key V")?;
+    let public = CurvyScanPublicKey::from_affine_coordinates((&spend_x, &spend_y), (&view_x, &view_y))
+        .map_err(|error| anyhow!("failed to encode Curvy scan identity: {error}"))?;
+
+    let view_secret = U256::from_str_radix(view_secret.trim_start_matches("0x"), 16)
+        .map_err(|error| anyhow!("invalid Curvy view scalar: {error}"))?;
+    let secret = CurvyScanSecret::new(SecretKey::from(view_secret.to_big_endian()), public);
+    Ok((public, secret))
+}
+
+fn curvy_point_to_bytes(point: &str, field: &str) -> anyhow::Result<([u8; 32], [u8; 32])> {
+    let (x, y) = point
+        .split_once('.')
+        .ok_or_else(|| anyhow!("{field} is not encoded as x.y"))?;
+    let x = U256::from_dec_str(x).map_err(|error| anyhow!("invalid {field} x-coordinate: {error}"))?;
+    let y = U256::from_dec_str(y).map_err(|error| anyhow!("invalid {field} y-coordinate: {error}"))?;
+    Ok((x.to_big_endian(), y.to_big_endian()))
+}
+
+fn validate_curvy_scan_public_key(public: CurvyScanPublicKey) -> anyhow::Result<()> {
+    let (kx, ky) = public
+        .spend_meta_key()
+        .map_err(|error| anyhow!("invalid Curvy spend meta-key K: {error}"))?;
+    let (vx, vy) = public
+        .view_key()
+        .map_err(|error| anyhow!("invalid Curvy view key V: {error}"))?;
+    let spend_meta_key = format!("{}.{}", U256::from_big_endian(&kx), U256::from_big_endian(&ky));
+    let view_public_key = format!("{}.{}", U256::from_big_endian(&vx), U256::from_big_endian(&vy));
+    curvy_core::stealth::send_with_r("1", &spend_meta_key, &view_public_key)
+        .map(|_| ())
+        .map_err(|error| anyhow!("invalid Curvy scan identity: {error}"))
+}
 
 /// Release reconstructor state for the SSA cycles of a session that may still be live.
 ///
@@ -270,20 +317,23 @@ const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 0;
 
 /// Hard ceiling on both SSA batch-size knobs, whatever the configuration says.
 ///
-/// Deliberately far below the wire limit (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only
+/// Deliberately below the generic wire limit (`StartProtocol::MAX_SSAS_PER_REQUEST`), which only
 /// bounds what can be *decoded*. The real cost is paid on both sides of the exchange, and neither is
 /// small at the profiled dimensions:
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
 ///   burst of thousands of `SsaCommit` packets, and its own `ReadyToDeposit` — i.e. its own on-chain deposit.
-/// * Exit: every entry is a live reconstructor cycle, ≈49 MiB of peak state, held until that cycle recovers. At this
-///   ceiling that is ≈1 GB per Session.
+/// * Exit: every entry is a live reconstructor cycle, ≈49 MiB of peak state, held until that cycle recovers. Nine
+///   entries are already ≈441 MiB per Session.
+///
+/// Nine also keeps the concrete HOPR `SsaRequest` below the packet budget after adding the 65-byte
+/// Curvy public scan identity and its per-index framing for every commitment.
 ///
 /// Both [`IncomingSessionPixConfig::ssas_per_request`] and
 /// [`SessionManagerConfig::max_ssas_per_ssa_request`] are clamped to `1..=Self` in
 /// [`SessionManager::new`], so a programmatically built config that never calls `validate()` cannot
 /// exceed it.
-pub const MAX_SSA_BATCH_SIZE: usize = 20;
+pub const MAX_SSA_BATCH_SIZE: usize = 9;
 
 /// Default for [`SessionManagerConfig::max_ssas_per_ssa_request`] — how many SSA commitments an Entry
 /// accepts in a single [`SsaServerCommitmentMessage`].
@@ -367,6 +417,9 @@ struct SessionSsaState {
     /// Serializes the three call sites of [`SessionManager::request_next_ssa`] so that
     /// `peek_index` / fallible work / `advance_index` is never interleaved.
     request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
+    /// Per-SSA private Curvy viewer retained only until it is handed to the Exit-side watcher.
+    /// It contains no BabyJubJub note-spending key.
+    curvy_scan_secrets: Arc<parking_lot::Mutex<HashMap<SsaIndex, CurvyScanSecret>>>,
 }
 
 impl SessionSsaState {
@@ -377,6 +430,7 @@ impl SessionSsaState {
             num_errors: Default::default(),
             params,
             request_lock: Arc::new(hopr_utils::runtime::prelude::Mutex::new(())),
+            curvy_scan_secrets: Default::default(),
         }
     }
 
@@ -410,6 +464,18 @@ impl SessionSsaState {
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |i| i.checked_add(n))
             .expect("SSA index overflow after u32::MAX cycles");
         SsaIndex::new(old.checked_add(n).expect("just advanced")).expect("non-zero just advanced")
+    }
+
+    fn insert_curvy_scan_secret(&self, ssa_index: SsaIndex, secret: CurvyScanSecret) {
+        self.curvy_scan_secrets.lock().insert(ssa_index, secret);
+    }
+
+    fn curvy_scan_secret(&self, ssa_index: SsaIndex) -> Option<CurvyScanSecret> {
+        self.curvy_scan_secrets.lock().get(&ssa_index).cloned()
+    }
+
+    fn remove_curvy_scan_secret(&self, ssa_index: SsaIndex) {
+        self.curvy_scan_secrets.lock().remove(&ssa_index);
     }
 
     /// Data quota a single SSA of this Session buys, as per [`pix_params_to_quota`] — the whole
@@ -2077,6 +2143,19 @@ where
             "generated exit commitments for the SSA batch"
         );
 
+        // Generate an independent Curvy viewer per SSA. Only `(K,V)` enters the network payload;
+        // the matching `v` stays in Exit-local session state until the deposit watcher accepts it.
+        // Complete the full batch first so a generation failure cannot install partial state.
+        let mut scan_keys = Vec::with_capacity(exit_commitments.len());
+        let mut scan_secrets = Vec::with_capacity(exit_commitments.len());
+        for (ssa_index, _) in &exit_commitments {
+            let (scan_key, scan_secret) =
+                generate_curvy_scan_identity().map_err(SessionManagerError::other)?;
+            scan_keys.push((*ssa_index, scan_key));
+            scan_secrets.push((*ssa_index, scan_secret));
+        }
+        let deposit_data = HoprPixDepositData::from_scan_keys(scan_keys).map_err(SessionManagerError::other)?;
+
         // Set up the kill switches before sending the SSA request so there is no
         // window where the commitments are in flight but no timeout is installed.
         //
@@ -2129,17 +2208,27 @@ where
             session_id,
             current_ssa_state.params,
             exit_commitments,
-            HoprPixDepositData::default(),
+            deposit_data,
         ));
 
-        send_via_msg_sender(
+        // Install private capabilities before publishing the request so a fast response cannot
+        // reach `handle_ssa_commit` first. Roll them back if the request is not sent.
+        for (ssa_index, scan_secret) in scan_secrets {
+            current_ssa_state.insert_curvy_scan_secret(ssa_index, scan_secret);
+        }
+        if let Err(error) = send_via_msg_sender(
             &mut msg_sender,
             slot.routing_opts.clone(),
             data,
             "session SSA commitment request message",
         )
         .await
-        .map_err(TransportSessionError::packet_sending)?;
+        {
+            for ssa_index in &ssa_indices {
+                current_ssa_state.remove_curvy_scan_secret(*ssa_index);
+            }
+            return Err(TransportSessionError::packet_sending(error));
+        }
 
         // All fallible steps succeeded — commit the index advance past the whole batch, and hand the
         // registrations over to the cycles they now belong to.
@@ -3017,9 +3106,10 @@ where
         };
 
         // See if we haven't received an SSA commitment for a Session that we did not register as PIX-capable
-        let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
+        let Some(ssa_state) = session_slot.current_ssa_state.get() else {
             return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
         };
+        let quota_per_ssa = ssa_state.quota_per_ssa();
 
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
@@ -3058,6 +3148,8 @@ where
         if ssa_client_commitment_state.deposit_address_first_encountered
             && let Some(deposit_address) = ssa_client_commitment_state.ssa_deposit_address
         {
+            let scan_secret = ssa_state.curvy_scan_secret(ssa_id.ssa_index());
+            let allocation_id = (*ssa_id.pseudonym(), ssa_id.ssa_index()).into();
             // Inside the guard on purpose: every other `SsaCommit` of a cycle takes the other branch,
             // so allocating this before the `if` built and dropped a channel per message.
             let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
@@ -3076,11 +3168,7 @@ where
                 SessionHandles::DepositAwaiter(ssa_id.ssa_index().get()),
                 hopr_utils::spawn_as_abortable!(async move {
                     let deposit_done_rx_result = deposit_done_rx
-                        .filter(|((evt_pseudonym, evt_index), _)| {
-                            futures::future::ready(
-                                evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym(),
-                            )
-                        })
+                        .filter(move |(event_id, _)| futures::future::ready(event_id == &allocation_id))
                         .next()
                         .delay(futures_time::time::Duration::from_millis(100))
                         .timeout(futures_time::time::Duration::from(max_deposit_wait))
@@ -3117,11 +3205,13 @@ where
                         deposit_address,
                         quota_per_ssa,
                     },
+                    scan_secret,
                     deposit_done_tx,
                 ))
                 .map_err(|_| {
                     SessionManagerError::other(anyhow::anyhow!("failed to send pix event for needed deposit"))
                 })?;
+            ssa_state.remove_curvy_scan_secret(ssa_id.ssa_index());
             info!(%ssa_id, %deposit_address, quota_per_ssa, "retrieved first client SSA commitment and deposit address");
         }
 
@@ -3292,6 +3382,31 @@ where
             return Err(error.into());
         }
 
+        // The deposit data is optional for pools that do not use private discovery. Once present,
+        // it must describe exactly this batch; accepting a partial or extra map could associate a
+        // viewer with the wrong SSA deposit.
+        let mut scan_keys = match msg.deposit_data.scan_keys() {
+            Ok(scan_keys) => scan_keys,
+            Err(error) => {
+                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                    .await;
+                return Err(SessionManagerError::Unacceptable(format!("invalid PIX deposit data: {error}")).into());
+            }
+        };
+        if !scan_keys.is_empty() {
+            let exact_key_set = scan_keys.len() == msg.commitments.len()
+                && msg.commitments.keys().all(|ssa_index| scan_keys.contains_key(ssa_index));
+            let all_valid = scan_keys.values().copied().all(|key| validate_curvy_scan_public_key(key).is_ok());
+            if !exact_key_set || !all_valid {
+                self.refuse_ssa_request(msg.session_id, session_slot.routing_opts.clone())
+                    .await;
+                return Err(SessionManagerError::Unacceptable(
+                    "PIX deposit data does not contain one valid Curvy scan identity per SSA commitment".into(),
+                )
+                .into());
+            }
+        }
+
         let Some(our_params) = session_slot.current_ssa_state.get().map(|s| s.params) else {
             return Err(
                 SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {}", msg.session_id)).into(),
@@ -3353,6 +3468,7 @@ where
         // by design, since the Exit may advance by more than one SSA at a time.
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
+            let scan_key = scan_keys.remove(&ssa_index);
 
             // Use the global `pix_toolbox.share_generator` to generate the client
             // commitment. The generator is shared with the packet pipeline's
@@ -3409,11 +3525,14 @@ where
             // complete commitment to reconstruct the deposit key.
             pix_toolbox
                 .pix_events
-                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
-                    ssa_id: SsaId::new(pseudonym, ssa_index),
-                    deposit_address,
-                    quota_per_ssa,
-                }))
+                .try_send(HoprSessionOutPixEvent::ReadyToDeposit(
+                    AgreedSsaQuota {
+                        ssa_id: SsaId::new(pseudonym, ssa_index),
+                        deposit_address,
+                        quota_per_ssa,
+                    },
+                    scan_key,
+                ))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
             info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
         }
@@ -3467,6 +3586,55 @@ mod tests {
     /// Surplus used by the small test `SsaGeneratorConfig`s below. Non-zero and different from
     /// [`SsaGeneratorConfig::default`], so a value that failed to cross the wire is visible.
     const TEST_SURPLUS_SHARES: u8 = 1;
+
+    #[test]
+    fn curvy_scan_identities_round_trip_in_concrete_hopr_deposit_data() -> anyhow::Result<()> {
+        let mut scan_keys = Vec::new();
+        let mut scan_secrets = Vec::new();
+        let mut commitments = Vec::new();
+        for index in 1..=MAX_SSA_BATCH_SIZE as u32 {
+            let ssa_index = SsaIndex::new(index).ok_or_else(|| anyhow!("non-zero test SSA index"))?;
+            let (scan_key, scan_secret) = generate_curvy_scan_identity()?;
+            assert_eq!(CurvyScanSecret::try_from(scan_secret.to_bytes().as_slice())?.public(), scan_key);
+            scan_keys.push((ssa_index, scan_key));
+            scan_secrets.push((ssa_index, scan_secret));
+            commitments.push((ssa_index, HoprPixGroupElement(Default::default())));
+        }
+
+        let deposit_data = HoprPixDepositData::from_scan_keys(scan_keys.clone())?;
+        let decoded = deposit_data.scan_keys()?;
+        assert_eq!(decoded.len(), MAX_SSA_BATCH_SIZE);
+        for ((ssa_index, scan_key), (_, scan_secret)) in scan_keys.iter().zip(&scan_secrets) {
+            assert_eq!(decoded.get(ssa_index), Some(scan_key));
+            assert_eq!(scan_secret.public(), *scan_key);
+        }
+
+        // The real HOPR instantiation, with the maximum supported batch and full Curvy payload,
+        // must fit the Start protocol packet budget and survive its CBOR round trip.
+        let request = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
+            HoprPseudonym::random(),
+            small_pix_params(),
+            commitments,
+            deposit_data.clone(),
+        ));
+        let (tag, encoded) = request.clone().encode()?;
+        let decoded_request = HoprStartProtocol::decode(tag, &encoded)?;
+        assert_eq!(decoded_request, request);
+        Ok(())
+    }
+
+    #[test]
+    fn curvy_deposit_data_rejects_duplicate_indices_and_truncation() -> anyhow::Result<()> {
+        let ssa_index = SsaIndex::MIN;
+        let (scan_key, _) = generate_curvy_scan_identity()?;
+        let duplicate = HoprPixDepositData::from_scan_keys([(ssa_index, scan_key), (ssa_index, scan_key)])?;
+        assert!(duplicate.scan_keys().is_err());
+
+        let mut truncated = HoprPixDepositData::from_scan_keys([(ssa_index, scan_key)])?;
+        truncated.0.pop();
+        assert!(truncated.scan_keys().is_err());
+        Ok(())
+    }
 
     #[test]
     fn session_config_forwards_max_buffered_segments() {
@@ -7578,11 +7746,11 @@ mod tests {
 
         assert!(matches!(
             event,
-            HoprSessionOutPixEvent::DepositNeeded(AgreedSsaQuota { ssa_id: ref received_ssa_id, .. }, _)
+            HoprSessionOutPixEvent::DepositNeeded(AgreedSsaQuota { ssa_id: ref received_ssa_id, .. }, _, _)
             if received_ssa_id == &ssa_id
         ));
 
-        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+        let HoprSessionOutPixEvent::DepositNeeded(quota, _, _) = event else {
             unreachable!();
         };
         assert_eq!(quota.quota_per_ssa, pix_params_to_quota(&small_pix_params()));

@@ -940,6 +940,7 @@ checksum = "6bc66f96ebe2a17a499475b4f94791d379817592ef494171586967ffdc6f95db"
 dependencies = [
  "ark-ec 0.6.0",
  "ark-ff 0.6.0",
+ "ark-r1cs-std",
  "ark-std 0.6.0",
 ]
 
@@ -1179,6 +1180,51 @@ dependencies = [
  "educe",
  "fnv",
  "hashbrown 0.17.1",
+]
+
+[[package]]
+name = "ark-r1cs-std"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "291f1c6628bfcac79b0dc2adbe401aa9100e2e96daa971645e0b18fc94de9a98"
+dependencies = [
+ "ark-ec 0.6.0",
+ "ark-ff 0.6.0",
+ "ark-relations",
+ "ark-std 0.6.0",
+ "educe",
+ "itertools 0.14.0",
+ "num-bigint 0.4.8",
+ "num-integer",
+ "num-traits",
+ "tracing",
+]
+
+[[package]]
+name = "ark-relations"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe4c11c797a64b8a23e22bf4e77bf582ac27bb21395e3183a9a506ba2561e9f9"
+dependencies = [
+ "ark-ff 0.6.0",
+ "ark-poly 0.6.0",
+ "ark-serialize 0.6.0",
+ "ark-std 0.6.0",
+ "foldhash 0.1.5",
+ "indexmap 2.14.0",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ark-secp256k1"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a41b34e9124731f4834db5a8f92ce085a47cd6f006fdb50359ea508d6256341d"
+dependencies = [
+ "ark-ec 0.6.0",
+ "ark-ff 0.6.0",
+ "ark-std 0.6.0",
 ]
 
 [[package]]
@@ -1787,9 +1833,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1645e71eacbae4cf304636a390a08b5c03cf068a814923dbd1631d5558f7ddeb"
+version = "0.31.1"
+source = "git+https://github.com/hoprnet/blokli-client?rev=98a890c7c6609c9467e02072702a743c29e1fa6a#98a890c7c6609c9467e02072702a743c29e1fa6a"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -2585,6 +2630,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "curvy-core"
+version = "0.1.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad039edd8eb265c92104aaff6758113893e198c384e0301881f127155bd9ce03"
+dependencies = [
+ "aes 0.9.2",
+ "ark-bn254 0.6.0",
+ "ark-ec 0.6.0",
+ "ark-ff 0.6.0",
+ "ark-secp256k1",
+ "ctr 0.10.1",
+ "getrandom 0.2.17",
+ "hkdf 0.13.0",
+ "hmac 0.13.0",
+ "num-bigint 0.5.1",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -4098,9 +4165,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b888d2f2d08002d003db1789f732c812ebe2709375780cc6b12eeba09930452c"
+version = "2.0.1"
+source = "git+https://github.com/hoprnet/hopr-api?rev=683c13a710ca6d8ac22455bc104e2dfe876f9d86#683c13a710ca6d8ac22455bc104e2dfe876f9d86"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4137,8 +4203,7 @@ dependencies = [
 [[package]]
 name = "hopr-chain-connector"
 version = "0.22.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a053b62b7fb08927b8bc1f271018c122151d8bafbdcd3e0081a09322b13fcdae"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e#bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4195,8 +4260,7 @@ dependencies = [
 [[package]]
 name = "hopr-ct-full-network"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7985d0e77c83e9ae107dcc53012eeb736b83edeb83cf3522a3d1b7ab1e66fa9"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e#bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4259,8 +4323,7 @@ dependencies = [
 [[package]]
 name = "hopr-network-graph"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1104069d205e792651562e8648e2403f815169c4c822ba00678b82fa1911fa2e"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e#bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4417,8 +4480,7 @@ dependencies = [
 [[package]]
 name = "hopr-ticket-manager"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbedcb10d008c7a1831ceb89c213ab2a0242405e24d99886839553fca725ca89"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e#bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4527,8 +4589,7 @@ dependencies = [
 [[package]]
 name = "hopr-transport-p2p"
 version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1e9a987efe3013cf7f3809d5f87aec29d5588a695a6af718dd406f5d0f5806b"
+source = "git+https://github.com/hoprnet/hopr-impls?rev=bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e#bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -4586,6 +4647,7 @@ dependencies = [
  "async-trait",
  "criterion",
  "crossfire",
+ "curvy-core",
  "flagset",
  "futures",
  "futures-time",
@@ -4617,6 +4679,7 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -4635,9 +4698,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a19fe24538d5d68590496763119afbb5f8ccb466f88abbf36cda7a8c7d49e1f1"
+version = "2.4.0"
+source = "git+https://github.com/hoprnet/hopr-types?rev=19c6eec0357f75ac544536ae435ffc10da7b222f#19c6eec0357f75ac544536ae435ffc10da7b222f"
 dependencies = [
  "aes 0.9.2",
  "anyhow",
@@ -9078,6 +9140,7 @@ dependencies = [
  "once_cell",
  "regex-automata",
  "sharded-slab",
+ "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",

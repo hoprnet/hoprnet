@@ -68,6 +68,7 @@ criterion = { version = "0.8.2", default-features = false, features = [
   "async_tokio",
 ] }
 crossfire = { version = "3.1.19", default-features = false }
+curvy-core = "=0.1.0-rc.3"
 dashmap = { version = "6.2.1", features = ["inline"] }
 elliptic-curve-tools = "0.3.0"
 flagset = "0.4.7"
@@ -137,14 +138,13 @@ tokio-util = { version = "0.7.19", default-features = false, features = [
 tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
+zeroize = "1.9.0"
 
-# TEMPORARY: pinned to unreleased branches so this change compiles and is tested end to end,
-# and pinned together so a single hopr-api major is in the graph — two majors coexisting makes
-# `hopr_api::chain::DeployedSafe` two distinct types. `version` alongside `git` is the "multiple
-# locations" form: git wins locally, the version requirement survives packaging. Revert to plain
-# versions once hopr-api 2.0.0, hopr-utilities 0.9.0 and the hopr-impls crates are published.
-hopr-api = { version = "2.0.0" }
-hopr-types = { version = "2.2.1", features = ["use-bindings"] }
+# TEMPORARY: version requirements keep these manifests publishable, while the root patch table
+# pins the matching Curvy PIX integration commits. Remove the patches once those commits are
+# released.
+hopr-api = { version = "2.0.1" }
+hopr-types = { version = "2.4.0", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.9.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
@@ -244,3 +244,14 @@ similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
 ignored = ["oas3", "hopr-session-server-forwarder", "hopr-utils-session"]
+
+# Temporary cross-repository Curvy PIX integration pins.
+[patch.crates-io]
+blokli-client = { git ="https://github.com/hoprnet/blokli-client", rev = "98a890c7c6609c9467e02072702a743c29e1fa6a" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", rev = "683c13a710ca6d8ac22455bc104e2dfe876f9d86" }
+hopr-types = { git = "https://github.com/hoprnet/hopr-types", rev = "19c6eec0357f75ac544536ae435ffc10da7b222f" }
+hopr-chain-connector = { git ="https://github.com/hoprnet/hopr-impls", rev = "bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e" }
+hopr-ct-full-network = { git ="https://github.com/hoprnet/hopr-impls", rev = "bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e" }
+hopr-network-graph = { git ="https://github.com/hoprnet/hopr-impls", rev = "bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e" }
+hopr-ticket-manager = { git ="https://github.com/hoprnet/hopr-impls", rev = "bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e" }
+hopr-transport-p2p = { git ="https://github.com/hoprnet/hopr-impls", rev = "bb32c420b67dfe0d9a68eb8fe931c5f6e2f9d50e" }

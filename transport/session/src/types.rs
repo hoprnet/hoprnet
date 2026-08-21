@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     convert::Into,
     fmt::Debug,
     pin::Pin,
@@ -11,7 +12,9 @@ use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::{
     HoprBalance,
     types::{
+        crypto::prelude::{CURVY_SCAN_PUBLIC_KEY_SIZE, CurvyScanPublicKey, CurvyScanSecret},
         internal::{prelude::HoprPseudonym, routing::DestinationRouting},
+        network::PixAddressId,
         primitive::errors::GeneralError,
     },
 };
@@ -93,12 +96,77 @@ pub type HoprStartProtocol = StartProtocol<
     HoprPixDepositData,
 >;
 
-/// Deposit data placeholder, CBOR-encoded as a byte string.
+/// HOPR-specific PIX deposit data, CBOR-encoded as one compact byte string.
 ///
-/// Currently set to an empty byte string (zero-length Vec). Uses [`serde_bytes`] for compact
-/// CBOR byte-string encoding.
+/// A non-empty payload carries one public Curvy scan identity `(K,V)` for each SSA commitment:
+/// `version || count || (ssa_index || scan_key)*`. The separate Exit-held view scalar `v` is
+/// never serialized into this network type. An empty value remains valid for deposit pools that
+/// do not require private note discovery.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct HoprPixDepositData(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+const CURVY_DEPOSIT_DATA_VERSION: u8 = 1;
+const CURVY_DEPOSIT_DATA_HEADER_SIZE: usize = 2;
+const CURVY_DEPOSIT_DATA_ENTRY_SIZE: usize = size_of::<u32>() + CURVY_SCAN_PUBLIC_KEY_SIZE;
+
+impl HoprPixDepositData {
+    /// Encodes an ordered set of per-SSA public Curvy scan identities.
+    pub fn from_scan_keys(
+        scan_keys: impl IntoIterator<Item = (SsaIndex, CurvyScanPublicKey)>,
+    ) -> Result<Self, GeneralError> {
+        let scan_keys = scan_keys.into_iter().collect::<Vec<_>>();
+        let count = u8::try_from(scan_keys.len())
+            .map_err(|_| GeneralError::ParseError("too many Curvy scan identities".into()))?;
+        if count == 0 {
+            return Ok(Self::default());
+        }
+
+        let mut bytes = Vec::with_capacity(
+            CURVY_DEPOSIT_DATA_HEADER_SIZE + scan_keys.len() * CURVY_DEPOSIT_DATA_ENTRY_SIZE,
+        );
+        bytes.push(CURVY_DEPOSIT_DATA_VERSION);
+        bytes.push(count);
+        for (ssa_index, scan_key) in scan_keys {
+            bytes.extend_from_slice(&ssa_index.get().to_be_bytes());
+            bytes.extend_from_slice(scan_key.as_ref());
+        }
+        Ok(Self(bytes))
+    }
+
+    /// Decodes public scan identities by SSA index.
+    ///
+    /// Every point and index is validated and duplicate indices are rejected. An empty payload
+    /// represents a pool without additional deposit data.
+    pub fn scan_keys(&self) -> Result<BTreeMap<SsaIndex, CurvyScanPublicKey>, GeneralError> {
+        if self.0.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        if self.0.len() < CURVY_DEPOSIT_DATA_HEADER_SIZE || self.0[0] != CURVY_DEPOSIT_DATA_VERSION {
+            return Err(GeneralError::ParseError("unsupported PIX deposit data".into()));
+        }
+        let count = self.0[1] as usize;
+        let expected_len = CURVY_DEPOSIT_DATA_HEADER_SIZE + count * CURVY_DEPOSIT_DATA_ENTRY_SIZE;
+        if count == 0 || self.0.len() != expected_len {
+            return Err(GeneralError::ParseError("invalid PIX deposit data length".into()));
+        }
+
+        let mut scan_keys = BTreeMap::new();
+        for entry in self.0[CURVY_DEPOSIT_DATA_HEADER_SIZE..].chunks_exact(CURVY_DEPOSIT_DATA_ENTRY_SIZE) {
+            let index = u32::from_be_bytes(
+                entry[..size_of::<u32>()]
+                    .try_into()
+                    .map_err(|_| GeneralError::ParseError("Curvy scan identity SSA index".into()))?,
+            );
+            let ssa_index = SsaIndex::new(index)
+                .ok_or_else(|| GeneralError::ParseError("Curvy scan identity SSA index".into()))?;
+            let scan_key = CurvyScanPublicKey::try_from(&entry[size_of::<u32>()..])?;
+            if scan_keys.insert(ssa_index, scan_key).is_some() {
+                return Err(GeneralError::ParseError("duplicate Curvy scan identity SSA index".into()));
+            }
+        }
+        Ok(scan_keys)
+    }
+}
 
 /// Quota per single SSA in bytes.
 ///
@@ -251,14 +319,15 @@ pub struct AgreedSsaQuota {
 pub enum HoprSessionOutPixEvent {
     /// Event raised by the [`crate::manager::SessionManager`] of an Entry node can deposit funds to an SSA for the
     /// agreed data quota.
-    ReadyToDeposit(AgreedSsaQuota),
+    ReadyToDeposit(AgreedSsaQuota, Option<CurvyScanPublicKey>),
     /// Event raised by the [`crate::manager::SessionManager`] of an Exit node, whenever it knows a new SSA and expects
     /// funds to be deposited.
     ///
     /// The attached sender is used to deliver updates once the deposit is completed.
     DepositNeeded(
         AgreedSsaQuota,
-        futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
+        Option<CurvyScanSecret>,
+        futures::channel::mpsc::Sender<(PixAddressId, HoprBalance)>,
     ),
 }
 

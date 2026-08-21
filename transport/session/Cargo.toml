@@ -62,6 +62,7 @@ allocator-jemalloc = [
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 crossfire = { workspace = true }
+curvy-core = { workspace = true }
 flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 humantime-serde = { workspace = true }
@@ -78,6 +79,7 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }
 tokio = { workspace = true, optional = true }
 mockall = { workspace = true, optional = true }
 

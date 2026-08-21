@@ -307,7 +307,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         .map_err(|e| anyhow::anyhow!("timeout: {e}"))?
         .ok_or(anyhow::anyhow!("alice must get a pix event"))?;
 
-    let HoprSessionOutPixEvent::ReadyToDeposit(alice_quota) = &alice_session_event else {
+    let HoprSessionOutPixEvent::ReadyToDeposit(alice_quota, Some(alice_scan_key)) = &alice_session_event else {
         panic!("expected ReadyToDeposit, got {alice_session_event:?}");
     };
 
@@ -316,7 +316,7 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         .map_err(|e| anyhow::anyhow!("timeout: {e}"))?
         .ok_or(anyhow::anyhow!("bob must get a pix event"))?;
 
-    let HoprSessionOutPixEvent::DepositNeeded(bob_quota, _) = &bob_session_event else {
+    let HoprSessionOutPixEvent::DepositNeeded(bob_quota, Some(bob_scan_secret), _) = &bob_session_event else {
         panic!("expected DepositNeeded, got {bob_session_event:?}");
     };
 
@@ -328,6 +328,11 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
     assert_eq!(
         alice_quota.quota_per_ssa, bob_quota.quota_per_ssa,
         "Entry and Exit must agree on SSA quota"
+    );
+    assert_eq!(
+        alice_scan_key,
+        &bob_scan_secret.public(),
+        "Entry public scan identity must match the Exit-held private capability"
     );
 
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -660,7 +665,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
             .await
             .map_err(|e| anyhow::anyhow!("timeout awaiting entry cycle {i}: {e}"))?
             .ok_or(anyhow::anyhow!("entry must emit cycle {i}"))?;
-        let HoprSessionOutPixEvent::ReadyToDeposit(quota) = event else {
+        let HoprSessionOutPixEvent::ReadyToDeposit(quota, Some(_)) = event else {
             panic!("expected ReadyToDeposit, got {event:?}");
         };
         entry_cycles.push(quota);
@@ -673,7 +678,7 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
             .await
             .map_err(|e| anyhow::anyhow!("timeout awaiting exit cycle {i}: {e}"))?
             .ok_or(anyhow::anyhow!("exit must emit cycle {i}"))?;
-        let HoprSessionOutPixEvent::DepositNeeded(quota, _) = event else {
+        let HoprSessionOutPixEvent::DepositNeeded(quota, Some(_), _) = event else {
             panic!("expected DepositNeeded, got {event:?}");
         };
         exit_cycles.push(quota);

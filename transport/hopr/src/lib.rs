@@ -1389,7 +1389,7 @@ pub(crate) fn recovered_ssa_to_pix_event(
     rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
 ) -> PixEvent {
     PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
-        id: (*rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
+        id: (*rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()).into(),
         secret: PixDepositSecret(rec.ssa.secret().clone()),
     })
 }
@@ -1407,19 +1407,19 @@ const PIX_EVENT_DISPATCH_CONCURRENCY: usize = 64;
 /// instruction for the funding strategy.
 fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
     match event {
-        HoprSessionOutPixEvent::ReadyToDeposit(AgreedSsaQuota {
-            ssa_id,
-            deposit_address,
-            quota_per_ssa,
-        }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+        HoprSessionOutPixEvent::ReadyToDeposit(
+            AgreedSsaQuota {
+                ssa_id,
+                deposit_address,
+                quota_per_ssa,
+            },
+            scan_key,
+        ) => PixEvent::NewDepositAddress(PixNewDepositAddress {
+            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()).into(),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // `None` rather than the handshake's `deposit_data`: that field is carried by the Start
-            // protocol's `SsaRequest` (`hopr-protocol-start`) and is not surfaced through
-            // `AgreedSsaQuota`, so there is nothing here to forward yet. Threading it through is a
-            // change to the Session layer's event types, not to this mapping.
-            additional_data: None,
+            // Entry receives only the public `(K,V)` scan identity.
+            additional_data: scan_key.map(|key| key.as_ref().into()),
         }),
         HoprSessionOutPixEvent::DepositNeeded(
             AgreedSsaQuota {
@@ -1427,14 +1427,14 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
                 deposit_address,
                 quota_per_ssa,
             },
+            scan_secret,
             notifier,
         ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()).into(),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // See `NewDepositAddress` above: the handshake's `deposit_data` does not reach
-            // `AgreedSsaQuota`, so there is nothing to forward yet.
-            additional_data: None,
+            // Exit keeps `v` locally and hands the complete scan-only capability to its pool.
+            additional_data: scan_secret.map(|secret| secret.to_bytes().into()),
             deposit_updated: Some(notifier),
         }),
     }
@@ -1760,7 +1760,7 @@ mod pix_recovery_event_tests {
             anyhow::bail!("expected PrivateKeyRecovered");
         };
 
-        assert_eq!(pk.id, (pseudonym, ssa_id.ssa_index()));
+        assert_eq!(pk.id, (pseudonym, ssa_id.ssa_index()).into());
         assert_eq!(pk.secret.0.as_ref(), rec.ssa.secret().as_ref());
 
         Ok(())
