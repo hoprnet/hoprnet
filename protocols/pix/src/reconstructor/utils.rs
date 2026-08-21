@@ -119,9 +119,16 @@ impl<S: PixSpec> SsaCycle<S> {
         // this is an internal consistency claim about two paths out of one `PixParams`, not
         // untrusted input — a release build has nothing to gain by re-checking it, and a test build
         // fails loudly if the two ever part company.
+        //
+        // Infallible on purpose. `debug_assert_eq!` compiles to nothing when `debug_assertions` is
+        // off, so anything fallible inside it — a `?`, in particular — is control flow that exists
+        // in one profile and not the other. An empty `parts` would then return `Err` from a debug
+        // build and construct a zero-part cycle in a release one, silently, since the assertion
+        // message never reaches the caller. `map_or(0, ..)` keeps the check while leaving the
+        // constructor's result identical in both.
         debug_assert_eq!(
             target_useful_shares,
-            num_polys as u64 * parts.first().ok_or(errors::PixError::InvalidInput)?.min_shares() as u64,
+            num_polys as u64 * parts.first().map_or(0, |part| part.min_shares()) as u64,
             "the params-derived recovery target disagrees with the part builders' own threshold"
         );
 

@@ -776,6 +776,15 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // Not an error: the constant-term set is still incomplete, so no part builder exists
             // yet. Leave the share in `awaiting_acks` and hand the caller the key it needs to
             // bucket the ack.
+            //
+            // A third state also lands here and is deliberately left to the TTL: a cycle that idled
+            // out of `ssa_cycles` through `unused_verifier_lifetime` leaves no tombstone, so its
+            // late acks are bucketed as though the cycle were still coming. That is bounded rather
+            // than corrected — both the bucket and the retained share expire on
+            // `max_ack_await_time` — and correcting it would mean a tombstone per expiry, which is
+            // the unbounded write the cap on `retired_ssas` exists to avoid. The tombstoned paths
+            // above are the ones that recur per cycle; this one costs a cycle that already went
+            // quiet for longer than its verifier lifetime.
             return Ok(ProcessedAckResult::VerifierNotReady(spi));
         };
 
