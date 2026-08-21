@@ -275,7 +275,22 @@ pub struct HoprProtocolConfig {
 /// Session running *slower* needs a *longer* deadline, so checking against the cap is the loosest
 /// bound that still catches a `max_recovery_time` no Session could meet. It cannot certify that a
 /// slow Session will finish.
+///
+/// Integer division, so this *understates* the rate — which is the same safe direction: a lower
+/// assumed rate demands a longer `max_recovery_time`. Worth stating, because a reader checking the
+/// arithmetic cannot otherwise tell whether the truncation was considered or overlooked.
 const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
+
+// A zero rate would panic `div_ceil` at config load, and the panic would name nothing an operator
+// set. Denied at compile time rather than clamped with `.max(1)`: the constant is derived entirely
+// from other constants, so a payload wide enough to zero it is a change to this repository and not
+// an input — and a build failure says so, where a silent clamp would go on quietly asserting a rate
+// of one packet per second.
+const _: () = assert!(
+    ASSUMED_SESSION_PACKET_RATE > 0,
+    "HoprPacket::PAYLOAD_SIZE has grown past the modelled per-Session byte rate, leaving the assumed packet rate at \
+     zero; re-derive the rate rather than letting it divide to nothing"
+);
 
 /// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
 ///
