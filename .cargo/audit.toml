@@ -22,7 +22,6 @@ informational_warnings = ["unmaintained"]
 severity_threshold = "low"
 
 [database]
-path = "~/.cargo/advisory-db"
 url = "https://github.com/RustSec/advisory-db.git"
 fetch = true
 stale = false
