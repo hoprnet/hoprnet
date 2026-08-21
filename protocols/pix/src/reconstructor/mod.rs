@@ -2534,6 +2534,25 @@ mod tests {
         Ok(results)
     }
 
+    /// A cycle with no polynomials can never recover, so the constructor refuses to build one.
+    ///
+    /// Unreachable through the commitment path — `PixParams::try_new` rejects `polys_per_ssa == 0` —
+    /// but `SsaCycle::new` and `SsaBuilder::new` are both public, so this is a property of the type
+    /// rather than of its current callers. It is also the case that must behave identically in debug
+    /// and release: the guard predates the cross-check below it precisely because
+    /// `debug_assert_eq!` compiles away and anything fallible inside it would not.
+    #[test]
+    fn a_cycle_with_no_polynomials_is_refused() {
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+        assert!(
+            matches!(
+                SsaCycle::new(ssa_id, make_builder(0), Vec::new()),
+                Err(PixError::InvalidInput)
+            ),
+            "a zero-part cycle is unusable and must not be constructible"
+        );
+    }
+
     #[test]
     fn ssa_builder_early_threshold_below() -> anyhow::Result<()> {
         // num_polys=10, threshold=0.85 → ceil(0.85×10)=9.

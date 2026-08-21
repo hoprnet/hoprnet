@@ -113,22 +113,28 @@ impl<S: PixSpec> SsaCycle<S> {
         // is a second thing that can disagree, and the disagreement would read as the violation.
         let target_useful_shares = builder.target_useful_shares();
 
+        // A cycle with no polynomials can never recover, so it is refused here rather than built and
+        // left to fail later. `PixParams::try_new` rejects `polys_per_ssa == 0`, which is what makes
+        // this unreachable through the commitment path — but both this constructor and
+        // `SsaBuilder::new` are public, so the guard is what makes that a property of this type
+        // rather than of its current callers.
+        //
+        // A guard and not a `?` inside the assertion below: `debug_assert_eq!` compiles to nothing
+        // when `debug_assertions` is off, so anything fallible inside it is control flow present in
+        // one profile and absent in the other. This runs in both.
+        let Some(first_part) = parts.first() else {
+            return Err(errors::PixError::InvalidInput);
+        };
+
         // The old derivation, kept as a cross-check rather than deleted: every part builder was
         // handed the same `SsaCommitmentBuilder::poly_threshold`, so any of them reports the
         // negotiated threshold, and the product must match what the params said. Debug-only because
         // this is an internal consistency claim about two paths out of one `PixParams`, not
         // untrusted input — a release build has nothing to gain by re-checking it, and a test build
         // fails loudly if the two ever part company.
-        //
-        // Infallible on purpose. `debug_assert_eq!` compiles to nothing when `debug_assertions` is
-        // off, so anything fallible inside it — a `?`, in particular — is control flow that exists
-        // in one profile and not the other. An empty `parts` would then return `Err` from a debug
-        // build and construct a zero-part cycle in a release one, silently, since the assertion
-        // message never reaches the caller. `map_or(0, ..)` keeps the check while leaving the
-        // constructor's result identical in both.
         debug_assert_eq!(
             target_useful_shares,
-            num_polys as u64 * parts.first().map_or(0, |part| part.min_shares()) as u64,
+            num_polys as u64 * first_part.min_shares() as u64,
             "the params-derived recovery target disagrees with the part builders' own threshold"
         );
 
