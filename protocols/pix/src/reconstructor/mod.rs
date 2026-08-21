@@ -719,6 +719,22 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.commitment_builder.invalidate(&ssa_id);
     }
 
+    /// Removes a cycle that has reached a terminal state, and tombstones it so it cannot come back.
+    ///
+    /// The tombstone is written *before* the removal, so a commitment completing concurrently sees
+    /// the retirement and undoes its own publication rather than resurrecting the cycle.
+    ///
+    /// This is the operation for a cycle that went **live** and is now finished, however it
+    /// finished — recovered, or failed terminally. It is deliberately *not* the operation for a
+    /// commitment released before going live: that index is retried at the same value by design, and
+    /// a tombstone would block the retry permanently.
+    /// [`release_abandoned_commitment`](Self::release_abandoned_commitment) draws exactly that line,
+    /// and escalates to this for the live case.
+    fn retire_cycle(&self, ssa_id: SsaId<S::Pseudonym>) {
+        self.retired_ssas.insert(ssa_id, ());
+        self.remove_cycle(ssa_id);
+    }
+
     fn process_verified_ack(
         &self,
         ack: HalfKey,
@@ -737,6 +753,26 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         // The lookup also refreshes the cycle's idle timer, which is what keeps a cycle that is
         // still being served from being reclaimed underneath itself.
         let Some(cycle) = self.ssa_cycles.get(spi.as_ref()) else {
+            // Two states share this miss and only one of them is worth deferring for. A cycle that
+            // has not been published yet will arrive, so the share stays put and the caller buckets
+            // the ack against it. A cycle that has been retired — recovered, or failed terminally —
+            // never will, and deferring holds both the bucket and the share for `max_ack_await_time`
+            // to no end.
+            //
+            // Not a corner case at the deployed dimensions: a conforming Entry ends every emission
+            // window in a run of shares that advance nothing, so *every* recovered cycle is followed
+            // by acks landing here. Deferring them would hold up to `MAX_DEFERRED_ACKS_PER_CYCLE`
+            // dead entries per cycle, and — the part that actually costs something — keep their
+            // shares in `awaiting_acks`, whose budget is global. There they crowd out live cycles
+            // rather than merely wasting space.
+            if self.retired_ssas.contains_key(spi.as_ref()) {
+                // Frees the buffer entry: the per-peer cache's eviction listener decrements the
+                // global count on an explicit removal, which is what the redeeming path below
+                // relies on too.
+                awaiting_ack_from_peer.remove(&ack_challenge);
+                tracing::trace!(%spi, "ack for a retired cycle — dropped rather than deferred");
+                return Ok(ProcessedAckResult::NoProgress);
+            }
             // Not an error: the constant-term set is still incomplete, so no part builder exists
             // yet. Leave the share in `awaiting_acks` and hand the caller the key it needs to
             // bucket the ack.
@@ -832,28 +868,30 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 // supposed to reclaim them — so a Session that keeps sending holds a cycle that can
                 // never reconstruct for as long as it likes.
                 //
-                // The lock goes first: `remove_cycle` drops the last `Arc` to this very cycle.
+                // The lock goes first: `retire_cycle` drops the last `Arc` to this very cycle.
                 drop(builder_guard);
                 tracing::error!(%spi, %error, "ssa part could not be added to its accumulator");
-                self.remove_cycle(ssa_id);
+                self.retire_cycle(ssa_id);
                 return Err(error);
             }
         };
         match ssa {
             Some(scalar) => {
-                // Read the final progress while the cycle is still live: `remove_cycle` below drops
+                // Read the final progress while the cycle is still live: `retire_cycle` below drops
                 // the counters along with everything else, so this is the last chance to report them.
                 let progress = cycle.progress();
-                // Release the accumulator lock before retiring, so `remove_cycle` — which drops
+                // Release the accumulator lock before retiring, so `retire_cycle` — which drops
                 // the last `Arc` to this very cycle — does not run while it is held.
                 drop(builder_guard);
                 let Some(ssa) = S::scalar_to_private_key(scalar) else {
                     tracing::error!(%spi, "ssa reconstruction failed");
-                    self.remove_cycle(ssa_id);
+                    self.retire_cycle(ssa_id);
                     return Err(PixError::InvalidSsa);
                 };
-                // Full recovery: this cycle's state is no longer needed.
-                self.remove_cycle(ssa_id);
+                // Full recovery: this cycle's state is no longer needed. Tombstoned rather than
+                // merely removed, so the surplus run that follows every recovered cycle is dropped
+                // on arrival instead of being deferred against a cycle that will never return.
+                self.retire_cycle(ssa_id);
                 tracing::info!(%ssa_id, "ssa recovered");
                 Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }, progress))
             }
@@ -1326,13 +1364,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     }
 
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
-        // Mark tombstone BEFORE removing state so the commitment completion path can detect
-        // retirement and undo its publication.
-        self.retired_ssas.insert(ssa_id, ());
-
         // Every key is the SsaId itself, so there is nothing to enumerate and no way for part of a
-        // cycle to survive the removal of the rest.
-        self.remove_cycle(ssa_id);
+        // cycle to survive the removal of the rest. The tombstone-before-removal ordering the
+        // commitment completion path depends on lives in `retire_cycle`, which the terminal
+        // acknowledgement paths share with this one.
+        self.retire_cycle(ssa_id);
     }
 
     /// No range check on the dimensions: holding a [`PixParams`] is what proves them in range, since
@@ -4026,6 +4062,77 @@ mod tests {
                 .iter()
                 .any(|r| matches!(r, ShareResolution::RecoveredSsa(r) if r.ssa_id == ssa_id)),
             "deferred shares must recover the SSA once their verifiers install, got {resolutions:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Acknowledgements trailing a fully recovered cycle must be dropped, not deferred.
+    ///
+    /// A missing cycle means one of two opposite things, and the acknowledgement path cannot tell
+    /// them apart from the cache miss alone: a cycle not yet published, whose acks are worth
+    /// bucketing, or one already retired, whose acks are worth nothing. The tombstone written at
+    /// recovery is what separates them.
+    ///
+    /// This is the common case rather than an edge: a conforming Entry emits `threshold + surplus`
+    /// per polynomial, so the run of shares that advance nothing lands *after* the last polynomial
+    /// completes — every recovered cycle is followed by acks in this state. Deferring them costs a
+    /// bucket that can never be redeemed and, more expensively, holds their shares in
+    /// `awaiting_acks`, whose budget is global and shared with live cycles.
+    #[test]
+    fn acks_trailing_a_recovered_cycle_are_dropped_rather_than_deferred() -> anyhow::Result<()> {
+        // A single polynomial, so its recovery *is* the SSA's and the surplus shares are
+        // unambiguously post-recovery. With more, emission interleaves and which shares land after
+        // the last completion stops being obvious from the dimensions.
+        const POLYS: u16 = 1;
+        const THRESHOLD: u8 = 2;
+        const SURPLUS: u8 = 2;
+
+        let peer = OffchainKeypair::random();
+        let (reconstructor, ssa_id, acks) = cycle_with_pending_acks(POLYS, THRESHOLD, SURPLUS, &peer)?;
+        assert_eq!(
+            (THRESHOLD + SURPLUS) as usize,
+            acks.len(),
+            "the generator emits threshold + surplus for the single polynomial"
+        );
+        assert_eq!(
+            acks.len(),
+            reconstructor.count_ack_buffer_entries(),
+            "every emitted share is awaiting its acknowledgement"
+        );
+
+        // One at a time: the two shares after the recovering one are the subject, and feeding the
+        // batch whole would let a single dropped resolution hide which of them did what.
+        let mut recovered_after = None;
+        for (i, ack) in acks.into_iter().enumerate() {
+            for resolution in reconstructor.acknowledge_shares(*peer.public(), vec![ack])? {
+                if let ShareResolution::RecoveredSsa(r) = resolution {
+                    assert_eq!(ssa_id, r.ssa_id);
+                    recovered_after = Some(i + 1);
+                }
+            }
+        }
+        assert_eq!(
+            Some(THRESHOLD as usize),
+            recovered_after,
+            "the SSA must recover on the threshold-th share, leaving the surplus to trail it"
+        );
+
+        assert_eq!(
+            0,
+            reconstructor.deferred_ack_count(&ssa_id),
+            "a retired cycle must not accumulate deferred acknowledgements"
+        );
+        assert!(
+            !reconstructor.pending_acks.contains_key(&ssa_id),
+            "no bucket may be created for a cycle that cannot come back"
+        );
+        // The load-bearing one: without the tombstone the trailing shares stay here until
+        // `max_ack_await_time`, holding a global budget against a cycle that is gone.
+        assert_eq!(
+            0,
+            reconstructor.count_ack_buffer_entries(),
+            "the trailing shares must leave the acknowledgement buffer on arrival"
         );
 
         Ok(())
