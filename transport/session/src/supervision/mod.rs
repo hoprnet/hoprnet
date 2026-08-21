@@ -1217,6 +1217,27 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
     }
 
+    /// The tombstone has to outlive the reconstructor's acknowledgement window, or a late ack arrives
+    /// with its cycle record already gone.
+    ///
+    /// Non-zero but too short is the case that needs stating: `valid_cfg()`'s 30 s window never
+    /// approaches `valid_rcn_cfg()`'s 10 s, and `validation_rejects_zero_tombstone_retention_window`
+    /// reaches the zero check earlier in the validator rather than this rule. Without this test the
+    /// branch could be deleted and the suite would stay green.
+    #[test]
+    fn validation_rejects_a_tombstone_shorter_than_the_ack_window() {
+        let mut cfg = valid_cfg();
+        let rcn = valid_rcn_cfg();
+        // max_ack_await_time is 10 s.
+        cfg.tombstone_retention_window = Duration::from_secs(9);
+        assert!(validate_pix_supervision(&cfg, &rcn).is_err(), "9 < 10 must reject");
+        cfg.tombstone_retention_window = Duration::from_secs(10);
+        assert!(
+            validate_pix_supervision(&cfg, &rcn).is_ok(),
+            "equal is admissible — the rule is >=, unlike the verifier-lifetime rule above"
+        );
+    }
+
     /// The supervisor must give up on a stalled SSA before the reconstructor reclaims the state
     /// needed to finish it, or the session would sit waiting on shares that can never be applied.
     #[test]
