@@ -329,6 +329,18 @@ where
         my_multiaddresses: Vec<Multiaddr>,
         cfg: HoprProtocolConfig,
     ) -> errors::Result<Self> {
+        // Validated at the constructor boundary, because this is the boundary. The shared node
+        // builder does validate before all four of its build methods reach here, but this function is
+        // `pub`, and a direct caller then skips every relational check on the way in — including
+        // `validate_pix_supervision_pairing`, which is a schema-level validator on
+        // `HoprProtocolConfig` and so is not reached by validating any single field.
+        //
+        // `run_inner` validates `self.cfg.pix` alone, which is the narrower of the two: it cannot see
+        // the supervisor-against-reconstructor pairing, and it runs at Session establishment rather
+        // than at construction — long after a caller could have been told.
+        validator::Validate::validate(&cfg)
+            .map_err(|error| HoprTransportError::Api(format!("invalid protocol configuration: {error}")))?;
+
         let me_offchain = *identity.1.public();
         let planner_config = cfg.path_planner;
         let selector = HoprGraphPathSelector::new(
