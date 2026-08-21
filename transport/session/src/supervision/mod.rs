@@ -942,23 +942,34 @@ pub fn validate_pix_supervision(
     // is the duration a deadline is actually set to. Checking the unscaled value would let a config
     // pass here and then be silently clamped at arming time, which is the failure mode this cap
     // exists to make loud.
-    for (name, dur) in [
+    //
+    // The other three are not scaled, so the scaling fact travels per entry rather than being
+    // asserted for the whole loop. A blanket "as armed for a batch of N" invites the operator to
+    // divide the reported figure by N and conclude they configured a value they did not — which is
+    // the same class of misdirection the cap exists to prevent.
+    for (name, dur, scaled) in [
         (
             "max_ssa_delivery_time",
             scaled_deadline(cfg.max_ssa_delivery_time, cfg.ssas_per_request),
+            true,
         ),
         (
             "max_deposit_wait",
             scaled_deadline(cfg.max_deposit_wait, cfg.ssas_per_request),
+            true,
         ),
-        ("max_recovery_idle", cfg.max_recovery_idle),
-        ("max_recovery_time", cfg.max_recovery_time),
-        ("tombstone_retention_window", cfg.tombstone_retention_window),
+        ("max_recovery_idle", cfg.max_recovery_idle, false),
+        ("max_recovery_time", cfg.max_recovery_time, false),
+        ("tombstone_retention_window", cfg.tombstone_retention_window, false),
     ] {
         if dur > MAX_SUPERVISOR_DURATION {
+            let armed = if scaled {
+                format!(", as armed for a batch of {}", cfg.ssas_per_request)
+            } else {
+                String::new()
+            };
             return Err(TransportSessionError::InvalidConfig(format!(
-                "{name} ({dur:?}, as armed for a batch of {}) must not exceed {MAX_SUPERVISOR_DURATION:?}",
-                cfg.ssas_per_request
+                "{name} ({dur:?}{armed}) must not exceed {MAX_SUPERVISOR_DURATION:?}"
             )));
         }
     }
@@ -1243,6 +1254,47 @@ mod tests {
                 "a duration of Duration::MAX must be rejected, not saturated"
             );
         }
+    }
+
+    /// The cap diagnostic must claim batch scaling only for the durations that are scaled.
+    ///
+    /// Only `max_ssa_delivery_time` and `max_deposit_wait` pass through `scaled_deadline`. Reporting
+    /// "as armed for a batch of N" against the other three invites the operator to divide by N and
+    /// conclude they configured a value they never set — at `ssas_per_request = 3`, an over-cap
+    /// `max_recovery_time` would be read as a third of what it is. `is_err()` cannot see the
+    /// difference, which is why the message itself is asserted here.
+    #[test]
+    fn the_deadline_cap_claims_batch_scaling_only_where_it_scales() {
+        const BATCH: usize = 3;
+        let rcn = valid_rcn_cfg();
+
+        let mut cfg = valid_cfg();
+        cfg.ssas_per_request = BATCH;
+        cfg.max_recovery_time = Duration::MAX;
+        let msg = validate_pix_supervision(&cfg, &rcn)
+            .expect_err("Duration::MAX must be rejected")
+            .to_string();
+        assert!(
+            msg.contains("max_recovery_time"),
+            "the unscaled duration must be named: {msg}"
+        );
+        assert!(
+            !msg.contains("as armed for a batch"),
+            "max_recovery_time is not batch-scaled, so the message must not say it is: {msg}"
+        );
+
+        // The scaled side of the same loop, so the claim is shown to be carried where it is true
+        // rather than merely dropped everywhere.
+        let mut cfg = valid_cfg();
+        cfg.ssas_per_request = BATCH;
+        cfg.max_ssa_delivery_time = Duration::MAX;
+        let msg = validate_pix_supervision(&cfg, &rcn)
+            .expect_err("Duration::MAX must be rejected")
+            .to_string();
+        assert!(
+            msg.contains("max_ssa_delivery_time") && msg.contains("as armed for a batch of 3"),
+            "a batch-scaled duration must report the scaling: {msg}"
+        );
     }
 
     /// An Exit below the protocol floor cannot have its successor requests admitted by any conforming
