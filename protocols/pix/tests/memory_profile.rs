@@ -676,7 +676,17 @@ fn exit_reconstructor_worst_case_share_order() {
         }
     }
     if !pending.is_empty() {
-        reconstructor.acknowledge_shares(*peer.public(), pending).unwrap();
+        // The same assertion as the full batches above. `staged.len()` is not a multiple of
+        // `ACK_BATCH` at the deployed dimensions, so this trailing batch runs on every execution and
+        // was the one path where a recovery — which would release the very share buffers this
+        // profile measures — could have gone unnoticed.
+        let resolutions = reconstructor.acknowledge_shares(*peer.public(), pending).unwrap();
+        assert!(
+            !resolutions
+                .iter()
+                .any(|r| matches!(r, ShareResolution::RecoveredSsa(_))),
+            "no polynomial may complete under this order, so the SSA cannot recover"
+        );
     }
     let delivered = staged.len();
 
@@ -750,6 +760,18 @@ fn tombstone_entry_cost() {
     const POINTS: [usize; 2] = [20_000, 100_000];
 
     let entries = POINTS[POINTS.len() - 1];
+    // The per-entry cost below divides live bytes by the number of `retire_ssa` *calls*, not by the
+    // cache's occupancy. Those agree only while nothing is evicted. Were `MAX_RETIRED_SSAS` ever
+    // lowered below this measurement's high-water mark, the cache would hold fewer entries than the
+    // divisor, the quotient would fall, and the assertion at the end would pass while understating
+    // the very figure the cap is denominated in — a false negative rather than a failure. Pin the
+    // precondition instead of relying on the two numbers happening to stay apart.
+    assert!(
+        entries <= hopr_protocol_pix::MAX_RETIRED_SSAS,
+        "MAX_RETIRED_SSAS ({}) is below the {entries} entries this measurement inserts, so the reading would be taken \
+         against an evicting cache",
+        hopr_protocol_pix::MAX_RETIRED_SSAS
+    );
     println!("\n=== Type sizes ===");
     println!(
         "  SsaId (key)                      {:>4} B",
