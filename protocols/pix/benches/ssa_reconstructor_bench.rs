@@ -192,11 +192,15 @@ fn bench_recon_cfg(use_batch_verification: bool) -> SsaReconstructorConfig {
     }
 }
 
+/// Derived from the `threshold` argument, not from [`PROD_THRESHOLD`]: this helper is called from the
+/// swept groups, where a flat [`PROD_SURPLUS`] would hold the surplus *count* fixed and so change
+/// the loss tolerance at every point of the sweep. See [`PROD_SURPLUS`] for why the ratio is the
+/// thing to keep constant.
 fn gen_cfg(polys: u16, threshold: u8) -> SsaGeneratorConfig {
     SsaGeneratorConfig {
         threshold,
         polynomials_per_ssa: polys,
-        surplus_shares: PROD_SURPLUS,
+        surplus_shares: hopr_protocol_pix::default_surplus_for(threshold),
     }
 }
 
@@ -415,7 +419,17 @@ fn bench_insert_coefficient_commitments(c: &mut Criterion) {
                         let reconstructor = SsaReconstructor::<TestSpec>::new(bench_recon_cfg(true));
                         let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
                         reconstructor
-                            .new_exit_commitment(ssa_id, bench_params(polys as usize, threshold as usize, PROD_SURPLUS))
+                            // Surplus from the swept threshold, matching the generator that produced
+                            // the fixture: `PROD_SURPLUS` here would negotiate a different ratio at
+                            // every point but the production one.
+                            .new_exit_commitment(
+                                ssa_id,
+                                bench_params(
+                                    polys as usize,
+                                    threshold as usize,
+                                    hopr_protocol_pix::default_surplus_for(threshold),
+                                ),
+                            )
                             .unwrap();
                         (reconstructor, ssa_id)
                     },
