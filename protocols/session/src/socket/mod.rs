@@ -66,6 +66,13 @@ pub struct SessionSocketConfig {
     /// Default is false.
     #[default(false)]
     pub flush_immediately: bool,
+    /// Preserve datagram boundaries: each write to the socket is emitted as exactly one frame and
+    /// delivered to the peer as exactly one read, regardless of [`Self::frame_size`]. Use for
+    /// datagram-oriented targets (UDP/WireGuard). Only meaningful on stateless sockets.
+    ///
+    /// Default is false.
+    #[default(false)]
+    pub datagram: bool,
     /// Capacity of the control channel, the maximum number of outstanding control messages.
     ///
     /// This option affects stateful sockets.
@@ -186,7 +193,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
                 future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter_with_terminating_segment::<C>(frame_size);
+            .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
@@ -361,7 +368,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 }
                 future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter_with_terminating_segment::<C>(frame_size);
+            .segmenter_with_terminating_segment::<C>(frame_size, cfg.datagram);
 
         // We have to merge the streams here and spawn a special task for it
         // Since the control messages from the State can come independent of Upstream writes.

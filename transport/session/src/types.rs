@@ -245,6 +245,7 @@ impl HoprSession {
                 frame_timeout: cfg.frame_timeout,
                 capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
+                datagram: cfg.capabilities.contains(Capability::Datagram),
                 max_buffered_segments: cfg.max_buffered_segments,
                 // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
                 // also where the honest clock that observes the resulting loss lives.

@@ -45,6 +45,9 @@ pub struct Segmenter<const C: usize, S> {
     frame_id: FrameId,
     is_closed: bool,
     send_terminating_segment: bool,
+    /// Datagram mode: emit exactly one frame per write (preserve datagram boundaries) instead of
+    /// coalescing writes up to `frame_size`. See [`Capability::Datagram`](crate).
+    datagram: bool,
 }
 
 enum State {
@@ -57,10 +60,14 @@ where
     S: futures::Sink<Segment>,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn new(inner: S, frame_size: usize, send_terminating_segment: bool) -> Self {
+    fn new(inner: S, frame_size: usize, send_terminating_segment: bool, datagram: bool) -> Self {
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
         // Minimum is SESSION_MTU (= C - SEGMENT_OVERHEAD) so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
+        //
+        // In datagram mode `frame_size` no longer bounds a frame (each write is its own frame);
+        // an individual datagram may be up to the same SeqIndicator-bounded maximum. `frame_size`
+        // is then only a capacity hint for the frame buffer.
         let frame_size = frame_size.clamp(
             C - SessionMessage::<C>::SEGMENT_OVERHEAD,
             (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
@@ -75,6 +82,7 @@ where
             frame_id: 1,
             is_closed: false,
             send_terminating_segment,
+            datagram,
         }
     }
 }
@@ -97,6 +105,38 @@ where
         loop {
             match this.state {
                 State::BufferingFrame => {
+                    // Datagram mode: emit exactly one frame per write so datagram boundaries are
+                    // preserved (the peer reads one datagram per read), regardless of `frame_size`.
+                    // `frame` is empty here: the previous write's frame was segmented and the
+                    // `WritingFrame` state drains before control returns to `BufferingFrame`.
+                    if *this.datagram {
+                        if buf.is_empty() {
+                            return Poll::Ready(Ok(0));
+                        }
+                        this.frame.extend_from_slice(buf);
+                        segment_into(
+                            this.frame.as_slice(),
+                            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
+                            *this.frame_id,
+                            this.ready_segments,
+                        )
+                        .map_err(std::io::Error::other)?;
+
+                        tracing::trace!(
+                            num_segments = this.ready_segments.len(),
+                            datagram_len = buf.len(),
+                            "datagram frame ready"
+                        );
+
+                        this.frame.clear();
+                        *this.frame_id += 1;
+                        *this.state = State::WritingFrame;
+
+                        // Segments drain on the next poll_write / poll_flush (as in the buffered
+                        // path); the whole datagram has been accepted.
+                        return Poll::Ready(Ok(buf.len()));
+                    }
+
                     // If there's space in the frame, keep writing to it
                     if *this.frame_size > this.frame.len() {
                         let to_write = buf.len().min(*this.frame_size - this.frame.len());
@@ -211,17 +251,20 @@ pub trait SegmenterExt: futures::Sink<Segment> {
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, false)
+        Segmenter::new(self, frame_size, false, false)
     }
 
     /// Attaches a [`Segmenter`] to the underlying sink.
     /// The `Segmenter` also sends a [terminating](Segment::terminating) when closed.
-    fn segmenter_with_terminating_segment<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
+    ///
+    /// When `datagram` is set, each write is emitted as exactly one frame (datagram boundaries are
+    /// preserved) instead of being coalesced up to `frame_size`.
+    fn segmenter_with_terminating_segment<const C: usize>(self, frame_size: usize, datagram: bool) -> Segmenter<C, Self>
     where
         Self: Sized,
         Self::Error: std::error::Error + Send + Sync + 'static,
     {
-        Segmenter::new(self, frame_size, true)
+        Segmenter::new(self, frame_size, true, datagram)
     }
 }
 
@@ -355,7 +398,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn segmenter_full_frame_segmentation_must_also_include_terminating_segment() -> anyhow::Result<()> {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
-        let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE);
+        let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE, false);
 
         let data = hopr_types::crypto_random::random_bytes::<FRAME_SIZE>();
 

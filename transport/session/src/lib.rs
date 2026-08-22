@@ -67,6 +67,13 @@ flagset::flags! {
         ///
         /// This applies only to the recipient of the Session (Exit).
         NoRateControl = 0b0001_0000,
+        /// Preserve datagram boundaries: each write is emitted as exactly one frame (and therefore
+        /// delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
+        /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
+        /// coalesced. Only supported on stateless (non-retransmitting) sessions.
+        ///
+        /// Implies [`Segmentation`].
+        Datagram = 0b0010_1000,
     }
 }
 
