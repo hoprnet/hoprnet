@@ -347,6 +347,61 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn datagram_mode_emits_one_frame_per_write() -> anyhow::Result<()> {
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE, true);
+        pin_mut!(segments);
+
+        // Two small datagrams that would coalesce into a single frame in byte-stream mode. In
+        // datagram mode each write is its own frame (distinct frame_id), so the boundary is kept.
+        writer.write_all(b"hello").await?;
+        writer.write_all(b"world").await?;
+        writer.flush().await?;
+
+        let first = segments.next().await.ok_or(anyhow!("no first datagram"))?;
+        assert_eq!(1, first.frame_id);
+        assert_eq!(0, first.seq_idx);
+        assert_eq!(1, first.seq_flags.seq_len(), "single-segment datagram");
+        assert_eq!(b"hello", first.data.as_ref());
+
+        let second = segments.next().await.ok_or(anyhow!("no second datagram"))?;
+        assert_eq!(2, second.frame_id, "each write is a distinct frame");
+        assert_eq!(0, second.seq_idx);
+        assert_eq!(1, second.seq_flags.seq_len());
+        assert_eq!(b"world", second.data.as_ref());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn datagram_mode_keeps_a_multi_segment_datagram_in_one_frame() -> anyhow::Result<()> {
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx.segmenter_with_terminating_segment::<MTU>(FRAME_SIZE, true);
+        pin_mut!(segments);
+
+        // A datagram larger than one segment (and larger than frame_size) stays a single frame: all
+        // segments share one frame_id/seq_len with contiguous indices, matching a direct segment().
+        let datagram = vec![0xABu8; SMTU * 2 + 10];
+        writer.write_all(&datagram).await?;
+        writer.flush().await?;
+
+        for expected in segment(&datagram, SMTU, 1)? {
+            let seg = segments
+                .next()
+                .timeout(futures_time::time::Duration::from_millis(500))
+                .await
+                .context("multi-segment datagram")?
+                .ok_or(anyhow!("no more segments"))?;
+            assert_eq!(1, seg.frame_id, "one frame_id for the whole datagram");
+            assert_eq!(expected.seq_idx, seg.seq_idx);
+            assert_eq!(expected.seq_flags.seq_len(), seg.seq_flags.seq_len());
+            assert_eq!(expected.data.as_ref(), seg.data.as_ref());
+        }
+
+        Ok(())
+    }
+
     #[parameterized::parameterized(num_frames = { 1, 3, 5, 11 })]
     #[parameterized_macro(tokio::test)]
     async fn segmenter_should_segment_complete_frames(num_frames: usize) -> anyhow::Result<()> {

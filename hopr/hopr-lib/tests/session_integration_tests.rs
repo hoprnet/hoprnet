@@ -12,7 +12,7 @@ use hopr_lib::{
     exports::{
         network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
         transport::{
-            ApplicationDataIn, ApplicationDataOut,
+            ApplicationDataIn, ApplicationDataOut, TransportSessionError,
             session::{Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session},
         },
     },
@@ -343,11 +343,15 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
     assert_eq!(sender.send_to(&datagram, addr).await?, datagram_len);
 
-    let mut buf = vec![0u8; datagram_len];
+    // Over-size the read buffer so a coalescing regression (more than one datagram in a single
+    // read) surfaces as `n > datagram_len` for the caller to assert on, instead of being silently
+    // truncated to `datagram_len` by an exact-size buffer.
+    let mut buf = vec![0u8; datagram_len + 8192];
     let n = tokio::time::timeout(std::time::Duration::from_secs(5), bob_session.read(&mut buf)).await??;
+    let checked = n.min(datagram_len);
     assert_eq!(
-        &buf[..n],
-        &datagram[..n],
+        &buf[..checked],
+        &datagram[..checked],
         "delivered bytes must be a prefix of the sent datagram"
     );
     Ok(n)
@@ -398,5 +402,46 @@ async fn udp_back_to_back_datagrams_each_arrive_whole_in_order() -> anyhow::Resu
         );
     }
 
+    Ok(())
+}
+
+#[rstest]
+#[case(Capabilities::from(Capability::Datagram) | Capability::RetransmissionAck)]
+#[case(Capabilities::from(Capability::Datagram) | Capability::RetransmissionNack)]
+#[tokio::test]
+/// The Datagram capability is only valid on stateless sessions: combining it with a retransmission
+/// capability selects the reliable socket, whose NACK missing-segment bitmap cannot address the
+/// segments of an oversized datagram frame. The session must refuse to open rather than risk stream
+/// corruption on loss, so `HoprSession::new` returns `DatagramRequiresStateless`.
+async fn datagram_capability_is_rejected_on_a_reliable_session(
+    #[case] capabilities: Capabilities,
+) -> anyhow::Result<()> {
+    let id = HoprPseudonym::random();
+    let dst: Address = (&ChainKeypair::random()).into();
+    let (tx, _bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+    let (_bob_tx, rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+
+    let err = HoprSession::new(
+        id,
+        DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
+        HoprSessionConfig {
+            capabilities,
+            ..Default::default()
+        },
+        (
+            tx,
+            rx.map(|(_, d)| ApplicationDataIn {
+                data: d.data,
+                packet_info: Default::default(),
+            }),
+        ),
+        None,
+    )
+    .err();
+
+    assert!(
+        matches!(err, Some(TransportSessionError::DatagramRequiresStateless)),
+        "Datagram + retransmission must be rejected, got {err:?}"
+    );
     Ok(())
 }

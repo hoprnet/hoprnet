@@ -240,6 +240,19 @@ impl HoprSession {
 
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
+            // Datagram mode emits one frame per write with no `frame_size` cap; the reliable socket
+            // cannot honor that. Its NACK missing-segment bitmap addresses at most
+            // `MAX_MISSING_SEGMENTS_PER_FRAME` segments per frame, so any segment past that bound in
+            // an oversized datagram frame could never be requested for retransmission — on loss the
+            // frame never completes and the stream stalls. Reject the contradictory combination up
+            // front instead of silently corrupting a reliable stream.
+            if cfg.capabilities.contains(Capability::Datagram)
+                && (cfg.capabilities.contains(Capability::RetransmissionAck)
+                    || cfg.capabilities.contains(Capability::RetransmissionNack))
+            {
+                return Err(TransportSessionError::DatagramRequiresStateless);
+            }
+
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
