@@ -260,15 +260,12 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
     Ok(())
 }
 
-/// Bridges a paired session to a `ConnectedUdpStream` with `transfer_session` (exactly as
-/// `hopr-session-server-forwarder` does on the exit node), sends a single UDP datagram of
-/// `datagram_len` bytes into it, and returns how many bytes the client side receives from a
-/// SINGLE `read` — i.e. how much of the datagram is delivered with its boundary intact.
-///
-/// A datagram-oriented consumer (the WireGuard pump/neptun) does one read per datagram and treats
-/// the returned bytes as one datagram; the datagram-preserving contract is therefore
-/// "one read == the whole datagram".
-async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyhow::Result<usize> {
+/// Wires a paired session to a `ConnectedUdpStream` via `transfer_session` (exactly as
+/// `hopr-session-server-forwarder` does on the exit node) and returns the client-side session plus
+/// the UDP address datagrams should be sent to. The session requests `Datagram` (the #8356 fix), so
+/// it preserves UDP datagram boundaries: one frame per write, one datagram per read. The forwarding
+/// task is detached and cancelled when the test runtime shuts down.
+async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketAddr)> {
     const BUF_LEN: usize = 16384; // HOPR_UDP_BUFFER_SIZE used by the exit forwarder
 
     let dst: Address = (&ChainKeypair::random()).into();
@@ -277,8 +274,6 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
     // The WireGuard session uses Segmentation + NoDelay + Datagram; frame_mtu defaults to 1500.
-    // `Datagram` makes the session preserve datagram boundaries (one frame per write) regardless of
-    // frame_mtu — the fix for #8356.
     let cfg = HoprSessionConfig {
         capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay | Capability::Datagram,
         ..Default::default()
@@ -304,7 +299,7 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
     )?;
 
     // Client-side session endpoint (where the WireGuard pump reads).
-    let mut bob_session = HoprSession::new(
+    let bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.into()),
         cfg,
@@ -326,21 +321,28 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
     let addr = *udp_bridge.bound_address();
 
     let (ready_tx, ready_rx) = oneshot::channel();
-    let transfer_handle = tokio::task::spawn(async move {
+    tokio::task::spawn(async move {
         ready_tx.send(()).ok();
         transfer_session(&mut alice_session, &mut udp_bridge, BUF_LEN, None).await
     });
     ready_rx.await.ok();
 
-    // A single UDP datagram from the WireGuard server. When it exceeds frame_mtu it models a
-    // UDP-GSO super-buffer (several WireGuard packets coalesced into one UDP send), which is what
-    // the exit receives over the high-MTU/loopback path to a co-located WireGuard server.
+    Ok((bob_session, addr))
+}
+
+/// Sends one UDP datagram of `datagram_len` bytes through the bridge and returns how many bytes the
+/// client receives from a SINGLE `read` — i.e. how much of the datagram is delivered with its
+/// boundary intact. A datagram-oriented consumer (the WireGuard pump/neptun) does one read per
+/// datagram, so the datagram-preserving contract is "one read == the whole datagram". A
+/// `datagram_len` above frame_mtu models a UDP-GSO super-buffer (several WireGuard packets in one
+/// UDP send), which is what the exit receives over the high-MTU path to a co-located WG server.
+async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyhow::Result<usize> {
+    let (mut bob_session, addr) = datagram_udp_bridge().await?;
+
     let datagram: Vec<u8> = (0..datagram_len).map(|i| (i % 251) as u8).collect();
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
-    let sent = sender.send_to(&datagram, addr).await?;
-    assert_eq!(sent, datagram_len);
+    assert_eq!(sender.send_to(&datagram, addr).await?, datagram_len);
 
-    // The WireGuard pump does ONE read per datagram and hands the result to neptun.
     let mut buf = vec![0u8; datagram_len];
     let n = tokio::time::timeout(std::time::Duration::from_secs(5), bob_session.read(&mut buf)).await??;
     assert_eq!(
@@ -348,41 +350,25 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
         &datagram[..n],
         "delivered bytes must be a prefix of the sent datagram"
     );
-
-    transfer_handle.abort();
     Ok(n)
 }
 
+#[rstest]
+#[case::larger_than_frame_mtu(2904)] // two 1452-byte WireGuard packets coalesced by UDP GSO
+#[case::within_frame_mtu(1452)] // a single WireGuard packet
 #[tokio::test]
-/// Regression test for hoprnet#8356. A UDP datagram larger than `frame_mtu` (a WireGuard UDP-GSO
-/// super-buffer of several packets) forwarded through `transfer_session` must be delivered to the
-/// peer as a single `read`. Before the fix the byte-stream session split it at `frame_mtu`, so the
-/// client's single `read` returned only one frame (<= 1500) and neptun rejected the partial buffer
-/// (`InvalidPacket`/`InvalidAeadTag`) until the `DecapStalled` guard reconnected. With the
-/// `Datagram` capability the session preserves the boundary (one frame per write).
-async fn udp_datagram_larger_than_frame_mtu_is_delivered_whole() -> anyhow::Result<()> {
-    const DATAGRAM_LEN: usize = 2904; // two 1452-byte WireGuard packets coalesced by UDP GSO
-
-    let n = single_read_of_one_forwarded_udp_datagram(DATAGRAM_LEN).await?;
+/// Regression test for hoprnet#8356. A UDP datagram forwarded through `transfer_session` must be
+/// delivered to the peer as a single `read`. Before the fix the byte-stream session split a
+/// datagram larger than `frame_mtu` across frames, so the client's single `read` returned only one
+/// frame (<= 1500) and neptun rejected the partial buffer (`InvalidPacket`/`InvalidAeadTag`) until
+/// the `DecapStalled` guard reconnected. With the `Datagram` capability the session preserves the
+/// boundary (one frame per write), whatever the datagram size.
+async fn udp_datagram_is_delivered_whole(#[case] datagram_len: usize) -> anyhow::Result<()> {
+    let n = single_read_of_one_forwarded_udp_datagram(datagram_len).await?;
 
     assert_eq!(
-        n, DATAGRAM_LEN,
-        "datagram boundary not preserved: a {DATAGRAM_LEN}-byte UDP datagram was delivered in a {n}-byte read instead \
-         of whole"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-/// Control for #8356: a datagram at/below `frame_mtu` is delivered whole in a single read.
-async fn udp_datagram_within_frame_mtu_preserves_boundary() -> anyhow::Result<()> {
-    const DATAGRAM_LEN: usize = 1452; // a single WireGuard packet
-
-    let n = single_read_of_one_forwarded_udp_datagram(DATAGRAM_LEN).await?;
-
-    assert_eq!(
-        n, DATAGRAM_LEN,
-        "a <= frame_mtu datagram must arrive whole in one read; got {n}"
+        n, datagram_len,
+        "datagram boundary not preserved: a {datagram_len}-byte UDP datagram was delivered in a {n}-byte read"
     );
     Ok(())
 }
@@ -395,61 +381,11 @@ async fn udp_back_to_back_datagrams_each_arrive_whole_in_order() -> anyhow::Resu
     // Mixed sizes incl. > frame_mtu; distinct fill bytes to check ordering and boundaries.
     let sizes: [usize; 4] = [1452, 2904, 900, 4308];
 
-    let dst: Address = (&ChainKeypair::random()).into();
-    let id = HoprPseudonym::random();
-    let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
-    let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
-
-    let cfg = HoprSessionConfig {
-        capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay | Capability::Datagram,
-        ..Default::default()
-    };
-
-    let mut alice_session = HoprSession::new(
-        id,
-        DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cfg.clone(),
-        (
-            alice_tx,
-            alice_rx.map(|(_, d)| ApplicationDataIn {
-                data: d.data,
-                packet_info: Default::default(),
-            }),
-        ),
-        None,
-    )?;
-    let mut bob_session = HoprSession::new(
-        id,
-        DestinationRouting::Return(id.into()),
-        cfg,
-        (
-            bob_tx,
-            bob_rx.map(|(_, d)| ApplicationDataIn {
-                data: d.data,
-                packet_info: Default::default(),
-            }),
-        ),
-        None,
-    )?;
-
-    let mut udp_bridge = ConnectedUdpStream::builder()
-        .with_buffer_size(BUF_LEN)
-        .with_queue_size(512)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto)
-        .build(("127.0.0.1", 0))?;
-    let addr = *udp_bridge.bound_address();
-
-    let (ready_tx, ready_rx) = oneshot::channel();
-    let transfer_handle = tokio::task::spawn(async move {
-        ready_tx.send(()).ok();
-        transfer_session(&mut alice_session, &mut udp_bridge, BUF_LEN, None).await
-    });
-    ready_rx.await.ok();
+    let (mut bob_session, addr) = datagram_udp_bridge().await?;
 
     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
     for (i, &len) in sizes.iter().enumerate() {
-        let datagram = vec![i as u8; len];
-        assert_eq!(sender.send_to(&datagram, addr).await?, len);
+        assert_eq!(sender.send_to(&vec![i as u8; len], addr).await?, len);
     }
 
     for (i, &len) in sizes.iter().enumerate() {
@@ -462,6 +398,5 @@ async fn udp_back_to_back_datagrams_each_arrive_whole_in_order() -> anyhow::Resu
         );
     }
 
-    transfer_handle.abort();
     Ok(())
 }

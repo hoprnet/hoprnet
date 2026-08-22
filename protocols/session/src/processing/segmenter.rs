@@ -107,15 +107,14 @@ where
                 State::BufferingFrame => {
                     // Datagram mode: emit exactly one frame per write so datagram boundaries are
                     // preserved (the peer reads one datagram per read), regardless of `frame_size`.
-                    // `frame` is empty here: the previous write's frame was segmented and the
-                    // `WritingFrame` state drains before control returns to `BufferingFrame`.
+                    // Segment `buf` directly — there is nothing to accumulate, so the `frame`
+                    // buffer is left untouched. Segments drain on the next poll_write / poll_flush.
                     if *this.datagram {
                         if buf.is_empty() {
                             return Poll::Ready(Ok(0));
                         }
-                        this.frame.extend_from_slice(buf);
                         segment_into(
-                            this.frame.as_slice(),
+                            buf,
                             C - SessionMessage::<C>::SEGMENT_OVERHEAD,
                             *this.frame_id,
                             this.ready_segments,
@@ -128,12 +127,9 @@ where
                             "datagram frame ready"
                         );
 
-                        this.frame.clear();
                         *this.frame_id += 1;
                         *this.state = State::WritingFrame;
 
-                        // Segments drain on the next poll_write / poll_flush (as in the buffered
-                        // path); the whole datagram has been accepted.
                         return Poll::Ready(Ok(buf.len()));
                     }
 
