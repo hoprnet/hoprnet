@@ -23,7 +23,7 @@ pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlCo
 pub use hopr_utils::network_types::types::*;
 #[cfg(feature = "benchmark")]
 pub use manager::SESSION_FORWARD_CAPACITY;
-pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
+pub use manager::{DispatchResult, DropReason, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
 #[cfg(feature = "telemetry")]
 pub use telemetry::{SessionAckMode, SessionLifecycleState};
 pub use types::{
