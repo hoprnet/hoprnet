@@ -30,9 +30,6 @@ pub enum TransportSessionError {
     #[error(transparent)]
     Network(#[from] hopr_utils::network_types::errors::NetworkTypeError),
 
-    #[error("the Datagram capability requires a stateless session and is incompatible with retransmission")]
-    DatagramRequiresStateless,
-
     #[error("session is closed")]
     Closed,
 }

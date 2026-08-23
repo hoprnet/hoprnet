@@ -12,7 +12,7 @@ use hopr_lib::{
     exports::{
         network::types::udp::{ConnectedUdpStream, UdpStreamParallelism},
         transport::{
-            ApplicationDataIn, ApplicationDataOut, TransportSessionError,
+            ApplicationDataIn, ApplicationDataOut,
             session::{Capabilities, Capability, HoprSession, HoprSessionConfig, transfer_session},
         },
     },
@@ -273,9 +273,10 @@ async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketA
     let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
-    // The WireGuard session uses Segmentation + NoDelay + Datagram; frame_mtu defaults to 1500.
+    // The WireGuard session uses Segmentation + NoDelay; on a stateless session NoDelay enables
+    // datagram-boundary preservation (UDP-like framing). frame_mtu defaults to 1500.
     let cfg = HoprSessionConfig {
-        capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay | Capability::Datagram,
+        capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay,
         ..Default::default()
     };
     assert_eq!(
@@ -406,42 +407,67 @@ async fn udp_back_to_back_datagrams_each_arrive_whole_in_order() -> anyhow::Resu
 }
 
 #[rstest]
-#[case(Capabilities::from(Capability::Datagram) | Capability::RetransmissionAck)]
-#[case(Capabilities::from(Capability::Datagram) | Capability::RetransmissionNack)]
+#[case(Capability::RetransmissionAck)]
+#[case(Capability::RetransmissionNack)]
 #[tokio::test]
-/// The Datagram capability is only valid on stateless sessions: combining it with a retransmission
-/// capability selects the reliable socket, whose NACK missing-segment bitmap cannot address the
-/// segments of an oversized datagram frame. The session must refuse to open rather than risk stream
-/// corruption on loss, so `HoprSession::new` returns `DatagramRequiresStateless`.
-async fn datagram_capability_is_rejected_on_a_reliable_session(
-    #[case] capabilities: Capabilities,
+/// Datagram-boundary preservation is stateless-only. On a reliable (retransmitting) session,
+/// NoDelay keeps only its buffering behavior — a write larger than frame_mtu is still split across
+/// frames (byte-stream framing), so a single read returns at most one frame and the payload is NOT
+/// delivered whole. This is what keeps oversized datagram frames off the reliable socket, whose
+/// NACK missing-segment bitmap cannot address their segments.
+async fn nodelay_on_reliable_session_keeps_byte_stream_framing(
+    #[case] retransmission: Capability,
 ) -> anyhow::Result<()> {
     let id = HoprPseudonym::random();
     let dst: Address = (&ChainKeypair::random()).into();
-    let (tx, _bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
-    let (_bob_tx, rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+    let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+    let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
-    let err = HoprSession::new(
+    // Reliable session (selects the stateful socket) that also requests NoDelay.
+    let cfg = HoprSessionConfig {
+        capabilities: Capabilities::from(Capability::Segmentation) | Capability::NoDelay | retransmission,
+        ..Default::default()
+    };
+
+    let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        HoprSessionConfig {
-            capabilities,
-            ..Default::default()
-        },
+        cfg.clone(),
         (
-            tx,
-            rx.map(|(_, d)| ApplicationDataIn {
+            alice_tx,
+            alice_rx.map(|(_, d)| ApplicationDataIn {
                 data: d.data,
                 packet_info: Default::default(),
             }),
         ),
         None,
-    )
-    .err();
+    )?;
+    let mut bob_session = HoprSession::new(
+        id,
+        DestinationRouting::Return(id.into()),
+        cfg,
+        (
+            bob_tx,
+            bob_rx.map(|(_, d)| ApplicationDataIn {
+                data: d.data,
+                packet_info: Default::default(),
+            }),
+        ),
+        None,
+    )?;
 
+    // A payload well above frame_mtu (1500): if datagram mode were (wrongly) active it would arrive
+    // in one read; on a reliable socket it must be split at frame_mtu instead.
+    let payload = vec![0x5Au8; 2904];
+    alice_session.write_all(&payload).await?;
+    alice_session.flush().await?;
+
+    let mut buf = vec![0u8; payload.len()];
+    let n = tokio::time::timeout(std::time::Duration::from_secs(5), bob_session.read(&mut buf)).await??;
     assert!(
-        matches!(err, Some(TransportSessionError::DatagramRequiresStateless)),
-        "Datagram + retransmission must be rejected, got {err:?}"
+        n < payload.len(),
+        "reliable NoDelay session must keep byte-stream framing (split at frame_mtu), but a single read returned all \
+         {n} bytes — datagram boundaries were preserved on a reliable socket"
     );
     Ok(())
 }

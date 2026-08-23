@@ -240,25 +240,16 @@ impl HoprSession {
 
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
-            // Datagram mode emits one frame per write with no `frame_size` cap; the reliable socket
-            // cannot honor that. Its NACK missing-segment bitmap addresses at most
-            // `MAX_MISSING_SEGMENTS_PER_FRAME` segments per frame, so any segment past that bound in
-            // an oversized datagram frame could never be requested for retransmission — on loss the
-            // frame never completes and the stream stalls. Reject the contradictory combination up
-            // front instead of silently corrupting a reliable stream.
-            if cfg.capabilities.contains(Capability::Datagram)
-                && (cfg.capabilities.contains(Capability::RetransmissionAck)
-                    || cfg.capabilities.contains(Capability::RetransmissionNack))
-            {
-                return Err(TransportSessionError::DatagramRequiresStateless);
-            }
-
             let socket_cfg = SessionSocketConfig {
                 frame_size: cfg.frame_mtu,
                 frame_timeout: cfg.frame_timeout,
                 capacity: SESSION_SOCKET_CAPACITY,
                 flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
-                datagram: cfg.capabilities.contains(Capability::Datagram),
+                // Datagram-boundary preservation is stateless-only: the stateless branch below turns
+                // it on for `NoDelay` sessions. The reliable socket must never run in datagram mode
+                // (its NACK missing-segment bitmap cannot address the segments of an oversized
+                // datagram frame), so it keeps `NoDelay`'s buffering behavior only.
+                datagram: false,
                 max_buffered_segments: cfg.max_buffered_segments,
                 // Anti-bufferbloat bound; only meaningful when flow control is enabled, which is
                 // also where the honest clock that observes the resulting loss lives.
@@ -347,6 +338,12 @@ impl HoprSession {
                     None => Box::new(socket),
                 }
             } else {
+                // Stateless (unreliable) sockets support datagram-boundary preservation, driven by
+                // `NoDelay` (UDP-like framing). See `Capability::NoDelay`.
+                let socket_cfg = SessionSocketConfig {
+                    datagram: cfg.capabilities.contains(Capability::NoDelay),
+                    ..socket_cfg
+                };
                 debug!(?socket_cfg, "opening new stateless session socket");
 
                 Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(

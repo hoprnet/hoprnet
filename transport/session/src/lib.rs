@@ -59,7 +59,13 @@ flagset::flags! {
         ///
         /// Implies [`Segmentation`].
         RetransmissionNack = 0b000_1010,
-        /// Disable packet buffering.
+        /// UDP-like behavior: disable packet buffering, and — on stateless (non-retransmitting)
+        /// sessions — preserve datagram boundaries by emitting each write as exactly one frame
+        /// (delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
+        /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
+        /// coalesced. On reliable (retransmitting) sessions only the buffering behavior applies;
+        /// boundary preservation is stateless-only (the NACK missing-segment bitmap cannot address
+        /// the segments of an oversized datagram frame).
         ///
         /// Implies [`Segmentation`].
         NoDelay = 0b0000_1001,
@@ -67,13 +73,6 @@ flagset::flags! {
         ///
         /// This applies only to the recipient of the Session (Exit).
         NoRateControl = 0b0001_0000,
-        /// Preserve datagram boundaries: each write is emitted as exactly one frame (and therefore
-        /// delivered to the peer as exactly one read), regardless of `frame_mtu`. Use this for
-        /// datagram-oriented targets (e.g. UDP/WireGuard) that must not have datagrams split or
-        /// coalesced. Only supported on stateless (non-retransmitting) sessions.
-        ///
-        /// Implies [`Segmentation`].
-        Datagram = 0b0010_1000,
     }
 }
 
