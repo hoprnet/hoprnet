@@ -100,6 +100,39 @@ impl<K: Eq + Hash + Copy> ReturnPathEpisodes<K> {
     }
 }
 
+/// Runs one SURB-flush tick in the exact order the flush task requires: **detect, then flush, then
+/// sequence recovery**.
+///
+/// Extracted from `HoprTransport::run` so the ordering can be exercised deterministically instead of
+/// only inside a live node. Two orderings here are load-bearing and this function is what pins them:
+/// detection must read the per-path counters *before* [`flush_into`](crate::protocol::surb_telemetry::flush_into)
+/// drains them (otherwise every path reads as idle and nothing is ever silent), and the graph must
+/// see this interval's counts *before* any re-plan reads it (otherwise the re-plan the silence just
+/// triggered runs a whole tick behind the evidence). Returns the recovery steps taken, for the
+/// caller to log.
+pub async fn run_flush_tick<G, R, RFut, F, FFut>(
+    surb_round_trips: &crate::protocol::surb_telemetry::SurbRoundTripRegistry,
+    graph: &G,
+    now_ms: u128,
+    episodes: &mut ReturnPathEpisodes<hopr_api::types::crypto::types::OffchainPublicKey>,
+    replan: R,
+    refill: F,
+) -> Vec<RecoveryStep<hopr_api::types::crypto::types::OffchainPublicKey>>
+where
+    G: hopr_api::graph::NetworkGraphUpdate,
+    R: FnMut(hopr_api::types::crypto::types::OffchainPublicKey) -> RFut,
+    RFut: Future<Output = usize>,
+    F: FnMut(hopr_api::types::crypto::types::OffchainPublicKey) -> FFut,
+    FFut: Future<Output = usize>,
+{
+    // Detection before the drain: `degraded_destinations` reads the counts the flush is about to
+    // reset.
+    let silent = surb_round_trips.degraded_destinations();
+    // The graph has to see this interval's counts before anything re-plans on it.
+    crate::protocol::surb_telemetry::flush_into(surb_round_trips, graph, now_ms);
+    episodes.tick(silent, replan, refill).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
