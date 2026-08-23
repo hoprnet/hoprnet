@@ -25,9 +25,9 @@ use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
 pub use manager::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, DropReason, IncomingSessionPixConfig,
-    MAX_OVERLAPPING_BATCHES, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
-    SessionManagerConfig, cycle_budget_for, max_cycle_budget_for_quota,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, DropReason,
+    IncomingSessionPixConfig, MAX_OVERLAPPING_BATCHES, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox,
+    SessionManager, SessionManagerConfig, cycle_budget_for, max_cycle_budget_for_quota,
 };
 pub use supervision::{SupervisorConfig, validate_pix_supervision};
 #[cfg(any(test, feature = "testing"))]
