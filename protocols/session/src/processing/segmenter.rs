@@ -46,7 +46,8 @@ pub struct Segmenter<const C: usize, S> {
     is_closed: bool,
     send_terminating_segment: bool,
     /// Datagram mode: emit exactly one frame per write (preserve datagram boundaries) instead of
-    /// coalescing writes up to `frame_size`. See [`Capability::Datagram`](crate).
+    /// coalescing writes up to `frame_size`. Driven by the `Datagram` session capability, which the
+    /// `hopr-transport-session` crate maps onto this flag.
     datagram: bool,
 }
 
