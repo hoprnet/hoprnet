@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use hopr_api::types::{crypto::prelude::*, internal::prelude::*};
 use hopr_crypto_packet::prelude::*;
+use hopr_protocol_pix::TaggedEncryptedPartialSsaShare;
 
 /// Packet that is being sent out by us.
 pub struct OutgoingPacket {
@@ -8,8 +9,16 @@ pub struct OutgoingPacket {
     pub next_hop: OffchainPublicKey,
     /// Challenge to be solved from the acknowledgement of the next hop.
     pub ack_challenge: HalfKeyChallenge,
+    /// Optional encrypted partial SSA share for PIX protocol.
+    pub encrypted_pix_share: Option<TaggedEncryptedPartialSsaShare<HoprPixSpec>>,
     /// Encoded HOPR packet.
     pub data: Bytes,
+    /// SURBs minted onto this packet, in the order of the return paths that produced them.
+    ///
+    /// Surfaced so a layer above can pair each SURB with the return path it encodes — the ids exist
+    /// only inside packet construction, and the routing that produced them only outside it, so this
+    /// is the single point where the two can be associated. Empty for packets carrying no SURBs.
+    pub minted_surbs: Vec<HoprSurbId>,
 }
 
 impl std::fmt::Debug for OutgoingPacket {
@@ -17,6 +26,7 @@ impl std::fmt::Debug for OutgoingPacket {
         f.debug_struct("OutgoingPacket")
             .field("next_hop", &self.next_hop)
             .field("ack_challenge", &self.ack_challenge)
+            .field("encrypted_pix_share", &self.encrypted_pix_share)
             .finish_non_exhaustive()
     }
 }
@@ -40,6 +50,12 @@ pub struct IncomingFinalPacket {
     pub previous_hop: OffchainPublicKey,
     /// Sender pseudonym.
     pub sender: HoprPseudonym,
+    /// SURB this packet was a reply on, when it was one.
+    ///
+    /// `None` for a packet that was not sent using one of our SURBs. Surfaced because decoding
+    /// already resolves the sender id to find the reply opener, so the id is known here and
+    /// nowhere later.
+    pub replied_on_surb: Option<HoprSurbId>,
     /// Plain text payload of the packet.
     pub plain_text: Box<[u8]>,
     /// Acknowledgement to be sent to the previous hop.

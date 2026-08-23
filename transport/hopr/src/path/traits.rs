@@ -26,9 +26,12 @@ pub struct PathWithMetrics {
     /// Worst per-edge acknowledgment rate along the path.
     /// `None` if no edge has sent any messages yet.
     pub min_ack_rate: Option<f64>,
-    /// Smallest known channel capacity along the path.
-    /// `None` if no edge carries channel-capacity data.
-    pub capacity_floor: Option<u128>,
+    /// Smallest number of single-hop tickets any edge along the path can still fund.
+    ///
+    /// Derived per query from each edge's balance and the current ticket face value — never stored
+    /// on an edge, which would stale the graph whenever the price moves.
+    /// `None` if no edge carries balance data.
+    pub fundable_tickets_floor: Option<u128>,
 }
 
 /// Selects multi-hop paths through the network.

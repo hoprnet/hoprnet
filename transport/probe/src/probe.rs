@@ -488,23 +488,25 @@ mod tests {
             None
         }
 
-        fn average_probe_rate(&self) -> f64 {
-            1.0
+        // A measured, perfect link — so the probe tests see the same edge they did before the
+        // trait gained the presence distinction. `has_observations` derives from this.
+        fn average_probe_rate(&self) -> Option<f64> {
+            Some(1.0)
         }
 
-        fn score(&self) -> f64 {
-            1.0
+        fn score(&self) -> Option<f64> {
+            Some(1.0)
         }
     }
 
     impl EdgeNetworkObservableRead for TestEdgeTransportObservations {
-        fn is_connected(&self) -> bool {
-            true
+        fn is_connected(&self) -> Option<bool> {
+            Some(true)
         }
     }
 
     impl EdgeProtocolObservable for TestEdgeTransportObservations {
-        fn capacity(&self) -> Option<u128> {
+        fn balance(&self) -> Option<hopr_api::graph::traits::Balance> {
             None
         }
     }
@@ -540,8 +542,8 @@ mod tests {
             None
         }
 
-        fn score(&self) -> f64 {
-            1.0
+        fn score(&self) -> Option<f64> {
+            Some(1.0)
         }
     }
 
@@ -583,6 +585,8 @@ mod tests {
         {
             unimplemented!()
         }
+
+        fn set_ticket_face_value(&self, _ticket_face_value: hopr_api::graph::traits::Balance) {}
     }
 
     #[async_trait]
@@ -592,6 +596,10 @@ mod tests {
 
         fn identity(&self) -> &OffchainPublicKey {
             &self.me
+        }
+
+        fn ticket_face_value(&self) -> Option<hopr_api::graph::traits::Balance> {
+            None
         }
 
         fn node_count(&self) -> usize {
@@ -610,6 +618,11 @@ mod tests {
 
         fn edge(&self, _src: &OffchainPublicKey, _dest: &OffchainPublicKey) -> Option<TestEdgeObservations> {
             Some(TestEdgeObservations)
+        }
+
+        /// Probing never identifies a path by slot, so nothing here depends on this mapping.
+        fn path_slot(&self, _key: &OffchainPublicKey) -> Option<u64> {
+            None
         }
     }
 

@@ -170,3 +170,87 @@ where
 
     Ok(Arc::new(node))
 }
+
+/// Builds an entry HOPR node with a custom chain connector.
+///
+/// Entry nodes do not process tickets, do not have ticket manager state,
+/// and do not accept incoming sessions.
+pub async fn build_entry_with_chain<
+    Chain,
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + 'static,
+>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    chain_connector: Chain,
+    server: Srv,
+) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+    }
+
+    let ticket_factory = ticket_factory_from_chain(&chain_connector)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
+
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    );
+
+    let node = builder.with_session_server(server).build_entry(ticket_factory).await?;
+
+    Ok(Arc::new(node))
+}
+
+/// Builds an exit HOPR node with a custom chain connector.
+///
+/// Exit nodes accept incoming sessions and process PIX acknowledgements,
+/// but do not process tickets (no ticket manager state).
+pub async fn build_exit_with_chain<
+    Chain,
+    Srv: hopr_api::node::HoprSessionServer<Session = hopr_transport::IncomingSession, Error: std::fmt::Display>
+        + Clone
+        + Send
+        + 'static,
+>(
+    chain_key: &ChainKeypair,
+    packet_key: &OffchainKeypair,
+    config: HoprLibConfig,
+    probe_cfg: Option<hopr_ct_full_network::ProberConfig>,
+    chain_connector: Chain,
+    server: Srv,
+) -> anyhow::Result<Arc<EdgeHopr<Chain>>>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+{
+    if let Some(ref pcfg) = probe_cfg {
+        pcfg.validate_against_probe_timeout(config.protocol.probe.timeout)?;
+    }
+
+    let ticket_factory = ticket_factory_from_chain(&chain_connector)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to seed ticket factory: {e}"))?;
+
+    let builder = make_builder(
+        chain_key,
+        packet_key,
+        config,
+        probe_cfg.unwrap_or_default(),
+        chain_connector,
+    );
+
+    let node = builder.with_session_server(server).build_exit(ticket_factory).await?;
+
+    Ok(Arc::new(node))
+}
