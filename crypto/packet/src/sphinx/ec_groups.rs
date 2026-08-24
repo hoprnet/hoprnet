@@ -195,8 +195,8 @@ impl GroupElement<Secp256k1Scalar> for Secp256k1Point {
 // TODO: invert this, so that each SphinxSuite takes this as a type argument
 /// Default packet block size for the Sphinx protocol.
 ///
-/// Currently, 1040 bytes.
-pub type DefaultSphinxPacketSize = hopr_types::primitive::hybrid_array::sizes::U1040;
+/// Currently, 3248 bytes.
+pub type DefaultSphinxPacketSize = hopr_types::primitive::hybrid_array::sizes::U3248;
 
 pub use hopr_types::primitive::typenum::Unsigned;
 
