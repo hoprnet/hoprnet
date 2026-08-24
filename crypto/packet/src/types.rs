@@ -326,7 +326,7 @@ mod tests {
         assert!(res.is_err());
 
         let res = HoprPacketMessage::try_from(HoprPacketParts {
-            surbs: generate_surbs(3)?,
+            surbs: generate_surbs(9)?,
             payload: Cow::default(),
             signals: None.into(),
         });
