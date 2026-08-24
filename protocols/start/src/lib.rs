@@ -513,8 +513,12 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
+        // The slack left after `MAX_SURBS_IN_PACKET` SURBs is `PAYLOAD_SIZE % HoprSurb::SIZE`
+        // (38 bytes at the current packet size), so how long a session id may be while the message
+        // still maxes out its SURBs tracks the packet size rather than being a constant. The real
+        // instantiation uses a `HoprPseudonym` and has far more room than this generic `String`.
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
-            session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+            session_id: "long-session-id-abcde".to_string(),
             flags: None.into(),
             additional_data: 0,
         });
