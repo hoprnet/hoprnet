@@ -262,9 +262,9 @@ async fn bidirectional_tcp_session(#[case] cap: Capabilities) -> anyhow::Result<
 
 /// Wires a paired session to a `ConnectedUdpStream` via `transfer_session` (exactly as
 /// `hopr-session-server-forwarder` does on the exit node) and returns the client-side session plus
-/// the UDP address datagrams should be sent to. The session requests `Datagram` (the #8356 fix), so
-/// it preserves UDP datagram boundaries: one frame per write, one datagram per read. The forwarding
-/// task is detached and cancelled when the test runtime shuts down.
+/// the UDP address datagrams should be sent to. The session requests `NoDelay`, which on a stateless
+/// session preserves UDP datagram boundaries (the #8356 fix): one frame per write, one datagram per
+/// read. The forwarding task is detached and cancelled when the test runtime shuts down.
 async fn datagram_udp_bridge() -> anyhow::Result<(HoprSession, std::net::SocketAddr)> {
     const BUF_LEN: usize = 16384; // HOPR_UDP_BUFFER_SIZE used by the exit forwarder
 
@@ -366,8 +366,8 @@ async fn single_read_of_one_forwarded_udp_datagram(datagram_len: usize) -> anyho
 /// delivered to the peer as a single `read`. Before the fix the byte-stream session split a
 /// datagram larger than `frame_mtu` across frames, so the client's single `read` returned only one
 /// frame (<= 1500) and neptun rejected the partial buffer (`InvalidPacket`/`InvalidAeadTag`) until
-/// the `DecapStalled` guard reconnected. With the `Datagram` capability the session preserves the
-/// boundary (one frame per write), whatever the datagram size.
+/// the `DecapStalled` guard reconnected. With `NoDelay` on a stateless session the session preserves
+/// the boundary (one frame per write), whatever the datagram size.
 async fn udp_datagram_is_delivered_whole(#[case] datagram_len: usize) -> anyhow::Result<()> {
     let n = single_read_of_one_forwarded_udp_datagram(datagram_len).await?;
 
