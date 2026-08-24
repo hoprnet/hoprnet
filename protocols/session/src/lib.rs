@@ -68,11 +68,39 @@ const fn min(a: usize, b: usize) -> usize {
 }
 
 /// Maximum Session MTU even if the HOPR packet allows for more.
+///
+/// This value is currently based on the WG packet size plus the WG overhead, as a primary
+/// use-case for Session sockets.
 pub const MAX_SESSION_MTU: usize = 1452;
 
 /// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {
     min(MAX_SESSION_MTU, C - protocol::SessionMessage::<C>::SEGMENT_OVERHEAD)
+}
+
+/// Snaps a requested `frame_size` down to a whole multiple of [`session_socket_mtu`], between one
+/// and `max_segments` segments.
+///
+/// A frame that is not a whole multiple of the segment payload ends in a runt segment, and since the
+/// downstream transport is unbuffered by default (`max_buffered_segments = 0`) that runt costs a
+/// whole HOPR packet to carry the handful of bytes that did not fit. At `C` = HOPR packet payload
+/// that is not a rounding detail: a 1500-byte frame over a 1452-byte segment emits 1452 + 48, so
+/// half the packets on the wire would carry 48 bytes.
+///
+/// Flooring rather than rounding to nearest is deliberate — the frame is the unit of head-of-line
+/// loss, so growing it past what the caller asked for would silently widen the blast radius of one
+/// missing segment. Flooring only ever narrows it, and costs no extra packets: the same bytes still
+/// occupy the same number of segments, just spread over more frames.
+pub const fn session_frame_size<const C: usize>(frame_size: usize, max_segments: usize) -> usize {
+    let segment = session_socket_mtu::<C>();
+    let mut segments = frame_size / segment;
+    if segments > max_segments {
+        segments = max_segments;
+    }
+    if segments == 0 {
+        segments = 1;
+    }
+    segments * segment
 }
 
 /// Adaptors for [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport to use Session protocol.

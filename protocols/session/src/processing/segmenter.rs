@@ -8,7 +8,7 @@ use std::{
 use tracing::instrument;
 
 use crate::{
-    protocol::{FrameId, Segment, SeqIndicator, SessionMessage},
+    protocol::{FrameId, Segment, SeqIndicator},
     session_socket_mtu,
     utils::segment_into,
 };
@@ -62,6 +62,11 @@ where
         // Clamp frame_size to [SESSION_MTU, SESSION_MTU * (SeqIndicator::MAX + 1)].
         // Minimum is SESSION_MTU so that a single frame fits in one
         // HOPR packet (1 segment). Maximum is bounded by SeqIndicator capacity.
+        //
+        // Deliberately only a clamp, not an alignment: whether a frame is a whole number of segments
+        // is `SessionSocket`'s policy (see `session_frame_size`), while the segmenter stays a
+        // mechanism that faithfully segments whatever it is handed — a partial frame at flush time is
+        // misaligned by nature and must still work.
         let frame_size = frame_size.clamp(
             session_socket_mtu::<C>(),
             session_socket_mtu::<C>() * (SeqIndicator::MAX + 1) as usize,
@@ -71,7 +76,9 @@ where
             inner,
             state: State::BufferingFrame,
             frame: Vec::with_capacity(frame_size),
-            ready_segments: VecDeque::with_capacity(frame_size.div_ceil(C - SessionMessage::<C>::SEGMENT_OVERHEAD)),
+            // Segments are `session_socket_mtu` bytes, not `C - SEGMENT_OVERHEAD`; sizing this on the
+            // latter under-counts whenever the MAX_SESSION_MTU cap binds.
+            ready_segments: VecDeque::with_capacity(frame_size.div_ceil(session_socket_mtu::<C>())),
             frame_size,
             frame_id: 1,
             is_closed: false,
@@ -109,7 +116,7 @@ where
                         // and write segments to the downstream
                         segment_into(
                             this.frame.as_slice(),
-                            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
+                            session_socket_mtu::<C>(),
                             *this.frame_id,
                             this.ready_segments,
                         )
@@ -161,7 +168,7 @@ where
                 // because poll_write always makes sure it is before returning Ready
                 segment_into(
                     this.frame.as_slice(),
-                    C - SessionMessage::<C>::SEGMENT_OVERHEAD,
+                    session_socket_mtu::<C>(),
                     *this.frame_id,
                     this.ready_segments,
                 )
@@ -235,11 +242,15 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::{protocol::SeqNum, utils::segment};
+    use crate::{
+        MAX_SESSION_MTU,
+        protocol::{SeqNum, SessionMessage},
+        utils::segment,
+    };
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
-    const FRAME_SIZE: usize = 1500;
+    const FRAME_SIZE: usize = MAX_SESSION_MTU;
 
     const SEGMENTS_PER_FRAME: usize = FRAME_SIZE / MTU + 1;
 
