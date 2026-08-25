@@ -283,7 +283,7 @@ const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 0;
 /// [`SessionManagerConfig::max_ssas_per_ssa_request`] are clamped to `1..=Self` in
 /// [`SessionManager::new`], so a programmatically built config that never calls `validate()` cannot
 /// exceed it.
-pub const MAX_SSA_BATCH_SIZE: usize = 20;
+pub const MAX_SSA_BATCH_SIZE: usize = 9;
 
 /// Default for [`SessionManagerConfig::max_ssas_per_ssa_request`] — how many SSA commitments an Entry
 /// accepts in a single [`SsaServerCommitmentMessage`].

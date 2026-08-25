@@ -138,24 +138,11 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-# TEMPORARY: pinned to unreleased branches so this change compiles and is tested end to end,
-# and pinned together so a single hopr-api major is in the graph — two majors coexisting makes
-# `hopr_api::chain::DeployedSafe` two distinct types. `version` alongside `git` is the "multiple
-# locations" form: git wins locally, the version requirement survives packaging. Revert to plain
-# versions once hopr-api 2.0.0, hopr-utilities 0.9.0 and the hopr-impls crates are published.
-hopr-api = { version = "2.0.0" }
-hopr-types = { version = "2.2.1", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.9.0", default-features = false }
+hopr-api = { version = "3.1.0" }
+hopr-types = { version = "3.1.0", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.10.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
-# The PIX curve is chosen by `pix-bjj` (default) or overridden by `pix-secp256k1`, and neither is
-# named here: `pix-bjj` reaches this crate through `hopr-transport` and `hopr-lib`, both of which
-# keep it in their `default` set, so building any hoprnet crate directly is unchanged.
-#
-# This used to say that `bjj` was withheld here so a downstream consumer could turn it off. That
-# reasoning no longer applies and never worked: Cargo features are additive, so withholding one
-# only holds while every crate in the graph agrees to it. `pix-secp256k1` replaces the omission
-# with a positive override that wins wherever it is enabled — see `crypto/packet/Cargo.toml`.
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
   "ed25519",
 ] }
