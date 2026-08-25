@@ -138,7 +138,7 @@ tracing = { version = "0.1.44", features = ["release_max_level_debug"] }
 validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
-hopr-api = { version = "3.1.0" }
+hopr-api = { git = "https://github.com/hoprnet/hopr-api", branch = "main" }
 hopr-types = { version = "3.1.0", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.10.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }

@@ -4118,9 +4118,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "224e2ecb9821e45905ce5a5ad9e8b06a29cb85daf9f3f024b3efbaf665686e49"
+version = "4.0.0"
+source = "git+https://github.com/hoprnet/hopr-api?branch=main#1a3e64e3b166dfcc53fdea856fce0dd828a41baf"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4131,6 +4130,7 @@ dependencies = [
  "hopr-types 3.1.0",
  "libp2p-identity",
  "serde",
+ "serde_bytes",
  "strum",
  "thiserror 2.0.20",
  "tracing",
@@ -4263,7 +4263,7 @@ dependencies = [
  "futures-concurrency",
  "futures-time",
  "hex-literal",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-chain-connector",
  "hopr-ct-full-network",
  "hopr-network-graph",
@@ -4341,7 +4341,7 @@ dependencies = [
  "const-hex",
  "criterion",
  "hex-literal",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-protocol-pix",
@@ -4496,7 +4496,7 @@ dependencies = [
  "futures-timer",
  "halfbrown",
  "hex-literal",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-network-graph",
@@ -4595,7 +4595,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hex-literal",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-transport-tag-allocator",
@@ -4627,7 +4627,7 @@ dependencies = [
  "flagset",
  "futures",
  "futures-time",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-crypto-packet",
  "hopr-protocol-app",
  "hopr-protocol-pix",
@@ -4874,7 +4874,7 @@ dependencies = [
  "dashmap",
  "futures",
  "futures-time",
- "hopr-api 3.1.0",
+ "hopr-api 4.0.0",
  "hopr-lib",
  "hopr-transport",
  "hopr-utilities 0.10.0",

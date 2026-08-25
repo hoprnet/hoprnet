@@ -65,6 +65,16 @@ pub enum SessionManagerError {
     UnsupportedMessage,
     #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
     Unacceptable(String),
+    /// The local deposit pool did not supply deposit data for an SSA batch.
+    ///
+    /// Fatal to the Session rather than something to send the batch without: the Entry may need the
+    /// data to make the deposit, it is only ever delivered in the `SsaRequest` that carries the
+    /// commitments, and there is no message to supply it afterwards. An Entry that needed it would
+    /// therefore never deposit, and the Session would die on the Exit's deposit timeout — several
+    /// minutes later, on the node that cannot see the cause. This names it on the node whose pool it
+    /// is, immediately.
+    #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
+    MissingDepositData(String),
     #[error(transparent)]
     PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
     #[error(transparent)]

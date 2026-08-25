@@ -119,7 +119,7 @@ pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RAN
 pub use hopr_api as api;
 use hopr_api::{
     chain::{ChainReadTicketOperations, ChainWriteTicketOperations, PixDepositSecret},
-    node::{PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
+    node::{PixAddressId, PixDepositAddressReceived, PixEvent, PixNewDepositAddress, PixPrivateKeyRecovered},
     tickets::TicketFactory,
     types::internal::routing::DestinationRouting,
 };
@@ -1395,7 +1395,7 @@ pub(crate) fn recovered_ssa_to_pix_event(
     rec: &RecoveredSsa<SimplePseudonym, <HoprPixSpec as PixSpec>::AddressPrivateKey>,
 ) -> PixEvent {
     PixEvent::PrivateKeyRecovered(PixPrivateKeyRecovered {
-        id: (*rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
+        id: PixAddressId::new(rec.ssa_id.pseudonym(), rec.ssa_id.ssa_index()),
         secret: PixDepositSecret(rec.ssa.secret().clone()),
     })
 }
@@ -1417,32 +1417,36 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
             ssa_id,
             deposit_address,
             quota_per_ssa,
+            deposit_data,
         }) => PixEvent::NewDepositAddress(PixNewDepositAddress {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+            id: PixAddressId::new(ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // `None` rather than the handshake's `deposit_data`: that field is carried by the Start
-            // protocol's `SsaRequest` (`hopr-protocol-start`) and is not surfaced through
-            // `AgreedSsaQuota`, so there is nothing here to forward yet. Threading it through is a
-            // change to the Session layer's event types, not to this mapping.
-            additional_data: None,
+            // What the Exit attached to this SSA in its `SsaRequest`, rebuilt by the Session layer
+            // from the message. Empty when the Exit's pool produced none — `PixDepositData::is_empty`
+            // is what tells the two apart, so there is nothing to signal here.
+            deposit_data,
         }),
         HoprSessionOutPixEvent::DepositNeeded(
             AgreedSsaQuota {
                 ssa_id,
                 deposit_address,
                 quota_per_ssa,
+                deposit_data,
             },
             notifier,
         ) => PixEvent::DepositAddressReceived(PixDepositAddressReceived {
-            id: (*ssa_id.pseudonym(), ssa_id.ssa_index()),
+            id: PixAddressId::new(ssa_id.pseudonym(), ssa_id.ssa_index()),
             address: deposit_address.into(),
             quota: quota_per_ssa,
-            // See `NewDepositAddress` above: the handshake's `deposit_data` does not reach
-            // `AgreedSsaQuota`, so there is nothing to forward yet.
-            additional_data: None,
+            // This node's own data coming back to it: the pool produced it for this SSA before the
+            // request went out, and gets it returned now that the address it pays for is known.
+            deposit_data,
             deposit_updated: Some(notifier),
         }),
+        // Straight through: `PixDepositDataRequest` is the pool's own request type, and the Session
+        // layer neither adds to it nor reads the answers off the channel it carries.
+        HoprSessionOutPixEvent::DepositDataRequest(request) => PixEvent::DepositDataRequest(request),
     }
 }
 
@@ -1698,7 +1702,7 @@ pub const PACKET_PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::
 #[cfg(test)]
 mod pix_recovery_event_tests {
     use hopr_api::{
-        node::PixEvent,
+        node::{PixAddressId, PixEvent},
         types::{
             crypto::{
                 keypairs::{Keypair, OffchainKeypair},
@@ -1766,7 +1770,7 @@ mod pix_recovery_event_tests {
             anyhow::bail!("expected PrivateKeyRecovered");
         };
 
-        assert_eq!(pk.id, (pseudonym, ssa_id.ssa_index()));
+        assert_eq!(pk.id, PixAddressId::new(&pseudonym, ssa_id.ssa_index()));
         assert_eq!(pk.secret.0.as_ref(), rec.ssa.secret().as_ref());
 
         Ok(())

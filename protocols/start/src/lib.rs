@@ -312,10 +312,20 @@ pub struct SsaServerCommitmentMessage<I, G, D> {
     /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
     /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
-    /// Deposit/payment data for the PIX session, carried in CBOR.
+    /// Per-SSA deposit/payment data, carried in CBOR as a single map keyed by the same
+    /// [`SsaIndex`](hopr_protocol_pix::SsaIndex) as [`commitments`](Self::commitments).
     ///
-    /// Currently set to [`Default::default`]. Must be preserved through encode/decode.
-    pub deposit_data: D,
+    /// One batch buys one deposit per SSA, so this is keyed rather than shared: the values differ per
+    /// index (each SSA is paid for separately) and a single field for the whole batch could only ever
+    /// carry what all of them have in common.
+    ///
+    /// Nothing here requires the key set to agree with `commitments`, and the codec does not check
+    /// it. Same reasoning as `params` above: the codec stays total, so a peer that sends a deposit
+    /// entry for an SSA outside the batch — or omits one that is in it — reaches the session layer
+    /// and is answered with a `SessionError`, rather than having the packet dropped as undecodable.
+    ///
+    /// Currently every value is [`Default::default`]. Must be preserved through encode/decode.
+    pub deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
 }
@@ -326,12 +336,12 @@ impl<I, G, D> SsaServerCommitmentMessage<I, G, D> {
         session_id: I,
         params: hopr_protocol_pix::PixParams,
         commitments: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, G)>,
-        deposit_data: D,
+        deposit_data: impl IntoIterator<Item = (hopr_protocol_pix::SsaIndex, D)>,
     ) -> Self {
         Self {
             session_id,
             params: params.to_u32(),
-            deposit_data,
+            deposit_data: deposit_data.into_iter().collect(),
             commitments: commitments.into_iter().collect(),
         }
     }
@@ -399,13 +409,50 @@ impl<I> From<I> for KeepAliveMessage<I> {
 }
 
 impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
+    /// Maximum size of the CBOR-serialized
+    /// [`deposit_data`](SsaServerCommitmentMessage::deposit_data) map an
+    /// [`SsaRequest`](StartProtocol::SsaRequest) message can carry.
+    ///
+    /// Bounds the whole map, not a single entry: the map goes on the wire as one CBOR value, so the
+    /// per-SSA share of this budget is what is left after the other entries — roughly this divided by
+    /// the batch size, minus the keys. A caller that grows the batch therefore shrinks what each
+    /// deposit may carry, and one that grows the deposits shrinks the batch that still fits.
+    ///
+    /// The counterpart of [`MAX_SSAS_PER_REQUEST`](Self::MAX_SSAS_PER_REQUEST), derived from the same
+    /// SsaRequest encode layout but with the roles swapped: that constant fixes a minimal
+    /// `deposit_data` and asks how many commitments fit, this one fixes a minimal *message* — one
+    /// commitment and a one-byte CBOR session_id — and asks how much `deposit_data` fits.
+    /// header(4) + params(4) + num_commitments(2) = 10 overhead, plus one commitment entry
+    /// (SsaIndex + commitment_repr) and one byte of session_id:
+    /// 1030 - 10 - (4 + 33) - 1 = 982.
+    ///
+    /// This is an absolute wire limit, not a per-message budget. A `deposit_data` inside it can
+    /// still fail to encode next to a real session_id and a full batch of commitments; the exact
+    /// remaining-space check in [`encode`](Self::encode) catches that case and reports
+    /// [`NumberOfCommitments`](StartProtocolError::NumberOfCommitments), since sending fewer
+    /// commitments is what fixes it. Exceeding *this* bound cannot be fixed that way — no
+    /// `SsaRequest` at all can be built around such a `deposit_data` — which is why it has its own
+    /// error.
+    pub const MAX_DEPOSIT_DATA_SIZE: usize = ApplicationData::PAYLOAD_SIZE.saturating_sub(
+        4 + size_of::<u32>()
+            + size_of::<u16>()
+            + size_of::<hopr_protocol_pix::SsaIndex>()
+            + Self::PIX_COEFF_COMMITMENT_REPR_SIZE
+            + 1,
+    );
     /// Maximum number of SSAs that can be requested in a single SsaRequest message.
     ///
     /// Derived from the SsaRequest encode layout with minimal CBOR deposit_data and session_id:
-    /// header(4) + params(4) + deposit_data(1 for CBOR null) + num_commitments(2) = 11 overhead;
+    /// header(4) + params(4) + deposit_data(1 for an empty CBOR map) + num_commitments(2) = 11 overhead;
     /// (PAYLOAD_SIZE - 11) / (SsaIndex + commitment_repr) = (1030 - 11) / (4 + 33) = 27.
     /// Since a zero-length session_id is the smallest possible, any non-empty session_id
     /// only makes this bound tighter, making it a safe decode limit.
+    ///
+    /// An empty `deposit_data` map is the smallest one, not a realistic one: a batch carries a
+    /// deposit entry per SSA, so the count a real message reaches is well below this. That keeps it a
+    /// safe decode limit for the same reason the session_id assumption does, and makes it a poor
+    /// estimate of what a sender can actually fit — `MAX_SSA_BATCH_SIZE` in the session layer is what
+    /// bounds that.
     pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 11)
         / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
         as u16;
@@ -587,7 +634,28 @@ where
             }
             StartProtocol::SsaRequest(req) => {
                 data.extend_from_slice(&req.params.to_be_bytes());
-                let deposit_data = serde_cbor_2::to_vec(&req.deposit_data)?;
+
+                // Serialized through a sorted view of the map, so that one message has one encoding:
+                // the field is a `HashMap`, and handing it to CBOR directly would order its entries
+                // by whatever the hasher decided this run, making the bytes of an unchanged message
+                // differ between two encodes of it. Ordering by SSA index also matches how
+                // `commitments` reaches the wire. Costs a map of references over at most
+                // `MAX_SSAS_PER_REQUEST` entries, and nothing on the decode side — a CBOR map is
+                // read back order-independently.
+                let deposit_data =
+                    serde_cbor_2::to_vec(&req.deposit_data.iter().collect::<std::collections::BTreeMap<_, _>>())?;
+
+                // Checked before anything downstream spends the payload budget. Without it, an
+                // oversized `D` is only caught by the combined check further down, which collapses
+                // `avail_space` to zero and blames the commitment count — a cause the caller cannot
+                // act on, because no commitment count would have made this message fit.
+                if deposit_data.len() > Self::MAX_DEPOSIT_DATA_SIZE {
+                    return Err(StartProtocolError::DepositDataTooLarge {
+                        size: deposit_data.len(),
+                        max: Self::MAX_DEPOSIT_DATA_SIZE,
+                    });
+                }
+
                 data.extend_from_slice(&deposit_data);
 
                 let num_commitments = req.commitments.len() as u16;
@@ -602,6 +670,10 @@ where
                 // version (1) + disc (1) + data_len (2) + data contents = 4 + data.len(),
                 // which must fit within PAYLOAD_SIZE.  Check using explicit arithmetic
                 // rather than Vec::spare_capacity_mut() which reflects pre-allocation.
+                //
+                // `data` already holds the serialized deposit data, so a `D` that passed
+                // `MAX_DEPOSIT_DATA_SIZE` above still narrows this budget: past a certain size it
+                // is the commitment count that has to give way, which is what this reports.
                 let avail_space = ApplicationData::PAYLOAD_SIZE.saturating_sub(4 + data.len() + session_id.len());
                 if req.commitments.is_empty() || required_size > avail_space {
                     return Err(StartProtocolError::NumberOfCommitments);
@@ -880,10 +952,17 @@ where
 
                     // deposit_data is CBOR — decode using a deserializer that tracks its
                     // byte offset so we can skip only its size and leave the rest of the body
-                    // (num_commitments + entries + session_id) untouched.
+                    // (num_commitments + entries + session_id) untouched. This holds for the map
+                    // just as it did for a single value: the offset is where the one CBOR item
+                    // ended, whatever its shape.
+                    //
+                    // The `SsaIndex` keys are `NonZero`, so a peer sending index 0 is rejected here
+                    // by serde rather than reaching the session layer — the same guard the
+                    // commitment entries get below, for free.
                     let mut de = serde_cbor_2::Deserializer::from_slice(&body[size_of::<u32>()..]);
-                    let deposit_data: D = serde::Deserialize::deserialize(&mut de)
-                        .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
+                    let deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D> =
+                        serde::Deserialize::deserialize(&mut de)
+                            .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
                     let deposit_data_len = de.byte_offset();
                     let mut next_offset = size_of::<u32>() + deposit_data_len;
 
@@ -987,7 +1066,8 @@ mod tests {
 
     use super::*;
 
-    /// A minimal deposit data type for tests (CBOR-encodes as a single byte).
+    /// A minimal deposit data *value* type for tests: `()` CBOR-encodes as a single byte, so a map of
+    /// them costs only its keys, and an empty one costs a single byte in total.
     type MinimalDeposit = ();
 
     #[test]
@@ -1082,10 +1162,16 @@ mod tests {
             commitments.insert(i.try_into()?, [0u8; 33]);
         }
 
+        // One deposit entry per commitment, which is the shape a real batch has.
+        let deposit_data = commitments
+            .keys()
+            .map(|&ssa_index| (ssa_index, MinimalDeposit::default()))
+            .collect();
+
         let msg_1 = StartProtocol::SsaRequest(SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: MinimalDeposit::default(),
+            deposit_data,
             commitments,
         });
 
@@ -1101,10 +1187,6 @@ mod tests {
     /// The round-trip test above deliberately uses an out-of-range sentinel to prove the codec is
     /// total. This one goes through the constructor and the accessor, which is what production uses
     /// and what actually pins the packed layout across `encode`/`decode`.
-    // `MinimalDeposit` is `()` — the instantiation that carries no deposit data — so passing
-    // `MinimalDeposit::default()` as the generic `deposit_data` argument is literally passing a
-    // unit value. That is the point of this instantiation, not an oversight.
-    #[allow(clippy::unit_arg)]
     #[test]
     fn start_protocol_session_ssa_request_message_should_preserve_pix_params() -> anyhow::Result<()> {
         let params = hopr_protocol_pix::PixParams::try_new(8192, 64, 32, hopr_protocol_pix::PixSuite::BabyJubJub)?;
@@ -1113,7 +1195,10 @@ mod tests {
                 0xfeedbeef_u32,
                 params,
                 [(1.try_into()?, [0u8; 33]), (2.try_into()?, [1u8; 33])],
-                MinimalDeposit::default(),
+                [
+                    (1.try_into()?, MinimalDeposit::default()),
+                    (2.try_into()?, MinimalDeposit::default()),
+                ],
             ),
         );
 
@@ -1135,7 +1220,7 @@ mod tests {
         let msg: SsaServerCommitmentMessage<u32, [u8; 33], MinimalDeposit> = SsaServerCommitmentMessage {
             session_id: 0xfeedbeef,
             params: 0xfeedbeef,
-            deposit_data: MinimalDeposit::default(),
+            deposit_data: Default::default(),
             commitments: Default::default(),
         };
         assert!(matches!(msg.dimensions(), Err(StartProtocolError::ParseError(_))));
@@ -1156,11 +1241,159 @@ mod tests {
             StartProtocol::<u32, (), u8, [u8; 33], [u8; 65], MinimalDeposit>::SsaRequest(SsaServerCommitmentMessage {
                 session_id: 0xfeedbeef,
                 params: 0xfeedbeef,
-                deposit_data: MinimalDeposit::default(),
+                // Empty: this test is about the commitment count exhausting the payload, and an
+                // empty map keeps the deposit data out of that arithmetic entirely.
+                deposit_data: Default::default(),
                 commitments,
             });
 
         assert!(matches!(msg.encode(), Err(StartProtocolError::NumberOfCommitments)));
+        Ok(())
+    }
+
+    /// A single-entry deposit map whose CBOR encoding is exactly `target` bytes long.
+    ///
+    /// The bound is on the *serialized* size of the whole map, which is what the encoder budgets
+    /// against, so the two tests below must not have to know how wide a length prefix CBOR spends on
+    /// the payload they ask for. Searching for the overhead keeps them correct across a prefix
+    /// boundary. One entry keyed by [`SsaIndex::MIN`] — the cheapest key there is — so what the tests
+    /// vary is the size of the deposit map and not of its keys.
+    fn deposit_data_of_cbor_size(target: usize) -> anyhow::Result<std::collections::HashMap<SsaIndex, Vec<u8>>> {
+        for overhead in 1..=8 {
+            let candidate: std::collections::HashMap<_, _> =
+                [(SsaIndex::MIN, vec![0u8; target.saturating_sub(overhead)])]
+                    .into_iter()
+                    .collect();
+            if serde_cbor_2::to_vec(&candidate)?.len() == target {
+                return Ok(candidate);
+            }
+        }
+        anyhow::bail!("no single-entry deposit map CBOR-encodes to exactly {target} bytes")
+    }
+
+    /// The per-SSA values must survive the round trip *individually*.
+    ///
+    /// A codec that kept only one value, or paired values with the wrong indices, would still satisfy
+    /// a check on the encoded length — so this compares the map itself. One deposit index is
+    /// deliberately outside the commitment range: the codec does not require the two key sets to
+    /// agree, and must not quietly normalise them either.
+    #[test]
+    fn start_protocol_ssa_request_should_round_trip_per_ssa_deposit_data() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        let deposit_data: std::collections::HashMap<SsaIndex, Vec<u8>> = [
+            (SsaIndex::MIN, vec![1u8, 2, 3]),
+            (2u32.try_into()?, vec![4u8]),
+            (0xdead_u32.try_into()?, vec![5u8; 20]),
+        ]
+        .into_iter()
+        .collect();
+
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: 0xfeedbeef,
+            params: 0xfeedbeef,
+            deposit_data: deposit_data.clone(),
+            commitments: [(SsaIndex::MIN, [0u8; 33]), (2u32.try_into()?, [1u8; 33])]
+                .into_iter()
+                .collect(),
+        });
+
+        let (tag, encoded) = msg.clone().encode()?;
+        let decoded = Spec::decode(tag, &encoded)?;
+        assert_eq!(msg, decoded);
+
+        let StartProtocol::SsaRequest(req) = decoded else {
+            anyhow::bail!("expected an SsaRequest");
+        };
+        assert_eq!(deposit_data, req.deposit_data);
+
+        Ok(())
+    }
+
+    /// The encoding is a function of the message, not of the hasher.
+    ///
+    /// `deposit_data` is a `HashMap`, and two maps holding equal entries iterate in different orders —
+    /// `RandomState` varies its seed per instance. Handing that order to CBOR would make the bytes of
+    /// two equal messages differ, which is why `encode` sorts the map first. Two independently built
+    /// maps, filled in opposite orders, is what catches its removal.
+    #[test]
+    fn start_protocol_ssa_request_encoding_should_not_depend_on_deposit_map_order() -> anyhow::Result<()> {
+        type Spec = StartProtocol<u32, String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        // Twelve entries rather than a handful: two independent maps can coincide on an iteration
+        // order by luck, and at this width the odds of that (1 in 12!) put the test past the point
+        // where a passing run means anything other than the sort being there.
+        let entries = (1u32..=12)
+            .map(|i| Ok((i.try_into()?, vec![i as u8; 2])))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let build = |deposit_data: std::collections::HashMap<SsaIndex, Vec<u8>>| {
+            Spec::SsaRequest(SsaServerCommitmentMessage {
+                session_id: 0xfeedbeef,
+                params: 0xfeedbeef,
+                deposit_data,
+                commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+            })
+        };
+
+        let forward = build(entries.iter().cloned().collect());
+        let reverse = build(entries.iter().rev().cloned().collect());
+
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.encode()?.1, reverse.encode()?.1);
+
+        Ok(())
+    }
+
+    /// An oversized `D` must be named as such, and not reported as a commitment-count problem.
+    ///
+    /// The distinction is what the caller can act on: below this bound the deposit data and the
+    /// batch size compete for one budget and dropping commitments is a fix, whereas above it no
+    /// commitment count would have made the message fit.
+    #[test]
+    fn start_protocol_ssa_request_should_reject_oversized_deposit_data() -> anyhow::Result<()> {
+        type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        let too_large = Spec::MAX_DEPOSIT_DATA_SIZE + 1;
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: (),
+            params: 0xfeedbeef,
+            deposit_data: deposit_data_of_cbor_size(too_large)?,
+            commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+        });
+
+        assert!(matches!(
+            msg.encode(),
+            Err(StartProtocolError::DepositDataTooLarge { size, max })
+                if size == too_large && max == Spec::MAX_DEPOSIT_DATA_SIZE
+        ));
+        Ok(())
+    }
+
+    /// Pins [`StartProtocol::MAX_DEPOSIT_DATA_SIZE`] as *achievable*, not merely safe.
+    ///
+    /// A bound a few bytes too conservative would pass a "the message still fits" assertion just as
+    /// well, so this asserts equality instead: the smallest legal `SsaRequest` built around a
+    /// maximal `deposit_data` — one commitment, a one-byte CBOR session_id — must fill the payload
+    /// exactly, and still round-trip.
+    #[test]
+    fn max_deposit_data_size_should_match_the_encode_layout() -> anyhow::Result<()> {
+        type Spec = StartProtocol<(), String, u8, [u8; 33], [u8; 65], Vec<u8>>;
+
+        // PAYLOAD_SIZE(1030) - header(4) - params(4) - num_commitments(2) - one entry(4 + 33)
+        // - CBOR null session_id(1). Stated as a literal so a layout change has to come through here.
+        assert_eq!(982, Spec::MAX_DEPOSIT_DATA_SIZE);
+
+        let msg = Spec::SsaRequest(SsaServerCommitmentMessage {
+            session_id: (),
+            params: 0xfeedbeef,
+            deposit_data: deposit_data_of_cbor_size(Spec::MAX_DEPOSIT_DATA_SIZE)?,
+            commitments: [(SsaIndex::MIN, [0u8; 33])].into_iter().collect(),
+        });
+
+        let (tag, encoded) = msg.clone().encode()?;
+        assert_eq!(ApplicationData::PAYLOAD_SIZE, encoded.len());
+        assert_eq!(msg, Spec::decode(tag, &encoded)?);
+
         Ok(())
     }
 
@@ -1331,8 +1564,9 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        // The deposit_data field (64 bytes) slightly reduces the per-request capacity, but
-        // 23 commitments must still fit alongside a realistic long session-id.
+        // The deposit_data map costs a key per SSA on top of the commitments, so 23 of them must
+        // still fit alongside a realistic long session-id — with a deposit entry for each, which is
+        // the shape a real batch has.
         let mut commitments = std::collections::BTreeMap::new();
         for i in 1..24 {
             commitments.insert(i.try_into()?, [0u8; 33]);
@@ -1342,7 +1576,10 @@ mod tests {
             SsaServerCommitmentMessage {
                 session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
                 params: 0xfeedbeef,
-                deposit_data: MinimalDeposit::default(),
+                deposit_data: commitments
+                    .keys()
+                    .map(|&ssa_index| (ssa_index, MinimalDeposit::default()))
+                    .collect(),
                 commitments,
             },
         );
@@ -1468,8 +1705,9 @@ mod tests {
     fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
         let mut body = Vec::new();
         body.extend_from_slice(&0u32.to_be_bytes());
-        // CBOR-encoded `()` (`null`), which is the single byte 0xF6
-        body.push(0xf6);
+        // An empty CBOR map, which is the single byte 0xA0 — the smallest `deposit_data` there is,
+        // so these bodies stay about the commitment entries that follow it.
+        body.push(0xa0);
         body.extend_from_slice(&declared_commitments.to_be_bytes());
         for (ssa_index, commitment) in entries {
             body.extend_from_slice(&ssa_index.to_be_bytes());
@@ -1584,7 +1822,7 @@ mod tests {
             SsaServerCommitmentMessage {
                 session_id: MALFORMED_SESSION_ID,
                 params: 0,
-                deposit_data: MinimalDeposit::default(),
+                deposit_data: [(SsaIndex::MIN, MinimalDeposit::default())].into_iter().collect(),
                 commitments: [(SsaIndex::MIN, VarLenBytes(vec![0u8; 7]))].into_iter().collect(),
             },
         );

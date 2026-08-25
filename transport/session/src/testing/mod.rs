@@ -373,3 +373,55 @@ pub fn start_msg_match(data: &ApplicationDataOut, msg: impl Fn(HoprStartProtocol
         .map(msg)
         .unwrap_or(false)
 }
+
+/// Answers the Exit's deposit-data requests in the background, forwarding every other PIX event on.
+///
+/// An Exit blocks each SSA request on the deposit pool's answer, so a test that reads the PIX event
+/// stream only *after* driving an SSA exchange has already made that exchange wait out
+/// [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::manager::DEPOSIT_DATA_REQUEST_TIMEOUT) — and then finds a
+/// `DepositDataRequest` where it expected the event it was waiting for. Wrapping the stream at
+/// construction plays the part of the pool: requests are answered as they arrive, and what the test
+/// reads is the stream it used to read.
+///
+/// `answer` is called once per requested [`PixAddressId`](hopr_api::node::PixAddressId) and returns
+/// the deposit data for it; return an empty slice to model a pool with nothing to attach.
+pub fn answering_deposit_pool(
+    events: impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static,
+    answer: impl Fn(&hopr_api::node::PixAddressId) -> Vec<u8> + Send + 'static,
+) -> impl futures::Stream<Item = crate::types::HoprSessionOutPixEvent> + Send + 'static {
+    let (forwarded_tx, forwarded_rx) = futures::channel::mpsc::unbounded();
+
+    tokio::task::spawn(async move {
+        futures::pin_mut!(events);
+        while let Some(event) = events.next().await {
+            match event {
+                crate::types::HoprSessionOutPixEvent::DepositDataRequest(request) => {
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        let data = answer(&id);
+                        if futures::SinkExt::send(
+                            &mut created,
+                            hopr_api::node::PixDepositData {
+                                id,
+                                data: data.into_boxed_slice(),
+                            },
+                        )
+                        .await
+                        .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
+                // Unbounded, so this never blocks the Exit behind a test that reads late. A test that
+                // does not read at all drops the receiver, and the send fails — which is not a reason
+                // to stop answering requests, so the event is simply discarded.
+                other => {
+                    let _ = forwarded_tx.unbounded_send(other);
+                }
+            }
+        }
+    });
+
+    forwarded_rx
+}
