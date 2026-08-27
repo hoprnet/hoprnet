@@ -307,32 +307,9 @@ pub struct SsaServerCommitmentMessage<I, G, D> {
     pub session_id: I,
     /// Parameters of the PIX protocol the server requires, packed by
     /// [`PixParams::to_u32`](hopr_protocol_pix::PixParams::to_u32).
-    ///
-    /// Deliberately the raw word rather than a [`PixParams`](hopr_protocol_pix::PixParams): the
-    /// codec stays total, so an out-of-range value from a peer reaches the session layer and is
-    /// answered with a `SessionError` instead of being dropped as an undecodable packet. Use
-    /// [`dimensions`](Self::dimensions) to read it.
     pub params: u32,
     /// Per-SSA deposit/payment data, carried in CBOR as a single map keyed by the same
     /// [`SsaIndex`](hopr_protocol_pix::SsaIndex) as [`commitments`](Self::commitments).
-    ///
-    /// One batch buys one deposit per SSA, so this is keyed rather than shared: the values differ per
-    /// index (each SSA is paid for separately) and a single field for the whole batch could only ever
-    /// carry what all of them have in common.
-    ///
-    /// Nothing here requires the key set to agree with `commitments`, and the codec does not check it.
-    /// Same reasoning as `params` above: the codec stays total, so a mismatch reaches the session
-    /// layer rather than having the packet dropped as undecodable. What the two sides then do with it
-    /// is deliberately *not* symmetric:
-    ///
-    /// * The sender refuses to build one. A pool that does not answer for every SSA in the batch fails the request
-    ///   outright, and the Session is closed — the data has no second chance to travel, so a batch the Entry could not
-    ///   pay for is not worth sending.
-    /// * The receiver reads an absent entry as empty. It cannot know whether the sender's pool had nothing to attach
-    ///   or failed to attach it, and it does not need to: whether empty deposit data is usable is a question for the
-    ///   receiver's own pool, which is what sees it. Entries for SSAs outside the batch are ignored.
-    ///
-    /// Must be preserved through encode/decode.
     pub deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,
@@ -420,27 +397,6 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
     /// Maximum size of the CBOR-serialized
     /// [`deposit_data`](SsaServerCommitmentMessage::deposit_data) map an
     /// [`SsaRequest`](StartProtocol::SsaRequest) message can carry.
-    ///
-    /// Bounds the whole map, not a single entry: the map goes on the wire as one CBOR value, so the
-    /// per-SSA share of this budget is what is left after the other entries — roughly this divided by
-    /// the batch size, minus the keys. A caller that grows the batch therefore shrinks what each
-    /// deposit may carry, and one that grows the deposits shrinks the batch that still fits.
-    ///
-    /// The counterpart of [`MAX_SSAS_PER_REQUEST`](Self::MAX_SSAS_PER_REQUEST), derived from the same
-    /// SsaRequest encode layout but with the roles swapped: that constant fixes a minimal
-    /// `deposit_data` and asks how many commitments fit, this one fixes a minimal *message* — one
-    /// commitment and a one-byte CBOR session_id — and asks how much `deposit_data` fits.
-    /// header(4) + params(4) + num_commitments(2) = 10 overhead, plus one commitment entry
-    /// (SsaIndex + commitment_repr) and one byte of session_id:
-    /// 1030 - 10 - (4 + 33) - 1 = 982.
-    ///
-    /// This is an absolute wire limit, not a per-message budget. A `deposit_data` inside it can
-    /// still fail to encode next to a real session_id and a full batch of commitments; the exact
-    /// remaining-space check in [`encode`](Self::encode) catches that case and reports
-    /// [`NumberOfCommitments`](StartProtocolError::NumberOfCommitments), since sending fewer
-    /// commitments is what fixes it. Exceeding *this* bound cannot be fixed that way — no
-    /// `SsaRequest` at all can be built around such a `deposit_data` — which is why it has its own
-    /// error.
     pub const MAX_DEPOSIT_DATA_SIZE: usize = ApplicationData::PAYLOAD_SIZE.saturating_sub(
         4 + size_of::<u32>()
             + size_of::<u16>()
@@ -449,18 +405,6 @@ impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D> {
             + 1,
     );
     /// Maximum number of SSAs that can be requested in a single SsaRequest message.
-    ///
-    /// Derived from the SsaRequest encode layout with minimal CBOR deposit_data and session_id:
-    /// header(4) + params(4) + deposit_data(1 for an empty CBOR map) + num_commitments(2) = 11 overhead;
-    /// (PAYLOAD_SIZE - 11) / (SsaIndex + commitment_repr) = (1030 - 11) / (4 + 33) = 27.
-    /// Since a zero-length session_id is the smallest possible, any non-empty session_id
-    /// only makes this bound tighter, making it a safe decode limit.
-    ///
-    /// An empty `deposit_data` map is the smallest one, not a realistic one: a batch carries a
-    /// deposit entry per SSA, so the count a real message reaches is well below this. That keeps it a
-    /// safe decode limit for the same reason the session_id assumption does, and makes it a poor
-    /// estimate of what a sender can actually fit — `MAX_SSA_BATCH_SIZE` in the session layer is what
-    /// bounds that.
     pub const MAX_SSAS_PER_REQUEST: u16 = ((ApplicationData::PAYLOAD_SIZE - 11)
         / (size_of::<hopr_protocol_pix::SsaIndex>() + Self::PIX_COEFF_COMMITMENT_REPR_SIZE))
         as u16;
@@ -643,20 +587,9 @@ where
             StartProtocol::SsaRequest(req) => {
                 data.extend_from_slice(&req.params.to_be_bytes());
 
-                // Serialized through a sorted view of the map, so that one message has one encoding:
-                // the field is a `HashMap`, and handing it to CBOR directly would order its entries
-                // by whatever the hasher decided this run, making the bytes of an unchanged message
-                // differ between two encodes of it. Ordering by SSA index also matches how
-                // `commitments` reaches the wire. Costs a map of references over at most
-                // `MAX_SSAS_PER_REQUEST` entries, and nothing on the decode side — a CBOR map is
-                // read back order-independently.
                 let deposit_data =
                     serde_cbor_2::to_vec(&req.deposit_data.iter().collect::<std::collections::BTreeMap<_, _>>())?;
 
-                // Checked before anything downstream spends the payload budget. Without it, an
-                // oversized `D` is only caught by the combined check further down, which collapses
-                // `avail_space` to zero and blames the commitment count — a cause the caller cannot
-                // act on, because no commitment count would have made this message fit.
                 if deposit_data.len() > Self::MAX_DEPOSIT_DATA_SIZE {
                     return Err(StartProtocolError::DepositDataTooLarge {
                         size: deposit_data.len(),
@@ -710,16 +643,6 @@ where
 
 /// Reads the per-SSA deposit data map, refusing one that announces more entries than a request can
 /// carry.
-///
-/// `HashMap`'s own `Deserialize` sizes its allocation from the map header, which is nothing more
-/// than the peer's word for how many entries follow. serde caps that at a megabyte, which is a
-/// backstop against nonsense rather than a protocol bound — it still lets a packet of at most
-/// [`ApplicationData::PAYLOAD_SIZE`] bytes ask for a thousand times its own size before failing on
-/// the bytes that were never there. The message itself has a much tighter bound to offer: a batch
-/// carries one deposit entry per commitment, and commitments are capped at `max_entries`. A header
-/// claiming more than that is refused on the claim, before it is used to size anything.
-///
-/// Indefinite-length maps announce nothing, so the same bound is enforced again as entries arrive.
 fn decode_deposit_data<'de, D, De>(
     deserializer: De,
     max_entries: usize,

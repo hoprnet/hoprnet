@@ -293,17 +293,7 @@ pub const MAX_SSA_BATCH_SIZE: usize = 9;
 /// How long an Exit waits for the deposit pool to answer a
 /// [`DepositDataRequest`](HoprSessionOutPixEvent::DepositDataRequest) before sending the batch
 /// without what has not arrived.
-///
-/// Only a pool that holds the request's sender open without answering ever waits this long — one that
-/// drops it ends the collection immediately — so this is the ceiling on a misbehaving listener, not
-/// the normal cost. It is charged per SSA request, under the per-session `request_lock`, so it also
-/// bounds how long one stalled pool delays the next request on the same Session.
-///
-/// Generating deposit data is local work (the pool is asked for bytes, not for a transaction), so
-/// seconds is generous. A constant rather than config because there is no reason for an operator to
-/// tune the patience for a component running in their own node; if one appears, this is the value it
-/// replaces.
-pub const DEPOSIT_DATA_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+pub const DEPOSIT_DATA_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// Default for [`SessionManagerConfig::max_ssas_per_ssa_request`] — how many SSA commitments an Entry
 /// accepts in a single [`SsaServerCommitmentMessage`].
@@ -389,22 +379,6 @@ struct SessionSsaState {
     request_lock: Arc<hopr_utils::runtime::prelude::Mutex<()>>,
     /// What this Exit sent as deposit data, per SSA index, for cycles whose deposit address it has
     /// not learned yet.
-    ///
-    /// The Exit hands the pool its own data back in
-    /// [`DepositNeeded`](HoprSessionOutPixEvent::DepositNeeded), so that a pool need not keep its own
-    /// index to recognise which deposit an address belongs to. That event fires when the *Entry's*
-    /// `SsaCommit` arrives, which is one round trip and up to a whole batch after the data was sent,
-    /// so it has to be held somewhere in between.
-    ///
-    /// Entries are removed as they are used — one per cycle, on the first `SsaCommit` that yields a
-    /// deposit address — so this holds at most one batch's worth per Session, and the rest goes with
-    /// the slot when the Session closes.
-    ///
-    /// Payloads rather than whole [`PixDepositData`], for the reason the wire format drops the `id`
-    /// too: the key is the SSA index and the Session is this one, so a stored `id` could only ever
-    /// repeat or contradict them. Contradict is not hypothetical — keying whole replies by
-    /// `id.ssa_index()` let a reply belonging to *another* Session overwrite the entry for an index in
-    /// this batch, and the pool would then have been handed back the foreign data.
     sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprPixDepositPayload>>>,
 }
 
@@ -423,11 +397,6 @@ impl SessionSsaState {
     /// Files the deposit data of a batch the Exit is about to send, for
     /// [`take_sent_deposit_data`](Self::take_sent_deposit_data) to hand back once the matching
     /// deposit address is known.
-    ///
-    /// Takes the map that goes on the wire, *after* [`deposit_data_for_batch`] has validated it —
-    /// never the pool's raw replies. What the Exit reports back has to be what it sent, and the raw
-    /// replies are not that: they may name another Session or an SSA outside the batch, and keying
-    /// them by index alone let such a reply displace a good entry.
     pub fn remember_sent_deposit_data(&self, deposit_data: &HashMap<SsaIndex, HoprPixDepositPayload>) {
         let mut sent = self.sent_deposit_data.lock();
         for (&ssa_index, payload) in deposit_data {
@@ -436,10 +405,6 @@ impl SessionSsaState {
     }
 
     /// Removes and returns what this Exit sent for `ssa_index`, or empty data if it sent none.
-    ///
-    /// The `id` is rebuilt here rather than stored, so it names this Session and this index by
-    /// construction. Removing is what bounds the map: every cycle reaches this exactly once, on the
-    /// first `SsaCommit` that yields a deposit address.
     pub fn take_sent_deposit_data(&self, session_id: &SessionId, ssa_index: SsaIndex) -> PixDepositData {
         PixDepositData {
             id: PixAddressId::new(session_id, ssa_index),
@@ -2071,23 +2036,6 @@ where
     }
 
     /// Asks the deposit pool for the data to attach to a batch of SSAs, and collects its answers.
-    ///
-    /// Fails rather than proceeding short. Deposit data reaches the Entry only in the `SsaRequest`
-    /// that carries the commitments — there is no later message that can supply it — so an Entry that
-    /// needs it to deposit and does not get it has no way back. It would simply never deposit, and
-    /// the Session would die minutes later on the Exit's deposit timeout, reported as
-    /// [`UnrealizedDeposit`](ClosureReason::UnrealizedDeposit) on the node whose peer is not at
-    /// fault. Failing here instead names the local pool, immediately, and costs one Session that was
-    /// not going to work.
-    ///
-    /// A pool with nothing to attach still answers — with empty data, which is a value and travels
-    /// fine. Silence is what is fatal, not emptiness.
-    ///
-    /// Three things end the wait, and the cheap one usually wins: the collection stops as soon as
-    /// every requested id has been answered *or* the pool drops the sender. Only a listener that
-    /// holds the sender open without answering all of them waits out
-    /// [`DEPOSIT_DATA_REQUEST_TIMEOUT`] — and a pool that keeps talking without ever closing the gap
-    /// is cut off after twice as many replies as there were ids.
     async fn request_deposit_data(
         pix_toolbox: &PixToolbox,
         session_id: SessionId,
@@ -2114,15 +2062,6 @@ where
             .into());
         }
 
-        // Read until every *requested* id has been answered, not until a fixed number of channel
-        // items has arrived. Counting items let a reply the batch has no place for — another
-        // Session's, an SSA outside the batch, a second answer for one already given — consume the
-        // budget belonging to a reply that was actually asked for, so a pool that answered everything
-        // and merely added noise lost the Session over the answers that got truncated.
-        //
-        // Bounded all the same: a pool that streams nothing useful would otherwise be read until the
-        // deadline, so tolerate at most one unusable reply per requested id. Past that the request
-        // fails on the gap, which is what a pool answering mostly noise deserves.
         let mut outstanding = ssa_indices
             .iter()
             .map(|&ssa_index| PixAddressId::new(&session_id, ssa_index))
@@ -2316,30 +2255,8 @@ where
         // Exit needs it twice. Once now, to put on the wire, and once per SSA later, to hand back to
         // the pool with the deposit address in `DepositNeeded` — by which point the batch it came
         // from is long gone.
-        //
-        // Before the kill switches, and it has to be: this waits up to
-        // `DEPOSIT_DATA_REQUEST_TIMEOUT`, while a deadline of
-        // `batch_size × (max_deposit_wait + max_ssa_delivery_time)` is free to be shorter — nothing
-        // stops an operator from configuring a deposit window under five seconds. Armed first, those
-        // kill switches could remove the Session while this is still waiting, before the `SsaRequest`
-        // they exist to time had even been sent.
-        //
-        // Fallible, and among the other fallible steps rather than before them: the `?` here drops
-        // `commitment_guards` undisarmed, which releases the registrations without a tombstone and
-        // leaves the index unadvanced, so a retry reuses these very indices. Same rollback every
-        // other failure in this function gets.
         let deposit_data = Self::request_deposit_data(&pix_toolbox_local, session_id, &ssa_indices).await?;
 
-        // That wait is the longest gap in this function, and the Session can end inside it — idle
-        // eviction, an explicit close, an earlier batch's kill switch. What follows would then arm
-        // kill switches on a slot no longer in the cache and, worse, put an `SsaRequest` on the wire
-        // for a Session this node has forgotten: the Entry answers it, commits, and pays a deposit
-        // for a cycle that can never be served. Cheaper to check once here than to make each of
-        // those steps defensive.
-        //
-        // Same rollback as every other failure in this function — `commitment_guards` drops
-        // undisarmed, releasing the registrations. Nothing will retry them, which is the correct
-        // outcome for a Session that is gone.
         if !self.sessions.contains_key(&session_id) {
             return Err(SessionManagerError::NonExistingSession.into());
         }

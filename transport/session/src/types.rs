@@ -103,18 +103,6 @@ pub type HoprStartProtocol = StartProtocol<
 pub type HoprPixDepositData = Vec<PixDepositData>;
 
 /// The deposit data for a *single* SSA, as it travels inside an `SsaRequest`.
-///
-/// Only [`PixDepositData::data`] goes on the wire. Its `id` does not, and does not need to: a
-/// `PixAddressId` is the session pseudonym followed by the SSA index, and the message already carries
-/// the former as its `session_id` and the latter as the key this payload is stored under. The Entry
-/// rebuilds the whole [`PixDepositData`] from those two — see `handle_ssa_request` — so sending the
-/// `id` would spend 15 CBOR bytes per entry restating what the reader already has, out of a budget
-/// (`StartProtocol::MAX_DEPOSIT_DATA_SIZE`) that the whole batch shares. It would also let the key
-/// and the value disagree about which SSA they belong to, which the receiver would then have to
-/// check; here that is unrepresentable.
-///
-/// [`serde_bytes`] for the same budget reason: without it a CBOR array of integers would spend two
-/// bytes on every payload byte ≥ 24.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct HoprPixDepositPayload(#[serde(with = "serde_bytes")] pub Box<[u8]>);
 
