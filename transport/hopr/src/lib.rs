@@ -1442,7 +1442,9 @@ fn session_pix_event_to_pix_event(event: HoprSessionOutPixEvent) -> PixEvent {
             // This node's own data coming back to it: the pool produced it for this SSA before the
             // request went out, and gets it returned now that the address it pays for is known.
             deposit_data,
-            deposit_updated: Some(notifier),
+            // Not optional as of hopr-api 4.0.1: the Exit always has a channel to report the deposit
+            // on, and every `DepositAddressReceived` this maps from carries one.
+            deposit_updated: notifier,
         }),
         // Straight through: `PixDepositDataRequest` is the pool's own request type, and the Session
         // layer neither adds to it nor reads the answers off the channel it carries.
