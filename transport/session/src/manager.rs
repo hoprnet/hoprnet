@@ -2319,14 +2319,28 @@ where
             deposit_data,
         ));
 
-        send_via_msg_sender(
+        if let Err(error) = send_via_msg_sender(
             &mut msg_sender,
             slot.routing_opts.clone(),
             data,
             "session SSA commitment request message",
         )
         .await
-        .map_err(TransportSessionError::packet_sending)?;
+        {
+            // The kill switches went up before the send on purpose — a request on the wire must never
+            // be untimed — and they have to come back down with it. Nothing reached the Entry, so
+            // there is nothing it owes and nothing to time; left armed, they would close this Session
+            // at the batch deadline for an `SsaRequest` it was never sent, and record the peer's
+            // `UnrealizedDeposit` for it. That is also the retry this failure exists to leave room
+            // for: the index is deliberately not advanced, so the next attempt re-arms these very
+            // keys. The last piece of the same rollback the guards and the unadvanced index get.
+            let mut abort_handles = slot.abort_handles.lock();
+            for &ssa_index in &ssa_indices {
+                abort_handles.abort_one(&SessionHandles::PixKillSwitch(ssa_index.get()));
+            }
+
+            return Err(TransportSessionError::packet_sending(error));
+        }
 
         // All fallible steps succeeded — commit the index advance past the whole batch, and hand the
         // registrations over to the cycles they now belong to.
@@ -7679,6 +7693,109 @@ mod tests {
                 .new_exit_commitment(ssa_id, 2, 2)
                 .with_context(|| format!("index {i} of the failed batch was left registered"))?;
         }
+
+        Ok(())
+    }
+
+    /// A failed `SsaRequest` send must take its kill switches down with it.
+    ///
+    /// They are armed *before* the send so that a request on the wire is never untimed, which leaves
+    /// them armed for a request that never got there. What they time is the Entry's deposit, and an
+    /// Entry that was never asked owes nothing — so a batch deadline that fires here closes a working
+    /// Session and records the peer's `UnrealizedDeposit` for an `SsaRequest` it never saw. It also
+    /// contradicts the retry a failed send is meant to leave room for: the index is deliberately not
+    /// advanced precisely so the next attempt can reuse these indices.
+    #[test_log::test(tokio::test)]
+    async fn failed_ssa_request_send_disarms_the_batch_deadline() -> anyhow::Result<()> {
+        use std::time::Duration;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        const BATCH: usize = 3;
+        // One cycle's window, so the whole batch's is 150 ms — short enough to wait out below.
+        const UNIT: Duration = Duration::from_millis(50);
+
+        // With a stand-in pool, so the request gets as far as the send rather than failing earlier on
+        // deposit data, which arms no kill switches at all and would prove nothing.
+        let pix_toolbox = pix_toolbox_with_pool(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ssas_per_request: BATCH,
+                max_deposit_wait: UNIT,
+                max_ssa_delivery_time: Duration::ZERO,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport
+            .expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        // Closing the transport is what makes the send fail — same trick as the stranded-commitment
+        // test above, for the same reason.
+        bob_sender.close_channel();
+        bob_handle.await??;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let (dummy_tx, _dummy_rx) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(1);
+        let slot = SessionSlot {
+            session_tx: dummy_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+            abort_handles: Default::default(),
+            surb_mgmt: Default::default(),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+        };
+        slot.current_ssa_state
+            .set(SessionSsaState::new(PixParams::try_new(
+                2,
+                2,
+                TEST_SURPLUS_SHARES,
+                LOCAL_PIX_SUITE,
+            )?))
+            .map_err(|_| anyhow!("pix state must be uninitialized"))?;
+        mgr.sessions.insert(alice_pseudonym, slot.clone());
+
+        let result = mgr.request_next_ssa(alice_pseudonym, slot.clone(), None).await;
+        assert!(result.is_err(), "a failed send must be reported, got {result:?}");
+
+        {
+            let abort_handles = slot.abort_handles.lock();
+            for idx in 1..=BATCH as u32 {
+                assert!(
+                    !abort_handles.contains(&SessionHandles::PixKillSwitch(idx)),
+                    "index {idx} of the failed batch left its kill switch armed"
+                );
+            }
+        }
+
+        // And the effect that matters: past the whole batch window, nothing has closed the Session.
+        tokio::time::sleep(2 * BATCH as u32 * UNIT).await;
+        assert_eq!(
+            vec![alice_pseudonym],
+            mgr.active_sessions(),
+            "a request that never reached the Entry must not close the Session on its deposit deadline"
+        );
 
         Ok(())
     }
