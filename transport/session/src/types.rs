@@ -345,7 +345,7 @@ pub enum HoprSessionOutPixEvent {
     /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
     /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
     /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
-    /// is closed with `ClosureReason::MissingDepositData`. A pool with nothing to attach must
+    /// is closed with [`ClosureReason::MissingDepositData`]. A pool with nothing to attach must
     /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
     ///
     /// A listener that cannot answer at all should drop the attached sender: that ends the wait
@@ -401,6 +401,10 @@ pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
 }
 
 /// Indicates the closure reason of a [`HoprSession`].
+///
+/// Delivered to the `on_close` callback a Session is constructed with — see
+/// [`HoprSession::new`] — and to the `SessionManager`'s closure notifier, so a caller has to be able
+/// to name this type to write either.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 pub enum ClosureReason {
     /// Write-half of the Session has been closed.

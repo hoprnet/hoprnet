@@ -397,7 +397,13 @@ struct SessionSsaState {
     /// Entries are removed as they are used — one per cycle, on the first `SsaCommit` that yields a
     /// deposit address — so this holds at most one batch's worth per Session, and the rest goes with
     /// the slot when the Session closes.
-    sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, PixDepositData>>>,
+    ///
+    /// Payloads rather than whole [`PixDepositData`], for the reason the wire format drops the `id`
+    /// too: the key is the SSA index and the Session is this one, so a stored `id` could only ever
+    /// repeat or contradict them. Contradict is not hypothetical — keying whole replies by
+    /// `id.ssa_index()` let a reply belonging to *another* Session overwrite the entry for an index in
+    /// this batch, and the pool would then have been handed back the foreign data.
+    sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprPixDepositPayload>>>,
 }
 
 impl SessionSsaState {
@@ -416,28 +422,32 @@ impl SessionSsaState {
     /// [`take_sent_deposit_data`](Self::take_sent_deposit_data) to hand back once the matching
     /// deposit address is known.
     ///
-    /// Takes the pool's answers as they came rather than the map that goes on the wire: an entry the
-    /// wire drops for not belonging to this batch would be equally wrong to report back, and one the
-    /// pool never sent is absent from both.
-    pub fn remember_sent_deposit_data(&self, deposit_data: &HoprPixDepositData) {
+    /// Takes the map that goes on the wire, *after* [`deposit_data_for_batch`] has validated it —
+    /// never the pool's raw replies. What the Exit reports back has to be what it sent, and the raw
+    /// replies are not that: they may name another Session or an SSA outside the batch, and keying
+    /// them by index alone let such a reply displace a good entry.
+    pub fn remember_sent_deposit_data(&self, deposit_data: &HashMap<SsaIndex, HoprPixDepositPayload>) {
         let mut sent = self.sent_deposit_data.lock();
-        for entry in deposit_data {
-            sent.insert(entry.id.ssa_index(), entry.clone());
+        for (&ssa_index, payload) in deposit_data {
+            sent.insert(ssa_index, payload.clone());
         }
     }
 
     /// Removes and returns what this Exit sent for `ssa_index`, or empty data if it sent none.
     ///
-    /// Removing is what bounds the map: every cycle reaches this exactly once, on the first
-    /// `SsaCommit` that yields a deposit address.
+    /// The `id` is rebuilt here rather than stored, so it names this Session and this index by
+    /// construction. Removing is what bounds the map: every cycle reaches this exactly once, on the
+    /// first `SsaCommit` that yields a deposit address.
     pub fn take_sent_deposit_data(&self, session_id: &SessionId, ssa_index: SsaIndex) -> PixDepositData {
-        self.sent_deposit_data
-            .lock()
-            .remove(&ssa_index)
-            .unwrap_or_else(|| PixDepositData {
-                id: PixAddressId::new(session_id, ssa_index),
-                data: Box::default(),
-            })
+        PixDepositData {
+            id: PixAddressId::new(session_id, ssa_index),
+            data: self
+                .sent_deposit_data
+                .lock()
+                .remove(&ssa_index)
+                .map(|payload| payload.0)
+                .unwrap_or_default(),
+        }
     }
 
     /// Record an unverifiable share error.
@@ -2290,8 +2300,8 @@ where
         // leaves the index unadvanced, so a retry reuses these very indices. Same rollback every
         // other failure in this function gets.
         let deposit_data = Self::request_deposit_data(&pix_toolbox_local, session_id, &ssa_indices).await?;
-        current_ssa_state.remember_sent_deposit_data(&deposit_data);
         let deposit_data = deposit_data_for_batch(&session_id, &ssa_indices, deposit_data)?;
+        current_ssa_state.remember_sent_deposit_data(&deposit_data);
 
         // Set up the kill switches before sending the SSA request so there is no
         // window where the commitments are in flight but no timeout is installed.
@@ -3092,16 +3102,20 @@ where
             // close_session. This is best-effort: network loss or concurrent processing
             // may leave the Entry's session alive (it will time out on its own).
             if let Err(e) = self.request_next_ssa(session_id, slot, None).await {
-                // A pool that could not supply deposit data is named as such on both halves. The
-                // rollback is the `slot_guard`'s either way — the slot is not committed yet, so
-                // `close_session_with_reason` has nothing to do here — but the reason the *Entry*
-                // records comes from this message, and `Unknown` would point it at nothing.
+                // A pool that could not supply deposit data is named as such on both halves: the
+                // Entry learns it from the `SessionError` reason below, which `Unknown` would have
+                // pointed at nothing, and this node records it as the closure reason.
                 let missing_deposit_data = matches!(
                     e,
                     TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
                 );
                 if missing_deposit_data {
                     error!(%session_id, %e, "refusing the session — the deposit pool did not supply deposit data");
+                    // Closed here rather than left to the `slot_guard`, which would record the
+                    // generic `Eviction`: this is the one reason an operator can act on, and it names
+                    // their own pool. The guard's rollback then finds nothing and is a no-op, so
+                    // nothing is closed or decremented twice.
+                    self.close_session_with_reason(&session_id, ClosureReason::MissingDepositData);
                 }
                 if let Err(send_err) = send_via_msg_sender(
                     &mut msg_sender,
@@ -7704,6 +7718,72 @@ mod tests {
                 .new_exit_commitment(ssa_id, 2, 2)
                 .with_context(|| format!("index {i} of the failed batch was left registered"))?;
         }
+
+        Ok(())
+    }
+
+    /// What the Exit reports back to its pool must be what the Exit sent.
+    ///
+    /// The pool answers over a channel and nothing stops it answering for an SSA that is not in the
+    /// batch, or for another Session entirely. Those replies are dropped from the wire; they must be
+    /// dropped from the Exit's own memory of the batch too. Keying whole replies by `id.ssa_index()`
+    /// did not do that: a foreign reply naming an in-batch index displaced the good entry, and
+    /// `DepositNeeded` then handed the pool back deposit data belonging to another Session.
+    #[test_log::test(tokio::test)]
+    async fn a_foreign_deposit_reply_must_not_displace_what_the_exit_sent() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN];
+
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+        drop(pix_events);
+        let _ = pix_toolbox;
+
+        let ssa_state = SessionSsaState::new(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?);
+
+        // What the pool sent: the right entry, then a same-index entry belonging to another Session.
+        let replies = vec![
+            PixDepositData {
+                id: PixAddressId::new(&session_id, SsaIndex::MIN),
+                data: b"mine".as_slice().into(),
+            },
+            PixDepositData {
+                id: PixAddressId::new(&other_session, SsaIndex::MIN),
+                data: b"someone else's".as_slice().into(),
+            },
+        ];
+
+        // Only the validated map is remembered, which is the whole point.
+        let validated = deposit_data_for_batch(&session_id, &batch, replies)?;
+        ssa_state.remember_sent_deposit_data(&validated);
+
+        let recalled = ssa_state.take_sent_deposit_data(&session_id, SsaIndex::MIN);
+        assert_eq!(
+            b"mine".as_slice(),
+            recalled.data.as_ref(),
+            "the Exit must recall the payload it actually sent"
+        );
+        assert_eq!(
+            PixAddressId::new(&session_id, SsaIndex::MIN),
+            recalled.id,
+            "the id must name this Session and this index"
+        );
+
+        // Consumed exactly once; a second cycle would see empty rather than a stale entry.
+        assert!(
+            ssa_state.take_sent_deposit_data(&session_id, SsaIndex::MIN).is_empty(),
+            "taking must remove the entry"
+        );
 
         Ok(())
     }
