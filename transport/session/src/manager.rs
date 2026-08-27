@@ -273,8 +273,10 @@ const MAX_ALLOWED_UNVERIFIABLE_PIX_SHARES: usize = 0;
 
 /// Hard ceiling on both SSA batch-size knobs, whatever the configuration says.
 ///
+/// The current maximum value of 9 is based on the current available pool limitations.
+///
 /// Deliberately far below the wire limit (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only
-/// bounds what can be *decoded*. The real cost is paid on both sides of the exchange, and neither is
+/// bounds what can be *decoded*. The real cost is paid on both sides of the exchange and neither is
 /// small at the profiled dimensions:
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own

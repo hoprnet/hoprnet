@@ -115,7 +115,8 @@ pub struct StartEstablished<I> {
 /// - `T` is the session target.
 /// - `C` are session capabilities.
 /// - `G` is the type of the commitment to the Session Stealth Address (SSA).
-/// - `K` is the wire form of the proof of knowledge accompanying a client SSA commitment.
+/// - `K` is the wire form of the proof of knowledge going with a client SSA commitment.
+/// - `D` is the type of the deposit data carried in the Server's SSA commitment.
 ///
 /// # Diagram of the protocol
 /// ```mermaid
