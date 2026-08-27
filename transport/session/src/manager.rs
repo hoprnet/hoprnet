@@ -7820,7 +7820,12 @@ mod tests {
     ///
     /// `script` is handed the ids the Exit asked for and returns the replies the pool will send, one
     /// at a time — which is what makes reply *ordering* expressible, and ordering is the only thing
-    /// the two tests below differ on from a run that never had a problem.
+    /// the tests below differ on from a run that never had a problem.
+    ///
+    /// The pool holds its sender open after the script runs out, rather than dropping it and ending
+    /// the stream. A pool that closes the channel ends the read all by itself, which would let a test
+    /// pass on that alone — the reason the collection stopped is exactly what these tests are about,
+    /// so the only things left to stop it are the ones under test.
     async fn request_deposit_data_answered_with(
         session_id: SessionId,
         batch: &[SsaIndex],
@@ -7845,6 +7850,8 @@ mod tests {
                         return;
                     }
                 }
+                // Held open, not dropped — see above. The task is torn down with the test's runtime.
+                std::future::pending::<()>().await;
             }
         });
 
@@ -7927,6 +7934,98 @@ mod tests {
         })
         .await
         .context("a pool that repeated itself but answered every SSA must not fail the request")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                &[index.get() as u8],
+                validated[&index].0.as_ref(),
+                "index {index} must carry its own payload"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Tolerating replies the batch has no place for must not become waiting for the deadline.
+    ///
+    /// Reading until every requested id is answered has no natural end when the pool never answers
+    /// one, so the read is capped at twice the requested count. A pool that talks without ever
+    /// closing the gap is cut off there and the request fails on the gap — which is the same
+    /// verdict the deadline would reach, minus the [`DEPOSIT_DATA_REQUEST_TIMEOUT`] spent reaching
+    /// it, with the Session held open throughout.
+    #[test_log::test(tokio::test)]
+    async fn a_pool_answering_only_noise_must_fail_on_the_cap_not_the_deadline() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        // Exactly the cap, and not one of them is for this Session.
+        let noise = move |ids: Vec<PixAddressId>| {
+            ids.iter()
+                .flat_map(|id| {
+                    std::iter::repeat_n(
+                        PixDepositData {
+                            id: PixAddressId::new(&other_session, id.ssa_index()),
+                            data: b"someone else's".as_slice().into(),
+                        },
+                        2,
+                    )
+                })
+                .collect()
+        };
+
+        // Well under the deadline: the point is that the cap ends the read, not the clock.
+        let result = timeout(
+            Duration::from_secs(1),
+            request_deposit_data_answered_with(session_id, &batch, noise),
+        )
+        .await
+        .context("the cap must end the read long before DEPOSIT_DATA_REQUEST_TIMEOUT")?;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::MissingDepositData(
+                    _
+                )))
+            ),
+            "a pool that answered none of the requested SSAs must fail the request, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// The reply that lands exactly on the cap still counts.
+    ///
+    /// One reply earlier and the batch would be complete without the cap ever mattering, so this is
+    /// the only arrangement that tells `take(2 * requested)` apart from `take(2 * requested - 1)`:
+    /// every requested SSA is answered, but the last answer is the last reply the read will accept.
+    #[test_log::test(tokio::test)]
+    async fn the_last_reply_the_cap_allows_must_still_complete_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, move |ids| {
+            // One unusable reply per requested id, then the answers themselves — `2 * requested`
+            // replies in total, with the one that closes the gap sitting on the boundary.
+            ids.iter()
+                .map(|id| PixDepositData {
+                    id: PixAddressId::new(&other_session, id.ssa_index()),
+                    data: b"someone else's".as_slice().into(),
+                })
+                .chain(ids.iter().map(|id| PixDepositData {
+                    id: *id,
+                    data: vec![id.ssa_index().get() as u8].into_boxed_slice(),
+                }))
+                .collect()
+        })
+        .await
+        .context("the answer landing on the cap must be read, not cut off by it")?;
 
         let validated = deposit_data_for_batch(&session_id, &batch, collected)
             .context("every SSA in the batch must come out with an entry")?;
