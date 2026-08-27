@@ -2329,6 +2329,21 @@ where
         // leaves the index unadvanced, so a retry reuses these very indices. Same rollback every
         // other failure in this function gets.
         let deposit_data = Self::request_deposit_data(&pix_toolbox_local, session_id, &ssa_indices).await?;
+
+        // That wait is the longest gap in this function, and the Session can end inside it — idle
+        // eviction, an explicit close, an earlier batch's kill switch. What follows would then arm
+        // kill switches on a slot no longer in the cache and, worse, put an `SsaRequest` on the wire
+        // for a Session this node has forgotten: the Entry answers it, commits, and pays a deposit
+        // for a cycle that can never be served. Cheaper to check once here than to make each of
+        // those steps defensive.
+        //
+        // Same rollback as every other failure in this function — `commitment_guards` drops
+        // undisarmed, releasing the registrations. Nothing will retry them, which is the correct
+        // outcome for a Session that is gone.
+        if !self.sessions.contains_key(&session_id) {
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
         let deposit_data = deposit_data_for_batch(&session_id, &ssa_indices, deposit_data)?;
         current_ssa_state.remember_sent_deposit_data(&deposit_data);
 
@@ -8154,6 +8169,120 @@ mod tests {
 
         bob_sender.close_channel();
         bob_handle.await??;
+
+        Ok(())
+    }
+
+    /// A Session that ends while the pool is being asked must not still be sent an `SsaRequest`.
+    ///
+    /// The wait runs up to [`DEPOSIT_DATA_REQUEST_TIMEOUT`], and a close can land anywhere inside it
+    /// — idle eviction, an explicit close, an earlier batch's kill switch. Everything after the wait
+    /// assumes the Session it started with: kill switches would be armed on a slot no longer in the
+    /// cache, and an `SsaRequest` would go out for a Session this node has forgotten. The Entry has
+    /// no way to know that, so it commits and pays a deposit for a cycle nothing will ever serve.
+    #[test_log::test(tokio::test)]
+    async fn a_session_closed_while_the_pool_is_answering_must_not_be_sent_an_ssa_request() -> anyhow::Result<()> {
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        // Answers, but not before the close below has landed.
+        let mut events = Box::pin(pix_events);
+        tokio::task::spawn(async move {
+            while let Some(event) = events.next().await {
+                if let HoprSessionOutPixEvent::DepositDataRequest(request) = event {
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        if created
+                            .send(PixDepositData {
+                                id,
+                                data: Box::default(),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+            SessionManager::new(SessionManagerConfig {
+                pix_config: IncomingSessionPixConfig {
+                    quota_range: 0..=1024 * 1024 * 1024,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+        // The real sender, so that anything put on the wire is observable rather than asserted about.
+        let (msg_tx, mut msg_rx) = futures::channel::mpsc::unbounded();
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(msg_tx, new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        let (dummy_tx, _dummy_rx) = crossfire::mpsc::bounded_blocking_async::<ApplicationDataIn>(1);
+        let slot = SessionSlot {
+            session_tx: dummy_tx,
+            routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+            abort_handles: Default::default(),
+            surb_mgmt: Default::default(),
+            surb_estimator: Default::default(),
+            current_ssa_state: Default::default(),
+        };
+        slot.current_ssa_state
+            .set(SessionSsaState::new(PixParams::try_new(
+                2,
+                2,
+                TEST_SURPLUS_SHARES,
+                LOCAL_PIX_SUITE,
+            )?))
+            .map_err(|_| anyhow!("pix state must be uninitialized"))?;
+        mgr.sessions.insert(alice_pseudonym, slot.clone());
+        mgr.active_sessions.fetch_add(1, Ordering::Relaxed);
+
+        // Closed while the pool is still being asked, which is the whole race.
+        let sessions = mgr.sessions.clone();
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            sessions.remove(&alice_pseudonym);
+        });
+
+        let result = mgr.request_next_ssa(alice_pseudonym, slot.clone(), None).await;
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+            ),
+            "a Session that is gone must fail the request, got {result:?}"
+        );
+
+        assert!(
+            msg_rx.try_recv().is_err(),
+            "nothing may go on the wire for a Session that is gone"
+        );
+        assert!(
+            !slot.abort_handles.lock().contains(&SessionHandles::PixKillSwitch(1)),
+            "no kill switch may be armed for a Session that is gone"
+        );
+        assert_eq!(
+            1,
+            slot.current_ssa_state.get().unwrap().peek_index().get(),
+            "an abandoned request must not consume its indices"
+        );
 
         Ok(())
     }

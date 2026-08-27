@@ -708,6 +708,63 @@ where
     }
 }
 
+/// Reads the per-SSA deposit data map, refusing one that announces more entries than a request can
+/// carry.
+///
+/// `HashMap`'s own `Deserialize` sizes its allocation from the map header, which is nothing more
+/// than the peer's word for how many entries follow. serde caps that at a megabyte, which is a
+/// backstop against nonsense rather than a protocol bound — it still lets a packet of at most
+/// [`ApplicationData::PAYLOAD_SIZE`] bytes ask for a thousand times its own size before failing on
+/// the bytes that were never there. The message itself has a much tighter bound to offer: a batch
+/// carries one deposit entry per commitment, and commitments are capped at `max_entries`. A header
+/// claiming more than that is refused on the claim, before it is used to size anything.
+///
+/// Indefinite-length maps announce nothing, so the same bound is enforced again as entries arrive.
+fn decode_deposit_data<'de, D, De>(
+    deserializer: De,
+    max_entries: usize,
+) -> Result<std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>, De::Error>
+where
+    D: serde::Deserialize<'de>,
+    De: serde::Deserializer<'de>,
+{
+    struct BoundedMap<D> {
+        max_entries: usize,
+        _deposit_data: std::marker::PhantomData<D>,
+    }
+
+    impl<'de, D: serde::Deserialize<'de>> serde::de::Visitor<'de> for BoundedMap<D> {
+        type Value = std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "at most {} per-SSA deposit data entries", self.max_entries)
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            if let Some(declared) = map.size_hint()
+                && declared > self.max_entries
+            {
+                return Err(serde::de::Error::invalid_length(declared, &self));
+            }
+
+            // Safe to trust now: whatever it says is at or below the bound.
+            let mut out = std::collections::HashMap::with_capacity(map.size_hint().unwrap_or(0));
+            while let Some((ssa_index, data)) = map.next_entry()? {
+                if out.len() >= self.max_entries {
+                    return Err(serde::de::Error::invalid_length(out.len() + 1, &self));
+                }
+                out.insert(ssa_index, data);
+            }
+            Ok(out)
+        }
+    }
+
+    deserializer.deserialize_map(BoundedMap {
+        max_entries,
+        _deposit_data: std::marker::PhantomData,
+    })
+}
+
 impl<I, T, C, G, K, D> StartProtocol<I, T, C, G, K, D>
 where
     I: for<'de> serde::Deserialize<'de>,
@@ -968,9 +1025,8 @@ where
                     // by serde rather than reaching the session layer — the same guard the
                     // commitment entries get below, for free.
                     let mut de = serde_cbor_2::Deserializer::from_slice(&body[size_of::<u32>()..]);
-                    let deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D> =
-                        serde::Deserialize::deserialize(&mut de)
-                            .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
+                    let deposit_data = decode_deposit_data::<D, _>(&mut de, Self::MAX_SSAS_PER_REQUEST as usize)
+                        .map_err(|e| StartProtocolError::ParseError(format!("deposit_data: {e}")))?;
                     let deposit_data_len = de.byte_offset();
                     let mut next_offset = size_of::<u32>() + deposit_data_len;
 
@@ -1711,11 +1767,21 @@ mod tests {
 
     /// The `SsaRequest` counterpart of [`ssa_commit_body`], whose entries are keyed by SSA index.
     fn ssa_request_body(declared_commitments: u16, entries: &[(u32, [u8; 33])]) -> Vec<u8> {
-        let mut body = Vec::new();
-        body.extend_from_slice(&0u32.to_be_bytes());
         // An empty CBOR map, which is the single byte 0xA0 — the smallest `deposit_data` there is,
         // so these bodies stay about the commitment entries that follow it.
-        body.push(0xa0);
+        ssa_request_body_with_deposit_data(&[0xa0], declared_commitments, entries)
+    }
+
+    /// [`ssa_request_body`] with the `deposit_data` bytes written out by the caller, for the tests
+    /// that are about that map rather than about what follows it.
+    fn ssa_request_body_with_deposit_data(
+        deposit_data: &[u8],
+        declared_commitments: u16,
+        entries: &[(u32, [u8; 33])],
+    ) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(&0u32.to_be_bytes());
+        body.extend_from_slice(deposit_data);
         body.extend_from_slice(&declared_commitments.to_be_bytes());
         for (ssa_index, commitment) in entries {
             body.extend_from_slice(&ssa_index.to_be_bytes());
@@ -1975,6 +2041,54 @@ mod tests {
             decode_framed(StartProtocolDiscriminants::SsaRequest, &body),
             Err(StartProtocolError::InvalidLength)
         ));
+    }
+
+    /// A map header is the peer's word for how many entries follow, and a packet of a few dozen
+    /// bytes is free to claim billions. Sizing an allocation from that claim is the whole problem:
+    /// the count a request can carry is bounded by its commitments, and a header above that bound is
+    /// refused on the header, before it has been used to size anything.
+    #[test]
+    fn start_protocol_decode_should_reject_a_deposit_data_map_larger_than_a_request_can_carry() {
+        let over_the_bound = |context: &str| context.starts_with("deposit_data") && context.contains("at most");
+
+        // A definite-length CBOR map (0xBB) announcing every entry the address space can hold, in a
+        // body that carries none of them.
+        let mut announced = vec![0xbb];
+        announced.extend_from_slice(&u64::MAX.to_be_bytes());
+        let body = ssa_request_body_with_deposit_data(&announced, 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "a map header claiming {} entries must be refused on the claim: {:?}",
+            u64::MAX,
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // Complete and well-formed, one entry over the bound — the case a header check alone would
+        // let through, and the only difference from the accepted body below.
+        let cbor_map = |entries: u16| {
+            serde_cbor_2::to_vec(
+                &(1..=entries as u32)
+                    .map(|i| (i, ()))
+                    .collect::<std::collections::BTreeMap<_, _>>(),
+            )
+            .expect("deposit data map must serialize")
+        };
+
+        let body =
+            ssa_request_body_with_deposit_data(&cbor_map(Decoder::MAX_SSAS_PER_REQUEST + 1), 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "a complete map one entry over the bound must be refused: {:?}",
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // And the bound itself still parses, entries and all.
+        let body = ssa_request_body_with_deposit_data(&cbor_map(Decoder::MAX_SSAS_PER_REQUEST), 1, &[(1, [0u8; 33])]);
+        let decoded = decode_framed(StartProtocolDiscriminants::SsaRequest, &body);
+        assert!(
+            matches!(decoded, Ok(StartProtocol::SsaRequest(ref req)) if req.deposit_data.len() == Decoder::MAX_SSAS_PER_REQUEST as usize),
+            "a map at the bound must decode with all of its entries: {decoded:?}"
+        );
     }
 
     #[test]
