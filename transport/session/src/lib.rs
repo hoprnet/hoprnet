@@ -22,8 +22,8 @@ use hopr_api::types::internal::routing::RoutingOptions;
 pub use hopr_protocol_session::{AcknowledgementMode, flow_control::FlowControlConfig};
 pub use hopr_utils::network_types::types::*;
 pub use manager::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DispatchResult, DropReason,
-    IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
+    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_SSAS_PER_SSA_REQUEST, DEPOSIT_DATA_REQUEST_TIMEOUT, DispatchResult,
+    DropReason, IncomingSessionPixConfig, MAX_SSA_BATCH_SIZE, MIN_SURB_BUFFER_DURATION, PixToolbox, SessionManager,
     SessionManagerConfig,
 };
 #[cfg(any(test, feature = "testing"))]
@@ -36,7 +36,7 @@ pub use telemetry::{SessionAckMode, SessionLifecycleState};
 #[cfg(any(test, feature = "testing"))]
 pub use testing::{MsgSender as MockMsgSender, SendMsg, mock_packet_planning, msg_type, start_msg_match};
 pub use types::{
-    AgreedSsaQuota, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
+    AgreedSsaQuota, ClosureReason, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, DEFAULT_PIX_SSA_QUOTA,
     DEFAULT_PIX_SURPLUS_SHARES, HoprSession, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent,
     HoprSessionOutPixEvent, HoprStartProtocol, IncomingSession, LOCAL_PIX_SUITE, ServiceId, SessionId, SessionTarget,
 };

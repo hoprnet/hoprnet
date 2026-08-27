@@ -9,7 +9,7 @@ use std::{
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_api::{
-    HoprBalance,
+    node::PixDepositData,
     types::{
         internal::{prelude::HoprPseudonym, routing::DestinationRouting},
         primitive::errors::GeneralError,
@@ -20,7 +20,7 @@ use hopr_crypto_packet::{
     prelude::{HoprPacket, HoprPixCommitmentProof, HoprPixGroupElement},
 };
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, ReservedTag, Tag};
-use hopr_protocol_pix::{PixParams, PixSpec, SsaId, SsaIndex};
+use hopr_protocol_pix::{PixParams, PixSpec, SsaId};
 #[cfg(feature = "telemetry")]
 use hopr_protocol_session::NoopTracker;
 use hopr_protocol_session::{
@@ -30,12 +30,12 @@ use hopr_protocol_session::{
 };
 use hopr_protocol_start::StartProtocol;
 use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::{
     Capabilities, Capability,
     balancer::BalancerStateValues,
-    errors::TransportSessionError,
+    errors::{SessionManagerError, TransportSessionError},
     flow_control::{PacedWriter, SurbSupply},
 };
 
@@ -90,15 +90,75 @@ pub type HoprStartProtocol = StartProtocol<
     HoprSessionCapabilities,
     HoprPixGroupElement,
     HoprPixCommitmentProof,
-    HoprPixDepositData,
+    HoprPixDepositPayload,
 >;
 
-/// Deposit data placeholder, CBOR-encoded as a byte string.
+/// The deposit data a [deposit pool](hopr_api::chain::DepositPool) produced for one batch of SSAs.
 ///
-/// Currently set to an empty byte string (zero-length Vec). Uses [`serde_bytes`] for compact
-/// CBOR byte-string encoding.
+/// This is what the Exit *collects*, not what it sends: the pool answers a
+/// [`PixDepositDataRequest`](hopr_api::node::PixDepositDataRequest) with one
+/// [`PixDepositData`] per requested [`PixAddressId`](hopr_api::node::PixAddressId), delivered one at
+/// a time over the `deposit_data_created` channel, so a batch arrives as a flat list rather than as
+/// anything keyed. [`deposit_data_for_batch`] turns it into the per-SSA map an `SsaRequest` carries.
+pub type HoprPixDepositData = Vec<PixDepositData>;
+
+/// The deposit data for a *single* SSA, as it travels inside an `SsaRequest`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-pub struct HoprPixDepositData(#[serde(with = "serde_bytes")] pub Vec<u8>);
+pub struct HoprPixDepositPayload(#[serde(with = "serde_bytes")] pub Box<[u8]>);
+
+/// Turns the deposit data a pool produced for a batch into the per-SSA map an `SsaRequest` carries.
+///
+/// Every SSA in the batch must come out of this with an entry, and the absence of one is fatal — see
+/// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) for why the batch
+/// cannot simply travel short. An *empty* entry is not an absent one: a pool with nothing to attach
+/// says so by answering with empty data, which is a value
+/// ([`PixDepositData::is_empty`]) and travels fine.
+///
+/// Entries the batch has no place for — another Session's, an SSA outside this batch, a second answer
+/// for an index already answered — are dropped and reported. They are not themselves fatal: what they
+/// are evidence of is, and the gap they leave behind is what fails.
+pub(crate) fn deposit_data_for_batch(
+    session_id: &SessionId,
+    batch: &[hopr_protocol_pix::SsaIndex],
+    deposit_data: HoprPixDepositData,
+) -> Result<std::collections::HashMap<hopr_protocol_pix::SsaIndex, HoprPixDepositPayload>, SessionManagerError> {
+    let mut out = std::collections::HashMap::with_capacity(batch.len());
+    let (mut foreign, mut duplicate) = (0usize, 0usize);
+
+    for entry in deposit_data {
+        let ssa_index = entry.id.ssa_index();
+        if &entry.id.session_id() != session_id || !batch.contains(&ssa_index) {
+            foreign += 1;
+            continue;
+        }
+        if out.insert(ssa_index, HoprPixDepositPayload(entry.data)).is_some() {
+            duplicate += 1;
+        }
+    }
+
+    if foreign > 0 || duplicate > 0 {
+        warn!(
+            %session_id,
+            requested = batch.len(),
+            usable = out.len(),
+            foreign,
+            duplicate,
+            "deposit pool answered with entries this batch has no place for"
+        );
+    }
+
+    let missing = batch.iter().filter(|i| !out.contains_key(i)).collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(SessionManagerError::MissingDepositData(format!(
+            "session {session_id} is missing deposit data for {} of {} SSAs in the batch: {missing:?} ({foreign} \
+             entries were for other SSAs, {duplicate} were repeats)",
+            missing.len(),
+            batch.len(),
+        )));
+    }
+
+    Ok(out)
+}
 
 /// Quota per single SSA in bytes.
 ///
@@ -236,7 +296,9 @@ pub const DEFAULT_PIX_SSA_QUOTA: SsaQuota = pix_params_to_quota(&DEFAULT_PIX_PAR
 pub(crate) const DEFAULT_PIX_QUOTA_RANGE_SPAN: SsaQuota = 4;
 
 /// Representation of a data quota per SSA agreed upon during the Session establishment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// No longer `Copy`: [`deposit_data`](Self::deposit_data) owns its bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgreedSsaQuota {
     /// ID of the SSA.
     pub ssa_id: SsaId<HoprPseudonym>,
@@ -244,6 +306,14 @@ pub struct AgreedSsaQuota {
     pub deposit_address: <HoprPixSpec as PixSpec>::DepositAddress,
     /// Quota of the SSA in bytes.
     pub quota_per_ssa: SsaQuota,
+    /// Deposit data the pool produced for this SSA.
+    ///
+    /// Both nodes end up holding the same value by different routes: the Entry rebuilds it from the
+    /// `SsaRequest` it just decoded, the Exit recalls what it sent for this index. Empty when the pool
+    /// produced nothing for this SSA — the field is not optional, because a pool that has no deposit
+    /// data to attach and one that failed to attach it are the same thing to a reader, and
+    /// [`PixDepositData::is_empty`] already says which it is.
+    pub deposit_data: PixDepositData,
 }
 
 /// Events raised by the [`crate::manager::SessionManager`] in response to received PIX messages.
@@ -256,10 +326,20 @@ pub enum HoprSessionOutPixEvent {
     /// funds to be deposited.
     ///
     /// The attached sender is used to deliver updates once the deposit is completed.
-    DepositNeeded(
-        AgreedSsaQuota,
-        futures::channel::mpsc::Sender<((HoprPseudonym, SsaIndex), HoprBalance)>,
-    ),
+    DepositNeeded(AgreedSsaQuota, hopr_api::node::DepositUpdated),
+    /// Event raised by the [`crate::manager::SessionManager`] of an Exit node before it requests
+    /// commitments for a batch of SSAs, asking the deposit pool for the data to attach to them.
+    ///
+    /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
+    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
+    /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
+    /// is closed with [`ClosureReason::MissingDepositData`]. A pool with nothing to attach must
+    /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
+    ///
+    /// A listener that cannot answer at all should drop the attached sender: that ends the wait
+    /// immediately and fails the request now, whereas holding it costs every SSA request the full
+    /// timeout before failing anyway.
+    DepositDataRequest(hopr_api::node::PixDepositDataRequest),
 }
 
 /// Events received by the [`crate::manager::SessionManager`] in reaction to received shares from the packet pipeline.
@@ -309,6 +389,10 @@ pub(crate) fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
 }
 
 /// Indicates the closure reason of a [`HoprSession`].
+///
+/// Delivered to the `on_close` callback a Session is constructed with — see
+/// [`HoprSession::new`] — and to the `SessionManager`'s closure notifier, so a caller has to be able
+/// to name this type to write either.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 pub enum ClosureReason {
     /// Write-half of the Session has been closed.
@@ -319,6 +403,12 @@ pub enum ClosureReason {
     Eviction,
     /// Deposit to an SSA has not been made on-time on a PIX-enabled Session.
     UnrealizedDeposit,
+    /// The local deposit pool did not supply the deposit data an SSA batch needs.
+    ///
+    /// Exit-side and locally caused, unlike [`UnrealizedDeposit`](Self::UnrealizedDeposit) which is
+    /// the Entry failing to pay. Kept apart from it for exactly that reason: the two look alike from
+    /// the outside — a PIX Session that stopped — and point at opposite nodes.
+    MissingDepositData,
 }
 
 /// Helper trait to allow Box aliasing
@@ -689,6 +779,114 @@ mod tests {
 
     use super::*;
 
+    fn deposit_entry(session_id: &SessionId, ssa_index: u32, data: &[u8]) -> PixDepositData {
+        PixDepositData {
+            id: hopr_api::node::PixAddressId::new(
+                session_id,
+                hopr_protocol_pix::SsaIndex::new(ssa_index).expect("non-zero"),
+            ),
+            data: data.into(),
+        }
+    }
+
+    /// The pool answers a batch as a flat list, in whatever order it produced the entries, so the
+    /// transform has to key them itself — and pair each payload with the index its own `id` names,
+    /// not with the position it arrived in.
+    #[test]
+    fn deposit_data_for_batch_should_key_payloads_by_their_own_ssa_index() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [
+            hopr_protocol_pix::SsaIndex::new(7).expect("non-zero"),
+            hopr_protocol_pix::SsaIndex::new(8).expect("non-zero"),
+        ];
+
+        // Deliberately not in batch order: nothing promises the channel delivers them sorted.
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![
+                deposit_entry(&session_id, 8, b"eight"),
+                deposit_entry(&session_id, 7, b"seven"),
+            ],
+        )?;
+
+        assert_eq!(2, out.len());
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"seven".as_slice().into())),
+            out.get(&batch[0])
+        );
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"eight".as_slice().into())),
+            out.get(&batch[1])
+        );
+
+        Ok(())
+    }
+
+    /// An answer must not be credited to an SSA it does not name, even when the index alone matches:
+    /// a `PixAddressId` is the pseudonym *and* the index, and only both together identify the SSA.
+    #[test]
+    fn deposit_data_for_batch_should_drop_entries_outside_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [hopr_protocol_pix::SsaIndex::new(7).expect("non-zero")];
+
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![
+                // Right Session, index the batch does not contain.
+                deposit_entry(&session_id, 9, b"not in batch"),
+                // Right index, but belonging to another Session.
+                deposit_entry(&other_session, 7, b"wrong session"),
+                deposit_entry(&session_id, 7, b"good"),
+            ],
+        )?;
+
+        assert_eq!(1, out.len());
+        assert_eq!(
+            Some(&HoprPixDepositPayload(b"good".as_slice().into())),
+            out.get(&batch[0])
+        );
+
+        Ok(())
+    }
+
+    /// An SSA with no answer fails the batch: the data only ever travels in the `SsaRequest` that
+    /// carries the commitments, so an Entry that needed it would have no way to obtain it later.
+    #[test]
+    fn deposit_data_for_batch_should_reject_a_short_answer() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [
+            hopr_protocol_pix::SsaIndex::new(1).expect("non-zero"),
+            hopr_protocol_pix::SsaIndex::new(2).expect("non-zero"),
+        ];
+
+        // One of two answered.
+        assert!(matches!(
+            deposit_data_for_batch(&session_id, &batch, vec![deposit_entry(&session_id, 2, b"only one")]),
+            Err(SessionManagerError::MissingDepositData(_))
+        ));
+
+        // Nothing answered at all — the no-pool case.
+        assert!(matches!(
+            deposit_data_for_batch(&session_id, &batch, Vec::new()),
+            Err(SessionManagerError::MissingDepositData(_))
+        ));
+
+        // An entry that is present but *empty* is an answer, not an absence: a pool with nothing to
+        // attach says so this way, and the batch travels.
+        let out = deposit_data_for_batch(
+            &session_id,
+            &batch,
+            vec![deposit_entry(&session_id, 1, b""), deposit_entry(&session_id, 2, b"")],
+        )?;
+        assert_eq!(2, out.len());
+        assert!(out.values().all(|payload| payload.0.is_empty()));
+
+        Ok(())
+    }
+
     // --- PIX quota tests ---
 
     /// The quota must count what the generator emits, not what the Exit needs to recover.
@@ -827,6 +1025,7 @@ mod tests {
             ClosureReason::EmptyRead,
             ClosureReason::Eviction,
             ClosureReason::UnrealizedDeposit,
+            ClosureReason::MissingDepositData,
         ];
         insta::assert_debug_snapshot!(reasons);
     }

@@ -65,6 +65,8 @@ pub enum SessionManagerError {
     UnsupportedMessage,
     #[error("one of the parties attempted to negotiate unacceptable Session parameters: {0}")]
     Unacceptable(String),
+    #[error("deposit pool did not supply deposit data for the SSA batch: {0}")]
+    MissingDepositData(String),
     #[error(transparent)]
     PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
     #[error(transparent)]

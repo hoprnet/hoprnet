@@ -4,14 +4,17 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use futures::{AsyncWriteExt, StreamExt, pin_mut};
-use hopr_api::types::{
-    crypto::{keypairs::ChainKeypair, prelude::Keypair},
-    crypto_random::Randomizable,
-    internal::{
-        prelude::HoprPseudonym,
-        routing::{RoutingOptions, SurbMatcher},
+use hopr_api::{
+    node::PixAddressId,
+    types::{
+        crypto::{keypairs::ChainKeypair, prelude::Keypair},
+        crypto_random::Randomizable,
+        internal::{
+            prelude::HoprPseudonym,
+            routing::{RoutingOptions, SurbMatcher},
+        },
+        primitive::prelude::Address,
     },
-    primitive::prelude::Address,
 };
 use hopr_crypto_packet::HoprPixSpec;
 use hopr_protocol_app::v1::ApplicationData;
@@ -23,7 +26,7 @@ use hopr_transport_session::{
     ApplicationDataIn, Capability, DestinationRouting, HoprSessionInPixEvent, HoprSessionOutPixEvent,
     HoprStartProtocol, IncomingSessionPixConfig, MockMsgSender, PixParams, PixToolbox, SessionClientConfig,
     SessionManager, SessionManagerConfig, SessionTarget, SurbBalancerConfig,
-    testing::{mock_packet_planning, msg_type},
+    testing::{answering_deposit_pool, mock_packet_planning, msg_type},
 };
 use hopr_utils::network_types::prelude::SealedHost;
 use test_log::test;
@@ -233,6 +236,9 @@ async fn session_manager_should_follow_start_protocol_to_establish_new_session_a
         SsaShareGenerator::new(ssa_gen_config).into(),
         SsaReconstructor::new(ssa_rec_config).into(),
     );
+    // Bob is the Exit, and blocks his SSA request on the deposit pool — stand in for one so that
+    // establishment does not wait out `DEPOSIT_DATA_REQUEST_TIMEOUT`.
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
 
     // Start Alice
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
@@ -614,6 +620,17 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         SsaReconstructor::new(ssa_rec_config).into(),
     );
 
+    // Bob is the Exit, so his SSA requests block on the deposit pool: stand in for one, answering
+    // each SSA with bytes derived from its own index so that what comes back on either side can only
+    // match if it stayed with the SSA it was produced for.
+    //
+    // Installed before the managers start, and it has to be: Bob's first request goes out during
+    // establishment, and `new_session` can return before it is answered because `SessionEstablished`
+    // precedes the PIX setup. Attaching the pool afterwards leaves that first request unanswered for
+    // however long the test takes to get here — under load, long enough to hit
+    // `DEPOSIT_DATA_REQUEST_TIMEOUT` and lose the Session.
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |id| vec![id.ssa_index().get() as u8; 4]);
+
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
@@ -679,6 +696,14 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         exit_cycles.push(quota);
     }
 
+    // The Exit notices the batch in its own order, and nothing says it should be the Entry's. The
+    // Entry walks the request's `BTreeMap` of commitments in one sequential pass, so it emits
+    // ascending; the Exit's `DepositNeeded` follows its `SsaCommit`s, which the manager processes
+    // with `for_each_concurrent` and which therefore complete in whatever order they finish. Sorted
+    // so that everything below pairs the two sides by SSA rather than by arrival — which is what all
+    // of it means, and what the relays above already say by not pinning message order.
+    exit_cycles.sort_by_key(|q| q.ssa_id.ssa_index());
+
     assert_eq!(
         1,
         ssa_requests.load(Ordering::Relaxed),
@@ -697,6 +722,22 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         entry_indices, exit_indices,
         "Entry and Exit must agree on which SSAs the batch covered"
     );
+
+    // The deposit data the Exit's pool produced reaches both sides, still attached to the SSA it was
+    // produced for: the Entry rebuilt it from the `SsaRequest`, the Exit recalled what it sent.
+    for quota in entry_cycles.iter().chain(exit_cycles.iter()) {
+        let ssa_index = quota.ssa_id.ssa_index();
+        assert_eq!(
+            PixAddressId::new(quota.ssa_id.pseudonym(), ssa_index),
+            quota.deposit_data.id,
+            "deposit data must identify the SSA it belongs to"
+        );
+        assert_eq!(
+            vec![ssa_index.get() as u8; 4].into_boxed_slice(),
+            quota.deposit_data.data,
+            "deposit data of SSA {ssa_index} must be the payload its own index was answered with"
+        );
+    }
 
     // Distinct deposit addresses: each entry of the batch is its own cycle, hence its own deposit.
     for (i, entry) in entry_cycles.iter().enumerate() {
@@ -821,10 +862,14 @@ async fn entry_refusing_an_oversized_batch_tears_down_both_halves_promptly() -> 
         SsaShareGenerator::new(ssa_gen_config).into(),
         SsaReconstructor::new(ssa_rec_config).into(),
     );
-    let (pix_toolbox_bob, _pix_bob_rx) = PixToolbox::new(
+    let (pix_toolbox_bob, pix_bob_rx) = PixToolbox::new(
         SsaShareGenerator::new(ssa_gen_config).into(),
         SsaReconstructor::new(ssa_rec_config).into(),
     );
+    // Bob is the Exit: without a pool answering his deposit-data request, his SSA request waits out
+    // `DEPOSIT_DATA_REQUEST_TIMEOUT` and the refusal this test times would land after the deadline it
+    // asserts. The events themselves are not read here — only the answering is needed.
+    let _pix_bob_rx = answering_deposit_pool(pix_bob_rx, |_| Vec::new());
 
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);

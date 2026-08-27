@@ -428,8 +428,8 @@ pub struct PixGlobalConfig {
     ///
     /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
     ///
-    /// Defaults to 2, minimum 1, maximum 20 (`MAX_SSA_BATCH_SIZE`).
-    #[validate(range(min = 1, max = 20))]
+    /// Defaults to 2, minimum 1, maximum 9 (`MAX_SSA_BATCH_SIZE`).
+    #[validate(range(min = 1, max = 9))]
     #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
     pub max_ssas_per_request: usize,
 

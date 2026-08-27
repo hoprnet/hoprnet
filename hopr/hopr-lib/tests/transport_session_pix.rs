@@ -25,7 +25,8 @@ use {
     hopr_lib::{
         HoprSessionClientConfig,
         api::node::{
-            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations, PixEvent,
+            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations,
+            PixDepositData, PixEvent,
         },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
@@ -265,14 +266,14 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 match event {
                     PixEvent::DepositAddressReceived(data) => {
                         tracing::info!(id = ?data.id, quota = data.quota, "Exit: DepositAddressReceived");
-                        // Signal deposit immediately to abort the kill switch
-                        if let Some(mut notifier) = data.deposit_updated {
-                            notifier
-                                .send((data.id, HoprBalance::new_base(1)))
-                                .await
-                                .context("failed to signal deposit via notifier")?;
-                            tracing::info!(id = ?data.id, "deposit signaled");
-                        }
+                        // Signal deposit immediately to abort the kill switch. Not optional as of
+                        // hopr-api 4.0.1: the event always carries a channel to report it on.
+                        let mut notifier = data.deposit_updated;
+                        notifier
+                            .send((data.id, HoprBalance::new_base(1)))
+                            .await
+                            .context("failed to signal deposit via notifier")?;
+                        tracing::info!(id = ?data.id, "deposit signaled");
                         deposit_received_ids.push(data.id);
                     }
                     PixEvent::PrivateKeyRecovered(data) => {
@@ -283,6 +284,22 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         );
                         pk_recovered_ids.push(data.id);
                         tracing::info!(count = pk_recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
+                    }
+                    PixEvent::DepositDataRequest(request) => {
+                        // Stands in for the deposit pool. The Exit blocks its SSA request on this and
+                        // fails the Session if it goes unanswered, so a test driving PIX cycles has to
+                        // answer it. Empty data is a valid answer: it says the pool has nothing to
+                        // attach, which is what this test models.
+                        let mut created = request.deposit_data_created;
+                        for id in request.deposit_ids {
+                            created
+                                .send(PixDepositData {
+                                    id,
+                                    data: Box::default(),
+                                })
+                                .await
+                                .context("failed to answer the deposit data request")?;
+                        }
                     }
                     other => {
                         anyhow::bail!("unexpected Exit PixEvent: {other:?}");
@@ -513,12 +530,11 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                             exit_ids.push(data.id);
                             exit_addresses.push(data.address);
                             // Signal the deposit immediately so this cycle's kill switch is aborted.
-                            if let Some(mut notifier) = data.deposit_updated {
-                                notifier
-                                    .send((data.id, HoprBalance::new_base(1)))
-                                    .await
-                                    .context("failed to signal deposit via notifier")?;
-                            }
+                            let mut notifier = data.deposit_updated;
+                            notifier
+                                .send((data.id, HoprBalance::new_base(1)))
+                                .await
+                                .context("failed to signal deposit via notifier")?;
                         }
                         PixEvent::PrivateKeyRecovered(data) => {
                             addresses_before_first_recovery.get_or_insert(exit_ids.len());
@@ -529,6 +545,19 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                             );
                             recovered_ids.push(data.id);
                             tracing::info!(count = recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
+                        }
+                        PixEvent::DepositDataRequest(request) => {
+                            // See the first test: unanswered, this is fatal to the Session.
+                            let mut created = request.deposit_data_created;
+                            for id in request.deposit_ids {
+                                created
+                                    .send(PixDepositData {
+                                        id,
+                                        data: Box::default(),
+                                    })
+                                    .await
+                                    .context("failed to answer the deposit data request")?;
+                            }
                         }
                         other => anyhow::bail!("unexpected Exit PixEvent: {other:?}"),
                     }
@@ -559,7 +588,8 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
     );
 
     // ── 2. Contiguous indices from 1, across the batch boundary ───────────
-    let mut indices: Vec<u32> = exit_ids.iter().map(|(_, index)| index.get()).collect();
+    // `PixAddressId` is an opaque struct as of hopr-api 4.0.1, not a (pseudonym, index) tuple.
+    let mut indices: Vec<u32> = exit_ids.iter().map(|id| id.ssa_index().get()).collect();
     indices.sort_unstable();
     assert_eq!(
         indices,
