@@ -2081,9 +2081,11 @@ where
     /// A pool with nothing to attach still answers — with empty data, which is a value and travels
     /// fine. Silence is what is fatal, not emptiness.
     ///
-    /// Two things end the wait, and the cheap one usually wins: the collection stops as soon as
-    /// `deposit_ids.len()` answers have arrived *or* the pool drops the sender. Only a listener that
-    /// holds the sender open without answering waits out [`DEPOSIT_DATA_REQUEST_TIMEOUT`].
+    /// Three things end the wait, and the cheap one usually wins: the collection stops as soon as
+    /// every requested id has been answered *or* the pool drops the sender. Only a listener that
+    /// holds the sender open without answering all of them waits out
+    /// [`DEPOSIT_DATA_REQUEST_TIMEOUT`] — and a pool that keeps talking without ever closing the gap
+    /// is cut off after twice as many replies as there were ids.
     async fn request_deposit_data(
         pix_toolbox: &PixToolbox,
         session_id: SessionId,
@@ -2110,22 +2112,47 @@ where
             .into());
         }
 
-        let deposit_data = deposit_data_rx
-            .take(ssa_indices.len())
-            .take_until(futures_time::task::sleep(futures_time::time::Duration::from(
-                DEPOSIT_DATA_REQUEST_TIMEOUT,
-            )))
-            .collect::<HoprPixDepositData>()
-            .await;
+        // Read until every *requested* id has been answered, not until a fixed number of channel
+        // items has arrived. Counting items let a reply the batch has no place for — another
+        // Session's, an SSA outside the batch, a second answer for one already given — consume the
+        // budget belonging to a reply that was actually asked for, so a pool that answered everything
+        // and merely added noise lost the Session over the answers that got truncated.
+        //
+        // Bounded all the same: a pool that streams nothing useful would otherwise be read until the
+        // deadline, so tolerate at most one unusable reply per requested id. Past that the request
+        // fails on the gap, which is what a pool answering mostly noise deserves.
+        let mut outstanding = ssa_indices
+            .iter()
+            .map(|&ssa_index| PixAddressId::new(&session_id, ssa_index))
+            .collect::<std::collections::HashSet<_>>();
+        let requested = outstanding.len();
+
+        let mut deposit_data = HoprPixDepositData::with_capacity(requested);
+        {
+            let replies = deposit_data_rx
+                .take(2 * requested)
+                .take_until(futures_time::task::sleep(futures_time::time::Duration::from(
+                    DEPOSIT_DATA_REQUEST_TIMEOUT,
+                )));
+            futures::pin_mut!(replies);
+            while let Some(entry) = replies.next().await {
+                outstanding.remove(&entry.id);
+                deposit_data.push(entry);
+                if outstanding.is_empty() {
+                    break;
+                }
+            }
+        }
 
         // Counted here rather than left to `deposit_data_for_batch`, which sees the same shortfall
         // but cannot tell a pool that went quiet from one that answered about the wrong SSAs. Both
         // are fatal; only one of them is fixed by making the pool faster.
-        if deposit_data.len() < ssa_indices.len() {
+        if !outstanding.is_empty() {
             return Err(SessionManagerError::MissingDepositData(format!(
-                "session {session_id} got {} of {} deposit data entries within {DEPOSIT_DATA_REQUEST_TIMEOUT:?}",
+                "session {session_id} got {} of {requested} requested deposit data entries within \
+                 {DEPOSIT_DATA_REQUEST_TIMEOUT:?} ({} replies read in total)",
+                requested - outstanding.len(),
                 deposit_data.len(),
-                ssa_indices.len(),
             ))
             .into());
         }
@@ -7784,6 +7811,134 @@ mod tests {
             ssa_state.take_sent_deposit_data(&session_id, SsaIndex::MIN).is_empty(),
             "taking must remove the entry"
         );
+
+        Ok(())
+    }
+
+    /// Runs [`request_deposit_data`](SessionManager::request_deposit_data) against a pool that answers
+    /// with exactly what `script` returns, in that order.
+    ///
+    /// `script` is handed the ids the Exit asked for and returns the replies the pool will send, one
+    /// at a time — which is what makes reply *ordering* expressible, and ordering is the only thing
+    /// the two tests below differ on from a run that never had a problem.
+    async fn request_deposit_data_answered_with(
+        session_id: SessionId,
+        batch: &[SsaIndex],
+        script: impl FnOnce(Vec<PixAddressId>) -> Vec<PixDepositData> + Send + 'static,
+    ) -> errors::Result<HoprPixDepositData> {
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        tokio::task::spawn(async move {
+            let mut events = Box::pin(pix_events);
+            if let Some(HoprSessionOutPixEvent::DepositDataRequest(request)) = events.next().await {
+                let mut created = request.deposit_data_created;
+                for reply in script(request.deposit_ids) {
+                    if created.send(reply).await.is_err() {
+                        return;
+                    }
+                }
+            }
+        });
+
+        SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::request_deposit_data(
+            &pix_toolbox,
+            session_id,
+            batch,
+        )
+        .await
+    }
+
+    /// A reply the batch has no place for must not cost a reply that was asked for.
+    ///
+    /// The pool answers over one channel, and nothing about that channel separates a reply for this
+    /// batch from another Session's. Reading a fixed number of *items* — one per requested SSA — let
+    /// the first kind spend a slot belonging to the second, so a pool that answered every SSA and
+    /// merely spoke out of turn lost the Session on the answer that got truncated.
+    ///
+    /// Ordering is the whole test: the same foreign reply arriving *after* the batch was complete
+    /// never cost anything, because the collection had already stopped.
+    #[test_log::test(tokio::test)]
+    async fn a_foreign_reply_before_a_valid_one_must_not_truncate_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, move |ids| {
+            std::iter::once(PixDepositData {
+                id: PixAddressId::new(&other_session, SsaIndex::MIN),
+                data: b"someone else's".as_slice().into(),
+            })
+            .chain(ids.into_iter().map(|id| PixDepositData {
+                id,
+                data: b"mine".as_slice().into(),
+            }))
+            .collect()
+        })
+        .await
+        .context("a pool that answered every requested SSA must not fail the request")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                b"mine".as_slice(),
+                validated[&index].0.as_ref(),
+                "index {index} must carry this Session's payload"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// A second answer for an SSA already answered must not cost an SSA still outstanding.
+    ///
+    /// Same failure as the foreign reply above, from the other direction: the repeat is a reply the
+    /// batch has no place for, and counting items charged it against the one SSA that had not been
+    /// answered yet. Which copy of the repeat wins is not what is under test here — that
+    /// [`deposit_data_for_batch`] takes the later one is incidental — only that the reply after it
+    /// still arrives.
+    #[test_log::test(tokio::test)]
+    async fn a_duplicate_reply_before_a_valid_one_must_not_truncate_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, |ids| {
+            let mut replies = ids
+                .iter()
+                .map(|id| PixDepositData {
+                    id: *id,
+                    data: vec![id.ssa_index().get() as u8].into_boxed_slice(),
+                })
+                .collect::<Vec<_>>();
+            // The repeat of the first answer is inserted before the last one, so counting items
+            // would have stopped on it and never read the SSA it was hiding.
+            replies.insert(1, replies[0].clone());
+            replies
+        })
+        .await
+        .context("a pool that repeated itself but answered every SSA must not fail the request")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                &[index.get() as u8],
+                validated[&index].0.as_ref(),
+                "index {index} must carry its own payload"
+            );
+        }
 
         Ok(())
     }
