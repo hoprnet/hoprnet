@@ -319,12 +319,19 @@ pub struct SsaServerCommitmentMessage<I, G, D> {
     /// index (each SSA is paid for separately) and a single field for the whole batch could only ever
     /// carry what all of them have in common.
     ///
-    /// Nothing here requires the key set to agree with `commitments`, and the codec does not check
-    /// it. Same reasoning as `params` above: the codec stays total, so a peer that sends a deposit
-    /// entry for an SSA outside the batch — or omits one that is in it — reaches the session layer
-    /// and is answered with a `SessionError`, rather than having the packet dropped as undecodable.
+    /// Nothing here requires the key set to agree with `commitments`, and the codec does not check it.
+    /// Same reasoning as `params` above: the codec stays total, so a mismatch reaches the session
+    /// layer rather than having the packet dropped as undecodable. What the two sides then do with it
+    /// is deliberately *not* symmetric:
     ///
-    /// Currently every value is [`Default::default`]. Must be preserved through encode/decode.
+    /// * The sender refuses to build one. A pool that does not answer for every SSA in the batch fails the request
+    ///   outright, and the Session is closed — the data has no second chance to travel, so a batch the Entry could not
+    ///   pay for is not worth sending.
+    /// * The receiver reads an absent entry as empty. It cannot know whether the sender's pool had nothing to attach
+    ///   or failed to attach it, and it does not need to: whether empty deposit data is usable is a question for the
+    ///   receiver's own pool, which is what sees it. Entries for SSAs outside the batch are ignored.
+    ///
+    /// Must be preserved through encode/decode.
     pub deposit_data: std::collections::HashMap<hopr_protocol_pix::SsaIndex, D>,
     /// Server's serialized commitments to the SSAs, ordered by the SSA index.
     pub commitments: std::collections::BTreeMap<hopr_protocol_pix::SsaIndex, G>,

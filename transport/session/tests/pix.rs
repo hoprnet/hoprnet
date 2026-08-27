@@ -620,6 +620,17 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         SsaReconstructor::new(ssa_rec_config).into(),
     );
 
+    // Bob is the Exit, so his SSA requests block on the deposit pool: stand in for one, answering
+    // each SSA with bytes derived from its own index so that what comes back on either side can only
+    // match if it stayed with the SSA it was produced for.
+    //
+    // Installed before the managers start, and it has to be: Bob's first request goes out during
+    // establishment, and `new_session` can return before it is answered because `SessionEstablished`
+    // precedes the PIX setup. Attaching the pool afterwards leaves that first request unanswered for
+    // however long the test takes to get here — under load, long enough to hit
+    // `DEPOSIT_DATA_REQUEST_TIMEOUT` and lose the Session.
+    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |id| vec![id.ssa_index().get() as u8; 4]);
+
     let mut ahs = Vec::new();
     let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
     let (alice_sender, alice_handle) = mock_packet_planning(alice_transport);
@@ -655,11 +666,6 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
 
     let mut alice_session = alice_session?;
     let _bob_session = bob_session.ok_or(anyhow::anyhow!("bob must get an incoming session"))?;
-
-    // Bob is the Exit, so his SSA requests block on the deposit pool: stand in for one, answering
-    // each SSA with bytes derived from its own index so that what comes back on either side can only
-    // match if it stayed with the SSA it was produced for.
-    let pix_bob_rx = answering_deposit_pool(pix_bob_rx, |id| vec![id.ssa_index().get() as u8; 4]);
 
     pin_mut!(pix_alice_rx);
     pin_mut!(pix_bob_rx);

@@ -342,10 +342,15 @@ pub enum HoprSessionOutPixEvent {
     /// Event raised by the [`crate::manager::SessionManager`] of an Exit node before it requests
     /// commitments for a batch of SSAs, asking the deposit pool for the data to attach to them.
     ///
-    /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::manager::DEPOSIT_DATA_REQUEST_TIMEOUT)
-    /// for the answers before sending the batch without whatever has not arrived, so a listener that
-    /// cannot answer should drop the attached sender rather than hold it: dropping it ends the wait
-    /// immediately, holding it costs every SSA request the full timeout.
+    /// The Exit waits [`DEPOSIT_DATA_REQUEST_TIMEOUT`](crate::DEPOSIT_DATA_REQUEST_TIMEOUT) for one
+    /// answer per requested id, and a shortfall is *fatal*: the SSA request fails with
+    /// [`MissingDepositData`](crate::errors::SessionManagerError::MissingDepositData) and the Session
+    /// is closed with `ClosureReason::MissingDepositData`. A pool with nothing to attach must
+    /// therefore answer with *empty* data rather than stay silent — empty is a value, silence is not.
+    ///
+    /// A listener that cannot answer at all should drop the attached sender: that ends the wait
+    /// immediately and fails the request now, whereas holding it costs every SSA request the full
+    /// timeout before failing anyway.
     DepositDataRequest(hopr_api::node::PixDepositDataRequest),
 }
 
