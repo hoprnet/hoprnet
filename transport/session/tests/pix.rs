@@ -696,6 +696,14 @@ async fn batched_ssa_request_produces_one_deposit_cycle_per_requested_ssa() -> R
         exit_cycles.push(quota);
     }
 
+    // The Exit notices the batch in its own order, and nothing says it should be the Entry's. The
+    // Entry walks the request's `BTreeMap` of commitments in one sequential pass, so it emits
+    // ascending; the Exit's `DepositNeeded` follows its `SsaCommit`s, which the manager processes
+    // with `for_each_concurrent` and which therefore complete in whatever order they finish. Sorted
+    // so that everything below pairs the two sides by SSA rather than by arrival — which is what all
+    // of it means, and what the relays above already say by not pinning message order.
+    exit_cycles.sort_by_key(|q| q.ssa_id.ssa_index());
+
     assert_eq!(
         1,
         ssa_requests.load(Ordering::Relaxed),
