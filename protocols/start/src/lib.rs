@@ -749,9 +749,13 @@ where
 
             // Safe to trust now: whatever it says is at or below the bound.
             let mut out = std::collections::HashMap::with_capacity(map.size_hint().unwrap_or(0));
+            // Counted as they arrive, not by what the map ends up holding: repeating one key
+            // overwrites in place, so `out.len()` would sit at one however many entries followed.
+            let mut entries = 0;
             while let Some((ssa_index, data)) = map.next_entry()? {
-                if out.len() >= self.max_entries {
-                    return Err(serde::de::Error::invalid_length(out.len() + 1, &self));
+                entries += 1;
+                if entries > self.max_entries {
+                    return Err(serde::de::Error::invalid_length(entries, &self));
                 }
                 out.insert(ssa_index, data);
             }
@@ -2079,6 +2083,25 @@ mod tests {
         assert!(
             matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
             "a complete map one entry over the bound must be refused: {:?}",
+            decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
+        );
+
+        // An indefinite-length map (0xbf … 0xff) announces no count at all, so the header check has
+        // nothing to refuse and the per-entry one is the only bound left. Repeating a single key
+        // makes the map's own size useless as a counter: every entry overwrites the last, so the
+        // decoder holds one pair no matter how many went past it. Only the entries themselves are
+        // hand-framed; the pairs come from the serializer.
+        let mut repeated_key = vec![0xbf];
+        for _ in 0..=Decoder::MAX_SSAS_PER_REQUEST {
+            repeated_key.extend(serde_cbor_2::to_vec(&1u32).expect("an ssa index must serialize"));
+            repeated_key.extend(serde_cbor_2::to_vec(&MinimalDeposit::default()).expect("deposit data must serialize"));
+        }
+        repeated_key.push(0xff);
+
+        let body = ssa_request_body_with_deposit_data(&repeated_key, 1, &[(1, [0u8; 33])]);
+        assert!(
+            matches!(decode_framed(StartProtocolDiscriminants::SsaRequest, &body), Err(StartProtocolError::ParseError(ref c)) if over_the_bound(c)),
+            "an indefinite map must be bounded by the entries it carries, not the keys it keeps: {:?}",
             decode_framed(StartProtocolDiscriminants::SsaRequest, &body)
         );
 

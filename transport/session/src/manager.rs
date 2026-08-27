@@ -8182,6 +8182,9 @@ mod tests {
     /// no way to know that, so it commits and pays a deposit for a cycle nothing will ever serve.
     #[test_log::test(tokio::test)]
     async fn a_session_closed_while_the_pool_is_answering_must_not_be_sent_an_ssa_request() -> anyhow::Result<()> {
+        // Kept, because the release of the commitments is the one effect of the abandoned request
+        // with no local signal — it can only be seen by asking the reconstructor afterwards.
+        let reconstructor = Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default()));
         let (pix_toolbox, pix_events) = PixToolbox::new(
             SsaShareGenerator::new(SsaGeneratorConfig {
                 polynomials_per_ssa: 2,
@@ -8189,7 +8192,7 @@ mod tests {
                 surplus_shares: 1,
             })
             .into(),
-            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+            reconstructor.clone(),
         );
 
         // Answers, but not before the close below has landed.
@@ -8283,6 +8286,14 @@ mod tests {
             slot.current_ssa_state.get().unwrap().peek_index().get(),
             "an abandoned request must not consume its indices"
         );
+
+        // The commitments this attempt registered must be free again — the guards have to have been
+        // dropped undisarmed. `new_exit_commitment` is what a retry would call, and it refuses a
+        // still-registered index with `DuplicateCommitment`, so its success is the release. The
+        // default batch is one, at `SsaIndex::MIN`.
+        reconstructor
+            .new_exit_commitment(SsaId::new(alice_pseudonym, SsaIndex::MIN), 2, 2)
+            .context("the abandoned batch left its index registered")?;
 
         Ok(())
     }
