@@ -1317,12 +1317,12 @@ impl PixToolbox {
 /// they disagree, at least one of those shares did not come from the committed polynomial and an
 /// [`HoprSessionInPixEvent::UnverifiableShares`] event fires, carrying the reconstructor's running
 /// total for the SSA rather than a delta.
-/// [`SupervisorConfig::max_unverifiable_shares_per_ssa`] is 0 by default, so the first such report
-/// closes the Session — the cycle is already unrecoverable, and closing immediately caps what a
-/// malicious Entry is served at `threshold` packets.
-/// [`SupervisorConfig::max_unverifiable_shares_per_session`] bounds the same across cycles, so a
-/// steady trickle of one failure per SSA still escalates; at the default per-SSA limit of zero it
-/// never gets the chance to fire.
+///
+/// The first such report closes the Session, unconditionally and with nothing to configure. The
+/// failed polynomial is never retried, and the SSA is the sum of every polynomial's constant term,
+/// so the cycle is already unrecoverable and can never pay; closing immediately caps what a
+/// malicious Entry is served at `threshold` packets. The running total is logged rather than
+/// accumulated. See `SessionPixSupervisor::on_unverifiable_shares` for why no tolerance is offered.
 ///
 /// ### Configuring PIX at the Exit
 ///
@@ -3786,12 +3786,7 @@ where
         if ssa_client_commitment_state.is_verifiable
             && let Some(supervisor) = session_slot.pix_supervisor.get()
             && supervisor
-                .send_event(SessionPixEvent::CommitmentVerified {
-                    ssa_id,
-                    // The negotiated quota is denominated in bytes, not balance, so this Exit states
-                    // no per-SSA amount and accepts whatever `SupervisorConfig::min_deposit` allows.
-                    expected_deposit: None,
-                })
+                .send_event(SessionPixEvent::CommitmentVerified(ssa_id))
                 .await
                 .is_err()
         {
@@ -3806,9 +3801,10 @@ where
             let (deposit_done_tx, deposit_done_rx) =
                 futures::channel::mpsc::channel::<(PixAddressId, hopr_api::HoprBalance)>(10);
             // Report deposits for as long as they arrive rather than waiting for the first one and
-            // stopping: top-ups accumulate towards `min_deposit`, and the supervisor is what decides
-            // when enough has landed. It also owns the deadline, so the observer carries none — a
-            // timeout here would have been a second authority racing the first.
+            // stopping: the pool may report more than once for a cycle, and a first message carrying
+            // a zero balance asserts nothing, so the one that funds the cycle need not be the first.
+            // The supervisor owns the deadline, so the observer carries none — a timeout here would
+            // have been a second authority racing the first.
             let supervisor = session_slot.pix_supervisor.get().cloned();
             session_slot.abort_handles.lock().insert(
                 SessionHandles::PixDepositObserver(ssa_id.ssa_index().get()),
@@ -7446,9 +7442,9 @@ mod tests {
 
     /// Verifies that a session is closed on the very first `UnverifiableShares` PIX event.
     ///
-    /// An event now means a whole polynomial failed to open its commitment, which already dooms
-    /// the cycle — so [`SupervisorConfig::max_unverifiable_shares_per_ssa`] is 0 and there is
-    /// nothing to tolerate. See that field for the reasoning.
+    /// An event means a whole polynomial failed to open its commitment, which already dooms the
+    /// cycle, so there is nothing to tolerate and nothing to configure. See
+    /// `SessionPixSupervisor::on_unverifiable_shares` for the reasoning.
     ///
     /// ## Steps
     /// 1. Bob's manager is started with a `PixToolbox` and a PIX quota config. Alice's session initiation is processed
@@ -10030,19 +10026,17 @@ mod tests {
 
         let ssa_id = SsaId::new(alice_pseudonym, SsaIndex::new(1).expect("non-zero"));
 
-        // One more fault than the tolerance allows, which at the shipped tolerance of zero is a
-        // single one. Written against the configured limit, and reporting a rising absolute total
-        // as the reconstructor does, so that raising the tolerance would not silently turn this
-        // into a test of nothing.
-        let tolerance = mgr.cfg.pix_config.supervisor_config().max_unverifiable_shares_per_ssa;
-        for observed_total in 1..=tolerance + 1 {
-            let result = mgr
-                .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares { ssa_id, observed_total })
-                .await;
-            // Forwarding succeeds even for the event that closes: the supervisor decides, and it
-            // does so after the send has been accepted.
-            assert!(result.is_ok(), "dispatch_pix_event should not return an error");
-        }
+        // Exactly one event, reporting the absolute total the reconstructor would carry for a single
+        // failed polynomial. There is no tolerance to exhaust first.
+        let result = mgr
+            .dispatch_pix_event(HoprSessionInPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total: 1,
+            })
+            .await;
+        // Forwarding succeeds even for the event that closes: the supervisor decides, and it does so
+        // after the send has been accepted.
+        assert!(result.is_ok(), "dispatch_pix_event should not return an error");
 
         // The supervisor's `Close` reaches the driver asynchronously, so the teardown it triggers
         // is observed rather than assumed.

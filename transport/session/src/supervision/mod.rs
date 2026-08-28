@@ -77,11 +77,10 @@
 //! wait instead of the recovery. The front cycle is still on the clock from funding, so a
 //! funded-but-never-served cycle is caught as before.
 //!
-//! **Fault tracking** — the supervisor tracks unverifiable shares via the
-//! `UnverifiableShares` event (observed as absolute per-SSA totals that may
-//! arrive from multiple concurrent ack processing batches).  It charges only
-//! the delta from the maximum seen so far, preventing stale or out-of-order
-//! snapshots from double-counting.  Limits exist per-SSA and per-session.
+//! **Fault tracking** — an `UnverifiableShares` event closes the Session on arrival, with no
+//! tolerance to configure and no running totals to keep: the event means a polynomial's share set
+//! failed to open its commitment, which permanently dooms the cycle. Late reports against an already
+//! terminal SSA are absorbed. See the configuration section below for why this is not a dial.
 //!
 //! **Rolling SSAs** — to maintain continuity, the supervisor requests the *next* batch when the
 //! current one is "almost recovered" (early threshold reached) or fully recovered, so the commitment
@@ -265,14 +264,47 @@
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
 //! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 778 240 packets, ~72 min, at the defaults — or it closes honest Sessions instead. |
-//! | `max_unverifiable_shares_per_ssa` | 0 | Serving on past a polynomial whose share set failed to open its commitment. That already dooms the cycle, so tolerating it only buys the Entry more unpaid packets. |
-//! | `max_unverifiable_shares_per_session` | 0 | The same failure recurring once per cycle, which a per-cycle limit alone would reset each time. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry that never funds can extract. `0` is supported and means strict prepay. |
 //! | `max_served_without_progress` | 2048 | Packets served with no share of *any* kind coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. Counts `shares_seen`, so a conforming Entry's surplus resets it; see below. |
 //! | `tombstone_retention_window` | 30 s | A late acknowledgement arriving after its cycle's record is gone, with nothing left to attribute it to. |
-//! | `min_deposit` | 0 | A dust deposit counting as funding and releasing service. Top-ups accumulate, so this is a floor on the total, not on any one transfer. |
+//!
+//! ## What is *not* here: the price of a cycle
+//!
+//! No parameter above says what a quota costs, and none should. The Exit's deposit pool is handed the
+//! [`DepositUpdated`](hopr_api::node::DepositUpdated) sender along with
+//! [`AgreedSsaQuota`](crate::AgreedSsaQuota) when the deposit address arrives, and it is the component
+//! that knows both the byte quota and the price it charges for one. It sends on that channel once the
+//! deposit clears that price; the supervisor's `DepositConfirmed` handler acts on the verdict rather
+//! than recomputing it. The Entry side mirrors this — its own strategy prices the `quota` carried by
+//! `PixEvent::NewDepositAddress` and decides what to pay.
+//!
+//! There was briefly a `min_deposit` here, and a per-SSA `expected_deposit` on the commitment event to
+//! go with it. Both are gone. The Session layer has no price for a byte to derive one from, and a
+//! configured floor would not be a backstop but a second authority behind the first: set above the
+//! pool's price it kills a cycle the pool has already been paid for, on `max_deposit_wait`, with
+//! nothing on either side able to break the tie.
+//!
+//! ## The one fault with no dial: unverifiable shares
+//!
+//! An `UnverifiableShares` report closes the Session immediately, and there is no configuration for
+//! it. This used to be a pair of tolerances, per-SSA and per-Session, both shipped at zero.
+//!
+//! Shares are not checked on arrival — the non-constant coefficient commitments that made per-share
+//! verification possible were dropped — so a report means a whole *polynomial's* share set failed to
+//! open its commitment. The reconstructor marks that part failed, releases its shares, and never
+//! clears the flag; the SSA is the sum of every polynomial's constant term, so from that moment the
+//! cycle cannot be reconstructed by any means and will never pay. A tolerance would therefore not buy
+//! recovery, only unpaid service — including in the case it looks written for, a false positive from
+//! a verification bug, where the part is just as permanently failed. Closing on the first report also
+//! caps the exposure at the `threshold` packets already served when the failure surfaces, rather than
+//! a multiple of it.
+//!
+//! What the tolerances bought instead was machinery: absolute cross-peer totals, per-SSA and
+//! per-Session running sums, and delta accounting against the maximum seen so far to keep concurrent
+//! ack batches from double-counting. None of it is observable at a limit of zero, since the first
+//! report ends the Session.
 //!
 //! ## Constraints between parameters
 //!
@@ -341,10 +373,11 @@
 //! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 272 s at full rate, so 2 h implies a floor of ~23 packets/s (~0.19 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
 //! | `max_off_front_share_fraction` | 0.25 | Shipped value. A conforming Entry sits near 0; two-way spreading is 0.5 |
 //! | `min_share_order_sample` | 16384 | Shipped value, and safe here: with emission clamped to one cycle the front cycle is essentially complete before any off-front progress is possible, so even a loss-doomed cycle peaks near 15 % against the 25 % ceiling |
-//! | `max_unverifiable_shares_per_ssa` / `_per_session` | 0 / 0 | Shipped values; a failed polynomial has already doomed the cycle |
 //! | `tombstone_retention_window` | 60 s | 2× the reconstructor's 30 s ack window |
 //! | `max_failed_cycles` | 1 | Shipped value, and inert at this batch size of one — the failing cycle is always the last one standing, which closes the Session first |
-//! | `min_deposit` | ≥ one quota's value | 162.2 MiB at the operator's `price_per_byte`; anything less releases service for a fraction of a cycle |
+//!
+//! What one cycle costs is not in this table, because it is not in this configuration: the 162.2 MiB
+//! quota is priced by the deposit pool, which is also what decides that a deposit has cleared it.
 //!
 //! Related settings outside [`SupervisorConfig`] that this profile also pins:
 //!
@@ -384,7 +417,6 @@ mod worker;
 /// A worked set of values, and what each field defends against, is written out under
 /// "Configuration" in the `supervision` module documentation — the module is crate-private, so it is
 /// named rather than linked here.
-#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct SupervisorConfig {
@@ -515,35 +547,6 @@ pub struct SupervisorConfig {
     #[serde(with = "humantime_serde")]
     pub max_recovery_time: Duration,
 
-    /// Unverifiable shares tolerated for one SSA before the session is closed.
-    ///
-    /// Zero means the first one closes, and that is deliberate rather than austere. A share is no
-    /// longer checked on arrival — the non-constant coefficient commitments that made per-share
-    /// verification possible were dropped, so a failure now means a whole polynomial's share set did
-    /// not open its commitment. Two things follow:
-    ///
-    /// * A failed polynomial already dooms the cycle, since the SSA is the sum of *every* polynomial's constant term.
-    ///   There is no partial recovery to preserve by tolerating it.
-    /// * The failure surfaces on the `threshold`-th share of that polynomial, so the Exit has already served that many
-    ///   packets by the time it learns. Closing on the first failure is what keeps the exposure at `threshold` packets
-    ///   rather than a multiple of it.
-    ///
-    /// Kept as a limit rather than hard-coded so the tolerance stays a one-value decision.
-    ///
-    /// Default: 0 (the first closes).
-    #[default(0)]
-    pub max_unverifiable_shares_per_ssa: u64,
-
-    /// Unverifiable shares tolerated across the whole session before it is closed.
-    ///
-    /// Distinct from the per-SSA limit so a steady trickle of one failure per cycle still escalates,
-    /// rather than resetting with each new SSA. At the default per-SSA limit of zero this never gets
-    /// the chance to fire; it earns its keep only if that limit is raised.
-    ///
-    /// Default: 0.
-    #[default(0)]
-    pub max_unverifiable_shares_per_session: u64,
-
     /// Largest share of recovery progress that may land on a cycle *other* than the one at the front
     /// of the batch, as a fraction of all progress since that cycle took the front.
     ///
@@ -669,17 +672,6 @@ pub struct SupervisorConfig {
     #[default(Duration::from_secs(30))]
     #[serde(with = "humantime_serde")]
     pub tombstone_retention_window: Duration,
-
-    /// Minimum deposit amount required before the gate is released.
-    ///
-    /// A deposit confirmation below this amount is a no-op (the deposit
-    /// deadline keeps running and further top-ups accumulate).  Set to zero
-    /// (default) to accept any non-zero deposit.
-    ///
-    /// Default: zero (accepts any deposit).
-    #[default(HoprBalance::zero())]
-    #[serde_as(as = "serde_with::DisplayFromStr")]
-    pub min_deposit: HoprBalance,
 }
 
 // ---------------------------------------------------------------------------
@@ -710,11 +702,12 @@ pub enum SessionPixEvent {
     /// The initial or next SSA request was successfully sent on the wire.
     SsaRequestSent(SsaId<HoprPseudonym>),
     /// A verifiable commitment was installed in the reconstructor.
-    CommitmentVerified {
-        ssa_id: SsaId<HoprPseudonym>,
-        expected_deposit: Option<HoprBalance>,
-    },
-    /// Deposit for a specific SSA was confirmed with the given amount.
+    CommitmentVerified(SsaId<HoprPseudonym>),
+    /// The Exit's deposit pool reported a sufficient deposit for this SSA.
+    ///
+    /// The `amount` is the pool's, for the record and for the one check the supervisor still makes on
+    /// it — that it is non-zero. Sufficiency itself is the pool's verdict; see
+    /// `SessionPixSupervisor::on_deposit_confirmed`.
     DepositConfirmed {
         ssa_id: SsaId<HoprPseudonym>,
         amount: HoprBalance,
@@ -1047,14 +1040,11 @@ mod tests {
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
-            max_unverifiable_shares_per_ssa: 0,
-            max_unverifiable_shares_per_session: 0,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             max_off_front_share_fraction: 0.25,
             min_share_order_sample: 16384,
             tombstone_retention_window: Duration::from_secs(30),
-            min_deposit: HoprBalance::new_base(0),
         }
     }
 
@@ -1427,15 +1417,15 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
     }
 
-    /// The shipped default must close on the *first* unverifiable share.
+    /// One unverifiable-share report must close the Session, and no configuration may change that.
     ///
-    /// Worth pinning separately from the state machine's own limit tests, which all configure a
-    /// non-zero tolerance: the enforcement is `total > limit`, so a limit of zero is the one value
-    /// where the comparison has to fire on the first observation rather than the second. Nothing
-    /// else exercises it, and getting it wrong would silently restore tolerance for a failure that
-    /// has already doomed the cycle.
+    /// Pinned end-to-end through the public [`SupervisorConfig`] rather than the state machine's own
+    /// internals, because that is the surface a tolerance would come back on. The two limits this
+    /// replaces were shipped at zero and read `total > limit`, so re-introducing either — or any other
+    /// knob that makes the close conditional — fails here rather than silently restoring tolerance for
+    /// a failure that has already doomed the cycle.
     #[test]
-    fn the_default_configuration_closes_on_the_first_unverifiable_share() -> anyhow::Result<()> {
+    fn one_unverifiable_share_report_closes_the_session() -> anyhow::Result<()> {
         use hopr_api::types::crypto_random::Randomizable;
 
         use crate::supervision::supervisor::SessionPixSupervisor;
@@ -1463,6 +1453,36 @@ mod tests {
                 SessionPixAction::Close(SessionPixCloseReason::TooManyUnverifiableShares)
             )),
             "one unverifiable share must close the session under the default config, got {actions:?}"
+        );
+
+        // And under a config whose every other tolerance is at its most permissive, so the close
+        // cannot be attributed to something else being strict.
+        let permissive = SupervisorConfig {
+            max_failed_cycles: usize::MAX,
+            max_off_front_share_fraction: 1.0,
+            min_share_order_sample: u64::MAX,
+            max_predeposit_packets: u64::MAX,
+            max_served_without_progress: u64::MAX,
+            ..SupervisorConfig::default()
+        };
+        let (mut supervisor, _) = SessionPixSupervisor::new(permissive, dims, pseudonym, now);
+        supervisor.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id), now, 0);
+
+        let actions = supervisor.handle_event(
+            &SessionPixEvent::UnverifiableShares {
+                ssa_id,
+                observed_total: 1,
+            },
+            now,
+            0,
+        );
+
+        assert!(
+            actions.iter().any(|a| matches!(
+                a,
+                SessionPixAction::Close(SessionPixCloseReason::TooManyUnverifiableShares)
+            )),
+            "no configuration may tolerate an unverifiable share, got {actions:?}"
         );
 
         Ok(())

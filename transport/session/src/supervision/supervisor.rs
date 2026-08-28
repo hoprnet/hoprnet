@@ -54,14 +54,6 @@ struct PerSsaState {
     target_useful_shares: u64,
     recovered_polynomials: u16,
 
-    // Fault tracking.
-    per_ssa_invalid_total: u64,
-
-    // Deposit state.
-    expected_deposit: Option<HoprBalance>,
-    /// Accumulated deposit amount across top-up deposits.
-    accumulated_deposit: HoprBalance,
-
     // Overlap / deferred-request state.
     next_request_pending_deposit: bool,
     next_requested: bool,
@@ -100,9 +92,6 @@ impl PerSsaState {
             largest_shares_seen: 0,
             target_useful_shares,
             recovered_polynomials: 0,
-            per_ssa_invalid_total: 0,
-            expected_deposit: None,
-            accumulated_deposit: HoprBalance::new_base(0),
             next_request_pending_deposit: false,
             next_requested: false,
             is_batch_last: false,
@@ -128,7 +117,6 @@ pub struct SessionPixSupervisor {
     pub(crate) pseudonym: HoprPseudonym,
     pub(crate) closed: bool,
     next_ssa_index: u32,
-    session_invalid_total: u64,
     /// The cycle the two share-order counters below are measured against — the earliest unrecovered
     /// cycle, i.e. the one the Entry should currently be serving. `None` before the first batch exists.
     share_order_front: Option<SsaIndex>,
@@ -181,7 +169,6 @@ impl SessionPixSupervisor {
             dims,
             pseudonym,
             next_ssa_index: 1,
-            session_invalid_total: 0,
             share_order_front: None,
             front_useful: 0,
             off_front_useful: 0,
@@ -206,10 +193,7 @@ impl SessionPixSupervisor {
 
         let actions = match ev {
             SessionPixEvent::SsaRequestSent(ssa_id) => self.on_ssa_request_sent(ssa_id, now),
-            SessionPixEvent::CommitmentVerified {
-                ssa_id,
-                expected_deposit,
-            } => self.on_commitment_verified(ssa_id, *expected_deposit, now),
+            SessionPixEvent::CommitmentVerified(ssa_id) => self.on_commitment_verified(ssa_id, now),
             SessionPixEvent::DepositConfirmed { ssa_id, amount } => {
                 self.on_deposit_confirmed(ssa_id, *amount, now, served_total)
             }
@@ -517,12 +501,7 @@ impl SessionPixSupervisor {
         Vec::new()
     }
 
-    fn on_commitment_verified(
-        &mut self,
-        ssa_id: &SsaId<HoprPseudonym>,
-        expected_deposit: Option<HoprBalance>,
-        now: Instant,
-    ) -> Vec<SessionPixAction> {
+    fn on_commitment_verified(&mut self, ssa_id: &SsaId<HoprPseudonym>, now: Instant) -> Vec<SessionPixAction> {
         let idx = match self.find_ssa_idx(ssa_id) {
             Some(i) => i,
             None => return Vec::new(),
@@ -538,13 +517,30 @@ impl SessionPixSupervisor {
             self.cfg.ssas_per_request,
         ));
         ssa.phase = SsaPhase::AwaitingDeposit;
-        ssa.expected_deposit = expected_deposit;
         ssa.deposit_deadline = deposit_deadline;
         ssa.commitment_deadline = None;
 
         Vec::new()
     }
 
+    /// Funds the cycle on the deposit pool's verdict. The supervisor does not second-guess the amount.
+    ///
+    /// Sufficiency is priced and judged outside this workspace. The Exit's pool is handed the
+    /// [`DepositUpdated`](hopr_api::node::DepositUpdated) sender together with the byte quota when the
+    /// deposit address arrives, and it sends on that channel once the deposit clears the price it
+    /// charges for that quota — so by the time this runs, the question has been answered by the only
+    /// component that can answer it. Nothing in the Session layer prices a byte.
+    ///
+    /// This used to compare the running total against `max(expected_deposit, min_deposit)`. Both are
+    /// gone, and not because they were merely unused: a configured floor here is not a backstop behind
+    /// the pool but a second authority alongside it, and one set above the pool's price fails a cycle
+    /// that has already been paid for — silently, on `max_deposit_wait`, with neither side able to
+    /// break the tie. `expected_deposit` was the same idea arriving over the wire, and the commitment
+    /// never carried an amount to fill it.
+    ///
+    /// What remains is the one check that needs no price: a zero balance asserts that nothing was
+    /// deposited, so it is not a verdict and cannot release service. The deadline keeps running and a
+    /// later confirmation can still fund the cycle.
     fn on_deposit_confirmed(
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
@@ -562,34 +558,12 @@ impl SessionPixSupervisor {
             return Vec::new();
         }
 
-        // Accumulate deposit across top-ups.
-        ssa.accumulated_deposit += amount;
-
-        // Sufficiency is judged against the *cumulative* deposit and against the larger of the two
-        // floors that can apply.
-        //
-        // `expected_deposit` is what the peer's commitment implied, and it is `None` on the only
-        // production path there is: the negotiated quota is denominated in bytes, so `handle_ssa_commit`
-        // states no amount. Treating `None` as "any deposit will do" is what made
-        // `SupervisorConfig::min_deposit` dead configuration — an operator could set a floor and a
-        // one-unit deposit would still unlock the whole quota.
-        //
-        // A zero amount never suffices, even when both floors are zero: a zero-balance confirmation
-        // says nothing was deposited, and releasing service on it would be releasing it for free.
-        // Compared rather than `max`ed, so this does not rely on `HoprBalance: Ord`.
-        let expected = ssa.expected_deposit.unwrap_or_else(HoprBalance::zero);
-        let required = if self.cfg.min_deposit > expected {
-            self.cfg.min_deposit
-        } else {
-            expected
-        };
-        if ssa.accumulated_deposit == HoprBalance::zero() || ssa.accumulated_deposit < required {
+        if amount == HoprBalance::zero() {
             return Vec::new();
         }
 
         // Transition to Recovering. The two recovery clocks are *not* started here — see
         // `arm_recovery_clocks_for_earliest`, which starts them when this cycle's turn comes.
-        let ssa = &mut self.ssas[idx];
         ssa.phase = SsaPhase::Recovering;
         ssa.deposit_deadline = None;
         ssa.served_total_at_last_progress = served_total;
@@ -886,6 +860,30 @@ impl SessionPixSupervisor {
         actions
     }
 
+    /// Closes the Session on the first unverifiable-share report. There is no tolerance to configure.
+    ///
+    /// Shares are not checked on arrival, so a report is not "a bad share" — it means a whole
+    /// polynomial's share set failed to open its commitment, which surfaces only once `threshold` of
+    /// them have been interpolated. `SsaPart::add_share` then marks that part failed and releases its
+    /// shares, and nothing ever clears the flag; since the SSA is the sum of *every* polynomial's
+    /// constant term, the cycle can no longer be reconstructed by any means and will never pay.
+    ///
+    /// So serving on is not tolerance, it is donation: every packet past this point is unpaid with no
+    /// recovery to preserve at the end of it. That holds however the failure arose, which is why this
+    /// is not a knob — a false positive from a verification bug leaves the part just as permanently
+    /// failed, so a tolerance would buy unpaid service rather than the cycle it was raised to save.
+    /// Closing here caps the exposure at the `threshold` packets already served rather than a multiple
+    /// of it.
+    ///
+    /// `observed_total` is the reconstructor's cross-peer aggregate, and with no limit to compare it
+    /// against it is logged rather than accumulated: it says how many polynomials the batch that
+    /// triggered this took down, which is the difference between one bad relayer and a peer sending
+    /// garbage wholesale.
+    ///
+    /// Note this closes the Session directly rather than through
+    /// [`close_ssa_and_collect`](Self::close_ssa_and_collect), so a batch's surviving siblings do not
+    /// keep it alive: unlike a lost deposit, this fault is evidence about the peer rather than about
+    /// one cycle.
     fn on_unverifiable_shares(
         &mut self,
         ssa_id: &SsaId<HoprPseudonym>,
@@ -897,38 +895,23 @@ impl SessionPixSupervisor {
             None => return Vec::new(),
         };
 
-        // Absorb late fault reports on tombstones — the SSA is already
-        // terminal so fault totals are no longer relevant.
+        // Absorb late reports on a tombstoned or already-closing SSA: there is no service left to
+        // stop, and the cycle they condemn has already left. Concurrent ack batches make these
+        // ordinary rather than exceptional.
         if self.ssas[idx].is_terminal() {
             return Vec::new();
         }
 
-        let per_ssa_total = self.ssas[idx].per_ssa_invalid_total;
+        tracing::warn!(
+            %ssa_id,
+            observed_total,
+            phase = ?self.ssas[idx].phase,
+            "closing PIX session: a polynomial's share set failed to open its commitment"
+        );
 
-        // Counter regression (or stale snapshot from concurrent processing).
-        // With H-02's aggregate totals this should not happen in normal
-        // operation, but remain defensive against out-of-order delivery.
-        if observed_total < per_ssa_total {
-            return Vec::new();
-        }
-
-        let delta = observed_total - per_ssa_total;
-        if delta == 0 {
-            return Vec::new();
-        }
-
-        self.ssas[idx].per_ssa_invalid_total = observed_total;
-        self.session_invalid_total += delta;
-
-        if self.ssas[idx].per_ssa_invalid_total > self.cfg.max_unverifiable_shares_per_ssa
-            || self.session_invalid_total > self.cfg.max_unverifiable_shares_per_session
-        {
-            vec![SessionPixAction::Close(
-                SessionPixCloseReason::TooManyUnverifiableShares,
-            )]
-        } else {
-            Vec::new()
-        }
+        vec![SessionPixAction::Close(
+            SessionPixCloseReason::TooManyUnverifiableShares,
+        )]
     }
 
     // ------------------------------------------------------------------
@@ -959,7 +942,6 @@ impl SessionPixSupervisor {
             largest_useful_shares = ssa.largest_useful_shares,
             target_useful_shares = ssa.target_useful_shares,
             recovered_polynomials = ssa.recovered_polynomials,
-            per_ssa_invalid_total = ssa.per_ssa_invalid_total,
             served_total_at_last_progress = ssa.served_total_at_last_progress,
             ?ssa.commitment_deadline,
             ?ssa.deposit_deadline,
@@ -1161,11 +1143,10 @@ mod tests {
 
     use super::*;
 
-    /// A permissive baseline for the state-machine tests — *not* [`SupervisorConfig::default`].
+    /// A compact baseline for the state-machine tests — *not* [`SupervisorConfig::default`].
     ///
-    /// The shipped fault tolerances are zero, which would close a Session on the first unverifiable
-    /// share and so make every multi-fault transition here unreachable. Tests that care about the
-    /// shipped values say so by name.
+    /// Deadlines and budgets are shrunk to keep the tests short; the tolerances that remain are at
+    /// their shipped values. Tests that care about a specific one say so by name.
     fn default_cfg() -> SupervisorConfig {
         SupervisorConfig {
             ssas_per_request: 1,
@@ -1174,14 +1155,11 @@ mod tests {
             max_deposit_wait: Duration::from_secs(60),
             max_recovery_idle: Duration::from_secs(60),
             max_recovery_time: Duration::from_secs(3600),
-            max_unverifiable_shares_per_ssa: 3,
-            max_unverifiable_shares_per_session: 10,
             max_off_front_share_fraction: 0.25,
             min_share_order_sample: 16384,
             max_predeposit_packets: 1024,
             max_served_without_progress: 256,
             tombstone_retention_window: Duration::from_secs(30),
-            min_deposit: HoprBalance::new_base(0),
         }
     }
 
@@ -1239,14 +1217,7 @@ mod tests {
         for idx in 1..=batch {
             let id = ssa_id(p, idx);
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: None,
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
             sup.handle_event(
                 &SessionPixEvent::DepositConfirmed {
                     ssa_id: id,
@@ -1271,14 +1242,7 @@ mod tests {
         for idx in indices {
             let id = ssa_id(p, idx);
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: Some(sufficient_balance()),
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         }
     }
 
@@ -1399,14 +1363,7 @@ mod tests {
 
         // Deposit clock: armed when that cycle's commitment verifies, also at the scaled duration.
         let later = now + Duration::from_secs(1);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: ssa_ids[0],
-                expected_deposit: None,
-            },
-            later,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(ssa_ids[0]), later, 0);
         let idx = sup.find_ssa_idx(&ssa_ids[0]).expect("record must exist");
         assert_eq!(sup.ssas[idx].phase, SsaPhase::AwaitingDeposit);
         assert_eq!(
@@ -1494,7 +1451,7 @@ mod tests {
     // ---------------------------------------------------------------
 
     #[test]
-    fn commitment_verified_starts_deposit_deadline_and_stores_expected_deposit() {
+    fn commitment_verified_starts_the_deposit_deadline() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
@@ -1502,20 +1459,12 @@ mod tests {
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
 
-        let actions = sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(HoprBalance::new_base(500)),
-            },
-            now,
-            0,
-        );
+        let actions = sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         assert!(actions.is_empty());
 
         let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
         assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
         assert!(ssa.deposit_deadline.is_some());
-        assert_eq!(ssa.expected_deposit, Some(HoprBalance::new_base(500)));
         assert!(ssa.commitment_deadline.is_none());
     }
 
@@ -1527,22 +1476,8 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
-        let actions = sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
+        let actions = sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         assert!(actions.is_empty());
         assert_eq!(
             sup.ssas.iter().find(|s| s.ssa_id == id).unwrap().phase,
@@ -1562,14 +1497,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
 
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
@@ -1598,14 +1526,7 @@ mod tests {
         let id1 = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
 
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
@@ -1620,14 +1541,7 @@ mod tests {
 
         // Second deposit on a different SSA should not emit ReleaseService again.
         sup.handle_event(&SessionPixEvent::SsaRequestSent(ssa_id(p, 2)), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: ssa_id(p, 2),
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(ssa_id(p, 2)), now, 0);
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: ssa_id(p, 2),
@@ -1639,174 +1553,50 @@ mod tests {
         assert!(actions.iter().all(|a| !matches!(a, SessionPixAction::ReleaseService)));
     }
 
+    /// Any non-zero amount funds the cycle, because the amount is not the supervisor's to judge.
+    ///
+    /// The pool prices the quota and sends only once the deposit clears that price, so a confirmation
+    /// is a verdict rather than evidence. A dust amount arriving here means the pool decided dust was
+    /// enough — a pool bug, or an operator's deliberate pricing, and either way not something a floor
+    /// in this crate could correct without overruling the component that knows the price.
     #[test]
-    fn underfunded_deposit_is_noop_and_deposit_deadline_unchanged() {
+    fn any_nonzero_deposit_funds_the_cycle() {
+        for amount in [HoprBalance::new_base(1), sufficient_balance()] {
+            let p = pseudonym();
+            let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+            let now = Instant::now();
+            let id = ssa_id(p, 1);
+
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
+
+            let actions = sup.handle_event(&SessionPixEvent::DepositConfirmed { ssa_id: id, amount }, now, 0);
+
+            assert_eq!(
+                sup.ssas.iter().find(|s| s.ssa_id == id).unwrap().phase,
+                SsaPhase::Recovering,
+                "a confirmation of {amount} is the pool's verdict and must fund the cycle"
+            );
+            assert!(!actions.is_empty());
+        }
+    }
+
+    /// A zero balance is the one confirmation that asserts nothing, and must not release service.
+    ///
+    /// It also must not consume the cycle's chance to be funded: the deadline keeps running, and a
+    /// later confirmation still counts. That is what makes it safe for the observer to forward every
+    /// message the pool sends rather than latching on the first.
+    #[test]
+    fn a_zero_deposit_is_not_a_verdict_and_leaves_the_cycle_fundable() {
         let p = pseudonym();
         let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
         let now = Instant::now();
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(HoprBalance::new_base(500)),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
 
         let deadline_before = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap().deposit_deadline;
-
-        let actions = sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(100),
-            },
-            now,
-            0,
-        );
-        assert!(actions.is_empty());
-
-        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
-        assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
-        assert_eq!(ssa.deposit_deadline, deadline_before);
-    }
-
-    #[test]
-    fn underfunded_then_sufficient_topup_confirms() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(HoprBalance::new_base(500)),
-            },
-            now,
-            0,
-        );
-
-        sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(100),
-            },
-            now,
-            0,
-        );
-
-        let actions = sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(500),
-            },
-            now,
-            0,
-        );
-
-        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
-        assert_eq!(ssa.phase, SsaPhase::Recovering);
-        assert!(!actions.is_empty());
-    }
-
-    #[test]
-    fn underfunded_then_sufficient_topup_accumulates() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(HoprBalance::new_base(500)),
-            },
-            now,
-            0,
-        );
-
-        // First deposit: 300 < 500 -> accumulated=300, no-op.
-        sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(300),
-            },
-            now,
-            0,
-        );
-
-        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
-        assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
-        assert_eq!(ssa.accumulated_deposit, HoprBalance::new_base(300));
-
-        // Second deposit: 200 + 300 >= 500 -> transitions to Recovering.
-        let actions = sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(200),
-            },
-            now,
-            0,
-        );
-
-        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
-        assert_eq!(ssa.phase, SsaPhase::Recovering);
-        assert_eq!(ssa.accumulated_deposit, HoprBalance::new_base(500));
-        assert!(!actions.is_empty());
-    }
-
-    #[test]
-    fn expected_deposit_none_accepts_any_amount() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
-
-        sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(1),
-            },
-            now,
-            0,
-        );
-        assert_eq!(
-            sup.ssas.iter().find(|s| s.ssa_id == id).unwrap().phase,
-            SsaPhase::Recovering
-        );
-    }
-
-    #[test]
-    fn zero_deposit_does_not_release_service_when_both_floors_are_zero() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
 
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
@@ -1817,99 +1607,28 @@ mod tests {
             0,
         );
         assert!(actions.is_empty());
-        assert_eq!(
-            sup.ssas.iter().find(|ssa| ssa.ssa_id == id).map(|ssa| ssa.phase),
-            Some(SsaPhase::AwaitingDeposit)
-        );
-    }
 
-    #[test]
-    fn min_deposit_config_rejects_dust_and_accepts_full() {
-        let mut cfg = default_cfg();
-        cfg.min_deposit = HoprBalance::new_base(500);
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(HoprBalance::new_base(500)),
-            },
-            now,
-            0,
-        );
-
-        // Dust (100 < 500) → no-op, still AwaitingDeposit.
-        let actions = sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(100),
-            },
-            now,
-            0,
-        );
-        assert!(actions.is_empty());
         let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
         assert_eq!(ssa.phase, SsaPhase::AwaitingDeposit);
+        assert_eq!(
+            ssa.deposit_deadline, deadline_before,
+            "a zero confirmation must not extend or clear the deadline"
+        );
 
-        // Sufficient (500 >= 500) → transitions to Recovering.
+        // The next confirmation still funds it.
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
-                amount: HoprBalance::new_base(500),
+                amount: sufficient_balance(),
             },
             now,
             0,
-        );
-        assert!(!actions.is_empty());
-        let ssa = sup.ssas.iter().find(|s| s.ssa_id == id).unwrap();
-        assert_eq!(ssa.phase, SsaPhase::Recovering);
-    }
-
-    /// The production `handle_ssa_commit` path cannot derive a price from the byte quota and
-    /// therefore reports `expected_deposit: None`.  The configured floor must still apply in that
-    /// case; otherwise setting `SupervisorConfig::min_deposit` has no effect outside this module's
-    /// synthetic `Some(expected)` tests.
-    #[test]
-    fn configured_minimum_applies_when_no_expected_deposit_is_supplied() {
-        let mut cfg = default_cfg();
-        cfg.min_deposit = HoprBalance::new_base(500);
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
-
-        let actions = sup.handle_event(
-            &SessionPixEvent::DepositConfirmed {
-                ssa_id: id,
-                amount: HoprBalance::new_base(1),
-            },
-            now,
-            0,
-        );
-
-        assert!(
-            actions.is_empty(),
-            "a deposit below the configured floor must not release service"
         );
         assert_eq!(
-            sup.ssas.iter().find(|ssa| ssa.ssa_id == id).map(|ssa| ssa.phase),
-            Some(SsaPhase::AwaitingDeposit),
-            "the production None path must continue waiting for enough cumulative deposit"
+            sup.ssas.iter().find(|s| s.ssa_id == id).unwrap().phase,
+            SsaPhase::Recovering
         );
+        assert!(!actions.is_empty());
     }
 
     /// Funding a queued cycle must not release service while an unfunded predecessor is live, but
@@ -1928,14 +1647,7 @@ mod tests {
 
         for id in [front, successor] {
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: Some(sufficient_balance()),
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         }
 
         let actions = sup.handle_event(
@@ -1978,14 +1690,7 @@ mod tests {
 
         for id in [front, successor] {
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: Some(sufficient_balance()),
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         }
 
         // Recovery completes before the deposit is observed, so the event is held.
@@ -2030,14 +1735,7 @@ mod tests {
 
         // The later member is retired first, which puts the watermark above the earlier one.
         sup.handle_event(&SessionPixEvent::SsaRequestSent(later), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: later,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(later), now, 0);
         sup.handle_event(&SessionPixEvent::DepositObserverClosed(later), now, 0);
         assert_eq!(
             Some(later.ssa_index()),
@@ -2074,14 +1772,7 @@ mod tests {
         let retired = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(retired), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: retired,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(retired), now, 0);
         sup.handle_event(&SessionPixEvent::DepositObserverClosed(retired), now, 0);
         assert!(!sup.closed, "the second batch member must keep the Session alive");
 
@@ -2110,14 +1801,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
 
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
@@ -2190,14 +1874,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
 
         let actions = sup.handle_deadline(start + Duration::from_secs(61), 0);
         assert_eq!(actions.len(), 1);
@@ -2219,14 +1896,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
 
         let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(id), now, 0);
         assert_eq!(actions.len(), 1);
@@ -2248,14 +1918,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
 
         // Deposit arrives before deadline.
         sup.handle_event(
@@ -2289,14 +1952,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2331,14 +1987,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2374,14 +2023,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2415,14 +2057,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2459,14 +2094,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2509,14 +2137,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2584,14 +2205,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2624,14 +2238,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2681,14 +2288,7 @@ mod tests {
 
         // Must register the SSA first.
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -2749,161 +2349,86 @@ mod tests {
         );
     }
 
+    /// The report closes whatever it says, because the count is not what makes it fatal.
+    ///
+    /// `observed_total` is a cross-peer aggregate assembled from concurrently processed ack batches,
+    /// so it can arrive as any value and out of order. It used to be charged as a delta against a
+    /// running maximum and compared to a tolerance; with no tolerance left it is a log field, and the
+    /// close must not become conditional on it again — a total of one is a doomed cycle exactly as
+    /// much as a total of a thousand.
     #[test]
-    fn invalid_share_past_a_configured_tolerance_closes() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
+    fn any_observed_total_closes_on_the_first_report() {
+        for observed_total in [1, 2, u64::MAX] {
+            let p = pseudonym();
+            let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
+            let now = Instant::now();
+            let id = ssa_id(p, 1);
 
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
 
-        for i in 1..=3 {
             let actions = sup.handle_event(
                 &SessionPixEvent::UnverifiableShares {
                     ssa_id: id,
-                    observed_total: i,
+                    observed_total,
                 },
                 now,
                 0,
             );
-            assert!(actions.is_empty(), "unexpected close at count {i}");
+
+            assert!(
+                matches!(
+                    actions.as_slice(),
+                    [SessionPixAction::Close(
+                        SessionPixCloseReason::TooManyUnverifiableShares
+                    )]
+                ),
+                "observed_total {observed_total} must close on the first report, got {actions:?}"
+            );
+        }
+    }
+
+    /// A batch's healthy siblings must not keep the Session open.
+    ///
+    /// Every other per-cycle fault routes through `close_ssa_and_collect`, which retires the member
+    /// and lets `max_failed_cycles` siblings carry on. This one does not, and deliberately: a
+    /// polynomial that fails to open its commitment is evidence about the *peer*, and the same peer
+    /// holds every other cycle in the batch.
+    #[test]
+    fn an_unverifiable_share_closes_the_session_even_with_live_siblings() {
+        let p = pseudonym();
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 3;
+        cfg.max_failed_cycles = 10;
+        let (mut sup, actions) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let now = Instant::now();
+
+        let ids = match actions.as_slice() {
+            [SessionPixAction::RequestSsa { ssa_ids, .. }] => ssa_ids.clone(),
+            other => panic!("expected one RequestSsa, got {other:?}"),
+        };
+        assert_eq!(3, ids.len());
+        for id in &ids {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(*id), now, 0);
         }
 
+        // The fault lands on the *last* member, so two healthy cycles remain in front of it.
         let actions = sup.handle_event(
             &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 4,
-            },
-            now,
-            0,
-        );
-        assert_eq!(actions.len(), 1);
-        assert!(matches!(
-            actions[0],
-            SessionPixAction::Close(SessionPixCloseReason::TooManyUnverifiableShares)
-        ));
-    }
-
-    #[test]
-    fn duplicate_absolute_counts_do_not_double_charge() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 2,
-            },
-            now,
-            0,
-        );
-        let actions = sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 2,
-            },
-            now,
-            0,
-        );
-        assert!(actions.is_empty());
-        assert_eq!(sup.session_invalid_total, 2);
-    }
-
-    #[test]
-    fn decreasing_invalid_count_is_ignored_as_stale() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 3,
-            },
-            now,
-            0,
-        );
-        // Stale snapshot from concurrent processing is silently ignored.
-        // Close-on-regression was rejected because ack batches are processed
-        // with for_each_concurrent, so out-of-order arrival is possible.  A
-        // fail-closed approach would be a self-inflicted DoS.
-        let actions = sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
+                ssa_id: ids[2],
                 observed_total: 1,
             },
             now,
             0,
         );
-        assert!(actions.is_empty(), "stale snapshot should be ignored, got: {actions:?}");
-    }
 
-    #[test]
-    fn cross_peer_invalid_shares_accumulates_separately() {
-        let p = pseudonym();
-        let (mut sup, _) = SessionPixSupervisor::new(default_cfg(), dims(10, 5), p, Instant::now());
-        let now = Instant::now();
-        let id = ssa_id(p, 1);
-
-        // Advance the single SSA past request.
-        sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-
-        // First peer reports 3 invalid shares (absolute total).
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 3,
-            },
-            now,
-            0,
-        );
-        assert_eq!(sup.session_invalid_total, 3);
-
-        // Second peer independently reports 5 invalid shares for the SAME SSA.
-        // The supervisor must observe the *maximum* per-SSA absolute count and
-        // charge the delta (5 - 3 = 2) as additional session-level faults.
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 5,
-            },
-            now,
-            0,
-        );
-        assert_eq!(
-            sup.session_invalid_total, 5,
-            "cross-peer aggregate must track the max total"
-        );
-
-        // Third peer reports 7 — another delta of 2.
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 7,
-            },
-            now,
-            0,
-        );
-        assert_eq!(sup.session_invalid_total, 7, "third peer delta must also be charged");
-
-        // Stale report from the first peer (3 < per_ssa_total 7) is ignored.
-        sup.handle_event(
-            &SessionPixEvent::UnverifiableShares {
-                ssa_id: id,
-                observed_total: 3,
-            },
-            now,
-            0,
-        );
-        assert_eq!(
-            sup.session_invalid_total, 7,
-            "stale cross-peer snapshot must not regress the aggregate"
+        assert!(
+            matches!(
+                actions.as_slice(),
+                [SessionPixAction::Close(
+                    SessionPixCloseReason::TooManyUnverifiableShares
+                )]
+            ),
+            "a live batch must not absorb an unverifiable-share report, got {actions:?}"
         );
     }
 
@@ -2919,14 +2444,7 @@ mod tests {
         let id1 = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3248,14 +2766,7 @@ mod tests {
         for idx in 1..=BATCH as u32 {
             let id = ssa_id(p, idx);
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: None,
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
             sup.handle_event(
                 &SessionPixEvent::DepositConfirmed {
                     ssa_id: id,
@@ -3325,14 +2836,7 @@ mod tests {
         for idx in 1..BATCH as u32 {
             let id = ssa_id(p, idx);
             sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-            sup.handle_event(
-                &SessionPixEvent::CommitmentVerified {
-                    ssa_id: id,
-                    expected_deposit: None,
-                },
-                now,
-                0,
-            );
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
             sup.handle_event(
                 &SessionPixEvent::DepositConfirmed {
                     ssa_id: id,
@@ -3344,14 +2848,7 @@ mod tests {
         }
         let last = ssa_id(p, BATCH as u32);
         sup.handle_event(&SessionPixEvent::SsaRequestSent(last), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: last,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(last), now, 0);
 
         // Its deposit observer gives up, so the gate holder is retired mid-batch.
         let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(last), now, 0);
@@ -3476,14 +2973,7 @@ mod tests {
         let id1 = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: Some(sufficient_balance()),
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
 
         let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         assert!(actions.is_empty());
@@ -3514,14 +3004,7 @@ mod tests {
         let id1 = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3549,14 +3032,7 @@ mod tests {
         let id1 = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3605,10 +3081,7 @@ mod tests {
 
         for ev in &[
             SessionPixEvent::SsaRequestSent(ssa_id(p, 2)),
-            SessionPixEvent::CommitmentVerified {
-                ssa_id: ssa_id(p, 2),
-                expected_deposit: None,
-            },
+            SessionPixEvent::CommitmentVerified(ssa_id(p, 2)),
             SessionPixEvent::DepositConfirmed {
                 ssa_id: ssa_id(p, 2),
                 amount: sufficient_balance(),
@@ -3672,14 +3145,7 @@ mod tests {
 
         let id1 = ssa_id(p, 1);
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3703,14 +3169,7 @@ mod tests {
         assert_eq!(id2.ssa_index().get(), 2, "the pipelined SSA must take the next index");
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id2), later, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id2,
-                expected_deposit: None,
-            },
-            later,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id2), later, 0);
 
         let after = sup.ssas.iter().find(|s| s.ssa_id == id1).unwrap();
         assert_eq!(
@@ -3745,14 +3204,7 @@ mod tests {
 
         let id1 = ssa_id(p, 1);
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), now, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3820,14 +3272,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -3871,14 +3316,7 @@ mod tests {
 
         // Set up first SSA through recovery.
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id1), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id1,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id1), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id1,
@@ -3921,14 +3359,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -3993,14 +3424,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            now,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
 
         // Recovered arrives before DepositConfirmed — should be ignored.
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id), now, 0);
@@ -4021,14 +3445,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
 
         // Entry delivered all shares before the on-chain deposit confirmed.
         // Recovered arrives while still AwaitingDeposit — deferred.
@@ -4086,14 +3503,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,
@@ -4121,14 +3531,7 @@ mod tests {
         let id = ssa_id(p, 1);
 
         sup.handle_event(&SessionPixEvent::SsaRequestSent(id), start, 0);
-        sup.handle_event(
-            &SessionPixEvent::CommitmentVerified {
-                ssa_id: id,
-                expected_deposit: None,
-            },
-            start,
-            0,
-        );
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(id), start, 0);
         sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: id,

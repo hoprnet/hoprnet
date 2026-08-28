@@ -448,9 +448,9 @@ impl<S: PixSpec> SsaPartBuilder<S> {
     ) -> errors::Result<AddShareOutcome<S>, S::Pseudonym> {
         // First, and before decoding: a failed part reports its fault exactly once, and every later
         // share for it is absorbed in silence. Validating ahead of this would turn each of those
-        // into another `InvalidShare`, and the caller charges those against
-        // `max_unverifiable_shares_per_ssa` — zero by default, so one already-doomed polynomial
-        // would close the Session once per remaining share instead of once.
+        // into another `InvalidShare`, and the Session layer closes on the first one it is told
+        // about — so one already-doomed polynomial would report a close once per remaining share
+        // instead of once.
         if self.failed {
             return Ok(AddShareOutcome::Absorbed);
         }

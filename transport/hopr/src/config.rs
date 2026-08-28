@@ -1473,7 +1473,7 @@ mod tests {
             "pix": { "num_ssa_parts": 2048 },
             "incoming_session_pix_config": {
                 "enforce_pix": true,
-                "supervision": { "max_deposit_wait": "90s", "min_deposit": "5 wxHOPR" }
+                "supervision": { "max_deposit_wait": "90s" }
             }
         }"#;
         let cfg: HoprProtocolConfig = serde_json::from_str(json).expect("PIX config must deserialize");
@@ -1489,11 +1489,6 @@ mod tests {
         assert_eq!(
             Duration::from_secs(90),
             cfg.incoming_session_pix_config.supervision.max_deposit_wait
-        );
-        assert_eq!(
-            "5 wxHOPR".parse::<hopr_api::HoprBalance>().unwrap(),
-            cfg.incoming_session_pix_config.supervision.min_deposit,
-            "a balance must be settable in its human-readable spelling"
         );
         assert_eq!(
             hopr_transport_session::SupervisorConfig::default().max_recovery_time,

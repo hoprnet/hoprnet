@@ -74,7 +74,6 @@ pin-project = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_repr = { workspace = true }
-serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -122,7 +121,7 @@ rand = { workspace = true }
 test-log = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes", "serde_with", "humantime-serde"]
+ignored = ["serde_bytes", "humantime-serde"]
 
 [[bench]]
 name = "session_bench"

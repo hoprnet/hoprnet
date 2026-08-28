@@ -4612,7 +4612,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_repr",
- "serde_with",
  "smart-default",
  "strum",
  "test-log",
