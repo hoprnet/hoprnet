@@ -2518,19 +2518,27 @@ where
     /// and delivered here. Sessions that did not opt in ignore the mark; the rest stop trusting
     /// their counterparty buffer estimate for `grace`.
     ///
-    /// Returns how many Sessions were marked, which is zero when nothing currently routes there.
+    /// Returns the pseudonyms of the Sessions that were marked (empty when nothing routes there).
+    ///
+    /// The caller uses these to advance each Session's SURB generation: the return path to
+    /// `destination` has just been re-planned, so the fresh SURB batch must supersede the SURBs the
+    /// counterparty still holds for the dead path.
     pub fn mark_return_path_degraded(
         &self,
         destination: &hopr_api::types::internal::NodeId,
         grace: std::time::Duration,
-    ) -> usize {
+    ) -> Vec<HoprPseudonym> {
         self.sessions
             .iter()
             .filter(|(_, slot)| {
                 matches!(&slot.routing_opts, DestinationRouting::Forward { destination: d, .. } if d.as_ref() == destination)
             })
-            .map(|(_, slot)| slot.surb_mgmt.mark_return_path_degraded(grace))
-            .count()
+            .map(|(pseudonym, slot)| {
+                slot.surb_mgmt.mark_return_path_degraded(grace);
+                // The session cache is keyed by pseudonym, which is exactly the SURB-generation key.
+                *pseudonym.as_ref()
+            })
+            .collect()
     }
 
     /// The main method to be called whenever data are received.

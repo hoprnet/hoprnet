@@ -1011,6 +1011,7 @@ where
         let surb_flush_smgr = self.smgr.clone();
         let surb_flush_chain = self.chain_api.clone();
         let surb_flush_planner = self.path_planner.clone();
+        let surb_flush_store = self.path_planner.surb_store.clone();
         processes.insert(
             HoprTransportProcess::SurbFlush,
             hopr_utils::spawn_as_abortable!(async move {
@@ -1025,7 +1026,8 @@ where
                     //
                     // Borrowed rather than cloned per call: the callbacks are `FnMut`, so anything
                     // they capture has to survive being invoked once per silent destination.
-                    let (planner, chain, smgr) = (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr);
+                    let (planner, chain, smgr, store) =
+                        (&surb_flush_planner, &surb_flush_chain, &surb_flush_smgr, &surb_flush_store);
                     let now_ms = hopr_utils::platform::time::native::current_time()
                         .as_unix_timestamp()
                         .as_millis();
@@ -1046,10 +1048,19 @@ where
                             // stocked -- so tell the Sessions routed there to stop believing
                             // that estimate while the evidence says otherwise.
                             match chain.packet_key_to_chain_key(&destination) {
-                                Ok(Some(address)) => smgr.mark_return_path_degraded(
-                                    &hopr_api::types::internal::prelude::NodeId::Chain(address),
-                                    RETURN_PATH_DEGRADED_GRACE,
-                                ),
+                                Ok(Some(address)) => {
+                                    let marked = smgr.mark_return_path_degraded(
+                                        &hopr_api::types::internal::prelude::NodeId::Chain(address),
+                                        RETURN_PATH_DEGRADED_GRACE,
+                                    );
+                                    // The return path for these sessions was just re-planned; advance
+                                    // each one's SURB generation so the fresh batch supersedes the
+                                    // SURBs the counterparty still holds for the dead path.
+                                    for pseudonym in &marked {
+                                        store.bump_generation(pseudonym);
+                                    }
+                                    marked.len()
+                                }
                                 // A resolver error is exactly the failure this recovery path exists
                                 // to surface, so it must not be collapsed into "no chain key" — log
                                 // it rather than silently marking zero sessions.

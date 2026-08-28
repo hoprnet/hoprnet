@@ -120,6 +120,7 @@ impl PartialHoprPacket {
             PacketRouting::ForwardPath {
                 forward_path,
                 return_paths,
+                generation,
             } => {
                 // Create shared secrets and PoR challenge chain for forward and return paths
                 let mut key_data = PathKeyData::iter_from_paths(
@@ -149,7 +150,9 @@ impl PartialHoprPacket {
                 let (surbs, openers): (Vec<_>, Vec<_>) = key_data
                     .zip(return_paths)
                     .zip(receiver_data.into_sequence())
-                    .map(|((key_data, rp), data)| create_surb_for_path((rp, key_data), data, mapper, pix_share_gen))
+                    .map(|((key_data, rp), data)| {
+                        create_surb_for_path((rp, key_data), data, mapper, pix_share_gen, generation)
+                    })
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
@@ -411,7 +414,16 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     /// The packet is routed directly via the given path.
     /// Optionally, return paths for
     /// attached SURBs can be specified.
-    ForwardPath { forward_path: P, return_paths: Vec<P> },
+    ///
+    /// `generation` is the RFC-1982 serial stamped into every SURB minted here (see
+    /// [`SurbReceiverInfo::generation`]). The creator bumps it whenever it changes the return path,
+    /// so the replying side can drop SURBs left over from a superseded path. It is irrelevant when
+    /// `return_paths` is empty; pass `0` there.
+    ForwardPath {
+        forward_path: P,
+        return_paths: Vec<P>,
+        generation: u8,
+    },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSenderId, HoprSurb),
     /// No acknowledgement packet: a special type of 0-hop packet that is not going to be acknowledged but can carry a
@@ -428,6 +440,7 @@ fn create_surb_for_path<
     recv_data: HoprSenderId,
     mapper: &M,
     pix_share_gen: &G,
+    generation: u8,
 ) -> Result<(HoprSurb, HoprReplyOpener)> {
     let (
         return_path,
@@ -464,7 +477,7 @@ fn create_surb_for_path<
             .collect::<Result<Vec<_>>>()?,
         &por_strings,
         recv_data,
-        SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default()),
+        SurbReceiverInfo::new(por_values, HoprEncryptedPartialSsaShare::default(), generation),
     )
     .map(|(s, r)| (s, (recv_data.surb_id(), r)))?;
 
@@ -478,11 +491,20 @@ fn create_surb_for_path<
     {
         // Replace the empty encrypted share with the generated one, encrypted using the first relayer ticket challenge
         // solution.
-        surb.additional_data_receiver = SurbReceiverInfo::new(por_values, enc_share);
+        surb.additional_data_receiver = SurbReceiverInfo::new(por_values, enc_share, generation);
     }
 
     Ok((surb, (surb_id, ro)))
 }
+
+/// Guards the SURB-batch generation byte added to `SurbReceiverInfo`: it must not have shrunk the
+/// per-packet SURB capacity. A drop from 2 to 1 would halve SURB delivery throughput, which would be
+/// a worse regression than the return-path staleness the generation tag exists to fix.
+const _: () = assert!(
+    HoprPacket::MAX_SURBS_IN_PACKET == 2,
+    "SURB size grew enough to reduce MAX_SURBS_IN_PACKET; the generation carrier must move to spare bits (e.g. \
+     ProofOfRelayValues chain_length high bits) instead of enlarging SurbReceiverInfo"
+);
 
 impl HoprPacket {
     /// The maximum number of SURBs that fit into a packet that contains no message.
@@ -755,6 +777,7 @@ mod tests {
             PacketRouting::ForwardPath {
                 forward_path,
                 return_paths,
+                generation: 0,
             },
             &PEERS[0].0,
             ticket,

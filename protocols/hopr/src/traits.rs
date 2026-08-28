@@ -59,6 +59,29 @@ pub trait SurbStore {
     ///
     /// Defaults to a no-op, for stores that do not track edge validity.
     fn revalidate_relayer(&self, _relayer: &HoprKeyIdent) {}
+
+    /// Current SURB-batch generation to stamp into SURBs minted for `pseudonym`.
+    ///
+    /// Used by the sending side at mint time. The value is written into every SURB of the batch so
+    /// the replying side can tell SURBs for the current return path from ones left over after a
+    /// return-path change (see [`SurbStore::bump_generation`]).
+    ///
+    /// Defaults to `0`, for stores that do not track generations.
+    fn current_generation(&self, _pseudonym: &HoprPseudonym) -> u8 {
+        0
+    }
+
+    /// Advances the SURB-batch generation for `pseudonym` and returns the new value.
+    ///
+    /// Called by the sending side when it changes the return path for a session (a re-plan): the
+    /// next batch it mints will carry the advanced generation, and the replying side drops the SURBs
+    /// it still holds for the superseded path. A `u8` serial (RFC-1982) is sufficient because only
+    /// two adjacent generations are ever in flight.
+    ///
+    /// Defaults to a no-op returning `0`, for stores that do not track generations.
+    fn bump_generation(&self, _pseudonym: &HoprPseudonym) -> u8 {
+        0
+    }
 }
 
 /// Trait defining encoder for [outgoing HOPR packets](OutgoingPacket).

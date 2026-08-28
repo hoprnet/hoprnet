@@ -217,7 +217,8 @@ mod tests {
     #[test]
     fn surb_length() {
         let surb_len = HoprSurb::SIZE;
-        assert_eq!(surb_len, 401);
+        // 401 bytes + 1 for the SURB-batch generation byte in `SurbReceiverInfo`.
+        assert_eq!(surb_len, 402);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 
