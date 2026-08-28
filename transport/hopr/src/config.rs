@@ -1771,8 +1771,8 @@ mod tests {
             })
             .validate()
             .is_err(),
-            "{MAX_SSA_BATCH_SIZE} x {per_cycle:?} of deposit wait exceeds the supervisor duration cap \
-             and must be rejected"
+            "{MAX_SSA_BATCH_SIZE} x {per_cycle:?} of deposit wait exceeds the supervisor duration cap and must be \
+             rejected"
         );
     }
 
