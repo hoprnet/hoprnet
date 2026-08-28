@@ -526,8 +526,8 @@ pub struct PixGlobalConfig {
     ///
     /// Unlike its neighbours this is not a dimension, so `validate_pix_dimension_product` ignores it.
     ///
-    /// Defaults to 2, minimum 1, maximum 20 (`MAX_SSA_BATCH_SIZE`).
-    #[validate(range(min = 1, max = 20))]
+    /// Defaults to 2, minimum 1, maximum 9 (`MAX_SSA_BATCH_SIZE`).
+    #[validate(range(min = 1, max = 9))]
     #[default(DEFAULT_MAX_SSAS_PER_SSA_REQUEST)]
     pub max_ssas_per_request: usize,
 
@@ -1415,12 +1415,18 @@ mod tests {
             "a budget one byte short of a single session must be refused"
         );
 
-        // The other way round: the budget is untouched and the operator asked for more cycles. This
-        // rather than a widened `quota_range`, because widening the quota does *not* scale the
-        // reservation without limit — `MAX_POLYS_PER_SSA` caps the polynomial count, so past a
-        // point a larger quota only buys a bigger threshold. The batch size has no such ceiling
-        // below `MAX_SSA_BATCH_SIZE`, and it multiplies the whole figure.
+        // The other way round: the operator asked for more cycles per request. This rather than a
+        // widened `quota_range`, because widening the quota does *not* scale the reservation without
+        // limit — `MAX_POLYS_PER_SSA` caps the polynomial count, so past a point a larger quota only
+        // buys a bigger threshold. The batch size has no such ceiling below `MAX_SSA_BATCH_SIZE`,
+        // and it multiplies the whole figure.
+        //
+        // Measured against the single-cycle figure rather than the shipping default, because the
+        // multiplication is the invariant and whether 3 GiB happens to be exceeded is not: at
+        // `MAX_SSA_BATCH_SIZE` the default budget covers the whole legal range, so a batched config
+        // left on the default would validate and prove nothing.
         let batched = IncomingSessionPixConfig {
+            max_live_cycle_bytes: widest,
             supervision: SupervisorConfig {
                 ssas_per_request: hopr_transport_session::MAX_SSA_BATCH_SIZE,
                 ..cfg.supervision.clone()
@@ -1429,7 +1435,7 @@ mod tests {
         };
         assert!(
             validate_incoming_session_pix_config(&batched).is_err(),
-            "a batch of {} live cycles per session needs a budget raised to match",
+            "a batch of {} live cycles per session needs a budget raised past the {widest} one cycle needs",
             hopr_transport_session::MAX_SSA_BATCH_SIZE
         );
     }
@@ -1751,15 +1757,22 @@ mod tests {
         // The scaled deadlines are what the supervisor actually arms, so the 24 h cap has to be
         // applied to the product. A per-cycle duration that is fine alone must be rejected once the
         // batch multiplies it past the cap.
+        //
+        // Derived from the ceiling rather than written out, so this keeps testing the multiplication
+        // if `MAX_SSA_BATCH_SIZE` moves again: just over `cap / n` is legal on its own at any `n`,
+        // and always over the cap once `n` of them are chained.
+        const SUPERVISOR_DURATION_CAP: Duration = Duration::from_secs(24 * 3600);
+        let per_cycle = SUPERVISOR_DURATION_CAP / MAX_SSA_BATCH_SIZE as u32 + Duration::from_secs(1);
         assert!(
             with_supervision(SupervisorConfig {
                 ssas_per_request: MAX_SSA_BATCH_SIZE,
-                max_deposit_wait: Duration::from_secs(2 * 3600),
+                max_deposit_wait: per_cycle,
                 ..Default::default()
             })
             .validate()
             .is_err(),
-            "20 x 2 h of deposit wait exceeds the supervisor duration cap and must be rejected"
+            "{MAX_SSA_BATCH_SIZE} x {per_cycle:?} of deposit wait exceeds the supervisor duration cap \
+             and must be rejected"
         );
     }
 

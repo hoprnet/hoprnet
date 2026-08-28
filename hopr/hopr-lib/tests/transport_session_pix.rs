@@ -21,7 +21,8 @@ use {
     hopr_lib::{
         HoprSessionClientConfig,
         api::node::{
-            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations, PixEvent,
+            HasChainApi, HasExitIncentivization, HoprSessionClientOperations, IncentiveChannelOperations,
+            PixDepositData, PixEvent,
         },
         exports::{
             network::types::prelude::{IpOrHost, SealedHost},
@@ -408,14 +409,14 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                 match event {
                     PixEvent::DepositAddressReceived(data) => {
                         tracing::info!(id = ?data.id, quota = data.quota, "Exit: DepositAddressReceived");
-                        // Signal deposit immediately to abort the kill switch
-                        if let Some(mut notifier) = data.deposit_updated {
-                            notifier
-                                .send((data.id, HoprBalance::new_base(1)))
-                                .await
-                                .context("failed to signal deposit via notifier")?;
-                            tracing::info!(id = ?data.id, "deposit signaled");
-                        }
+                        // Signal deposit immediately to abort the kill switch. Not optional as of
+                        // hopr-api 4.0.1: the event always carries a channel to report it on.
+                        let mut notifier = data.deposit_updated;
+                        notifier
+                            .send((data.id, HoprBalance::new_base(1)))
+                            .await
+                            .context("failed to signal deposit via notifier")?;
+                        tracing::info!(id = ?data.id, "deposit signaled");
                         deposit_received_ids.push(data.id);
                     }
                     PixEvent::PrivateKeyRecovered(data) => {
@@ -426,6 +427,22 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                         );
                         pk_recovered_ids.push(data.id);
                         tracing::info!(count = pk_recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
+                    }
+                    PixEvent::DepositDataRequest(request) => {
+                        // Stands in for the deposit pool. The Exit blocks its SSA request on this and
+                        // fails the Session if it goes unanswered, so a test driving PIX cycles has to
+                        // answer it. Empty data is a valid answer: it says the pool has nothing to
+                        // attach, which is what this test models.
+                        let mut created = request.deposit_data_created;
+                        for id in request.deposit_ids {
+                            created
+                                .send(PixDepositData {
+                                    id,
+                                    data: Box::default(),
+                                })
+                                .await
+                                .context("failed to answer the deposit data request")?;
+                        }
                     }
                     other => {
                         anyhow::bail!("unexpected Exit PixEvent: {other:?}");
@@ -569,12 +586,28 @@ async fn deposit_timeout_closes_session(#[case] hops: usize) -> anyhow::Result<(
                     match event {
                         PixEvent::DepositAddressReceived(data) => {
                             deposit_clock_armed.get_or_insert_with(std::time::Instant::now);
-                            held_notifiers.extend(data.deposit_updated);
+                            held_notifiers.push(data.deposit_updated);
                             tracing::info!(id = ?data.id, quota = data.quota,
                                 "Exit: DepositAddressReceived — holding the notifier, never signalling a deposit");
                         }
                         PixEvent::PrivateKeyRecovered(data) => {
                             anyhow::bail!("recovery completed without a deposit: {:?}", data.id);
+                        }
+                        PixEvent::DepositDataRequest(request) => {
+                            // Stands in for the deposit pool, which the Exit blocks its SSA request
+                            // on. Unanswered, the Session dies of *that* rather than of the deposit
+                            // deadline under test — and it dies before the Entry ever commits, so
+                            // the clock this test measures is never armed at all.
+                            let mut created = request.deposit_data_created;
+                            for id in request.deposit_ids {
+                                created
+                                    .send(PixDepositData {
+                                        id,
+                                        data: Box::default(),
+                                    })
+                                    .await
+                                    .context("failed to answer the deposit data request")?;
+                            }
                         }
                         other => anyhow::bail!("unexpected Exit PixEvent: {other:?}"),
                     }
@@ -711,22 +744,35 @@ async fn strict_prepay_serves_nothing_before_the_deposit(#[case] hops: usize) ->
         let mut notifier_tx = Some(notifier_tx);
         while let Some(event) = exit_events.next().await {
             match event {
-                // Matched on the notifier alone, so the sender is taken only once one is actually in
-                // hand. Matching on the tuple built it — and therefore ran `take` — before any arm
-                // was tested, so a first `DepositAddressReceived` carrying no notifier dropped the
-                // sender in the fallthrough arm and closed the channel. `notifier_rx` below then
-                // resolved to `Canceled` and failed the test with a message naming a supervisor
-                // defect that had not occurred, with no later event able to recover.
-                PixEvent::DepositAddressReceived(data) => match data.deposit_updated {
-                    Some(notifier) if notifier_tx.is_some() => {
+                // The sender is taken only on the first request, and only inside the branch that
+                // uses it: taking it unconditionally would close the channel on a later event, and
+                // `notifier_rx` below would resolve to `Canceled` and fail the test with a message
+                // naming a supervisor defect that had not occurred.
+                PixEvent::DepositAddressReceived(data) => {
+                    if let Some(notifier_tx) = notifier_tx.take() {
                         tracing::info!(id = ?data.id, "Exit: DepositAddressReceived — withholding the deposit");
-                        let _ = notifier_tx
-                            .take()
-                            .expect("guarded by the match arm")
-                            .send((data.id, notifier));
+                        let _ = notifier_tx.send((data.id, data.deposit_updated));
+                    } else {
+                        tracing::debug!(id = ?data.id, "further deposit request");
                     }
-                    _ => tracing::debug!(id = ?data.id, "further deposit request"),
-                },
+                }
+                // Stands in for the deposit pool. Left unanswered, the Exit never gets as far as
+                // asking for a deposit, and the `notifier_rx` below never resolves.
+                PixEvent::DepositDataRequest(request) => {
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        if created
+                            .send(PixDepositData {
+                                id,
+                                data: Box::default(),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
                 other => tracing::debug!("Exit PixEvent: {other:?}"),
             }
         }
@@ -828,21 +874,33 @@ async fn recovery_hard_deadline_closes_session(#[case] hops: usize) -> anyhow::R
         while let Some(event) = exit_events.next().await {
             match event {
                 PixEvent::DepositAddressReceived(data) => {
-                    // Return only once something was actually funded. Returning on an event that
-                    // carried no notifier would leave the SSA unfunded, so recovery is never entered
-                    // and `max_recovery_time` is not the clock that governs — but the assertion 80 s
-                    // below would still name it, reporting a supervisor defect that did not occur.
-                    // The `bail!` past the loop is the correct diagnostic for that case.
-                    let Some(mut notifier) = data.deposit_updated else {
-                        tracing::debug!(id = ?data.id, "deposit request carried no notifier, still waiting");
-                        continue;
-                    };
+                    // Returns only once something was actually funded: an SSA left unfunded never
+                    // enters recovery, so `max_recovery_time` would not be the clock that governs —
+                    // and the assertion 80 s below would still name it, reporting a supervisor
+                    // defect that did not occur. The `bail!` past the loop covers the case where no
+                    // request arrives at all.
+                    let mut notifier = data.deposit_updated;
                     notifier
                         .send((data.id, HoprBalance::new_base(1)))
                         .await
                         .context("failed to signal deposit via notifier")?;
                     tracing::info!(id = ?data.id, "deposit signalled, no traffic flowing");
                     return anyhow::Ok(());
+                }
+                // Stands in for the deposit pool, which the Exit blocks its SSA request on. Left
+                // unanswered, no deposit is ever asked for and the `bail!` below is what this test
+                // reports — naming the Exit where the fault would be the missing pool.
+                PixEvent::DepositDataRequest(request) => {
+                    let mut created = request.deposit_data_created;
+                    for id in request.deposit_ids {
+                        created
+                            .send(PixDepositData {
+                                id,
+                                data: Box::default(),
+                            })
+                            .await
+                            .context("failed to answer the deposit data request")?;
+                    }
                 }
                 other => tracing::debug!("Exit PixEvent while awaiting the deposit request: {other:?}"),
             }
@@ -1069,12 +1127,11 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
                             exit_ids.push(data.id);
                             exit_addresses.push(data.address);
                             // Signal the deposit immediately so this cycle's deadline is disarmed.
-                            if let Some(mut notifier) = data.deposit_updated {
-                                notifier
-                                    .send((data.id, HoprBalance::new_base(1)))
-                                    .await
-                                    .context("failed to signal deposit via notifier")?;
-                            }
+                            let mut notifier = data.deposit_updated;
+                            notifier
+                                .send((data.id, HoprBalance::new_base(1)))
+                                .await
+                                .context("failed to signal deposit via notifier")?;
                         }
                         PixEvent::PrivateKeyRecovered(data) => {
                             addresses_before_first_recovery.get_or_insert(exit_ids.len());
@@ -1085,6 +1142,19 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
                             );
                             recovered_ids.push(data.id);
                             tracing::info!(count = recovered_ids.len(), id = ?data.id, "Exit: PrivateKeyRecovered");
+                        }
+                        PixEvent::DepositDataRequest(request) => {
+                            // See the first test: unanswered, this is fatal to the Session.
+                            let mut created = request.deposit_data_created;
+                            for id in request.deposit_ids {
+                                created
+                                    .send(PixDepositData {
+                                        id,
+                                        data: Box::default(),
+                                    })
+                                    .await
+                                    .context("failed to answer the deposit data request")?;
+                            }
                         }
                         other => anyhow::bail!("unexpected Exit PixEvent: {other:?}"),
                     }
@@ -1126,7 +1196,8 @@ async fn batched_ssa_request_drives_pix_cycles(#[case] hops: usize) -> anyhow::R
     );
 
     // ── 2. Contiguous indices from 1, across the batch boundary ───────────
-    let mut indices: Vec<u32> = exit_ids.iter().map(|(_, index)| index.get()).collect();
+    // `PixAddressId` is an opaque struct as of hopr-api 4.0.1, not a (pseudonym, index) tuple.
+    let mut indices: Vec<u32> = exit_ids.iter().map(|id| id.ssa_index().get()).collect();
     indices.sort_unstable();
     assert_eq!(
         indices,

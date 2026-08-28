@@ -15,6 +15,8 @@ pub enum StartProtocolError {
     NumberOfCommitments,
     #[error("duplicate commitment index in message")]
     DuplicateCommitment,
+    #[error("serialized deposit data is {size} bytes, which exceeds the maximum of {max}")]
+    DepositDataTooLarge { size: usize, max: usize },
     #[error("message parse error: {0}")]
     ParseError(String),
     #[error("cbor error: {0}")]

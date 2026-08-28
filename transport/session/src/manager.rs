@@ -8,13 +8,16 @@ use std::{
 use anyhow::anyhow;
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::oneshot, future::AbortHandle};
 use futures_time::future::FutureExt as TimeExt;
-use hopr_api::types::{
-    crypto_random::Randomizable,
-    internal::{
-        prelude::HoprPseudonym,
-        routing::{DestinationRouting, RoutingOptions},
+use hopr_api::{
+    node::{PixAddressId, PixDepositData, PixDepositDataRequest},
+    types::{
+        crypto_random::Randomizable,
+        internal::{
+            prelude::HoprPseudonym,
+            routing::{DestinationRouting, RoutingOptions},
+        },
+        primitive::prelude::Address,
     },
-    primitive::prelude::Address,
 };
 use hopr_crypto_packet::{
     HoprPixSpec,
@@ -53,8 +56,8 @@ use crate::{
     },
     types::{
         ClosureReason, DEFAULT_PIX_PARAMS, DEFAULT_PIX_QUOTA_RANGE_SPAN, DEFAULT_PIX_SSA_QUOTA, HoprPixDepositData,
-        HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol, LOCAL_PIX_SUITE,
-        SESSION_APPLICATION_TAG, SsaQuota, pix_params_to_quota,
+        HoprPixDepositPayload, HoprSessionCapabilities, HoprSessionConfig, HoprSessionInPixEvent, HoprStartProtocol,
+        LOCAL_PIX_SUITE, SESSION_APPLICATION_TAG, SsaQuota, deposit_data_for_batch, pix_params_to_quota,
     },
     utils,
     utils::{SurbNotificationMode, insert_into_next_slot},
@@ -301,8 +304,10 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
 /// Hard ceiling on both SSA batch-size knobs, whatever the configuration says.
 ///
+/// The current maximum value of 9 is based on the current available pool limitations.
+///
 /// Deliberately far below the wire limit (`StartProtocol::MAX_SSAS_PER_REQUEST`, 27), which only
-/// bounds what can be *decoded*. The real cost is paid on both sides of the exchange, and neither is
+/// bounds what can be *decoded*. The real cost is paid on both sides of the exchange and neither is
 /// small at the profiled dimensions:
 ///
 /// * Entry: every entry in the batch is a full `new_ssa_commitment` (hundreds of thousands of EC commitments), its own
@@ -320,7 +325,12 @@ const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 /// Both [`SupervisorConfig::ssas_per_request`](crate::SupervisorConfig::ssas_per_request) and
 /// [`SessionManagerConfig::max_ssas_per_ssa_request`] are clamped to `1..=Self` where they are read,
 /// so a programmatically built config that never calls `validate()` cannot exceed it.
-pub const MAX_SSA_BATCH_SIZE: usize = 20;
+pub const MAX_SSA_BATCH_SIZE: usize = 9;
+
+/// How long an Exit waits for the deposit pool to answer a
+/// [`DepositDataRequest`](HoprSessionOutPixEvent::DepositDataRequest) before sending the batch
+/// without what has not arrived.
+pub const DEPOSIT_DATA_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// SSA batches whose reconstructor state can be live on the Exit at the same moment.
 ///
@@ -461,6 +471,9 @@ struct SessionSsaState {
     /// any deposit exists. Crediting that prefix would let the Exit bank unpaid service against the
     /// first cycle it *is* paid for. Everything after this point rides a share.
     returned_at_first_commit: std::sync::atomic::AtomicU64,
+    /// What this Exit sent as deposit data, per SSA index, for cycles whose deposit address it has
+    /// not learned yet.
+    sent_deposit_data: Arc<parking_lot::Mutex<HashMap<SsaIndex, HoprPixDepositPayload>>>,
 }
 
 impl SessionSsaState {
@@ -469,6 +482,30 @@ impl SessionSsaState {
             params,
             committed_ssa_watermark: std::sync::atomic::AtomicU32::new(0),
             returned_at_first_commit: std::sync::atomic::AtomicU64::new(0),
+            sent_deposit_data: Default::default(),
+        }
+    }
+
+    /// Files the deposit data of a batch the Exit is about to send, for
+    /// [`take_sent_deposit_data`](Self::take_sent_deposit_data) to hand back once the matching
+    /// deposit address is known.
+    pub fn remember_sent_deposit_data(&self, deposit_data: &HashMap<SsaIndex, HoprPixDepositPayload>) {
+        let mut sent = self.sent_deposit_data.lock();
+        for (&ssa_index, payload) in deposit_data {
+            sent.insert(ssa_index, payload.clone());
+        }
+    }
+
+    /// Removes and returns what this Exit sent for `ssa_index`, or empty data if it sent none.
+    pub fn take_sent_deposit_data(&self, session_id: &SessionId, ssa_index: SsaIndex) -> PixDepositData {
+        PixDepositData {
+            id: PixAddressId::new(session_id, ssa_index),
+            data: self
+                .sent_deposit_data
+                .lock()
+                .remove(&ssa_index)
+                .map(|payload| payload.0)
+                .unwrap_or_default(),
         }
     }
 
@@ -2298,6 +2335,72 @@ where
         }
     }
 
+    /// Asks the deposit pool for the data to attach to a batch of SSAs, and collects its answers.
+    async fn request_deposit_data(
+        pix_toolbox: &PixToolbox,
+        session_id: SessionId,
+        ssa_indices: &[SsaIndex],
+    ) -> errors::Result<HoprPixDepositData> {
+        let deposit_ids = ssa_indices
+            .iter()
+            .map(|&ssa_index| PixAddressId::new(&session_id, ssa_index))
+            .collect::<Vec<_>>();
+
+        let (deposit_data_created, deposit_data_rx) = futures::channel::mpsc::channel(ssa_indices.len().max(1));
+
+        if pix_toolbox
+            .pix_events
+            .try_send(HoprSessionOutPixEvent::DepositDataRequest(PixDepositDataRequest {
+                deposit_ids,
+                deposit_data_created,
+            }))
+            .is_err()
+        {
+            return Err(SessionManagerError::MissingDepositData(format!(
+                "session {session_id} has no listener for the deposit data request"
+            ))
+            .into());
+        }
+
+        let mut outstanding = ssa_indices
+            .iter()
+            .map(|&ssa_index| PixAddressId::new(&session_id, ssa_index))
+            .collect::<std::collections::HashSet<_>>();
+        let requested = outstanding.len();
+
+        let mut deposit_data = HoprPixDepositData::with_capacity(requested);
+        {
+            let replies = deposit_data_rx
+                .take(2 * requested)
+                .take_until(futures_time::task::sleep(futures_time::time::Duration::from(
+                    DEPOSIT_DATA_REQUEST_TIMEOUT,
+                )));
+            futures::pin_mut!(replies);
+            while let Some(entry) = replies.next().await {
+                outstanding.remove(&entry.id);
+                deposit_data.push(entry);
+                if outstanding.is_empty() {
+                    break;
+                }
+            }
+        }
+
+        // Counted here rather than left to `deposit_data_for_batch`, which sees the same shortfall
+        // but cannot tell a pool that went quiet from one that answered about the wrong SSAs. Both
+        // are fatal; only one of them is fixed by making the pool faster.
+        if !outstanding.is_empty() {
+            return Err(SessionManagerError::MissingDepositData(format!(
+                "session {session_id} got {} of {requested} requested deposit data entries within \
+                 {DEPOSIT_DATA_REQUEST_TIMEOUT:?} ({} replies read in total)",
+                requested - outstanding.len(),
+                deposit_data.len(),
+            ))
+            .into());
+        }
+
+        Ok(deposit_data)
+    }
+
     /// Spawns the task that carries out one Session's supervisor actions.
     ///
     /// The supervisor decides; this executes. Keeping the two apart is what lets the state machine
@@ -2376,6 +2479,37 @@ where
                                     %session_id, %error, batch_size = ssa_ids.len(),
                                     "failed to send ssa request"
                                 );
+
+                                // A pool that could not supply deposit data ends the Session here
+                                // rather than reporting the failure onwards. The other failures are
+                                // transient or already self-correcting, and the supervisor is the
+                                // right judge of them; this one is neither. The data only ever
+                                // travels in the `SsaRequest` that carries the commitments, so it
+                                // cannot be supplied later, and the pool will not answer a retry it
+                                // did not answer the first time.
+                                //
+                                // Named rather than folded into the supervisor's `PixFailure`,
+                                // because it points at this node's own pool while every reason the
+                                // supervisor has points at the peer — and the Entry is told with a
+                                // reason it can act on rather than the generic one.
+                                if matches!(
+                                    error,
+                                    TransportSessionError::Manager(SessionManagerError::MissingDepositData(_))
+                                ) {
+                                    gate.poison();
+                                    owned_ssas.clear();
+                                    myself
+                                        .notify_session_error(
+                                            session_id,
+                                            reply_routing.clone(),
+                                            StartErrorReason::UnacceptablePixParams,
+                                            "session error due to missing deposit data",
+                                        )
+                                        .await;
+                                    myself.close_session_with_reason(&session_id, ClosureReason::MissingDepositData);
+                                    return;
+                                }
+
                                 if let Some(supervisor) = slot.pix_supervisor.get()
                                     && supervisor
                                         .send_action_result(
@@ -2542,6 +2676,9 @@ where
         };
 
         let pix_toolbox = self.pix_toolbox.get().cloned().ok_or(SessionManagerError::NotStarted)?;
+        // Clone kept on this task: `pix_toolbox` itself is moved into the blocking commitment task,
+        // while the deposit-data request below needs it here.
+        let pix_toolbox_local = pix_toolbox.clone();
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
         // One blocking task for the whole batch rather than one per SSA: each commitment is a single
@@ -2571,13 +2708,34 @@ where
             "generated exit commitments for the SSA batch"
         );
 
+        // Ask the deposit pool for the data to attach to this batch, and keep what it produced: the
+        // Exit needs it twice. Once now, to put on the wire, and once per SSA later, to hand back to
+        // the pool with the deposit address in `DepositNeeded` — by which point the batch it came
+        // from is long gone.
+        //
+        // A pool that does not answer fails the batch here, which drops `guards` and releases every
+        // registration it made. That is the only safe direction: deposit data reaches the Entry in
+        // this message or not at all, so a batch sent without it buys service the Entry can never
+        // pay for.
+        let ssa_indices = ssa_ids.iter().map(|ssa_id| ssa_id.ssa_index()).collect::<Vec<_>>();
+        let deposit_data = Self::request_deposit_data(&pix_toolbox_local, session_id, &ssa_indices).await?;
+
+        if !self.sessions.contains_key(&session_id) {
+            return Err(SessionManagerError::NonExistingSession.into());
+        }
+
+        let deposit_data = deposit_data_for_batch(&session_id, &ssa_indices, deposit_data)?;
+        if let Some(ssa_state) = slot.current_ssa_state.get() {
+            ssa_state.remember_sent_deposit_data(&deposit_data);
+        }
+
         // Construct and send the Exit SSA commitment request message.
         // The parameters were previously verified to be acceptable.
         let data = HoprStartProtocol::SsaRequest(SsaServerCommitmentMessage::new(
             session_id,
             params,
             exit_commitments,
-            HoprPixDepositData::default(),
+            deposit_data,
         ));
 
         send_via_msg_sender(
@@ -2613,11 +2771,19 @@ where
     /// capacity bound to evict the entry, which is the desired behaviour when
     /// the caller (e.g. REST `DELETE /session`) knows the session is finished.
     pub fn close_session(&self, id: &SessionId) -> bool {
+        self.close_session_with_reason(id, ClosureReason::Eviction)
+    }
+
+    /// [`close_session`](Self::close_session) with the reason spelled out.
+    ///
+    /// The reason is what the operator reads when a PIX Session stops, and the failures are hard to
+    /// tell apart from the outside, so a caller that knows which one it is says so.
+    fn close_session_with_reason(&self, id: &SessionId, reason: ClosureReason) -> bool {
         if let Some(slot) = self.sessions.remove(id) {
             self.active_sessions.fetch_sub(1, Ordering::Relaxed);
             // Reconstructor state is released by `close_session` aborting the PIX action driver,
             // whose commitment guards retire on drop.
-            close_session(*id, slot, ClosureReason::Eviction);
+            close_session(*id, slot, reason);
             true
         } else {
             false
@@ -3576,9 +3742,10 @@ where
         };
 
         // See if we haven't received an SSA commitment for a Session that we did not register as PIX-capable
-        let Some(quota_per_ssa) = session_slot.current_ssa_state.get().map(|s| s.quota_per_ssa()) else {
+        let Some(ssa_state) = session_slot.current_ssa_state.get() else {
             return Err(SessionManagerError::Other(anyhow::anyhow!("no SSA state for session {session_id}")).into());
         };
+        let quota_per_ssa = ssa_state.quota_per_ssa();
 
         let ssa_id = SsaId::new(pseudonym, msg.ssa_index);
 
@@ -3636,7 +3803,8 @@ where
         {
             // Inside the guard on purpose: every other `SsaCommit` of a cycle takes the other branch,
             // so allocating this before the `if` built and dropped a channel per message.
-            let (deposit_done_tx, deposit_done_rx) = futures::channel::mpsc::channel(10);
+            let (deposit_done_tx, deposit_done_rx) =
+                futures::channel::mpsc::channel::<(PixAddressId, hopr_api::HoprBalance)>(10);
             // Report deposits for as long as they arrive rather than waiting for the first one and
             // stopping: top-ups accumulate towards `min_deposit`, and the supervisor is what decides
             // when enough has landed. It also owns the deadline, so the observer carries none — a
@@ -3650,8 +3818,10 @@ where
                         // only reachable if it died between the check above and here.
                         return;
                     };
-                    let mut confirmations = deposit_done_rx.filter(|((evt_pseudonym, evt_index), _)| {
-                        futures::future::ready(evt_index == &ssa_id.ssa_index() && evt_pseudonym == ssa_id.pseudonym())
+                    let mut confirmations = deposit_done_rx.filter(|(evt_id, _)| {
+                        futures::future::ready(
+                            evt_id.ssa_index() == ssa_id.ssa_index() && &evt_id.session_id() == ssa_id.pseudonym(),
+                        )
                     });
                     while let Some((_, amount)) = confirmations.next().await {
                         info!(%session_id, %ssa_id, %amount, "ssa deposit confirmed");
@@ -3680,6 +3850,9 @@ where
                         ssa_id,
                         deposit_address,
                         quota_per_ssa,
+                        // Handed back to the pool that produced it, now that the address it pays for
+                        // is known. Consumed here: this branch is reached once per cycle.
+                        deposit_data: ssa_state.take_sent_deposit_data(&session_id, ssa_id.ssa_index()),
                     },
                     deposit_done_tx,
                 ))
@@ -3731,7 +3904,7 @@ where
     async fn handle_ssa_request(
         &self,
         pseudonym: HoprPseudonym,
-        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositData>,
+        msg: SsaServerCommitmentMessage<SessionId, HoprPixGroupElement, HoprPixDepositPayload>,
     ) -> errors::Result<()> {
         let Some(pix_toolbox) = self.pix_toolbox.get().cloned() else {
             return Err(SessionManagerError::UnsupportedMessage.into());
@@ -4076,6 +4249,10 @@ where
         // `try_into_pix_group` decompresses the point and rejects anything outside the prime-order
         // subgroup. Doing every one of them up front is what makes a malformed later member cost
         // nothing, and it is cheap relative to phase two.
+        // Taken out before the loop consumes `msg.commitments`, and drained as the loop goes: an SSA
+        // is committed to once, so its deposit data is needed once.
+        let mut deposit_payloads = msg.deposit_data;
+
         let mut validated = Vec::with_capacity(msg.commitments.len());
         for (ssa_index, exit_commitment) in msg.commitments {
             trace!(ssa_index, "received Exit SSA commitment");
@@ -4178,6 +4355,15 @@ where
                     ssa_id: SsaId::new(pseudonym, ssa_index),
                     deposit_address,
                     quota_per_ssa,
+                    // Rebuilt rather than carried: the `id` is not on the wire, because this message
+                    // already says which Session and which SSA these bytes belong to.
+                    deposit_data: PixDepositData {
+                        id: PixAddressId::new(&pseudonym, ssa_index),
+                        data: deposit_payloads
+                            .remove(&ssa_index)
+                            .map(|payload| payload.0)
+                            .unwrap_or_default(),
+                    },
                 }))
                 .map_err(|_| SessionManagerError::other(anyhow::anyhow!("failed to notify new deposit ssa")))?;
             info!(%ssa_index, %deposit_address, quota_per_ssa, "generated client SSA commitment and deposit address");
@@ -4206,6 +4392,22 @@ mod tests {
 
     use super::*;
     use crate::{Capabilities, balancer::SurbBalancerConfig, types::SessionTarget};
+
+    /// A [`PixToolbox`] whose deposit-data requests are answered, for tests that do not read the
+    /// PIX event stream themselves.
+    ///
+    /// An Exit cannot send an `SsaRequest` without the pool answering, so a test that only needs the
+    /// request to *happen* would otherwise be asserting against `MissingDepositData`.
+    fn pix_toolbox_with_pool(
+        generator: Arc<SsaShareGenerator<HoprPixSpec>>,
+        reconstructor: Arc<SsaReconstructor<HoprPixSpec>>,
+    ) -> PixToolbox {
+        let (toolbox, events) = PixToolbox::new(generator, reconstructor);
+        // The answering task owns `events`, and lives until the toolbox is dropped. The forwarded
+        // stream is discarded: these tests do not read PIX events.
+        drop(crate::testing::answering_deposit_pool(events, |_| Vec::new()));
+        toolbox
+    }
 
     /// `StartInitiation::additional_data` as an Entry offering these dimensions would send it.
     ///
@@ -7366,7 +7568,7 @@ mod tests {
         use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
         use hopr_protocol_start::StartInitiation;
 
-        let (pix_toolbox, _) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(SsaGeneratorConfig {
                 polynomials_per_ssa: 2,
                 threshold: 2,
@@ -7451,6 +7653,111 @@ mod tests {
         Ok(())
     }
 
+    /// A pool that does not supply deposit data must take the Session with it, and name itself.
+    ///
+    /// The data only ever travels in the `SsaRequest` that carries the commitments, so an Entry that
+    /// needs it and does not get it cannot ask for it later — it would simply never deposit, and the
+    /// Session would die on the Exit's own commitment deadline, blamed on the peer. Failing here
+    /// costs one Session that was not going to work, and points at the local pool instead: the Entry
+    /// is told with `UnacceptablePixParams` rather than the supervisor's generic `Unknown`, and this
+    /// node records [`ClosureReason::MissingDepositData`] rather than `PixFailure`.
+    ///
+    /// The event stream is dropped rather than left unanswered, which reaches the same failure
+    /// through the listener check instead of [`DEPOSIT_DATA_REQUEST_TIMEOUT`] — the same error, the
+    /// same close, three seconds sooner. What the collection itself does with a pool that answers
+    /// badly is covered by the `request_deposit_data` tests below.
+    #[test_log::test(tokio::test)]
+    async fn missing_deposit_data_closes_the_session_and_names_the_pool() -> anyhow::Result<()> {
+        use std::sync::Arc;
+
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+        use hopr_protocol_start::StartInitiation;
+
+        // Deliberately *not* `pix_toolbox_with_pool`: nothing answers, which is the case under test.
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+        );
+        drop(pix_events);
+
+        let mgr = SessionManager::new(SessionManagerConfig {
+            pix_config: IncomingSessionPixConfig {
+                quota_range: 0..=1024 * 1024 * 1024,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        // Records the kind of every outbound Start message, with the reason of any SessionError.
+        let sent = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let sent_clone = sent.clone();
+        let mut bob_transport = MockMsgSender::new();
+        bob_transport.expect_send_message().returning(move |_, data| {
+            let sent_clone = sent_clone.clone();
+            Box::pin(async move {
+                match HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text) {
+                    Ok(HoprStartProtocol::SessionEstablished(_)) => {
+                        sent_clone.lock().unwrap().push("established".into())
+                    }
+                    Ok(HoprStartProtocol::SsaRequest(_)) => sent_clone.lock().unwrap().push("ssa_request".into()),
+                    Ok(HoprStartProtocol::SessionError(err)) => {
+                        sent_clone.lock().unwrap().push(format!("error:{}", err.reason))
+                    }
+                    _ => {}
+                }
+                Ok(())
+            })
+        });
+
+        let (bob_sender, bob_handle) = mock_packet_planning(bob_transport);
+        let (new_session_tx, new_session_rx) = futures::channel::mpsc::channel(1);
+        let _notifications = tokio::spawn(async move {
+            pin_mut!(new_session_rx);
+            while let Some(_session) = new_session_rx.next().await {}
+        });
+        mgr.start(bob_sender.clone(), new_session_tx, Some(pix_toolbox))?;
+
+        let alice_pseudonym = HoprPseudonym::random();
+        mgr.handle_incoming_session_initiation(
+            alice_pseudonym,
+            StartInitiation {
+                challenge: MIN_CHALLENGE,
+                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
+                additional_data: small_pix_additional_data(),
+            },
+        )
+        .await?;
+
+        timeout(Duration::from_secs(1), async {
+            while mgr.num_active_sessions() > 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("the Session must not survive a pool that cannot supply deposit data")?;
+
+        let sent = sent.lock().unwrap().clone();
+        assert!(
+            !sent.iter().any(|m| m == "ssa_request"),
+            "no SsaRequest may go on the wire without the deposit data it has to carry, got {sent:?}"
+        );
+        assert!(
+            sent.iter()
+                .any(|m| m == &format!("error:{}", StartErrorReason::UnacceptablePixParams)),
+            "the Entry must be told with a reason that names the failure, got {sent:?}"
+        );
+
+        bob_sender.close_channel();
+        bob_handle.await??;
+        Ok(())
+    }
+
     // `pipelined_ssa_preserves_earlier_deposit_deadline` lived here. It asserted that
     // `PixKillSwitch(1)` and `PixKillSwitch(2)` were independent entries in the `AbortableList`,
     // which is no longer a thing the manager can observe: per-SSA deadlines belong to the
@@ -7468,7 +7775,7 @@ mod tests {
     /// covered where the guards are: `protocols/pix`'s guard tests and the supervisor's own suite.
     #[test_log::test(tokio::test)]
     async fn close_session_retires_in_flight_ssa_cycles() -> anyhow::Result<()> {
-        let (pix_toolbox, _) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(SsaGeneratorConfig {
                 polynomials_per_ssa: 2,
                 threshold: 2,
@@ -7618,7 +7925,7 @@ mod tests {
                     session_id,
                     PixParams::try_new(10, 10, 0, LOCAL_PIX_SUITE)?,
                     BTreeMap::new(),
-                    HoprPixDepositData::default(),
+                    [],
                 ),
             )
             .await;
@@ -7733,6 +8040,10 @@ mod tests {
             })
             .into(),
         );
+        // This fixture's manager plays both halves, so its own Exit side opens a cycle and blocks on
+        // the deposit pool. Answered on the way through, leaving the stream the caller reads — which
+        // is the deposits — as it was.
+        let pix_events = crate::testing::answering_deposit_pool(pix_events, |_| Vec::new());
 
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
@@ -7781,10 +8092,20 @@ mod tests {
         std::collections::BTreeMap::from([(SsaIndex::new(index).expect("non-zero"), identity)])
     }
 
-    fn drain_pix_events(events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)) -> usize {
+    /// Drains whatever the PIX event stream has ready, counting the deposits among it.
+    ///
+    /// Only [`ReadyToDeposit`](HoprSessionOutPixEvent::ReadyToDeposit) is counted: an Exit sharing
+    /// this stream also asks its pool for deposit data on it, and every caller here is asking how
+    /// many cycles were opened, not how many messages went by.
+    async fn drain_pix_events(events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)) -> usize {
         let mut seen = 0;
-        while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
-            seen += 1;
+        // A bounded wait rather than `now_or_never`: these fixtures answer the Exit half's
+        // deposit-data requests on a forwarding task, so an event that has already been produced may
+        // not have crossed it yet. The wait is only paid once, when the stream has gone quiet.
+        while let Ok(Some(event)) = timeout(Duration::from_millis(50), events.next()).await {
+            if matches!(event, HoprSessionOutPixEvent::ReadyToDeposit(_)) {
+                seen += 1;
+            }
         }
         seen
     }
@@ -7841,11 +8162,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         // Fully served, so that the emission boundary is the only thing this test can be measuring.
         credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&params, 1));
@@ -7867,7 +8188,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
             )
             .await
             .expect_err("a request one share below the boundary must be refused");
@@ -7878,7 +8199,7 @@ mod tests {
             ),
             "expected Unacceptable, got {err:?}"
         );
-        assert_eq!(0, drain_pix_events(&mut pix_events));
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
         // On the boundary itself it is admitted — and would not be if the gate read the local 1.0.
         generator.next_share(&pseudonym, &at_floor.to_be_bytes())?;
@@ -7892,11 +8213,11 @@ mod tests {
         );
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
         )
         .await
         .context("a request at the protocol floor must be accepted whatever the local threshold is")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         bob_sender.close_channel();
         bob_handle.await??;
@@ -7927,11 +8248,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
         assert_eq!(vec![pseudonym], mgr.active_sessions());
 
         generator.forget(&pseudonym);
@@ -7943,7 +8264,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
             )
             .await
             .expect_err("a successor request against discarded generator state must be refused");
@@ -7956,7 +8277,7 @@ mod tests {
         );
         assert_eq!(
             0,
-            drain_pix_events(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             "a refused request must not emit a single ReadyToDeposit"
         );
         assert!(
@@ -7989,11 +8310,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         // Emit the whole cycle: the emission half of the gate is now satisfied several times over,
         // and it is the only half that would have been consulted before.
@@ -8014,7 +8335,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
             )
             .await
             .expect_err("a successor must not be funded before the Exit has returned anything");
@@ -8027,7 +8348,7 @@ mod tests {
         );
         assert_eq!(
             0,
-            drain_pix_events(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             "a refused successor must not emit a single ReadyToDeposit"
         );
         assert_eq!(
@@ -8040,11 +8361,11 @@ mod tests {
         credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&params, 1));
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
         )
         .await
         .context("a successor must be admitted once the Exit has returned what it owes")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         bob_sender.close_channel();
         bob_handle.await??;
@@ -8066,11 +8387,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
             generator.next_share(&pseudonym, &sent.to_be_bytes())?;
@@ -8080,7 +8401,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
             )
             .await
             .expect_err("an unserved successor must be refused");
@@ -8120,11 +8441,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
             generator.next_share(&pseudonym, &sent.to_be_bytes())?;
@@ -8144,11 +8465,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
         )
         .await
         .context("a request one packet ahead of its own service must be waited for, not refused")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
         late.await?;
 
         bob_sender.close_channel();
@@ -8175,11 +8496,11 @@ mod tests {
 
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(1, drain_pix_events(&mut pix_events));
+        assert_eq!(1, drain_pix_events(&mut pix_events).await);
 
         for sent in 1..=(params.polys_per_ssa() as u32 * params.emitted_shares_per_poly() as u32) {
             generator.next_share(&pseudonym, &sent.to_be_bytes())?;
@@ -8188,7 +8509,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), HoprPixDepositData::default()),
+                SsaServerCommitmentMessage::new(pseudonym, params, ssa_request_for(2), []),
             )
             .await
             .expect_err("pre-commitment service must not pay for the first successor");
@@ -8199,7 +8520,7 @@ mod tests {
             ),
             "expected Unacceptable, got {err:?}"
         );
-        assert_eq!(0, drain_pix_events(&mut pix_events));
+        assert_eq!(0, drain_pix_events(&mut pix_events).await);
 
         bob_sender.close_channel();
         bob_handle.await??;
@@ -8428,10 +8749,13 @@ mod tests {
             threshold: 2,
             surplus_shares: 1,
         }));
-        let (pix_toolbox, mut pix_events) = PixToolbox::new(
+        let (pix_toolbox, pix_events) = PixToolbox::new(
             generator.clone(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
+        // This manager plays both halves, so its own Exit side opens a cycle and blocks on the
+        // deposit pool. Answered on the way through; the deposits this test counts pass on unchanged.
+        let mut pix_events = crate::testing::answering_deposit_pool(pix_events, |_| Vec::new());
 
         let mgr = SessionManager::new(SessionManagerConfig {
             max_ssas_per_ssa_request: BATCH as usize,
@@ -8474,25 +8798,16 @@ mod tests {
                 .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
                 .collect::<BTreeMap<_, _>>()
         };
-        // Drains whatever the PIX event stream has ready, without awaiting more.
-        // `futures::FutureExt` is spelled out because `moka::future::FutureExt` is also in scope.
-        let drain_deposits = |events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)| {
-            let mut seen = 0;
-            while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
-                seen += 1;
-            }
-            seen
-        };
 
         // The opening batch is accepted: nothing is committed yet, so there is nothing to be early for.
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
         assert_eq!(
-            drain_deposits(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             BATCH as usize,
             "the opening batch must yield one deposit address per SSA"
         );
@@ -8505,12 +8820,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(
-                    pseudonym,
-                    small_pix_params(),
-                    batch(BATCH + 1),
-                    HoprPixDepositData::default(),
-                ),
+                SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1), []),
             )
             .await
             .expect_err("a batch asked for before any share was emitted must be refused");
@@ -8522,7 +8832,7 @@ mod tests {
             "expected Unacceptable, got {err:?}"
         );
         assert_eq!(
-            drain_deposits(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             0,
             "a refused batch must not emit a single ReadyToDeposit"
         );
@@ -8565,12 +8875,7 @@ mod tests {
         let err = mgr
             .handle_ssa_request(
                 pseudonym,
-                SsaServerCommitmentMessage::new(
-                    pseudonym,
-                    small_pix_params(),
-                    batch(BATCH + 1),
-                    HoprPixDepositData::default(),
-                ),
+                SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1), []),
             )
             .await
             .expect_err("reaching the last cycle must not by itself admit the next batch");
@@ -8582,7 +8887,7 @@ mod tests {
             "expected Unacceptable, got {err:?}"
         );
         assert_eq!(
-            drain_deposits(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             0,
             "a batch refused for being early must not emit a single ReadyToDeposit"
         );
@@ -8591,12 +8896,7 @@ mod tests {
         emit_until(&|p| p.front_emitted >= min_emitted)?;
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(
-                pseudonym,
-                small_pix_params(),
-                batch(BATCH + 1),
-                HoprPixDepositData::default(),
-            ),
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(BATCH + 1), []),
         )
         .await
         .context("a batch asked for on time must be accepted")?;
@@ -8640,10 +8940,13 @@ mod tests {
             threshold: 2,
             surplus_shares: 1,
         }));
-        let (pix_toolbox, mut pix_events) = PixToolbox::new(
+        let (pix_toolbox, pix_events) = PixToolbox::new(
             generator.clone(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
+        // This manager plays both halves, so its own Exit side opens a cycle and blocks on the
+        // deposit pool. Answered on the way through; the deposits this test counts pass on unchanged.
+        let mut pix_events = crate::testing::answering_deposit_pool(pix_events, |_| Vec::new());
 
         let mgr = SessionManager::new(SessionManagerConfig {
             max_ssas_per_ssa_request: BATCH as usize,
@@ -8686,23 +8989,16 @@ mod tests {
                 .map(|i| (SsaIndex::new(i).expect("non-zero"), identity))
                 .collect::<BTreeMap<_, _>>()
         };
-        let drain_deposits = |events: &mut (dyn futures::Stream<Item = HoprSessionOutPixEvent> + Unpin)| {
-            let mut seen = 0;
-            while futures::FutureExt::now_or_never(events.next()).flatten().is_some() {
-                seen += 1;
-            }
-            seen
-        };
 
         // The opening batch, then emission far enough into its last cycle that exactly one successor
         // batch is legitimately admissible.
         mgr.handle_ssa_request(
             pseudonym,
-            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), HoprPixDepositData::default()),
+            SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), batch(1), []),
         )
         .await
         .context("the opening batch must be accepted")?;
-        assert_eq!(BATCH as usize, drain_deposits(&mut pix_events));
+        assert_eq!(BATCH as usize, drain_pix_events(&mut pix_events).await);
 
         // Served for the batch, so that serialisation is the only thing deciding the outcome below.
         credit_returned_packets(&mgr, &pseudonym, required_returned_packets(&small_pix_params(), BATCH));
@@ -8736,12 +9032,7 @@ mod tests {
                 barrier.wait().await;
                 mgr.handle_ssa_request(
                     pseudonym,
-                    SsaServerCommitmentMessage::new(
-                        pseudonym,
-                        small_pix_params(),
-                        commitments,
-                        HoprPixDepositData::default(),
-                    ),
+                    SsaServerCommitmentMessage::new(pseudonym, small_pix_params(), commitments, []),
                 )
                 .await
             })
@@ -8758,7 +9049,7 @@ mod tests {
         );
         assert_eq!(
             BATCH as usize,
-            drain_deposits(&mut pix_events),
+            drain_pix_events(&mut pix_events).await,
             "only the admitted batch may produce deposit instructions"
         );
 
@@ -8866,7 +9157,7 @@ mod tests {
                         session_id,
                         PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                         commitments,
-                        HoprPixDepositData::default(),
+                        [],
                     ),
                 )
                 .await;
@@ -9030,7 +9321,7 @@ mod tests {
                     alice_pseudonym,
                     PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?,
                     commitments,
-                    HoprPixDepositData::default(),
+                    [],
                 ),
             )
             .await;
@@ -9228,6 +9519,11 @@ mod tests {
             SsaShareGenerator::new(ssa_gen_config).into(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
+        // This test reads the event stream itself, so the pool has to be played on the way through:
+        // the Exit blocks its SSA request on the answer, and the request would otherwise be the
+        // first event read here.
+        let pix_events_rx =
+            crate::testing::answering_deposit_pool(pix_events_rx, |id| vec![id.ssa_index().get() as u8; 3]);
 
         let mgr = SessionManager::new(SessionManagerConfig {
             pix_config: IncomingSessionPixConfig {
@@ -9464,7 +9760,7 @@ mod tests {
         // visibly wrong rather than accidentally right.
         const OFFERED_SURPLUS: u8 = 37;
 
-        let (pix_toolbox, _) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(SsaGeneratorConfig {
                 polynomials_per_ssa: 2,
                 threshold: 2,
@@ -9682,7 +9978,7 @@ mod tests {
             surplus_shares: 1,
         };
 
-        let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
+        let pix_toolbox = pix_toolbox_with_pool(
             SsaShareGenerator::new(ssa_gen_config).into(),
             SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
         );
@@ -9809,6 +10105,299 @@ mod tests {
         );
 
         guard.unwrap().commit();
+
+        Ok(())
+    }
+
+    /// What the Exit reports back to its pool must be what the Exit sent.
+    ///
+    /// The pool answers over a channel and nothing stops it answering for an SSA that is not in the
+    /// batch, or for another Session entirely. Those replies are dropped from the wire; they must be
+    /// dropped from the Exit's own memory of the batch too. Keying whole replies by `id.ssa_index()`
+    /// did not do that: a foreign reply naming an in-batch index displaced the good entry, and
+    /// `DepositNeeded` then handed the pool back deposit data belonging to another Session.
+    #[test_log::test(tokio::test)]
+    async fn a_foreign_deposit_reply_must_not_displace_what_the_exit_sent() -> anyhow::Result<()> {
+        use hopr_protocol_pix::{SsaGeneratorConfig, SsaReconstructorConfig};
+
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN];
+
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+        drop(pix_events);
+        let _ = pix_toolbox;
+
+        let ssa_state = SessionSsaState::new(PixParams::try_new(2, 2, TEST_SURPLUS_SHARES, LOCAL_PIX_SUITE)?);
+
+        // What the pool sent: the right entry, then a same-index entry belonging to another Session.
+        let replies = vec![
+            PixDepositData {
+                id: PixAddressId::new(&session_id, SsaIndex::MIN),
+                data: b"mine".as_slice().into(),
+            },
+            PixDepositData {
+                id: PixAddressId::new(&other_session, SsaIndex::MIN),
+                data: b"someone else's".as_slice().into(),
+            },
+        ];
+
+        // Only the validated map is remembered, which is the whole point.
+        let validated = deposit_data_for_batch(&session_id, &batch, replies)?;
+        ssa_state.remember_sent_deposit_data(&validated);
+
+        let recalled = ssa_state.take_sent_deposit_data(&session_id, SsaIndex::MIN);
+        assert_eq!(
+            b"mine".as_slice(),
+            recalled.data.as_ref(),
+            "the Exit must recall the payload it actually sent"
+        );
+        assert_eq!(
+            PixAddressId::new(&session_id, SsaIndex::MIN),
+            recalled.id,
+            "the id must name this Session and this index"
+        );
+
+        // Consumed exactly once; a second cycle would see empty rather than a stale entry.
+        assert!(
+            ssa_state.take_sent_deposit_data(&session_id, SsaIndex::MIN).is_empty(),
+            "taking must remove the entry"
+        );
+
+        Ok(())
+    }
+
+    /// Runs [`request_deposit_data`](SessionManager::request_deposit_data) against a pool that answers
+    /// with exactly what `script` returns, in that order.
+    ///
+    /// `script` is handed the ids the Exit asked for and returns the replies the pool will send, one
+    /// at a time — which is what makes reply *ordering* expressible, and ordering is the only thing
+    /// the tests below differ on from a run that never had a problem.
+    ///
+    /// The pool holds its sender open after the script runs out, rather than dropping it and ending
+    /// the stream. A pool that closes the channel ends the read all by itself, which would let a test
+    /// pass on that alone — the reason the collection stopped is exactly what these tests are about,
+    /// so the only things left to stop it are the ones under test.
+    async fn request_deposit_data_answered_with(
+        session_id: SessionId,
+        batch: &[SsaIndex],
+        script: impl FnOnce(Vec<PixAddressId>) -> Vec<PixDepositData> + Send + 'static,
+    ) -> errors::Result<HoprPixDepositData> {
+        let (pix_toolbox, pix_events) = PixToolbox::new(
+            SsaShareGenerator::new(SsaGeneratorConfig {
+                polynomials_per_ssa: 2,
+                threshold: 2,
+                surplus_shares: 1,
+            })
+            .into(),
+            Arc::new(SsaReconstructor::new(SsaReconstructorConfig::default())),
+        );
+
+        tokio::task::spawn(async move {
+            let mut events = Box::pin(pix_events);
+            if let Some(HoprSessionOutPixEvent::DepositDataRequest(request)) = events.next().await {
+                let mut created = request.deposit_data_created;
+                for reply in script(request.deposit_ids) {
+                    if created.send(reply).await.is_err() {
+                        return;
+                    }
+                }
+                // Held open, not dropped — see above. The task is torn down with the test's runtime.
+                std::future::pending::<()>().await;
+            }
+        });
+
+        SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::request_deposit_data(
+            &pix_toolbox,
+            session_id,
+            batch,
+        )
+        .await
+    }
+
+    /// A reply the batch has no place for must not cost a reply that was asked for.
+    ///
+    /// The pool answers over one channel, and nothing about that channel separates a reply for this
+    /// batch from another Session's. Reading a fixed number of *items* — one per requested SSA — let
+    /// the first kind spend a slot belonging to the second, so a pool that answered every SSA and
+    /// merely spoke out of turn lost the Session on the answer that got truncated.
+    ///
+    /// Ordering is the whole test: the same foreign reply arriving *after* the batch was complete
+    /// never cost anything, because the collection had already stopped.
+    #[test_log::test(tokio::test)]
+    async fn a_foreign_reply_before_a_valid_one_must_not_truncate_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, move |ids| {
+            std::iter::once(PixDepositData {
+                id: PixAddressId::new(&other_session, SsaIndex::MIN),
+                data: b"someone else's".as_slice().into(),
+            })
+            .chain(ids.into_iter().map(|id| PixDepositData {
+                id,
+                data: b"mine".as_slice().into(),
+            }))
+            .collect()
+        })
+        .await
+        .context("a pool that answered every requested SSA must not fail the request")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                b"mine".as_slice(),
+                validated[&index].0.as_ref(),
+                "index {index} must carry this Session's payload"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// A second answer for an SSA already answered must not cost an SSA still outstanding.
+    ///
+    /// Same failure as the foreign reply above, from the other direction: the repeat is a reply the
+    /// batch has no place for, and counting items charged it against the one SSA that had not been
+    /// answered yet. Which copy of the repeat wins is not what is under test here — that
+    /// [`deposit_data_for_batch`] takes the later one is incidental — only that the reply after it
+    /// still arrives.
+    #[test_log::test(tokio::test)]
+    async fn a_duplicate_reply_before_a_valid_one_must_not_truncate_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, |ids| {
+            let mut replies = ids
+                .iter()
+                .map(|id| PixDepositData {
+                    id: *id,
+                    data: vec![id.ssa_index().get() as u8].into_boxed_slice(),
+                })
+                .collect::<Vec<_>>();
+            // The repeat of the first answer is inserted before the last one, so counting items
+            // would have stopped on it and never read the SSA it was hiding.
+            replies.insert(1, replies[0].clone());
+            replies
+        })
+        .await
+        .context("a pool that repeated itself but answered every SSA must not fail the request")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                &[index.get() as u8],
+                validated[&index].0.as_ref(),
+                "index {index} must carry its own payload"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Tolerating replies the batch has no place for must not become waiting for the deadline.
+    ///
+    /// Reading until every requested id is answered has no natural end when the pool never answers
+    /// one, so the read is capped at twice the requested count. A pool that talks without ever
+    /// closing the gap is cut off there and the request fails on the gap — which is the same
+    /// verdict the deadline would reach, minus the [`DEPOSIT_DATA_REQUEST_TIMEOUT`] spent reaching
+    /// it, with the Session held open throughout.
+    #[test_log::test(tokio::test)]
+    async fn a_pool_answering_only_noise_must_fail_on_the_cap_not_the_deadline() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        // Exactly the cap, and not one of them is for this Session.
+        let noise = move |ids: Vec<PixAddressId>| {
+            ids.iter()
+                .flat_map(|id| {
+                    std::iter::repeat_n(
+                        PixDepositData {
+                            id: PixAddressId::new(&other_session, id.ssa_index()),
+                            data: b"someone else's".as_slice().into(),
+                        },
+                        2,
+                    )
+                })
+                .collect()
+        };
+
+        // Well under the deadline: the point is that the cap ends the read, not the clock.
+        let result = timeout(
+            Duration::from_secs(1),
+            request_deposit_data_answered_with(session_id, &batch, noise),
+        )
+        .await
+        .context("the cap must end the read long before DEPOSIT_DATA_REQUEST_TIMEOUT")?;
+
+        assert!(
+            matches!(
+                result,
+                Err(TransportSessionError::Manager(SessionManagerError::MissingDepositData(
+                    _
+                )))
+            ),
+            "a pool that answered none of the requested SSAs must fail the request, got {result:?}"
+        );
+
+        Ok(())
+    }
+
+    /// The reply that lands exactly on the cap still counts.
+    ///
+    /// One reply earlier and the batch would be complete without the cap ever mattering, so this is
+    /// the only arrangement that tells `take(2 * requested)` apart from `take(2 * requested - 1)`:
+    /// every requested SSA is answered, but the last answer is the last reply the read will accept.
+    #[test_log::test(tokio::test)]
+    async fn the_last_reply_the_cap_allows_must_still_complete_the_batch() -> anyhow::Result<()> {
+        let session_id: SessionId = HoprPseudonym::random();
+        let other_session: SessionId = HoprPseudonym::random();
+        let batch = [SsaIndex::MIN, SsaIndex::new(2).expect("non-zero")];
+
+        let collected = request_deposit_data_answered_with(session_id, &batch, move |ids| {
+            // One unusable reply per requested id, then the answers themselves — `2 * requested`
+            // replies in total, with the one that closes the gap sitting on the boundary.
+            ids.iter()
+                .map(|id| PixDepositData {
+                    id: PixAddressId::new(&other_session, id.ssa_index()),
+                    data: b"someone else's".as_slice().into(),
+                })
+                .chain(ids.iter().map(|id| PixDepositData {
+                    id: *id,
+                    data: vec![id.ssa_index().get() as u8].into_boxed_slice(),
+                }))
+                .collect()
+        })
+        .await
+        .context("the answer landing on the cap must be read, not cut off by it")?;
+
+        let validated = deposit_data_for_batch(&session_id, &batch, collected)
+            .context("every SSA in the batch must come out with an entry")?;
+
+        assert_eq!(batch.len(), validated.len(), "the whole batch must be covered");
+        for index in batch {
+            assert_eq!(
+                &[index.get() as u8],
+                validated[&index].0.as_ref(),
+                "index {index} must carry its own payload"
+            );
+        }
 
         Ok(())
     }
