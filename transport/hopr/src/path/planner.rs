@@ -656,15 +656,25 @@ where
             )));
         }
 
+        // Distinct first relayers in the candidate pool: the return-relayer diversity actually
+        // available for this destination. A value of 1 is the corroboration blind spot (a dead
+        // relayer cannot be told from a quiet peer) — the same condition the selector WARNs on.
+        let candidate_relayers = items
+            .iter()
+            .filter_map(|item| item.0.first())
+            .collect::<std::collections::HashSet<_>>();
+
         tracing::debug!(
             %destination,
             count,
             candidates = items.len(),
+            distinct_relayers = candidate_relayers.len(),
             temper = self.return_path_weight_temper,
+            exploration = self.return_path_exploration,
             "drawing return paths from tempered weights"
         );
 
-        Ok((0..count)
+        let drawn = (0..count)
             .filter_map(|_| {
                 if should_explore(self.return_path_exploration) {
                     pick_uniform_index(items.len())
@@ -673,7 +683,24 @@ where
                 }
                 .map(|i| items[i].0.clone())
             })
-            .collect())
+            .collect::<Vec<_>>();
+
+        // How many distinct relayers the actual SURBs went to. Fewer than the candidate pool means
+        // the weighting concentrated the stream — expected — but a persistent 1 here while
+        // `candidates` > 1 says the draw itself is starving the siblings the detector relies on.
+        let drawn_relayers = drawn
+            .iter()
+            .filter_map(|vp| vp.first())
+            .collect::<std::collections::HashSet<_>>();
+        tracing::debug!(
+            %destination,
+            drawn = drawn.len(),
+            distinct_relayers = drawn_relayers.len(),
+            of_candidates = candidate_relayers.len(),
+            "drew return paths"
+        );
+
+        Ok(drawn)
     }
 
     /// Resolve a [`DestinationRouting`] to a [`ResolvedTransportRouting`].
@@ -1664,6 +1691,12 @@ mod tests {
     /// the evidence *under* an already-populated cache -- which is the whole point of the primitive
     /// under test.
     fn two_relayer_return_planner() -> (TestPlanner, ChannelGraph) {
+        two_relayer_return_planner_with_floor(small_config().min_paths_anonymity_floor)
+    }
+
+    /// A `me <- {a,b} <- dest` return topology with the given anonymity floor, so a test can watch
+    /// the cap collapse the two relayers to one (or, at floor 0, keep both).
+    fn two_relayer_return_planner_with_floor(floor: usize) -> (TestPlanner, ChannelGraph) {
         let me = pubkey(&SECRET_ME);
         let a = pubkey(&SECRET_A);
         let b = pubkey(&SECRET_B);
@@ -1678,7 +1711,10 @@ mod tests {
             mark_edge_full(&graph, &src, &dst);
         }
 
-        let cfg = small_config();
+        let cfg = PathPlannerConfig {
+            min_paths_anonymity_floor: floor,
+            ..small_config()
+        };
         let selector = HoprGraphPathSelector::new(
             me,
             graph.clone(),
@@ -1876,6 +1912,31 @@ mod tests {
             1,
             "a collapse on one relayer must register as moved"
         );
+    }
+
+    /// End-to-end proof of the fix: a disabled cap keeps every return relayer, a cap of one
+    /// collapses the stream onto a single relayer. The latter is the blind spot the degradation
+    /// detector cannot escape, and the shape of the 2026-08-28 outage; the former is what the
+    /// edge-client `latency_path_planner_config` now requests (`min_paths_anonymity_floor = 0`).
+    #[tokio::test]
+    async fn floor_zero_keeps_every_return_relayer_but_a_cap_of_one_collapses_it() {
+        let (a, b) = (pubkey(&SECRET_A), pubkey(&SECRET_B));
+
+        let (uncapped, _g) = two_relayer_return_planner_with_floor(0);
+        let paths = fill_return_cache(&uncapped).await;
+        assert_eq!(2, candidate_set(&paths).len(), "floor 0 keeps both return relayers");
+        assert!(
+            share_of(&paths, &a) > 0.0,
+            "relayer a carries part of the return stream"
+        );
+        assert!(
+            share_of(&paths, &b) > 0.0,
+            "relayer b carries part of the return stream"
+        );
+
+        let (capped, _g) = two_relayer_return_planner_with_floor(1);
+        let paths = fill_return_cache(&capped).await;
+        assert_eq!(1, candidate_set(&paths).len(), "floor 1 collapses to a single relayer");
     }
 
     #[tokio::test]

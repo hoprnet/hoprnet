@@ -235,6 +235,13 @@ impl SurbRoundTripRegistry {
             .flat_map(|entry| return_relayers(&entry.key().reply, me_slot).collect::<Vec<_>>())
             .collect();
 
+        // Destinations that used to deliver, have now gone silent, yet cannot be attributed because
+        // no sibling pair to them is delivering — the corroboration blind spot. Distinct from
+        // `degraded`: these are exactly the return paths that are failing but that the detector
+        // *cannot* act on (a single-relayer collapse looks identical to a quiet peer). Surfacing
+        // them is the diagnostic that was missing when this condition took the tunnel down.
+        let mut blind_spot: std::collections::HashSet<OffchainPublicKey> = std::collections::HashSet::new();
+
         for entry in self.inner.iter() {
             let paths = *entry.key();
             let (expected, observed) = entry.value().peek();
@@ -269,6 +276,9 @@ impl SurbRoundTripRegistry {
             // pair was silent *while the peer was demonstrably answering elsewhere* -- not merely
             // flushes in which it was quiet.
             if !delivering.contains(&dest) {
+                // Used to deliver, now silent, and nothing else to this destination is answering:
+                // the blind spot. Cannot tell a dead return path from a peer with nothing to say.
+                blind_spot.insert(dest);
                 state.runs = 0;
                 continue;
             }
@@ -282,6 +292,16 @@ impl SurbRoundTripRegistry {
             }
 
             state.runs += 1;
+            // Early warning: this pair used to deliver, is now silent, and a sibling to the same
+            // destination is still answering — so the silence is attributable and climbing toward a
+            // re-plan. Surfacing the run as it builds turns "suddenly re-planned" into a visible ramp.
+            tracing::debug!(
+                destination = %dest,
+                runs = state.runs,
+                threshold = SILENT_FLUSHES_BEFORE_DEGRADED,
+                expected,
+                "return pair silent while a sibling delivers; silence run climbing",
+            );
             if state.runs >= SILENT_FLUSHES_BEFORE_DEGRADED {
                 // Re-arm rather than accumulate: re-planning the same destination on every
                 // subsequent flush churns its cached candidates instead of letting the new
@@ -291,10 +311,29 @@ impl SurbRoundTripRegistry {
                 // pairs may have reported it moments ago, and re-planning again now would discard
                 // the candidate that re-plan just chose.
                 if !self.replanned.contains_key(&dest) {
+                    tracing::debug!(
+                        destination = %dest,
+                        runs = SILENT_FLUSHES_BEFORE_DEGRADED,
+                        "return path degraded: sustained silence corroborated by a delivering sibling; \
+                         marking destination for re-plan",
+                    );
                     self.replanned.insert(dest, 0);
                     degraded.push(dest);
                 }
             }
+        }
+
+        // One line per flush, only when there is something to say. `blind_spot` is the actionable
+        // gap: return paths demonstrably failing that the detector cannot re-plan for want of a
+        // corroborating sibling — raise return-relayer diversity (see the path selector) to close it.
+        if !degraded.is_empty() || !blind_spot.is_empty() {
+            tracing::debug!(
+                degraded = degraded.len(),
+                blind_spot = blind_spot.len(),
+                delivering_destinations = delivering.len(),
+                delivering_relayers = delivering_relayers.len(),
+                "surb return-path degradation scan",
+            );
         }
 
         degraded
