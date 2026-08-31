@@ -139,9 +139,6 @@ validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = { version = "4.1.0" }
-# These two and `hopr-chain-connector` below move together: 4.0.1 added the `Payer` to the
-# `Withdraw*` actions, `hopr-utils` 0.13.0 is the blokli emulator that reads it, and the connector
-# is what requires that `hopr-utils`.
 hopr-types = { version = "4.0.1", features = ["use-bindings"] }
 hopr-utils = { package = "hopr-utilities", version = "0.13.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
@@ -165,9 +162,6 @@ hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.29.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-# Kept at whatever `hopr-strategy` requires, which is 0.26.0. A consumer linking both gets two
-# connector copies otherwise, and with them a `hopr-utils` 0.12.0 whose emulator no longer compiles
-# against the `hopr-types` the rest of the graph resolves.
 hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
