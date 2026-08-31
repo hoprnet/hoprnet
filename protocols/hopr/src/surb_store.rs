@@ -207,8 +207,17 @@ pub struct MemorySurbStore {
     /// channels), so a plain set behind an `RwLock` beats a concurrent map on this read-heavy path.
     invalidated_relayers: Arc<parking_lot::RwLock<std::collections::HashSet<HoprKeyIdent>>>,
     /// Current SURB-batch generation per pseudonym we originate for (sending side). Advanced on a
-    /// return-path change so the replying side can drop SURBs for the superseded path. Keyed and
-    /// evicted like [`surbs_per_pseudonym`](Self::surbs_per_pseudonym) so it shares its lifetime.
+    /// return-path change so the replying side can drop SURBs for the superseded path.
+    ///
+    /// This is sending-side state, so it is retained like the reply openers
+    /// ([`pseudonym_openers`](Self::pseudonym_openers)) — **not** like the receiving-side
+    /// [`surbs_per_pseudonym`](Self::surbs_per_pseudonym). If this entry were evicted while the peer
+    /// still held SURBs of generation `N`, [`current_generation`](Self::current_generation) would
+    /// fall back to `0`; the peer's [`SurbRingBuffer::push`] then reads `generation_is_newer(0, N)`
+    /// as false (for `1 <= N <= 128`) and silently discards every fresh batch, stranding the reply
+    /// path. `reply_opener_lifetime` bounds how long we expect replies (hence outstanding SURBs) for
+    /// a pseudonym, and it is `>=` the peer's SURB idle window, so the serial outlives the SURBs it
+    /// numbers.
     generations: moka::sync::Cache<HoprPseudonym, Arc<std::sync::atomic::AtomicU8>>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -240,8 +249,16 @@ impl MemorySurbStore {
                 .build(),
             invalidated_relayers: Default::default(),
             generations: moka::sync::Cache::builder()
-                .time_to_idle(cfg.pseudonyms_lifetime.max(MINIMUM_SURB_LIFETIME))
+                // Sending-side state: retained for the reply-opener window (>= the peer's SURB idle
+                // window), so the serial cannot reset to 0 while the peer still holds SURBs it
+                // numbers. See the field doc for why an early eviction would strand the reply path.
+                .time_to_idle(cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
+                .eviction_listener(|pseudonym, _generation, cause| {
+                    // Under normal operation minting keeps this entry warm; an eviction here can
+                    // reset the generation serial and have the peer reject fresh SURBs.
+                    tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
+                })
                 .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             cfg: cfg.into(),
