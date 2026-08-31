@@ -11,10 +11,11 @@ use hopr_types::{
         types::Pseudonym,
     },
     crypto_random::random_fill,
-    primitive::{prelude::*, typenum::Unsigned},
+    primitive::prelude::*,
 };
+use typenum::Unsigned;
 
-use super::{
+use crate::{
     derivation::{generate_key, generate_key_iv},
     shared_keys::SharedSecret,
 };
@@ -393,7 +394,7 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
         /// Data from the sender to the packet receiver.
         /// This usually contains also `H::Pseudonym`.
         receiver_data: H::PacketReceiverData,
-        /// Indicates whether this message is a reply and a [`ReplyOpener`](super::surb::ReplyOpener)
+        /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
         /// should be used to further decrypt the message.
         is_reply: bool,
         /// Special flag used for acknowledgement signaling.
@@ -426,11 +427,8 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     let mut uh: H::UH =
         generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(&header[0..H::HEADER_LEN]);
-    #[allow(deprecated)]
-    uh.verify(hopr_types::crypto::crypto_traits::Block::<H::UH>::from_slice(
-        &header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE],
-    ))
-    .map_err(|_| CryptoError::TagMismatch)?;
+    uh.verify(header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE].into())
+        .map_err(|_| CryptoError::TagMismatch)?;
 
     // Decrypt the header using the key=stream
     let mut prg = H::new_prg(secret)?;
@@ -492,12 +490,10 @@ pub(crate) mod tests {
     };
     use parameterized::parameterized;
 
-    use super::{
-        super::{
-            shared_keys::{Alpha, GroupElement, SphinxSuite},
-            tests::*,
-        },
-        *,
+    use super::*;
+    use crate::{
+        shared_keys::{Alpha, GroupElement, SphinxSuite},
+        tests::*,
     };
 
     #[test]
@@ -606,7 +602,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_ed25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::Ed25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
             reply,
         )
@@ -615,7 +611,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_x25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::X25519Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
             reply,
         )
@@ -624,7 +620,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
     fn test_secp256k1_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward::<crate::sphinx::ec_groups::Secp256k1Suite>(
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
             reply,
         )

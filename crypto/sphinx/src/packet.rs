@@ -6,10 +6,11 @@ use std::{
 
 use hopr_types::{
     crypto::{crypto_traits::PRP, prelude::*},
-    primitive::{prelude::*, typenum::Unsigned},
+    primitive::prelude::*,
 };
+use typenum::Unsigned;
 
-use super::{
+use crate::{
     derivation::derive_packet_tag,
     errors::SphinxError,
     routing::{ForwardedHeader, RoutingInfo, SphinxHeaderSpec, forward_header},
@@ -252,14 +253,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     }
 
     /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
+    #[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
     pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
         for iv_key in self.prp_inits {
             let prp = iv_key.into_init::<S::PRP>();
             // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
             // However, it would be nicer to make PaddedPayload take P as a typenum parameter
             // and enforce this invariant at compile time.
-            let block = <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(payload.as_mut())
-                .expect("block size mismatch");
+            let block = crypto_traits::Block::<S::PRP>::from_mut_slice(&mut payload);
             prp.forward(block);
         }
 
@@ -434,7 +435,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
-            <&Alpha<<S::G as GroupElement<S::E>>::AlphaLen>>::try_from(self.alpha()).expect("alpha length mismatch"),
+            Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
             node_keypair.public().into(),
         )?;
@@ -445,10 +446,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.inverse(
-            <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
-                .expect("block size mismatch"),
-        );
+        prp.inverse(decrypted.into());
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -485,19 +483,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_secrets.into_iter().rev() {
                         let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-                        prp.forward(
-                            <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
-                                .expect("block size mismatch"),
-                        );
+                        prp.forward(decrypted.into());
                     }
 
                     // Invert the initial encryption using the sender key
                     let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
-                    prp.inverse(
-                        <&mut hopr_types::crypto::crypto_traits::Block<S::PRP>>::try_from(&mut *decrypted)
-                            .expect("block size mismatch"),
-                    );
+                    prp.inverse(decrypted.into());
                 }
 
                 // Remove all the data before the actual decrypted payload
@@ -555,10 +547,8 @@ pub(crate) mod tests {
     };
     use parameterized::parameterized;
 
-    use super::{
-        super::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes},
-        *,
-    };
+    use super::*;
+    use crate::{prelude::DefaultSphinxPacketSize, surb::create_surb, tests::WrappedBytes};
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -790,7 +780,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<crate::sphinx::ec_groups::X25519Suite>(
+        generic_test_meta_packet::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -798,7 +788,7 @@ pub(crate) mod tests {
     #[cfg(feature = "x25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::X25519Suite>(
+        generic_meta_packet_reply_test::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -806,7 +796,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "x25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::X25519Suite>(
+        generic_test_partial_packet_serialization::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -814,7 +804,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<crate::sphinx::ec_groups::Ed25519Suite>(
+        generic_test_meta_packet::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -822,7 +812,7 @@ pub(crate) mod tests {
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::Ed25519Suite>(
+        generic_meta_packet_reply_test::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -830,7 +820,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "ed25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::Ed25519Suite>(
+        generic_test_partial_packet_serialization::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -838,7 +828,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_test_meta_packet::<crate::sphinx::ec_groups::Secp256k1Suite>(
+        generic_test_meta_packet::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
@@ -848,7 +838,7 @@ pub(crate) mod tests {
     #[cfg(feature = "secp256k1")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
-        generic_meta_packet_reply_test::<crate::sphinx::ec_groups::Secp256k1Suite>(
+        generic_meta_packet_reply_test::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),
@@ -858,7 +848,7 @@ pub(crate) mod tests {
     #[cfg(all(feature = "secp256k1", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
-        generic_test_partial_packet_serialization::<crate::sphinx::ec_groups::Secp256k1Suite>(
+        generic_test_partial_packet_serialization::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_types::crypto::keypairs::ChainKeypair::random())
                 .collect(),

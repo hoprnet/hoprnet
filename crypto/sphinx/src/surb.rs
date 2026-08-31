@@ -1,13 +1,10 @@
 use std::fmt::Formatter;
 
-use hopr_types::{
-    crypto::prelude::*,
-    crypto_random::Randomizable,
-    primitive::{prelude::*, typenum::Unsigned},
-};
+use hopr_types::{crypto::prelude::*, crypto_random::Randomizable, primitive::prelude::*};
 use subtle::ConstantTimeEq;
+use typenum::Unsigned;
 
-use super::{
+use crate::{
     routing::{RoutingInfo, SphinxHeaderSpec},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
@@ -150,13 +147,10 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
                 first_relayer: value[0..H::KEY_ID_SIZE.get()]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.first_relayer".into()))?,
-                alpha: {
-                    #[allow(deprecated)]
-                    Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
-                        &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
-                    )
-                    .clone()
-                },
+                alpha: Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
+                    &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
+                )
+                .clone(),
                 header: value[H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.header".into()))?,
@@ -237,19 +231,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "x25519")]
     use hopr_types::crypto_random::Randomizable;
 
-    #[cfg(feature = "x25519")]
-    use super::{super::tests::*, *};
-    #[cfg(feature = "x25519")]
-    use crate::sphinx::ec_groups::X25519Suite;
+    use super::*;
+    use crate::{ec_groups::X25519Suite, tests::*};
 
-    #[cfg(feature = "x25519")]
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
-    #[cfg(feature = "x25519")]
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
@@ -268,7 +257,6 @@ mod tests {
         )?)
     }
 
-    #[cfg(feature = "x25519")]
     #[test]
     fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
         let (surb_1, _) = generate_surbs::<X25519Suite>((0..3).map(|_| OffchainKeypair::random()).collect())?;

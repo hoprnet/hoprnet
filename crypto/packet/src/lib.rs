@@ -17,6 +17,8 @@
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 pub mod sphinx;
+use hopr_types::{internal::prelude::*, primitive::prelude::*};
+use sphinx::prelude::*;
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -38,16 +40,12 @@ pub mod prelude {
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{
-            HOPR_PIX_COMMITMENT_PROOF_SIZE, HoprPixCommitmentProof, HoprPixGroupElement, PacketSignal, PacketSignals,
-        },
+        types::{PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
     };
 }
 
-use hopr_protocol_pix::{PixGroup, PixScalar};
-use hopr_types::{crypto::prelude::*, internal::prelude::*, primitive::prelude::*};
-use sphinx::prelude::*;
+use hopr_types::internal::routing;
 pub use sphinx::prelude::{ProtocolKeyIdMapper, ReplyOpener};
 
 /// Currently used public key cipher suite for Sphinx.
@@ -62,12 +60,12 @@ pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = HoprKeyIdent;
-    type PRG = ChaCha20;
-    type PacketReceiverData = HoprSenderId;
+    type PRG = hopr_types::crypto::primitives::ChaCha20;
+    type PacketReceiverData = routing::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = types::SurbReceiverInfo;
-    type UH = Poly1305;
+    type SurbReceiverData = por::SurbReceiverInfo;
+    type UH = hopr_types::crypto::primitives::Poly1305;
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }
@@ -79,7 +77,7 @@ pub type HoprKeyIdent = KeyIdent<4>;
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 /// Type alias for identifiable [`ReplyOpener`].
-pub type HoprReplyOpener = (HoprSurbId, ReplyOpener);
+pub type HoprReplyOpener = (routing::HoprSurbId, ReplyOpener);
 
 /// Size of the maximum packet payload.
 ///
@@ -89,97 +87,6 @@ pub type HoprReplyOpener = (HoprSurbId, ReplyOpener);
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
 pub(crate) const PAYLOAD_SIZE_INT: usize = DefaultSphinxPacketSize::USIZE - 1; // minus padding byte
-
-/// Current specification of the PIX protocol in HOPR.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct HoprPixSpec;
-
-#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
-impl hopr_protocol_pix::PixSpec for HoprPixSpec {
-    type AddressPrivateKey = ChainKeypair;
-    type Cipher = ChaCha20;
-    type Curve = Secp256k1;
-    type DepositAddress = Address;
-    type Digest = Blake3;
-    type Pseudonym = SimplePseudonym;
-
-    const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"Secp256k1_XMD:BLAKE3_SSWU_RO_";
-    const PIX_SUITE: hopr_protocol_pix::PixSuite = hopr_protocol_pix::PixSuite::Secp256k1;
-
-    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
-        PublicKey::try_from(group.to_affine()).ok().map(|pk| pk.to_address())
-    }
-
-    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
-        ChainKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
-    }
-}
-
-#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
-impl hopr_protocol_pix::PixSpec for HoprPixSpec {
-    type AddressPrivateKey = BjjKeypair;
-    type Cipher = ChaCha20;
-    type Curve = BabyJubJub;
-    type DepositAddress = BjjPublicKey;
-    type Digest = Blake3;
-    type Pseudonym = SimplePseudonym;
-
-    const HASH_TO_SCALAR_SUITE_ID: &'static [u8] = b"BabyJubJub_XMD:BLAKE3_SSWU_RO_";
-    const PIX_SUITE: hopr_protocol_pix::PixSuite = hopr_protocol_pix::PixSuite::BabyJubJub;
-
-    fn group_to_deposit_address(group: PixGroup<Self>) -> Option<Self::DepositAddress> {
-        BjjPublicKey::try_from(group).ok()
-    }
-
-    fn scalar_to_private_key(scalar: PixScalar<Self>) -> Option<Self::AddressPrivateKey> {
-        BjjKeypair::from_secret(scalar.to_bytes().as_ref()).ok()
-    }
-}
-
-/// HOPR-specific encrypted partial SSA share type from the PIX protocol.
-pub type HoprEncryptedPartialSsaShare = hopr_protocol_pix::EncryptedPartialSsaShare<HoprPixSpec>;
-
-/// HOPR-specific [`hopr_protocol_pix::ShareResolution`].
-#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
-pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, ChainKeypair>;
-#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
-pub type HoprShareResolution = hopr_protocol_pix::ShareResolution<SimplePseudonym, BjjKeypair>;
-
-/// HOPR-specific [`hopr_protocol_pix::SsaCommitmentState`].
-#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
-pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, Address>;
-#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
-pub type HoprSsaCommitmentState = hopr_protocol_pix::SsaCommitmentState<SimplePseudonym, BjjPublicKey>;
-
-/// HOPR-specific PIX scalar type.
-///
-/// This is the normalized form of `hopr_protocol_pix::PixScalar<HoprPixSpec>`
-/// (i.e. `<<HoprPixSpec as PixSpec>::Curve as CurveArithmetic>::Scalar`),
-/// re-exported here so downstream crates can name it without depending on
-/// directly.
-///
-/// This also avoids a Rust compiler issue due to deep nesting of PixScalar<HoprPixSpec> when used
-/// itself as another generic argument.
-#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
-pub type HoprPixScalar = crypto_traits::elliptic_curve::Scalar<Secp256k1>;
-#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
-pub type HoprPixScalar = BabyJubJubScalar;
-
-/// HOPR-specific PIX group element representation type.
-///
-/// This is the normalized (concrete) form of `hopr_protocol_pix::PixGroupRepr<HoprPixSpec>`
-/// (i.e. `<PixGroup<HoprPixSpec> as GroupEncoding>::Repr`), re-exported here as the concrete
-/// type.
-///
-/// Using the concrete type instead of the associated-type projection avoids a Rust coherence
-/// error (E0119): implementing `From`/`TryFrom` for a new-type wrapping the projection conflicts
-/// with the blanket `impl<T> From<T> for T` because the compiler cannot prove the unresolved
-/// projection is distinct from the wrapper type.
-#[cfg(any(feature = "pix-secp256k1", not(feature = "pix-bjj")))]
-pub type HoprPixGroupRepr = crypto_traits::elliptic_curve::array::Array<u8, crypto_traits::elliptic_curve::consts::U33>;
-#[cfg(all(feature = "pix-bjj", not(feature = "pix-secp256k1")))]
-pub type HoprPixGroupRepr = BabyJubJubCompressedPoint;
 
 #[cfg(test)]
 mod tests {
@@ -197,7 +104,7 @@ mod tests {
         );
 
         assert!(
-            hopr_packet_len <= 1492 - 31,
+            hopr_packet_len <= 1492 - 31, // 31 bytes was measured as the libp2p QUIC overhead
             "HOPR packet of {hopr_packet_len} bytes must fit within a layer 4 packet with libp2p overhead"
         );
     }
@@ -217,7 +124,7 @@ mod tests {
     #[test]
     fn surb_length() {
         let surb_len = HoprSurb::SIZE;
-        assert_eq!(surb_len, 401);
+        assert_eq!(surb_len, 395);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 

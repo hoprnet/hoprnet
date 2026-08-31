@@ -53,9 +53,6 @@ tokio = { workspace = true, features = ["time"] }
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]
 
-[package.metadata.cargo-shear]
-ignored = ["humantime-serde"]
-
 [[bench]]
 name = "mixer_throughput_bench"
 harness = false

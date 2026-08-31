@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use hopr_types::{
-    crypto::{errors::CryptoError, prelude::SimplePseudonym},
+    crypto::errors::CryptoError,
     internal::{
         errors::CoreTypesError,
         prelude::{ChannelId, Ticket, WinningProbability},
@@ -38,9 +38,6 @@ pub enum PacketError {
 
     #[error(transparent)]
     SphinxError(#[from] crate::sphinx::errors::SphinxError),
-
-    #[error(transparent)]
-    PixError(#[from] hopr_protocol_pix::errors::PixError<SimplePseudonym>),
 
     #[error(transparent)]
     Other(#[from] GeneralError),

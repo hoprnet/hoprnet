@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo llvm-cov:*)",
       "Bash(cargo:*)",
       "Bash(cat:*)",
       "Bash(cd:*)",

@@ -35,7 +35,7 @@ fn validate_reply_opener_lifetime(lifetime: &Duration) -> Result<(), ValidationE
 }
 
 fn default_rb_capacity() -> usize {
-    100_000
+    15_000
 }
 
 fn default_distress_threshold() -> usize {
@@ -95,21 +95,7 @@ pub struct SurbStoreConfig {
     /// This indicates how many SURBs can be at most held to be used to send a reply
     /// back to the sending side.
     ///
-    /// Once the buffer is full, a push overwrites the oldest SURBs, which are then never used.
-    /// With PIX that is not merely a wasted SURB: each one carries a partial SSA share that is only
-    /// delivered to the reconstructor when the SURB is *used*, so an overwrite is a permanently
-    /// lost share. The capacity is therefore sized well above what any Session's SURB balancer
-    /// targets — see `maximum_surb_buffer_size` in `hopr-transport`, which is derived from this
-    /// value with headroom left for balancer overshoot.
-    ///
-    /// This is a ceiling rather than a reservation: the internal `SurbRingBuffer` allocates with
-    /// occupancy, so a pseudonym holding three SURBs costs three, and only one that genuinely fills
-    /// up pays `rb_capacity` × ~400 B. That property is what makes a large default safe here — see
-    /// the "Why the capacity is a ceiling, not a reservation" section on `SurbRingBuffer`.
-    ///
-    /// Default is 100 000.
-    // `SurbRingBuffer` is deliberately unlinked above: it is crate-private, so an intra-doc link
-    // from this public field trips `rustdoc::private_intra_doc_links`, which CI builds as an error.
+    /// Default is 15 000.
     #[default(default_rb_capacity())]
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
@@ -282,6 +268,7 @@ impl Default for MemorySurbStore {
     }
 }
 
+#[async_trait::async_trait]
 impl SurbStore for MemorySurbStore {
     #[tracing::instrument(skip_all, level = "trace", fields(?matcher), ret)]
     fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
@@ -386,30 +373,12 @@ pub struct PoppedSurb<S> {
 /// Ring buffer of SURBs and their IDs, all normally belonging to one pseudonym and therefore
 /// identified only by [`HoprSurbId`].
 ///
-/// Backed by a [`VecDeque`] that is never allowed to exceed `capacity`: a push into a full buffer
-/// evicts the oldest element first. [`SurbPopOrder`] picks which end a pop consumes from; overflow
-/// always evicts the oldest, in either order.
-///
-/// ## Why the capacity is a ceiling, not a reservation
-///
-/// The deque grows with occupancy rather than being sized at construction. The distinction matters
-/// because the pseudonym a buffer is filed under is chosen by whoever sent the packet: any
-/// `HoprPacket::Final` carrying a SURB reaches `insert_surbs`, which mints a buffer for a pseudonym
-/// it has never seen, with no Session or handshake behind it.
-///
-/// A structure that took its whole capacity upfront therefore let an unauthenticated peer reserve
-/// `rb_capacity` × `size_of::<(HoprSurbId, S)>()` of address space per pseudonym it invented —
-/// ~16.8 MB each at the default capacity, and `max_pseudonyms` of those. Resident memory was never
-/// the problem (untouched pages cost nothing), but the reservation is real to anything that
-/// accounts address space: strict overcommit, `ulimit -v`, `vm.max_map_count`.
-///
-/// Growth is geometric and amortised, and the deque never shrinks below its high-water mark, so a
-/// pseudonym that genuinely fills up still ends at the same footprint — and stops reallocating
-/// there, however long the steady-state overflow runs. It just has to earn it.
+/// Backed by a [`VecDeque`] pre-allocated to `capacity` and never allowed to exceed it, so it
+/// never reallocates: a push into a full buffer evicts the oldest element first. [`SurbPopOrder`]
+/// picks which end a pop consumes from; overflow always evicts the oldest, in either order.
 #[derive(Clone, Debug)]
 pub struct SurbRingBuffer<S> {
     surbs: Arc<parking_lot::Mutex<VecDeque<(HoprSurbId, S)>>>,
-    /// Ceiling on the number of retained SURBs; the oldest are dropped once a push would exceed it.
     capacity: usize,
     pop_order: SurbPopOrder,
 }
@@ -418,27 +387,23 @@ impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs,
     /// popped in the given order.
     pub fn new(capacity: usize, pop_order: SurbPopOrder) -> Self {
+        let capacity = capacity.max(1);
         Self {
-            surbs: Arc::new(parking_lot::Mutex::new(VecDeque::new())),
-            // A zero capacity would make the eviction below pop from an empty deque and then push
-            // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
-            capacity: capacity.max(1),
+            surbs: Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(capacity))),
+            capacity,
             pop_order,
         }
     }
 
     /// Pushes all SURBs with their IDs, evicting the oldest ones past capacity.
     ///
-    /// Once at capacity, each push evicts the oldest SURB. Under PIX that is a lost SSA share, not
-    /// merely a lost SURB — see [`SurbStoreConfig::rb_capacity`].
-    ///
     /// Returns the number of elements held after the push.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> usize {
         let mut rb = self.surbs.lock();
         for surb in surbs {
-            // Evict before inserting, so the length never exceeds the ceiling and the backing
-            // allocation stops growing once the high-water mark is reached.
-            if rb.len() >= self.capacity {
+            // Evict before inserting, so that the length never exceeds the pre-allocated
+            // capacity and the backing allocation stays put.
+            if rb.len() == self.capacity {
                 rb.pop_front();
             }
             rb.push_back(surb);
@@ -762,23 +727,12 @@ mod tests {
         Ok(())
     }
 
-    /// The buffer grows with occupancy, so it does reallocate on the way up to its ceiling — that
-    /// is the point of
-    /// [`surb_ring_buffer_must_allocate_with_occupancy_not_capacity`]. What must not happen is
-    /// churn *afterwards*: once a pseudonym has filled its buffer, an unbounded stream of
-    /// pushes and pops must not keep reallocating. So the high-water mark is reached first and
-    /// sampled there, rather than at construction.
     #[rstest]
     #[case::fifo(SurbPopOrder::Fifo)]
     #[case::lifo(SurbPopOrder::Lifo)]
     fn surb_ring_buffer_should_not_reallocate_under_steady_overflow(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(8, order);
-
-        for i in 0..8u32 {
-            rb.push([(((i as u64).to_be_bytes()), 0)]);
-        }
-        let settled_capacity = rb.surbs.lock().capacity();
-        assert!(settled_capacity >= 8, "8 SURBs must actually fit");
+        let initial_capacity = rb.surbs.lock().capacity();
 
         for i in 0..1_000u32 {
             rb.push([(((i as u64).to_be_bytes()), 0)]);
@@ -788,35 +742,9 @@ mod tests {
             assert!(rb.surbs.lock().len() <= 8, "length exceeded capacity");
         }
 
-        assert_eq!(settled_capacity, rb.surbs.lock().capacity(), "buffer reallocated");
+        assert_eq!(initial_capacity, rb.surbs.lock().capacity(), "buffer reallocated");
 
         Ok(())
-    }
-
-    /// The pseudonym a buffer is filed under is chosen by whoever sent the packet, and
-    /// `insert_surbs` mints a buffer for any pseudonym that arrives carrying a SURB. So the cost
-    /// must track what a buffer holds, not what it is allowed to hold — otherwise an
-    /// unauthenticated peer reserves `rb_capacity` worth of memory per pseudonym it invents.
-    ///
-    /// Guards against a swap back to a structure that sizes itself at construction.
-    #[test]
-    fn surb_ring_buffer_must_allocate_with_occupancy_not_capacity() {
-        const CAPACITY: usize = 100_000;
-        let rb = SurbRingBuffer::<u64>::new(CAPACITY, SurbPopOrder::default());
-
-        let empty = rb.surbs.lock().capacity();
-        assert!(empty < CAPACITY / 100, "a buffer holding nothing reserved for {empty}");
-
-        for i in 0..10u64 {
-            rb.push([([i as u8; 8], i)]);
-        }
-
-        let allocated = rb.surbs.lock().capacity();
-        assert!(allocated >= 10, "10 SURBs must actually fit");
-        assert!(
-            allocated < CAPACITY / 100,
-            "10 SURBs reserved for {allocated} — allocation is tracking capacity, not occupancy"
-        );
     }
 
     #[rstest]

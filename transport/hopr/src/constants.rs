@@ -24,11 +24,6 @@ mod tests {
     /// value that would overflow the Rayon encoding queue.
     ///
     /// Safe formula: ≤ 7 × available_parallelism. 256 covers machines with up to ~36 cores.
-    // Constant by construction — that is the whole point of the guard. Clippy suggests a `const`
-    // block instead, which would be stronger but cannot format the offending value into the
-    // message: `assert!` in const context takes a literal `&str` only. The value is worth more
-    // than the earlier failure here.
-    #[allow(clippy::assertions_on_constants)]
     #[test]
     fn outgoing_buffer_size_within_backpressure_limit() {
         assert!(

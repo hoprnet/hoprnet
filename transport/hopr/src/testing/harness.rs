@@ -44,7 +44,6 @@ use hopr_protocol_hopr::{
     HoprCodecConfig, HoprDecoder, HoprEncoder, HoprUnacknowledgedTicketProcessor,
     HoprUnacknowledgedTicketProcessorConfig, MemorySurbStore, SurbStoreConfig,
 };
-use hopr_protocol_pix::{SsaGeneratorConfig, SsaShareGenerator};
 use hopr_ticket_manager::{HoprTicketFactory, RedbStore};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_utils::runtime::AbortableList;
@@ -367,15 +366,12 @@ async fn peer_setup_for_with_all(
 
         let ticket_factory = Arc::new(HoprTicketFactory::new(RedbStore::new_temp()?));
 
-        let ssa_gen = SsaShareGenerator::new(SsaGeneratorConfig::default());
-
         let encoder = HoprEncoder::new(
             PEERS_CHAIN[i].clone(),
             connector.clone(),
             surb_store.clone(),
             ticket_factory.clone(),
             channels_dst,
-            ssa_gen,
             codec_config,
         );
 

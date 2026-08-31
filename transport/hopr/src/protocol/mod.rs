@@ -34,8 +34,8 @@ pub mod surb_telemetry;
 
 pub use counters::{PeerProtocolCounterRegistry, PeerProtocolCounters};
 pub use pipeline::{
-    AcknowledgementPipelineConfig, NodeType, NopExitAcknowledgementShareProcessor, PacketPipelineBuilder,
-    PacketPipelineConfig, PacketPipelineProcesses, Unset,
+    AcknowledgementPipelineConfig, NodeType, PacketPipelineBuilder, PacketPipelineConfig, PacketPipelineProcesses,
+    Unset,
 };
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;

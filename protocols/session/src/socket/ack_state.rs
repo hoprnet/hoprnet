@@ -640,7 +640,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             tracing::trace!(
                 frame_id = segment.frame_id,
                 seq_idx = segment.seq_idx,
-                "ring buffer full: new segment enqueued, oldest buffered segment overwritten"
+                "segment dropped: ring buffer full"
             );
         }
 
