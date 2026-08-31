@@ -482,7 +482,7 @@ dependencies = [
  "fixed-cache",
  "foldhash 0.2.0",
  "hashbrown 0.17.1",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "itoa",
  "k256 0.13.4",
  "keccak-asm",
@@ -709,7 +709,7 @@ dependencies = [
  "alloy-sol-macro-input",
  "const-hex",
  "heck 0.5.0",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "proc-macro-error2",
  "proc-macro2",
  "quote",
@@ -1804,7 +1804,7 @@ dependencies = [
  "hex",
  "hopr-types",
  "http",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "launchdarkly-sdk-transport",
  "parking_lot",
  "rand 0.10.2",
@@ -2625,7 +2625,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7793e157a59a0bd2142a5723860aeaef3aa459feae1467b597351e5f58251904"
 dependencies = [
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "lalrpop-util",
  "logos",
 ]
@@ -3740,9 +3740,9 @@ dependencies = [
 
 [[package]]
 name = "granit-parser"
-version = "1.0.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c92814c286f45b5ed1498ce9547bc9637b473eba7037f8aee6a4d5a3c1e051c"
+checksum = "65ec0d45986cd51c847c75c5b69a00852c4fc84d0e5e79f041173f73437d0cdf"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -3783,7 +3783,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "slab",
  "tokio",
  "tokio-util",
@@ -4109,7 +4109,7 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hopr-types",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "serde",
  "serde_bytes",
  "strum",
@@ -4269,7 +4269,7 @@ dependencies = [
  "futures",
  "hopr-api",
  "hopr-utilities",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "lazy_static",
  "parking_lot",
  "petgraph",
@@ -4376,7 +4376,7 @@ dependencies = [
  "hopr-protocol-app",
  "hopr-types",
  "hopr-utilities",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "insta",
  "lazy_static",
  "mimalloc",
@@ -4480,7 +4480,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "moka",
- "multiaddr",
+ "multiaddr 0.19.0",
  "parking_lot",
  "pcap-file",
  "proc-macro-regex",
@@ -4541,7 +4541,7 @@ dependencies = [
  "hopr-utilities",
  "libp2p",
  "libp2p-stream",
- "multiaddr",
+ "multiaddr 0.18.2",
  "pin-project",
  "quinn-udp 0.6.1",
  "thiserror 2.0.20",
@@ -4637,9 +4637,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "4.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1998a31a5fec199e2e51cb6c79804934a49d72a10c54714208ce17fa42e73af0"
+checksum = "c46c3109d786f2688fa712240720a0ada428d99382eb2b76a996ee7ea33ba188"
 dependencies = [
  "aes 0.9.2",
  "anyhow",
@@ -4669,8 +4669,8 @@ dependencies = [
  "hybrid-array",
  "k256 0.14.0",
  "lazy_static",
- "libp2p-identity",
- "multiaddr",
+ "libp2p-identity 0.2.14",
+ "multiaddr 0.18.2",
  "num_enum",
  "opentelemetry",
  "opentelemetry-prometheus-text-exporter",
@@ -4717,11 +4717,11 @@ dependencies = [
  "hickory-resolver 0.26.1",
  "hopr-api",
  "hopr-types",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "lazy_static",
  "libc",
- "libp2p-identity",
- "multiaddr",
+ "libp2p-identity 0.2.14",
+ "multiaddr 0.18.2",
  "pcap-file",
  "pin-project",
  "rand 0.10.2",
@@ -4743,7 +4743,7 @@ version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytesize",
  "dashmap",
  "futures",
@@ -5160,9 +5160,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.14.0"
+version = "2.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
+checksum = "07aa2048142242915a31d35844fb311e0e53fcca590c3a0a40dcf1b841fa09eb"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
@@ -5178,7 +5178,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "232929e1d75fe899576a3d5c7416ad0d88dbfbb3c3d6aa00873a7408a50ddb88"
 dependencies = [
  "ahash",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "is-terminal",
  "itoa",
  "log",
@@ -5548,7 +5548,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-dns",
  "libp2p-identify",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-mdns",
  "libp2p-metrics",
  "libp2p-noise",
@@ -5558,7 +5558,7 @@ dependencies = [
  "libp2p-tcp",
  "libp2p-upnp",
  "libp2p-yamux",
- "multiaddr",
+ "multiaddr 0.18.2",
  "pin-project",
  "rw-stream-sink",
  "thiserror 2.0.20",
@@ -5571,7 +5571,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d16ccf824ee859ca83df301e1c0205270206223fd4b1f2e512a693e1912a8f4a"
 dependencies = [
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
 ]
 
@@ -5588,7 +5588,7 @@ dependencies = [
  "futures-bounded",
  "futures-timer",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-request-response",
  "libp2p-swarm",
  "quick-protobuf",
@@ -5607,7 +5607,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a18b8b607cf3bfa2f8c57db9c7d8569a315d5cc0a282e6bfd5ebfc0a9840b2a0"
 dependencies = [
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
 ]
 
@@ -5621,8 +5621,8 @@ dependencies = [
  "fnv",
  "futures",
  "futures-timer",
- "libp2p-identity",
- "multiaddr",
+ "libp2p-identity 0.2.14",
+ "multiaddr 0.18.2",
  "multihash",
  "multistream-select",
  "parking_lot",
@@ -5646,7 +5646,7 @@ dependencies = [
  "futures",
  "hickory-resolver 0.25.2",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "parking_lot",
  "smallvec",
  "tracing",
@@ -5664,7 +5664,7 @@ dependencies = [
  "futures-bounded",
  "futures-timer",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
  "quick-protobuf",
  "quick-protobuf-codec",
@@ -5693,6 +5693,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "libp2p-identity"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d77f16caa4f4d2667a1fad5bb1a3a4a4556967c1bff93525ebb2975847fa3de"
+dependencies = [
+ "bs58",
+ "hkdf 0.13.0",
+ "multihash",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "libp2p-mdns"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5702,7 +5716,7 @@ dependencies = [
  "hickory-proto 0.25.2",
  "if-watch",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
  "rand 0.8.7",
  "smallvec",
@@ -5720,7 +5734,7 @@ dependencies = [
  "futures",
  "libp2p-core",
  "libp2p-identify",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
  "pin-project",
  "prometheus-client",
@@ -5737,8 +5751,8 @@ dependencies = [
  "bytes",
  "futures",
  "libp2p-core",
- "libp2p-identity",
- "multiaddr",
+ "libp2p-identity 0.2.14",
+ "multiaddr 0.18.2",
  "multihash",
  "quick-protobuf",
  "rand 0.8.7",
@@ -5760,7 +5774,7 @@ dependencies = [
  "futures-timer",
  "if-watch",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-tls",
  "quinn",
  "quinn-proto",
@@ -5783,7 +5797,7 @@ dependencies = [
  "futures",
  "futures-bounded",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
  "rand 0.8.7",
  "smallvec",
@@ -5798,7 +5812,7 @@ checksum = "1d6bd8025c80205ec2810cfb28b02f362ab48a01bee32c50ab5f12761e033464"
 dependencies = [
  "futures",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm",
  "rand 0.8.7",
  "tracing",
@@ -5816,7 +5830,7 @@ dependencies = [
  "futures-timer",
  "hashlink",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "libp2p-swarm-derive",
  "multistream-select",
  "rand 0.8.7",
@@ -5862,7 +5876,7 @@ dependencies = [
  "futures",
  "futures-rustls",
  "libp2p-core",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
  "rcgen",
  "ring",
  "rustls",
@@ -6126,7 +6140,27 @@ dependencies = [
  "arrayref",
  "byteorder",
  "data-encoding",
- "libp2p-identity",
+ "libp2p-identity 0.2.14",
+ "multibase",
+ "multihash",
+ "percent-encoding",
+ "serde",
+ "static_assertions",
+ "unsigned-varint 0.8.0",
+ "url",
+]
+
+[[package]]
+name = "multiaddr"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d96879ec0057cf5f99543c5333f6818c1473081684ae7ad55da21b6ea65ba214"
+dependencies = [
+ "arrayref",
+ "byteorder",
+ "bytes",
+ "data-encoding",
+ "libp2p-identity 0.3.0",
  "multibase",
  "multihash",
  "percent-encoding",
@@ -6685,7 +6719,7 @@ checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
 dependencies = [
  "fixedbitset",
  "hashbrown 0.15.5",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "rayon",
  "serde",
  "serde_derive",
@@ -8067,9 +8101,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "1.0.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af2c6921c8ce48fb1b052b457619d008834039d80325992ed3bc55bbe6c155ad"
+checksum = "3afb591f9cdb6223c88ba39269aff895620c7f0716dc42b705b5733d5c7c0823"
 dependencies = [
  "annotate-snippets",
  "base64 0.23.1",
@@ -8157,7 +8191,7 @@ dependencies = [
  "chrono",
  "hex",
  "indexmap 1.9.3",
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "jiff",
  "schemars 0.9.0",
  "schemars 1.2.2",
@@ -8960,7 +8994,7 @@ version = "0.25.13+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6975367e4d2ef766d86af01ffad14b622fecc8d4357a998fbc4deb6e9bacaf9b"
 dependencies = [
- "indexmap 2.14.0",
+ "indexmap 2.14.1",
  "toml_datetime",
  "toml_parser",
  "winnow",
