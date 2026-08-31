@@ -58,27 +58,22 @@ fn default_reply_opener_lifetime() -> Duration {
     Duration::from_secs(3600)
 }
 
-/// **Deprecated.** Which end of the per-pseudonym buffer a pop consumes from.
+/// Which end of the per-pseudonym buffer a pop consumes from. Replying side only.
 ///
-/// Retained only so existing configuration files that set `pop_order` still deserialize (the config
-/// uses `deny_unknown_fields`). The value is ignored at runtime: SURBs are always consumed FIFO, and
-/// a return-path change is now handled precisely by the per-SURB generation tag
-/// (`SurbReceiverInfo::generation`) rather than by reaching for the newest buffered SURB. `Lifo`
-/// existed to approximate that behaviour and is no longer needed.
+/// Chooses the consumption order *within* a SURB generation. It is orthogonal to the per-SURB
+/// generation tag (`SurbReceiverInfo::generation`), which handles an explicit return-path re-plan by
+/// clearing superseded SURBs wholesale on the next push. Overflow always evicts the oldest SURB, in
+/// either order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumString, strum::Display)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[strum(serialize_all = "lowercase")]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum SurbPopOrder {
-    /// Oldest first. The only behaviour now; kept as the default.
+    /// Oldest first. Default; preserves the historical behaviour.
     #[default]
     Fifo,
-    /// **Deprecated, ignored.** Newest first. Superseded by generation-tagged consumption; a
-    /// configured value is accepted (for config back-compat) and warned about, but has no runtime
-    /// effect.
-    // Not `#[deprecated]`: the `strum` and `serde` derives generate references to this variant, and
-    // the attribute would make that generated code warn (which CI denies). The deprecation is
-    // conveyed by this doc comment and the runtime warning in `MemorySurbStore::new`.
+    /// Newest first, so a return-path change applies sooner instead of only after the buffered SURBs
+    /// drain. Stale ones are shed from the other end on overflow.
     Lifo,
 }
 
@@ -122,12 +117,9 @@ pub struct SurbStoreConfig {
     #[validate(range(min = 1024, message = "rb_capacity must be at least 1024"))]
     #[cfg_attr(feature = "serde", serde(default = "default_rb_capacity"))]
     pub rb_capacity: usize,
-    /// **Deprecated, ignored.** Which end of the per-pseudonym buffer a pop consumes from; see
-    /// [`SurbPopOrder`].
+    /// Which end of the per-pseudonym buffer a pop consumes from; see [`SurbPopOrder`].
     ///
-    /// Retained so existing configs still parse under `deny_unknown_fields`. SURBs are always
-    /// consumed FIFO now; a return-path change is handled by the per-SURB generation tag. A
-    /// configured `lifo` is accepted and warned about, but has no effect.
+    /// Affects only the replying side. Default is [`SurbPopOrder::Fifo`].
     #[cfg_attr(feature = "serde", serde(default))]
     pub pop_order: SurbPopOrder,
     /// Threshold for the number of SURBs in the ring buffer, below which it is
@@ -224,14 +216,6 @@ pub struct MemorySurbStore {
 impl MemorySurbStore {
     /// Creates a new instance with the given configuration.
     pub fn new(cfg: SurbStoreConfig) -> Self {
-        // `pop_order` is retained only for config back-compat; surface that a set `lifo` does nothing.
-        if cfg.pop_order == SurbPopOrder::Lifo {
-            tracing::warn!(
-                "SurbStoreConfig.pop_order = \"lifo\" is deprecated and ignored: SURBs are consumed FIFO and \
-                 return-path changes are handled by the per-SURB generation tag"
-            );
-        }
-
         Self {
             // Reply openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
             // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
@@ -356,7 +340,7 @@ impl SurbStore for MemorySurbStore {
 
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
-            .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY)))
+            .or_insert_with(|| SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY), self.cfg.pop_order))
             .value()
             .push(surbs, generation)
     }
@@ -451,7 +435,8 @@ fn generation_is_newer(a: u8, b: u8) -> bool {
 /// by [`HoprSurbId`].
 ///
 /// Backed by a [`VecDeque`] that is never allowed to exceed `capacity`: a push into a full buffer
-/// evicts the oldest element first, and pops always consume the oldest (FIFO).
+/// evicts the oldest element first. [`SurbPopOrder`] picks which end a pop consumes from; overflow
+/// always evicts the oldest, in either order.
 ///
 /// ## Generations: dropping SURBs for a superseded return path
 ///
@@ -485,6 +470,8 @@ pub struct SurbRingBuffer<S> {
     inner: Arc<parking_lot::Mutex<GenerationalBuffer<S>>>,
     /// Ceiling on the number of retained SURBs; the oldest are dropped once a push would exceed it.
     capacity: usize,
+    /// Which end a pop consumes from; overflow always evicts the oldest regardless.
+    pop_order: SurbPopOrder,
 }
 
 /// The mutex-protected state of a [`SurbRingBuffer`]: the SURBs and the highest generation seen.
@@ -500,8 +487,8 @@ struct GenerationalBuffer<S> {
 
 impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs,
-    /// consumed oldest-first.
-    pub fn new(capacity: usize) -> Self {
+    /// popped in the given order.
+    pub fn new(capacity: usize, pop_order: SurbPopOrder) -> Self {
         Self {
             inner: Arc::new(parking_lot::Mutex::new(GenerationalBuffer {
                 surbs: VecDeque::new(),
@@ -510,6 +497,7 @@ impl<S> SurbRingBuffer<S> {
             // A zero capacity would make the eviction below pop from an empty deque and then push
             // past the bound. Callers already clamp to `MIN_SURB_RB_CAPACITY`; this is belt-and-braces.
             capacity: capacity.max(1),
+            pop_order,
         }
     }
 
@@ -557,7 +545,7 @@ impl<S> SurbRingBuffer<S> {
         inner.surbs.len()
     }
 
-    /// Pops the oldest SURB that `is_valid` accepts (FIFO).
+    /// Pops the next SURB that `is_valid` accepts, in the buffer's [`SurbPopOrder`].
     ///
     /// **Destructive:** rejected entries are discarded, not skipped, so an unusable SURB neither is
     /// handed out nor blocks those behind it. Pass only a validity test — a selective predicate
@@ -573,7 +561,10 @@ impl<S> SurbRingBuffer<S> {
         loop {
             let (id, surb, remaining) = {
                 let mut inner = self.inner.lock();
-                let (id, surb) = inner.surbs.pop_front()?;
+                let (id, surb) = match self.pop_order {
+                    SurbPopOrder::Fifo => inner.surbs.pop_front()?,
+                    SurbPopOrder::Lifo => inner.surbs.pop_back()?,
+                };
                 (id, surb, inner.surbs.len())
             };
 
@@ -588,12 +579,20 @@ impl<S> SurbRingBuffer<S> {
         self.inner.lock().surbs.len()
     }
 
-    /// Pops the oldest SURB (FIFO) only if it has the given ID.
+    /// Pops the next SURB (in the buffer's [`SurbPopOrder`]) only if it has the given ID.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Option<PoppedSurb<S>> {
         let mut inner = self.inner.lock();
 
-        if inner.surbs.front().is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = inner.surbs.pop_front()?;
+        let next = match self.pop_order {
+            SurbPopOrder::Fifo => inner.surbs.front(),
+            SurbPopOrder::Lifo => inner.surbs.back(),
+        };
+
+        if next.is_some_and(|(surb_id, _)| surb_id == id) {
+            let (id, surb) = match self.pop_order {
+                SurbPopOrder::Fifo => inner.surbs.pop_front()?,
+                SurbPopOrder::Lifo => inner.surbs.pop_back()?,
+            };
             Some(PoppedSurb {
                 id,
                 surb,
@@ -609,6 +608,7 @@ impl<S> SurbRingBuffer<S> {
 mod tests {
     use hopr_api::types::crypto::crypto_traits::Randomizable;
     use hopr_crypto_packet::sphinx::prelude::SphinxHeaderSpec;
+    use rstest::rstest;
 
     use super::*;
 
@@ -770,20 +770,25 @@ mod tests {
         assert_eq!(SurbPopOrder::Fifo, SurbPopOrder::default());
     }
 
-    /// Within one generation, overflow evicts the oldest and pops consume oldest-first (FIFO), so
-    /// the surviving set {2,3,4} is handed out in that order.
-    #[test]
-    fn surb_ring_buffer_should_drop_oldest_items_when_capacity_is_reached() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(3);
+    /// Eviction always removes the oldest, so both orders see the same surviving set {2,3,4}, but
+    /// consume it from opposite ends (all within one generation).
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo, [[2u8; 8], [3u8; 8], [4u8; 8]])]
+    #[case::lifo(SurbPopOrder::Lifo, [[4u8; 8], [3u8; 8], [2u8; 8]])]
+    fn surb_ring_buffer_should_drop_oldest_items_when_capacity_is_reached(
+        #[case] order: SurbPopOrder,
+        #[case] expected: [HoprSurbId; 3],
+    ) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(3, order);
         rb.push([([1u8; 8], 0)], 0);
         rb.push([([2u8; 8], 0)], 0);
         rb.push([([3u8; 8], 0)], 0);
         rb.push([([4u8; 8], 0)], 0);
 
-        for (i, expected_id) in [[2u8; 8], [3u8; 8], [4u8; 8]].into_iter().enumerate() {
+        for (i, expected_id) in expected.into_iter().enumerate() {
             let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
             assert_eq!(expected_id, popped.id, "unexpected id at index {i}");
-            assert_eq!(2 - i, popped.remaining, "unexpected remaining");
+            assert_eq!(expected.len() - 1 - i, popped.remaining, "unexpected remaining");
         }
 
         assert!(rb.pop_any().is_none(), "buffer should be drained");
@@ -792,8 +797,8 @@ mod tests {
     }
 
     #[test]
-    fn surb_ring_buffer_should_pop_oldest_first() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
+    fn surb_ring_buffer_should_pop_fifo_by_default() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, SurbPopOrder::default());
 
         let len = rb.push([([1u8; 8], 0)], 0);
         assert_eq!(1, len);
@@ -819,8 +824,37 @@ mod tests {
     }
 
     #[test]
-    fn surb_ring_buffer_should_skip_entries_failing_the_predicate() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
+    fn surb_ring_buffer_should_pop_lifo_when_configured() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
+
+        let len = rb.push([([1u8; 8], 0)], 0);
+        assert_eq!(1, len);
+
+        let len = rb.push([([2u8; 8], 0)], 0);
+        assert_eq!(2, len);
+
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
+
+        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([1u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
+        assert_eq!(2, len);
+
+        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
+    }
+
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_skip_entries_failing_the_predicate(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, order);
         rb.push([([1u8; 8], 0), ([2u8; 8], 0), ([3u8; 8], 0)], 0);
 
         // Only the middle entry is acceptable, so the two rejected ones must be discarded.
@@ -838,7 +872,7 @@ mod tests {
 
     #[test]
     fn surb_ring_buffer_should_return_none_when_no_entry_satisfies_the_predicate() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
+        let rb = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
         rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
 
         assert!(rb.pop_next_valid(|_, _| false).is_none());
@@ -854,9 +888,11 @@ mod tests {
     /// churn *afterwards*: once a pseudonym has filled its buffer, an unbounded stream of
     /// pushes and pops must not keep reallocating. So the high-water mark is reached first and
     /// sampled there, rather than at construction.
-    #[test]
-    fn surb_ring_buffer_should_not_reallocate_under_steady_overflow() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(8);
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_not_reallocate_under_steady_overflow(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(8, order);
 
         for i in 0..8u32 {
             rb.push([(((i as u64).to_be_bytes()), 0)], 0);
@@ -886,7 +922,7 @@ mod tests {
     #[test]
     fn surb_ring_buffer_must_allocate_with_occupancy_not_capacity() {
         const CAPACITY: usize = 100_000;
-        let rb = SurbRingBuffer::<u64>::new(CAPACITY);
+        let rb = SurbRingBuffer::<u64>::new(CAPACITY, SurbPopOrder::default());
 
         let empty = rb.inner.lock().surbs.capacity();
         assert!(empty < CAPACITY / 100, "a buffer holding nothing reserved for {empty}");
@@ -903,9 +939,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn surb_ring_buffer_should_not_pop_if_id_does_not_match() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo)]
+    #[case::lifo(SurbPopOrder::Lifo)]
+    fn surb_ring_buffer_should_not_pop_if_id_does_not_match(#[case] order: SurbPopOrder) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, order);
 
         rb.push([([1u8; 8], 0)], 0);
 
@@ -921,14 +959,25 @@ mod tests {
     }
 
     #[test]
-    fn surb_ring_buffer_should_check_the_oldest_entry_for_an_exact_id() -> anyhow::Result<()> {
-        // FIFO: the oldest entry is checked; a match for the newer id at the back is not popped.
-        let rb = SurbRingBuffer::new(5);
-        rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-        assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_none());
+    fn surb_ring_buffer_should_check_the_popping_end_for_an_exact_id() -> anyhow::Result<()> {
+        // FIFO checks the oldest (front); a match for the newer id at the back is not popped.
+        let fifo = SurbRingBuffer::new(5, SurbPopOrder::Fifo);
+        fifo.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
+        assert!(fifo.pop_one_if_has_id(&[2u8; 8]).is_none());
         assert_eq!(
             [1u8; 8],
-            rb.pop_one_if_has_id(&[1u8; 8])
+            fifo.pop_one_if_has_id(&[1u8; 8])
+                .ok_or(anyhow::anyhow!("expected pop"))?
+                .id
+        );
+
+        // LIFO checks the newest (back); a match for the older id at the front is not popped.
+        let lifo = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
+        lifo.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
+        assert!(lifo.pop_one_if_has_id(&[1u8; 8]).is_none());
+        assert_eq!(
+            [2u8; 8],
+            lifo.pop_one_if_has_id(&[2u8; 8])
                 .ok_or(anyhow::anyhow!("expected pop"))?
                 .id
         );
@@ -940,7 +989,7 @@ mod tests {
 
     #[test]
     fn surb_ring_buffer_should_drop_the_previous_generation_when_a_newer_one_arrives() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(64);
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
         rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 3);
         assert_eq!(2, rb.len());
 
@@ -959,7 +1008,7 @@ mod tests {
 
     #[test]
     fn surb_ring_buffer_should_append_within_the_same_generation() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(64);
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
         rb.push([([1u8; 8], 0)], 7);
         rb.push([([2u8; 8], 0)], 7);
         assert_eq!(2, rb.len(), "same-generation batches accumulate");
@@ -970,7 +1019,7 @@ mod tests {
 
     #[test]
     fn surb_ring_buffer_should_discard_a_stale_older_generation_batch() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(64);
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
         rb.push([([9u8; 8], 0)], 5);
 
         // A late/reordered batch from an older generation must not reintroduce stale SURBs.
@@ -1029,10 +1078,10 @@ mod tests {
         Ok(())
     }
 
-    /// The deprecated `pop_order` is retained on the config (so existing files still parse under
-    /// `deny_unknown_fields`) but ignored at runtime: even with `Lifo` set, consumption is FIFO.
+    /// A configured `pop_order = lifo` is honoured end-to-end at the store: within a generation, the
+    /// newest buffered SURB is handed out first.
     #[test]
-    fn surb_store_config_lifo_should_be_ignored_at_runtime() -> anyhow::Result<()> {
+    fn memory_surb_store_should_consume_lifo_when_configured() -> anyhow::Result<()> {
         let cfg = SurbStoreConfig {
             pop_order: SurbPopOrder::Lifo,
             ..Default::default()
@@ -1052,9 +1101,9 @@ mod tests {
             .find_surb(SurbMatcher::Pseudonym(pseudonym))
             .ok_or(anyhow::anyhow!("expected a usable SURB"))?;
         assert_eq!(
-            [1u8; 8],
+            [2u8; 8],
             found.sender_id.surb_id(),
-            "consumption must be FIFO despite lifo config"
+            "LIFO must hand out the newest SURB first"
         );
 
         Ok(())
