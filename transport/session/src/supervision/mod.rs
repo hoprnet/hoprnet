@@ -274,7 +274,7 @@
 //!
 //! No parameter above says what a quota costs, and none should. The Exit's deposit pool is handed the
 //! [`DepositUpdated`](hopr_api::node::DepositUpdated) sender along with
-//! [`AgreedSsaQuota`](crate::AgreedSsaQuota) when the deposit address arrives, and it is the component
+//! [`AgreedSsaQuota`] when the deposit address arrives, and it is the component
 //! that knows both the byte quota and the price it charges for one. It sends on that channel once the
 //! deposit clears that price; the supervisor's `DepositConfirmed` handler acts on the verdict rather
 //! than recomputing it. The Entry side mirrors this — its own strategy prices the `quota` carried by
