@@ -1031,6 +1031,116 @@ mod tests {
         Ok(())
     }
 
+    /// A generation is an RFC-1982 `u8` serial, so it wraps 255 -> 0. The wrap must trigger the same
+    /// supersede-and-clear as any other newer generation, not be misread as an older batch.
+    #[test]
+    fn surb_ring_buffer_should_switch_generations_across_the_u8_wrap() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 255);
+        assert_eq!(2, rb.len());
+
+        // 0 is newer than 255 across the wrap: drop the old generation and switch to the new one.
+        rb.push([([9u8; 8], 0)], 0);
+        assert_eq!(
+            1,
+            rb.len(),
+            "the wrapped-around newer generation must supersede the previous one"
+        );
+        assert_eq!(Some(0), rb.generation());
+        assert_eq!([9u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert!(rb.pop_any().is_none(), "no stale SURB may survive the wrap");
+
+        Ok(())
+    }
+
+    /// Several return-path re-plans in a row, walking up to and across the wrap (253 -> 1). Each newer
+    /// generation supersedes the one before, so the eldest is dropped at every step and the buffer
+    /// holds only the newest batch — re-plans alone can never accumulate stale generations and so can
+    /// never overflow capacity.
+    #[test]
+    fn surb_ring_buffer_should_supersede_across_consecutive_replans_including_the_wrap() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
+
+        for (i, generation) in [253u8, 254, 255, 0, 1].into_iter().enumerate() {
+            rb.push([([i as u8; 8], 0)], generation);
+            assert_eq!(
+                1,
+                rb.len(),
+                "each re-plan must leave only its own batch, dropping the previous"
+            );
+            assert_eq!(Some(generation), rb.generation());
+        }
+
+        // Only the final generation's SURB (index 4, generation 1) survives.
+        assert_eq!([4u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert!(rb.pop_any().is_none());
+
+        Ok(())
+    }
+
+    /// With several re-plans in flight at once, their batches can arrive out of order. The buffer
+    /// keeps the highest generation it has seen and discards a later-arriving older batch, so the exit
+    /// never falls back to a superseded path even when three generations touch the buffer.
+    #[test]
+    fn surb_ring_buffer_should_keep_the_highest_generation_when_replans_arrive_out_of_order() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
+        rb.push([([1u8; 8], 0)], 7); // generation 7
+        rb.push([([2u8; 8], 0)], 9); // generation 9 (two re-plans later) supersedes 7
+        rb.push([([3u8; 8], 0)], 8); // generation 8 arrives late, out of order -> discarded as older
+        assert_eq!(1, rb.len(), "a late older-generation batch must not be reintroduced");
+        assert_eq!(Some(9), rb.generation());
+        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
+    }
+
+    /// The exit's discard decision must be defined right at the serial-space boundary. A batch a full
+    /// half-space ahead (+128) is deliberately NOT taken as newer, so the exit keeps its current SURBs
+    /// rather than switch to an ambiguously-ordered generation. This cannot arise while adjacent
+    /// generations are in flight (the design's premise); the test pins the boundary so it stays
+    /// intentional rather than accidental.
+    #[test]
+    fn surb_ring_buffer_should_not_switch_on_a_half_serial_space_jump() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(64, SurbPopOrder::Fifo);
+        rb.push([([1u8; 8], 0)], 10);
+
+        rb.push([([2u8; 8], 0)], 10u8.wrapping_add(128));
+        assert_eq!(1, rb.len(), "a half-space jump must not be taken as newer");
+        assert_eq!(
+            Some(10),
+            rb.generation(),
+            "the current generation is retained at the boundary"
+        );
+        assert_eq!(
+            [1u8; 8],
+            rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id,
+            "the exit keeps its current SURB rather than the ambiguous one"
+        );
+
+        Ok(())
+    }
+
+    /// A newer generation clears the buffer *before* inserting, so even a batch large enough to
+    /// overflow capacity holds only new-generation SURBs — a superseded generation can never occupy a
+    /// slot the live return path needs.
+    #[test]
+    fn surb_ring_buffer_should_clear_before_capacity_eviction_on_a_newer_generation() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(3, SurbPopOrder::Fifo);
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0), ([3u8; 8], 0)], 0); // fill to capacity at generation 0
+        assert_eq!(3, rb.len());
+
+        // Newer generation, a full batch: generation 0 is cleared first, then the new batch fills
+        // from scratch — no generation-0 SURB survives to consume a slot.
+        rb.push([([4u8; 8], 0), ([5u8; 8], 0), ([6u8; 8], 0)], 1);
+        assert_eq!(3, rb.len(), "capacity is respected and no superseded SURB survives");
+        assert_eq!(Some(1), rb.generation());
+        for expected in [[4u8; 8], [5u8; 8], [6u8; 8]] {
+            assert_eq!(expected, rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn generation_serial_should_wrap_around() {
         // RFC-1982: 0 is newer than 255, and 255 is not newer than 0.
@@ -1041,6 +1151,19 @@ mod tests {
         );
         assert!(generation_is_newer(4, 3));
         assert!(!generation_is_newer(3, 3), "a generation is not newer than itself");
+
+        // The comparison window is half the serial space: +127 is still newer, but +128 sits on the
+        // ambiguity boundary and is deliberately NOT treated as newer. This is the cap on how far the
+        // sender may advance between two batches the exit actually sees; adjacent generations — the
+        // only case in flight — are nowhere near it, so the exit's discard decision stays well-defined.
+        assert!(
+            generation_is_newer(10u8.wrapping_add(127), 10),
+            "+127 is inside the window"
+        );
+        assert!(
+            !generation_is_newer(10u8.wrapping_add(128), 10),
+            "+128 is the boundary and must not read as newer"
+        );
     }
 
     /// The sending-side generation serial starts at 0 for an unseen pseudonym and each bump advances
