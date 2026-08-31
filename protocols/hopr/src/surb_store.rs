@@ -502,6 +502,25 @@ struct GenerationalBuffer<S> {
     generation: Option<u8>,
 }
 
+impl<S> GenerationalBuffer<S> {
+    /// The end a pop consumes from under `order` (front for FIFO, back for LIFO). The single place
+    /// the order-to-end polarity is decided, so [`pop_end`](Self::pop_end) and its peek stay in step.
+    fn peek_end(&self, order: SurbPopOrder) -> Option<&(HoprSurbId, S)> {
+        match order {
+            SurbPopOrder::Fifo => self.surbs.front(),
+            SurbPopOrder::Lifo => self.surbs.back(),
+        }
+    }
+
+    /// Removes and returns the SURB at the end `order` consumes from.
+    fn pop_end(&mut self, order: SurbPopOrder) -> Option<(HoprSurbId, S)> {
+        match order {
+            SurbPopOrder::Fifo => self.surbs.pop_front(),
+            SurbPopOrder::Lifo => self.surbs.pop_back(),
+        }
+    }
+}
+
 impl<S> SurbRingBuffer<S> {
     /// Creates a buffer holding at most `capacity` (min 1, so a push is never a no-op) SURBs,
     /// popped in the given order.
@@ -578,10 +597,7 @@ impl<S> SurbRingBuffer<S> {
         loop {
             let (id, surb, remaining) = {
                 let mut inner = self.inner.lock();
-                let (id, surb) = match self.pop_order {
-                    SurbPopOrder::Fifo => inner.surbs.pop_front()?,
-                    SurbPopOrder::Lifo => inner.surbs.pop_back()?,
-                };
+                let (id, surb) = inner.pop_end(self.pop_order)?;
                 (id, surb, inner.surbs.len())
             };
 
@@ -600,16 +616,8 @@ impl<S> SurbRingBuffer<S> {
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Option<PoppedSurb<S>> {
         let mut inner = self.inner.lock();
 
-        let next = match self.pop_order {
-            SurbPopOrder::Fifo => inner.surbs.front(),
-            SurbPopOrder::Lifo => inner.surbs.back(),
-        };
-
-        if next.is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = match self.pop_order {
-                SurbPopOrder::Fifo => inner.surbs.pop_front()?,
-                SurbPopOrder::Lifo => inner.surbs.pop_back()?,
-            };
+        if inner.peek_end(self.pop_order).is_some_and(|(surb_id, _)| surb_id == id) {
+            let (id, surb) = inner.pop_end(self.pop_order)?;
             Some(PoppedSurb {
                 id,
                 surb,
@@ -813,56 +821,33 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn surb_ring_buffer_should_pop_fifo_by_default() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5, SurbPopOrder::default());
+    /// Two SURBs pushed as {1, 2}: FIFO hands out 1 then 2, LIFO hands out 2 then 1 — and the same
+    /// order holds for a fresh batch pushed after the buffer drains. (That FIFO is the *default* is
+    /// asserted separately by `surb_store_config_should_default_to_fifo`.)
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo, [[1u8; 8], [2u8; 8]])]
+    #[case::lifo(SurbPopOrder::Lifo, [[2u8; 8], [1u8; 8]])]
+    fn surb_ring_buffer_should_consume_from_the_configured_end(
+        #[case] order: SurbPopOrder,
+        #[case] expected: [HoprSurbId; 2],
+    ) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, order);
 
-        let len = rb.push([([1u8; 8], 0)], 0);
-        assert_eq!(1, len);
-
-        let len = rb.push([([2u8; 8], 0)], 0);
-        assert_eq!(2, len);
+        assert_eq!(1, rb.push([([1u8; 8], 0)], 0));
+        assert_eq!(2, rb.push([([2u8; 8], 0)], 0));
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!([1u8; 8], popped.id);
+        assert_eq!(expected[0], popped.id);
         assert_eq!(1, popped.remaining);
 
         let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(expected[1], popped.id);
         assert_eq!(0, popped.remaining);
 
-        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-        assert_eq!(2, len);
-
-        assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
-        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
-
-        Ok(())
-    }
-
-    #[test]
-    fn surb_ring_buffer_should_pop_lifo_when_configured() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
-
-        let len = rb.push([([1u8; 8], 0)], 0);
-        assert_eq!(1, len);
-
-        let len = rb.push([([2u8; 8], 0)], 0);
-        assert_eq!(2, len);
-
-        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!([2u8; 8], popped.id);
-        assert_eq!(1, popped.remaining);
-
-        let popped = rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?;
-        assert_eq!([1u8; 8], popped.id);
-        assert_eq!(0, popped.remaining);
-
-        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-        assert_eq!(2, len);
-
-        assert_eq!([2u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
-        assert_eq!([1u8; 8], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        // A fresh batch after draining consumes from the same end.
+        assert_eq!(2, rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0));
+        assert_eq!(expected[0], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!(expected[1], rb.pop_any().ok_or(anyhow::anyhow!("expected pop"))?.id);
 
         Ok(())
     }
@@ -975,26 +960,24 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn surb_ring_buffer_should_check_the_popping_end_for_an_exact_id() -> anyhow::Result<()> {
-        // FIFO checks the oldest (front); a match for the newer id at the back is not popped.
-        let fifo = SurbRingBuffer::new(5, SurbPopOrder::Fifo);
-        fifo.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-        assert!(fifo.pop_one_if_has_id(&[2u8; 8]).is_none());
-        assert_eq!(
-            [1u8; 8],
-            fifo.pop_one_if_has_id(&[1u8; 8])
-                .ok_or(anyhow::anyhow!("expected pop"))?
-                .id
-        );
+    /// `pop_one_if_has_id` checks only the popping end — FIFO the front (oldest), LIFO the back
+    /// (newest). Given {1, 2}, a match for the id at the *other* end is not popped; the id at the
+    /// consuming end is.
+    #[rstest]
+    #[case::fifo(SurbPopOrder::Fifo, [2u8; 8], [1u8; 8])]
+    #[case::lifo(SurbPopOrder::Lifo, [1u8; 8], [2u8; 8])]
+    fn surb_ring_buffer_should_check_the_popping_end_for_an_exact_id(
+        #[case] order: SurbPopOrder,
+        #[case] other_end_id: HoprSurbId,
+        #[case] popping_end_id: HoprSurbId,
+    ) -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5, order);
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
 
-        // LIFO checks the newest (back); a match for the older id at the front is not popped.
-        let lifo = SurbRingBuffer::new(5, SurbPopOrder::Lifo);
-        lifo.push([([1u8; 8], 0), ([2u8; 8], 0)], 0);
-        assert!(lifo.pop_one_if_has_id(&[1u8; 8]).is_none());
+        assert!(rb.pop_one_if_has_id(&other_end_id).is_none());
         assert_eq!(
-            [2u8; 8],
-            lifo.pop_one_if_has_id(&[2u8; 8])
+            popping_end_id,
+            rb.pop_one_if_has_id(&popping_end_id)
                 .ok_or(anyhow::anyhow!("expected pop"))?
                 .id
         );
