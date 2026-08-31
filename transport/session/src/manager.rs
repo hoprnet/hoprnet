@@ -5540,6 +5540,58 @@ mod tests {
         Ok(())
     }
 
+    /// `mark_return_path_degraded` must mark exactly the Sessions routed to the given destination and
+    /// return their pseudonyms (the SURB-generation keys the caller bumps), leaving Sessions bound
+    /// for other destinations untouched.
+    #[test_log::test(tokio::test)]
+    async fn session_manager_mark_return_path_degraded_should_return_the_marked_pseudonyms() -> anyhow::Result<()> {
+        use std::collections::HashSet;
+
+        let mgr = SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+
+        let dest_a: Address = (&ChainKeypair::random()).into();
+        let dest_b: Address = (&ChainKeypair::random()).into();
+
+        let forward_to = |addr: Address, ps: HoprPseudonym| DestinationRouting::Forward {
+            destination: Box::new(addr.into()),
+            pseudonym: Some(ps),
+            forward_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN),
+            return_options: RoutingOptions::Hops(hopr_api::types::primitive::bounded::BoundedSize::MIN).into(),
+        };
+
+        // Two Sessions route to `dest_a`, one to `dest_b`.
+        let (ps_a1, ps_a2, ps_b) = (
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+            HoprPseudonym::random(),
+        );
+        mgr.pre_populate_session(ps_a1, forward_to(dest_a, ps_a1));
+        mgr.pre_populate_session(ps_a2, forward_to(dest_a, ps_a2));
+        mgr.pre_populate_session(ps_b, forward_to(dest_b, ps_b));
+        mgr.sessions.run_pending_tasks();
+
+        let node_a = hopr_api::types::internal::NodeId::Chain(dest_a);
+        let marked: HashSet<_> = mgr
+            .mark_return_path_degraded(&node_a, Duration::from_secs(30))
+            .into_iter()
+            .collect();
+        assert_eq!(
+            marked,
+            HashSet::from([ps_a1, ps_a2]),
+            "only the Sessions routed to dest_a must be marked, and their pseudonyms returned"
+        );
+
+        // A destination nothing routes to marks nothing.
+        let node_c = hopr_api::types::internal::NodeId::Chain((&ChainKeypair::random()).into());
+        assert!(
+            mgr.mark_return_path_degraded(&node_c, Duration::from_secs(30))
+                .is_empty(),
+            "a destination with no Sessions must return no pseudonyms"
+        );
+
+        Ok(())
+    }
+
     /// Verifies that a `KeepAlive` message with the `BalancerState` flag updates the session's
     /// SURB buffer level in the manager.
     ///
