@@ -416,7 +416,7 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     /// attached SURBs can be specified.
     ///
     /// `generation` is the RFC-1982 serial stamped into every SURB minted here (see
-    /// [`SurbReceiverInfo::generation`]). The creator bumps it whenever it changes the return path,
+    /// `SurbReceiverInfo::generation()`). The creator bumps it whenever it changes the return path,
     /// so the replying side can drop SURBs left over from a superseded path. It is irrelevant when
     /// `return_paths` is empty; pass `0` there.
     ForwardPath {

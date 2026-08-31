@@ -1787,9 +1787,9 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.32.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e7ee57f8d848cdd86b0b2b4f144f10a9a28edba042d609d08850f57bbd79a47"
+checksum = "f2eed63aec778288cd2fa8aaf9537687e0b5a7d2eae53f7b0360e05fc02134db"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4098,9 +4098,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "4.0.1"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fc0875b8cc5c7e5037b3a7c2e466156fde906e29a83e6fbff89da71a19b91c5"
+checksum = "5f004332014f2739746ff6428b01f6308791528ec0bc5b692e2c4837fa27c87c"
 dependencies = [
  "async-trait",
  "atomic_enum",
@@ -4137,9 +4137,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-connector"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "406561821270b7ccff78dd09ce12b8d93b3da727f800f8be29ad26d296974e4a"
+checksum = "d5ccf6e1918b73b93a3e56fc1181490b21f2e3b5a18d87fde363103af7adbc36"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4196,9 +4196,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-ct-full-network"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46b1129751a1d54a2625e9e1c71d86f09cc7d6c6ea18f3e7716902510b7ae72d"
+checksum = "cd44827e18b23aabe61dee30ad00ebb345028aed825d9a268e83a06b478ab526"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4260,9 +4260,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-graph"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b181ef9132b15ccfe20d82af990f3f2e58c07f5fd96adaa8b4516a82050cd445"
+checksum = "2515e6939e1b1c2388f6414a6da5a7e22de8fa0755203f8f19b4e296703b1b8c"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4316,7 +4316,6 @@ dependencies = [
  "moka",
  "parameterized",
  "parking_lot",
- "rstest",
  "serde",
  "serde_with",
  "smart-default",
@@ -4418,9 +4417,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-ticket-manager"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "432fcb6a5c815db1d802fa26c05a8ddb42223fc6317e68123185c8864d0ba31a"
+checksum = "325e8c0a2f64d29805e02c6f6d24bf686dfb03a688809f36407595fc47f94993"
 dependencies = [
  "ahash",
  "anyhow",
@@ -4528,9 +4527,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "131805f9a85a8fcc155b58db24d8d9068cd5af8063a9ac8fb5309f2307000ed7"
+checksum = "fe10edd3f8a72932451e3d8f75058075e68d86942c2cc4db005587c31cd58c29"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -4637,9 +4636,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-types"
-version = "3.1.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6994bdc05812ab588d3fa970c1df9a7bea3d8808907baf30c0596a54b84458f3"
+checksum = "1998a31a5fec199e2e51cb6c79804934a49d72a10c54714208ce17fa42e73af0"
 dependencies = [
  "aes 0.9.2",
  "anyhow",
@@ -4701,9 +4700,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-utilities"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "727f1af414f4923a9e32832304bf759cf1db56f262dc8bdf70a475806cae0e60"
+checksum = "c14c15d3f0945752daaf2a0b5c5b0a9e11821d012eff7c48195e89dc1454695d"
 dependencies = [
  "anyhow",
  "arrayvec",
