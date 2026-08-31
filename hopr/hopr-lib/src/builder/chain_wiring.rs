@@ -1019,11 +1019,6 @@ mod tests {
             "the event following the service ones must still be routed"
         );
         assert_eq!(
-            edges.len(),
-            1,
-            "the event following the service ones must still be routed"
-        );
-        assert_eq!(
             edges[0].balance,
             Some(hopr_api::graph::traits::Balance::from(100u64)),
             "the balance inputs must have survived the service events"
