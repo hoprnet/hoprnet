@@ -1060,6 +1060,32 @@ mod tests {
         assert!(!generation_is_newer(3, 3), "a generation is not newer than itself");
     }
 
+    /// The sending-side generation serial starts at 0 for an unseen pseudonym and each bump advances
+    /// it by one (the value the encoder stamps onto the next minted batch).
+    #[test]
+    fn memory_surb_store_generation_should_start_at_zero_and_advance_on_bump() {
+        let store = MemorySurbStore::default();
+        let pseudonym = HoprPseudonym::random();
+
+        assert_eq!(
+            0,
+            store.current_generation(&pseudonym),
+            "an unseen pseudonym starts at generation 0"
+        );
+        assert_eq!(
+            1,
+            store.bump_generation(&pseudonym),
+            "the first bump returns the new generation 1"
+        );
+        assert_eq!(
+            1,
+            store.current_generation(&pseudonym),
+            "current_generation reflects the last bump"
+        );
+        assert_eq!(2, store.bump_generation(&pseudonym), "each bump advances by one");
+        assert_eq!(2, store.current_generation(&pseudonym));
+    }
+
     /// End-to-end at the store: a newer generation for a pseudonym drops the SURBs held for the old
     /// one, so a return-path change takes effect on the next reply (one-packet recovery).
     #[test]
