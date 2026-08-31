@@ -140,7 +140,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         let alpha_new = alpha_point.mul(&b_k_checked);
 
         if !alpha_new.is_valid() {
-            return Err(CryptoError::CalculationError);
+            return Err(hopr_types::crypto::errors::CryptoError::CalculationError);
         }
 
         Ok((alpha_new.to_alpha(), secret))

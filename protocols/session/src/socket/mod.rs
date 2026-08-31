@@ -73,6 +73,35 @@ pub struct SessionSocketConfig {
     /// Default is 2048.
     #[default(2048)]
     pub control_channel_capacity: usize,
+    /// Maximum time a fully-received frame may sit in the ordering buffer before being discarded
+    /// rather than delivered.
+    ///
+    /// Bounds how stale delivered data can be, so a stall surfaces as clean loss instead of a burst
+    /// of seconds-old frames. Distinct from [`Self::frame_timeout`], which bounds how long a
+    /// *missing* frame is waited for. Default `None` (no bound).
+    ///
+    /// A frame dropped here has already been acknowledged, since the acknowledgement is queued at
+    /// reassembly. That is deliberate: the ack states that the *path* delivered the frame, which it
+    /// did, and the drop is a local freshness policy applied afterwards. Withholding the ack would
+    /// make the sender retransmit data we discarded precisely for being stale, reintroducing the
+    /// latency tail this bound exists to remove.
+    #[default(None)]
+    pub max_frame_age: Option<Duration>,
+    /// Abandon the frame due next once this many later frames are already waiting behind it,
+    /// instead of holding them for [`Self::frame_timeout`].
+    ///
+    /// Head-of-line bound. `frame_timeout` waits for a frame that may still arrive; this bounds
+    /// how much already-received data is held hostage while that wait runs. On a session without
+    /// retransmission the missing frame is never coming, so the wait is pure cost: measured on a
+    /// cluster, 98.5% of bytes returned over the wire while 0.60% reached the application and the
+    /// application-side inter-arrival median sat exactly on the timeout.
+    ///
+    /// Counting frames rather than watching a clock decides on evidence -- a queue building up
+    /// behind a gap is a lost frame, where one or two frames ahead is ordinary reordering. The
+    /// right value tracks reordering depth, which is throughput x latency spread, so it is
+    /// deployment-specific and meant to be tuned. `None` (default) keeps the previous behaviour.
+    #[default(None)]
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 enum WriteState {
@@ -220,7 +249,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            .sequencer_with(crate::processing::SequencerConfig {
+                max_wait: cfg.frame_timeout,
+                capacity: cfg.capacity,
+                max_item_age: cfg.max_frame_age,
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
+            })
             // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 let _span = stage3_span.enter();
@@ -426,7 +460,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 })
             })
             // Put the frames into the correct sequence by Frame Ids
-            .sequencer(cfg.frame_timeout, cfg.capacity)
+            .sequencer_with(crate::processing::SequencerConfig {
+                max_wait: cfg.frame_timeout,
+                capacity: cfg.capacity,
+                max_item_age: cfg.max_frame_age,
+                max_frames_behind_gap: cfg.max_frames_behind_gap,
+            })
             // Discard frames missing from the sequence and
             // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
@@ -1110,6 +1149,102 @@ mod tests {
             insta::assert_yaml_snapshot!(bob_tracker);
         }
 
+        Ok(())
+    }
+
+    /// Drives the head-of-line case end to end over the real socket pipeline.
+    ///
+    /// Segment 0 is dropped, so frame 1 can never be completed, and the sender is deliberately
+    /// left **open**: closing it would drain the sequencer through `State::Done`, which discards
+    /// missing frames immediately and would hide the very stall under test. Returns how long the
+    /// surviving frames took to arrive, and asserts they arrived intact.
+    async fn time_delivery_behind_a_lost_frame(max_frames_behind_gap: Option<usize>) -> anyhow::Result<Duration> {
+        // hoprd's production value, chosen to clear the ~2 s SURB KeepAlive.
+        const FRAME_TIMEOUT: Duration = Duration::from_secs(3);
+
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless(
+            "alice",
+            alice,
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            TestTelemetryTracker::default(),
+        )?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless(
+            "bob",
+            bob,
+            SessionSocketConfig {
+                frame_size: FRAME_SIZE,
+                frame_timeout: FRAME_TIMEOUT,
+                max_frames_behind_gap,
+                ..Default::default()
+            },
+            #[cfg(feature = "telemetry")]
+            TestTelemetryTracker::default(),
+        )?;
+
+        let data = hopr_types::crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket
+            .write_all(&data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await??;
+        alice_socket.flush().await?;
+
+        // Everything except the lost first frame.
+        let mut received = vec![0u8; DATA_SIZE - FRAME_SIZE];
+        let started = std::time::Instant::now();
+        bob_socket
+            .read_exact(&mut received)
+            .timeout(futures_time::time::Duration::from_secs(20))
+            .await??;
+        let elapsed = started.elapsed();
+
+        assert_eq!(
+            &data[FRAME_SIZE..],
+            &received,
+            "the frames that did arrive must be delivered intact, whenever they are released"
+        );
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+        Ok(elapsed)
+    }
+
+    /// The fix, at the socket level: frames behind an unfillable gap are released on the evidence
+    /// that later frames are queued, not after the frame timeout has run its course.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_should_release_frames_behind_a_gap_without_waiting_for_the_timeout() -> anyhow::Result<()>
+    {
+        let elapsed = time_delivery_behind_a_lost_frame(Some(2)).await?;
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "frames already received must not wait on a frame that cannot arrive; took {elapsed:?}"
+        );
+        Ok(())
+    }
+
+    /// The witness for the test above: with the bound disabled, the same loss on the same pipeline
+    /// stalls for the whole frame timeout. Without this, a fast run could be crediting the fix for
+    /// something the network or the harness was doing anyway.
+    #[test_log::test(tokio::test)]
+    async fn stateless_socket_without_the_gap_bound_should_stall_for_the_whole_frame_timeout() -> anyhow::Result<()> {
+        let elapsed = time_delivery_behind_a_lost_frame(None).await?;
+        assert!(
+            elapsed >= Duration::from_secs(3),
+            "the unbounded path is what the fix removes; it must still be observable here, took {elapsed:?}"
+        );
         Ok(())
     }
 

@@ -24,7 +24,7 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 /// Testing utilities: cluster fixtures, node wiring helpers, echo server.
-#[cfg(any(feature = "testing", test))]
+#[cfg(feature = "testing")]
 pub mod testing;
 /// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
@@ -60,8 +60,8 @@ use hopr_api::{
     network::{Health, NetworkStreamControl, NetworkView},
     node::{
         ActionableEvent, ActionableEventDiscriminant, AtomicHoprState, ComponentStatus, ComponentStatusReporter,
-        EitherErrExt, EventWaitResult, HasChainApi, HasGraphView, HasNetworkView, HasTicketManagement, HasTransportApi,
-        HoprNodeOperations, HoprState, NodeOnchainIdentity,
+        EitherErrExt, EventWaitResult, HasChainApi, HasExitIncentivization, HasGraphView, HasNetworkView,
+        HasTicketManagement, HasTransportApi, HoprNodeOperations, HoprState, NodeOnchainIdentity, PixEvent,
     },
     tickets::TicketManagement,
     types::{crypto::prelude::OffchainKeypair, internal::routing::DestinationRouting},
@@ -74,8 +74,8 @@ pub use hopr_transport::SESSION_MTU;
 use hopr_transport::{ApplicationDataIn, ApplicationDataOut, HoprTransport, HoprTransportProcess, OffchainPublicKey};
 #[cfg(feature = "session-client")]
 pub use hopr_transport::{
-    FlowControlConfig, HoprSession, HoprSessionConfigurator, SessionCapabilities, SessionCapability, SessionTarget,
-    SurbBalancerConfig,
+    FlowControlConfig, HoprSession, HoprSessionConfigurator, InvalidPixParams, LOCAL_PIX_SUITE, PixParams,
+    SessionCapabilities, SessionCapability, SessionTarget, SurbBalancerConfig,
 };
 use hopr_utils::runtime::prelude::spawn;
 pub use hopr_utils::runtime::{Abortable, AbortableList};
@@ -154,11 +154,34 @@ pub struct HoprSessionClientConfig {
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     #[default(false)]
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX dimensions for the Session.
+    ///
+    /// These must match this node's own PIX configuration exactly — see
+    /// [`SessionClientConfig::pix_ssa_quota`](hopr_transport::SessionClientConfig) — so the usual
+    /// way to build one is `PixParams::try_from_config` over the installed generator's config rather
+    /// than by restating the values. The curve suite among them is fixed at build time, not
+    /// configured; [`LOCAL_PIX_SUITE`] names this build's.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced, the default).
     /// `Some(FlowControlConfig::default())` = the clean profile; `Some(FlowControlConfig::robust())` =
     /// the tail-tolerance bundle. Only meaningful on a reliable (`RetransmissionAck`) session.
     #[default(None)]
     pub flow_control: Option<FlowControlConfig>,
+    /// Abandon the frame due next once the sequence has advanced this far past it, instead of
+    /// holding everything already received for the whole frame timeout.
+    ///
+    /// Head-of-line bound for this session's incoming direction. `None` inherits the node's
+    /// setting, `Some(0)` disables it here, `Some(n)` sets it.
+    ///
+    /// Worth setting per session because the right value tracks reordering depth -- throughput x
+    /// latency spread / frame size -- which is a property of the traffic, not of the node: a bulk
+    /// data session and a control session on the same node differ by orders of magnitude.
+    ///
+    /// Has no effect on a session carrying a retransmission capability, where a missing frame can
+    /// still be recovered and waiting for it is productive.
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 /// Session client configuration for explicit intermediate-path routing.
@@ -181,8 +204,14 @@ pub struct HoprSessionClientExplicitPathConfig {
     pub surb_management: Option<SurbBalancerConfig>,
     /// If set, the maximum number of possible SURBs will always be sent with session data packets.
     pub always_max_out_surbs: bool,
+    /// If set, sets the PIX dimensions for the Session.
+    ///
+    /// Defaults to `None`.
+    pub pix_ssa_quota: Option<PixParams>,
     /// Opt-in client-side send-window flow control for this session (`None` = unpaced).
     pub flow_control: Option<FlowControlConfig>,
+    /// As [`HoprSessionClientConfig::max_frames_behind_gap`].
+    pub max_frames_behind_gap: Option<usize>,
 }
 
 #[cfg(all(feature = "session-client", feature = "explicit-path"))]
@@ -196,7 +225,9 @@ impl Default for HoprSessionClientExplicitPathConfig {
             pseudonym: None,
             surb_management: Some(SurbBalancerConfig::default()),
             always_max_out_surbs: false,
+            pix_ssa_quota: None,
             flow_control: None,
+            max_frames_behind_gap: None,
         }
     }
 }
@@ -211,7 +242,9 @@ impl From<HoprSessionClientConfig> for hopr_transport::SessionClientConfig {
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
+            max_frames_behind_gap: value.max_frames_behind_gap,
         }
     }
 }
@@ -233,7 +266,9 @@ impl TryFrom<HoprSessionClientExplicitPathConfig> for hopr_transport::SessionCli
             pseudonym: value.pseudonym,
             surb_management: value.surb_management,
             always_max_out_surbs: value.always_max_out_surbs,
+            pix_ssa_quota: value.pix_ssa_quota,
             flow_control: value.flow_control,
+            max_frames_behind_gap: value.max_frames_behind_gap,
         })
     }
 }
@@ -305,6 +340,11 @@ type TicketEvents = (
     async_broadcast::InactiveReceiver<hopr_api::node::TicketEvent>,
 );
 
+type PixEvents = (
+    async_broadcast::Sender<hopr_api::node::PixEvent>,
+    async_broadcast::InactiveReceiver<hopr_api::node::PixEvent>,
+);
+
 /// Time to wait until the node's keybinding appears on-chain
 const NODE_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -327,6 +367,7 @@ pub struct Hopr<Chain, Graph, Net, TMgr> {
     pub(crate) transport_api: HoprTransport<Chain, Graph, Net>,
     pub(crate) chain_api: Chain,
     pub(crate) ticket_event_subscribers: TicketEvents,
+    pub(crate) pix_event_subscribers: PixEvents,
     pub(crate) ticket_manager: TMgr,
     #[allow(dead_code)] // Handles must stay alive to keep background tasks running
     pub(crate) processes: AbortableList<HoprLibProcess>,
@@ -614,6 +655,16 @@ where
     }
 }
 
+impl<Chain, Graph, Net, TMgr> HasExitIncentivization for Hopr<Chain, Graph, Net, TMgr> {
+    fn subscribe_pix_events(&self) -> impl Stream<Item = PixEvent> + Send + 'static {
+        self.pix_event_subscribers.1.activate_cloned()
+    }
+
+    fn status(&self) -> ComponentStatus {
+        ComponentStatus::Ready
+    }
+}
+
 impl<Chain, Graph, Net, TMgr> hopr_api::node::ActionableEventSource for Hopr<Chain, Graph, Net, TMgr>
 where
     Chain: HoprChainApi + Send + Sync + 'static,
@@ -654,6 +705,16 @@ where
                     .1
                     .activate_cloned()
                     .map(ActionableEvent::Ticket)
+                    .boxed(),
+            );
+        }
+
+        if wants(ActionableEventDiscriminant::Pix) {
+            streams.push(
+                self.pix_event_subscribers
+                    .1
+                    .activate_cloned()
+                    .map(ActionableEvent::Pix)
                     .boxed(),
             );
         }
@@ -896,10 +957,18 @@ mod tests {
             pseudonym: None,
             surb_management: None,
             always_max_out_surbs: false,
+            pix_ssa_quota: None,
             flow_control: None,
+            max_frames_behind_gap: Some(8),
         })
         .context("explicit path config conversion must succeed")?;
 
+        assert_eq!(
+            cfg.max_frames_behind_gap,
+            Some(8),
+            "the session's head-of-line bound has to survive the conversion, or it silently reverts to the node \
+             default"
+        );
         assert!(matches!(
             cfg.forward_path_options,
             hopr_transport::RoutingOptions::IntermediatePath(_)

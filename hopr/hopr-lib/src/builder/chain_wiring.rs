@@ -4,14 +4,17 @@ use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_api::{
     HoprBalance, Multiaddr, OffchainPublicKey, PeerId,
     chain::{ChainKeyOperations, WinningProbability},
-    graph::{EdgeCapacityUpdate, MeasurableEdge, NetworkGraphUpdate},
+    graph::{EdgeBalanceUpdate, MeasurableEdge, NetworkGraphUpdate},
     types::{
         chain::chain_events::ChainEvent,
         internal::prelude::ChannelStatus,
-        primitive::prelude::{Address, UnitaryFloatOps},
+        primitive::{
+            prelude::{Address, UnitaryFloatOps},
+            traits::KeyIdMapping,
+        },
     },
 };
-use hopr_transport::{NeighborTelemetry, PathTelemetry};
+use hopr_transport::{NeighborTelemetry, PathTelemetry, SurbStore};
 use parking_lot::RwLock;
 use tracing::Instrument;
 
@@ -30,11 +33,16 @@ lazy_static::lazy_static! {
 /// `ChainEvent`s into [`NetworkGraphUpdate`] calls so the routing graph stays current.
 /// When `peer_discovery_tx` is `Some`, each [`ChainEvent::Announcement`] is also forwarded
 /// to the p2p network layer so it can initiate connections to newly discovered peers.
+///
+/// Status changes on *our own outgoing* channels are also reported to `surb_store`, so SURBs whose
+/// return path starts at a relayer we can no longer pay are shed rather than replied with.
+///
 /// Runs until the supplied `events` stream terminates.
 #[allow(clippy::too_many_arguments)]
-pub(super) async fn process_chain_events<C, G>(
+pub(super) async fn process_chain_events<C, G, S>(
     chain_reader: C,
     graph_updater: G,
+    surb_store: S,
     events: impl futures::Stream<Item = ChainEvent> + Send + 'static,
     own_chain_addr: Address,
     own_packet_key: OffchainPublicKey,
@@ -44,8 +52,15 @@ pub(super) async fn process_chain_events<C, G>(
 ) where
     C: ChainKeyOperations + Clone + Send + Sync + 'static,
     G: NetworkGraphUpdate + Send + Sync + 'static,
+    S: SurbStore + Send + Sync + 'static,
 {
     pin_mut!(events);
+
+    // Seed the face value before the first event. Startup replays on-chain state as channel events,
+    // and a pricing event only follows if the price actually changes — so without this the graph
+    // would record balances while `ticket_face_value()` was still `None`, and selection would price
+    // every path off the fallback until the next price change happened to arrive.
+    push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
 
     // Tracks the node's currently-open channel IDs per direction so `hopr_channels_count`
     // can be maintained incrementally from channel events. The initial on-chain state is
@@ -122,32 +137,46 @@ pub(super) async fn process_chain_events<C, G>(
 
                 match keys {
                     Ok(Some((from, to))) => {
-                        let capacity =
-                            match channel.status {
-                                ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
-                                _ => ticket_price.read().div_f64(win_probability.read().as_f64()).ok().map(
-                                    |ticket_value| {
-                                        channel
-                                            .balance
-                                            .amount()
-                                            .checked_div(ticket_value.amount())
-                                            .map(|v| v.low_u128())
-                                            .unwrap_or(u128::MAX)
-                                    },
-                                ),
-                            };
+                        // Emit the raw balance, not a ticket count. Dividing by the ticket face
+                        // value here would bake a live ticket price and winning probability into
+                        // every edge, so each price change would stale the whole graph at once.
+                        // Consumers apply the face value when they evaluate a path instead.
+                        let balance = match channel.status {
+                            ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => None,
+                            _ => Some(channel.balance.amount()),
+                        };
 
                         tracing::debug!(
-                            %channel, ?capacity,
-                            "recording graph edge for channel capacity"
+                            %channel, ?balance,
+                            "recording graph edge for channel balance"
                         );
-                        graph_updater.record_edge(MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Capacity(
-                            Box::new(EdgeCapacityUpdate {
-                                capacity,
+                        graph_updater.record_edge(MeasurableEdge::<NeighborTelemetry, PathTelemetry>::Balance(
+                            Box::new(EdgeBalanceUpdate {
+                                balance,
                                 src: from,
                                 dest: to,
                             }),
                         ));
+
+                        // Only our own outgoing channels matter for SURBs: `to` is then the peer
+                        // we would have to pay as the first relayer of a stored SURB's return path.
+                        if src_addr == own_chain_addr {
+                            match chain_reader.key_id_mapper_ref().map_key_to_id(&to) {
+                                // Matched exhaustively on purpose: a wildcard would silently
+                                // revalidate any future non-payable status, handing out SURBs that
+                                // cannot be paid for, with no compiler warning.
+                                Some(relayer) => match channel.status {
+                                    ChannelStatus::Closed | ChannelStatus::PendingToClose(_) => {
+                                        surb_store.invalidate_relayer(&relayer)
+                                    }
+                                    ChannelStatus::Open => surb_store.revalidate_relayer(&relayer),
+                                },
+                                None => tracing::warn!(
+                                    %channel,
+                                    "no key id for own channel counterparty; SURB validity not updated"
+                                ),
+                            }
+                        }
                     }
                     Ok(None) => {
                         tracing::error!(
@@ -166,10 +195,12 @@ pub(super) async fn process_chain_events<C, G>(
             ChainEvent::WinningProbabilityIncreased(prob) | ChainEvent::WinningProbabilityDecreased(prob) => {
                 tracing::debug!(%prob, "recording winning probability change");
                 *win_probability.write() = prob;
+                push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
             ChainEvent::TicketPriceChanged(price) => {
                 tracing::debug!(%price, "recording ticket price change");
                 *ticket_price.write() = price;
+                push_ticket_face_value(&graph_updater, &ticket_price, &win_probability);
             }
             // Redemption moves balance inside a channel that is already in the graph, and the
             // `ChannelBalance*` events that accompany it carry the capacity change. This arm was
@@ -194,6 +225,37 @@ pub(super) async fn process_chain_events<C, G>(
     }
 }
 
+/// Recomputes the single-hop ticket face value and pushes it into the graph.
+///
+/// `price / win_probability` is the amount that makes the expected payout per packet equal the
+/// ticket price, i.e. one ticket's face value. Edges store only a balance, so this is the one place
+/// pricing enters path selection — and a change costs a single write rather than an edge sweep.
+fn push_ticket_face_value<G>(
+    graph: &G,
+    ticket_price: &Arc<RwLock<HoprBalance>>,
+    win_probability: &Arc<RwLock<WinningProbability>>,
+) where
+    G: NetworkGraphUpdate,
+{
+    // Both guards are released before the division: holding one while taking the other is a lock
+    // order this code would then be obliged to honour everywhere else.
+    let price = *ticket_price.read();
+    let probability = win_probability.read().as_f64();
+
+    // The `f64` carries the probability, it does not convert it. `as_f64` packs the 56-bit encoded
+    // value into the mantissa of a number in [1, 2), and `div_f64` strips it straight back out and
+    // divides in `U256` — the balance never becomes a float, and a whole probability short-circuits
+    // to the identity. A hand-rolled integer division here would gain nothing but the guards.
+    match price.div_f64(probability) {
+        Ok(face_value) => {
+            let face_value = face_value.amount();
+            tracing::debug!(%face_value, "recording ticket face value change");
+            graph.set_ticket_face_value(face_value);
+        }
+        Err(error) => tracing::error!(%error, "failed to derive the ticket face value; leaving the previous one"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -206,7 +268,7 @@ mod tests {
     use hopr_api::{
         HoprBalance, OffchainPublicKey,
         chain::{ChainKeyOperations, HoprKeyIdent, KeyIdMapping, WinningProbability},
-        graph::{EdgeCapacityUpdate, MeasurableEdge, MeasurablePath, MeasurablePeer, NetworkGraphUpdate},
+        graph::{EdgeBalanceUpdate, MeasurableEdge, MeasurablePath, MeasurablePeer, NetworkGraphUpdate},
         types::{
             chain::chain_events::ChainEvent,
             crypto::prelude::{ChainKeypair, Keypair, OffchainKeypair},
@@ -214,6 +276,7 @@ mod tests {
             primitive::prelude::Address,
         },
     };
+    use hopr_transport::MemorySurbStore;
     use parking_lot::RwLock;
 
     use super::process_chain_events;
@@ -226,37 +289,43 @@ mod tests {
     #[error("stub: {0}")]
     struct StubError(String);
 
-    #[derive(Debug, Clone)]
-    struct NoopMapper;
+    /// Maps only the keys it was given; empty by default, in which case it maps nothing.
+    #[derive(Debug, Clone, Default)]
+    struct StubMapper(HashMap<OffchainPublicKey, HoprKeyIdent>);
 
-    impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for NoopMapper {
-        fn map_key_to_id(&self, _key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
-            None
+    impl KeyIdMapping<HoprKeyIdent, OffchainPublicKey> for StubMapper {
+        fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
+            self.0.get(key).copied()
         }
 
-        fn map_id_to_public(&self, _id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
-            None
+        fn map_id_to_public(&self, id: &HoprKeyIdent) -> Option<OffchainPublicKey> {
+            self.0.iter().find_map(|(k, v)| (v == id).then_some(*k))
         }
     }
 
     #[derive(Debug, Clone)]
     struct StubChainKeys {
         keys: HashMap<Address, OffchainPublicKey>,
-        mapper: NoopMapper,
+        mapper: StubMapper,
     }
 
     impl StubChainKeys {
         fn new(pairs: impl IntoIterator<Item = (Address, OffchainPublicKey)>) -> Self {
             Self {
                 keys: pairs.into_iter().collect(),
-                mapper: NoopMapper,
+                mapper: StubMapper::default(),
             }
+        }
+
+        fn with_key_ids(mut self, ids: impl IntoIterator<Item = (OffchainPublicKey, HoprKeyIdent)>) -> Self {
+            self.mapper = StubMapper(ids.into_iter().collect());
+            self
         }
     }
 
     impl ChainKeyOperations for StubChainKeys {
         type Error = StubError;
-        type Mapper = NoopMapper;
+        type Mapper = StubMapper;
 
         fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
             Ok(self.keys.get(chain).copied())
@@ -274,7 +343,8 @@ mod tests {
     #[derive(Debug, Clone)]
     enum GraphCall {
         Node(OffchainPublicKey),
-        Edge(Box<EdgeCapacityUpdate>),
+        Edge(Box<EdgeBalanceUpdate>),
+        FaceValue(hopr_api::graph::traits::Balance),
     }
 
     #[derive(Debug, Clone, Default)]
@@ -287,10 +357,17 @@ mod tests {
             self.calls.lock().unwrap().clone()
         }
 
-        fn edges(&self) -> Vec<EdgeCapacityUpdate> {
+        fn edges(&self) -> Vec<EdgeBalanceUpdate> {
             self.recorded()
                 .into_iter()
                 .filter_map(|c| if let GraphCall::Edge(e) = c { Some(*e) } else { None })
+                .collect()
+        }
+
+        fn face_values(&self) -> Vec<hopr_api::graph::traits::Balance> {
+            self.recorded()
+                .into_iter()
+                .filter_map(|c| if let GraphCall::FaceValue(v) = c { Some(v) } else { None })
                 .collect()
         }
 
@@ -303,13 +380,17 @@ mod tests {
     }
 
     impl NetworkGraphUpdate for RecordingGraph {
+        fn set_ticket_face_value(&self, ticket_face_value: hopr_api::graph::traits::Balance) {
+            self.calls.lock().unwrap().push(GraphCall::FaceValue(ticket_face_value));
+        }
+
         fn record_edge<N, P>(&self, update: MeasurableEdge<N, P>)
         where
             N: MeasurablePeer + Clone + Send + Sync + 'static,
             P: MeasurablePath + Clone + Send + Sync + 'static,
         {
-            if let MeasurableEdge::Capacity(cap) = update {
-                self.calls.lock().unwrap().push(GraphCall::Edge(cap));
+            if let MeasurableEdge::Balance(balance) = update {
+                self.calls.lock().unwrap().push(GraphCall::Edge(balance));
             }
         }
 
@@ -414,6 +495,7 @@ mod tests {
         process_chain_events(
             chain,
             graph,
+            MemorySurbStore::default(),
             futures::stream::iter(events),
             own_chain_addr,
             own_packet_key,
@@ -423,6 +505,28 @@ mod tests {
         )
         .await;
         rx.collect().await
+    }
+
+    /// Runs the event loop against a caller-supplied SURB store, so the test can inspect it after.
+    async fn run_with_surb_store(
+        events: Vec<ChainEvent>,
+        chain: StubChainKeys,
+        surb_store: MemorySurbStore,
+        own_chain_addr: Address,
+        own_packet_key: OffchainPublicKey,
+    ) {
+        process_chain_events(
+            chain,
+            RecordingGraph::default(),
+            surb_store,
+            futures::stream::iter(events),
+            own_chain_addr,
+            own_packet_key,
+            Arc::new(RwLock::new(HoprBalance::from(1u32))),
+            Arc::new(RwLock::new(WinningProbability::ALWAYS)),
+            None,
+        )
+        .await;
     }
 
     // ---------------------------------------------------------------------------
@@ -502,7 +606,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // price=10, win_prob=1.0, balance=100 → capacity = 100/(10/1.0) = 10
+        // The balance is emitted as-is; pricing no longer enters the per-edge value.
         run(
             vec![ChainEvent::ChannelOpened(channel(
                 src_addr,
@@ -521,7 +625,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(10));
+        assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(100u64)));
         assert_eq!(edges[0].src, *src_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
     }
@@ -536,7 +640,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // price=10, win_prob=1.0, balance=50 after decrease → capacity = 50/10 = 5
+        // The decreased balance is emitted as-is.
         run(
             vec![ChainEvent::ChannelBalanceDecreased(
                 channel(src_addr, dst_addr, 50, ChannelStatus::Open),
@@ -553,7 +657,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(5));
+        assert_eq!(edges[0].balance, Some(hopr_api::graph::traits::Balance::from(50u64)));
     }
 
     #[tokio::test]
@@ -584,7 +688,7 @@ mod tests {
 
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, None);
+        assert_eq!(edges[0].balance, None);
     }
 
     /// Regression test: before the fix, ChannelClosureInitiated was a no-op and the
@@ -619,13 +723,13 @@ mod tests {
         let edges = graph.edges();
         assert_eq!(edges.len(), 1, "closure-initiated must emit a graph update");
         assert_eq!(
-            edges[0].capacity, None,
-            "closure-initiated must zero out the capacity so routing stops using this edge"
+            edges[0].balance, None,
+            "closure-initiated must clear the balance so routing stops using this edge"
         );
     }
 
     #[tokio::test]
-    async fn ticket_price_change_affects_subsequent_capacity() {
+    async fn ticket_price_change_pushes_a_new_face_value() {
         let (src_offchain, src_chain) = make_keypairs();
         let (dst_offchain, dst_chain) = make_keypairs();
         let src_addr = src_chain.public().to_address();
@@ -634,7 +738,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // initial price=10; after price change to 20, balance=200 → 200/(20/1.0) = 10
+        // A price change recomputes the face value: 20 / 1.0 = 20. The balance is untouched.
         run(
             vec![
                 ChainEvent::TicketPriceChanged(HoprBalance::from(20u64)),
@@ -649,13 +753,26 @@ mod tests {
         )
         .await;
 
+        assert_eq!(
+            graph.face_values(),
+            vec![
+                hopr_api::graph::traits::Balance::from(10u64),
+                hopr_api::graph::traits::Balance::from(20u64),
+            ],
+            "the seeded face value, then the one recomputed from the price change"
+        );
+
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(10));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::Balance::from(200u64)),
+            "the emitted balance must not depend on the price"
+        );
     }
 
     #[tokio::test]
-    async fn win_probability_change_affects_subsequent_capacity() -> anyhow::Result<()> {
+    async fn win_probability_change_pushes_a_new_face_value() -> anyhow::Result<()> {
         let (src_offchain, src_chain) = make_keypairs();
         let (dst_offchain, dst_chain) = make_keypairs();
         let src_addr = src_chain.public().to_address();
@@ -664,7 +781,7 @@ mod tests {
         let graph = RecordingGraph::default();
         let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
 
-        // initial win_prob=1.0; after decrease to 0.5, balance=100, price=10 → 100/(10/0.5) = 5
+        // A winning-probability change recomputes the face value: 10 / 0.5 = 20.
         let new_prob = WinningProbability::try_from_f64(0.5).context("0.5 is a valid winning probability")?;
         run(
             vec![
@@ -680,10 +797,61 @@ mod tests {
         )
         .await;
 
+        assert_eq!(
+            graph.face_values(),
+            vec![
+                hopr_api::graph::traits::Balance::from(10u64),
+                hopr_api::graph::traits::Balance::from(20u64),
+            ],
+            "the seeded face value, then the one recomputed from the probability change"
+        );
+
         let edges = graph.edges();
         assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].capacity, Some(5));
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::Balance::from(100u64)),
+            "the emitted balance must not depend on the winning probability"
+        );
         Ok(())
+    }
+
+    /// Startup replays on-chain state as channel events, and a pricing event follows only if the
+    /// price actually changed. Without a seed the graph would then hold balances while
+    /// `ticket_face_value()` was still `None`, and selection would price every path off the
+    /// fallback for as long as the price happened to stay put.
+    #[tokio::test]
+    async fn a_face_value_is_seeded_before_any_pricing_event() {
+        let (src_offchain, src_chain) = make_keypairs();
+        let (dst_offchain, dst_chain) = make_keypairs();
+        let src_addr = src_chain.public().to_address();
+        let dst_addr = dst_chain.public().to_address();
+
+        let graph = RecordingGraph::default();
+        let stub = StubChainKeys::new([(src_addr, *src_offchain.public()), (dst_addr, *dst_offchain.public())]);
+
+        // Only a channel event: exactly the startup replay, with no price or probability change.
+        run(
+            vec![ChainEvent::ChannelOpened(channel(
+                src_addr,
+                dst_addr,
+                200,
+                ChannelStatus::Open,
+            ))],
+            stub,
+            graph.clone(),
+            src_addr,
+            *src_offchain.public(),
+            HoprBalance::from(10u64),
+            WinningProbability::ALWAYS,
+        )
+        .await;
+
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::Balance::from(10u64)],
+            "the graph must know the price before it records a balance it will be compared against"
+        );
     }
 
     #[tokio::test]
@@ -759,6 +927,7 @@ mod tests {
         process_chain_events(
             StubChainKeys::new([]),
             RecordingGraph::default(),
+            MemorySurbStore::default(),
             futures::stream::iter(vec![ChainEvent::Announcement(account(*offchain.public(), addr))]),
             addr,
             *offchain.public(),
@@ -794,6 +963,7 @@ mod tests {
         process_chain_events(
             stub.clone(),
             graph.clone(),
+            MemorySurbStore::default(),
             futures::stream::iter(events),
             src_addr,
             *src_offchain.public(),
@@ -803,10 +973,12 @@ mod tests {
         )
         .await;
 
-        assert!(
-            graph.recorded().is_empty(),
-            "service events must not touch the routing graph, got {:?}",
-            graph.recorded()
+        assert!(graph.edges().is_empty(), "service events must not record graph edges");
+        assert!(graph.nodes().is_empty(), "service events must not record graph nodes");
+        assert_eq!(
+            graph.face_values(),
+            vec![hopr_api::graph::traits::Balance::from(10u64)],
+            "only the unconditional startup face-value seed should be recorded"
         );
         assert_eq!(
             *ticket_price.read(),
@@ -829,7 +1001,6 @@ mod tests {
         )));
         let graph = RecordingGraph::default();
 
-        // price=10, win_prob=1.0, balance=100 → capacity = 100/(10/1.0) = 10
         run(
             events,
             stub,
@@ -848,14 +1019,103 @@ mod tests {
             "the event following the service ones must still be routed"
         );
         assert_eq!(
-            edges[0].capacity,
-            Some(10),
-            "the capacity inputs must have survived the service events"
+            edges.len(),
+            1,
+            "the event following the service ones must still be routed"
+        );
+        assert_eq!(
+            edges[0].balance,
+            Some(hopr_api::graph::traits::Balance::from(100u64)),
+            "the balance inputs must have survived the service events"
         );
         assert_eq!(edges[0].src, *src_offchain.public());
         assert_eq!(edges[0].dest, *dst_offchain.public());
         assert!(graph.nodes().is_empty(), "no service event may record a graph node");
 
         Ok(())
+    }
+
+    // ---------------------------------------------------------------------------
+    // SURB store invalidation
+    // ---------------------------------------------------------------------------
+
+    /// Sets up `me -> peer` with `peer` mapped to key id 1, and runs the given channel events.
+    async fn run_own_channel_events(
+        statuses: impl IntoIterator<Item = ChannelStatus>,
+    ) -> (MemorySurbStore, HoprKeyIdent) {
+        let (me_offchain, me_chain) = make_keypairs();
+        let (peer_offchain, peer_chain) = make_keypairs();
+        let (me_addr, peer_addr) = (me_chain.public().to_address(), peer_chain.public().to_address());
+        let peer_id = HoprKeyIdent::from(1u32);
+
+        let stub = StubChainKeys::new([(me_addr, *me_offchain.public()), (peer_addr, *peer_offchain.public())])
+            .with_key_ids([(*peer_offchain.public(), peer_id)]);
+
+        let surb_store = MemorySurbStore::default();
+        let events = statuses
+            .into_iter()
+            .map(|status| ChainEvent::ChannelOpened(channel(me_addr, peer_addr, 100, status)))
+            .collect();
+
+        run_with_surb_store(events, stub, surb_store.clone(), me_addr, *me_offchain.public()).await;
+
+        (surb_store, peer_id)
+    }
+
+    #[tokio::test]
+    async fn closing_an_own_outgoing_channel_should_invalidate_that_relayer() {
+        let (store, peer_id) =
+            run_own_channel_events([ChannelStatus::PendingToClose(std::time::SystemTime::now())]).await;
+        assert!(store.is_relayer_invalidated(&peer_id), "PendingToClose must invalidate");
+
+        let (store, peer_id) = run_own_channel_events([ChannelStatus::Closed]).await;
+        assert!(store.is_relayer_invalidated(&peer_id), "Closed must invalidate");
+    }
+
+    #[tokio::test]
+    async fn reopening_an_own_outgoing_channel_should_revalidate_that_relayer() {
+        let (store, peer_id) = run_own_channel_events([ChannelStatus::Closed, ChannelStatus::Open]).await;
+        assert!(!store.is_relayer_invalidated(&peer_id), "re-opening must revalidate");
+    }
+
+    #[tokio::test]
+    async fn a_channel_that_is_not_ours_should_not_invalidate_anything() {
+        // Same topology, but the event is for a channel between two other parties.
+        let (me_offchain, me_chain) = make_keypairs();
+        let (a_offchain, a_chain) = make_keypairs();
+        let (b_offchain, b_chain) = make_keypairs();
+        let (me_addr, a_addr, b_addr) = (
+            me_chain.public().to_address(),
+            a_chain.public().to_address(),
+            b_chain.public().to_address(),
+        );
+        let b_id = HoprKeyIdent::from(1u32);
+
+        let stub = StubChainKeys::new([
+            (me_addr, *me_offchain.public()),
+            (a_addr, *a_offchain.public()),
+            (b_addr, *b_offchain.public()),
+        ])
+        .with_key_ids([(*b_offchain.public(), b_id)]);
+
+        let store = MemorySurbStore::default();
+        run_with_surb_store(
+            vec![ChainEvent::ChannelClosed(channel(
+                a_addr,
+                b_addr,
+                100,
+                ChannelStatus::Closed,
+            ))],
+            stub,
+            store.clone(),
+            me_addr,
+            *me_offchain.public(),
+        )
+        .await;
+
+        assert!(
+            !store.is_relayer_invalidated(&b_id),
+            "someone else's channel must not affect our SURBs"
+        );
     }
 }
