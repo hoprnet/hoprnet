@@ -165,7 +165,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
                 pseudonym: None,
                 surb_management: None,
-                always_max_out_surbs: true,
+                max_surbs_per_data_packet: usize::MAX,
                 pix_ssa_quota: None,
                 flow_control: None,
                 max_frames_behind_gap: None,
@@ -183,7 +183,7 @@ async fn capture_direct_session() -> anyhow::Result<()> {
 #[cfg(feature = "session-client")]
 /// 1-hop bidirectional data flow through a HOPR session via a relay.
 ///
-/// SURB balancing is not used — with `always_max_out_surbs: true`, each small
+/// SURB balancing is not used — with `max_surbs_per_data_packet: usize::MAX`, each small
 /// data packet (32 bytes) carries enough SURBs alongside the payload for a
 /// symmetric 1:1 echo pattern (1 SURB delivered → 1 reply).
 async fn capture_one_hop_session() -> anyhow::Result<()> {
@@ -221,7 +221,7 @@ async fn capture_one_hop_session() -> anyhow::Result<()> {
                 capabilities: SessionCapability::Segmentation | SessionCapability::NoRateControl,
                 pseudonym: None,
                 surb_management: None,
-                always_max_out_surbs: true,
+                max_surbs_per_data_packet: usize::MAX,
                 pix_ssa_quota: None,
                 flow_control: None,
                 max_frames_behind_gap: None,

@@ -33,7 +33,7 @@ use hopr_utils::network_types::utils::{AsyncWriteSink, DuplexIO};
 use tracing::{debug, instrument, warn};
 
 use crate::{
-    Capabilities, Capability,
+    Capabilities, Capability, SESSION_MTU,
     balancer::BalancerStateValues,
     errors::{SessionManagerError, TransportSessionError},
     flow_control::{PacedWriter, SurbSupply},
@@ -432,8 +432,12 @@ pub struct HoprSessionConfig {
     pub capabilities: Capabilities,
     /// Expected frame size of the Session protocol socket.
     ///
-    /// Default is 1500.
-    #[default(1500)]
+    /// Floored to a whole multiple of [`SESSION_MTU`] by the socket, so a value that is not one
+    /// buys nothing and costs a runt segment's worth of packet — see
+    /// [`session_frame_size`](hopr_protocol_session::session_frame_size).
+    ///
+    /// Default is [`SESSION_MTU`], i.e. exactly one segment per frame.
+    #[default(SESSION_MTU)]
     pub frame_mtu: usize,
     /// Maximum amount of time an incomplete frame can be kept in the buffer.
     ///

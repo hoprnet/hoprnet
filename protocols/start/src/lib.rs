@@ -1412,8 +1412,8 @@ mod tests {
         );
         // Stated as literals too, so that a change reaching *both* the encoder and the derivation
         // above still has to be acknowledged here.
-        assert_eq!(28, chunking.max_commitments_per_message);
-        assert_eq!(27, chunking.max_constant_terms_per_message);
+        assert_eq!(92, chunking.max_commitments_per_message);
+        assert_eq!(90, chunking.max_constant_terms_per_message);
 
         // The proof is carried by constant-term messages only, so phase 1 must never fit more
         // entries than phase 2 — the invariant `new_multiple`'s two loops rely on.
@@ -1629,9 +1629,13 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
+        // The slack left after `MAX_SURBS_IN_PACKET` SURBs is `PAYLOAD_SIZE % HoprSurb::SIZE`
+        // (38 bytes at the current packet size), so how long a session id may be while the message
+        // still maxes out its SURBs tracks the packet size rather than being a constant. The real
+        // instantiation uses a `HoprPseudonym` and has far more room than this generic `String`.
         let msg =
             StartProtocol::<String, String, u8, Box<[u8]>, Box<[u8]>, MinimalDeposit>::KeepAlive(KeepAliveMessage {
-                session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
+                session_id: "long-session-id-abcde".to_string(),
                 flags: None.into(),
                 additional_data: 0,
             });

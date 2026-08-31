@@ -41,7 +41,7 @@ use {
 
 const FUNDING_AMOUNT: &str = "15000 wxHOPR";
 
-// PIX params: 8 polys × 2 shares × ~1440 bytes = ~23 KB per SSA cycle
+// PIX params: 8 polys × (2 + 2) shares × one packet payload per share, per SSA cycle.
 const PIX_POLYS: u16 = 8;
 const PIX_SHARES: u8 = 2;
 
@@ -62,6 +62,16 @@ const PIX_PARAMS: hopr_lib::PixParams =
         Ok(params) => params,
         Err(_) => panic!("test PIX parameters must be within the protocol ranges"),
     };
+
+/// Quota one SSA cycle costs, as the Exit computes it when deciding whether to accept the Session.
+///
+/// Mirrors `pix_params_to_quota`: `polys × (shares + surplus) × HoprPacket::PAYLOAD_SIZE`. Derived
+/// rather than written as a literal because the payload size is a build-time constant that moves —
+/// a hard-coded ceiling here does not fail loudly when it goes stale, it just makes every PIX
+/// session in this file get rejected with `UnacceptablePixParams` after a cluster has booted.
+const PIX_QUOTA_PER_SSA: u64 = PIX_POLYS as u64
+    * (PIX_SHARES as u64 + PIX_SURPLUS as u64)
+    * hopr_lib::exports::transport::PACKET_PAYLOAD_SIZE as u64;
 
 /// Number of SSAs the Exit packs into one `SsaRequest` in [`batched_ssa_request_drives_pix_cycles`].
 ///
@@ -123,7 +133,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
         TestNodeConfig {
             win_prob: 1.0,
             incoming_pix_config: Some(IncomingSessionPixConfig {
-                quota_range: 0..=100_000,
+                quota_range: 0..=PIX_QUOTA_PER_SSA,
                 enforce_pix: false,
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
@@ -196,7 +206,7 @@ async fn capture_n_hop_pix_session(#[case] hops: usize) -> anyhow::Result<()> {
                             | SessionCapability::UsePIX,
                         pseudonym: None,
                         surb_management: None,
-                        always_max_out_surbs: false,
+                        max_surbs_per_data_packet: 1,
                         pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
                         max_frames_behind_gap: None,
@@ -384,7 +394,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
         TestNodeConfig {
             win_prob: 1.0,
             incoming_pix_config: Some(IncomingSessionPixConfig {
-                quota_range: 0..=100_000,
+                quota_range: 0..=PIX_QUOTA_PER_SSA,
                 enforce_pix: false,
                 max_ssa_delivery_time: Duration::from_secs(10),
                 max_deposit_wait: Duration::from_secs(60),
@@ -442,7 +452,7 @@ async fn batched_ssa_request_drives_pix_cycles() -> anyhow::Result<()> {
                             | SessionCapability::UsePIX,
                         pseudonym: None,
                         surb_management: None,
-                        always_max_out_surbs: false,
+                        max_surbs_per_data_packet: 1,
                         pix_ssa_quota: Some(PIX_PARAMS),
                         flow_control: None,
                         max_frames_behind_gap: None,

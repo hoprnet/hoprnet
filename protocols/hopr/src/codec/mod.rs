@@ -72,7 +72,7 @@ mod tests {
         HoprBlockchainSafeConnector,
         testing::{BlokliTestClient, StaticState},
     };
-    use hopr_crypto_packet::HoprPixSpec;
+    use hopr_crypto_packet::{HoprPixSpec, prelude::HoprPacket};
     use hopr_protocol_pix::{EntryShareGenerator, ExitAcknowledgementShareProcessor, SsaId, SsaShareGenerator};
     use hopr_ticket_manager::{HoprTicketFactory, MemoryStore};
 
@@ -249,7 +249,7 @@ mod tests {
 
         let encoder = create_encoder(&sender);
 
-        let data = hopr_api::types::crypto_random::random_bytes::<2048>();
+        let data = [1u8; HoprPacket::PAYLOAD_SIZE + 1];
 
         assert!(
             encoder

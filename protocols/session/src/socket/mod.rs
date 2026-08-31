@@ -25,9 +25,11 @@ use {
 };
 
 use crate::{
+    MAX_SESSION_MTU,
     errors::SessionError,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
     protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
+    session_frame_size,
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -35,14 +37,16 @@ use crate::{
 pub struct SessionSocketConfig {
     /// The maximum size of a frame on the read/write interface of the [`SessionSocket`].
     ///
-    /// The size is always greater or equal to the MTU `C` of the underlying transport, and
-    /// less or equal to:
-    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * (`SeqIndicator::MAX` + 1) for stateless sockets, or
-    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1,
-    ///   `SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`) for stateful sockets
+    /// Snapped by [`session_frame_size`] to a whole multiple of [`session_socket_mtu`], between one
+    /// segment and:
+    /// - `SeqIndicator::MAX` + 1 segments for stateless sockets, or
+    /// - min(`SeqIndicator::MAX` + 1, `SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`) segments for stateful sockets
     ///
-    /// Default is 1500 bytes.
-    #[default(1500)]
+    /// A value that is not a whole multiple is floored, never raised — see [`session_frame_size`]
+    /// for why.
+    ///
+    /// Default is [`MAX_SESSION_MTU`], i.e. exactly one segment per frame.
+    #[default(MAX_SESSION_MTU)]
     pub frame_size: usize,
     /// The maximum time to wait for a frame to be fully received.
     ///
@@ -157,12 +161,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
-        // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
-        // The maximum is bounded by the SeqIndicator capacity.
-        let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
-        );
+        // A frame is a whole number of segments: at least one, at most as many as the SeqIndicator
+        // can enumerate. Snapping rather than clamping is what keeps a frame from ending in a runt
+        // segment, which the unbuffered downstream would pay a whole packet for.
+        let frame_size = session_frame_size::<C>(cfg.frame_size, (SeqIndicator::MAX + 1) as usize);
 
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
@@ -310,12 +312,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
-        // The minimum frame size is SESSION_MTU (= C - SEGMENT_OVERHEAD) to allow 1-segment frames.
-        // The maximum is reduced due to the size of the missing segment bitmap in SegmentRequests.
-        let frame_size = cfg.frame_size.clamp(
-            C - SessionMessage::<C>::SEGMENT_OVERHEAD,
-            (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
-                * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
+        // A frame is a whole number of segments (see the stateless constructor). The upper bound is
+        // additionally reduced here by the size of the missing-segment bitmap in SegmentRequests.
+        let frame_size = session_frame_size::<C>(
+            cfg.frame_size,
+            SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
         );
 
         // Segment data incoming/outgoing using underlying transport
@@ -609,7 +610,12 @@ mod tests {
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
-    const FRAME_SIZE: usize = 1500;
+    /// The frame size production actually feeds a Session: [`MAX_SESSION_MTU`].
+    ///
+    /// `MTU` here is the real HOPR packet payload, so this is exactly one segment per frame and is
+    /// therefore also the real frame boundary — which is what the expectations below are about (how
+    /// much a lost frame costs).
+    const FRAME_SIZE: usize = MAX_SESSION_MTU;
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
 
@@ -1137,9 +1143,11 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        assert_eq!(data.len() - 1500, bob_data.len());
-        assert_eq!(&data[1500..], &bob_data);
+        // The whole first frame is discarded due to the missing first segment. A frame is a whole
+        // number of segments, so the data lost is exactly the frame size.
+        let segment_payload = FRAME_SIZE;
+        assert_eq!(data.len() - segment_payload, bob_data.len());
+        assert_eq!(&data[segment_payload..], &bob_data);
 
         bob_socket.close().await?;
 
@@ -1396,12 +1404,14 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await??;
 
-        // The whole first frame is discarded due to the missing first segment
-        assert_eq!(bob_sent_data.len() - 1500, alice_recv_data.len());
-        assert_eq!(&bob_sent_data[1500..], &alice_recv_data);
+        // The whole first frame is discarded due to the missing first segment. A frame is a whole
+        // number of segments, so the data lost is exactly the frame size.
+        let segment_payload = FRAME_SIZE;
+        assert_eq!(bob_sent_data.len() - segment_payload, alice_recv_data.len());
+        assert_eq!(&bob_sent_data[segment_payload..], &alice_recv_data);
 
-        assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
-        assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+        assert_eq!(alice_sent_data.len() - segment_payload, bob_recv_data.len());
+        assert_eq!(&alice_sent_data[segment_payload..], &bob_recv_data);
 
         #[cfg(feature = "telemetry")]
         {
