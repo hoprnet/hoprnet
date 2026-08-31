@@ -1,8 +1,9 @@
 //! [`ServiceGate`] — bounded predeposit egress gate for PIX sessions.
 //!
-//! Before funding, the gate enforces a provisional packet budget from Exit to Entry.
-//! After funding, it enforces a ceiling on packets served without SSA
-//! recovery progress as a defense-in-depth backstop.
+//! While the current front cycle is unfunded, the gate enforces a provisional packet budget from
+//! Exit to Entry. Once that cycle is funded, it enforces a ceiling on packets served without its
+//! recovery progress as a defense-in-depth backstop. A paid handoff restores the allowance for an
+//! unfunded successor.
 //! On poisoning, all acquires fail permanently.
 
 use std::sync::{
@@ -21,18 +22,27 @@ pub struct GateClosed;
 ///
 /// # Parking
 ///
-/// Before funding, when the predeposit budget is exhausted, [`acquire`](Self::acquire) parks
-/// the caller. After funding, when the served-without-progress ceiling is exceeded, it
-/// parks on the same mechanism.
-/// On [`release_service`](Self::release_service), [`notify_progress`](Self::notify_progress),
-/// or [`poison`](Self::poison), all parked callers are woken.
+/// While the front is unfunded, exhausting its predeposit budget parks [`acquire`](Self::acquire).
+/// Once funded, exceeding the served-without-progress ceiling parks on the same mechanism. On
+/// [`release_service`](Self::release_service), [`withhold_service`](Self::withhold_service),
+/// [`notify_progress`](Self::notify_progress), or [`poison`](Self::poison), all parked callers are
+/// woken.
 pub struct ServiceGate {
     /// Monotonic number of packets served.
     served: AtomicU64,
+    /// Predeposit budget restored after each paid front-cycle handoff.
+    predeposit_budget: u64,
     /// Remaining predeposit budget (tracked separately so we can park on 0).
     remaining: AtomicU64,
-    /// Whether the funded flag has been flipped.
+    /// Whether the current front cycle is funded.
     funded: AtomicBool,
+    /// Incremented after every mode publication.
+    ///
+    /// Permit acquisition performs an RMW on this epoch before committing its counter update. That
+    /// gives mode transitions and permits one atomic ordering point: a permit either belongs to the
+    /// old front or observes the new mode, rather than loading `funded` before a transition and
+    /// committing after it.
+    mode_epoch: AtomicU64,
     /// Whether the gate is poisoned.
     poisoned: AtomicBool,
     /// Waker for parked writers.
@@ -48,8 +58,10 @@ impl ServiceGate {
     pub fn new(predeposit_budget: u64, max_served_without_progress: u64) -> Arc<Self> {
         Arc::new(Self {
             served: AtomicU64::new(0),
+            predeposit_budget,
             remaining: AtomicU64::new(predeposit_budget),
             funded: AtomicBool::new(false),
+            mode_epoch: AtomicU64::new(0),
             poisoned: AtomicBool::new(false),
             notify: SlotNotify::new(),
             ceiling: AtomicU64::new(max_served_without_progress),
@@ -72,6 +84,7 @@ impl ServiceGate {
                 return Err(GateClosed);
             }
 
+            let mode_epoch = self.mode_epoch.load(Ordering::Acquire);
             if self.funded.load(Ordering::Acquire) {
                 // Funded path: ceiling-checking CAS loop.
                 let served = self.served.load(Ordering::Acquire);
@@ -84,7 +97,7 @@ impl ServiceGate {
                     if self.poisoned.load(Ordering::Acquire) {
                         return Err(GateClosed);
                     }
-                    if !self.funded.load(Ordering::Acquire) {
+                    if self.mode_epoch.load(Ordering::Acquire) != mode_epoch || !self.funded.load(Ordering::Acquire) {
                         continue;
                     }
                     let served2 = self.served.load(Ordering::Acquire);
@@ -102,6 +115,10 @@ impl ServiceGate {
                 // poison() is not missed between the entry check and here.
                 if self.poisoned.load(Ordering::Acquire) {
                     return Err(GateClosed);
+                }
+
+                if !self.mode_is_current(mode_epoch) {
+                    continue;
                 }
 
                 if self
@@ -123,6 +140,9 @@ impl ServiceGate {
                 // poison() is not missed between the entry check and here.
                 if self.poisoned.load(Ordering::Acquire) {
                     return Err(GateClosed);
+                }
+                if !self.mode_is_current(mode_epoch) {
+                    continue;
                 }
                 if self
                     .remaining
@@ -151,7 +171,7 @@ impl ServiceGate {
             if self.poisoned.load(Ordering::Acquire) {
                 return Err(GateClosed);
             }
-            if self.funded.load(Ordering::Acquire) {
+            if self.mode_epoch.load(Ordering::Acquire) != mode_epoch || self.funded.load(Ordering::Acquire) {
                 // Re-enter the loop — the funded path handles ceiling checks.
                 continue;
             }
@@ -174,10 +194,18 @@ impl ServiceGate {
         self.funded.load(Ordering::Acquire)
     }
 
-    /// Flip the funded flag and wake all parked writers.
+    /// Linearization point shared by a permit and mode publication.
+    fn mode_is_current(&self, epoch: u64) -> bool {
+        self.mode_epoch
+            .compare_exchange(epoch, epoch, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    /// Publish funded mode for the current front and wake all parked writers.
     ///
-    /// Once funded, `acquire` enforces the served-without-progress ceiling
-    /// instead of the predeposit budget.
+    /// `acquire` then enforces the served-without-progress ceiling instead of the predeposit budget.
+    /// Calling this while already funded represents a funded-to-funded front handoff and starts the
+    /// new front with a fresh ceiling window.
     ///
     /// Snapshots `served_total` into `served_at_last_progress` so the ceiling
     /// check starts from the moment of funding and does not count predeposit
@@ -195,8 +223,21 @@ impl ServiceGate {
         // since the wake below releases whoever parked in it, but it costs a spurious refusal on
         // every funding event for nothing.
         self.funded.store(true, Ordering::Release);
+        self.mode_epoch.fetch_add(1, Ordering::Release);
         // Wake all parkers — predeposit-parked writers re-enter and take the
         // funded path, which checks the ceiling.
+        self.notify.notify_waiters();
+    }
+
+    /// Return to predeposit mode for the next unfunded front cycle.
+    ///
+    /// The allowance is restored before the mode is published, so a permit that observes the new
+    /// epoch also observes the complete budget. Parked ceiling waiters are woken to re-evaluate the
+    /// predeposit branch; with a zero allowance they correctly park again.
+    pub fn withhold_service(self: &Arc<Self>) {
+        self.remaining.store(self.predeposit_budget, Ordering::Release);
+        self.funded.store(false, Ordering::Release);
+        self.mode_epoch.fetch_add(1, Ordering::Release);
         self.notify.notify_waiters();
     }
 
@@ -239,18 +280,26 @@ impl ServiceGate {
     /// keeps gating off the allocator: only [`acquire`](Self::acquire)'s parking path needs a future
     /// large enough to box, and that path is about to block anyway.
     pub fn try_acquire_sync(&self) -> Result<bool, GateClosed> {
-        if self.poisoned.load(Ordering::Acquire) {
-            return Err(GateClosed);
-        }
-        if self.funded.load(Ordering::Acquire) {
-            // Ceiling-checking CAS loop, matching the predeposit branch below and `acquire`'s own
-            // funded path. Re-reads the ceiling inputs on every attempt, so a retry cannot admit a
-            // packet the ceiling has meanwhile closed on.
-            loop {
+        loop {
+            if self.poisoned.load(Ordering::Acquire) {
+                return Err(GateClosed);
+            }
+
+            let mode_epoch = self.mode_epoch.load(Ordering::Acquire);
+            if self.funded.load(Ordering::Acquire) {
                 let served = self.served.load(Ordering::Acquire);
                 let base = self.served_at_last_progress.load(Ordering::Acquire);
                 if served.saturating_sub(base) >= self.ceiling.load(Ordering::Acquire) {
+                    if !self.mode_is_current(mode_epoch) {
+                        continue;
+                    }
                     return Ok(false);
+                }
+                if self.poisoned.load(Ordering::Acquire) {
+                    return Err(GateClosed);
+                }
+                if !self.mode_is_current(mode_epoch) {
+                    continue;
                 }
                 if self
                     .served
@@ -259,13 +308,22 @@ impl ServiceGate {
                 {
                     return Ok(true);
                 }
+                continue;
             }
-        }
-        // Try to consume from predeposit budget (non-blocking CAS loop).
-        loop {
+
+            // Try to consume from the current front's predeposit budget.
             let remaining = self.remaining.load(Ordering::Acquire);
             if remaining == 0 {
+                if !self.mode_is_current(mode_epoch) {
+                    continue;
+                }
                 return Ok(false);
+            }
+            if self.poisoned.load(Ordering::Acquire) {
+                return Err(GateClosed);
+            }
+            if !self.mode_is_current(mode_epoch) {
+                continue;
             }
             if self
                 .remaining
@@ -604,5 +662,77 @@ mod tests {
         gate.release_service();
         gate.acquire().await.unwrap();
         assert_eq!(gate.served_total(), 31);
+    }
+
+    #[tokio::test]
+    async fn withholding_restores_the_predeposit_budget_for_the_next_paid_handoff() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(2, 10);
+
+        assert!(gate.try_acquire_sync()?);
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+
+        gate.withhold_service();
+        assert!(!gate.funded());
+        assert!(gate.try_acquire_sync()?);
+        assert!(gate.try_acquire_sync()?);
+        assert!(!gate.try_acquire_sync()?);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn strict_prepay_is_restored_when_service_is_withheld() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(0, 10);
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+
+        gate.withhold_service();
+        assert!(!gate.try_acquire_sync()?);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), gate.acquire())
+                .await
+                .is_err(),
+            "the async path must park after a strict-prepay rotation too"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn withholding_wakes_a_ceiling_parked_writer_into_the_new_allowance() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(1, 1);
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+
+        let mut parked = {
+            let gate = gate.clone();
+            tokio::spawn(async move { gate.acquire().await })
+        };
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut parked)
+                .await
+                .is_err(),
+            "the writer must first park on the funded ceiling"
+        );
+
+        gate.withhold_service();
+        tokio::time::timeout(Duration::from_secs(1), parked).await???;
+        assert_eq!(gate.served_total(), 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn a_new_funded_front_gets_a_fresh_progress_ceiling() -> anyhow::Result<()> {
+        let gate = ServiceGate::new(0, 2);
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+        assert!(gate.try_acquire_sync()?);
+        assert!(!gate.try_acquire_sync()?);
+
+        // A funded-to-funded front handoff stays open but starts a new ceiling window.
+        gate.release_service();
+        assert!(gate.try_acquire_sync()?);
+        assert!(gate.try_acquire_sync()?);
+        assert!(!gate.try_acquire_sync()?);
+        Ok(())
     }
 }

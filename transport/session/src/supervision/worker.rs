@@ -1,8 +1,8 @@
 //! Per-session actor for the [`SessionPixSupervisor`].
 //!
 //! The worker serializes lifecycle events through the deterministic core,
-//! manages the deadline timer, and drives actions through an external
-//! action driver.
+//! manages the deadline timer, applies safety-critical gate actions locally,
+//! and forwards actions to an external I/O driver.
 //!
 //! Runtime-agnostic: uses crossfire channels and the runtime prelude from
 //! `hopr_utils` so no direct tokio dependency (tests use tokio freely).
@@ -250,7 +250,7 @@ async fn process_cmd(
     true
 }
 
-/// Forward `actions`, then report whether the worker should keep running.
+/// Apply gate control, forward `actions`, then report whether the worker should keep running.
 ///
 /// The four places that produce actions — the two deadline paths in [`worker_loop`] and the two
 /// command arms in [`process_cmd`] — all had the same four-way branch spelled out: send, check
@@ -260,6 +260,22 @@ async fn process_cmd(
 /// Poisons the gate on every terminal path, so no caller has to remember to. `closed` is passed
 /// rather than read from the supervisor because the callers hold it by different borrows.
 fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, gate: &Arc<ServiceGate>) -> bool {
+    // Gate control is local state, not I/O. Apply it before touching the action channel so a safety
+    // transition cannot wait behind commitment generation, deposit-data lookup, or a network send in
+    // the action driver. Stop at Close to preserve the driver's rule that actions after a close are
+    // unreachable; poisoning below is stronger than every gate mode.
+    for action in actions
+        .iter()
+        .take_while(|action| !matches!(action, SessionPixAction::Close(_)))
+    {
+        match action {
+            SessionPixAction::ReleaseService => gate.release_service(),
+            SessionPixAction::WithholdService => gate.withhold_service(),
+            SessionPixAction::ProgressNotification => gate.notify_progress(),
+            _ => {}
+        }
+    }
+
     // Sent before the verdict either way: a closing supervisor's last actions carry the reason it
     // closed, and dropping them would leave the driver to infer it.
     let delivered = send_actions(actions, action_tx);
@@ -278,8 +294,8 @@ fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, ga
 /// On `Full`:
 /// - **Coalescible** actions (`ProgressNotification`) are logged + skipped. They are idempotent and safe to drop — the
 ///   next notification will replace them, and dropping here prevents transient load from killing a healthy session.
-/// - **Non-coalescible** actions (`Close`, `RequestSsa`, `RetireSsa`) are treated as fatal.  If these cannot be
-///   delivered the channel is genuinely wedged.
+/// - **Non-coalescible** actions (every other variant) are treated as fatal. If these cannot be delivered the channel
+///   is genuinely wedged.
 fn send_actions(actions: &[SessionPixAction], action_tx: &ActionTx) -> bool {
     for action in actions {
         match action_tx.try_send(action.clone()) {
@@ -315,7 +331,10 @@ fn is_coalescible(action: &SessionPixAction) -> bool {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use hopr_api::types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym};
+    use hopr_api::{
+        HoprBalance,
+        types::{crypto_random::Randomizable, internal::prelude::HoprPseudonym},
+    };
     use hopr_protocol_pix::{SsaId, SsaIndex};
 
     use super::*;
@@ -451,21 +470,47 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn release_service_action_flips_gate() {
+    async fn worker_rearms_strict_prepay_without_waiting_for_the_action_driver() -> anyhow::Result<()> {
+        let cfg = SupervisorConfig {
+            max_predeposit_packets: 0,
+            ..default_cfg()
+        };
         let p = HoprPseudonym::random();
-        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+        let (handle, _stalled_action_rx) = spawn_supervisor_worker(cfg, dims(), p, Instant::now());
+        let first = SsaId::new(
+            p,
+            SsaIndex::new(1).ok_or_else(|| anyhow::anyhow!("SSA index 1 must be valid"))?,
+        );
 
-        // Consume initial RequestSsa.
-        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+        handle
+            .send_event(SessionPixEvent::SsaRequestSent(first))
             .await
-            .expect("timeout")
-            .expect("action stream ended");
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        handle
+            .send_event(SessionPixEvent::CommitmentVerified(first))
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        handle
+            .send_event(SessionPixEvent::DepositConfirmed {
+                ssa_id: first,
+                amount: HoprBalance::new_base(1),
+            })
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
 
-        assert!(!handle.gate.funded());
+        poll_until("the paid front opens the gate", || handle.gate.funded()).await;
+        assert!(handle.gate.try_acquire_sync()?);
 
-        handle.gate.acquire().await.unwrap();
-        handle.gate.release_service();
-        assert!(handle.gate.funded());
+        // The receiver remains alive but deliberately unread, modeling an action driver blocked on
+        // RequestSsa I/O. The worker must close the gate locally when this recovery rotates to the
+        // already-registered, unfunded successor.
+        handle
+            .send_event(SessionPixEvent::Recovered(first))
+            .await
+            .map_err(|()| anyhow::anyhow!("worker stopped"))?;
+        poll_until("the unfunded successor closes the gate", || !handle.gate.funded()).await;
+        assert!(!handle.gate.try_acquire_sync()?);
+        Ok(())
     }
 
     #[tokio::test]
@@ -736,6 +781,8 @@ mod tests {
         // returns true (session survives).
         let progress: Vec<_> = (0..100).map(|_| SessionPixAction::ProgressNotification).collect();
         assert!(send_actions(&progress, &action_tx));
+
+        assert!(!send_actions(&[SessionPixAction::WithholdService], &action_tx));
 
         // Non-coalescible action on the same full channel → returns false
         // (session must be terminated).

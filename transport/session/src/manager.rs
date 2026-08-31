@@ -129,8 +129,8 @@ fn acquire_egress_permit(
         // Forwarded rather than reconstructed: the gate now names its own error, so both of its
         // entry points report the same one and neither caller has to know what a refusal means.
         Err(closed) => futures::future::Either::Left(std::future::ready(Err(std::io::Error::other(closed)))),
-        // Budget exhausted: park until the supervisor releases service, reports progress, or gives
-        // up on the Session entirely.
+        // Budget exhausted: park until the supervisor funds the front, restores a successor's
+        // allowance, reports front-cycle progress, or gives up on the Session entirely.
         Ok(false) => futures::future::Either::Right(Box::pin(async move {
             gate.acquire()
                 .await
@@ -334,10 +334,10 @@ pub const DEPOSIT_DATA_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// SSA batches whose reconstructor state can be live on the Exit at the same moment.
 ///
-/// Two, and structurally so. Only the *last* cycle of a batch may ask for a successor, and it asks
-/// once (`supervision`'s "Rolling SSAs"), so a batch has at most one successor outstanding. The
-/// predecessor cannot add a third: full recovery calls `remove_cycle` immediately, and what survives
-/// until `RetireSsa` is the supervisor's own record and a tombstone, not cycle state.
+/// Two, enforced at allocation rather than inferred from share-order policy. The supervisor tags
+/// every requested generation and defers a successor while this many generations still own live
+/// reconstructor state; it also checks the equivalent full-batch cycle count charged below. Full
+/// recovery releases cycle state immediately, after which a deferred request is retried.
 ///
 /// Used as the pipelining factor when a Session reserves against
 /// [`IncomingSessionPixConfig::max_live_cycle_bytes`].
@@ -1285,9 +1285,10 @@ impl PixToolbox {
 /// without ever confirming, the observer reports that (`DepositObserverClosed`) rather than
 /// letting the deadline run out on a deposit that is never coming.
 ///
-/// Once the deposit suffices, the SSA moves to *recovering* and its recovery deadlines start. The
-/// first sufficient deposit on a Session also releases the egress gate, which is what lets the
-/// Session be served at all; later cycles inherit that release.
+/// Once the deposit suffices, the SSA moves to *recovering*. Its recovery deadlines start when it
+/// reaches the front, and its deposit releases the egress gate only while it is there. When a paid
+/// front finishes, an unfunded successor restores its own bounded predeposit allowance; an already
+/// funded successor stays open but starts a fresh served-without-progress ceiling.
 ///
 /// ### 5. SSA Collection, Recovery and Pipelining
 ///
@@ -1297,18 +1298,19 @@ impl PixToolbox {
 /// [`HoprSessionInPixEvent::RecoveryProgress`]; `dispatch_pix_event` forwards those snapshots to
 /// the supervisor, which uses them both to reset `max_recovery_idle` and to keep the gate serving.
 ///
-/// When the reconstructor reaches the *early recovery threshold* (≈85%), an
+/// When the last cycle of a batch reaches the *early recovery threshold* (≈85%), an
 /// [`HoprSessionInPixEvent::SsaAlmostRecovered`] event fires and the supervisor answers with a
-/// `RequestSsa` action for the next index — pipelining the costly commitment exchange with the
-/// tail of the share collection for the current SSA. If the current cycle is still awaiting its
-/// own commitment or deposit, the request is deferred until that clears, so a Session never has
-/// two unfunded cycles outstanding.
+/// `RequestSsa` action for the next batch — pipelining the costly commitment exchange with the tail
+/// of share collection. If that cycle is still awaiting its own commitment or deposit, the request
+/// waits for funding; if two generations still own cycle state, it waits for one to be fully
+/// released. Those checks are independent of the configurable share-order policy.
 ///
 /// Once fully recovered, [`HoprSessionInPixEvent::SsaRecovered`] fires, allowing the Exit to
-/// unlock and redeem the deposited funds. The supervisor tombstones the cycle and emits
-/// `RetireSsa`, which drops that cycle's [`SsaCommitmentGuard`] and aborts its deposit observer;
-/// the next SSA is requested here if `SsaAlmostRecovered` has not already done so. Observers are
-/// keyed by SSA index, so retiring one cycle never cancels a pipelined successor's.
+/// unlock and redeem the deposited funds. The reconstructor releases the live cycle immediately;
+/// the supervisor retains a short tombstone, whose expiry emits `RetireSsa` to drop that cycle's
+/// [`SsaCommitmentGuard`] and abort its deposit observer. The next batch is requested here if
+/// `SsaAlmostRecovered` has not already done so. Observers are keyed by SSA index, so retiring one
+/// cycle never cancels a pipelined successor's.
 ///
 /// ### 6. Unverifiable Shares
 ///
@@ -2409,8 +2411,9 @@ where
     ///
     /// The task owns an [`SsaCommitmentGuard`] per SSA it has requested, which is what releases
     /// reconstructor state on teardown: aborting this task drops its future, and the guards with it.
-    /// That bounds cleanup to the cycles actually in flight — at most two live plus one tombstone —
-    /// where enumerating every index a Session had ever used grew without bound.
+    /// That bounds cleanup to the cycles actually in flight — at most two live batches, plus
+    /// supervisor tombstones that no longer own reconstructor state — where enumerating every index
+    /// a Session had ever used grew without bound.
     fn spawn_pix_action_driver(
         &self,
         session_id: SessionId,
@@ -2529,11 +2532,16 @@ where
                         }
                     }
                     SessionPixAction::ReleaseService => {
-                        gate.release_service();
                         #[cfg(feature = "telemetry")]
                         crate::telemetry::set_pix_gate_mode(&session_id, true);
                     }
-                    SessionPixAction::ProgressNotification => gate.notify_progress(),
+                    SessionPixAction::WithholdService => {
+                        #[cfg(feature = "telemetry")]
+                        crate::telemetry::set_pix_gate_mode(&session_id, false);
+                    }
+                    // Gate control is applied synchronously by the supervisor worker. The action
+                    // reaches this I/O driver only to preserve observability and ordering.
+                    SessionPixAction::ProgressNotification => {}
                     SessionPixAction::RetireSsa(ssa_id) => {
                         // Dropping the guard is the retirement.
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));

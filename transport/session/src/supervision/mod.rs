@@ -5,9 +5,9 @@
 //! runs a deterministic supervisor that tracks each *Secret Sharing Aggregate*
 //! (SSA) through a well-defined lifecycle, enforcing timeouts, deposit
 //! sufficiency, recovery progress, and fault tolerances.  Egress data
-//! packets are gated behind a concurrent `ServiceGate` that allows
-//! bounded predeposit service before funding and a ceiling-limited
-//! post-funding path.
+//! packets are gated behind a concurrent `ServiceGate` that follows the
+//! front cycle: bounded predeposit service while it is unfunded and a
+//! ceiling-limited path after it funds.
 //!
 //! # Why supervision is needed
 //!
@@ -31,8 +31,8 @@
 //! | Component | File | Role |
 //! |---|---|---|
 //! | `SessionPixSupervisor` | `supervisor` | Pure state machine — no I/O, no async, no spawning.  Driven by explicit `Instant` timestamps and service-gate snapshots. |
-//! | `ServiceGate` | `gate` | Concurrent, lock-free egress gate.  Before funding: bounded predeposit budget.  After funding: ceiling on packets served without SSA recovery progress.  Callers park on a generation-counter waker. |
-//! | Worker loop | `worker` | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, and forwards supervisor actions to the caller. |
+//! | `ServiceGate` | `gate` | Concurrent, lock-free egress gate.  Before the front funds: bounded predeposit budget.  After it funds: ceiling on packets served without that cycle's recovery progress.  Callers park on a generation-counter waker. |
+//! | Worker loop | `worker` | Per-session actor that bridges the pure supervisor to async reality.  Receives commands via a backpressured channel, manages the deadline timer, applies gate actions synchronously, and forwards actions to the caller. |
 //!
 //! The [`SlotNotify`](crate::utils::SlotNotify) multi-waker primitive is shared from [`utils`] and used
 //! by `ServiceGate` to park and wake callers without a tokio dependency.
@@ -91,8 +91,12 @@
 //! the first would ask a whole batch too early. Retiring the cycle holding the gate hands it to the
 //! newest survivor, or a batch whose last cycle lost its deposit would strand with no successor.
 //!
-//! Live cycles at any moment are therefore `ssas_per_request` plus whatever the overlap has already
-//! requested, each with its own reconstructor state, plus tombstones inside their retention window.
+//! Allocation independently enforces the reservation: at most
+//! `MAX_OVERLAPPING_BATCHES` generations and
+//! `MAX_OVERLAPPING_BATCHES × ssas_per_request` live cycles may own reconstructor state. If the
+//! early signal arrives while both generations are still live, the supervisor records the owed
+//! request and retries it only after one generation releases all of its cycle state. Recovered
+//! supervisor tombstones do not count because full recovery removes their reconstructor state.
 //!
 //! ## The `ServiceGate` — egress gating
 //!
@@ -101,23 +105,26 @@
 //!
 //! ### Pre-funding (predeposit)
 //!
-//! Before the first deposit is confirmed, a provisional budget lets the Exit answer the Entry for a
-//! bounded number of packets, so that the application's opening exchange is not held up for as long
-//! as an on-chain deposit takes to confirm.  The budget is
+//! While the current front cycle is unfunded, a provisional budget lets the Exit answer the Entry
+//! for a bounded number of packets, so that the application is not held up for as long as an
+//! on-chain deposit takes to confirm. The initial front starts with this allowance; a successor gets
+//! a fresh allowance only after its predecessor paid and finished. Losing an unfunded front does not
+//! mint another grant. The budget is
 //! `min(target_useful_shares - 1, max_predeposit_packets)`; at production dimensions the first term
 //! is in the hundreds of thousands, so the configured cap is what binds and the `min` only matters
 //! for the small dimensions used in tests.
 //!
 //! When the budget is exhausted, `acquire` parks the caller on a
-//! `SlotNotify` future.  A concurrent `release_service`,
+//! `SlotNotify` future. A concurrent `release_service`, `withhold_service`,
 //! `notify_progress`, or `poison`
 //! wakes all parkers.
 //!
 //! ### Strict prepay (`max_predeposit_packets = 0`)
 //!
-//! Zero is a supported setting, and it means the Exit serves nothing at all until a sufficient
-//! deposit is confirmed: the first egress data packet parks, and the Entry has to commit and fund
-//! before a single payload byte flows back to it.
+//! Zero is a supported setting, and it means the Exit serves nothing against any unfunded front:
+//! the first egress data packet parks, and the Entry has to commit and fund that cycle before a
+//! single payload byte flows back to it. The rule is restored on every paid rotation rather than
+//! applying only to the Session's first SSA.
 //!
 //! This does not deadlock, because nothing on the path to funding passes through the gate:
 //!
@@ -138,13 +145,14 @@
 //!
 //! ### Post-funding (ceiling)
 //!
-//! Once the first deposit is confirmed and the supervisor emits
-//! `ReleaseService`, the gate flips
-//! to funded mode.  It then enforces `max_served_without_progress`: a
+//! Once the current front's deposit is confirmed and the supervisor emits `ReleaseService`, the
+//! gate flips to funded mode. It then enforces `max_served_without_progress`: a
 //! ceiling on how many packets may be served between SSA recovery progress
 //! events, as a defense-in-depth backstop even when the supervisor's
-//! service-gated idle timer is alive.  Each `ProgressNotification`
-//! resets the ceiling by snapshotting the served counter as the new watermark.
+//! service-gated idle timer is alive. Only progress from that funded front emits
+//! `ProgressNotification` and resets the watermark; unfunded or off-front progress cannot buy it
+//! service. A rotation to an unfunded successor emits `WithholdService` and restores the bounded
+//! allowance. A funded successor stays open, but another `ReleaseService` rebaselines its ceiling.
 //!
 //! The gate is implemented with lock-free atomics and CAS loops.  It uses
 //! the generation-counter `SlotNotify` to avoid the two classic
@@ -169,14 +177,15 @@
 //! 3. Otherwise, waits on the command channel with a timeout set to the remaining deadline duration.
 //! 4. On command received → calls `handle_event` or `action_result`.
 //! 5. On timeout → calls `handle_deadline`.
-//! 6. Forwards resulting actions to the action channel (non-blocking `try_send`).
+//! 6. Applies gate-control actions immediately, then forwards all actions to the action channel (non-blocking
+//!    `try_send`).
 //!
 //! **Coalescing** — `ProgressNotification` actions are coalescible: when
 //! the action channel is transiently full, they are dropped rather than
-//! blocking or failing the worker.  They are idempotent and the next
-//! notification will replace the missed one.
+//! blocking or failing the worker. The gate has already consumed the notification locally, and the
+//! next forwarded notification replaces it for observers.
 //!
-//! All other actions (`RequestSsa`, `ReleaseService`, `RetireSsa`, `Close`)
+//! All other actions (`RequestSsa`, `ReleaseService`, `WithholdService`, `RetireSsa`, `Close`)
 //! are non-coalescible — if they cannot be delivered, the channel is
 //! genuinely wedged and the worker fails the session.
 //!
@@ -193,14 +202,15 @@
 //! 3. Reads the initial action, calls `send_ssa_request` on the wire, and notifies the supervisor of `SsaRequestSent`.
 //! 4. Stores the supervisor handle and gate in the session slot (via `OnceLock`).
 //! 5. Constructs the [`HoprSession`] — the egress adapter acquires the gate on every outgoing data packet.
-//! 6. After session publication, spawns the **action driver task** that receives actions from `ActionRx` and executes
-//!    them:
+//! 6. After session publication, spawns the **action driver task** that receives actions from `ActionRx`. Gate control
+//!    has already happened in the worker; the driver performs I/O and records the gate-mode telemetry:
 //!
-//!    | Action | Driver behaviour |
+//!    | Action | Behaviour |
 //!    |---|---|
-//!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor.  Tracks SSA in `SsaRetirementGuard` for Drop-safe cleanup. |
-//!    | `ReleaseService` | Calls `gate.release_service()` — flips to funded mode. |
-//!    | `ProgressNotification` | Calls `gate.notify_progress()` — resets ceiling watermark. |
+//!    | `RequestSsa` | Calls `send_ssa_request`, feeds back result to supervisor. Tracks each SSA in `SsaCommitmentGuard` for Drop-safe cleanup. |
+//!    | `ReleaseService` | Worker calls `gate.release_service()`; driver records funded telemetry. |
+//!    | `WithholdService` | Worker calls `gate.withhold_service()`; driver records unfunded telemetry. |
+//!    | `ProgressNotification` | Worker calls `gate.notify_progress()`; no driver I/O. |
 //!    | `RetireSsa` | Calls `share_processor.retire_ssa`, aborts the deposit observer task. |
 //!    | `Close` | Poisons gate, retires all SSAs, publishes close metric, removes session slot. |
 //!
@@ -240,7 +250,8 @@
 //! │  Entry → DepositConfirmed    → supervisor (via     │
 //! │                                PixDepositObserver) │
 //! │  Packets → share_processor   → RecoveryProgress    │
-//! │  Action: ReleaseService      → gate.release_service│
+//! │  Action: ReleaseService       → gate.release_service│
+//! │  Action: WithholdService      → gate.withhold_service│
 //! │  Action: ProgressNotification → gate.notify_progress│
 //! │  Action: RequestSsa (next)   → send on wire        │
 //! │  Action: RetireSsa           → reconstructor.retire│
@@ -266,7 +277,7 @@
 //! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 778 240 packets, ~72 min, at the defaults — or it closes honest Sessions instead. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
-//! | `max_predeposit_packets` | 10000 | Bounds what an Entry that never funds can extract. `0` is supported and means strict prepay. |
+//! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
 //! | `max_served_without_progress` | 2048 | Packets served with no share of *any* kind coming back — in *packets*, so unlike the idle timer the bound does not move with the Session's rate. Counts `shares_seen`, so a conforming Entry's surplus resets it; see below. |
 //! | `tombstone_retention_window` | 30 s | A late acknowledgement arriving after its cycle's record is gone, with nothing left to attribute it to. |
 //!
@@ -367,7 +378,7 @@
 //! | `ssas_per_request` | **1** | The 85 % early signal leaves a 24 627-packet runway — **41 s** — before the cycle drains, against 6 s of settlement plus a commitment round trip. There is nothing to amortise, and a batch of `n` would multiply the unfunded exposure to `n × 162.2 MiB` |
 //! | `max_ssa_delivery_time` | 20 s | 2048 commitments ship in ~71 forward packets, well under a second; the margin covers commitment generation |
 //! | `max_deposit_wait` | 30 s | 5× the 6 s settlement, leaving room for the Entry to notice `ReadyToDeposit`, submit, and the observer to see it |
-//! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is exactly what is lost to an Entry that never funds — 4.2 MB. Use `0` for strict prepay and accept a ~6 s stall at session start |
+//! | `max_predeposit_packets` | 4096 | ~6.8 s of service, matching expected settlement rather than the deadline. This is the most exposed against an unfunded front after the initial grant or a paid handoff — 4.2 MB. Use `0` for strict prepay at every rotation; normal overlap usually funds the successor before it reaches the front |
 //! | `max_served_without_progress` | 2048 | Shipped value, and no longer dimension-dependent: the surplus run resets it like any other share, so this bounds genuine silence only |
 //! | `max_recovery_idle` | 60 s | Shipped value. Satisfies `>= max_ack_await_time` and `< unused_verifier_lifetime`. It no longer has to cover the surplus run — that resets it — so what it now implies is only that a Session returning *nothing at all* for a minute is closed |
 //! | `max_recovery_time` | 2 h | Resource backstop only. A cycle needs 272 s at full rate, so 2 h implies a floor of ~23 packets/s (~0.19 Mbps) — deliberately far below the idle rule, which is the instrument that should bind |
@@ -428,13 +439,13 @@ pub struct SupervisorConfig {
     ///
     /// Two things it costs, both linear in the value:
     ///
-    /// * The Exit holds that many live reconstructor cycles at once — worst case ≈41 MiB each at the profiled
-    ///   dimensions, per `hopr_protocol_pix::peak_cycle_bytes`. That cost is reserved up front against
-    ///   `IncomingSessionPixConfig::max_live_cycle_bytes`, so this value divides the number of PIX Sessions the node
-    ///   will admit.
-    /// * The unfunded exposure. The supervisor never lets a *second* batch go out while the first is still unfunded,
-    ///   but within one batch every cycle is unfunded at once — so the ceiling is this many SSA quotas rather than
-    ///   one.
+    /// * Up to two batches can own live reconstructor state — worst case ≈41 MiB per cycle at the profiled dimensions,
+    ///   per `hopr_protocol_pix::peak_cycle_bytes`. That cost is reserved up front against
+    ///   `IncomingSessionPixConfig::max_live_cycle_bytes`; the supervisor enforces the two-generation/full-cycle bound
+    ///   before allocating, so this value directly divides the number of PIX Sessions the node will admit.
+    /// * The unfunded exposure within one batch: every cycle is initially requested unfunded, so the commitment and
+    ///   deposit deadlines cover this many SSA quotas rather than one. The front-aware service gate still grants only
+    ///   the current cycle's bounded predeposit allowance.
     ///
     /// **Must not exceed the peer Entry's `max_ssas_per_request`.** The batch size is not negotiated
     /// — `StartSession.additional_data` is fully allocated (PIX dimensions in the upper 32 bits, SURB
@@ -623,9 +634,11 @@ pub struct SupervisorConfig {
 
     /// Cap on the provisional predeposit service budget.
     ///
-    /// This buys the application its opening exchange while the deposit confirms on chain; it is not
-    /// needed for the Session to become fundable, so it is a latency-versus-exposure dial rather than
-    /// a correctness requirement.
+    /// This buys the application an exchange while the current front cycle's deposit confirms on
+    /// chain; it is not needed for the Session to become fundable, so it is a
+    /// latency-versus-exposure dial rather than a correctness requirement. The initial front starts
+    /// with this allowance, and it is restored for an unfunded successor only after a paid front
+    /// completes. Retiring an unfunded front does not grant it again.
     ///
     /// **Zero is supported and means strict prepay**: the Exit answers nothing until a sufficient
     /// deposit is confirmed. Everything on the path to funding — the `SsaRequest`, the Entry's
@@ -645,8 +658,9 @@ pub struct SupervisorConfig {
     /// Maximum packets served without a single share coming back, before the gate blocks further
     /// service as a defence-in-depth backstop.
     ///
-    /// A ceiling enforced by `ServiceGate::acquire` after the gate is funded. Each
-    /// [`crate::HoprSessionInPixEvent::RecoveryProgress`] event resets it.
+    /// A ceiling enforced by `ServiceGate::acquire` while the current front is funded. A
+    /// [`crate::HoprSessionInPixEvent::RecoveryProgress`] snapshot resets it only for that funded
+    /// front; progress on an unfunded or queued cycle does not grant service.
     ///
     /// Those events now follow `shares_seen` rather than `useful_shares`, which is what makes a flat
     /// 2048 safe at any dimensions. Keyed on useful shares, this had to exceed
@@ -745,9 +759,11 @@ pub enum SessionPixAction {
         ssa_ids: Vec<SsaId<HoprPseudonym>>,
         params: PixParams,
     },
-    /// Release the service gate (from predeposit to funded mode).
+    /// Put the service gate in funded mode for the front cycle, or rebaseline a funded successor.
     ReleaseService,
-    /// Notifies the gate that SSA recovery made progress, resetting the
+    /// Return the service gate to an unfunded successor's predeposit allowance after a paid handoff.
+    WithholdService,
+    /// Notifies the gate that the funded front made recovery progress, resetting its
     /// served-without-progress ceiling.
     ProgressNotification,
     /// Close the session with the given reason.

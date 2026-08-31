@@ -237,30 +237,17 @@ pub const TOMBSTONE_ENTRY_BYTES: usize = 288;
 /// so a size eviction is not a lost optimisation, it is the failure the set exists to prevent. The
 /// cap therefore has to sit far above the count reachable while `time_to_idle` still holds an entry.
 ///
-/// Derived from the Session layer's live-cycle budget, which is what makes the count finite. That
-/// budget admits `max_live_cycle_bytes / (MAX_OVERLAPPING_BATCHES × ssas_per_request ×
-/// peak_cycle_bytes)` concurrent PIX Sessions — ~37 at the shipping 3 GiB and the deployed
-/// dimensions, where `peak_cycle_bytes` is ~41 MiB.
+/// The Session layer's live-cycle budget makes the concurrent-Session part finite. It admits
+/// `max_live_cycle_bytes / (MAX_OVERLAPPING_BATCHES × ssas_per_request × peak_cycle_bytes)` PIX
+/// Sessions — ~37 at the shipping 3 GiB and deployed dimensions — and the supervisor now enforces
+/// that two-generation premise before allocating cycle state.
 ///
-/// One Session contributes at most 90 tombstones per `unused_verifier_lifetime`, **whatever the
-/// batch size**. It retires `ssas_per_request` cycles per generation, and a generation cannot be
-/// shorter than its commitment deadline — which is itself batch-scaled, `scaled_deadline` of
-/// `max_ssa_delivery_time` — so the two factors cancel: `1800 / (20 × b) × b` = 90 for every `b`.
-///
-/// The concurrent-Session count, meanwhile, falls as `1/b`. The product is therefore *largest at a
-/// batch of one*, at ~37 × 90 ≈ **3 300** — and a Session that closes and is replaced costs a full
-/// initiation round trip per replacement, so churn does not change the order.
-///
-/// 262 144 leaves ~79× headroom over that and costs at most ~72 MiB at [`TOMBSTONE_ENTRY_BYTES`] — a
-/// fortieth of the budget it is derived from, and only if every entry is live at once, which the
-/// arithmetic above says cannot happen.
-///
-/// That headroom is not slack, it is what absorbs the one term the arithmetic above holds fixed. The
-/// Session layer charges the *offered* `peak_cycle_bytes`, so a node whose `quota_range` floor admits
-/// cycles much smaller than the deployed ones admits proportionally more Sessions and consumes the
-/// headroom at the same rate. At the shipping range that leaves the cap two orders of magnitude
-/// clear; a node that widens its `quota_range` downwards by more than ~79× should re-run this
-/// derivation rather than assume it still holds.
+/// The retirement *rate* is not a structural consequence of that admission bound: commitment and
+/// recovery deadlines are maxima, not minima, so a fast Session can complete more than one
+/// generation per deadline interval. `262_144` is therefore operational headroom, not a proved
+/// count. It costs at most ~72 MiB at [`TOMBSTONE_ENTRY_BYTES`]. Operators accepting much smaller
+/// cycles or substantially higher churn must re-evaluate it; replacing per-cycle tombstones with a
+/// compact per-Session retirement frontier would remove that remaining rate dependency.
 pub const MAX_RETIRED_SSAS: usize = 262_144;
 
 /// The per-polynomial share buffer [`peak_cycle_bytes`] models, in bytes.
@@ -666,12 +653,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // `abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it` asserts. Shortening
             // this to the width of the race would break that contract silently.
             //
-            // Capacity chosen against the concurrent-Session budget, not picked: a size eviction
-            // here permits exactly the resurrection the tombstone prevents, so the cap has to sit
-            // above the count this node can create while any of them still matters. See
-            // `MAX_RETIRED_SSAS` for that arithmetic — it is derived from the Session layer's
-            // live-cycle budget, which is the global admission control this cap used to be waiting
-            // on.
+            // A size eviction here permits exactly the resurrection the tombstone prevents. The
+            // Session layer now structurally enforces the concurrent live-generation term behind
+            // this cap; retirement throughput still relies on the operational headroom documented
+            // at `MAX_RETIRED_SSAS`.
             retired_ssas: moka::sync::Cache::builder()
                 .max_capacity(MAX_RETIRED_SSAS as u64)
                 .time_to_idle(cfg.unused_verifier_lifetime)

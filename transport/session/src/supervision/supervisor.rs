@@ -37,6 +37,8 @@ enum SsaPhase {
 /// Internal state for one supervised SSA.
 struct PerSsaState {
     ssa_id: SsaId<HoprPseudonym>,
+    /// First SSA index allocated in this request batch.
+    batch_id: u32,
     phase: SsaPhase,
 
     // Deadlines (None means not set for this phase).
@@ -68,6 +70,10 @@ struct PerSsaState {
     /// The last cycle rather than the first because the batch is served in index order: gating on
     /// the first would ask for the successor a whole batch too early, which is the exposure
     /// `ssas_per_request` deliberately bounds.
+    ///
+    /// If the two-generation admission bound defers that request, `next_requested` remains set and
+    /// the supervisor-level `successor_request_deferred` flag owns the retry; the gate must not be
+    /// handed to another cycle and spend the request twice.
     is_batch_last: bool,
     /// Set when `Recovered` arrives before deposit confirms (i.e. during
     /// `AwaitingCommitment` or `AwaitingDeposit`). Once deposit is confirmed
@@ -80,9 +86,10 @@ struct PerSsaState {
 }
 
 impl PerSsaState {
-    fn new(ssa_id: SsaId<HoprPseudonym>, target_useful_shares: u64, _now: Instant) -> Self {
+    fn new(ssa_id: SsaId<HoprPseudonym>, batch_id: u32, target_useful_shares: u64, _now: Instant) -> Self {
         Self {
             ssa_id,
+            batch_id,
             phase: SsaPhase::AwaitingCommitment,
             commitment_deadline: None,
             deposit_deadline: None,
@@ -129,8 +136,19 @@ pub struct SessionPixSupervisor {
     /// rather than a count. Both counters reset when the front changes, which is what keeps the window
     /// bounded to a single cycle's service.
     off_front_useful: u64,
-    release_service_emitted: bool,
-    /// Ordered SSAs (oldest first, newest last). At most 2 live + 1 tombstone.
+    /// Whether the service gate currently follows a funded front cycle.
+    service_open: bool,
+    /// Front cycle for which the current gate mode was emitted.
+    ///
+    /// Tracking the identity as well as the mode lets a funded-to-funded handoff rebaseline the
+    /// served-without-progress ceiling for the newly promoted cycle.
+    service_front: Option<SsaIndex>,
+    /// A front cycle became paid and terminal in one event, so an unfunded successor still earns a
+    /// freshly restored predeposit allowance even though the gate never entered funded mode.
+    paid_front_handoff: bool,
+    /// A successor batch was earned but could not yet fit the two-generation reservation.
+    successor_request_deferred: bool,
+    /// Ordered SSAs (oldest first, newest last), including short-lived recovered tombstones.
     ssas: Vec<PerSsaState>,
     /// Tracks the first failure reason when multiple SSAs fail, so the
     /// earliest cause is used for the final `Close` action rather than the last.
@@ -173,7 +191,10 @@ impl SessionPixSupervisor {
             front_useful: 0,
             off_front_useful: 0,
             closed: false,
-            release_service_emitted: false,
+            service_open: false,
+            service_front: None,
+            paid_front_handoff: false,
+            successor_request_deferred: false,
             ssas: Vec::with_capacity(2),
             first_failure_reason: None,
             failed_cycles: 0,
@@ -206,9 +227,18 @@ impl SessionPixSupervisor {
             }
         };
 
-        let mut actions = actions;
+        let mut lifecycle_actions = actions;
+        lifecycle_actions.extend(self.retry_deferred_successor_request(now));
         self.arm_recovery_clocks_for_earliest(now, served_total);
-        actions.extend(self.release_service_if_front_is_funded());
+        let mut actions = if lifecycle_actions
+            .iter()
+            .any(|action| matches!(action, SessionPixAction::Close(_)))
+        {
+            Vec::new()
+        } else {
+            self.sync_service_gate()
+        };
+        actions.extend(lifecycle_actions);
         self.refresh_share_order_front();
         actions
     }
@@ -236,38 +266,71 @@ impl SessionPixSupervisor {
             .map(|(i, _)| i)
     }
 
-    /// Emits the one-shot [`SessionPixAction::ReleaseService`] once the front of the batch is funded.
+    /// Keeps the service gate aligned with the funding state of the earliest live cycle.
     ///
-    /// [`on_deposit_confirmed`](Self::on_deposit_confirmed) already covers the case where the front
-    /// is the cycle whose deposit just landed. This covers the other direction: a cycle that funded
-    /// while queued behind an unfunded predecessor, and reaches the front when that predecessor is
-    /// retired. There is no further deposit event for it — its deposit already happened — so without
-    /// this the Session keeps a funded front and a gate stuck in predeposit mode, and stalls for good
-    /// once `max_predeposit_packets` is spent.
-    ///
-    /// Called from the same two places as [`arm_recovery_clocks_for_earliest`](Self::arm_recovery_clocks_for_earliest),
-    /// and for the same reason: those are the two paths on which the front can move.
-    ///
-    /// `Recovering` is exactly the funded-and-unfinished phase — it is entered only once a deposit
-    /// clears both floors, and the phases after it are terminal, which `earliest_live_idx` already
-    /// excludes.
-    fn release_service_if_front_is_funded(&mut self) -> Vec<SessionPixAction> {
-        if self.closed || self.release_service_emitted {
-            return Vec::new();
-        }
-        let Some(idx) = self.earliest_live_idx() else {
-            return Vec::new();
-        };
-        if self.ssas[idx].phase != SsaPhase::Recovering {
+    /// A funded-to-unfunded handoff restores the configured predeposit allowance. A
+    /// funded-to-funded handoff emits `ReleaseService` too: the mode does not change, but the new
+    /// front must receive its own served-without-progress ceiling rather than inheriting the tail of
+    /// its predecessor's. An unfunded cycle that fails does not earn another allowance.
+    fn sync_service_gate(&mut self) -> Vec<SessionPixAction> {
+        if self.closed {
             return Vec::new();
         }
 
-        self.release_service_emitted = true;
-        tracing::debug!(
-            ssa_id = %self.ssas[idx].ssa_id,
-            "releasing service — a funded cycle reached the front of the batch"
-        );
-        vec![SessionPixAction::ReleaseService]
+        let front = self.earliest_live_idx();
+        let front_id = front.map(|idx| self.ssas[idx].ssa_id.ssa_index());
+        let front_changed = front_id != self.service_front;
+        let front_funded = front.is_some_and(|idx| self.ssas[idx].phase == SsaPhase::Recovering);
+        let paid_front_handoff = std::mem::take(&mut self.paid_front_handoff);
+        self.service_front = front_id;
+
+        match (front_funded, self.service_open, front_changed) {
+            (true, false, _) | (true, true, true) => {
+                self.service_open = true;
+                tracing::debug!(?front_id, "aligning service gate with funded front cycle");
+                vec![SessionPixAction::ReleaseService]
+            }
+            (false, true, _) => {
+                self.service_open = false;
+                tracing::debug!(?front_id, "withholding service for unfunded front cycle");
+                vec![SessionPixAction::WithholdService]
+            }
+            (false, false, _) if paid_front_handoff => {
+                tracing::debug!(?front_id, "restoring predeposit service after paid front handoff");
+                vec![SessionPixAction::WithholdService]
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    fn live_cycle_count(&self) -> usize {
+        self.ssas.iter().filter(|ssa| !ssa.is_terminal()).count()
+    }
+
+    fn live_batch_count(&self) -> usize {
+        let mut batches = Vec::with_capacity(crate::MAX_OVERLAPPING_BATCHES as usize);
+        for ssa in self.ssas.iter().filter(|ssa| !ssa.is_terminal()) {
+            if !batches.contains(&ssa.batch_id) {
+                batches.push(ssa.batch_id);
+            }
+        }
+        batches.len()
+    }
+
+    fn reserved_cycle_slots(&self) -> usize {
+        self.cfg
+            .ssas_per_request
+            .clamp(1, crate::MAX_SSA_BATCH_SIZE)
+            .saturating_mul(crate::MAX_OVERLAPPING_BATCHES as usize)
+    }
+
+    fn retry_deferred_successor_request(&mut self, now: Instant) -> Vec<SessionPixAction> {
+        if self.closed || !self.successor_request_deferred {
+            return Vec::new();
+        }
+
+        self.successor_request_deferred = false;
+        self.emit_request_next_ssa(now)
     }
 
     /// Re-points the share-order accounting at the current front of the batch, clearing it if the front
@@ -387,6 +450,11 @@ impl SessionPixSupervisor {
             actions.push(SessionPixAction::RetireSsa(id));
         }
 
+        // A terminal cycle may have released the older of two live batches. Keep retirement before
+        // the replacement request in the action stream so the reconstructor drops the old guard
+        // before allocating the successor.
+        actions.extend(self.retry_deferred_successor_request(now));
+
         // If no SSAs remain, close.
         // Note: a successor request may still be in flight here (RequestSsa
         // emitted, SsaRequestSent not yet observed) — intentionally not
@@ -406,9 +474,11 @@ impl SessionPixSupervisor {
         // that one is already funded, promotion is the only moment left at which service can be
         // released, since its deposit event is long past.
         self.arm_recovery_clocks_for_earliest(now, served_total);
-        actions.extend(self.release_service_if_front_is_funded());
+        let mut gate_actions = self.sync_service_gate();
+        gate_actions.extend(actions);
+        self.refresh_share_order_front();
 
-        actions
+        gate_actions
     }
 
     /// Returns the earliest deadline across all live SSAs, or `None`.
@@ -506,7 +576,6 @@ impl SessionPixSupervisor {
             Some(i) => i,
             None => return Vec::new(),
         };
-
         let ssa = &mut self.ssas[idx];
         if ssa.phase != SsaPhase::AwaitingCommitment {
             return Vec::new();
@@ -552,6 +621,7 @@ impl SessionPixSupervisor {
             Some(i) => i,
             None => return Vec::new(),
         };
+        let was_front = self.earliest_live_idx() == Some(idx);
 
         let ssa = &mut self.ssas[idx];
         if ssa.phase != SsaPhase::AwaitingDeposit {
@@ -581,31 +651,11 @@ impl SessionPixSupervisor {
 
         let mut actions = Vec::new();
 
-        // Decided *before* `perform_recovered_transition` below, which can make this cycle terminal
-        // and hand the front to a successor. A cycle that funds and recovers in the same call has
-        // still paid for the service it consumed, so the gate must open on it; testing the front
-        // afterwards would find a different cycle and leave the gate shut.
-        let front_now_funded = !self.release_service_emitted && self.earliest_live_idx() == Some(idx);
-
         if recovered_pending {
+            if was_front {
+                self.paid_front_handoff = true;
+            }
             actions.extend(self.perform_recovered_transition(idx, now));
-        }
-
-        // Service is released by the *front* cycle being funded, not by whichever cycle funds first.
-        //
-        // `ReleaseService` is one-shot and Session-wide — the gate can never return to predeposit mode —
-        // so with `ssas_per_request > 1` an Entry could fund a later member of the batch, leave the front
-        // unfunded, and then consume unbounded service against the front until its batch-scaled deposit
-        // deadline retired it. That bypasses `max_predeposit_packets` entirely, and the share-order ratio
-        // cannot see it: serving the unfunded front is perfectly in-order.
-        //
-        // A no-op at the default `ssas_per_request = 1`, where the only live cycle is the front. When a
-        // later cycle funds first, the release waits — either for the front to fund, which comes out of
-        // this same call, or for the front to be retired, which comes out of
-        // `release_service_if_front_is_funded` as a post-step.
-        if front_now_funded {
-            self.release_service_emitted = true;
-            actions.push(SessionPixAction::ReleaseService);
         }
 
         if pending {
@@ -691,8 +741,14 @@ impl SessionPixSupervisor {
             }
         }
 
-        // Signal the gate to reset its served-without-progress ceiling.
-        vec![SessionPixAction::ProgressNotification]
+        // Only funded progress on the cycle service is currently charged against may reopen the
+        // Session-wide ceiling. Unfunded progress is the H11 bypass; off-front progress belongs to a
+        // queued cycle and must not buy service for the front either.
+        if self.ssas[idx].phase == SsaPhase::Recovering && self.earliest_live_idx() == Some(idx) {
+            vec![SessionPixAction::ProgressNotification]
+        } else {
+            Vec::new()
+        }
     }
 
     /// Attributes `delta` useful shares to the front of the batch or behind it, and judges the ratio.
@@ -1032,11 +1088,34 @@ impl SessionPixSupervisor {
     /// it every member would ask for one of its own, since the request flags are per-cycle; see that
     /// field for why the last rather than the first.
     ///
+    /// Before allocating, this enforces both halves of the admission reservation: no more than
+    /// [`crate::MAX_OVERLAPPING_BATCHES`] live generations and no more than that many full batches'
+    /// live cycles. A request earned while the reservation is full is retried after a generation
+    /// releases its reconstructor state.
+    ///
     /// What batching does change is the exposure *within* a batch: every cycle in it is unfunded at
     /// once, so the ceiling is `ssas_per_request` SSA quotas rather than one. That is the trade the
     /// knob exists to make, and it is why both deadlines are scaled by the same factor.
     fn emit_request_next_ssa(&mut self, now: Instant) -> Vec<SessionPixAction> {
         let batch = self.cfg.ssas_per_request.clamp(1, crate::MAX_SSA_BATCH_SIZE);
+        let live_cycles = self.live_cycle_count();
+        let live_batches = self.live_batch_count();
+        if live_batches >= crate::MAX_OVERLAPPING_BATCHES as usize
+            || live_cycles.saturating_add(batch) > self.reserved_cycle_slots()
+        {
+            self.successor_request_deferred = true;
+            tracing::debug!(
+                live_cycles,
+                live_batches,
+                requested = batch,
+                reserved = self.reserved_cycle_slots(),
+                "deferring successor SSA batch until an older batch is released"
+            );
+            return Vec::new();
+        }
+
+        self.successor_request_deferred = false;
+        let batch_id = self.next_ssa_index;
         let mut ssa_ids = Vec::with_capacity(batch);
 
         for _ in 0..batch {
@@ -1062,8 +1141,12 @@ impl SessionPixSupervisor {
             //
             // No deadline yet: the request has not gone out, so there is nothing to be late for. That
             // is what `SsaRequestSent` adds, per index.
-            self.ssas
-                .push(PerSsaState::new(ssa_id, self.dims.target_useful_shares(), now));
+            self.ssas.push(PerSsaState::new(
+                ssa_id,
+                batch_id,
+                self.dims.target_useful_shares(),
+                now,
+            ));
             ssa_ids.push(ssa_id);
         }
 
@@ -1553,6 +1636,23 @@ mod tests {
         assert!(actions.iter().all(|a| !matches!(a, SessionPixAction::ReleaseService)));
     }
 
+    #[test]
+    fn a_funded_successor_gets_a_fresh_service_ceiling_when_it_reaches_the_front() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+
+        fund_batch(&mut sup, p, 2, now);
+        let actions = sup.handle_event(&SessionPixEvent::Recovered(ssa_id(p, 1)), now, 0);
+
+        assert!(
+            matches!(actions.as_slice(), [SessionPixAction::ReleaseService]),
+            "a funded-to-funded handoff must rebaseline the ceiling, got {actions:?}"
+        );
+    }
+
     /// Any non-zero amount funds the cycle, because the amount is not the supervisor's to judge.
     ///
     /// The pool prices the quota and sends only once the deposit clears that price, so a confirmation
@@ -1670,16 +1770,15 @@ mod tests {
         );
     }
 
-    /// A cycle that funds and goes terminal in the same call must still release service.
+    /// A cycle that funds and goes terminal in the same call must re-arm rather than open service.
     ///
     /// `Recovered` can arrive while the cycle is still `AwaitingDeposit` — the Exit finishes
     /// reconstructing before the chain observer reports the deposit — and is deferred until the
-    /// deposit lands. That one call then both funds the cycle and retires it, so by the time the
-    /// front is examined the cycle is terminal and the front is somebody else. Deciding on the
-    /// post-`Recovering` state and not the post-retirement one is what keeps the gate from staying
-    /// shut over a cycle that was paid for in full.
+    /// deposit lands. That one call then both funds the cycle and retires it. Opening the gate at
+    /// that point would serve against its unfunded successor; withholding restores the successor's
+    /// allowance, and its own deposit opens the gate normally.
     #[test]
-    fn a_cycle_that_funds_and_recovers_at_once_still_releases_service() {
+    fn a_cycle_that_funds_and_recovers_at_once_rearms_for_its_unfunded_successor() {
         let mut cfg = default_cfg();
         cfg.ssas_per_request = 2;
         let p = pseudonym();
@@ -1700,8 +1799,8 @@ mod tests {
             "recovering an unfunded cycle must not release service"
         );
 
-        // The deposit lands: the cycle funds and is retired in the same call. The successor behind it
-        // is still unfunded, so nothing else can open the gate.
+        // The deposit lands: the cycle funds and is retired in the same call. Its successor remains
+        // unfunded, so the next allowance is restored without opening funded service.
         let actions = sup.handle_event(
             &SessionPixEvent::DepositConfirmed {
                 ssa_id: front,
@@ -1711,8 +1810,87 @@ mod tests {
             0,
         );
         assert!(
+            matches!(actions.as_slice(), [SessionPixAction::WithholdService]),
+            "the paid handoff must re-arm without opening service, got {actions:?}"
+        );
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: successor,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+        assert!(
             actions.iter().any(|a| matches!(a, SessionPixAction::ReleaseService)),
-            "a cycle funded and retired in one call has still paid for its service; got {actions:?}"
+            "the successor's own deposit must open service, got {actions:?}"
+        );
+    }
+
+    #[test]
+    fn progress_on_an_unfunded_front_does_not_notify_the_service_gate() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_off_front_share_fraction = 1.0;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+        let funded_front = ssa_id(p, 1);
+        let unfunded_successor = ssa_id(p, 2);
+
+        for id in [funded_front, unfunded_successor] {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
+        }
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: funded_front,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+        sup.handle_event(&SessionPixEvent::Recovered(funded_front), now, 0);
+
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(
+                unfunded_successor,
+                1,
+                sup.dims.target_useful_shares(),
+                0,
+            )),
+            now,
+            1,
+        );
+
+        assert!(
+            actions
+                .iter()
+                .all(|action| !matches!(action, SessionPixAction::ProgressNotification)),
+            "an unfunded front must not reopen the funded service ceiling, got {actions:?}"
+        );
+    }
+
+    #[test]
+    fn progress_behind_the_front_does_not_notify_the_service_gate() {
+        let mut cfg = default_cfg();
+        cfg.ssas_per_request = 2;
+        cfg.max_off_front_share_fraction = 1.0;
+        let p = pseudonym();
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+
+        fund_batch(&mut sup, p, 2, now);
+        let actions = sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 2), 1, sup.dims.target_useful_shares(), 0)),
+            now,
+            1,
+        );
+
+        assert!(
+            actions.is_empty(),
+            "off-front progress must not reopen the gate, got {actions:?}"
         );
     }
 
@@ -2511,8 +2689,8 @@ mod tests {
             850,
         );
         assert!(
-            matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
-            "a boundary's worth of reordering must not convict, got {actions:?}"
+            actions.is_empty(),
+            "off-front progress must neither convict nor reopen the gate"
         );
         assert!(!sup.closed);
     }
@@ -2622,10 +2800,7 @@ mod tests {
                 now,
                 useful,
             );
-            assert!(
-                matches!(actions.as_slice(), [SessionPixAction::ProgressNotification]),
-                "{useful} shares is below the floor of {SAMPLE} and must not convict, got {actions:?}"
-            );
+            assert!(actions.is_empty(), "{useful} shares is below the floor and off-front");
         }
 
         let actions = sup.handle_event(
@@ -2741,11 +2916,9 @@ mod tests {
     ///
     /// `next_requested` is per-`PerSsaState`, so without a batch-wide gate every member of a batch
     /// answers its own `AlmostRecovered` with a fresh batch of `ssas_per_request`: one batch of 3
-    /// becomes three, then nine, each SSA a separate on-chain deposit demanded of the Entry. The
-    /// documented invariant on [`SessionPixSupervisor::emit_request_next_ssa`] is the opposite —
-    /// "refuses to ask for another batch while any cycle of this one is unfunded" — and at
-    /// `ssas_per_request == 1` the two readings coincide, which is why every other test here misses
-    /// it.
+    /// becomes three, then nine, each SSA a separate on-chain deposit demanded of the Entry. At
+    /// `ssas_per_request == 1`, "one requesting cycle" and "one requesting batch" coincide, which is
+    /// why every unbatched test misses the distinction.
     ///
     /// All three cycles are funded and `Recovering` before the first event, i.e. the case where the
     /// deferral in [`almost_recovered_while_awaiting_deposit_defers_request`] does *not* apply and
@@ -2812,6 +2985,129 @@ mod tests {
             "a repeated AlmostRecovered on the last member must not ask again"
         );
         assert_eq!(sup.next_ssa_index, 2 * BATCH as u32 + 1);
+        assert_eq!(
+            sup.live_cycle_count(),
+            sup.reserved_cycle_slots(),
+            "two full batches sit exactly on the admission reservation"
+        );
+    }
+
+    #[test]
+    fn a_third_live_batch_is_deferred_even_when_share_order_policy_allows_it() {
+        const BATCH: usize = 2;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH,
+            max_off_front_share_fraction: 1.0,
+            ..default_cfg()
+        };
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+
+        fund_batch(&mut sup, p, BATCH as u32, now);
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 2)), now, 0);
+        let second_batch = match actions.as_slice() {
+            [SessionPixAction::RequestSsa { ssa_ids, .. }] => ssa_ids.clone(),
+            other => panic!("expected the second batch, got {other:?}"),
+        };
+        for id in second_batch {
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+
+        let actions = sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 4)), now, 0);
+        assert!(
+            actions
+                .iter()
+                .all(|action| !matches!(action, SessionPixAction::RequestSsa { .. })),
+            "two live batches already consume the reservation, got {actions:?}"
+        );
+        assert_eq!(sup.ssas.len(), 2 * BATCH, "a third batch must not be allocated");
+    }
+
+    #[test]
+    fn a_deferred_batch_retries_only_after_the_older_generation_is_released() {
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: 2,
+            max_failed_cycles: 2,
+            max_off_front_share_fraction: 1.0,
+            ..default_cfg()
+        };
+        let now = Instant::now();
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, now);
+
+        // Leave cycle 1 unfunded and fund cycle 2, whose early signal earns batch 2.
+        commit_unfunded(&mut sup, p, 1..=1, now);
+        let second = ssa_id(p, 2);
+        sup.handle_event(&SessionPixEvent::SsaRequestSent(second), now, 0);
+        sup.handle_event(&SessionPixEvent::CommitmentVerified(second), now, 0);
+        sup.handle_event(
+            &SessionPixEvent::DepositConfirmed {
+                ssa_id: second,
+                amount: sufficient_balance(),
+            },
+            now,
+            0,
+        );
+        assert!(
+            sup.handle_event(&SessionPixEvent::AlmostRecovered(second), now, 0)
+                .iter()
+                .any(|action| matches!(action, SessionPixAction::RequestSsa { .. }))
+        );
+
+        for idx in 3..=4 {
+            let id = ssa_id(p, idx);
+            sup.handle_event(&SessionPixEvent::SsaRequestSent(id), now, 0);
+            sup.handle_event(&SessionPixEvent::CommitmentVerified(id), now, 0);
+            sup.handle_event(
+                &SessionPixEvent::DepositConfirmed {
+                    ssa_id: id,
+                    amount: sufficient_balance(),
+                },
+                now,
+                0,
+            );
+        }
+        assert!(
+            sup.handle_event(&SessionPixEvent::AlmostRecovered(ssa_id(p, 4)), now, 0)
+                .iter()
+                .all(|action| !matches!(action, SessionPixAction::RequestSsa { .. }))
+        );
+
+        // Releasing only one member of the old generation is insufficient.
+        let actions = sup.handle_event(&SessionPixEvent::DepositObserverClosed(ssa_id(p, 1)), now, 0);
+        assert!(
+            actions
+                .iter()
+                .all(|action| !matches!(action, SessionPixAction::RequestSsa { .. }))
+        );
+
+        // The remaining old member times out. Its RetireSsa must precede the now-admissible request,
+        // otherwise the action driver would allocate the replacement before dropping the old guard.
+        let actions = sup.handle_deadline(now + default_cfg().max_recovery_idle, 1);
+        let retire_position = actions
+            .iter()
+            .position(|action| matches!(action, SessionPixAction::RetireSsa(id) if *id == second));
+        let request_position = actions.iter().position(|action| {
+            matches!(action, SessionPixAction::RequestSsa { ssa_ids, .. }
+                if ssa_ids.iter().map(|id| id.ssa_index().get()).eq(5..=6))
+        });
+        assert!(
+            matches!((retire_position, request_position), (Some(retire), Some(request)) if retire < request),
+            "the old generation must retire before batch 3 is requested, got {actions:?}"
+        );
+        assert_eq!(sup.live_batch_count(), 2);
+        assert_eq!(sup.live_cycle_count(), 4);
     }
 
     /// Retiring the cycle that holds the successor gate must hand it to the newest survivor.
@@ -3015,8 +3311,9 @@ mod tests {
         );
 
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), now, 0);
-        assert_eq!(actions.len(), 1);
-        match &actions[0] {
+        assert_eq!(actions.len(), 2);
+        assert!(matches!(actions[0], SessionPixAction::WithholdService));
+        match &actions[1] {
             SessionPixAction::RequestSsa { ssa_ids, .. } => {
                 assert_eq!(ssa_ids[0].ssa_index(), SsaIndex::new(2).unwrap());
             }
@@ -3044,7 +3341,7 @@ mod tests {
 
         sup.handle_event(&SessionPixEvent::AlmostRecovered(id1), now, 0);
         let actions = sup.handle_event(&SessionPixEvent::Recovered(id1), now, 0);
-        assert!(actions.is_empty());
+        assert!(matches!(actions.as_slice(), [SessionPixAction::WithholdService]));
     }
 
     // ---------------------------------------------------------------

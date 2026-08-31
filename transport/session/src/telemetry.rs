@@ -389,10 +389,10 @@ pub fn record_session_surb_consumed(session_id: &SessionId, by: u64) {
     touch_session_activity(session_id);
 }
 
-/// Records that a PIX Session's egress gate left the predeposit budget for funded service.
+/// Records whether a PIX Session's current front cycle has funded service.
 ///
-/// One-way in practice: the supervisor releases service once per Session, on the first sufficient
-/// deposit. `false` exists so the gauge can be reset when the Session goes away.
+/// The supervisor moves this in both directions as the front rotates. An unfunded successor reports
+/// `false` while it consumes its bounded predeposit allowance; its deposit moves the gauge to `true`.
 pub fn set_pix_gate_mode(session_id: &SessionId, funded: bool) {
     let session_id_str: &str = session_id.as_ref();
     METRIC_SESSION_PIX_GATE_MODE.set(&[session_id_str], if funded { 1.0 } else { 0.0 });
