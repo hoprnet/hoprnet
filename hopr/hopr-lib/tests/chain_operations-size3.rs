@@ -217,10 +217,14 @@ async fn test_withdraw_native(cluster: &ClusterGuard) -> anyhow::Result<()> {
 
     // Exactly the withdrawn amount: the Safe pays the value and none of the gas.
     assert_eq!(final_safe_balance, initial_safe_balance - withdrawn_amount);
-    // The signer is out only the fee. Bounded on both sides rather than stated exactly, because
-    // the fee is not fixed — but it has to stay strictly under the value moved, or the node paid
-    // for the withdrawal after all and the assertion above passed for the wrong reason.
-    assert!(final_balance_src <= initial_balance_src);
+    // The signer is out the fee and nothing else, so it is bounded on both sides rather than
+    // stated exactly — the fee is not fixed, but neither bound may be slack:
+    //
+    // - strictly below, because the signer always pays the fee. `<=` would also admit a node that paid nothing at all,
+    //   which is what a broken fee accounting looks like.
+    // - strictly above `initial - withdrawn`, because it must not have paid the value. Without this, a node debited for
+    //   the whole withdrawal satisfies the bound above just as well.
+    assert!(final_balance_src < initial_balance_src);
     assert!(final_balance_src > initial_balance_src - withdrawn_amount);
     Ok(())
 }
