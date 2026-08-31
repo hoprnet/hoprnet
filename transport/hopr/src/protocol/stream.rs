@@ -54,6 +54,11 @@ struct PeerSink<T: Send + 'static> {
     /// channel when the stream is `ready`; while still opening it uses non-blocking drop-newest,
     /// so a slow open for one peer never head-of-line-blocks other peers.
     ready: Arc<AtomicBool>,
+    /// Set once this peer missed `egress_backpressure_timeout`; cleared when it accepts again.
+    ///
+    /// `ready` only says the write pump started, not that it is still draining. Without this a peer
+    /// whose pump is parked forever costs the shared drain loop one timeout per packet, forever.
+    stalled: Arc<AtomicBool>,
 }
 
 impl<T: Send + 'static> PeerSink<T> {
@@ -62,6 +67,7 @@ impl<T: Send + 'static> PeerSink<T> {
             tx,
             token: Arc::new(()),
             ready: Arc::new(AtomicBool::new(false)),
+            stalled: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -331,9 +337,15 @@ where
             };
 
             match sink.tx.try_send(msg) {
-                Ok(()) => tracing::trace!(%peer, "message queued to peer channel"),
+                Ok(()) => {
+                    // Space in the channel means the pump drained, so backpressure is safe again.
+                    if sink.stalled.swap(false, Ordering::Relaxed) {
+                        tracing::debug!(%peer, "peer egress recovered; resuming blocking backpressure");
+                    }
+                    tracing::trace!(%peer, "message queued to peer channel");
+                }
                 Err(crossfire::TrySendError::Full(msg)) => {
-                    if sink.ready.load(Ordering::Relaxed) {
+                    if sink.ready.load(Ordering::Relaxed) && !sink.stalled.load(Ordering::Relaxed) {
                         // Stream is open and draining; a full channel means the wire is slower
                         // than the producer. Wait (bounded) for space so wire-rate backpressure
                         // propagates upstream — through the mixer, the outgoing CrossfireSink and
@@ -357,9 +369,12 @@ where
                             Err(_timeout) => {
                                 #[cfg(all(feature = "telemetry", not(test)))]
                                 METRIC_RING_BUFFER_DROPPED.increment();
-                                tracing::debug!(
+                                // Latch to drop-newest so the next packet cannot block the loop too.
+                                sink.stalled.store(true, Ordering::Relaxed);
+                                tracing::warn!(
                                     %peer,
-                                    "per-peer egress channel full past backpressure timeout; dropping newest packet"
+                                    "per-peer egress channel full past backpressure timeout; dropping newest packet \
+                                     and bypassing backpressure for this peer until it drains"
                                 );
                             }
                         }
@@ -1108,6 +1123,117 @@ mod tests {
              regression to drop-newest on a full open channel would lose the overflow (wrote {} bytes, need >= \
              {min_delivered})",
             io.written()
+        );
+
+        Ok(())
+    }
+
+    /// One peer gets a writer gated shut forever, everyone else one that accepts immediately.
+    #[derive(Clone, Debug)]
+    struct HeadOfLineControl {
+        stalled_peer: PeerId,
+        stalled_io: GatedWriteIo,
+        healthy_io: GatedWriteIo,
+        open_calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for HeadOfLineControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, GatedWriteIo)>())
+        }
+
+        async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(if peer == self.stalled_peer {
+                self.stalled_io.clone()
+            } else {
+                self.healthy_io.clone()
+            })
+        }
+    }
+
+    /// Reproduces the 2026-08-27 `jura-dev` OOM: a peer whose write pump parks forever held the
+    /// shared drain loop for one timeout per packet, starving every other peer until the unbounded
+    /// mixer queue exhausted memory.
+    ///
+    /// The healthy packet is queued *after* the stalled burst, so it only arrives promptly if the
+    /// loop refuses to serialise on the stalled peer.
+    #[tokio::test]
+    async fn stalled_peer_must_not_head_of_line_block_a_healthy_peer() -> anyhow::Result<()> {
+        const BACKPRESSURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+        const OVERFLOW: usize = 8;
+
+        let stalled_peer = PeerId::random();
+        let healthy_peer = PeerId::random();
+
+        // Gate never opens: the remote that stopped reading.
+        let stalled_io = GatedWriteIo::default();
+        let healthy_io = GatedWriteIo {
+            open: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            ..Default::default()
+        };
+
+        let open_calls = Arc::new(AtomicUsize::new(0));
+        let control = HeadOfLineControl {
+            stalled_peer,
+            stalled_io: stalled_io.clone(),
+            healthy_io: healthy_io.clone(),
+            open_calls: open_calls.clone(),
+        };
+
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control,
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 2,
+                // Flush every frame so the channel fills, not the `FramedWrite` buffer.
+                frame_writer_backpressure_bytes: 1,
+                egress_backpressure_timeout: BACKPRESSURE_TIMEOUT,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let msg = BytesMut::from(&b"hello"[..]);
+
+        // Overflow the stalled peer: each excess packet costs the loop a full timeout.
+        for _ in 0..OVERFLOW {
+            tx_out
+                .send((stalled_peer, msg.clone()))
+                .await
+                .context("egress queue must accept stalled-peer packet")?;
+        }
+
+        tx_out
+            .send((healthy_peer, msg.clone()))
+            .await
+            .context("egress queue must accept healthy-peer packet")?;
+
+        assert!(
+            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
+            "no stream was ever opened"
+        );
+
+        let delivered = wait_for(2, || healthy_io.written() >= msg.len()).await;
+
+        assert_eq!(
+            stalled_io.written(),
+            0,
+            "precondition: stalled writer must accept nothing"
+        );
+
+        assert!(
+            delivered,
+            "a single stalled peer head-of-line-blocked the shared egress drain: the healthy peer got {} of {} bytes \
+             within 2s, while {OVERFLOW} overflow packets to the stalled peer each hold the loop for \
+             {BACKPRESSURE_TIMEOUT:?} (~{}s of blocking)",
+            healthy_io.written(),
+            msg.len(),
+            OVERFLOW as u64 * BACKPRESSURE_TIMEOUT.as_secs(),
         );
 
         Ok(())
