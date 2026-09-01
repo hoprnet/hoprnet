@@ -139,8 +139,8 @@ validator = { version = "0.21.0", features = ["derive"] }
 vsss-rs = { version = "6.0.1", default-features = false }
 
 hopr-api = { version = "4.1.0" }
-hopr-types = { version = "4.0.0", features = ["use-bindings"] }
-hopr-utils = { package = "hopr-utilities", version = "0.12.0", default-features = false }
+hopr-types = { version = "4.0.1", features = ["use-bindings"] }
+hopr-utils = { package = "hopr-utilities", version = "0.13.0", default-features = false }
 hopr-utils-session = { version = "1.2.1", path = "utils-session" }
 
 hopr-crypto-packet = { version = "1.4.0", path = "crypto/packet", default-features = false, features = [
@@ -162,7 +162,7 @@ hopr-transport-mixer = { version = "0.4.1", path = "transport/mixer", default-fe
 hopr-transport-probe = { version = "0.8.0", path = "transport/probe", default-features = false }
 hopr-transport-session = { version = "0.29.0", path = "transport/session", default-features = false }
 hopr-transport-tag-allocator = { version = "0.1.1", path = "transport/tag-allocator", default-features = false }
-hopr-chain-connector = { version = "0.25.0" }
+hopr-chain-connector = { version = "0.26.0" }
 
 # referential implementations (published to crates.io)
 hopr-session-server-forwarder = { version = "0.3.0", default-features = false }
