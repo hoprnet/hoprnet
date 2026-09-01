@@ -796,8 +796,12 @@ pub enum SessionPixCloseReason {
     RecoveryIdle,
     /// The per-SSA hard recovery deadline expired.
     RecoveryDeadline,
-    /// Too many unverifiable shares (per-SSA or session-limit exceeded).
-    TooManyUnverifiableShares,
+    /// A polynomial's share set failed to open its commitment.
+    ///
+    /// There is no threshold behind this: the first report closes the Session, and the reported
+    /// `observed_total` is diagnostic only. See the module documentation for why a tolerance would
+    /// buy nothing — a failed part can never be reconstructed, so the cycle can never pay.
+    UnverifiableShares,
     /// Too much of the batch's recovery progress landed on cycles behind the front one — see
     /// [`SupervisorConfig::max_off_front_share_fraction`].
     BatchServedOutOfOrder,
@@ -1436,6 +1440,56 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &rcn).is_err());
     }
 
+    /// The `Display` value of every close reason is a metric label, so it is API.
+    ///
+    /// [`crate::telemetry::record_pix_closure`] derives the `reason` label of
+    /// `hopr_session_pix_closures_total` from `to_string()`. A variant rename, or a `strum`
+    /// attribute added to one, silently renames a metric series and breaks whatever dashboards and
+    /// alerts were built on the old name.
+    ///
+    /// The `Display` string is snapshotted rather than the `Debug` form used by the sibling guard in
+    /// [`crate::types`], because `Display` is what actually reaches the label: `#[strum(serialize =
+    /// "…")]` makes the two diverge, and only one of them is observable to an operator.
+    ///
+    /// The array is hand-maintained, so the wildcard-free match below is what keeps it honest — a new
+    /// variant fails to compile *here*, next to the array it has to be added to, rather than
+    /// quietly falling outside a snapshot that still reads as a guarantee.
+    #[test]
+    fn pix_close_reason_display_values_are_stable() {
+        let reasons = [
+            SessionPixCloseReason::CommitmentTimeout,
+            SessionPixCloseReason::DepositTimeout,
+            SessionPixCloseReason::DepositObserverClosed,
+            SessionPixCloseReason::RecoveryIdle,
+            SessionPixCloseReason::RecoveryDeadline,
+            SessionPixCloseReason::UnverifiableShares,
+            SessionPixCloseReason::BatchServedOutOfOrder,
+            SessionPixCloseReason::CounterRegression,
+            SessionPixCloseReason::InvalidTransition,
+            SessionPixCloseReason::NoSsaRemaining,
+            SessionPixCloseReason::SupervisorUnavailable,
+        ];
+
+        for reason in reasons {
+            match reason {
+                SessionPixCloseReason::CommitmentTimeout
+                | SessionPixCloseReason::DepositTimeout
+                | SessionPixCloseReason::DepositObserverClosed
+                | SessionPixCloseReason::RecoveryIdle
+                | SessionPixCloseReason::RecoveryDeadline
+                | SessionPixCloseReason::UnverifiableShares
+                | SessionPixCloseReason::BatchServedOutOfOrder
+                | SessionPixCloseReason::CounterRegression
+                | SessionPixCloseReason::InvalidTransition
+                | SessionPixCloseReason::NoSsaRemaining
+                | SessionPixCloseReason::SupervisorUnavailable => {}
+            }
+        }
+
+        let labels = reasons.map(|reason| reason.to_string());
+        insta::assert_debug_snapshot!(labels);
+    }
+
     /// One unverifiable-share report must close the Session, and no configuration may change that.
     ///
     /// Pinned end-to-end through the public [`SupervisorConfig`] rather than the state machine's own
@@ -1467,10 +1521,9 @@ mod tests {
         );
 
         assert!(
-            actions.iter().any(|a| matches!(
-                a,
-                SessionPixAction::Close(SessionPixCloseReason::TooManyUnverifiableShares)
-            )),
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares))),
             "one unverifiable share must close the session under the default config, got {actions:?}"
         );
 
@@ -1497,10 +1550,9 @@ mod tests {
         );
 
         assert!(
-            actions.iter().any(|a| matches!(
-                a,
-                SessionPixAction::Close(SessionPixCloseReason::TooManyUnverifiableShares)
-            )),
+            actions
+                .iter()
+                .any(|a| matches!(a, SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares))),
             "no configuration may tolerate an unverifiable share, got {actions:?}"
         );
 

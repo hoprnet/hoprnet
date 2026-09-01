@@ -965,9 +965,7 @@ impl SessionPixSupervisor {
             "closing PIX session: a polynomial's share set failed to open its commitment"
         );
 
-        vec![SessionPixAction::Close(
-            SessionPixCloseReason::TooManyUnverifiableShares,
-        )]
+        vec![SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)]
     }
 
     // ------------------------------------------------------------------
@@ -2519,9 +2517,7 @@ mod tests {
         assert!(
             matches!(
                 actions.as_slice(),
-                [SessionPixAction::Close(
-                    SessionPixCloseReason::TooManyUnverifiableShares
-                )]
+                [SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)]
             ),
             "expected a close, got {actions:?}"
         );
@@ -2556,9 +2552,7 @@ mod tests {
             assert!(
                 matches!(
                     actions.as_slice(),
-                    [SessionPixAction::Close(
-                        SessionPixCloseReason::TooManyUnverifiableShares
-                    )]
+                    [SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)]
                 ),
                 "observed_total {observed_total} must close on the first report, got {actions:?}"
             );
@@ -2602,9 +2596,7 @@ mod tests {
         assert!(
             matches!(
                 actions.as_slice(),
-                [SessionPixAction::Close(
-                    SessionPixCloseReason::TooManyUnverifiableShares
-                )]
+                [SessionPixAction::Close(SessionPixCloseReason::UnverifiableShares)]
             ),
             "a live batch must not absorb an unverifiable-share report, got {actions:?}"
         );
