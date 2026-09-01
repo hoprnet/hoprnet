@@ -1269,10 +1269,10 @@ mod tests {
 
     /// The hard recovery deadline must clear one whole cycle at the widest quota this Exit accepts.
     ///
-    /// At the shipping defaults a cycle is 786 432 packets, about 72 minutes at the documented
-    /// 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped closed an honest,
-    /// fully saturated Session five sixths of the way through a cycle, which is worth nothing since
-    /// the SSA is the sum of every polynomial's constant term.
+    /// At the shipping defaults a cycle is 655 360 packets, about 61 minutes at the documented
+    /// 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped was 41 seconds short of
+    /// the accepted quota and closed an honest, fully saturated Session just before recovery, which
+    /// is worth nothing since the SSA is the sum of every polynomial's constant term.
     #[test]
     fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() {
         let cfg = IncomingSessionPixConfig::default();
@@ -1303,7 +1303,7 @@ mod tests {
         };
         assert!(
             validate_incoming_session_pix_config(&too_short).is_err(),
-            "an hour cannot cover a 72-minute cycle and must be refused"
+            "an hour cannot cover the 61-minute accepted quota and must be refused"
         );
 
         // The other way round: the deadline is fine, the operator widened what they accept.

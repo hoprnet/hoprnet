@@ -748,7 +748,7 @@ pub struct SsaRecoveryProgress<P> {
     /// by more than a rounding error, and conflating them has a specific failure mode. A conforming
     /// Entry emits `threshold + surplus` shares per polynomial across a window advancing in lockstep,
     /// so every window ends with `surplus × window` consecutive shares that advance nothing —
-    /// 8192 packets at the deployed dimensions. A consumer that treats "no useful share" as "the
+    /// 4096 packets at the deployed dimensions. A consumer that treats "no useful share" as "the
     /// Entry has gone quiet" will act on that run, and if the action is to withhold service it
     /// removes the only thing that could have produced the next useful share.
     ///

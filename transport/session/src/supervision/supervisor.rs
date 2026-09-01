@@ -357,7 +357,7 @@ impl SessionPixSupervisor {
     /// one cycle (see [`hopr_protocol_pix::SHARE_EMISSION_WINDOW`]) — so a cycle behind the front of
     /// the batch is *queued*, not stalled. Starting its clocks when its deposit confirmed, as this used
     /// to, measured the queue wait rather than the recovery: at deployed dimensions one cycle takes
-    /// ~72 min of emission to exhaust, so every cycle after the first was retired by
+    /// ~61 min of emission to exhaust, so every cycle after the first was retired by
     /// `max_recovery_time` — or, worse, by `max_recovery_idle` inside a minute, since the idle gate
     /// compares against *session-wide* service and a queued cycle sees plenty of that without any of it
     /// being its own.
@@ -2299,7 +2299,7 @@ mod tests {
     /// A snapshot carrying only surplus must keep the cycle alive without paying it anything.
     ///
     /// This is the whole of C1 at the supervisor. A conforming Entry drains an emission window's
-    /// surplus in one contiguous run — `surplus × min(polys, 256)` packets, 8192 at the shipped
+    /// surplus in one contiguous run — `surplus × min(polys, 256)` packets, 4096 at the shipped
     /// dimensions — during which `useful_shares` does not move at all. Every one of those packets is
     /// service the Exit is consuming, so a supervisor that keyed liveness on `useful_shares` would
     /// let the run exhaust `max_served_without_progress`, park the writer, and then close an honest
@@ -2820,7 +2820,7 @@ mod tests {
     /// A cycle queued behind the front of its batch must not be charged for the wait.
     ///
     /// The Entry serves a batch strictly in index order, so at deployed dimensions cycle 2 of a batch
-    /// sits idle for the ~72 min it takes cycle 1's shares to be emitted. Starting its recovery clocks
+    /// sits idle for the ~61 min it takes cycle 1's shares to be emitted. Starting its recovery clocks
     /// when its deposit confirmed measured that queue wait: `max_recovery_idle` would retire it inside
     /// a minute — the idle gate compares against *session-wide* service, which is plentiful while cycle
     /// 1 is served — and `max_recovery_time` would finish the job. Batching would have paid for

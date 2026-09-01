@@ -966,7 +966,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             //
             // Reported rather than swallowed, even though it advances nothing. Polynomials in an
             // emission window run in lockstep, so they reach `threshold` together and then take their
-            // surplus together — `surplus × window` consecutive shares, 8192 at the deployed
+            // surplus together — `surplus × window` consecutive shares, 4096 at the deployed
             // dimensions, none of them useful. A consumer that only ever hears about useful shares
             // reads that as the Entry having gone quiet. The snapshot says which it is: `shares_seen`
             // moves, `useful_shares` does not.
@@ -3072,7 +3072,7 @@ mod tests {
     ///
     /// This is the distinction the Exit's egress gate and recovery-idle deadline turn on. A conforming
     /// Entry emits `threshold + surplus` shares per polynomial, and a whole emission window reaches its
-    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 8192 packets
+    /// threshold in lockstep, so `surplus × window` consecutive shares advance nothing — 4096 packets
     /// at the deployed dimensions. A consumer told only about *useful* shares reads that run as the
     /// Entry having gone quiet, and if it answers by withholding service it removes the only thing that
     /// could have produced the next useful share.

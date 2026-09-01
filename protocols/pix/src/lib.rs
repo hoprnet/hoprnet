@@ -1,4 +1,4 @@
-// PIX (Private Incentivized eXchange) protocol: SSA commitment generation and reconstruction.
+// PIX (Protocol for Incentivization of eXits): SSA commitment generation and reconstruction.
 #![deny(clippy::debug_assert_with_mut_call)]
 
 use std::ops::{Add, Mul};

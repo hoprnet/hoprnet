@@ -590,7 +590,8 @@ pub(crate) struct SessionSlot {
     pix_egress_gate: Arc<OnceLock<Arc<ServiceGate>>>,
     /// Exit → Entry Session packets received on this Session, ever.
     ///
-    /// Entry-side only; stays zero on the Exit, which is the side that *sends* them. Each such
+    /// Entry-side only; stays zero on the Exit, which is the side that *sends* them. This includes
+    /// both Session data and Start-protocol traffic such as the Exit's SURB-level keep-alives. Each
     /// packet consumed one return SURB, and a SURB carries at most one PIX share which the Exit can
     /// only decrypt by using it — so this counts shares the Exit has unlocked, measured without
     /// asking it. That is what makes it usable as a deposit gate: see the successor gate in
@@ -1342,8 +1343,9 @@ impl PixToolbox {
 ///
 /// Once the deposit suffices, the SSA moves to *recovering*. Its recovery deadlines start when it
 /// reaches the front, and its deposit releases the egress gate only while it is there. When a paid
-/// front finishes, an unfunded successor restores its own bounded predeposit allowance; an already
-/// funded successor stays open but starts a fresh served-without-progress ceiling.
+/// front leaves—whether recovered or retired after a tolerated failure—an unfunded successor
+/// restores its own bounded predeposit allowance; an already funded successor stays open but starts
+/// a fresh served-without-progress ceiling.
 ///
 /// ### 5. SSA Collection, Recovery and Pipelining
 ///
@@ -1641,7 +1643,7 @@ where
             cfg,
             slot_allocated: Arc::new(Mutex::new(HashMap::new())),
             // Idle rather than live TTL, and generous: the entry must outlive the gap between two
-            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~72 min at the
+            // successive `SsaRequest`s of a Session, which is a whole SSA cycle — ~61 min at the
             // deployed dimensions and the documented rate cap. Matches the generator's own
             // per-pseudonym cache, which is what the guarded region reads.
             ssa_request_locks: moka::future::Cache::builder()
@@ -3011,6 +3013,18 @@ where
         in_data: ApplicationDataIn,
     ) -> errors::Result<DispatchResult> {
         if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
+            // Start-protocol traffic bypasses `session_rx`, but an Exit → Entry message still
+            // consumed one return SURB and unlocked one PIX share. Count it on outgoing Sessions
+            // before handing it to the protocol worker; incoming Sessions receive this traffic from
+            // the Entry over the forward path and must not be credited.
+            if let Some(session_slot) = self.sessions.get(&pseudonym)
+                && matches!(&session_slot.routing_opts, DestinationRouting::Forward { .. })
+            {
+                session_slot
+                    .returned_packets
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
+
             // This is a Start protocol message, so we send it to the handler
             trace!("dispatching Start protocol message");
             if let Some(start_protocol_tx) = self.start_protocol_tx.get() {
@@ -6481,8 +6495,7 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a `KeepAlive` message with the `BalancerState` flag updates the session's
-    /// SURB buffer level in the manager.
+    /// Verifies that an Exit `KeepAlive` updates the SURB buffer level and counts as returned service.
     ///
     /// ## Steps
     /// 1. A session slot is manually inserted into Alice's manager with a known `SurbBalancerConfig` and an initial
@@ -6491,7 +6504,7 @@ mod tests {
     ///    dispatched to Alice's manager via `dispatch_message`.
     /// 3. The manager processes the keep-alive asynchronously; the test polls until the slot's `buffer_level` reaches
     ///    200 (with a 1-second timeout).
-    /// 4. The buffer level is confirmed to be 200, proving the `BalancerState` flag updated it.
+    /// 4. The buffer level is confirmed to be 200 and the returned-packet counter advances once.
     #[test_log::test(tokio::test)]
     async fn session_manager_should_update_buffer_level_on_keep_alive_with_balancer_state_flag() -> anyhow::Result<()> {
         use std::sync::atomic::Ordering;
@@ -6586,6 +6599,11 @@ mod tests {
             session_slot.surb_mgmt.buffer_level(),
             new_buffer_level,
             "buffer level should be updated via keep-alive with BalancerState flag"
+        );
+        assert_eq!(
+            1,
+            session_slot.returned_packets.load(Ordering::Relaxed),
+            "an Exit keep-alive consumes a return SURB and must count toward the successor gate"
         );
 
         Ok(())
@@ -6686,6 +6704,11 @@ mod tests {
             session_slot.surb_mgmt.target_surb_buffer_size.load(Ordering::Relaxed),
             new_target,
             "target buffer size should be updated via keep-alive with BalancerTarget flag"
+        );
+        assert_eq!(
+            0,
+            session_slot.returned_packets.load(Ordering::Relaxed),
+            "an Entry keep-alive received on the Exit must not count as returned Exit service"
         );
 
         Ok(())

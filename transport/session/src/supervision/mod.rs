@@ -1,7 +1,7 @@
 //! PIX supervision for incoming PIX-enabled sessions.
 //!
 //! This module implements the **Exit-side** supervision logic for sessions
-//! using the Packet Information eXtension (PIX) protocol.  The Exit node
+//! using the Protocol for Incentivization of eXits (PIX).  The Exit node
 //! runs a deterministic supervisor that tracks each *Secret Sharing Aggregate*
 //! (SSA) through a well-defined lifecycle, enforcing timeouts, deposit
 //! sufficiency, recovery progress, and fault tolerances.  Egress data
@@ -108,8 +108,10 @@
 //! While the current front cycle is unfunded, a provisional budget lets the Exit answer the Entry
 //! for a bounded number of packets, so that the application is not held up for as long as an
 //! on-chain deposit takes to confirm. The initial front starts with this allowance; a successor gets
-//! a fresh allowance only after its predecessor paid and finished. Losing an unfunded front does not
-//! mint another grant. The budget is
+//! a fresh allowance after its predecessor was funded and leaves the front, whether by recovery or a
+//! tolerated failure. A failed funded cycle has already cost the Entry its full deposit, and
+//! `max_failed_cycles` bounds how often that can happen. Losing an unfunded front does not mint
+//! another grant. The budget is
 //! `min(target_useful_shares - 1, max_predeposit_packets)`; at production dimensions the first term
 //! is in the hundreds of thousands, so the configured cap is what binds and the `min` only matters
 //! for the small dimensions used in tests.
@@ -274,7 +276,7 @@
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
-//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 778 240 packets, ~72 min, at the defaults — or it closes honest Sessions instead. |
+//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets, ~61 min, at the defaults — or it closes honest Sessions instead. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
@@ -331,7 +333,7 @@
 //! Emission is round-robin over a window of up to `hopr_protocol_pix::SHARE_EMISSION_WINDOW` (256)
 //! polynomials advancing in lockstep. They reach `threshold` on the same pass and then take their
 //! surplus shares together, so every block ends with `surplus_shares × window` consecutive packets
-//! carrying no *useful* share — **8192 at the shipped dimensions**, against a
+//! carrying no *useful* share — **4096 at the shipped dimensions**, against a
 //! `max_served_without_progress` of 2048.
 //!
 //! That used to be a live constraint on two parameters, and an unmeetable one: the ceiling and the
@@ -532,20 +534,20 @@ pub struct SupervisorConfig {
     /// 8192 polynomials the last useful share of the cycle lands at
     ///
     /// ```text
-    /// (31 full windows x 96 emitted + 1 window x 64 useful) x 256 = 778 240 packets
+    /// (31 full windows x 80 emitted + 1 window x 64 useful) x 256 = 651 264 packets
     /// ```
     ///
-    /// which is about **72 minutes** at the 1.5 Mbps per-Session cap this crate documents, before
+    /// which is just over **60 minutes** at the 1.5 Mbps per-Session cap this crate documents, before
     /// any mixing latency or loss. A one-hour ceiling closes an honest, fully saturated Session at
-    /// the default configuration — with the cycle roughly five sixths recovered and therefore worth
-    /// nothing, since the SSA is the sum of every polynomial's constant term.
+    /// the default configuration with its last useful share only about 18 seconds away — and the
+    /// partial cycle is worth nothing, since the SSA is the sum of every polynomial's constant term.
     ///
     /// Two hours is the value the worked profile in the module documentation already used, and it
     /// keeps this instrument where it belongs: far enough out that
     /// [`max_recovery_idle`](Self::max_recovery_idle) is what actually binds.
     ///
     /// The clock starts when the cycle reaches the front of its batch, which is up to one
-    /// predecessor's surplus tail — ~8192 packets, ~45 s at that rate — before it can make any
+    /// predecessor's surplus tail — ~4096 packets, ~23 s at that rate — before it can make any
     /// progress of its own. Negligible against two hours. Arming on first progress instead is
     /// rejected because a funded cycle that is never served must still be caught.
     ///
@@ -637,8 +639,9 @@ pub struct SupervisorConfig {
     /// This buys the application an exchange while the current front cycle's deposit confirms on
     /// chain; it is not needed for the Session to become fundable, so it is a
     /// latency-versus-exposure dial rather than a correctness requirement. The initial front starts
-    /// with this allowance, and it is restored for an unfunded successor only after a paid front
-    /// completes. Retiring an unfunded front does not grant it again.
+    /// with this allowance, and it is restored for an unfunded successor after a paid front leaves
+    /// the front, whether by recovery or a tolerated failure. Retiring an unfunded front does not
+    /// grant it again.
     ///
     /// **Zero is supported and means strict prepay**: the Exit answers nothing until a sufficient
     /// deposit is confirmed. Everything on the path to funding — the `SsaRequest`, the Entry's
@@ -664,7 +667,7 @@ pub struct SupervisorConfig {
     ///
     /// Those events now follow `shares_seen` rather than `useful_shares`, which is what makes a flat
     /// 2048 safe at any dimensions. Keyed on useful shares, this had to exceed
-    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 8192 at the shipped dimensions, four times
+    /// `surplus x min(polys, SHARE_EMISSION_WINDOW)` — 4096 at the shipped dimensions, twice
     /// this value — because a conforming Entry emits a whole window's surplus in one contiguous run
     /// during which no share is useful. The gate parked the writer partway through, and a parked
     /// writer spends no SURBs, so nothing could arrive to release it. See
