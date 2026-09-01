@@ -276,7 +276,7 @@
 //! | `max_ssa_delivery_time` | 20 s | An Entry that accepts a request and never delivers the commitment set, holding a session slot and a reconstructor cycle that can never be funded. |
 //! | `max_deposit_wait` | 60 s | An Entry that commits but never deposits — typically after it has already drawn the predeposit budget. |
 //! | `max_recovery_idle` | 60 s | An Entry, or a colluding first return relayer, consuming service while returning no shares. Service-gated, so a Session that is merely quiet is never punished. |
-//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets, ~61 min, at the defaults — or it closes honest Sessions instead. |
+//! | `max_recovery_time` | 2 h | A cycle that dribbles just enough progress to refresh the idle timer forever. A resource backstop for the slot and the reconstructor state, *not* the anti-drip rule. It must clear a whole cycle at the widest dimensions the node accepts — 655 360 packets of *full emission*, ~61 min, at the defaults — or it closes honest Sessions instead. That is the quantity `quota_range` prices and `validate_incoming_session_pix_config` enforces; the *last useful share* lands earlier, at 651 264, which is the figure the "why two hours" argument on [`SupervisorConfig::max_recovery_time`] uses. |
 //! | `max_off_front_share_fraction` | 0.25 | An Entry spreading a batch's shares across all of its cycles, taking `ssas_per_request` quotas of service while completing none of them — and a cycle short of completion pays nothing at all. |
 //! | `min_share_order_sample` | 16384 | Convicting on a thin sample: the shares that legitimately cross a cycle boundary out of order while in flight. |
 //! | `max_predeposit_packets` | 10000 | Bounds what an Entry can extract from an unfunded front. Restored only after a paid front handoff; `0` means strict prepay on every rotation. |
@@ -401,7 +401,7 @@
 //! | `SessionManagerConfig::maximum_surb_buffer_size` | 10 000 | Ceiling the balancer may be steered to |
 //! | `SsaReconstructorConfig::max_ack_await_time` | 30 s | Bounds how long an unacknowledged share is held; both `max_recovery_idle` and `tombstone_retention_window` must clear it |
 //! | `SsaReconstructorConfig::unused_verifier_lifetime` | 1800 s | Must exceed `max_recovery_idle`, so the supervisor gives up on a stalled cycle before the reconstructor reclaims what it would need to finish |
-//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the 54 s pipelining runway quoted above. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
+//! | `SsaReconstructorConfig::early_recovery_threshold` | 0.85 | Sets the pipelining runway derived for `ssas_per_request` above — 24 627 packets, 41 s. Bounded below by `MIN_EARLY_RECOVERY_THRESHOLD` and equal to it today: the Entry's successor gate is computed at that floor, so a lower value asks for the next batch before any conforming Entry admits the request. Raising it shortens the runway |
 //! | `PixGlobalConfig::max_ssas_per_request` (Entry) | 2 | Must be ≥ every peer Exit's `ssas_per_request`; not negotiated, and an over-cap batch is refused in full |
 //! | `IncomingSessionPixConfig::max_live_cycle_bytes` | 3 GiB | Shipped value. At `2048 × 64 + 16` a Session reserves ≈20.5 MiB, so this profile admits ≈150 concurrent PIX Sessions rather than the ≈37 the default dimensions imply. It is the ceiling on live reconstructor state, and it — not `maximum_managed_sessions` — is what decides how many PIX Sessions this Exit accepts |
 
@@ -541,6 +541,13 @@ pub struct SupervisorConfig {
     /// any mixing latency or loss. A one-hour ceiling closes an honest, fully saturated Session at
     /// the default configuration with its last useful share only about 18 seconds away — and the
     /// partial cycle is worth nothing, since the SSA is the sum of every polynomial's constant term.
+    ///
+    /// This is deliberately not the same count as the 655 360 quoted in the module documentation's
+    /// parameter table, and the two must not be reconciled: 655 360 is `8192 × 80`, the *full*
+    /// emission including the last window's surplus, which is what `quota_range` prices and what
+    /// `validate_incoming_session_pix_config` checks this value against. 651 264 is where the last
+    /// *useful* share lands, which is the point this argument is about — a deadline that clears the
+    /// useful shares but not the surplus tail still collects a payable cycle.
     ///
     /// Two hours is the value the worked profile in the module documentation already used, and it
     /// keeps this instrument where it belongs: far enough out that

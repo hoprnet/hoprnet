@@ -1269,10 +1269,15 @@ mod tests {
 
     /// The hard recovery deadline must clear one whole cycle at the widest quota this Exit accepts.
     ///
-    /// At the shipping defaults a cycle is 655 360 packets, about 61 minutes at the documented
-    /// 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped was 41 seconds short of
-    /// the accepted quota and closed an honest, fully saturated Session just before recovery, which
-    /// is worth nothing since the SSA is the sum of every polynomial's constant term.
+    /// At the shipping defaults a cycle is 655 360 packets of full emission, about 61 minutes at the
+    /// documented 1.5 Mbps per-Session cap — so the one-hour ceiling this crate shipped was 41
+    /// seconds short of the accepted quota and closed an honest, fully saturated Session just before
+    /// recovery, which is worth nothing since the SSA is the sum of every polynomial's constant term.
+    ///
+    /// Full emission is the right count *here* because it is what `quota_range` prices, which is
+    /// what the assertion below derives the requirement from. `SupervisorConfig::max_recovery_time`
+    /// documents the same deadline against 651 264 — where the last *useful* share lands — because
+    /// that argument is about when the cycle becomes payable rather than about what was sold.
     #[test]
     fn default_recovery_deadline_must_cover_a_whole_cycle_at_the_accepted_quota() {
         let cfg = IncomingSessionPixConfig::default();
