@@ -12,8 +12,8 @@ use hopr_protocol_pix::SsaReconstructorConfig;
 pub use hopr_transport_mixer::config::MixerConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 use hopr_transport_session::{
-    DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA, DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig,
-    MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
+    ASSUMED_SESSION_PACKET_RATE, DEFAULT_MAX_SSAS_PER_SSA_REQUEST, DEFAULT_PIX_POLYS_PER_SSA,
+    DEFAULT_PIX_SHARES_PER_POLY, IncomingSessionPixConfig, MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION,
 };
 use proc_macro_regex::regex;
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -265,33 +265,6 @@ pub struct HoprProtocolConfig {
     pub surb_flush_interval: Duration,
 }
 
-/// Per-Session return-path rate the recovery deadline is sized against, in packets per second.
-///
-/// 1.5 Mbps over a [`HoprPacket::PAYLOAD_SIZE`](hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE)
-/// payload — the per-Session cap documented throughout this repository, in
-/// `hopr_protocol_pix::reconstructor` and in the `supervision` module's worked profile.
-///
-/// An assumption rather than an enforced limit, and used in the only direction that is safe: a
-/// Session running *slower* needs a *longer* deadline, so checking against the cap is the loosest
-/// bound that still catches a `max_recovery_time` no Session could meet. It cannot certify that a
-/// slow Session will finish.
-///
-/// Integer division, so this *understates* the rate — which is the same safe direction: a lower
-/// assumed rate demands a longer `max_recovery_time`. Worth stating, because a reader checking the
-/// arithmetic cannot otherwise tell whether the truncation was considered or overlooked.
-const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
-
-// A zero rate would panic `div_ceil` at config load, and the panic would name nothing an operator
-// set. Denied at compile time rather than clamped with `.max(1)`: the constant is derived entirely
-// from other constants, so a payload wide enough to zero it is a change to this repository and not
-// an input — and a build failure says so, where a silent clamp would go on quietly asserting a rate
-// of one packet per second.
-const _: () = assert!(
-    ASSUMED_SESSION_PACKET_RATE > 0,
-    "HoprPacket::PAYLOAD_SIZE has grown past the modelled per-Session byte rate, leaving the assumed packet rate at \
-     zero; re-derive the rate rather than letting it divide to nothing"
-);
-
 /// Rejects a supervisor whose deadlines its own node's reconstructor cannot honour.
 ///
 /// The deadlines the Exit-side supervisor derives from `incoming_session_pix_config` have to agree
@@ -340,51 +313,11 @@ fn validate_pix_supervision_pairing(cfg: &HoprProtocolConfig) -> Result<(), Vali
 /// `maximum_managed_sessions` of them: this budget exists precisely because that product is a
 /// number no node holds, so checking it here would only ever reject the shipping defaults.
 fn validate_incoming_session_pix_config(cfg: &IncomingSessionPixConfig) -> Result<(), ValidationError> {
-    if cfg.quota_range.is_empty() {
-        return Err(ValidationError::new(
-            "pix quota_range must be non-empty (start must not exceed end)",
-        ));
-    }
-
-    // The whole cycle rather than the point at which recovery completes: the quota does not reveal
-    // how the product splits between polynomials and threshold, so the emission-window arithmetic
-    // that puts the last useful share ~8192 packets early cannot be reproduced from it. Erring by
-    // that margin — ~45 s against a two-hour deadline — is the safe direction.
-    let worst_cycle_packets = *cfg.quota_range.end() / hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE as u64;
-    let needed = Duration::from_secs(worst_cycle_packets.div_ceil(ASSUMED_SESSION_PACKET_RATE));
-    if cfg.supervision.max_recovery_time < needed {
-        let mut e = ValidationError::new("pix max_recovery_time cannot cover one cycle at the accepted quota");
-        e.message = Some(
-            format!(
-                "max_recovery_time is {:?}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
-                 packets and needs at least {needed:?} at {ASSUMED_SESSION_PACKET_RATE} packets/s. Raise \
-                 max_recovery_time or lower the top of quota_range.",
-                cfg.supervision.max_recovery_time,
-                cfg.quota_range.end(),
-            )
-            .into(),
-        );
-        return Err(e);
-    }
-
-    let widest =
-        hopr_transport_session::max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
-    if cfg.max_live_cycle_bytes < widest {
-        let mut e = ValidationError::new("pix max_live_cycle_bytes cannot admit one session at the accepted quota");
-        e.message = Some(
-            format!(
-                "max_live_cycle_bytes is {}, but one session offering the largest accepted quota ({} bytes) reserves \
-                 up to {widest} bytes of reconstructor state. Raise max_live_cycle_bytes, lower the top of \
-                 quota_range, or lower ssas_per_request.",
-                cfg.max_live_cycle_bytes,
-                cfg.quota_range.end(),
-            )
-            .into(),
-        );
-        return Err(e);
-    }
-
-    Ok(())
+    hopr_transport_session::validate_incoming_session_pix_config(cfg, ASSUMED_SESSION_PACKET_RATE).map_err(|error| {
+        let mut e = ValidationError::new("invalid incoming PIX configuration");
+        e.message = Some(error.to_string().into());
+        e
+    })
 }
 
 /// Headroom over the profiled dimension product that [`PixGlobalConfig`] will accept.

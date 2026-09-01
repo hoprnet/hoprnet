@@ -274,6 +274,18 @@ pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 /// Minimum time between SURB buffer notifications to the Entry.
 pub const MIN_SURB_BUFFER_NOTIFICATION_PERIOD: Duration = Duration::from_secs(1);
 
+/// Per-Session return-path rate used to size the PIX recovery deadline, in packets per second.
+///
+/// This is 1.5 Mbps divided by the HOPR packet payload size. A slower Session needs a longer
+/// deadline, so this is the loosest useful bound for rejecting a deadline that no fully saturated
+/// Session could meet.
+pub const ASSUMED_SESSION_PACKET_RATE: u64 = 1_500_000 / 8 / HoprPacket::PAYLOAD_SIZE as u64;
+
+const _: () = assert!(
+    ASSUMED_SESSION_PACKET_RATE > 0,
+    "HoprPacket::PAYLOAD_SIZE leaves the assumed PIX Session packet rate at zero"
+);
+
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 
@@ -821,6 +833,49 @@ impl IncomingSessionPixConfig {
     pub fn supervisor_config(&self) -> SupervisorConfig {
         self.supervision.clone()
     }
+}
+
+/// Validates the incoming-PIX invariants that span quota, supervision and memory settings.
+///
+/// `assumed_session_packet_rate` is explicit because the deadline is meaningful only relative to
+/// the rate a caller expects a Session to sustain.
+pub fn validate_incoming_session_pix_config(
+    cfg: &IncomingSessionPixConfig,
+    assumed_session_packet_rate: u64,
+) -> errors::Result<()> {
+    if cfg.quota_range.is_empty() {
+        return Err(TransportSessionError::InvalidConfig(
+            "PIX quota_range must be non-empty (start must not exceed end)".into(),
+        ));
+    }
+    if assumed_session_packet_rate == 0 {
+        return Err(TransportSessionError::InvalidConfig(
+            "assumed PIX Session packet rate must be non-zero".into(),
+        ));
+    }
+
+    let worst_cycle_packets = *cfg.quota_range.end() / HoprPacket::PAYLOAD_SIZE as u64;
+    let needed = Duration::from_secs(worst_cycle_packets.div_ceil(assumed_session_packet_rate));
+    if cfg.supervision.max_recovery_time < needed {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "PIX max_recovery_time is {:?}, but the largest accepted quota ({} bytes) is {worst_cycle_packets} \
+             packets and needs at least {needed:?} at {assumed_session_packet_rate} packets/s",
+            cfg.supervision.max_recovery_time,
+            cfg.quota_range.end(),
+        )));
+    }
+
+    let widest = max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
+    if cfg.max_live_cycle_bytes < widest {
+        return Err(TransportSessionError::InvalidConfig(format!(
+            "PIX max_live_cycle_bytes is {}, but one Session offering the largest accepted quota ({} bytes) reserves \
+             up to {widest} bytes of reconstructor state",
+            cfg.max_live_cycle_bytes,
+            cfg.quota_range.end(),
+        )));
+    }
+
+    Ok(())
 }
 
 /// Configuration for the [`SessionManager`].
@@ -1621,6 +1676,8 @@ where
         // `AlreadyStarted`: neither running nor recoverable, out of what is an ordinary configuration
         // error the caller could have corrected and retried on the same instance.
         if let Some(pix) = pix.as_ref() {
+            validate_incoming_session_pix_config(&self.cfg.pix_config, ASSUMED_SESSION_PACKET_RATE)?;
+
             // The authoritative cross-component check, and the first moment it can be made: the
             // supervisor's deadlines are meaningless without the reconstructor lifetimes they race
             // against, and the reconstructor arrives here rather than at construction.
@@ -5883,14 +5940,19 @@ mod tests {
     async fn a_pix_session_over_the_live_cycle_budget_is_refused() -> anyhow::Result<()> {
         use hopr_utils::network_types::prelude::SealedHost;
 
-        let params = small_pix_params();
+        // Four shares has only one legal dimension split: 2 polynomials at threshold 2. Using no
+        // surplus makes this offer the worst-case reservation at its exact quota, so the configured
+        // budget can honestly admit the whole range while still fitting exactly one such Session.
+        let params = PixParams::try_new(2, 2, 0, LOCAL_PIX_SUITE)?;
+        let quota = pix_params_to_quota(&params);
         let one_session = cycle_budget_for(&params, DEFAULT_SSAS_PER_SSA_REQUEST);
+        assert_eq!(one_session, max_cycle_budget_for_quota(quota, 1));
 
         let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
             SessionManager::new(SessionManagerConfig {
                 maximum_sessions: 100,
                 pix_config: IncomingSessionPixConfig {
-                    quota_range: 0..=10_000_000_000_000,
+                    quota_range: quota..=quota,
                     // Room for exactly one Session at these dimensions.
                     max_live_cycle_bytes: one_session,
                     ..Default::default()
@@ -5901,7 +5963,7 @@ mod tests {
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
-            surplus_shares: TEST_SURPLUS_SHARES,
+            surplus_shares: 0,
         };
         let (pix_toolbox, _pix_events_rx) = PixToolbox::new(
             SsaShareGenerator::new(ssa_gen_config).into(),
@@ -5927,7 +5989,7 @@ mod tests {
                     challenge: MIN_CHALLENGE,
                     target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse().unwrap())),
                     capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                    additional_data: small_pix_additional_data(),
+                    additional_data: params.into_additional_data(0),
                 },
             )
         };
@@ -7052,6 +7114,69 @@ mod tests {
             matches!(started, Err(TransportSessionError::InvalidConfig(_))),
             "starting with a reconstructor that cannot support the supervisor config must fail, got {started:?}"
         );
+
+        Ok(())
+    }
+
+    /// A programmatically assembled manager must enforce the same incoming-PIX cross-field rules
+    /// as the serialized transport configuration before it starts accepting Sessions.
+    #[allow(clippy::reversed_empty_ranges)]
+    #[test_log::test(tokio::test)]
+    async fn start_rejects_each_invalid_incoming_pix_cross_field_combination() -> anyhow::Result<()> {
+        let valid = IncomingSessionPixConfig::default();
+        let widest = max_cycle_budget_for_quota(*valid.quota_range.end(), valid.supervision.ssas_per_request);
+        let invalid_configs = [
+            (
+                "empty quota range",
+                IncomingSessionPixConfig {
+                    quota_range: 100..=10,
+                    ..valid.clone()
+                },
+                "quota_range",
+            ),
+            (
+                "recovery deadline below one accepted cycle",
+                IncomingSessionPixConfig {
+                    supervision: SupervisorConfig {
+                        max_recovery_time: Duration::from_secs(1),
+                        ..valid.supervision.clone()
+                    },
+                    ..valid.clone()
+                },
+                "max_recovery_time",
+            ),
+            (
+                "live-cycle budget below one accepted cycle",
+                IncomingSessionPixConfig {
+                    max_live_cycle_bytes: widest - 1,
+                    ..valid
+                },
+                "max_live_cycle_bytes",
+            ),
+        ];
+
+        for (case, pix_config, expected_field) in invalid_configs {
+            let mgr: SessionManager<UnboundedSender<(DestinationRouting, ApplicationDataOut)>> =
+                SessionManager::new(SessionManagerConfig {
+                    pix_config,
+                    ..Default::default()
+                });
+            let (pix_toolbox, _pix_events) = PixToolbox::new(
+                SsaShareGenerator::new(SsaGeneratorConfig::default()).into(),
+                SsaReconstructor::new(SsaReconstructorConfig::default()).into(),
+            );
+            let (tx, _rx) = futures::channel::mpsc::unbounded();
+            let (new_session_tx, _new_session_rx) = futures::channel::mpsc::channel(1);
+
+            match mgr.start(tx, new_session_tx, Some(pix_toolbox)) {
+                Err(TransportSessionError::InvalidConfig(message)) => assert!(
+                    message.contains(expected_field),
+                    "{case} should identify {expected_field}, got: {message}"
+                ),
+                Err(error) => anyhow::bail!("{case} returned the wrong error: {error}"),
+                Ok(_) => anyhow::bail!("{case} was accepted"),
+            }
+        }
 
         Ok(())
     }
@@ -9976,6 +10101,8 @@ mod tests {
     /// Verifies that dispatching too many `UnverifiableShare` events closes the session.
     #[test_log::test(tokio::test)]
     async fn too_many_unverifiable_shares_closes_session() -> anyhow::Result<()> {
+        let params = small_pix_params();
+        let quota = pix_params_to_quota(&params);
         let ssa_gen_config = SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -9990,7 +10117,8 @@ mod tests {
         let mgr =
             SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(SessionManagerConfig {
                 pix_config: IncomingSessionPixConfig {
-                    quota_range: 0..=10_000_000_000_000,
+                    quota_range: quota..=quota,
+                    max_live_cycle_bytes: max_cycle_budget_for_quota(quota, 1),
                     supervision: SupervisorConfig {
                         max_deposit_wait: Duration::from_secs(1),
                         ..Default::default()
@@ -10024,7 +10152,7 @@ mod tests {
                 challenge: MIN_CHALLENGE,
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: HoprSessionCapabilities(Capability::UsePIX.into()),
-                additional_data: small_pix_additional_data(),
+                additional_data: params.into_additional_data(0),
             },
         )
         .await?;
