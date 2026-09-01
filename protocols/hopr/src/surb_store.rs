@@ -215,9 +215,12 @@ pub struct MemorySurbStore {
     /// still held SURBs of generation `N`, [`current_generation`](Self::current_generation) would
     /// fall back to `0`; the peer's [`SurbRingBuffer::push`] then reads `generation_is_newer(0, N)`
     /// as false (for `1 <= N <= 128`) and silently discards every fresh batch, stranding the reply
-    /// path. `reply_opener_lifetime` bounds how long we expect replies (hence outstanding SURBs) for
-    /// a pseudonym, and it is `>=` the peer's SURB idle window, so the serial outlives the SURBs it
-    /// numbers.
+    /// path. Both dimensions are therefore taken from the sending-side reply-opener config, not the
+    /// receiving-side SURB config: `reply_opener_lifetime` bounds how long we expect replies (hence
+    /// outstanding SURBs) for a pseudonym, and it is `>=` the peer's SURB idle window, so the serial
+    /// outlives the SURBs it numbers; and the capacity matches the reply-opener pseudonym bound
+    /// (`max_openers_per_pseudonym`, which covers `maximum_managed_sessions`) so LRU pressure from the
+    /// unrelated receiving-side `max_pseudonyms` cannot evict a live sender's generation.
     generations: moka::sync::Cache<HoprPseudonym, Arc<std::sync::atomic::AtomicU8>>,
     cfg: Arc<SurbStoreConfig>,
 }
@@ -249,9 +252,13 @@ impl MemorySurbStore {
                 .build(),
             invalidated_relayers: Default::default(),
             generations: moka::sync::Cache::builder()
-                // Sending-side state: retained for the reply-opener window (>= the peer's SURB idle
-                // window), so the serial cannot reset to 0 while the peer still holds SURBs it
-                // numbers. See the field doc for why an early eviction would strand the reply path.
+                // Sending-side state, so it is sized and aged like the sibling sending-side
+                // `pseudonym_openers` cache — NOT like the receiving-side `surbs_per_pseudonym`.
+                // Retained for the reply-opener window (>= the peer's SURB idle window) so the serial
+                // cannot reset to 0 while the peer still holds SURBs it numbers, and bounded by the
+                // reply-opener pseudonym capacity (which covers `maximum_managed_sessions`) so LRU
+                // pressure from the receiving-side `max_pseudonyms` cannot evict a live sender's
+                // generation. See the field doc for why an early eviction would strand the reply path.
                 .time_to_idle(cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _generation, cause| {
@@ -259,7 +266,7 @@ impl MemorySurbStore {
                     // reset the generation serial and have the peer reject fresh SURBs.
                     tracing::warn!(%pseudonym, ?cause, "evicting SURB generation for pseudonym");
                 })
-                .max_capacity(cfg.max_pseudonyms.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
+                .max_capacity(cfg.max_openers_per_pseudonym.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
             cfg: cfg.into(),
         }
