@@ -725,7 +725,14 @@ impl SessionPixSupervisor {
         // the gate that is self-inflicted: withholding service removes the only thing that could
         // produce the next useful share. See `SsaRecoveryProgress::shares_seen`.
         ssa.served_total_at_last_progress = served_total;
-        if ssa.phase == SsaPhase::Recovering {
+        // Refreshing is not arming: only `arm_recovery_clocks_for_earliest` starts a cycle's clocks,
+        // and `recovery_hard_deadline` is how a cycle records that it has reached the front. Without
+        // that second condition a stray reordered share *starts* the idle clock on a cycle still
+        // queued behind the front — which the Entry cannot then feed, because emission is clamped to
+        // one cycle — and 60 s later the idle gate sees session-wide service climbing and retires it.
+        // That is the queue-wait failure `arm_recovery_clocks_for_earliest` documents, reached
+        // through the refresh path instead of the deposit one. The clocks arm together or not at all.
+        if ssa.phase == SsaPhase::Recovering && ssa.recovery_hard_deadline.is_some() {
             ssa.recovery_idle_deadline = now.checked_add(self.cfg.max_recovery_idle);
         }
 
@@ -2807,6 +2814,67 @@ mod tests {
             ),
             "at the floor the verdict must be reached, got {actions:?}"
         );
+    }
+
+    /// A stray reordered share must not put a *queued* cycle on the idle clock.
+    ///
+    /// The sibling test below fixes the arming path: clocks start when a cycle reaches the front. But
+    /// refreshing is not arming, and `on_recovery_progress` used to set `recovery_idle_deadline` for
+    /// any cycle merely in `Recovering`. One share crossing a cycle boundary out of order — the exact
+    /// thing [`SupervisorConfig::min_share_order_sample`] exists to tolerate — therefore *started* the
+    /// idle clock on a cycle the Entry cannot serve, since emission is clamped to one cycle. A
+    /// `max_recovery_idle` later the gate saw session-wide service climbing on the front cycle's
+    /// behalf and retired the queued one, charging it for a queue wait it had no way to end.
+    ///
+    /// The two clocks arm together or not at all, so the hard deadline is the witness for "has been at
+    /// the front", and a queued cycle must come out of this with neither.
+    #[test]
+    fn a_stray_share_on_a_queued_cycle_must_not_start_its_idle_clock() {
+        const BATCH: u32 = 3;
+
+        let p = pseudonym();
+        let cfg = SupervisorConfig {
+            ssas_per_request: BATCH as usize,
+            max_recovery_idle: Duration::from_secs(10),
+            max_recovery_time: Duration::from_secs(3600),
+            ..default_cfg()
+        };
+        let (mut sup, _) = SessionPixSupervisor::new(cfg, dims(10, 5), p, Instant::now());
+        let start = Instant::now();
+        fund_batch(&mut sup, p, BATCH, start);
+        let target = sup.dims.target_useful_shares();
+
+        // One share for queued cycle 2 arrives while cycle 1 holds the front.
+        sup.handle_event(
+            &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 2), 1, target, 0)),
+            start + Duration::from_secs(1),
+            1_000,
+        );
+
+        let queued = sup.ssas.iter().find(|s| s.ssa_id == ssa_id(p, 2)).expect("cycle 2");
+        assert_eq!(
+            (queued.recovery_hard_deadline, queued.recovery_idle_deadline),
+            (None, None),
+            "an off-front share must leave a queued cycle off both clocks, not just the hard one"
+        );
+
+        // Cycle 1 is served normally, so session-wide service climbs past cycle 2's baseline — which is
+        // what would convict it if the idle clock were running.
+        for step in 1..=3u64 {
+            sup.handle_event(
+                &SessionPixEvent::RecoveryProgress(make_progress(ssa_id(p, 1), step, target, 0)),
+                start + Duration::from_secs(1 + step * 3),
+                1_000 + step * 1_000,
+            );
+        }
+
+        let actions = sup.handle_deadline(start + Duration::from_secs(12), 5_000);
+        assert!(
+            actions.is_empty(),
+            "no cycle may be retired or closed while the front is being served, got {actions:?}"
+        );
+        assert_eq!(sup.ssas.len(), BATCH as usize, "the whole batch must still be live");
+        assert_eq!(sup.failed_cycles, 0, "nothing may be charged as a failed cycle");
     }
 
     /// A cycle queued behind the front of its batch must not be charged for the wait.
