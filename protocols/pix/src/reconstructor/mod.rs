@@ -1228,7 +1228,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         }
     }
 
-    /// Takes any resolutions parked by [`drain_deferred_acks`](Self::drain_deferred_acks).
+    /// Takes any resolutions parked by `drain_deferred_acks`.
     ///
     /// The take is atomic with respect to producers and other consumers. This lets the transport's
     /// notification stream and the acknowledgement fallback race safely: exactly one receives each
