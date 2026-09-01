@@ -1,16 +1,22 @@
 //! Infrastructure supporting converting a collection of `PeerId` split `libp2p_stream` managed
 //! individual peer-to-peer `libp2p::swarm::Stream`s.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+use std::{
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+    time::Duration,
 };
 
 use crossfire::mpsc;
 use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, StreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, FutureExt, Sink, StreamExt,
     channel::mpsc::{Receiver, Sender, channel},
 };
+use futures_timer::Delay;
 use hopr_api::network::NetworkStreamControl;
 use libp2p::PeerId;
 use tokio_util::{
@@ -68,6 +74,122 @@ impl<T: Send + 'static> PeerSink<T> {
 
 type PeerStreamCache<T> = moka::sync::Cache<PeerId, PeerSink<T>>;
 
+/// Error produced by the per-peer write pump ([`StallGuardSink`]).
+#[derive(Debug)]
+enum EgressWriteError<E> {
+    /// The wrapped framed-writer sink returned an error of its own.
+    Sink(E),
+    /// The wrapped sink made no forward progress within the stall timeout.
+    Stalled { timeout: Duration },
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for EgressWriteError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EgressWriteError::Sink(e) => write!(f, "egress sink error: {e}"),
+            EgressWriteError::Stalled { timeout } => {
+                write!(f, "egress write pump made no progress within {timeout:?}")
+            }
+        }
+    }
+}
+
+/// A [`Sink`] adapter that fails the per-peer write pump once the inner sink stops making progress.
+///
+/// The write pump is `rx.forward(frame_writer)`, where `frame_writer` writes to the peer's quinn
+/// substream. When a remote stops reading, quinn's `poll_write` parks (`Pending`) indefinitely
+/// under flow control, so the framed writer's `poll_ready`/`poll_flush` never resolve and the pump
+/// task parks forever — never completing, so the cache-eviction closure attached to it never runs.
+/// The stalled peer's channel then stays full and the shared egress drain burns one backpressure
+/// timeout per packet for that peer, head-of-line-blocking every other peer until the unbounded
+/// mixer queue exhausts memory (the 2026-08-27 `jura-dev` OOM).
+///
+/// This adapter arms an idle deadline the first time the inner sink returns `Pending` on a
+/// readiness/flush/close poll, and clears it the moment the inner sink returns `Ready`. If the
+/// deadline elapses while the inner sink is still `Pending`, the poll resolves to
+/// [`EgressWriteError::Stalled`], driving the pump to completion so its cache entry is evicted and
+/// the next send reopens the stream. A merely-slow peer that keeps making progress within the
+/// timeout is never killed — the deadline resets on every `Ready`.
+struct StallGuardSink<S> {
+    inner: S,
+    timeout: Duration,
+    /// Persistent idle timer, `reset` in place when a stall starts (the same persistent-`Delay`
+    /// pattern as the mixer's `MixerSink`) so a busy-but-healthy peer that oscillates
+    /// `Pending`/`Ready` does not churn a fresh `Delay` per flush cycle.
+    timer: Delay,
+    /// `true` while a readiness/flush/close poll is outstanding (inner last returned `Pending`).
+    /// While set, the `timer` is polled without resetting, so a continuous stall is measured from
+    /// its start rather than restarted on every poll.
+    armed: bool,
+}
+
+impl<S> StallGuardSink<S> {
+    fn new(inner: S, timeout: Duration) -> Self {
+        Self {
+            inner,
+            timeout,
+            timer: Delay::new(timeout),
+            armed: false,
+        }
+    }
+
+    /// Poll the inner sink, arming/clearing the idle timer and mapping a stall to an error.
+    fn poll_guarded<T, E>(
+        &mut self,
+        cx: &mut Context<'_>,
+        poll_inner: impl FnOnce(&mut S, &mut Context<'_>) -> Poll<Result<T, E>>,
+    ) -> Poll<Result<T, EgressWriteError<E>>> {
+        match poll_inner(&mut self.inner, cx) {
+            Poll::Ready(Ok(v)) => {
+                self.armed = false;
+                Poll::Ready(Ok(v))
+            }
+            Poll::Ready(Err(e)) => {
+                self.armed = false;
+                Poll::Ready(Err(EgressWriteError::Sink(e)))
+            }
+            Poll::Pending => {
+                if !self.armed {
+                    self.timer.reset(self.timeout);
+                    self.armed = true;
+                }
+                match self.timer.poll_unpin(cx) {
+                    Poll::Ready(()) => {
+                        self.armed = false;
+                        Poll::Ready(Err(EgressWriteError::Stalled { timeout: self.timeout }))
+                    }
+                    Poll::Pending => Poll::Pending,
+                }
+            }
+        }
+    }
+}
+
+impl<S, T> Sink<T> for StallGuardSink<S>
+where
+    S: Sink<T> + Unpin,
+{
+    type Error = EgressWriteError<S::Error>;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().poll_guarded(cx, |s, cx| Pin::new(s).poll_ready(cx))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        Pin::new(&mut self.get_mut().inner)
+            .start_send(item)
+            .map_err(EgressWriteError::Sink)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().poll_guarded(cx, |s, cx| Pin::new(s).poll_flush(cx))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().poll_guarded(cx, |s, cx| Pin::new(s).poll_close(cx))
+    }
+}
+
 /// Spawn the write and read pump tasks for an open peer stream.
 ///
 /// The write pump drains `rx` into the framed stream writer; the read pump
@@ -84,6 +206,7 @@ fn spawn_stream_pumps<S, C>(
     codec: C,
     ingress_from_peers: Sender<(PeerId, <C as Decoder>::Item)>,
     frame_writer_backpressure_bytes: usize,
+    write_stall_timeout: Duration,
     ready: Arc<AtomicBool>,
 ) where
     S: AsyncRead + AsyncWrite + Send + 'static,
@@ -105,6 +228,11 @@ fn spawn_stream_pumps<S, C>(
     // coalesce into a single quinn write, significantly reducing the number of
     // connection-mutex acquisitions and driver wake-ups on the hot path.
     frame_writer.set_backpressure_boundary(frame_writer_backpressure_bytes);
+
+    // Guard the framed writer so a remote that stops reading (quinn `poll_write` parked forever)
+    // fails the pump after `write_stall_timeout` instead of parking it indefinitely. On failure the
+    // pump completes and the eviction closure below removes the cache entry, so the next send reopens.
+    let frame_writer = StallGuardSink::new(frame_writer, write_stall_timeout);
 
     // Write pump: drain the per-peer channel into the framed stream writer.
     hopr_utils::runtime::prelude::spawn(
@@ -229,6 +357,7 @@ where
                     codec.clone(),
                     tx_in.clone(),
                     frame_writer_backpressure_bytes,
+                    egress_backpressure_timeout,
                     ready,
                 );
                 cache.insert(peer, sink);
@@ -302,6 +431,7 @@ where
                                         codec.clone(),
                                         tx_in.clone(),
                                         frame_writer_backpressure_bytes,
+                                        egress_backpressure_timeout,
                                         ready,
                                     );
                                 }
@@ -746,21 +876,27 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that a full per-peer channel does not invalidate the cache or
-    /// trigger a pathological reopen.
+    /// Reopening a permanently stalled peer must self-heal at the stall-timeout cadence — never as
+    /// tight per-send churn.
     ///
-    /// `CountingControl` returns a `StalledWriteIo` whose `poll_write` always
-    /// returns `Pending`. The write pump stalls; the channel fills. The drain loop
-    /// drops newest packets (no-op eviction path) and yields, but must never call
-    /// `cache.invalidate` — so the stream must not reopen.
+    /// `CountingControl` returns a `StalledWriteIo` whose `poll_write`/`poll_flush` always return
+    /// `Pending`. Before the sink-level stall mitigation the write pump parked forever and the entry
+    /// was never evicted (the previous version of this test asserted "must not reopen"). It now
+    /// terminates after the stall timeout so the entry is evicted and the next send reopens — but
+    /// the reopen cadence must stay bounded by the stall timeout, not spin once per send.
     #[tokio::test]
-    async fn per_peer_stream_should_not_reopen_pathologically_on_send_failures() -> anyhow::Result<()> {
+    async fn stalled_peer_reopen_cadence_should_be_bounded_by_the_stall_timeout() -> anyhow::Result<()> {
+        const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(300);
+        const WINDOW: std::time::Duration = std::time::Duration::from_millis(1_500);
+
         let control = CountingControl::default();
         let (mut tx_out, _rx_in) = process_stream_protocol(
             BytesCodec::new(),
             control.clone(),
             crate::config::StreamProtocolConfig {
-                per_peer_channel_capacity: 16,
+                per_peer_channel_capacity: 4,
+                frame_writer_backpressure_bytes: 1,
+                egress_backpressure_timeout: STALL_TIMEOUT,
                 ..Default::default()
             },
         )
@@ -769,33 +905,400 @@ mod tests {
         let peer = PeerId::random();
         let msg = BytesMut::from(&b"x"[..]);
 
-        for _ in 0..1200 {
-            tx_out
-                .send((peer, msg.clone()))
-                .await
-                .context("egress queue should accept test packet")?;
-        }
-
-        // Wait for at least one stream open (first cache miss).
-        let open_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
-        while control.open_calls() < 1 && tokio::time::Instant::now() < open_deadline {
+        // Keep offering packets throughout the window so every eviction is promptly observable as a
+        // fresh open.
+        let deadline = tokio::time::Instant::now() + WINDOW;
+        while tokio::time::Instant::now() < deadline {
+            let _ = tx_out.send((peer, msg.clone())).await;
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;
         }
+
+        let opens = control.open_calls();
         assert!(
-            control.open_calls() >= 1,
-            "stream was never opened — egress task did not process any packet"
+            opens >= 2,
+            "a permanently stalled peer must self-heal by reopening (open_calls={opens})"
         );
 
-        // Give it another second; pathological reopen must not occur.
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
-        while control.open_calls() < 2 && tokio::time::Instant::now() < deadline {
+        // Cadence bound: at most one reopen per stall timeout, plus generous slack for scheduling.
+        // A regression to per-send reopen churn (dozens/hundreds of opens) trips this.
+        let max_expected = (WINDOW.as_millis() / STALL_TIMEOUT.as_millis()) as usize + 3;
+        assert!(
+            opens <= max_expected,
+            "reopen churn detected: {opens} opens in {WINDOW:?} exceeds the ~{max_expected} bounded by the \
+             {STALL_TIMEOUT:?} stall timeout"
+        );
+
+        Ok(())
+    }
+
+    /// Reproduces the 2026-08-27 `jura-dev` OOM at the integration boundary.
+    ///
+    /// A peer whose remote stops reading makes the underlying `poll_write` park (`Pending`)
+    /// forever under flow control. The per-peer write pump (`rx.forward(frame_writer)`) then
+    /// parks with it and never completes, so its cache-eviction closure never runs: the sink is
+    /// never evicted, the peer's channel stays full, and the shared egress drain burns one
+    /// backpressure timeout per packet for that peer — head-of-line-blocking every other peer
+    /// until the unbounded mixer queue exhausts memory.
+    ///
+    /// The fix mitigates the stall *at the sink*: the write pump must fail once it makes no
+    /// progress for `egress_backpressure_timeout`, driving the pump to completion so the entry is
+    /// evicted and a later send reopens the stream. A merely-slow peer that keeps making progress
+    /// within the timeout is never killed.
+    ///
+    /// Under the unfixed code the pump parks forever, the entry is never evicted, and
+    /// `open_calls` stays pinned at 1 — this test fails.
+    #[tokio::test]
+    async fn stalled_write_pump_should_terminate_and_reopen_after_stall_timeout() -> anyhow::Result<()> {
+        const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
+
+        let control = CountingControl::default();
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control.clone(),
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 4,
+                // Flush every frame so the pump reaches the stalled writer immediately, rather than
+                // buffering frames inside `FramedWrite` until the byte threshold forces a flush.
+                frame_writer_backpressure_bytes: 1,
+                // Reused as the write-pump stall timeout.
+                egress_backpressure_timeout: STALL_TIMEOUT,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let peer = PeerId::random();
+        let msg = BytesMut::from(&b"payload"[..]);
+
+        // First send opens the stream; its writer is permanently stalled (poll_write == Pending).
+        tx_out.send((peer, msg.clone())).await.context("first send")?;
+        assert!(
+            wait_for(2, || control.open_calls() >= 1).await,
+            "stream was never opened"
+        );
+
+        // A merely-slow peer must not be evicted: no reopen before the stall timeout elapses.
+        tokio::time::sleep(STALL_TIMEOUT / 2).await;
+        assert_eq!(
+            control.open_calls(),
+            1,
+            "stream reopened before the stall timeout elapsed — over-eager eviction would kill merely-slow peers"
+        );
+
+        // Past the stall timeout the pump must terminate, evict the cache entry, and a subsequent
+        // send must reopen the stream. Keep sending so an eviction is observable as a fresh open.
+        let mut sends = 0;
+        while control.open_calls() < 2 && sends < 200 {
+            let _ = tx_out.send((peer, msg.clone())).await;
+            sends += 1;
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;
         }
 
         assert!(
-            control.open_calls() <= 1,
-            "pathological reopen churn detected for same peer under send failures (open_calls={})",
-            control.open_calls()
+            wait_for(3, || control.open_calls() >= 2).await,
+            "stalled write pump never terminated: the stream was not reopened after the stall timeout (open_calls={}) \
+             — the pump parked forever and the peer became a permanent silent black hole, exactly the field failure \
+             mode",
+            control.open_calls(),
+        );
+
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // StallGuardSink unit tests — isolate the sink-level stall mitigation from
+    // the surrounding stream-protocol machinery. Each covers one way the wrapped
+    // sink can stall (or make progress) and asserts the adapter's response.
+    // -----------------------------------------------------------------------
+
+    /// Outcome a [`ScriptedSink`] returns for a given poll.
+    #[derive(Clone, Copy)]
+    enum Op {
+        Ready,
+        Pending,
+        Err,
+    }
+
+    fn apply(op: Op) -> Poll<Result<(), std::io::Error>> {
+        match op {
+            Op::Ready => Poll::Ready(Ok(())),
+            Op::Pending => Poll::Pending,
+            Op::Err => Poll::Ready(Err(std::io::Error::other("scripted sink error"))),
+        }
+    }
+
+    /// A `Sink` whose `poll_ready`/`poll_flush`/`poll_close` outcomes are fixed per-op. A `Pending`
+    /// op never registers a waker (modelling a quinn substream whose remote stopped reading) — the
+    /// wake-up must come from `StallGuardSink`'s own timer.
+    struct ScriptedSink {
+        ready: Op,
+        flush: Op,
+        close: Op,
+    }
+
+    impl Sink<u8> for ScriptedSink {
+        type Error = std::io::Error;
+
+        fn poll_ready(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            apply(self.ready)
+        }
+
+        fn start_send(self: Pin<&mut Self>, _item: u8) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            apply(self.flush)
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            apply(self.close)
+        }
+    }
+
+    /// A `Sink` whose first `poll_flush` parks once (waking itself so it is re-polled immediately),
+    /// then succeeds — a peer that briefly stalls but recovers well within the timeout.
+    #[derive(Default)]
+    struct TransientFlushSink {
+        flushed_once: bool,
+    }
+
+    impl Sink<u8> for TransientFlushSink {
+        type Error = std::io::Error;
+
+        fn poll_ready(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(self: Pin<&mut Self>, _item: u8) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            let this = self.get_mut();
+            if this.flushed_once {
+                Poll::Ready(Ok(()))
+            } else {
+                this.flushed_once = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }
+
+        fn poll_close(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_error_when_poll_ready_stalls_past_timeout() {
+        let mut sink = StallGuardSink::new(
+            ScriptedSink {
+                ready: Op::Pending,
+                flush: Op::Ready,
+                close: Op::Ready,
+            },
+            Duration::from_millis(150),
+        );
+        let res = tokio::time::timeout(Duration::from_secs(2), sink.send(1u8))
+            .await
+            .expect("StallGuardSink must resolve on its own timer, not hang");
+        assert!(
+            matches!(res, Err(EgressWriteError::Stalled { .. })),
+            "a sink that never becomes ready must fail with Stalled, got {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_error_when_poll_flush_stalls_past_timeout() {
+        let mut sink = StallGuardSink::new(
+            ScriptedSink {
+                ready: Op::Ready,
+                flush: Op::Pending,
+                close: Op::Ready,
+            },
+            Duration::from_millis(150),
+        );
+        let res = tokio::time::timeout(Duration::from_secs(2), sink.send(1u8))
+            .await
+            .expect("StallGuardSink must resolve on its own timer, not hang");
+        assert!(
+            matches!(res, Err(EgressWriteError::Stalled { .. })),
+            "a sink that accepts but never flushes must fail with Stalled, got {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_error_when_poll_close_stalls_past_timeout() {
+        let mut sink = StallGuardSink::new(
+            ScriptedSink {
+                ready: Op::Ready,
+                flush: Op::Ready,
+                close: Op::Pending,
+            },
+            Duration::from_millis(150),
+        );
+        let res = tokio::time::timeout(Duration::from_secs(2), sink.close())
+            .await
+            .expect("StallGuardSink must resolve on its own timer, not hang");
+        assert!(
+            matches!(res, Err(EgressWriteError::Stalled { .. })),
+            "a sink that never closes must fail with Stalled, got {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_pass_through_a_healthy_sink_without_error() {
+        let mut sink = StallGuardSink::new(
+            ScriptedSink {
+                ready: Op::Ready,
+                flush: Op::Ready,
+                close: Op::Ready,
+            },
+            Duration::from_millis(50),
+        );
+        for i in 0..100u8 {
+            sink.send(i)
+                .await
+                .expect("a healthy sink must never be failed by the stall guard");
+        }
+        sink.close().await.expect("closing a healthy sink must succeed");
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_surface_inner_errors_verbatim_not_as_a_stall() {
+        let mut sink = StallGuardSink::new(
+            ScriptedSink {
+                ready: Op::Ready,
+                flush: Op::Err,
+                close: Op::Ready,
+            },
+            Duration::from_millis(150),
+        );
+        let res = sink.send(1u8).await;
+        assert!(
+            matches!(res, Err(EgressWriteError::Sink(_))),
+            "an inner sink error must surface as Sink(_), not be masked as Stalled, got {res:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn stall_guard_sink_should_not_error_on_a_transient_stall_that_recovers_in_time() {
+        // Timeout far larger than the transient stall: the deadline is armed on the first (parked)
+        // flush poll and must be cleared when the sink makes progress, so no Stalled error fires.
+        let mut sink = StallGuardSink::new(TransientFlushSink::default(), Duration::from_secs(10));
+        tokio::time::timeout(Duration::from_secs(2), sink.send(1u8))
+            .await
+            .expect("a sink that recovers before the timeout must not hang")
+            .expect("a sink that recovers before the timeout must not be failed as Stalled");
+    }
+
+    /// One peer gets a writer gated shut forever, everyone else one that accepts immediately.
+    #[derive(Clone, Debug)]
+    struct HeadOfLineControl {
+        stalled_peer: PeerId,
+        stalled_io: GatedWriteIo,
+        healthy_io: GatedWriteIo,
+        open_calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl hopr_api::network::traits::NetworkStreamControl for HeadOfLineControl {
+        fn accept(
+            self,
+        ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>
+        {
+            Ok::<_, std::io::Error>(futures::stream::empty::<(PeerId, GatedWriteIo)>())
+        }
+
+        async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
+            self.open_calls.fetch_add(1, Ordering::Relaxed);
+            Ok::<_, std::io::Error>(if peer == self.stalled_peer {
+                self.stalled_io.clone()
+            } else {
+                self.healthy_io.clone()
+            })
+        }
+    }
+
+    /// End-to-end proof that the sink-level stall mitigation clears the head-of-line block that
+    /// caused the 2026-08-27 `jura-dev` OOM: a peer whose write pump parks must not hold the shared
+    /// drain loop hostage while a healthy peer waits behind it.
+    ///
+    /// The healthy packet is queued *after* the stalled burst, so it only arrives promptly if the
+    /// stalled peer's sink is evicted and the loop stops serialising on it. Under the unfixed code
+    /// the burst holds the loop for one backpressure timeout per packet forever, and the healthy
+    /// peer is starved.
+    #[tokio::test]
+    async fn stalled_peer_must_not_head_of_line_block_a_healthy_peer() -> anyhow::Result<()> {
+        const STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+        const OVERFLOW: usize = 8;
+
+        let stalled_peer = PeerId::random();
+        let healthy_peer = PeerId::random();
+
+        // Gate never opens: the remote that stopped reading.
+        let stalled_io = GatedWriteIo::default();
+        let healthy_io = GatedWriteIo {
+            open: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            ..Default::default()
+        };
+
+        let open_calls = Arc::new(AtomicUsize::new(0));
+        let control = HeadOfLineControl {
+            stalled_peer,
+            stalled_io: stalled_io.clone(),
+            healthy_io: healthy_io.clone(),
+            open_calls: open_calls.clone(),
+        };
+
+        let (mut tx_out, _rx_in) = process_stream_protocol(
+            BytesCodec::new(),
+            control,
+            crate::config::StreamProtocolConfig {
+                per_peer_channel_capacity: 2,
+                // Flush every frame so the channel fills, not the `FramedWrite` buffer.
+                frame_writer_backpressure_bytes: 1,
+                egress_backpressure_timeout: STALL_TIMEOUT,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let msg = BytesMut::from(&b"hello"[..]);
+
+        // Overflow the stalled peer: under the old code each excess packet costs the loop a full timeout.
+        for _ in 0..OVERFLOW {
+            tx_out
+                .send((stalled_peer, msg.clone()))
+                .await
+                .context("egress queue must accept stalled-peer packet")?;
+        }
+
+        tx_out
+            .send((healthy_peer, msg.clone()))
+            .await
+            .context("egress queue must accept healthy-peer packet")?;
+
+        assert!(
+            wait_for(2, || open_calls.load(Ordering::Relaxed) >= 1).await,
+            "no stream was ever opened"
+        );
+
+        let delivered = wait_for(3, || healthy_io.written() >= msg.len()).await;
+
+        assert_eq!(
+            stalled_io.written(),
+            0,
+            "precondition: stalled writer must accept nothing"
+        );
+
+        assert!(
+            delivered,
+            "a single stalled peer head-of-line-blocked the shared egress drain: the healthy peer got {} of {} bytes \
+             within 3s, while {OVERFLOW} overflow packets to the stalled peer each held the loop for {STALL_TIMEOUT:?}",
+            healthy_io.written(),
+            msg.len(),
         );
 
         Ok(())
