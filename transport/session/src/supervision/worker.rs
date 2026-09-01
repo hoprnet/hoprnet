@@ -163,9 +163,10 @@ async fn worker_loop(
     gate: Arc<ServiceGate>,
     initial_actions: Vec<SessionPixAction>,
 ) {
-    // Emit initial actions. `closed` is `false` rather than `supervisor.closed` to keep this
-    // exactly what it was: a freshly built supervisor has nothing to report yet, and only a failed
-    // delivery should stop the worker before it has run once.
+    // Emit initial actions. `false` says only that a freshly built supervisor has not flagged
+    // itself, which it cannot have: `new` does not close. It is not a claim that these actions are
+    // non-terminal — `dispatch` reads the payload for that, so a construction-time `Close` would
+    // still fail closed here rather than being waved through on the strength of the flag.
     if !dispatch(&initial_actions, false, &action_tx, &gate) {
         return;
     }
@@ -259,6 +260,15 @@ async fn process_cmd(
 ///
 /// Poisons the gate on every terminal path, so no caller has to remember to. `closed` is passed
 /// rather than read from the supervisor because the callers hold it by different borrows.
+///
+/// Terminality is derived from the *actions* as well as from `closed`, because the two do not
+/// always agree: several handlers return [`Close`](SessionPixAction::Close) without setting the
+/// supervisor's flag — both `InvalidTransition` paths in `on_ssa_request_sent`, `CounterRegression`
+/// and the share-order verdict in `on_recovery_progress`, and `on_unverifiable_shares`. Two of those
+/// are the anti-abuse verdicts. Reading only the flag would send the close, return `true`, and leave
+/// the gate open for as long as it takes the action driver to poison it on receipt — which is a real
+/// but bounded window, not a correct one. `Close` is also the one action the driver never reports
+/// back, so `action_result`'s own close path cannot cover for it.
 fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, gate: &Arc<ServiceGate>) -> bool {
     // Gate control is local state, not I/O. Apply it before touching the action channel so a safety
     // transition cannot wait behind commitment generation, deposit-data lookup, or a network send in
@@ -276,10 +286,12 @@ fn dispatch(actions: &[SessionPixAction], closed: bool, action_tx: &ActionTx, ga
         }
     }
 
+    let terminal = closed || actions.iter().any(|a| matches!(a, SessionPixAction::Close(_)));
+
     // Sent before the verdict either way: a closing supervisor's last actions carry the reason it
     // closed, and dropping them would leave the driver to infer it.
     let delivered = send_actions(actions, action_tx);
-    if closed || !delivered {
+    if terminal || !delivered {
         gate.poison();
         return false;
     }
@@ -647,6 +659,48 @@ mod tests {
             ),
             "expected Close due to commitment timeout, got {close_action:?}"
         );
+    }
+
+    /// A `Close` the supervisor did not flag itself with must still fail closed.
+    ///
+    /// Several handlers return [`SessionPixAction::Close`] without setting `supervisor.closed` —
+    /// among them the two anti-abuse verdicts. A `dispatch` that reads only the flag sends the close
+    /// and then keeps running with the gate open, which is what this pins against. The foreign
+    /// pseudonym is the cheapest of those paths to reach: `on_ssa_request_sent` rejects it before it
+    /// looks anything up, and returns `InvalidTransition` without touching the flag.
+    #[tokio::test]
+    async fn a_close_the_supervisor_did_not_flag_still_poisons_the_gate() {
+        let p = HoprPseudonym::random();
+        let (handle, action_rx) = spawn_supervisor_worker(default_cfg(), dims(), p, Instant::now());
+
+        // Consume the initial RequestSsa so the close below is unambiguous.
+        let _initial = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("action stream ended");
+
+        let foreign = SsaId::new(HoprPseudonym::random(), SsaIndex::new(1).unwrap());
+        handle
+            .send_event(SessionPixEvent::SsaRequestSent(foreign))
+            .await
+            .expect("worker must accept the event");
+
+        let close_action = tokio::time::timeout(Duration::from_secs(1), action_rx.recv())
+            .await
+            .expect("timeout waiting for close action")
+            .expect("action stream ended before close");
+        assert!(
+            matches!(
+                close_action,
+                SessionPixAction::Close(SessionPixCloseReason::InvalidTransition)
+            ),
+            "expected Close on a foreign pseudonym, got {close_action:?}"
+        );
+
+        poll_until("the gate is poisoned by a close the supervisor did not flag", || {
+            handle.gate.try_acquire_sync().is_err()
+        })
+        .await;
     }
 
     #[tokio::test]
