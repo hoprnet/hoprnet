@@ -1,5 +1,7 @@
 mod utils;
 
+use std::collections::{HashMap, HashSet};
+
 use hopr_types::{
     crypto::{
         crypto_traits::elliptic_curve::Field,
@@ -13,11 +15,112 @@ use validator::Validate;
 use crate::{
     CoefficientIndex, CompletedShare, ExitAcknowledgementShareProcessor, Group, MAX_POLYS_PER_SSA, PixGroup,
     PixGroupRepr, PixParams, PixScalar, PixSpec, PolynomialIndex, RecoveredSsa, ShareResolution, SsaCommitmentProof,
-    SsaCommitmentState, SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare, errors::PixError,
-    types::SsaId,
+    SsaCommitmentState, SsaIndex, SsaPolynomialId, SsaRecoveryProgress, TaggedEncryptedPartialSsaShare,
+    errors::PixError, types::SsaId,
 };
 
 type ReadyResolutionNotifier = Box<dyn Fn() + Send + Sync + 'static>;
+
+/// Compact retirement state for one Session.
+///
+/// `highest_retired` alone is not enough: a later member of a batch may retire while an earlier
+/// member is still live. The exception sets retain only indices that still own a registration or
+/// were released before going live and may be retried. Live registrations are bounded by the
+/// Session layer's generation limit; a failed pre-live request closes a production Session, whose
+/// scope releases its retriable entries. The number of completed cycles is represented by one
+/// watermark rather than one allocation each.
+#[derive(Default)]
+struct RetirementFrontier {
+    highest_retired: Option<SsaIndex>,
+    registered: HashSet<SsaIndex>,
+    retriable: HashSet<SsaIndex>,
+}
+
+impl RetirementFrontier {
+    fn is_retired(&self, index: SsaIndex) -> bool {
+        self.highest_retired.is_some_and(|highest| index <= highest)
+            && !self.registered.contains(&index)
+            && !self.retriable.contains(&index)
+    }
+
+    fn register(&mut self, index: SsaIndex) -> bool {
+        if self.is_retired(index) {
+            return false;
+        }
+        self.retriable.remove(&index);
+        self.registered.insert(index);
+        true
+    }
+
+    /// Releases a registration that never went live while leaving its index reusable.
+    fn abandon(&mut self, index: SsaIndex) {
+        if self.registered.remove(&index) {
+            self.retriable.insert(index);
+        }
+    }
+
+    /// Retires a known registration and raises the compact watermark.
+    ///
+    /// Returning `false` for an unknown index is load-bearing: allowing an arbitrary `retire_ssa`
+    /// call to raise the watermark would condemn legitimate lower indices that are registered
+    /// later.
+    fn retire(&mut self, index: SsaIndex) -> bool {
+        let was_registered = self.registered.remove(&index);
+        let was_retriable = self.retriable.remove(&index);
+        if !was_registered && !was_retriable {
+            return false;
+        }
+
+        self.highest_retired = Some(match self.highest_retired {
+            Some(highest) if highest >= index => highest,
+            _ => index,
+        });
+        true
+    }
+}
+
+type SharedRetirementFrontier = std::sync::Arc<parking_lot::Mutex<RetirementFrontier>>;
+type RegisteredExitCommitment<S> = (PixGroup<S>, std::sync::Arc<RegisteredCommitment<S>>);
+
+/// A commitment registration paired with the Session retirement state that governs it.
+struct RegisteredCommitment<S: PixSpec> {
+    builder: parking_lot::Mutex<SsaCommitmentBuilder<S>>,
+    retirement: SharedRetirementFrontier,
+}
+
+impl<S: PixSpec> std::ops::Deref for RegisteredCommitment<S> {
+    type Target = parking_lot::Mutex<SsaCommitmentBuilder<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.builder
+    }
+}
+
+/// A published cycle paired with the same retirement state as its commitment registration.
+struct RegisteredCycle<S: PixSpec> {
+    cycle: SsaCycle<S>,
+    registration: std::sync::Arc<RegisteredCommitment<S>>,
+}
+
+impl<S: PixSpec> std::ops::Deref for RegisteredCycle<S> {
+    type Target = SsaCycle<S>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cycle
+    }
+}
+
+/// Owns one Session's retirement-frontier registration in an [`SsaReconstructor`].
+///
+/// The Session action driver holds this for its whole lifetime. Dropping it removes the pseudonym
+/// from the reconstructor immediately; commitment guards and in-flight workers retain their own
+/// `Arc` to the frontier until the publication/retirement race has settled.
+#[must_use = "dropping the scope stops tracking retirement state for its Session"]
+pub struct SsaRetirementScope<S: PixSpec> {
+    reconstructor: std::sync::Weak<SsaReconstructor<S>>,
+    pseudonym: S::Pseudonym,
+    retirement: SharedRetirementFrontier,
+}
 
 /// Rejects an early-recovery fraction that is not a finite value in `0.0..=1.0`.
 ///
@@ -221,37 +324,6 @@ pub const AWAITING_ACK_ENTRY_BYTES: usize = 400;
 /// would let that budget be exceeded.
 pub const PART_BUILDER_OVERHEAD_BYTES: usize = 704;
 
-/// Live heap one entry in the retirement tombstone set costs, in bytes.
-///
-/// **Measured, not derived**, for the same reason as [`AWAITING_ACK_ENTRY_BYTES`]: the payload is an
-/// [`SsaId`] key against a unit value, and moka's per-entry bookkeeping — hash map entry, LRU node,
-/// TTL timer-wheel node — is everything else. Run `tombstone_entry_cost` in
-/// `tests/memory_profile.rs` to re-derive it; at the time of writing it reports 256 B/entry at
-/// 20 000 entries and 255 B at 100 000, on `TestSpec`'s 40 B key — wider than the deployed
-/// `HoprPseudonym`'s, so the measurement over-covers production. Rounded up, because understating it
-/// would understate what [`MAX_RETIRED_SSAS`] can cost.
-pub const TOMBSTONE_ENTRY_BYTES: usize = 288;
-
-/// Capacity of the retirement tombstone set.
-///
-/// A tombstone is what stops a cycle that has been retired from being resurrected by a commitment
-/// completing concurrently, and it must also keep a re-registered `SsaId` retired *permanently* —
-/// so a size eviction is not a lost optimisation, it is the failure the set exists to prevent. The
-/// cap therefore has to sit far above the count reachable while `time_to_idle` still holds an entry.
-///
-/// The Session layer's live-cycle budget makes the concurrent-Session part finite. It admits
-/// `max_live_cycle_bytes / (MAX_OVERLAPPING_BATCHES × ssas_per_request × peak_cycle_bytes)` PIX
-/// Sessions — ~37 at the shipping 3 GiB and deployed dimensions — and the supervisor now enforces
-/// that two-generation premise before allocating cycle state.
-///
-/// The retirement *rate* is not a structural consequence of that admission bound: commitment and
-/// recovery deadlines are maxima, not minima, so a fast Session can complete more than one
-/// generation per deadline interval. `262_144` is therefore operational headroom, not a proved
-/// count. It costs at most ~72 MiB at [`TOMBSTONE_ENTRY_BYTES`]. Operators accepting much smaller
-/// cycles or substantially higher churn must re-evaluate it; replacing per-cycle tombstones with a
-/// compact per-Session retirement frontier would remove that remaining rate dependency.
-pub const MAX_RETIRED_SSAS: usize = 262_144;
-
 /// The per-polynomial share buffer [`peak_cycle_bytes`] models, in bytes.
 ///
 /// `Vec` doubles from a minimum of four elements, so a buffer holding `threshold - 1` shares has a
@@ -439,11 +511,16 @@ pub const MAX_DEFERRED_ACKS_PER_CYCLE: usize = 8192;
 ///
 /// It is able to track SSA for multiple different pseudonyms (Sessions).
 pub struct SsaReconstructor<S: PixSpec> {
-    commitment_builder:
-        moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<parking_lot::Mutex<SsaCommitmentBuilder<S>>>>,
+    commitment_builder: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<RegisteredCommitment<S>>>,
     /// Post-commitment state of every live cycle: the part accumulator and all part builders,
     /// published and reclaimed as one unit. See [`SsaCycle`].
-    ssa_cycles: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<SsaCycle<S>>>,
+    ssa_cycles: moka::sync::Cache<SsaId<S::Pseudonym>, std::sync::Arc<RegisteredCycle<S>>>,
+    /// One compact retirement frontier per active Session pseudonym.
+    ///
+    /// A plain `HashMap` under a short synchronous lock is deliberate. Session scopes remove their
+    /// entries immediately on teardown; a cache would defer physical removal and put the same
+    /// turnover-rate assumption back into the memory bound this state replaces.
+    retirement_frontiers: parking_lot::Mutex<HashMap<S::Pseudonym, SharedRetirementFrontier>>,
     awaiting_acks: moka::sync::Cache<OffchainPublicKey, EncryptedShareCache<S>>,
     /// Acknowledgements that arrived before their cycle's part builders were installed, bucketed by
     /// cycle and then by polynomial.
@@ -493,9 +570,6 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// cannot drop a recovered deposit key. `OnceLock` prevents two transport streams from racing
     /// as competing designated consumers; `acknowledge_shares` remains an opportunistic fallback.
     ready_resolution_notifier: std::sync::OnceLock<ReadyResolutionNotifier>,
-    /// Tombstone set: SsaIds that have been retired. The commitment completion path checks this
-    /// after publishing the cycle, preventing resurrection when `retire_ssa` runs concurrently.
-    retired_ssas: moka::sync::Cache<SsaId<S::Pseudonym>, ()>,
     /// Running estimate of the entries live in [`awaiting_acks`](Self::awaiting_acks), summed over
     /// every peer, so the global budget costs one relaxed load per insertion.
     ///
@@ -515,6 +589,22 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// an interval before its first ground-truth reading.
     ack_buffer_resync: parking_lot::Mutex<Option<std::time::Instant>>,
     cfg: SsaReconstructorConfig,
+}
+
+impl<S: PixSpec> Drop for SsaRetirementScope<S> {
+    fn drop(&mut self) {
+        let Some(reconstructor) = self.reconstructor.upgrade() else {
+            return;
+        };
+
+        let mut frontiers = reconstructor.retirement_frontiers.lock();
+        let owns_entry = frontiers
+            .get(&self.pseudonym)
+            .is_some_and(|current| std::sync::Arc::ptr_eq(current, &self.retirement));
+        if owns_entry {
+            frontiers.remove(&self.pseudonym);
+        }
+    }
 }
 
 /// Result of processing a single verified acknowledgement in the SSA reconstructor.
@@ -608,6 +698,45 @@ impl<S: PixSpec + Clone> Default for SsaReconstructor<S> {
 }
 
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
+    fn retirement_frontier(&self, pseudonym: S::Pseudonym) -> SharedRetirementFrontier {
+        self.retirement_frontiers
+            .lock()
+            .entry(pseudonym)
+            .or_insert_with(|| std::sync::Arc::new(parking_lot::Mutex::new(RetirementFrontier::default())))
+            .clone()
+    }
+
+    fn existing_retirement_frontier(&self, pseudonym: &S::Pseudonym) -> Option<SharedRetirementFrontier> {
+        self.retirement_frontiers.lock().get(pseudonym).cloned()
+    }
+
+    fn retirement_frontier_for(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<SharedRetirementFrontier> {
+        self.commitment_builder
+            .get(ssa_id)
+            .map(|registration| registration.retirement.clone())
+            .or_else(|| {
+                self.ssa_cycles
+                    .get(ssa_id)
+                    .map(|cycle| cycle.registration.retirement.clone())
+            })
+            .or_else(|| self.existing_retirement_frontier(ssa_id.pseudonym()))
+    }
+
+    /// Registers a Session pseudonym for compact retirement tracking.
+    ///
+    /// The returned scope belongs in the same owner as that Session's
+    /// [`SsaCommitmentGuard`]s. Dropping it removes the map entry immediately, while any guards,
+    /// published cycles or commitment workers still in flight retain the shared frontier until
+    /// their own retirement race has settled.
+    pub fn begin_retirement_scope(self: &std::sync::Arc<Self>, pseudonym: S::Pseudonym) -> SsaRetirementScope<S> {
+        let retirement = self.retirement_frontier(pseudonym);
+        SsaRetirementScope {
+            reconstructor: std::sync::Arc::downgrade(self),
+            pseudonym,
+            retirement,
+        }
+    }
+
     /// Creates a new SSA reconstructor from the given configuration.
     ///
     /// Fails if the configuration does not validate. Prefer this over [`Self::new`] anywhere the
@@ -630,6 +759,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ssa_cycles: moka::sync::Cache::builder()
                 .time_to_idle(cfg.unused_verifier_lifetime)
                 .build(),
+            retirement_frontiers: parking_lot::Mutex::new(HashMap::new()),
             awaiting_acks: moka::sync::CacheBuilder::new(cfg.max_tracked_peers as u64)
                 .time_to_idle(cfg.max_ack_await_time)
                 // Dropping a peer entry drops its whole inner cache, and dropping a moka handle
@@ -657,21 +787,6 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ready_resolutions: parking_lot::Mutex::new(Vec::new()),
             ready_resolutions_len: std::sync::atomic::AtomicUsize::new(0),
             ready_resolution_notifier: std::sync::OnceLock::new(),
-            // Tombstone set. Its immediate job is the window between `retire_ssa` running and a
-            // concurrent commitment completion publishing its cycle — but the TTL must outlive that
-            // by a long way, because retirement is also permanent: a cycle re-registered at the same
-            // `SsaId` after being abandoned must stay retired, which is what
-            // `abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it` asserts. Shortening
-            // this to the width of the race would break that contract silently.
-            //
-            // A size eviction here permits exactly the resurrection the tombstone prevents. The
-            // Session layer now structurally enforces the concurrent live-generation term behind
-            // this cap; retirement throughput still relies on the operational headroom documented
-            // at `MAX_RETIRED_SSAS`.
-            retired_ssas: moka::sync::Cache::builder()
-                .max_capacity(MAX_RETIRED_SSAS as u64)
-                .time_to_idle(cfg.unused_verifier_lifetime)
-                .build(),
             ack_buffer_entries: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             // At least one, so a budget rounded below one entry refuses everything rather than
             // dividing to zero and admitting everything.
@@ -740,19 +855,23 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         self.commitment_builder.invalidate(&ssa_id);
     }
 
-    /// Removes a cycle that has reached a terminal state, and tombstones it so it cannot come back.
+    /// Removes a cycle that has reached a terminal state and advances its Session frontier.
     ///
-    /// The tombstone is written *before* the removal, so a commitment completing concurrently sees
+    /// Retirement is recorded *before* the removal, so a commitment completing concurrently sees
     /// the retirement and undoes its own publication rather than resurrecting the cycle.
     ///
     /// This is the operation for a cycle that went **live** and is now finished, however it
     /// finished — recovered, or failed terminally. It is deliberately *not* the operation for a
     /// commitment released before going live: that index is retried at the same value by design, and
-    /// a tombstone would block the retry permanently.
+    /// retirement would block the retry permanently.
     /// [`release_abandoned_commitment`](Self::release_abandoned_commitment) draws exactly that line,
     /// and escalates to this for the live case.
-    fn retire_cycle(&self, ssa_id: SsaId<S::Pseudonym>) {
-        self.retired_ssas.insert(ssa_id, ());
+    fn retire_cycle(&self, ssa_id: SsaId<S::Pseudonym>, retirement: &SharedRetirementFrontier) {
+        // Keep the frontier lock through cache invalidation. Registration takes the same lock, so a
+        // same-index retry cannot install itself between the retirement marker and the removal and
+        // then be mistaken for the state this call intended to tear down.
+        let mut frontier = retirement.lock();
+        frontier.retire(ssa_id.ssa_index());
         self.remove_cycle(ssa_id);
     }
 
@@ -786,7 +905,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // dead entries per cycle, and — the part that actually costs something — keep their
             // shares in `awaiting_acks`, whose budget is global. There they crowd out live cycles
             // rather than merely wasting space.
-            if self.retired_ssas.contains_key(spi.as_ref()) {
+            if self
+                .existing_retirement_frontier(spi.pseudonym())
+                .is_some_and(|frontier| frontier.lock().is_retired(spi.ssa_index()))
+            {
                 // Frees the buffer entry: the per-peer cache's eviction listener decrements the
                 // global count on an explicit removal, which is what the redeeming path below
                 // relies on too.
@@ -799,13 +921,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             // bucket the ack.
             //
             // A third state also lands here and is deliberately left to the TTL: a cycle that idled
-            // out of `ssa_cycles` through `unused_verifier_lifetime` leaves no tombstone, so its
-            // late acks are bucketed as though the cycle were still coming. That is bounded rather
-            // than corrected — both the bucket and the retained share expire on
-            // `max_ack_await_time` — and correcting it would mean a tombstone per expiry, which is
-            // the unbounded write the cap on `retired_ssas` exists to avoid. The tombstoned paths
-            // above are the ones that recur per cycle; this one costs a cycle that already went
-            // quiet for longer than its verifier lifetime.
+            // out of `ssa_cycles` through `unused_verifier_lifetime` is still registered, not
+            // retired, so its late acks are bucketed as though the cycle were still coming. Both
+            // the bucket and retained share expire on `max_ack_await_time`; retirement paths above
+            // are classified exactly without allocating one historical entry per cycle.
             return Ok(ProcessedAckResult::VerifierNotReady(spi));
         };
 
@@ -901,7 +1020,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 // The lock goes first: `retire_cycle` drops the last `Arc` to this very cycle.
                 drop(builder_guard);
                 tracing::error!(%spi, %error, "ssa part could not be added to its accumulator");
-                self.retire_cycle(ssa_id);
+                self.retire_cycle(ssa_id, &cycle.registration.retirement);
                 return Err(error);
             }
         };
@@ -915,13 +1034,13 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 drop(builder_guard);
                 let Some(ssa) = S::scalar_to_private_key(scalar) else {
                     tracing::error!(%spi, "ssa reconstruction failed");
-                    self.retire_cycle(ssa_id);
+                    self.retire_cycle(ssa_id, &cycle.registration.retirement);
                     return Err(PixError::InvalidSsa);
                 };
-                // Full recovery: this cycle's state is no longer needed. Tombstoned rather than
-                // merely removed, so the surplus run that follows every recovered cycle is dropped
-                // on arrival instead of being deferred against a cycle that will never return.
-                self.retire_cycle(ssa_id);
+                // Full recovery: this cycle's state is no longer needed. Recorded in the Session
+                // frontier rather than merely removed, so the surplus run that follows every
+                // recovered cycle is dropped instead of deferred against a cycle that cannot return.
+                self.retire_cycle(ssa_id, &cycle.registration.retirement);
                 tracing::info!(%ssa_id, "ssa recovered");
                 Ok(ProcessedAckResult::FullRecovery(RecoveredSsa { ssa_id, ssa }, progress))
             }
@@ -1210,7 +1329,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 
     /// The published cycle, if it is still live.
     #[cfg(test)]
-    fn cycle(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<std::sync::Arc<SsaCycle<S>>> {
+    fn cycle(&self, ssa_id: &SsaId<S::Pseudonym>) -> Option<std::sync::Arc<RegisteredCycle<S>>> {
         self.ssa_cycles.get(ssa_id)
     }
 
@@ -1265,8 +1384,13 @@ pub struct SsaCommitmentGuard<S: PixSpec + Clone> {
     owned: Option<OwnedCommitment<S>>,
 }
 
-/// What an [`SsaCommitmentGuard`] needs to release its SSA: where it is registered, and which one.
-type OwnedCommitment<S> = (std::sync::Arc<SsaReconstructor<S>>, SsaId<<S as PixSpec>::Pseudonym>);
+/// What an [`SsaCommitmentGuard`] needs to release its SSA: where it is registered, which one, and
+/// the Session frontier that must outlive a concurrent commitment worker.
+type OwnedCommitment<S> = (
+    std::sync::Arc<SsaReconstructor<S>>,
+    SsaId<<S as PixSpec>::Pseudonym>,
+    std::sync::Arc<RegisteredCommitment<S>>,
+);
 
 /// A registered Exit commitment, paired with ownership of its lifetime.
 type GuardedExitCommitment<S> = (PixGroup<S>, SsaCommitmentGuard<S>);
@@ -1274,7 +1398,7 @@ type GuardedExitCommitment<S> = (PixGroup<S>, SsaCommitmentGuard<S>);
 impl<S: PixSpec + Clone> std::fmt::Debug for SsaCommitmentGuard<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SsaCommitmentGuard")
-            .field("ssa_id", &self.owned.as_ref().map(|(_, id)| id))
+            .field("ssa_id", &self.owned.as_ref().map(|(_, id, _)| id))
             .finish()
     }
 }
@@ -1282,34 +1406,73 @@ impl<S: PixSpec + Clone> std::fmt::Debug for SsaCommitmentGuard<S> {
 impl<S: PixSpec + Clone> SsaCommitmentGuard<S> {
     /// The SSA this guard owns, or `None` if it has been disarmed.
     pub fn ssa_id(&self) -> Option<&SsaId<S::Pseudonym>> {
-        self.owned.as_ref().map(|(_, id)| id)
+        self.owned.as_ref().map(|(_, id, _)| id)
     }
 
     /// Gives up ownership without retiring, returning the SSA that is now the caller's to release.
     ///
     /// Returns `None` if the guard was already disarmed.
     pub fn disarm(mut self) -> Option<SsaId<S::Pseudonym>> {
-        self.owned.take().map(|(_, ssa_id)| ssa_id)
+        self.owned.take().map(|(_, ssa_id, _)| ssa_id)
     }
 }
 
 impl<S: PixSpec + Clone> Drop for SsaCommitmentGuard<S> {
     fn drop(&mut self) {
-        if let Some((reconstructor, ssa_id)) = self.owned.take() {
-            reconstructor.release_abandoned_commitment(ssa_id);
+        if let Some((reconstructor, ssa_id, registration)) = self.owned.take() {
+            reconstructor.release_abandoned_commitment(ssa_id, &registration);
         }
     }
 }
 
 impl<S: PixSpec + Clone> SsaReconstructor<S> {
+    fn register_exit_commitment(
+        &self,
+        id: SsaId<S::Pseudonym>,
+        params: PixParams,
+    ) -> Result<RegisteredExitCommitment<S>, PixError<S::Pseudonym>> {
+        let exit_commitment_secret = PixScalar::<S>::random(&mut hopr_types::crypto_random::rng());
+        let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
+        let retirement = self.retirement_frontier(*id.pseudonym());
+        let registration = std::sync::Arc::new(RegisteredCommitment {
+            builder: parking_lot::Mutex::new(SsaCommitmentBuilder::new(
+                id,
+                params,
+                exit_commitment_secret,
+                exit_commitment_public,
+            )),
+            retirement: retirement.clone(),
+        });
+
+        // Registration and retirement serialize on this Session-local lock. The cache insertion is
+        // inside the critical section so a retiring call cannot remove the old registration and
+        // accidentally remove a same-index retry installed between its marker and invalidation.
+        let mut frontier = retirement.lock();
+        if frontier.is_retired(id.ssa_index()) || self.ssa_cycles.contains_key(&id) {
+            return Err(PixError::DuplicateCommitment);
+        }
+
+        self.commitment_builder
+            .entry(id)
+            .and_try_compute_with(|entry| match entry {
+                Some(_) => Err(PixError::DuplicateCommitment),
+                None => Ok(moka::ops::compute::Op::Put(registration.clone())),
+            })?;
+
+        // The retired check above and this mutation share the same lock, so this cannot fail unless
+        // the frontier's own invariants were broken locally.
+        let newly_registered = frontier.register(id.ssa_index());
+        debug_assert!(newly_registered, "registration raced the frontier under its own lock");
+        drop(frontier);
+
+        Ok((exit_commitment_public, registration))
+    }
+
     /// Releases a commitment that was registered but never taken over by an owner.
     ///
     /// Deliberately **not** [`retire_ssa`](ExitAcknowledgementShareProcessor::retire_ssa), which
-    /// additionally writes the resurrection tombstone. The tombstone is permanent for that `SsaId`
-    /// for as long as it is retained, and it takes effect at the moment a cycle is *published* — so a
-    /// retry at the same index would re-register, accept the peer's commitments, publish a deposit
-    /// address, and then be silently undone at completion. The peer funds an SSA that can never be
-    /// reconstructed, and nothing on either side reports a failure.
+    /// permanently moves the index behind the Session's retirement frontier. A pre-live release
+    /// instead marks the index retriable, so a replacement registration can use the same value.
     ///
     /// Same-index retry is not a corner case: the SSA index is advanced only after every fallible
     /// step of a request has succeeded, so a request that failed keeps its index by design and the
@@ -1318,15 +1481,37 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     /// Escalates to a full retirement if a cycle did go live, which means the peer was asked and
     /// answered — and therefore that ownership should already have been transferred with
     /// [`disarm`](SsaCommitmentGuard::disarm). That branch is a caller error, and retiring is the
-    /// safe response to it, because a live cycle is exactly what the tombstone exists to protect.
-    fn release_abandoned_commitment(&self, ssa_id: SsaId<S::Pseudonym>) {
-        if self.ssa_cycles.contains_key(&ssa_id) {
+    /// safe response to it, because a live cycle is exactly what the retirement frontier protects.
+    fn release_abandoned_commitment(
+        &self,
+        ssa_id: SsaId<S::Pseudonym>,
+        registration: &std::sync::Arc<RegisteredCommitment<S>>,
+    ) {
+        // Hold the frontier lock through both classification and removal. A completion that already
+        // published is retired and removed here; one that publishes later sees either retirement or
+        // an abandoned registration and withdraws its own state.
+        let mut frontier = registration.retirement.lock();
+        let owns_live_cycle = self
+            .ssa_cycles
+            .get(&ssa_id)
+            .is_some_and(|cycle| std::sync::Arc::ptr_eq(&cycle.registration, registration));
+        let owns_pending_commitment = self
+            .commitment_builder
+            .get(&ssa_id)
+            .is_some_and(|current| std::sync::Arc::ptr_eq(&current, registration));
+
+        if owns_live_cycle {
             tracing::warn!(%ssa_id, "abandoned ssa commitment was already live — retiring it");
-            self.retire_ssa(ssa_id);
-        } else {
+            frontier.retire(ssa_id.ssa_index());
+        } else if owns_pending_commitment {
             tracing::debug!(%ssa_id, "releasing ssa commitment abandoned by its owner");
-            self.remove_cycle(ssa_id);
+            frontier.abandon(ssa_id.ssa_index());
+        } else {
+            // This guard belonged to an expired registration that has since been retried. Pointer
+            // identity is what prevents the old owner from tearing down the replacement.
+            return;
         }
+        self.remove_cycle(ssa_id);
     }
 
     /// [`new_exit_commitment`](ExitAcknowledgementShareProcessor::new_exit_commitment), with the
@@ -1339,11 +1524,11 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
         id: SsaId<S::Pseudonym>,
         params: PixParams,
     ) -> Result<GuardedExitCommitment<S>, PixError<S::Pseudonym>> {
-        let exit_commitment = self.new_exit_commitment(id, params)?;
+        let (exit_commitment, registration) = self.register_exit_commitment(id, params)?;
         Ok((
             exit_commitment,
             SsaCommitmentGuard {
-                owned: Some((self.clone(), id)),
+                owned: Some((self.clone(), id, registration)),
             },
         ))
     }
@@ -1389,10 +1574,15 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
     fn retire_ssa(&self, ssa_id: SsaId<S::Pseudonym>) {
         // Every key is the SsaId itself, so there is nothing to enumerate and no way for part of a
-        // cycle to survive the removal of the rest. The tombstone-before-removal ordering the
+        // cycle to survive the removal of the rest. The frontier-before-removal ordering the
         // commitment completion path depends on lives in `retire_cycle`, which the terminal
-        // acknowledgement paths share with this one.
-        self.retire_cycle(ssa_id);
+        // acknowledgement paths share with this one. An entirely unknown id has no frontier to
+        // advance and remains the documented idempotent no-op.
+        if let Some(retirement) = self.retirement_frontier_for(&ssa_id) {
+            self.retire_cycle(ssa_id, &retirement);
+        } else {
+            self.remove_cycle(ssa_id);
+        }
     }
 
     /// No range check on the dimensions: holding a [`PixParams`] is what proves them in range, since
@@ -1410,24 +1600,8 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
     /// asking to be charged 128× and is refused unless the operator configured a range that admits
     /// it, in which case the traffic it credits is traffic it paid for.
     fn new_exit_commitment(&self, id: SsaId<S::Pseudonym>, params: PixParams) -> Result<PixGroup<S>, Self::Error> {
-        let exit_commitment_secret = PixScalar::<S>::random(&mut hopr_types::crypto_random::rng());
-        let exit_commitment_public = PixGroup::<S>::mul_by_generator(&exit_commitment_secret);
-
-        self.commitment_builder
-            .entry(id)
-            .and_try_compute_with(|entry| match entry {
-                Some(_) => Err(PixError::DuplicateCommitment),
-                None => Ok(moka::ops::compute::Op::Put(std::sync::Arc::new(
-                    parking_lot::Mutex::new(SsaCommitmentBuilder::new(
-                        id,
-                        params,
-                        exit_commitment_secret,
-                        exit_commitment_public,
-                    )),
-                ))),
-            })?;
-
-        Ok(exit_commitment_public)
+        self.register_exit_commitment(id, params)
+            .map(|(commitment, _)| commitment)
     }
 
     fn insert_coefficient_commitments(
@@ -1443,6 +1617,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         let Some(builder) = self.commitment_builder.get(&ssa_id) else {
             return Err(PixError::MissingSsaCommitment);
         };
+        let retirement = builder.retirement.clone();
 
         let progress = {
             let mut builder = builder.lock();
@@ -1465,22 +1640,52 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
         // The accumulator and every part builder go in as one entry. There is deliberately no
         // ordering to get right here: a share can never observe a cycle in which one is reachable
         // and the other is not, which used to be a permanent-drop hazard.
+        let mut publication_rejected = false;
         let installed = if let Some(ssa_builder) = progress.ssa_builder {
             let num_polys = ssa_builder.num_polys();
             let cycle = SsaCycle::new(ssa_id, ssa_builder, progress.new_verifiers)?;
-            self.ssa_cycles.insert(ssa_id, std::sync::Arc::new(cycle));
-            tracing::debug!(%ssa_id, num_polys, "ssa commitment known — cycle is live");
-            true
+            let registered_cycle = std::sync::Arc::new(RegisteredCycle {
+                cycle,
+                registration: builder.clone(),
+            });
+
+            // Registration, abandonment and retirement all take this same Session-local lock. A
+            // stale worker therefore cannot overwrite a newer retry: it verifies pointer identity
+            // and publishes while every state transition for this index is excluded.
+            let frontier = retirement.lock();
+            let registration_is_current = self
+                .commitment_builder
+                .get(&ssa_id)
+                .is_some_and(|current| std::sync::Arc::ptr_eq(&current, &builder));
+            let was_retired = frontier.is_retired(ssa_id.ssa_index());
+            if !registration_is_current || was_retired {
+                publication_rejected = true;
+                false
+            } else {
+                self.ssa_cycles.insert(ssa_id, registered_cycle);
+
+                // Keep the check after publication as well. Cache expiry is independent of the
+                // frontier lock; if it withdraws this registration during insertion, undo the cycle
+                // before releasing the lock and allowing a retry.
+                let registration_is_current = self
+                    .commitment_builder
+                    .get(&ssa_id)
+                    .is_some_and(|current| std::sync::Arc::ptr_eq(&current, &builder));
+                if !registration_is_current {
+                    self.remove_cycle(ssa_id);
+                    publication_rejected = true;
+                    false
+                } else {
+                    tracing::debug!(%ssa_id, num_polys, "ssa commitment known — cycle is live");
+                    true
+                }
+            }
         } else {
             false
         };
 
-        // Tombstone checked *after* publishing, so that retirement racing this call cannot slip
-        // between a check and a write. If it did run, undo what this call published — the cycle's
-        // state was already torn down and republishing it would resurrect it.
-        if installed && self.retired_ssas.contains_key(&ssa_id) {
-            self.remove_cycle(ssa_id);
-            tracing::trace!(%ssa_id, "ssa commitment progressed but cycle was retired — dropped published state");
+        if publication_rejected {
+            tracing::trace!(%ssa_id, "ssa commitment progressed after its registration ended — dropped published state");
             res.deposit_address_first_encountered = false;
             return Ok(res);
         }
@@ -1669,6 +1874,7 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 mod tests {
     use std::collections::HashMap;
 
+    use anyhow::Context;
     use hopr_types::{
         crypto::{crypto_traits, prelude::*},
         crypto_random::Randomizable,
@@ -1732,6 +1938,68 @@ mod tests {
         assert!(
             buffers * 2 > total,
             "share buffers ({buffers} B) must dominate the modelled cycle ({total} B)"
+        );
+    }
+
+    #[test]
+    fn retirement_frontier_keeps_out_of_order_and_retriable_indices_live() -> anyhow::Result<()> {
+        let first = SsaIndex::new(1).context("one is a non-zero SSA index")?;
+        let second = SsaIndex::new(2).context("two is a non-zero SSA index")?;
+        let unknown = SsaIndex::new(3).context("three is a non-zero SSA index")?;
+        let mut frontier = RetirementFrontier::default();
+
+        assert!(!frontier.retire(unknown), "retiring an unknown index must be a no-op");
+        assert!(frontier.register(first));
+        assert!(frontier.register(second));
+        assert!(frontier.retire(second));
+        assert!(frontier.is_retired(second));
+        assert!(
+            !frontier.is_retired(first),
+            "a registered lower batch member must survive a later member's retirement"
+        );
+
+        frontier.abandon(first);
+        assert!(
+            !frontier.is_retired(first),
+            "an abandoned pre-live index remains reusable below the watermark"
+        );
+        assert!(frontier.register(first), "same-index retry must be admitted");
+        assert!(frontier.retire(first));
+        assert!(frontier.is_retired(first));
+
+        Ok(())
+    }
+
+    #[test]
+    fn sequential_retirements_use_one_compact_frontier() -> anyhow::Result<()> {
+        const CYCLES: u32 = 100_000;
+        let mut frontier = RetirementFrontier::default();
+
+        for raw in 1..=CYCLES {
+            let index = SsaIndex::new(raw).context("the test range contains no zero index")?;
+            assert!(frontier.register(index));
+            assert!(frontier.retire(index));
+        }
+
+        assert_eq!(SsaIndex::new(CYCLES), frontier.highest_retired);
+        assert!(frontier.registered.is_empty());
+        assert!(frontier.retriable.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn dropping_a_retirement_scope_removes_its_session_entry() {
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let pseudonym = SimplePseudonym::random();
+
+        let scope = reconstructor.begin_retirement_scope(pseudonym);
+        assert!(reconstructor.retirement_frontiers.lock().contains_key(&pseudonym));
+
+        drop(scope);
+        assert!(
+            !reconstructor.retirement_frontiers.lock().contains_key(&pseudonym),
+            "Session teardown must release its frontier immediately"
         );
     }
 
@@ -3082,7 +3350,7 @@ mod tests {
     ///
     /// Reaching this is a caller error — a live cycle means the peer was asked and answered, so
     /// ownership should already have been handed on with `disarm()`. Retiring is the safe response
-    /// rather than the merely tidy one: the tombstone is what stops a commitment completion racing
+    /// rather than the merely tidy one: the frontier is what stops a commitment completion racing
     /// the teardown from republishing the cycle that was just dismantled.
     #[test]
     fn abandoning_a_live_cycle_retires_it_rather_than_just_releasing_it() -> anyhow::Result<()> {
@@ -3112,29 +3380,12 @@ mod tests {
             "abandoning a live cycle must tear it down"
         );
 
-        // A tombstone was written, so this SsaId is spent: a fresh cycle at the same index is
-        // published and then withdrawn at completion. That is the retirement contract, and the
-        // contrast with `an_ssa_index_stays_usable_after_its_request_is_abandoned` is the point.
-        reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD))?;
-        // A fresh generator: the original has already spent this pseudonym's index, and the identity
-        // of the replacement commitment is irrelevant to what is being tested.
-        let replacement = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
-            polynomials_per_ssa: POLYS,
-            threshold: THRESHOLD,
-            surplus_shares: 0,
-        })
-        .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?;
-        let mut final_state = None;
-        for (coeff_idx, coeffs) in replacement.verifiers.clone() {
-            let proof = (coeff_idx == crate::CONSTANT_TERM_COEFFICIENT).then_some(replacement.commitment_proof);
-            final_state =
-                Some(reconstructor.insert_coefficient_commitments(ssa_id, coeff_idx, proof, coeffs.into_iter())?);
-        }
         assert!(
-            !final_state
-                .ok_or(anyhow::anyhow!("commitment carried no batches"))?
-                .is_verifiable,
-            "a retired SsaId must stay retired"
+            matches!(
+                reconstructor.new_exit_commitment(ssa_id, test_params(POLYS, THRESHOLD)),
+                Err(PixError::DuplicateCommitment)
+            ),
+            "the Session frontier must reject a retired SsaId before accepting replacement commitments"
         );
 
         Ok(())
@@ -3158,10 +3409,8 @@ mod tests {
     /// Abandoning a request must leave its SSA index usable, because that index is what the next
     /// attempt will use — it is advanced only once every fallible step has succeeded.
     ///
-    /// Releasing through the full retirement path instead writes the resurrection tombstone, and the
-    /// resulting failure is the quietest one in the protocol: the retry accepts the peer's
-    /// commitments and publishes a deposit address, then has its cycle undone at completion. The peer
-    /// funds an SSA that can never be reconstructed and neither side reports anything wrong.
+    /// Releasing through the full retirement path instead advances the Session frontier and makes
+    /// the retry fail as a duplicate before the peer can be asked to fund it.
     #[test]
     fn an_ssa_index_stays_usable_after_its_request_is_abandoned() -> anyhow::Result<()> {
         const POLYS: u16 = 2;
@@ -3224,6 +3473,56 @@ mod tests {
         assert!(
             reconstructor.contains_builder(&ssa_id),
             "the rejected duplicate must leave the original registration intact"
+        );
+
+        drop(guard);
+        Ok(())
+    }
+
+    #[test]
+    fn an_expired_registration_guard_does_not_release_its_same_index_retry() -> anyhow::Result<()> {
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let ssa_id = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
+
+        let (_commitment, stale_guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2))?;
+        // Model the commitment cache's independent TTL expiry while its owner is still alive.
+        reconstructor.commitment_builder.invalidate(&ssa_id);
+
+        let (_commitment, retry_guard) = reconstructor.new_guarded_exit_commitment(ssa_id, test_params(2, 2))?;
+        drop(stale_guard);
+
+        assert!(
+            reconstructor.contains_builder(&ssa_id),
+            "a stale guard must not remove the replacement registration at the same index"
+        );
+
+        drop(retry_guard);
+        Ok(())
+    }
+
+    #[test]
+    fn a_live_cycle_stays_duplicate_after_its_commitment_registration_expires() -> anyhow::Result<()> {
+        let pseudonym = SimplePseudonym::random();
+        let ssa_id = SsaId::new(pseudonym, SsaIndex::MIN);
+        let params = test_params(2, 2);
+        let reconstructor = std::sync::Arc::new(SsaReconstructor::<TestSpec>::default());
+        let (_commitment, guard) = reconstructor.new_guarded_exit_commitment(ssa_id, params)?;
+
+        SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        })
+        .new_ssa_commitment(&pseudonym, SsaIndex::MIN)?
+        .process_into_reconstructor(reconstructor.as_ref())?;
+        reconstructor.commitment_builder.invalidate(&ssa_id);
+
+        assert!(
+            matches!(
+                reconstructor.new_guarded_exit_commitment(ssa_id, params),
+                Err(PixError::DuplicateCommitment)
+            ),
+            "a live cycle must continue occupying its index after the commitment cache entry expires"
         );
 
         drop(guard);
@@ -3640,6 +3939,44 @@ mod tests {
         let never_seen = SsaId::new(SimplePseudonym::random(), SsaIndex::MIN);
         reconstructor.retire_ssa(never_seen);
         assert_eq!(0, reconstructor.live_cycles());
+
+        Ok(())
+    }
+
+    #[test]
+    fn retiring_a_later_cycle_does_not_block_an_earlier_registered_cycle() -> anyhow::Result<()> {
+        let pseudonym = SimplePseudonym::random();
+        let first_index = SsaIndex::new(1).context("one is a non-zero SSA index")?;
+        let second_index = SsaIndex::new(2).context("two is a non-zero SSA index")?;
+        let first = SsaId::new(pseudonym, first_index);
+        let second = SsaId::new(pseudonym, second_index);
+        let params = test_params(2, 2);
+        let reconstructor = SsaReconstructor::<TestSpec>::default();
+
+        reconstructor.new_exit_commitment(first, params)?;
+        reconstructor.new_exit_commitment(second, params)?;
+        reconstructor.retire_ssa(second);
+
+        let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
+            polynomials_per_ssa: 2,
+            threshold: 2,
+            surplus_shares: 0,
+        });
+        generator
+            .new_ssa_commitment(&pseudonym, first_index)?
+            .process_into_reconstructor(&reconstructor)?;
+
+        assert!(
+            reconstructor.cycle(&first).is_some(),
+            "the registered lower index must win over the higher retirement watermark"
+        );
+        assert!(
+            matches!(
+                reconstructor.new_exit_commitment(second, params),
+                Err(PixError::DuplicateCommitment)
+            ),
+            "the exact retired index must remain spent"
+        );
 
         Ok(())
     }
@@ -4118,8 +4455,8 @@ mod tests {
     ///
     /// A missing cycle means one of two opposite things, and the acknowledgement path cannot tell
     /// them apart from the cache miss alone: a cycle not yet published, whose acks are worth
-    /// bucketing, or one already retired, whose acks are worth nothing. The tombstone written at
-    /// recovery is what separates them.
+    /// bucketing, or one already retired, whose acks are worth nothing. Advancing the Session
+    /// frontier at recovery is what separates them.
     ///
     /// This is the common case rather than an edge: a conforming Entry emits `threshold + surplus`
     /// per polynomial, so the run of shares that advance nothing lands *after* the last polynomial
@@ -4174,7 +4511,7 @@ mod tests {
             !reconstructor.pending_acks.contains_key(&ssa_id),
             "no bucket may be created for a cycle that cannot come back"
         );
-        // The load-bearing one: without the tombstone the trailing shares stay here until
+        // The load-bearing one: without the retirement frontier the trailing shares stay here until
         // `max_ack_await_time`, holding a global budget against a cycle that is gone.
         assert_eq!(
             0,
@@ -4891,13 +5228,13 @@ mod tests {
             .collect())
     }
 
-    /// Tombstone guard on the *first* publication point: the SSA becoming live.
+    /// Retirement-frontier guard on the *first* publication point: the SSA becoming live.
     ///
     /// Since verifiers are now installed as individual polynomials complete, the part accumulator
     /// has to be published earlier — the moment the constant terms yield the SSA commitment. A
     /// `retire_ssa` racing that publication must still leave nothing behind.
     #[test]
-    fn retire_ssa_tombstone_prevents_builder_publication() -> anyhow::Result<()> {
+    fn retire_ssa_frontier_prevents_builder_publication() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -4922,8 +5259,12 @@ mod tests {
             "deposit address must not be derivable from a partial constant-term set"
         );
 
-        // Simulate `retire_ssa` racing the completion by setting only the tombstone.
-        reconstructor.retired_ssas.insert(ssa_id, ());
+        // Simulate `retire_ssa` winning the frontier race but pausing before cache removal.
+        let registration = reconstructor
+            .commitment_builder
+            .get(&ssa_id)
+            .context("registered commitment must exist")?;
+        assert!(registration.retirement.lock().retire(ssa_id.ssa_index()));
 
         // Constant term of polynomial 1 completes the set, so this call would publish the builder.
         let state = reconstructor.insert_coefficient_commitments(
@@ -4937,19 +5278,19 @@ mod tests {
         assert_eq!(
             0,
             reconstructor.live_cycles(),
-            "tombstone must prevent cycle publication"
+            "retirement frontier must prevent cycle publication"
         );
 
         Ok(())
     }
 
-    /// Tombstone guard on verifier installation.
+    /// Retirement-frontier guard on verifier installation.
     ///
     /// Verifiers and the part accumulator are now published by the same call, so retirement racing
-    /// it must withdraw both. The guard is checked *after* publishing — so that retirement cannot
-    /// slip between a check and a write — which means the withdrawal path is what this pins.
+    /// it must withdraw both. Publication and retirement serialize on the Session frontier, so a
+    /// retirement that wins the lock must prevent the installation altogether.
     #[test]
-    fn retire_ssa_tombstone_prevents_verifier_installation() -> anyhow::Result<()> {
+    fn retire_ssa_frontier_prevents_verifier_installation() -> anyhow::Result<()> {
         let generator = SsaShareGenerator::<TestSpec>::new(SsaGeneratorConfig {
             polynomials_per_ssa: 2,
             threshold: 2,
@@ -4975,8 +5316,12 @@ mod tests {
             "no part builder may be installed while the SSA commitment is unknown"
         );
 
-        // Retirement lands here.
-        reconstructor.retired_ssas.insert(ssa_id, ());
+        // Retirement lands here but pauses before cache removal.
+        let registration = reconstructor
+            .commitment_builder
+            .get(&ssa_id)
+            .context("registered commitment must exist")?;
+        assert!(registration.retirement.lock().retire(ssa_id.ssa_index()));
 
         // Polynomial 1's constant term closes the set, so this call would install both verifiers.
         let state = reconstructor.insert_coefficient_commitments(
@@ -4990,7 +5335,7 @@ mod tests {
         assert_eq!(
             0,
             reconstructor.live_cycles(),
-            "tombstone must withdraw the cycle published after retirement — accumulator and every part builder"
+            "retirement frontier must prevent installation of the accumulator and every part builder"
         );
 
         Ok(())

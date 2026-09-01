@@ -2466,11 +2466,10 @@ where
     /// be pure and exhaustively tested, and it means every side effect a PIX Session can have is
     /// visible in one `match`.
     ///
-    /// The task owns an [`SsaCommitmentGuard`] per SSA it has requested, which is what releases
-    /// reconstructor state on teardown: aborting this task drops its future, and the guards with it.
-    /// That bounds cleanup to the cycles actually in flight — at most two live batches, plus
-    /// supervisor tombstones that no longer own reconstructor state — where enumerating every index
-    /// a Session had ever used grew without bound.
+    /// The task owns an [`SsaCommitmentGuard`] per SSA it has requested and one Session retirement
+    /// scope. Terminal actions retire through the frontier before releasing their guard; aborting
+    /// the task drops every remaining guard and then the Session's compact frontier. No state grows
+    /// with the number of cycles the Session completed.
     fn spawn_pix_action_driver(
         &self,
         session_id: SessionId,
@@ -2484,10 +2483,18 @@ where
             .get()
             .cloned()
             .expect("the gate is installed before the driver is spawned");
+        let share_processor = self
+            .pix_toolbox
+            .get()
+            .expect("the PIX toolbox is installed before a PIX action driver is spawned")
+            .share_processor
+            .clone();
+        let retirement_scope = share_processor.begin_retirement_scope(session_id);
 
         hopr_utils::spawn_as_abortable!(async move {
-            // Dropping a guard releases its SSA, so the vector *is* the retirement mechanism —
-            // draining it retires, and so does dropping this future.
+            let _retirement_scope = retirement_scope;
+            // The vector owns each registration until a terminal action explicitly retires it or
+            // dropping this future releases it during whole-Session teardown.
             let mut owned_ssas: Vec<SsaCommitmentGuard<HoprPixSpec>> = Vec::new();
 
             let close_reason = loop {
@@ -2600,7 +2607,7 @@ where
                     // reaches this I/O driver only to preserve observability and ordering.
                     SessionPixAction::ProgressNotification => {}
                     SessionPixAction::RetireSsa(ssa_id) => {
-                        // Dropping the guard is the retirement.
+                        share_processor.retire_ssa(ssa_id);
                         owned_ssas.retain(|guard| guard.ssa_id() != Some(&ssa_id));
                         if let Some(slot) = myself.sessions.get(&session_id) {
                             slot.abort_handles
@@ -7963,8 +7970,8 @@ mod tests {
 
         mgr.close_session(&alice_pseudonym);
 
-        // Aborting the driver drops the `SsaCommitmentGuard`s it owns, and dropping a guard retires
-        // its SSA. The abort takes effect at the next scheduling point, hence the wait.
+        // Aborting the driver drops the `SsaCommitmentGuard`s it owns, which releases each SSA's
+        // reconstructor state. The abort takes effect at the next scheduling point, hence the wait.
         tokio::time::timeout(Duration::from_secs(1), async {
             while share_processor.contains_builder(&ssa1) {
                 tokio::time::sleep(Duration::from_millis(10)).await;

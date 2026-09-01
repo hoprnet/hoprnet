@@ -31,7 +31,7 @@ use hopr_protocol_pix::{
     AWAITING_ACK_ENTRY_BYTES, CONSTANT_TERM_COEFFICIENT, DEFAULT_POLY_THRESHOLD, DEFAULT_POLYS_PER_SSA,
     EntryShareGenerator, ExitAcknowledgementShareProcessor, PixGroup, PixGroupRepr, PixParams, PixScalar,
     ShareResolution, SsaGeneratorConfig, SsaId, SsaIndex, SsaReconstructor, SsaReconstructorConfig, SsaShareGenerator,
-    TOMBSTONE_ENTRY_BYTES, TaggedEncryptedPartialSsaShare, peak_cycle_bytes, peak_share_buffer_bytes,
+    TaggedEncryptedPartialSsaShare, peak_cycle_bytes, peak_share_buffer_bytes,
 };
 use hopr_types::{
     crypto::prelude::{HalfKey, HalfKeyChallenge, Keypair, OffchainKeypair, SimplePseudonym},
@@ -92,7 +92,7 @@ struct TrackingAllocator;
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 
-/// Serializes the four tests that measure `LIVE` or re-arm `PEAK`.
+/// Serializes the three tests that measure `LIVE` or re-arm `PEAK`.
 ///
 /// Both counters are process-global, so two measuring tests running as threads of one binary
 /// observe each other's allocations: one re-arms the high-water mark under the other, and each
@@ -100,11 +100,10 @@ static PEAK: AtomicUsize = AtomicUsize::new(0);
 /// process and does not need this; `cargo test` runs a binary's tests as threads and does.
 ///
 /// Worth guarding even though the repository standardises on nextest, because of what these tests
-/// assert. They are memory *ceilings* — `peak_over_baseline <= modelled` and
-/// `live / entries <= TOMBSTONE_ENTRY_BYTES` — so a false failure reads as a genuine regression
-/// against `peak_cycle_bytes`, which is among the most expensive things here to chase. The
-/// `#[ignore]` attributes reduce the exposure but do not remove it: these are run deliberately, and
-/// more than one at a time.
+/// assert. They are memory *ceilings*, so a false failure reads as a genuine regression against
+/// `peak_cycle_bytes`, which is among the most expensive things here to chase. The `#[ignore]`
+/// attributes reduce the exposure but do not remove it: these are run deliberately, and more than
+/// one at a time.
 static MEASURING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 unsafe impl GlobalAlloc for TrackingAllocator {
@@ -740,82 +739,5 @@ fn exit_reconstructor_worst_case_share_order() {
     assert!(
         peak_over_baseline <= modelled,
         "peak_cycle_bytes ({modelled} B) is understated: the worst share order reached {peak_over_baseline} B"
-    );
-}
-
-/// Measures what one entry in the retirement tombstone set costs in live heap.
-///
-/// Same instrument and same reason as [`awaiting_ack_entry_cost`]: `size_of` sees a ~20 B `SsaId`
-/// key against a unit value, and moka's per-entry bookkeeping is the rest. `MAX_RETIRED_SSAS` is
-/// denominated in this figure, and a tombstone evicted for want of capacity permits exactly the
-/// resurrection it exists to prevent — so it is rounded up.
-///
-/// Ignored by default: it holds ~100 000 live cache entries.
-#[test]
-#[ignore]
-fn tombstone_entry_cost() {
-    // Held for the whole test: `LIVE` and `PEAK` are process-global, so a concurrent measuring
-    // test would be read as this one's allocations. See `MEASURING`.
-    let _measuring = MEASURING.lock().expect("the measurement lock is never poisoned");
-    const POINTS: [usize; 2] = [20_000, 100_000];
-
-    let entries = POINTS[POINTS.len() - 1];
-    // The per-entry cost below divides live bytes by the number of `retire_ssa` *calls*, not by the
-    // cache's occupancy. Those agree only while nothing is evicted. Were `MAX_RETIRED_SSAS` ever
-    // lowered below this measurement's high-water mark, the cache would hold fewer entries than the
-    // divisor, the quotient would fall, and the assertion at the end would pass while understating
-    // the very figure the cap is denominated in — a false negative rather than a failure. Pin the
-    // precondition instead of relying on the two numbers happening to stay apart.
-    assert!(
-        entries <= hopr_protocol_pix::MAX_RETIRED_SSAS,
-        "MAX_RETIRED_SSAS ({}) is below the {entries} entries this measurement inserts, so the reading would be taken \
-         against an evicting cache",
-        hopr_protocol_pix::MAX_RETIRED_SSAS
-    );
-    println!("\n=== Type sizes ===");
-    println!(
-        "  SsaId (key)                      {:>4} B",
-        size_of::<SsaId<SimplePseudonym>>()
-    );
-
-    let reconstructor = SsaReconstructor::<TestSpec>::new(SsaReconstructorConfig {
-        // Far longer than the run, so nothing expires mid-measurement and understates the entry.
-        unused_verifier_lifetime: std::time::Duration::from_secs(7200),
-        ..Default::default()
-    });
-
-    // Distinct pseudonyms as well as distinct indices: an `SsaId` is the pair, and a real node
-    // accumulates tombstones across Sessions rather than within one.
-    let ids = (0..entries)
-        .map(|i| SsaId::new(SimplePseudonym::random(), SsaIndex::new(1 + (i as u32 % 1024)).unwrap()))
-        .collect::<Vec<_>>();
-
-    let baseline = live_bytes();
-    println!("\n=== Tombstone set ===");
-    let mut inserted = 0;
-    for point in POINTS {
-        while inserted < point {
-            reconstructor.retire_ssa(ids[inserted]);
-            inserted += 1;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(500));
-
-        let live = live_bytes().saturating_sub(baseline);
-        println!(
-            "  {point:>7} entries                  {:>9.1} MiB live   {:>4} B/entry",
-            mib(live),
-            live / point
-        );
-    }
-
-    let live = live_bytes().saturating_sub(baseline);
-    println!(
-        "\n  Quote the last row as TOMBSTONE_ENTRY_BYTES. MAX_RETIRED_SSAS x that figure is the\n  ceiling the \
-         Session layer's live-cycle budget has to leave room for.\n"
-    );
-    assert!(
-        live / entries <= TOMBSTONE_ENTRY_BYTES,
-        "TOMBSTONE_ENTRY_BYTES ({TOMBSTONE_ENTRY_BYTES} B) is understated at {} B/entry",
-        live / entries
     );
 }

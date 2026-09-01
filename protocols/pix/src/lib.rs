@@ -1,3 +1,6 @@
+// PIX (Private Incentivized eXchange) protocol: SSA commitment generation and reconstruction.
+#![deny(clippy::debug_assert_with_mut_call)]
+
 use std::ops::{Add, Mul};
 
 use hopr_types::{
@@ -32,8 +35,8 @@ pub use generator::{
 };
 pub use params::{InvalidPixParams, PixParams, PixSuite};
 pub use reconstructor::{
-    AWAITING_ACK_ENTRY_BYTES, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL, MAX_RETIRED_SSAS,
-    PART_BUILDER_OVERHEAD_BYTES, SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig, TOMBSTONE_ENTRY_BYTES,
+    AWAITING_ACK_ENTRY_BYTES, MAX_DEFERRED_ACKS_PER_CYCLE, MAX_DEFERRED_ACKS_PER_POLYNOMIAL,
+    PART_BUILDER_OVERHEAD_BYTES, SsaCommitmentGuard, SsaReconstructor, SsaReconstructorConfig, SsaRetirementScope,
     peak_cycle_bytes, peak_share_buffer_bytes,
 };
 pub use traits::{EntryShareGenerator, ExitAcknowledgementShareProcessor, ShareResolution};
