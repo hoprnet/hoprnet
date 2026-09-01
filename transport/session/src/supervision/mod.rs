@@ -857,6 +857,16 @@ pub enum SessionPixCloseReason {
 // `io::Error`, which is why the import reads as unused.
 #[allow(unused_imports)]
 pub use gate::{GateClosed, ServiceGate};
+/// The state machine itself, for benchmarks only.
+///
+/// `supervisor` is otherwise private on purpose: the worker owns the only instance that exists in
+/// production, and driving one by hand means supplying the `Instant` and served-count arguments
+/// that the worker derives from the gate. A benchmark is exactly the case where doing so is the
+/// point — [`SessionPixSupervisor::handle_event`] runs once per acknowledgement batch, which is the
+/// highest-rate input this module has, and it cannot be measured from outside the crate otherwise.
+/// Same gate as [`SessionManager::pre_populate_session`](crate::SessionManager::pre_populate_session).
+#[cfg(any(feature = "benchmark", test))]
+pub use supervisor::SessionPixSupervisor;
 pub use worker::{ActionRx, SessionPixSupervisorHandle, spawn_supervisor_worker};
 
 // ---------------------------------------------------------------------------
