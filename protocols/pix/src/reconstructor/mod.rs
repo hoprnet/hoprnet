@@ -17,6 +17,8 @@ use crate::{
     types::SsaId,
 };
 
+type ReadyResolutionNotifier = Box<dyn Fn() + Send + Sync + 'static>;
+
 /// Rejects an early-recovery fraction that is not a finite value in `0.0..=1.0`.
 ///
 /// A `range` validator does not cover this. Every IEEE comparison against `NaN` is false, so `NaN`
@@ -472,17 +474,25 @@ pub struct SsaReconstructor<S: PixSpec> {
     /// `max_ack_await_time` TTL is the operative bound.
     pending_acks: moka::sync::Cache<SsaId<S::Pseudonym>, DeferredAckBucket>,
     /// Resolutions produced by draining deferred-ack buckets at verifier-installation time, waiting
-    /// to be picked up by the next [`Self::acknowledge_shares`] call.
+    /// for either the transport notification stream or an acknowledgement batch to collect them.
     ///
     /// Draining happens on the commitment path (`insert_coefficient_commitments`), which is where
     /// the verifier that unblocks the acks is installed. That deliberately keeps the share
     /// verification off the acknowledgement hot path, but it also means the resolutions surface
-    /// somewhere that has no route to the upper layer — hence this hand-off. Acks flow continuously
-    /// while a Session is live, so pickup latency is one ack batch.
+    /// on a synchronous worker. The buffer bridges that worker to the transport's asynchronous
+    /// resolution stream without blocking it or making recovered deposit keys depend on later
+    /// acknowledgement traffic.
     ready_resolutions: parking_lot::Mutex<Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>>>,
     /// Length of [`ready_resolutions`](Self::ready_resolutions), so the common case (nothing to pick
     /// up) costs one relaxed load instead of a mutex acquisition on every ack batch.
     ready_resolutions_len: std::sync::atomic::AtomicUsize,
+    /// Non-blocking wake-up for the asynchronous consumer of [`ready_resolutions`](Self::ready_resolutions).
+    ///
+    /// The callback carries no data: resolutions remain owned by `ready_resolutions` until a
+    /// consumer atomically takes them, so wake-ups may safely coalesce and channel backpressure
+    /// cannot drop a recovered deposit key. `OnceLock` prevents two transport streams from racing
+    /// as competing designated consumers; `acknowledge_shares` remains an opportunistic fallback.
+    ready_resolution_notifier: std::sync::OnceLock<ReadyResolutionNotifier>,
     /// Tombstone set: SsaIds that have been retired. The commitment completion path checks this
     /// after publishing the cycle, preventing resurrection when `retire_ssa` runs concurrently.
     retired_ssas: moka::sync::Cache<SsaId<S::Pseudonym>, ()>,
@@ -646,6 +656,7 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
                 .build(),
             ready_resolutions: parking_lot::Mutex::new(Vec::new()),
             ready_resolutions_len: std::sync::atomic::AtomicUsize::new(0),
+            ready_resolution_notifier: std::sync::OnceLock::new(),
             // Tombstone set. Its immediate job is the window between `retire_ssa` running and a
             // concurrent commitment completion publishing its cycle — but the TTL must outlive that
             // by a long way, because retirement is also permanent: a cycle re-registered at the same
@@ -683,6 +694,31 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
     #[inline]
     pub fn config(&self) -> &SsaReconstructorConfig {
         &self.cfg
+    }
+
+    /// Installs the non-blocking wake-up used when commitment installation resolves deferred
+    /// acknowledgements.
+    ///
+    /// Returns `false` when a notifier was already installed. The callback is invoked only after
+    /// the resolution-buffer mutex has been released, so it may immediately call
+    /// [`take_ready_resolutions`](Self::take_ready_resolutions). If resolutions were queued before
+    /// registration, registration wakes the consumer once before returning.
+    pub fn set_ready_resolution_notifier(&self, notifier: impl Fn() + Send + Sync + 'static) -> bool {
+        if self.ready_resolution_notifier.set(Box::new(notifier)).is_err() {
+            return false;
+        }
+
+        if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) > 0 {
+            self.notify_ready_resolutions();
+        }
+        true
+    }
+
+    #[inline]
+    fn notify_ready_resolutions(&self) {
+        if let Some(notifier) = self.ready_resolution_notifier.get() {
+            notifier();
+        }
     }
 
     /// Returns `true` if the reconstructor still holds a builder (SSA-part
@@ -1068,14 +1104,20 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
             ready.extend(resolved);
             self.ready_resolutions_len
                 .store(ready.len(), std::sync::atomic::Ordering::Release);
+            drop(ready);
+            self.notify_ready_resolutions();
         }
     }
 
     /// Takes any resolutions parked by [`drain_deferred_acks`](Self::drain_deferred_acks).
     ///
-    /// One relaxed load in the common case — the buckets are empty whenever the Entry finishes the
-    /// constant-term pass before the shares that reference it arrive.
-    fn take_ready_resolutions(&self) -> Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> {
+    /// The take is atomic with respect to producers and other consumers. This lets the transport's
+    /// notification stream and the acknowledgement fallback race safely: exactly one receives each
+    /// queued resolution.
+    ///
+    /// One atomic load is the entire common-case cost — the buckets are empty whenever the Entry
+    /// finishes the constant-term pass before the shares that reference it arrive.
+    pub fn take_ready_resolutions(&self) -> Vec<ShareResolution<S::Pseudonym, S::AddressPrivateKey>> {
         if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) == 0 {
             return Vec::new();
         }
@@ -1310,21 +1352,10 @@ impl<S: PixSpec + Clone> SsaReconstructor<S> {
 impl<S: PixSpec> Drop for SsaReconstructor<S> {
     /// Reports terminal resolutions that were never collected.
     ///
-    /// `ready_resolutions` is a hand-off the *commitment* path fills and
-    /// only `acknowledge_shares` empties, so delivery waits on the next acknowledgement batch from
-    /// any peer. That is the common case and not the guaranteed one: a Session whose final cycle
-    /// recovers through the deferred-ack drain, and which then stops sending because the cycle it
-    /// was funding is complete, leaves the last resolution sitting here.
-    ///
-    /// Retirement is not the deadline — a retired cycle's resolution stays collectable, since the
-    /// buffer is global and its entries name their own `SsaId`. This is, and nothing here can
-    /// deliver: the commitment path has no route to the upper layer, which is why these were parked
-    /// rather than returned. So the most that can be done is to refuse to lose them quietly. A
-    /// `RecoveredSsa` reported here is a deposit key the Exit held and never handed on.
-    ///
-    /// The real fix is for the reconstructor to push rather than be pulled, which needs a sink on
-    /// its constructor; that is bundled with threading a real `SsaReconstructorConfig` through the
-    /// three sites in `hopr-transport` that hard-code `::default()`.
+    /// The transport normally drains this buffer as soon as the commitment path wakes it, with an
+    /// acknowledgement batch retained as a fallback consumer. Reaching `Drop` with anything left
+    /// therefore means every delivery route has gone away. A `RecoveredSsa` reported here is a
+    /// deposit key the Exit held and never handed on.
     fn drop(&mut self) {
         if self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) == 0 {
             return;
@@ -1343,12 +1374,11 @@ impl<S: PixSpec + Clone> ExitAcknowledgementShareProcessor<S> for SsaReconstruct
 
     fn has_pending_shares(&self, peer: &OffchainPublicKey) -> bool {
         // The parked-resolution check is not redundant with the per-peer one. Callers use this to
-        // skip `acknowledge_shares` entirely, and that is the only thing which ever collects
-        // `ready_resolutions` — a buffer the *commitment* path fills, holding terminal events up
-        // to and including a recovered deposit key. It is global rather than per-peer and its
-        // contents name their own `SsaId`, so any batch can correctly carry it out; gating it
-        // behind the producing peer's `awaiting_acks` entry, which expires on its own timer,
-        // would strand it for no reason.
+        // skip `acknowledge_shares` entirely. The transport notification stream is the primary
+        // consumer of `ready_resolutions`, but an acknowledgement batch remains a useful fallback
+        // if it wins the race to this global buffer. Its entries name their own `SsaId`, so any
+        // batch can correctly carry them out; gating collection behind the producing peer's
+        // `awaiting_acks` entry, which expires on its own timer, would strand them for no reason.
         self.ready_resolutions_len.load(std::sync::atomic::Ordering::Acquire) > 0
             || self.awaiting_acks.contains_key(peer)
     }
