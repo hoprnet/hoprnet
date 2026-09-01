@@ -1098,18 +1098,31 @@ mod tests {
         assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
     }
 
+    /// Unlike its siblings, this one has to assert on the message.
+    ///
+    /// Zero is rejected twice over: by the non-zero check, and by
+    /// `max_recovery_idle >= max_ack_await_time`, which `ZERO` also fails. `is_err()` cannot see
+    /// which fired, so with it the test stays green after the branch it names is deleted. The other
+    /// zero-value tests in this module target fields with no second guard and are sound as written.
     #[test]
     fn validation_rejects_zero_max_recovery_idle() {
         let mut cfg = valid_cfg();
         cfg.max_recovery_idle = Duration::ZERO;
-        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+        let msg = validate_pix_supervision(&cfg, &valid_rcn_cfg())
+            .expect_err("a zero idle deadline must be rejected")
+            .to_string();
+        assert!(msg.contains("max_recovery_idle must be non-zero"), "{msg}");
     }
 
+    /// Shadowed the same way: `ZERO` also fails `max_recovery_time > max_recovery_idle`.
     #[test]
     fn validation_rejects_zero_max_recovery_time() {
         let mut cfg = valid_cfg();
         cfg.max_recovery_time = Duration::ZERO;
-        assert!(validate_pix_supervision(&cfg, &valid_rcn_cfg()).is_err());
+        let msg = validate_pix_supervision(&cfg, &valid_rcn_cfg())
+            .expect_err("a zero hard deadline must be rejected")
+            .to_string();
+        assert!(msg.contains("max_recovery_time must be non-zero"), "{msg}");
     }
 
     #[test]
