@@ -637,6 +637,12 @@ pub struct SupervisorConfig {
     /// Unlike an absolute tolerance this does not have to grow with Session length or track the mixer
     /// configuration — it is a floor on evidence, evaluated once and then continuously.
     ///
+    /// Very large values can make this rule effectively inert for a Session. To disable share-order
+    /// enforcement intentionally, prefer
+    /// [`max_off_front_share_fraction = 1.0`](Self::max_off_front_share_fraction). No fixed upper bound
+    /// is enforced because the accounting window can span multiple successor batches before the front
+    /// advances.
+    ///
     /// Default: 16384 shares.
     #[default(16384)]
     pub min_share_order_sample: u64,
