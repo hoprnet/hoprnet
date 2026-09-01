@@ -866,34 +866,6 @@ pub fn validate_incoming_session_pix_config(
         )));
     }
 
-    // A share-order sample that no legal batch could ever reach is not a permissive setting, it is
-    // an inert one: `book_share_order_progress` judges the ratio only once
-    // `front_useful + off_front_useful` reaches the sample, and the counters reset whenever the
-    // front changes, so an unreachable sample silently disables the rule. This is a footgun check,
-    // not a security control — the value is a local dial, not something a peer supplies.
-    // `max_off_front_share_fraction = 1.0` remains the supported way to turn the rule off, and it is
-    // honest about it: a reader sees a tolerance of "everything". `u64::MAX` reads like strictness
-    // and behaves like absence, and that difference is the whole of what this catches.
-    //
-    // Measured against the *protocol's* widest dimensions rather than this Exit's configured quota,
-    // deliberately. A quota-relative bound would also reject the shipping default sample on any Exit
-    // whose accepted quota is small — the rule really is inert there, but so is
-    // `max_served_without_progress`, which gets no such check, and refusing to start over a degraded
-    // optional defence is out of proportion to the harm. Unlike a short `max_recovery_time`, which
-    // closes honest Sessions, this only fails to catch a cheat. So the bound is the one that has no
-    // false positives at all: past it, no configuration of any quota could make the rule fire.
-    let widest_conceivable_batch = (hopr_protocol_pix::MAX_POLYS_PER_SSA as u64)
-        .saturating_mul(hopr_protocol_pix::MAX_POLY_THRESHOLD as u64)
-        .saturating_mul(MAX_SSA_BATCH_SIZE as u64);
-    if cfg.supervision.min_share_order_sample > widest_conceivable_batch {
-        return Err(TransportSessionError::InvalidConfig(format!(
-            "PIX min_share_order_sample is {}, but the widest batch the protocol permits yields at most \
-             {widest_conceivable_batch} useful shares, so the share-order rule could never fire at any quota; use \
-             max_off_front_share_fraction = 1.0 to disable it deliberately",
-            cfg.supervision.min_share_order_sample,
-        )));
-    }
-
     let widest = max_cycle_budget_for_quota(*cfg.quota_range.end(), cfg.supervision.ssas_per_request);
     if cfg.max_live_cycle_bytes < widest {
         return Err(TransportSessionError::InvalidConfig(format!(

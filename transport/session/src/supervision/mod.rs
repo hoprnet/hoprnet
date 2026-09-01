@@ -637,18 +637,6 @@ pub struct SupervisorConfig {
     /// Unlike an absolute tolerance this does not have to grow with Session length or track the mixer
     /// configuration — it is a floor on evidence, evaluated once and then continuously.
     ///
-    /// Bounded above by
-    /// [`validate_incoming_session_pix_config`](crate::validate_incoming_session_pix_config), at the
-    /// widest batch the *protocol* permits. The counters reset whenever the front changes, so a
-    /// sample no batch can reach within one front never judges anything — the rule reads as strict
-    /// and behaves as absent. Turning the rule off is a supported choice, but the honest spelling of
-    /// it is [`max_off_front_share_fraction`](Self::max_off_front_share_fraction) `= 1.0`, which
-    /// says so.
-    ///
-    /// The bound is not relative to the Exit's own quota, so a small-quota Exit on this default
-    /// still starts even though the rule cannot fire there. That is a tuning question rather than a
-    /// misconfiguration, and it is shared with `max_served_without_progress`.
-    ///
     /// Default: 16384 shares.
     #[default(16384)]
     pub min_share_order_sample: u64,
